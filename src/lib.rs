@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 use pyo3::{create_exception, wrap_pyfunction};
 
 mod core;
+mod onion;
 mod utils;
 mod validators;
 
@@ -21,5 +22,6 @@ fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(validators::validate_str_full))?;
     m.add_wrapped(wrap_pyfunction!(validators::validate_str_recursive))?;
     m.add_class::<core::SchemaValidator>()?;
+    m.add_class::<onion::Onion>()?;
     Ok(())
 }
