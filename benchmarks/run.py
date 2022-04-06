@@ -42,7 +42,7 @@ def benchmark_str_validation():
     steps = 1_000
 
     for impl in impls:
-        print(f'\n{impl.__name__}:')
+        print(f'{impl.__name__} validate_str_recursive:')
         result = impl.validate_str_recursive(data, None, 50, True, False, True)
         # debug(result)
         if old_result:
@@ -55,7 +55,7 @@ def benchmark_str_validation():
             globals={'impl': impl, 'big_data': big_data},
             number=steps,
         )
-        print(f'    validate_str_recursive: {t / steps * 1_000_000:.2f}µs')
+        print(f'    {t / steps * 1_000_000:.2f}µs\n')
 
 
 def benchmark_regex():
@@ -65,7 +65,7 @@ def benchmark_regex():
     steps = 100_000
 
     for impl in impls:
-        print(f'\n{impl.__name__}:')
+        print(f'{impl.__name__}:')
         # https://stackoverflow.com/a/3809435/949890
         r = impl(
             r'https?://(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)'
@@ -77,9 +77,9 @@ def benchmark_regex():
             timeit.timeit('r.test("https://www.google.com")', globals={'r': r}, number=steps),
             timeit.timeit('r.test("foobar")', globals={'r': r}, number=steps),
         )
-        print(f'    regex: {mean(times) / steps * 1_000_000:.2f}µs')
+        print(f'    {mean(times) / steps * 1_000_000:.2f}µs\n')
 
 
 if __name__ == '__main__':
-    # benchmark_str_validation()
+    benchmark_str_validation()
     benchmark_regex()
