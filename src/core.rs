@@ -4,7 +4,7 @@ use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 
-macro_rules! dict_get {
+macro_rules! get_as {
     ($dict:ident, $key:expr, $type:ty) => {
         match $dict.get_item($key) {
             Some(t) => Some(<$type>::extract(t)?),
@@ -45,7 +45,7 @@ struct BooleanSchema {
 impl SchemaType for BooleanSchema {
     fn build(dict: &PyDict) -> PyResult<Self> {
         Ok(BooleanSchema {
-            const_: dict_get!(dict, "const", bool),
+            const_: get_as!(dict, "const", bool),
         })
     }
 
@@ -70,13 +70,13 @@ struct IntegerSchema {
 impl SchemaType for IntegerSchema {
     fn build(dict: &PyDict) -> PyResult<Self> {
         Ok(IntegerSchema {
-            enum_: dict_get!(dict, "enum", Vec<i64>),
-            const_: dict_get!(dict, "const", i64),
-            multiple_of: dict_get!(dict, "multiple_of", i64),
-            maximum: dict_get!(dict, "maximum", i64),
-            exclusive_maximum: dict_get!(dict, "exclusive_maximum", i64),
-            minimum: dict_get!(dict, "minimum", i64),
-            exclusive_minimum: dict_get!(dict, "exclusive_minimum", i64),
+            enum_: get_as!(dict, "enum", Vec<i64>),
+            const_: get_as!(dict, "const", i64),
+            multiple_of: get_as!(dict, "multiple_of", i64),
+            maximum: get_as!(dict, "maximum", i64),
+            exclusive_maximum: get_as!(dict, "exclusive_maximum", i64),
+            minimum: get_as!(dict, "minimum", i64),
+            exclusive_minimum: get_as!(dict, "exclusive_minimum", i64),
         })
     }
 
@@ -101,13 +101,13 @@ struct NumberSchema {
 impl SchemaType for NumberSchema {
     fn build(dict: &PyDict) -> PyResult<Self> {
         Ok(NumberSchema {
-            enum_: dict_get!(dict, "enum", Vec<f64>),
-            const_: dict_get!(dict, "const", f64),
-            multiple_of: dict_get!(dict, "multiple_of", f64),
-            minimum: dict_get!(dict, "minimum", f64),
-            exclusive_minimum: dict_get!(dict, "exclusive_minimum", f64),
-            maximum: dict_get!(dict, "maximum", f64),
-            exclusive_maximum: dict_get!(dict, "exclusive_maximum", f64),
+            enum_: get_as!(dict, "enum", Vec<f64>),
+            const_: get_as!(dict, "const", f64),
+            multiple_of: get_as!(dict, "multiple_of", f64),
+            minimum: get_as!(dict, "minimum", f64),
+            exclusive_minimum: get_as!(dict, "exclusive_minimum", f64),
+            maximum: get_as!(dict, "maximum", f64),
+            exclusive_maximum: get_as!(dict, "exclusive_maximum", f64),
         })
     }
 
@@ -130,11 +130,11 @@ struct StringSchema {
 impl SchemaType for StringSchema {
     fn build(dict: &PyDict) -> PyResult<Self> {
         Ok(StringSchema {
-            enum_: dict_get!(dict, "enum", Vec<String>),
-            const_: dict_get!(dict, "const", String),
-            pattern: dict_get!(dict, "pattern", String),
-            min_length: dict_get!(dict, "min_length", usize),
-            max_length: dict_get!(dict, "max_length", usize),
+            enum_: get_as!(dict, "enum", Vec<String>),
+            const_: get_as!(dict, "const", String),
+            pattern: get_as!(dict, "pattern", String),
+            min_length: get_as!(dict, "min_length", usize),
+            max_length: get_as!(dict, "max_length", usize),
         })
     }
 
@@ -180,24 +180,24 @@ struct ArraySchema {
 impl SchemaType for ArraySchema {
     fn build(dict: &PyDict) -> PyResult<Self> {
         Ok(ArraySchema {
-            enum_: dict_get!(dict, "enum", Vec<Schema>),
+            enum_: get_as!(dict, "enum", Vec<Schema>),
             items: match dict.get_item("items") {
-                Some(t) => Some(Box::new(Schema::extract(t)?)),
+                Some(t) => Some(Box::new(t.extract()?)),
                 None => None,
             },
-            prefix_items: dict_get!(dict, "prefix_items", Vec<Schema>),
+            prefix_items: get_as!(dict, "prefix_items", Vec<Schema>),
             contains: match dict.get_item("contains") {
-                Some(t) => Some(Box::new(Schema::extract(t)?)),
+                Some(t) => Some(Box::new(t.extract()?)),
                 None => None,
             },
             unique_items: match dict.get_item("unique_items") {
                 Some(t) => bool::extract(t)?,
                 None => false,
             },
-            min_items: dict_get!(dict, "min_items", usize),
-            max_items: dict_get!(dict, "max_items", usize),
-            min_contains: dict_get!(dict, "min_contains", usize),
-            max_contains: dict_get!(dict, "max_contains", usize),
+            min_items: get_as!(dict, "min_items", usize),
+            max_items: get_as!(dict, "max_items", usize),
+            min_contains: get_as!(dict, "min_contains", usize),
+            max_contains: get_as!(dict, "max_contains", usize),
         })
     }
 
@@ -264,7 +264,7 @@ impl SchemaType for ObjectSchema {
                         properties.push(SchemaProperty {
                             key: key.to_string(),
                             required: required.contains(&key.to_string()),
-                            schema: Schema::extract(value)?,
+                            schema: value.extract()?,
                             validator,
                         });
                     }
@@ -273,11 +273,11 @@ impl SchemaType for ObjectSchema {
                 None => Vec::new(),
             },
             additional_properties: match dict.get_item("additional_properties") {
-                Some(t) => Some(Box::new(Schema::extract(t)?)),
+                Some(t) => Some(Box::new(t.extract()?)),
                 None => None,
             },
-            min_properties: dict_get!(dict, "min_properties", usize),
-            max_properties: dict_get!(dict, "max_properties", usize),
+            min_properties: get_as!(dict, "min_properties", usize),
+            max_properties: get_as!(dict, "max_properties", usize),
         })
     }
 
@@ -320,7 +320,7 @@ enum Schema {
 
 impl SchemaType for Schema {
     fn build(dict: &PyDict) -> PyResult<Self> {
-        let type_ = match dict_get!(dict, "type", String) {
+        let type_ = match get_as!(dict, "type", String) {
             Some(type_) => type_,
             None => {
                 return Err(PyKeyError::new_err("'type' is required"));
@@ -367,8 +367,8 @@ pub struct SchemaValidator {
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    fn py_new(py: Python, schema: PyObject) -> PyResult<Self> {
-        let schema: Schema = schema.extract(py)?;
+    fn py_new(schema_dict: &PyDict) -> PyResult<Self> {
+        let schema = Schema::build(schema_dict)?;
         Ok(Self { schema })
     }
 
