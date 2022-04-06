@@ -1,6 +1,6 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyInt, PyList, PyString};
+use pyo3::types::{PyBytes, PyDict, PyFunction, PyInt, PyList, PyString};
 
 #[pyfunction]
 pub fn validate_str(v: &PyAny) -> PyResult<String> {
@@ -107,5 +107,63 @@ pub fn validate_str_recursive<'py>(
         validate_str_dict(py, dict, min_length, max_length, strip_whitespace, to_lower, to_upper)
     } else {
         validate_str_full(py, value, min_length, max_length, strip_whitespace, to_lower, to_upper)
+    }
+}
+
+#[pyclass]
+pub struct PyRegex {
+    full_match: PyObject,
+}
+
+#[pymethods]
+impl PyRegex {
+    #[new]
+    fn py_new(py: Python, regex_string: String) -> PyResult<Self> {
+        let re = py.import("re")?;
+        let re_compile: &PyFunction = re.getattr("compile")?.cast_as()?;
+        let regex = re_compile.call1((regex_string,))?;
+        let full_match = regex.getattr("fullmatch")?.to_object(py);
+        Ok(Self { full_match })
+    }
+
+    fn test(&self, py: Python, value: &PyAny) -> PyResult<bool> {
+        let match_result = self.full_match.call1(py, (value,))?;
+        Ok(!match_result.is_none(py))
+    }
+}
+
+#[pyclass]
+pub struct RustRegex {
+    regex: regex::Regex,
+}
+
+#[pymethods]
+impl RustRegex {
+    #[new]
+    fn py_new(regex_string: String) -> PyResult<Self> {
+        let regex = regex::Regex::new(&regex_string).unwrap();
+        Ok(Self { regex })
+    }
+
+    fn test(&self, value: String) -> bool {
+        self.regex.is_match(value.as_str())
+    }
+}
+
+#[pyclass]
+pub struct OnigRegex {
+    regex: onig::Regex,
+}
+
+#[pymethods]
+impl OnigRegex {
+    #[new]
+    fn py_new(regex_string: String) -> PyResult<Self> {
+        let regex = onig::Regex::new(&regex_string).unwrap();
+        Ok(Self { regex })
+    }
+
+    fn test(&self, value: String) -> bool {
+        self.regex.is_match(value.as_str())
     }
 }

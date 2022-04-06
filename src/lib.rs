@@ -1,4 +1,6 @@
+extern crate onig;
 extern crate pyo3;
+extern crate regex;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -19,5 +21,8 @@ fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(validators::validate_str_full))?;
     m.add_wrapped(wrap_pyfunction!(validators::validate_str_recursive))?;
     m.add_class::<core::SchemaValidator>()?;
+    m.add_class::<validators::PyRegex>()?;
+    m.add_class::<validators::RustRegex>()?;
+    m.add_class::<validators::OnigRegex>()?;
     Ok(())
 }
