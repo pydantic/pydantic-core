@@ -4,11 +4,11 @@ use pyo3::types::{PyBytes, PyDict, PyInt, PyList, PyString};
 
 #[pyfunction]
 pub fn validate_str(v: &PyAny) -> PyResult<String> {
-    if let Ok(str) = v.cast_as::<PyString>() {
+    if let Ok(str) = v.extract::<&PyString>() {
         str.extract()
-    } else if let Ok(bytes) = v.cast_as::<PyBytes>() {
+    } else if let Ok(bytes) = v.extract::<&PyBytes>() {
         Ok(std::str::from_utf8(bytes.as_bytes())?.to_string())
-    } else if let Ok(int) = v.cast_as::<PyInt>() {
+    } else if let Ok(int) = v.extract::<&PyInt>() {
         Ok(i64::extract(int)?.to_string())
     } else if let Ok(float) = f64::extract(v) {
         // don't cast_as here so Decimals are covered - internally f64:extract uses PyFloat_AsDouble
@@ -101,9 +101,9 @@ pub fn validate_str_recursive<'py>(
     to_lower: bool,
     to_upper: bool,
 ) -> PyResult<&'py PyAny> {
-    if let Ok(list) = value.cast_as::<PyList>() {
+    if let Ok(list) = value.extract::<&PyList>() {
         validate_str_list(py, list, min_length, max_length, strip_whitespace, to_lower, to_upper)
-    } else if let Ok(dict) = value.cast_as::<PyDict>() {
+    } else if let Ok(dict) = value.extract::<&PyDict>() {
         validate_str_dict(py, dict, min_length, max_length, strip_whitespace, to_lower, to_upper)
     } else {
         validate_str_full(py, value, min_length, max_length, strip_whitespace, to_lower, to_upper)
