@@ -6,7 +6,6 @@ from statistics import mean
 from devtools import debug
 
 
-
 def benchmark_str_validation():
     import plain_validators
     from pydantic_core import _pydantic_core as rust
@@ -76,15 +75,18 @@ def benchmark_onion():
     import plain_onion
     from pydantic_core import _pydantic_core as rust
 
-    impls = plain_onion, rust
+    impls = [
+        # (plain_onion, plain_onion.functions + [rust.validate_str]),
+        (rust, plain_onion.functions[:1]),
+    ]
 
     old_result = None
     steps = 10_000
-    functions = plain_onion.functions
 
-    for impl in impls:
+    for (impl, functions) in impls:
         print(f'{impl.__name__} Onion:')
         onion = impl.Onion(functions)
+        debug(onion)
         result = onion(' Hello')
         debug(result)
         if old_result:

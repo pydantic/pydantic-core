@@ -1,4 +1,5 @@
 from functools import partial
+from pydantic_core._pydantic_core import validate_str
 
 
 class Onion:
@@ -29,7 +30,7 @@ def strip_whitespace(value, handler):
 
 
 def prepend(value, handler):
-    return handler('x' + value)
+    return 'x' + handler(value)
 
 
-functions = [prepend, strip_whitespace, max_length, to_str]
+functions = [prepend, strip_whitespace, max_length]
