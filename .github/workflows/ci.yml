@@ -73,14 +73,10 @@ jobs:
     - run: pip freeze
 
     - run: make test
-      env:
-        LLVM_PROFILE_FILE: 'rust_coverage.profraw'
 
     - run: coverage xml
 
-    - run: ls -alh
-    - run: ./tests/prepare_coverage.sh
-    - run: ls -alh
+    - run: ./tests/prepare_rust_coverage.sh
 
     - uses: codecov/codecov-action@v2
       with:
