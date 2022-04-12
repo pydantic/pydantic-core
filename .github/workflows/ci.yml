@@ -40,6 +40,8 @@ jobs:
     - run: cargo install cargo-binutils
       if: steps.cache-rust.outputs.cache-hit != 'true'
 
+    - run: cargo install rustfilt
+
     - run: rustup component add llvm-tools-preview
       if: steps.cache-rust.outputs.cache-hit != 'true'
 
