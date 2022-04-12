@@ -70,7 +70,7 @@ impl Validator for ModelValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &PyAny, _data: &PyDict) -> ValResult<PyObject> {
+    fn validate(&self, py: Python, input: &PyAny, _data: Option<&PyDict>) -> ValResult<PyObject> {
         let dict: &PyDict = validate_dict(py, input)?;
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
@@ -78,7 +78,7 @@ impl Validator for ModelValidator {
 
         for field in &self.fields {
             if let Some(value) = dict.get_item(&field.name) {
-                match field.validator.validate(py, value, output_dict) {
+                match field.validator.validate(py, value, Some(output_dict)) {
                     Ok(value) => output_dict.set_item(&field.name, value).map_err(as_internal)?,
                     Err(ValError::LineErrors(line_errors)) => {
                         let loc = vec![LocItem::S(field.name.clone())];
@@ -136,7 +136,7 @@ impl Validator for ModelValidator {
                         location = loc
                     ));
                 } else if let Some(ref validator) = self.extra_validator {
-                    match validator.validate(py, value, output_dict) {
+                    match validator.validate(py, value, Some(output_dict)) {
                         Ok(value) => output_dict.set_item(&key, value).map_err(as_internal)?,
                         Err(ValError::LineErrors(line_errors)) => {
                             for err in line_errors {

@@ -70,7 +70,6 @@ lazy_static! {
     static ref BOOL_TRUE_CELL: HashSet<&'static str> = HashSet::from(["1", "on", "t", "true", "y", "yes"]);
 }
 
-/// Util
 fn _maybe_as_string(py: Python, v: &PyAny, unicode_error: ErrorKind) -> ValResult<Option<String>> {
     if let Ok(str) = v.extract::<String>() {
         Ok(Some(str))

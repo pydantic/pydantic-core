@@ -39,8 +39,8 @@ impl FunctionBeforeValidator {
 impl Validator for FunctionBeforeValidator {
     build!();
 
-    fn validate(&self, py: Python, input: &PyAny, data: &PyDict) -> ValResult<PyObject> {
-        let kwargs = kwargs!(py, "data" => data.as_ref(), "config" => self.config.as_ref());
+    fn validate(&self, py: Python, input: &PyAny, data: Option<&PyDict>) -> ValResult<PyObject> {
+        let kwargs = kwargs!(py, "data" => data, "config" => &self.config);
         let value = self
             .func
             .call(py, (input,), kwargs)
@@ -68,9 +68,9 @@ impl FunctionAfterValidator {
 impl Validator for FunctionAfterValidator {
     build!();
 
-    fn validate(&self, py: Python, input: &PyAny, data: &PyDict) -> ValResult<PyObject> {
+    fn validate(&self, py: Python, input: &PyAny, data: Option<&PyDict>) -> ValResult<PyObject> {
         let v = self.validator.validate(py, input, data)?;
-        let kwargs = kwargs!(py, "data" => data.as_ref(), "config" => self.config.as_ref());
+        let kwargs = kwargs!(py, "data" => data, "config" => &self.config);
         self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
     }
 
@@ -97,8 +97,8 @@ impl Validator for FunctionPlainValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &PyAny, data: &PyDict) -> ValResult<PyObject> {
-        let kwargs = kwargs!(py, "data" => data.as_ref(), "config" => self.config.as_ref());
+    fn validate(&self, py: Python, input: &PyAny, data: Option<&PyDict>) -> ValResult<PyObject> {
+        let kwargs = kwargs!(py, "data" => data, "config" => &self.config);
         self.func
             .call(py, (input,), kwargs)
             .map_err(|e| convert_err(py, e, input))
@@ -123,16 +123,16 @@ impl FunctionWrapValidator {
 impl Validator for FunctionWrapValidator {
     build!();
 
-    fn validate(&self, py: Python, input: &PyAny, data: &PyDict) -> ValResult<PyObject> {
+    fn validate(&self, py: Python, input: &PyAny, data: Option<&PyDict>) -> ValResult<PyObject> {
         let validator_kwarg = ValidatorCallable {
             validator: self.validator.clone(),
-            data: data.into_py(py),
+            data: data.map(|d| d.into_py(py)),
         };
         let kwargs = kwargs!(
             py,
             "validator" => validator_kwarg,
-            "data" => data.as_ref(),
-            "config" => self.config.as_ref()
+            "data" => data,
+            "config" => &self.config
         );
         self.func
             .call(py, (input,), kwargs)
@@ -148,13 +148,14 @@ impl Validator for FunctionWrapValidator {
 #[derive(Debug, Clone)]
 pub struct ValidatorCallable {
     validator: Box<dyn Validator>,
-    data: Py<PyDict>,
+    data: Option<Py<PyDict>>,
 }
 
 #[pymethods]
 impl ValidatorCallable {
     fn __call__(&self, py: Python, arg: &PyAny) -> PyResult<PyObject> {
-        match self.validator.validate(py, arg, self.data.as_ref(py)) {
+        let data = self.data.as_ref().map(|data| data.as_ref(py));
+        match self.validator.validate(py, arg, data) {
             Ok(output) => Ok(output),
             Err(ValError::LineErrors(line_errors)) => Err(ValidationError::new_err((line_errors, "Model".to_string()))),
             Err(ValError::InternalErr(err)) => Err(err),

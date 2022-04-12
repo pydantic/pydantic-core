@@ -18,7 +18,7 @@ impl Validator for IntValidator {
         Ok(Box::new(Self))
     }
 
-    fn validate(&self, py: Python, input: &PyAny, _data: &PyDict) -> ValResult<PyObject> {
+    fn validate(&self, py: Python, input: &PyAny, _data: Option<&PyDict>) -> ValResult<PyObject> {
         Ok(validate_int(py, input)?.into_py(py))
     }
 
@@ -51,7 +51,7 @@ impl Validator for IntConstrainedValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &PyAny, _data: &PyDict) -> ValResult<PyObject> {
+    fn validate(&self, py: Python, input: &PyAny, _data: Option<&PyDict>) -> ValResult<PyObject> {
         let int = validate_int(py, input)?;
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {

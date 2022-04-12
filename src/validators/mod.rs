@@ -35,7 +35,7 @@ impl SchemaValidator {
     }
 
     fn run(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
-        match self.validator.validate(py, input, PyDict::new(py)) {
+        match self.validator.validate(py, input, None) {
             Ok(obj) => Ok(obj),
             Err(ValError::LineErrors(line_errors)) => Err(ValidationError::new_err((line_errors, self.title.clone()))),
             Err(ValError::InternalErr(err)) => Err(err),
@@ -112,7 +112,7 @@ pub trait Validator: Send + fmt::Debug {
         Self: Sized;
 
     /// Do the actual validation for this schema/type
-    fn validate(&self, py: Python, input: &PyAny, data: &PyDict) -> ValResult<PyObject>;
+    fn validate(&self, py: Python, input: &PyAny, data: Option<&PyDict>) -> ValResult<PyObject>;
 
     /// Ugly, but this has to be duplicated on all types to allow for cloning of validators,
     /// cloning is required to allow the SchemaValidator to be passed around in python
