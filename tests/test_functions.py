@@ -97,7 +97,7 @@ def test_config_no_model():
     v = SchemaValidator({'type': 'function-after', 'function': f, 'field': {'type': 'str'}, 'title': 'Test'})
 
     assert v.run(123) == '123 Changed'
-    assert f_kwargs == {'data': {}, 'config': None}
+    assert f_kwargs == {'data': None, 'config': None}
 
 
 def test_function_plain():

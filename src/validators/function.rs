@@ -40,7 +40,7 @@ impl Validator for FunctionBeforeValidator {
     build!();
 
     fn validate(&self, py: Python, input: &PyAny, data: Option<&PyDict>) -> ValResult<PyObject> {
-        let kwargs = kwargs!(py, "data" => data, "config" => &self.config);
+        let kwargs = kwargs!(py, "data" => data, "config" => self.config.as_ref());
         let value = self
             .func
             .call(py, (input,), kwargs)
@@ -74,7 +74,7 @@ impl Validator for FunctionAfterValidator {
 
     fn validate(&self, py: Python, input: &PyAny, data: Option<&PyDict>) -> ValResult<PyObject> {
         let v = self.validator.validate(py, input, data)?;
-        let kwargs = kwargs!(py, "data" => data, "config" => &self.config);
+        let kwargs = kwargs!(py, "data" => data, "config" => self.config.as_ref());
         self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
     }
 
@@ -106,7 +106,7 @@ impl Validator for FunctionPlainValidator {
     }
 
     fn validate(&self, py: Python, input: &PyAny, data: Option<&PyDict>) -> ValResult<PyObject> {
-        let kwargs = kwargs!(py, "data" => data, "config" => &self.config);
+        let kwargs = kwargs!(py, "data" => data, "config" => self.config.as_ref());
         self.func
             .call(py, (input,), kwargs)
             .map_err(|e| convert_err(py, e, input))
@@ -144,7 +144,7 @@ impl Validator for FunctionWrapValidator {
             py,
             "validator" => validator_kwarg,
             "data" => data,
-            "config" => &self.config
+            "config" => self.config.as_ref()
         );
         self.func
             .call(py, (input,), kwargs)
