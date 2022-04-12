@@ -23,6 +23,10 @@ impl Validator for BoolValidator {
         Ok(validate_bool(py, input)?.into_py(py))
     }
 
+    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
+        self.validate(py, input, None)
+    }
+
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }

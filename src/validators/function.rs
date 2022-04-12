@@ -2,8 +2,8 @@ use pyo3::exceptions::{PyAssertionError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
-use super::{ValError, ValidationError, Validator};
-use crate::errors::{val_line_error, ErrorKind, ValResult};
+use super::{ValError, Validator};
+use crate::errors::{map_validation_error, val_line_error, ErrorKind, ValResult};
 use crate::utils::{dict, dict_get_required, py_error};
 use crate::validators::build_validator;
 
@@ -49,6 +49,10 @@ impl Validator for FunctionBeforeValidator {
         self.validator.validate(py, v, data)
     }
 
+    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
+        self.validate(py, input, None)
+    }
+
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -72,6 +76,10 @@ impl Validator for FunctionAfterValidator {
         let v = self.validator.validate(py, input, data)?;
         let kwargs = kwargs!(py, "data" => data, "config" => &self.config);
         self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
+    }
+
+    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
+        self.validate(py, input, None)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -102,6 +110,10 @@ impl Validator for FunctionPlainValidator {
         self.func
             .call(py, (input,), kwargs)
             .map_err(|e| convert_err(py, e, input))
+    }
+
+    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
+        self.validate(py, input, None)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -139,6 +151,10 @@ impl Validator for FunctionWrapValidator {
             .map_err(|e| convert_err(py, e, input))
     }
 
+    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
+        self.validate(py, input, None)
+    }
+
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -155,11 +171,9 @@ pub struct ValidatorCallable {
 impl ValidatorCallable {
     fn __call__(&self, py: Python, arg: &PyAny) -> PyResult<PyObject> {
         let data = self.data.as_ref().map(|data| data.as_ref(py));
-        match self.validator.validate(py, arg, data) {
-            Ok(output) => Ok(output),
-            Err(ValError::LineErrors(line_errors)) => Err(ValidationError::new_err((line_errors, "Model".to_string()))),
-            Err(ValError::InternalErr(err)) => Err(err),
-        }
+        self.validator
+            .validate(py, arg, data)
+            .map_err(|e| map_validation_error("Model", e))
     }
 
     fn __repr__(&self) -> String {

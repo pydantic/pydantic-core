@@ -52,3 +52,11 @@ def test_str_config():
 
     with pytest.raises(ValidationError, match='String must have at most 5 characters'):
         v.run({'field_a': 'test long'})
+
+
+def test_validate_assignment():
+    v = SchemaValidator({'type': 'model', 'fields': {'field_a': {'type': 'str'}}})
+
+    assert v.run({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
+
+    assert v.run_assignment('field_a', 456) == '456'

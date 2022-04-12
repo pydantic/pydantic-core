@@ -35,5 +35,5 @@ repos:
   - id: run-tests
     name: Run Tests
     entry: make testcov
-    types: [rust, python]
+    types_or: [rust, python]
     language: system

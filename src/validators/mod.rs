@@ -3,7 +3,7 @@ use std::fmt;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
-use crate::errors::{ValError, ValResult, ValidationError};
+use crate::errors::{map_validation_error, ValError, ValResult};
 use crate::utils::{dict_get, dict_get_required, py_error};
 
 mod bool;
@@ -35,11 +35,13 @@ impl SchemaValidator {
     }
 
     fn run(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
-        match self.validator.validate(py, input, None) {
-            Ok(obj) => Ok(obj),
-            Err(ValError::LineErrors(line_errors)) => Err(ValidationError::new_err((line_errors, self.title.clone()))),
-            Err(ValError::InternalErr(err)) => Err(err),
-        }
+        let r = self.validator.validate(py, input, None);
+        r.map_err(|e| map_validation_error(&self.title, e))
+    }
+
+    fn run_assignment(&self, py: Python, field: String, input: &PyAny) -> PyResult<PyObject> {
+        let r = self.validator.validate_assignment(py, field, input);
+        r.map_err(|e| map_validation_error(&self.title, e))
     }
 
     fn __repr__(&self) -> String {
@@ -113,6 +115,9 @@ pub trait Validator: Send + fmt::Debug {
 
     /// Do the actual validation for this schema/type
     fn validate(&self, py: Python, input: &PyAny, data: Option<&PyDict>) -> ValResult<PyObject>;
+
+    /// Will be used by `__setattr__` in python as per the `validate_assignment` config setting
+    fn validate_assignment(&self, py: Python, field: String, input: &PyAny) -> ValResult<PyObject>;
 
     /// Ugly, but this has to be duplicated on all types to allow for cloning of validators,
     /// cloning is required to allow the SchemaValidator to be passed around in python

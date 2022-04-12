@@ -39,6 +39,10 @@ impl Validator for StrValidator {
         ValResult::Ok(s.into_py(py))
     }
 
+    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
+        self.validate(py, input, None)
+    }
+
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -153,6 +157,10 @@ impl Validator for StrConstrainedValidator {
         }
         let py_str = PyString::new(py, &str);
         ValResult::Ok(py_str.into_py(py))
+    }
+
+    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
+        self.validate(py, input, None)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

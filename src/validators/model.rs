@@ -2,7 +2,9 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use super::{build_validator, Validator};
-use crate::errors::{as_internal, val_line_error, ErrorKind, LocItem, ValError, ValLineError, ValResult};
+use crate::errors::{
+    as_internal, err_val_error, val_line_error, ErrorKind, LocItem, ValError, ValLineError, ValResult,
+};
 use crate::standalone_validators::validate_dict;
 use crate::utils::{dict_get, py_error};
 use std::collections::HashSet;
@@ -156,6 +158,30 @@ impl Validator for ModelValidator {
             Ok((output_dict, fields_set).to_object(py))
         } else {
             Err(ValError::LineErrors(errors))
+        }
+    }
+
+    fn validate_assignment(&self, py: Python, field: String, input: &PyAny) -> ValResult<PyObject> {
+        // TODO we don't set location on errors here, is that correct?
+        let field = self.fields.iter().find(|f| f.name == field);
+        match field {
+            Some(field) => {
+                let output = field.validator.validate(py, input, None)?;
+                Ok(output.to_object(py))
+            }
+            None => {
+                match self.extra_behavior {
+                    // with allow we either want to set the value
+                    ExtraBehavior::Allow => match self.extra_validator {
+                        Some(ref validator) => validator.validate(py, input, None),
+                        None => Ok(input.to_object(py)),
+                    },
+                    // otherwise we raise an error:
+                    // - with forbid this is obvious
+                    // - with ignore the model should not be overloaded
+                    _ => err_val_error!(py, input, kind = ErrorKind::ExtraForbidden),
+                }
+            }
         }
     }
 
