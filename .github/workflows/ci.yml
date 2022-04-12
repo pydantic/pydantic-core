@@ -38,10 +38,10 @@ jobs:
       uses: Swatinem/rust-cache@v1
 
     - run: cargo install cargo-binutils
+      if: steps.cache-rust.outputs.cache-hit != 'true'
 
     - run: rustup component add llvm-tools-preview
-
-    - run: make test
+      if: steps.cache-rust.outputs.cache-hit != 'true'
 
     - name: set up python
       uses: actions/setup-python@v3
