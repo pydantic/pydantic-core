@@ -41,6 +41,7 @@ jobs:
       if: steps.cache-rust.outputs.cache-hit != 'true'
 
     - run: cargo install rustfilt
+      if: steps.cache-rust.outputs.cache-hit != 'true'
 
     - run: rustup component add llvm-tools-preview
       if: steps.cache-rust.outputs.cache-hit != 'true'
@@ -73,6 +74,8 @@ jobs:
     - run: pip freeze
 
     - run: make test
+      env:
+        LLVM_PROFILE_FILE: 'rust_coverage.profraw'
 
     - run: coverage xml
 
