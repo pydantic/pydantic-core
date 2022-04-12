@@ -44,7 +44,6 @@ jobs:
       if: steps.cache-rust.outputs.cache-hit != 'true'
 
     - run: rustup component add llvm-tools-preview
-      if: steps.cache-rust.outputs.cache-hit != 'true'
 
     - name: set up python
       uses: actions/setup-python@v3
