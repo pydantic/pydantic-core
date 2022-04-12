@@ -6,3 +6,5 @@ rust-cov export -Xdemangler=rustfilt $(ls pydantic_core/*.so) \
     --ignore-filename-regex='/.cargo/registry' \
     --ignore-filename-regex='library/std' \
     -format=lcov > rust_coverage.lcov
+
+rm rust_coverage.profraw rust_coverage.profdata
