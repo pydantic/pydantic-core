@@ -39,8 +39,8 @@ impl SchemaValidator {
         r.map_err(|e| map_validation_error(&self.title, e))
     }
 
-    fn run_assignment(&self, py: Python, field: String, input: &PyAny) -> PyResult<PyObject> {
-        let r = self.validator.validate_assignment(py, field, input);
+    fn run_assignment(&self, py: Python, field: String, input: &PyAny, data: Option<&PyDict>) -> PyResult<PyObject> {
+        let r = self.validator.validate_assignment(py, field, input, data);
         r.map_err(|e| map_validation_error(&self.title, e))
     }
 
@@ -117,7 +117,13 @@ pub trait Validator: Send + fmt::Debug {
     fn validate(&self, py: Python, input: &PyAny, data: Option<&PyDict>) -> ValResult<PyObject>;
 
     /// Will be used by `__setattr__` in python as per the `validate_assignment` config setting
-    fn validate_assignment(&self, py: Python, field: String, input: &PyAny) -> ValResult<PyObject>;
+    fn validate_assignment(
+        &self,
+        py: Python,
+        field: String,
+        input: &PyAny,
+        data: Option<&PyDict>,
+    ) -> ValResult<PyObject>;
 
     /// Ugly, but this has to be duplicated on all types to allow for cloning of validators,
     /// cloning is required to allow the SchemaValidator to be passed around in python

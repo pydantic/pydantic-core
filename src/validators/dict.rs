@@ -76,8 +76,14 @@ impl Validator for DictValidator {
         }
     }
 
-    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
-        self.validate(py, input, None)
+    fn validate_assignment(
+        &self,
+        py: Python,
+        _field: String,
+        input: &PyAny,
+        data: Option<&PyDict>,
+    ) -> ValResult<PyObject> {
+        self.validate(py, input, data)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

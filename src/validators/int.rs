@@ -22,8 +22,14 @@ impl Validator for IntValidator {
         Ok(validate_int(py, input)?.into_py(py))
     }
 
-    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
-        self.validate(py, input, None)
+    fn validate_assignment(
+        &self,
+        py: Python,
+        _field: String,
+        input: &PyAny,
+        data: Option<&PyDict>,
+    ) -> ValResult<PyObject> {
+        self.validate(py, input, data)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -105,8 +111,14 @@ impl Validator for IntConstrainedValidator {
         Ok(int.into_py(py))
     }
 
-    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
-        self.validate(py, input, None)
+    fn validate_assignment(
+        &self,
+        py: Python,
+        _field: String,
+        input: &PyAny,
+        data: Option<&PyDict>,
+    ) -> ValResult<PyObject> {
+        self.validate(py, input, data)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

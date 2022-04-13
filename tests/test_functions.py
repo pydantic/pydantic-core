@@ -108,3 +108,21 @@ def test_function_plain():
 
     assert v.run(1) == 2
     assert v.run('x') == 'xx'
+
+
+@pytest.mark.skip(reason='WIP')
+def test_validate_assignment():
+    def f(input_value, **kwargs):
+        data, fields_set = input_value
+        data['more'] = 'foobar'
+        return input_value
+
+    v = SchemaValidator(
+        {'type': 'function-after', 'function': f, 'field': {'type': 'model', 'fields': {'field_a': {'type': 'str'}}}}
+    )
+
+    # debug(v.run({'field_a': 'test'}))
+    m = {'field_a': 'test', 'more': 'foobar'}
+    assert v.run({'field_a': 'test'}) == (m, {'field_a'})
+    # debug(v.run_assignment('field_a', 456, m))
+    # assert v.run_assignment('field_a', 456) == '456456'

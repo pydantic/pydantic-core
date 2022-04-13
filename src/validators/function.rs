@@ -49,8 +49,14 @@ impl Validator for FunctionBeforeValidator {
         self.validator.validate(py, v, data)
     }
 
-    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
-        self.validate(py, input, None)
+    fn validate_assignment(
+        &self,
+        py: Python,
+        _field: String,
+        input: &PyAny,
+        data: Option<&PyDict>,
+    ) -> ValResult<PyObject> {
+        self.validate(py, input, data)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -78,8 +84,16 @@ impl Validator for FunctionAfterValidator {
         self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
     }
 
-    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
-        self.validate(py, input, None)
+    fn validate_assignment(
+        &self,
+        py: Python,
+        field: String,
+        input: &PyAny,
+        data: Option<&PyDict>,
+    ) -> ValResult<PyObject> {
+        let v = self.validator.validate_assignment(py, field, input, data)?;
+        let kwargs = kwargs!(py, "data" => data, "config" => self.config.as_ref());
+        self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -112,8 +126,14 @@ impl Validator for FunctionPlainValidator {
             .map_err(|e| convert_err(py, e, input))
     }
 
-    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
-        self.validate(py, input, None)
+    fn validate_assignment(
+        &self,
+        py: Python,
+        _field: String,
+        input: &PyAny,
+        data: Option<&PyDict>,
+    ) -> ValResult<PyObject> {
+        self.validate(py, input, data)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -151,8 +171,14 @@ impl Validator for FunctionWrapValidator {
             .map_err(|e| convert_err(py, e, input))
     }
 
-    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
-        self.validate(py, input, None)
+    fn validate_assignment(
+        &self,
+        py: Python,
+        _field: String,
+        input: &PyAny,
+        data: Option<&PyDict>,
+    ) -> ValResult<PyObject> {
+        self.validate(py, input, data)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

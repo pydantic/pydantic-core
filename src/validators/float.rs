@@ -22,8 +22,14 @@ impl Validator for FloatValidator {
         Ok(validate_float(py, obj)?.into_py(py))
     }
 
-    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
-        self.validate(py, input, None)
+    fn validate_assignment(
+        &self,
+        py: Python,
+        _field: String,
+        input: &PyAny,
+        data: Option<&PyDict>,
+    ) -> ValResult<PyObject> {
+        self.validate(py, input, data)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -110,8 +116,14 @@ impl Validator for FloatConstrainedValidator {
         Ok(float.into_py(py))
     }
 
-    fn validate_assignment(&self, py: Python, _field: String, input: &PyAny) -> ValResult<PyObject> {
-        self.validate(py, input, None)
+    fn validate_assignment(
+        &self,
+        py: Python,
+        _field: String,
+        input: &PyAny,
+        data: Option<&PyDict>,
+    ) -> ValResult<PyObject> {
+        self.validate(py, input, data)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

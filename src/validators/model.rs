@@ -161,8 +161,14 @@ impl Validator for ModelValidator {
         }
     }
 
-    fn validate_assignment(&self, py: Python, field: String, input: &PyAny) -> ValResult<PyObject> {
-        // TODO we don't set location on errors here, is that correct?
+    fn validate_assignment(
+        &self,
+        py: Python,
+        field: String,
+        input: &PyAny,
+        _data: Option<&PyDict>,
+    ) -> ValResult<PyObject> {
+        // TODO probably we should set location on errors here
         let field = self.fields.iter().find(|f| f.name == field);
         match field {
             Some(field) => {
