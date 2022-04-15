@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyString};
 
-use super::Validator;
+use super::{Extra, Validator};
 use crate::errors::{context, err_val_error, ErrorKind, ValResult};
 use crate::standalone_validators::validate_str;
 use crate::utils::{dict_get, RegexPattern};
@@ -34,19 +34,9 @@ impl Validator for StrValidator {
         }
     }
 
-    fn validate(&self, py: Python, input: &PyAny, _data: Option<&PyDict>) -> ValResult<PyObject> {
+    fn validate(&self, py: Python, input: &PyAny, _extra: &Extra) -> ValResult<PyObject> {
         let s = validate_str(py, input)?;
         ValResult::Ok(s.into_py(py))
-    }
-
-    fn validate_assignment(
-        &self,
-        py: Python,
-        _field: String,
-        input: &PyAny,
-        data: Option<&PyDict>,
-    ) -> ValResult<PyObject> {
-        self.validate(py, input, data)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -118,7 +108,7 @@ impl Validator for StrConstrainedValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &PyAny, _data: Option<&PyDict>) -> ValResult<PyObject> {
+    fn validate(&self, py: Python, input: &PyAny, _extra: &Extra) -> ValResult<PyObject> {
         let mut str = validate_str(py, input)?;
         if let Some(min_length) = self.min_length {
             if str.len() < min_length {
@@ -163,16 +153,6 @@ impl Validator for StrConstrainedValidator {
         }
         let py_str = PyString::new(py, &str);
         ValResult::Ok(py_str.into_py(py))
-    }
-
-    fn validate_assignment(
-        &self,
-        py: Python,
-        _field: String,
-        input: &PyAny,
-        data: Option<&PyDict>,
-    ) -> ValResult<PyObject> {
-        self.validate(py, input, data)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

@@ -59,4 +59,4 @@ def test_validate_assignment():
 
     assert v.run({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
 
-    assert v.run_assignment('field_a', 456) == '456'
+    assert v.run_assignment('field_a', 456, {'field_a': 'test'}) == ({'field_a': '456'}, {'field_a'})
