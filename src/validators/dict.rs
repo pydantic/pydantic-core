@@ -3,8 +3,8 @@ use pyo3::types::PyDict;
 
 use super::{build_validator, Extra, Validator};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, LocItem, ValError, ValLineError, ValResult};
+use crate::input::{Input, ToPy};
 use crate::utils::dict_get;
-use crate::validate::Validate;
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
@@ -34,7 +34,7 @@ impl Validator for DictValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &PyAny, extra: &Extra) -> ValResult<PyObject> {
+    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
         let dict = input.validate_dict(py)?;
         if let Some(min_length) = self.min_items {
             if dict.len() < min_length {

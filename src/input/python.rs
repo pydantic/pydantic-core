@@ -1,25 +1,23 @@
 use std::collections::HashSet;
-use std::fmt;
 use std::str::from_utf8;
 
 use lazy_static::lazy_static;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyList, PyString};
 
+use super::traits::{Input, ToPy};
 use crate::errors::{as_internal, err_val_error, ErrorKind, ValResult};
 
-pub trait Validate: fmt::Debug {
-    fn validate_str(&self, py: Python) -> ValResult<String>;
+impl ToPy for PyDict {
+    fn to_py(&self, py: Python) -> PyObject {
+        self.into_py(py)
+    }
+}
 
-    fn validate_bool(&self, py: Python) -> ValResult<bool>;
-
-    fn validate_int(&self, py: Python) -> ValResult<i64>;
-
-    fn validate_float(&self, py: Python) -> ValResult<f64>;
-
-    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyDict>;
-
-    fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyList>;
+impl ToPy for PyAny {
+    fn to_py(&self, py: Python) -> PyObject {
+        self.into_py(py)
+    }
 }
 
 lazy_static! {
@@ -30,7 +28,15 @@ lazy_static! {
     static ref BOOL_TRUE_CELL: HashSet<&'static str> = HashSet::from(["1", "on", "t", "true", "y", "yes"]);
 }
 
-impl Validate for PyAny {
+impl Input for PyAny {
+    fn validate_none(&self, py: Python) -> ValResult<()> {
+        if self.is_none() {
+            Ok(())
+        } else {
+            err_val_error!(py, self, kind = ErrorKind::NoneRequired)
+        }
+    }
+
     fn validate_str(&self, py: Python) -> ValResult<String> {
         if let Ok(py_str) = self.cast_as::<PyString>() {
             py_str.extract().map_err(as_internal)

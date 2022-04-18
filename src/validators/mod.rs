@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
 use crate::errors::{map_validation_error, ValError, ValResult};
+use crate::input::Input;
 use crate::utils::{dict_get, dict_get_required, py_error};
 
 mod bool;
@@ -133,7 +134,7 @@ pub trait Validator: Send + fmt::Debug {
         Self: Sized;
 
     /// Do the actual validation for this schema/type
-    fn validate(&self, py: Python, input: &PyAny, extra: &Extra) -> ValResult<PyObject>;
+    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject>;
 
     /// Ugly, but this has to be duplicated on all types to allow for cloning of validators,
     /// cloning is required to allow the SchemaValidator to be passed around in python

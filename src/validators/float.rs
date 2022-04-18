@@ -3,8 +3,8 @@ use pyo3::types::PyDict;
 
 use super::{Extra, Validator};
 use crate::errors::{context, err_val_error, ErrorKind, ValResult};
+use crate::input::{Input, ToPy};
 use crate::utils::dict_get;
-use crate::validate::Validate;
 
 #[derive(Debug, Clone)]
 pub struct FloatValidator;
@@ -18,7 +18,7 @@ impl Validator for FloatValidator {
         Ok(Box::new(Self))
     }
 
-    fn validate(&self, py: Python, input: &PyAny, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
         Ok(input.validate_float(py)?.into_py(py))
     }
 
@@ -51,7 +51,7 @@ impl Validator for FloatConstrainedValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &PyAny, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
         let float = input.validate_float(py)?;
         if let Some(multiple_of) = self.multiple_of {
             if float % multiple_of != 0.0 {

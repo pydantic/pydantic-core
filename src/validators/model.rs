@@ -1,13 +1,13 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet};
+use std::collections::HashSet;
 
 use super::{build_validator, Extra, Validator};
 use crate::errors::{
     as_internal, err_val_error, val_line_error, ErrorKind, LocItem, ValError, ValLineError, ValResult,
 };
+use crate::input::{Input, ToPy};
 use crate::utils::{dict_get, py_error};
-use crate::validate::Validate;
-use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 struct ModelField {
@@ -72,7 +72,7 @@ impl Validator for ModelValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &PyAny, extra: &Extra) -> ValResult<PyObject> {
+    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
         if let Some(field) = extra.field {
             // we're validating assignment, completely different logic
             return self.validate_assignment(py, field, input, extra);
@@ -176,7 +176,7 @@ impl Validator for ModelValidator {
 }
 
 impl ModelValidator {
-    fn validate_assignment(&self, py: Python, field: &str, input: &PyAny, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_assignment(&self, py: Python, field: &str, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
         // TODO probably we should set location on errors here
         let field_name = field.to_string();
 
@@ -208,7 +208,7 @@ impl ModelValidator {
                 // with allow we either want to set the value
                 ExtraBehavior::Allow => match self.extra_validator {
                     Some(ref validator) => prepare_result(validator.validate(py, input, extra)),
-                    None => prepare_tuple(input.to_object(py)),
+                    None => prepare_tuple(input.to_py(py)),
                 },
                 // otherwise we raise an error:
                 // - with forbid this is obvious
