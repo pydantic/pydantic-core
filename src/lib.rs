@@ -2,6 +2,7 @@ extern crate core;
 extern crate lazy_static;
 extern crate pyo3;
 extern crate regex;
+extern crate serde_json;
 extern crate strum;
 
 use pyo3::create_exception;

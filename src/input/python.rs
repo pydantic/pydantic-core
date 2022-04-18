@@ -1,10 +1,9 @@
-use std::collections::HashSet;
 use std::str::from_utf8;
 
-use lazy_static::lazy_static;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyList, PyString};
 
+use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{Input, ToPy};
 use crate::errors::{as_internal, err_val_error, ErrorKind, ValResult};
 
@@ -18,14 +17,6 @@ impl ToPy for PyAny {
     fn to_py(&self, py: Python) -> PyObject {
         self.into_py(py)
     }
-}
-
-lazy_static! {
-    static ref BOOL_FALSE_CELL: HashSet<&'static str> = HashSet::from(["0", "off", "f", "false", "n", "no"]);
-}
-
-lazy_static! {
-    static ref BOOL_TRUE_CELL: HashSet<&'static str> = HashSet::from(["1", "on", "t", "true", "y", "yes"]);
 }
 
 impl Input for PyAny {
@@ -62,22 +53,9 @@ impl Input for PyAny {
         if let Ok(bool) = self.extract::<bool>() {
             Ok(bool)
         } else if let Some(str) = _maybe_as_string(py, self, ErrorKind::BoolParsing)? {
-            let s_lower = str.to_lowercase();
-            if BOOL_FALSE_CELL.contains(s_lower.as_str()) {
-                Ok(false)
-            } else if BOOL_TRUE_CELL.contains(s_lower.as_str()) {
-                Ok(true)
-            } else {
-                err_val_error!(py, str, kind = ErrorKind::BoolParsing)
-            }
+            str_as_bool(py, &str)
         } else if let Ok(int) = self.extract::<i64>() {
-            if int == 0 {
-                Ok(false)
-            } else if int == 1 {
-                Ok(true)
-            } else {
-                err_val_error!(py, int, kind = ErrorKind::BoolParsing)
-            }
+            int_as_bool(py, int)
         } else {
             err_val_error!(py, self, kind = ErrorKind::BoolType)
         }
