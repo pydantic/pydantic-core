@@ -65,7 +65,7 @@ impl Validator for ListValidator {
                     }
                     Err(err) => return Err(err),
                 },
-                None => output.push(item.into_py(py)),
+                None => output.push(item.to_py(py)),
             }
         }
 

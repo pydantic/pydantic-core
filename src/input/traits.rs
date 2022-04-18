@@ -40,6 +40,8 @@ pub trait Input: fmt::Debug + ToPy {
     fn validate_float(&self, py: Python) -> ValResult<f64>;
 
     fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyDict>;
+    // fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<&'py dyn InputDict<dyn Input, dyn Input>>;
 
     fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyList>;
+    // fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<&'py dyn InputList>;
 }

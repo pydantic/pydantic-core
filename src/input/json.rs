@@ -113,7 +113,13 @@ impl Input for Value {
         }
     }
 
-    fn validate_list<'py>(&'py self, _py: Python<'py>) -> ValResult<&'py PyList> {
-        todo!("validate_list for JSON")
+    fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyList> {
+        match self {
+            Value::Array(a) => {
+                let items: Vec<PyObject> = a.iter().map(|v| v.to_py(py)).collect();
+                Ok(PyList::new(py, items))
+            }
+            _ => err_val_error!(py, self, kind = ErrorKind::ListType),
+        }
     }
 }

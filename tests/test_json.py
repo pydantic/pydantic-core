@@ -18,3 +18,10 @@ def test_model():
     # language=json
     input_str = '{"field_a": 123, "field_b": 1}'
     assert v.validate_json(input_str) == ({'field_a': '123', 'field_b': 1}, {'field_b', 'field_a'})
+
+
+def test_list():
+    v = SchemaValidator({'type': 'list', 'items': {'type': 'int'}, 'title': 'TestModel'})
+    # language=json
+    input_str = '[1, 2, "3"]'
+    assert v.validate_json(input_str) == [1, 2, 3]

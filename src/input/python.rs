@@ -13,6 +13,12 @@ impl ToPy for PyDict {
     }
 }
 
+impl ToPy for PyList {
+    fn to_py(&self, py: Python) -> PyObject {
+        self.into_py(py)
+    }
+}
+
 impl ToPy for PyAny {
     fn to_py(&self, py: Python) -> PyObject {
         self.into_py(py)
