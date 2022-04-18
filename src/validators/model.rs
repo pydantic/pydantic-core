@@ -152,7 +152,6 @@ impl Validator for ModelValidator {
                         Ok(value) => output_dict.set_item(&key, value).map_err(as_internal)?,
                         Err(ValError::LineErrors(line_errors)) => {
                             for err in line_errors {
-                                // TODO I don't think this clone is necessary, but the compiler disagrees
                                 errors.push(err.prefix_location(&loc));
                             }
                         }
@@ -179,32 +178,45 @@ impl Validator for ModelValidator {
 impl ModelValidator {
     fn validate_assignment(&self, py: Python, field: &str, input: &PyAny, extra: &Extra) -> ValResult<PyObject> {
         // TODO probably we should set location on errors here
-        let field = field.to_string();
+        let field_name = field.to_string();
 
         let data = match extra.data {
             Some(data) => data,
             None => panic!("data is required when validating assignment"),
         };
 
-        let return_tuple = |output: PyObject| {
-            data.set_item(field.clone(), output).map_err(as_internal)?;
-            let fields_set = PySet::new(py, &vec![field.clone()][..]).map_err(as_internal)?;
+        let prepare_tuple = |output: PyObject| {
+            data.set_item(field_name.clone(), output).map_err(as_internal)?;
+            let fields_set = PySet::new(py, &vec![field_name.clone()][..]).map_err(as_internal)?;
             Ok((data, fields_set).to_object(py))
         };
 
-        if let Some(field) = self.fields.iter().find(|f| f.name == field) {
-            return_tuple(field.validator.validate(py, input, extra)?)
+        let prepare_result = |result: ValResult<PyObject>| match result {
+            Ok(output) => prepare_tuple(output),
+            Err(ValError::LineErrors(line_errors)) => {
+                let loc = vec![LocItem::S(field_name.clone())];
+                let errors = line_errors.iter().map(|e| e.prefix_location(&loc)).collect();
+                Err(ValError::LineErrors(errors))
+            }
+            Err(err) => Err(err),
+        };
+
+        if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
+            prepare_result(field.validator.validate(py, input, extra))
         } else {
             match self.extra_behavior {
                 // with allow we either want to set the value
                 ExtraBehavior::Allow => match self.extra_validator {
-                    Some(ref validator) => return_tuple(validator.validate(py, input, extra)?),
-                    None => return_tuple(input.to_object(py)),
+                    Some(ref validator) => prepare_result(validator.validate(py, input, extra)),
+                    None => prepare_tuple(input.to_object(py)),
                 },
                 // otherwise we raise an error:
                 // - with forbid this is obvious
                 // - with ignore the model should never be overloaded, so an error is the clearest option
-                _ => err_val_error!(py, input, kind = ErrorKind::ExtraForbidden),
+                _ => {
+                    let loc = vec![LocItem::S(field_name.clone())];
+                    err_val_error!(py, input, location = loc, kind = ErrorKind::ExtraForbidden)
+                }
             }
         }
     }
