@@ -3,8 +3,8 @@ use pyo3::types::PyDict;
 
 use super::{Extra, Validator};
 use crate::errors::{context, err_val_error, ErrorKind, ValResult};
-use crate::standalone_validators::validate_int;
 use crate::utils::dict_get;
+use crate::validate::Validate;
 
 #[derive(Debug, Clone)]
 pub struct IntValidator;
@@ -19,7 +19,7 @@ impl Validator for IntValidator {
     }
 
     fn validate(&self, py: Python, input: &PyAny, _extra: &Extra) -> ValResult<PyObject> {
-        Ok(validate_int(py, input)?.into_py(py))
+        Ok(input.validate_int(py)?.into_py(py))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -52,7 +52,7 @@ impl Validator for IntConstrainedValidator {
     }
 
     fn validate(&self, py: Python, input: &PyAny, _extra: &Extra) -> ValResult<PyObject> {
-        let int = validate_int(py, input)?;
+        let int = input.validate_int(py)?;
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
                 return err_val_error!(

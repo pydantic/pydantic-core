@@ -5,8 +5,8 @@ use super::{build_validator, Extra, Validator};
 use crate::errors::{
     as_internal, err_val_error, val_line_error, ErrorKind, LocItem, ValError, ValLineError, ValResult,
 };
-use crate::standalone_validators::validate_dict;
 use crate::utils::{dict_get, py_error};
+use crate::validate::Validate;
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
@@ -78,7 +78,7 @@ impl Validator for ModelValidator {
             return self.validate_assignment(py, field, input, extra);
         }
 
-        let dict: &PyDict = validate_dict(py, input)?;
+        let dict: &PyDict = input.validate_dict(py)?;
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let mut fields_set: HashSet<String> = HashSet::with_capacity(dict.len());
