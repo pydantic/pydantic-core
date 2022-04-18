@@ -59,7 +59,9 @@ test:
 
 .PHONY: testcov
 testcov: build-coverage test
-	coverage html -d htmlcov-python
+	@rm -rf htmlcov
+	@mkdir -p htmlcov
+	coverage html -d htmlcov/python
 	./tests/rust_coverage_html.sh
 
 .PHONY: all
