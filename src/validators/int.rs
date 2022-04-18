@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use super::{Extra, Validator};
 use crate::errors::{context, err_val_error, ErrorKind, ValResult};
-use crate::input::{Input, ToPy};
+use crate::input::Input;
 use crate::utils::dict_get;
 
 #[derive(Debug, Clone)]

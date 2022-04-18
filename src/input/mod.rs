@@ -1,3 +1,4 @@
+pub use json::JsonInput;
 pub use traits::*;
 
 mod json;

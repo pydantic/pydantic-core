@@ -5,30 +5,7 @@ use pyo3::types::{PyDict, PyList};
 
 use crate::errors::ValResult;
 
-pub trait ToPy {
-    fn to_py(&self, py: Python) -> PyObject;
-}
-
-/// special cases of standard types that need to implement ToPy
-impl ToPy for String {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for i64 {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for f64 {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-pub trait Input: fmt::Debug + ToPy {
+pub trait Input: fmt::Debug + ToPyObject {
     fn validate_none(&self, py: Python) -> ValResult<()>;
 
     fn validate_str(&self, py: Python) -> ValResult<String>;

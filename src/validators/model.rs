@@ -6,7 +6,7 @@ use super::{build_validator, Extra, Validator};
 use crate::errors::{
     as_internal, err_val_error, val_line_error, ErrorKind, LocItem, ValError, ValLineError, ValResult,
 };
-use crate::input::{Input, ToPy};
+use crate::input::Input;
 use crate::utils::{dict_get, py_error};
 
 #[derive(Debug, Clone)]
@@ -208,7 +208,7 @@ impl ModelValidator {
                 // with allow we either want to set the value
                 ExtraBehavior::Allow => match self.extra_validator {
                     Some(ref validator) => prepare_result(validator.validate(py, input, extra)),
-                    None => prepare_tuple(input.to_py(py)),
+                    None => prepare_tuple(input.to_object(py)),
                 },
                 // otherwise we raise an error:
                 // - with forbid this is obvious

@@ -5,7 +5,7 @@ use pyo3::types::{PyAny, PyDict};
 use serde_json::{from_str as parse_json, Value as JsonValue};
 
 use crate::errors::{err_val_error, map_validation_error, ErrorKind, ValError, ValResult};
-use crate::input::{Input, ToPy};
+use crate::input::{Input, JsonInput};
 use crate::utils::{dict_get, dict_get_required, py_error};
 
 mod bool;
@@ -52,7 +52,8 @@ impl SchemaValidator {
                     data: None,
                     field: None,
                 };
-                self.validator.validate(py, &input, &extra)
+                let json_input = JsonInput::new(input);
+                self.validator.validate(py, &json_input, &extra)
             }
             Err(e) => err_val_error!(py, input, message = Some(e.to_string()), kind = ErrorKind::InvalidJson),
         };

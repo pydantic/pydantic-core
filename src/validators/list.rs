@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use super::{build_validator, Extra, ValResult, Validator};
 use crate::errors::{context, err_val_error, ErrorKind, LocItem, ValError, ValLineError};
-use crate::input::{Input, ToPy};
+use crate::input::Input;
 use crate::utils::dict_get;
 
 #[derive(Debug, Clone)]
@@ -65,7 +65,7 @@ impl Validator for ListValidator {
                     }
                     Err(err) => return Err(err),
                 },
-                None => output.push(item.to_py(py)),
+                None => output.push(item.into_py(py)),
             }
         }
 

@@ -6,8 +6,6 @@ use pyo3::prelude::*;
 
 use crate::errors::{err_val_error, ErrorKind, ValResult};
 
-use super::traits::ToPy;
-
 lazy_static! {
     static ref BOOL_FALSE_CELL: HashSet<&'static str> = HashSet::from(["0", "off", "f", "false", "n", "no"]);
 }

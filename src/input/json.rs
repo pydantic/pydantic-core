@@ -4,47 +4,34 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use super::shared::{int_as_bool, str_as_bool};
-use super::traits::{Input, ToPy};
+use super::traits::Input;
 use crate::errors::{err_val_error, ErrorKind, ValResult};
 
-impl ToPy for Value {
-    fn to_py(&self, py: Python) -> PyObject {
-        match self {
-            Value::Null => py.None(),
-            Value::Bool(b) => b.into_py(py),
-            Value::Number(n) => {
-                if let Some(int) = n.as_i64() {
-                    int.into_py(py)
-                } else if let Some(float) = n.as_f64() {
-                    float.into_py(py)
-                } else {
-                    // TODO is this ok?
-                    0.into_py(py)
-                }
-            }
-            Value::String(s) => s.to_string().into_py(py),
-            Value::Array(a) => a.iter().map(|v| v.to_py(py)).collect::<Vec<_>>().into_py(py),
-            Value::Object(o) => {
-                let dict = PyDict::new(py);
-                for (k, v) in o.iter() {
-                    dict.set_item(k, v.to_py(py)).unwrap();
-                }
-                dict.into_py(py)
-            }
-        }
+#[derive(Debug)]
+pub struct JsonInput(Value);
+
+impl JsonInput {
+    pub fn new(value: Value) -> JsonInput {
+        JsonInput(value)
     }
 }
 
-impl Input for Value {
+impl ToPyObject for JsonInput {
+    fn to_object(&self, py: Python) -> PyObject {
+        value_to_py(&self.0, py)
+    }
+}
+
+impl Input for JsonInput {
     fn validate_none(&self, py: Python) -> ValResult<()> {
-        match self {
+        match &self.0 {
             Value::Null => Ok(()),
             _ => err_val_error!(py, self, kind = ErrorKind::NoneRequired),
         }
     }
 
     fn validate_str(&self, py: Python) -> ValResult<String> {
-        match self {
+        match &self.0 {
             Value::String(s) => Ok(s.to_string()),
             Value::Number(n) => Ok(n.to_string()),
             _ => err_val_error!(py, self, kind = ErrorKind::StrType),
@@ -52,7 +39,7 @@ impl Input for Value {
     }
 
     fn validate_bool(&self, py: Python) -> ValResult<bool> {
-        match self {
+        match &self.0 {
             Value::Bool(b) => Ok(*b),
             Value::String(s) => str_as_bool(py, s),
             Value::Number(n) => {
@@ -67,7 +54,7 @@ impl Input for Value {
     }
 
     fn validate_int(&self, py: Python) -> ValResult<i64> {
-        match self {
+        match &self.0 {
             Value::Number(n) => {
                 if let Some(int) = n.as_i64() {
                     Ok(int)
@@ -84,7 +71,7 @@ impl Input for Value {
     }
 
     fn validate_float(&self, py: Python) -> ValResult<f64> {
-        match self {
+        match &self.0 {
             Value::Number(n) => {
                 if let Some(float) = n.as_f64() {
                     Ok(float)
@@ -101,11 +88,12 @@ impl Input for Value {
     }
 
     fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyDict> {
-        match self {
+        match &self.0 {
             Value::Object(o) => {
                 let dict = PyDict::new(py);
                 for (k, v) in o.iter() {
-                    dict.set_item(k.to_py(py), v.to_py(py)).unwrap();
+                    let json_value = JsonInput(v.clone());
+                    dict.set_item(k.into_py(py), json_value).unwrap();
                 }
                 Ok(dict)
             }
@@ -114,12 +102,38 @@ impl Input for Value {
     }
 
     fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyList> {
-        match self {
+        match &self.0 {
             Value::Array(a) => {
-                let items: Vec<PyObject> = a.iter().map(|v| v.to_py(py)).collect();
+                let items: Vec<PyObject> = a.iter().map(|v| value_to_py(v, py)).collect();
                 Ok(PyList::new(py, items))
             }
             _ => err_val_error!(py, self, kind = ErrorKind::ListType),
+        }
+    }
+}
+
+fn value_to_py(value: &Value, py: Python) -> PyObject {
+    match value {
+        Value::Null => py.None(),
+        Value::Bool(b) => b.into_py(py),
+        Value::Number(n) => {
+            if let Some(int) = n.as_i64() {
+                int.into_py(py)
+            } else if let Some(float) = n.as_f64() {
+                float.into_py(py)
+            } else {
+                // TODO is this ok?
+                0.into_py(py)
+            }
+        }
+        Value::String(s) => s.to_string().into_py(py),
+        Value::Array(a) => a.iter().map(|v| value_to_py(v, py)).collect::<Vec<_>>().into_py(py),
+        Value::Object(o) => {
+            let dict = PyDict::new(py);
+            for (k, v) in o.iter() {
+                dict.set_item(k, value_to_py(v, py)).unwrap();
+            }
+            dict.into_py(py)
         }
     }
 }

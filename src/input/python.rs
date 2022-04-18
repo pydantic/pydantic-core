@@ -4,26 +4,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyList, PyString};
 
 use super::shared::{int_as_bool, str_as_bool};
-use super::traits::{Input, ToPy};
+use super::traits::Input;
 use crate::errors::{as_internal, err_val_error, ErrorKind, ValResult};
-
-impl ToPy for PyDict {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for PyList {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for PyAny {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
 
 impl Input for PyAny {
     fn validate_none(&self, py: Python) -> ValResult<()> {
