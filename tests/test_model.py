@@ -60,3 +60,39 @@ def test_validate_assignment():
     assert v.run({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
 
     assert v.run_assignment('field_a', 456, {'field_a': 'test'}) == ({'field_a': '456'}, {'field_a'})
+
+
+def test_validate_assignment_functions():
+    calls = []
+
+    def func_a(input_value, **kwargs):
+        calls.append('func_a')
+        return input_value * 2
+
+    def func_b(input_value, **kwargs):
+        calls.append('func_b')
+        return input_value / 2
+
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'fields': {
+                'field_a': {'type': 'function-after', 'function': func_a, 'field': {'type': 'str'}},
+                'field_b': {'type': 'function-after', 'function': func_b, 'field': {'type': 'int'}},
+            },
+        }
+    )
+
+    assert v.run({'field_a': 'test', 'field_b': 12.0}) == (
+        {'field_a': 'testtest', 'field_b': 6},
+        {'field_a', 'field_b'},
+    )
+
+    assert calls == ['func_a', 'func_b']
+    calls.clear()
+
+    assert v.run_assignment('field_a', 'new-val', {'field_a': 'testtest', 'field_b': 6}) == (
+        {'field_a': 'new-valnew-val', 'field_b': 6},
+        {'field_a'},
+    )
+    assert calls == ['func_a']

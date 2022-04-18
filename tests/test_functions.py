@@ -110,7 +110,6 @@ def test_function_plain():
     assert v.run('x') == 'xx'
 
 
-@pytest.mark.skip(reason='WIP')
 def test_validate_assignment():
     def f(input_value, **kwargs):
         data, fields_set = input_value
@@ -121,8 +120,6 @@ def test_validate_assignment():
         {'type': 'function-after', 'function': f, 'field': {'type': 'model', 'fields': {'field_a': {'type': 'str'}}}}
     )
 
-    # debug(v.run({'field_a': 'test'}))
     m = {'field_a': 'test', 'more': 'foobar'}
     assert v.run({'field_a': 'test'}) == (m, {'field_a'})
-    # debug(v.run_assignment('field_a', 456, m))
-    # assert v.run_assignment('field_a', 456) == '456456'
+    assert v.run_assignment('field_a', 456, m) == ({'field_a': '456', 'more': 'foobar'}, {'field_a'})
