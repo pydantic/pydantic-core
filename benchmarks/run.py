@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
 import timeit
 from typing import List, Dict
 
-import ujson
+import json
 
 from devtools import debug
 
@@ -47,10 +48,10 @@ def benchmark_simple_validation(from_json: bool = False):
     data = {'name': 'John', 'age': 42, 'friends': list(range(200)), 'settings': {f'v_{i}': i / 2.0 for i in range(50)}}
 
     if from_json:
-        data = ujson.dumps(data)
+        data = json.dumps(data)
 
         def pydantic(d):
-            obj = ujson.loads(d)
+            obj = json.loads(d)
             return PydanticModel.parse_obj(obj)
 
         def pydantic_core(d):
