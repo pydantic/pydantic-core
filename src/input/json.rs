@@ -1,14 +1,13 @@
-use serde_json::Value;
-
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use serde_json::Map;
+use serde_json::{Map, Value};
+
+use crate::errors::{as_internal, err_val_error, ErrorKind, LocItem, ValResult};
+use crate::utils::py_error;
 
 use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
-use crate::errors::{as_internal, err_val_error, ErrorKind, LocItem, ValResult};
-use crate::utils::py_error;
 
 impl ToPy for Value {
     fn to_py(&self, py: Python) -> PyObject {

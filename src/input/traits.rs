@@ -70,11 +70,14 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 // https://stackoverflow.com/a/47156134/949890
 pub trait DictInput<'py>: ToPy {
     fn input_iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_>;
+
     fn input_get(&self, key: &str) -> Option<&'_ dyn Input>;
+
     fn input_len(&self) -> usize;
 }
 
 pub trait ListInput<'py>: ToPy {
     fn input_iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_>;
+
     fn input_len(&self) -> usize;
 }
