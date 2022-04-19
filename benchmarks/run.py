@@ -63,15 +63,16 @@ def benchmark_simple_validation(from_json: bool = False):
             return PydanticModel.parse_obj(obj)
 
         @benchmark
-        def pydantic_core_json(d):
-            output, fields_set = schema_validator.validate_json(d)
-            return output
+        def core_json(d):
+            schema_validator.validate_json(d)
+            # output, fields_set = schema_validator.validate_json(d)
+            # return output
 
-        @benchmark
-        def pydantic_core_json_external(d):
-            obj = json.loads(d)
-            output, fields_set = schema_validator.validate_python(obj)
-            return output
+        # @benchmark
+        # def core_json_external(d):
+        #     obj = json.loads(d)
+        #     output, fields_set = schema_validator.validate_python(obj)
+        #     return output
 
     else:
         @benchmark
@@ -79,7 +80,7 @@ def benchmark_simple_validation(from_json: bool = False):
             return PydanticModel.parse_obj(d)
 
         @benchmark
-        def pydantic_core_py(d):
+        def core_py(d):
             output, fields_set = schema_validator.validate_python(d)
             return output
 
@@ -90,9 +91,9 @@ def benchmark_simple_validation(from_json: bool = False):
         print(f'{func.__name__}:')
         result = func(data)
         # debug(result)
-        if reference_result:
-            assert reference_result == result
-        reference_result = result
+        # if reference_result:
+        #     assert reference_result == result
+        # reference_result = result
 
         t = timeit.timeit(
             'func(data)',

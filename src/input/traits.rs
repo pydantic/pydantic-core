@@ -67,6 +67,7 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 
 // these are ugly, is there any way to avoid the maps in iter, one of the boxes and/or the duplication?
 // is this harming performance, particularly the .map(|item| item)?
+// https://stackoverflow.com/a/47156134/949890
 pub trait DictInput<'py>: ToPy {
     fn input_iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_>;
     fn input_get(&self, key: &str) -> Option<&'_ dyn Input>;
