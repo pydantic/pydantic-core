@@ -187,3 +187,15 @@ def test_validate_assignment_allow_extra_validate():
             'input_value': 'xyz',
         }
     ]
+
+
+def test_model_class():
+    class MyModel:
+        field_a: str
+
+    v = SchemaValidator(
+        {'type': 'model-class', 'class': MyModel, 'model': {'type': 'model', 'fields': {'field_a': {'type': 'str'}}}}
+    )
+    m = v.validate_python({'field_a': 'test'})
+    assert isinstance(m, MyModel)
+    assert m.field_a == 'test'
