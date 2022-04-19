@@ -31,8 +31,9 @@ impl Validator for ListValidator {
 
     fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
         let list = input.validate_list(py)?;
+        let length = list.input_len();
         if let Some(min_length) = self.min_items {
-            if list.input_len() < min_length {
+            if length < min_length {
                 return err_val_error!(
                     py,
                     list,
@@ -42,7 +43,7 @@ impl Validator for ListValidator {
             }
         }
         if let Some(max_length) = self.max_items {
-            if list.input_len() > max_length {
+            if length > max_length {
                 return err_val_error!(
                     py,
                     list,
@@ -51,7 +52,7 @@ impl Validator for ListValidator {
                 );
             }
         }
-        let mut output: Vec<PyObject> = Vec::with_capacity(list.input_len());
+        let mut output: Vec<PyObject> = Vec::with_capacity(length);
         let mut errors: Vec<ValLineError> = Vec::new();
         for (index, item) in list.input_iter().enumerate() {
             match self.item_validator {
