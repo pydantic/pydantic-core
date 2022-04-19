@@ -1,9 +1,7 @@
-use serde_json::Value;
-
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use serde_json::Map;
+use serde_json::{Map, Value};
 
 use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};

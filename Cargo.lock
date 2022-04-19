@@ -150,6 +150,7 @@ dependencies = [
  "lazy_static",
  "pyo3",
  "regex",
+ "serde",
  "serde_json",
  "strum",
  "strum_macros",
