@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyList, PyString};
 
 use super::shared::{int_as_bool, str_as_bool};
-use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
+use super::traits::{Input, ToLocItem, ToPy};
 use crate::errors::{as_internal, err_val_error, ErrorKind, LocItem, ValResult};
 
 impl ToPy for PyDict {
@@ -114,58 +114,22 @@ impl Input for PyAny {
         }
     }
 
-    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn DictInput<'py> + 'py>> {
+    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyDict> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
-            Ok(Box::new(dict))
+            Ok(dict)
             // TODO we probably want to try and support mapping like things here too
         } else {
             err_val_error!(py, self, kind = ErrorKind::DictType)
         }
     }
 
-    fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn ListInput + 'py>> {
+    fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyList> {
         if let Ok(list) = self.cast_as::<PyList>() {
-            Ok(Box::new(list))
+            Ok(list)
             // TODO support sets, tuples, frozen set etc. like in pydantic
         } else {
             err_val_error!(py, self, kind = ErrorKind::ListType)
         }
-    }
-}
-
-impl ToPy for &PyDict {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl<'py> DictInput<'py> for &'py PyDict {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_> {
-        Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
-    }
-
-    fn input_get(&self, key: &str) -> Option<&dyn Input> {
-        self.get_item(key).map(|item| item as &dyn Input)
-    }
-
-    fn input_len(&self) -> usize {
-        self.len()
-    }
-}
-
-impl ToPy for &PyList {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl<'py> ListInput<'py> for &'py PyList {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_> {
-        Box::new(self.iter().map(|item| item as &dyn Input))
-    }
-
-    fn input_len(&self) -> usize {
-        self.len()
     }
 }
 

@@ -11,31 +11,20 @@ use crate::errors::{err_val_error, ErrorKind, ValResult};
 
 pub fn parse_json(py: Python, json: &str) -> ValResult<PyObject> {
     let mut deserializer = JsonDeserializer::from_str(json);
-    let seed = JsonValue::new(py);
+    let seed = JsonVisitor { py };
 
     match seed.deserialize(&mut deserializer) {
-        Ok(data) => Ok(data.to_object(py)),
-        Err(e) => err_val_error!(
-            py,
-            json.to_string(),
-            message = Some(e.to_string()),
-            kind = ErrorKind::InvalidJson
-        ),
+        Ok(data) => Ok(data),
+        Err(e) => err_val_error!(py, json, message = Some(e.to_string()), kind = ErrorKind::InvalidJson),
     }
 }
 
 #[derive(Copy, Clone)]
-struct JsonValue<'py> {
+struct JsonVisitor<'py> {
     py: Python<'py>,
 }
 
-impl<'py> JsonValue<'py> {
-    fn new(py: Python<'py>) -> JsonValue<'py> {
-        JsonValue { py }
-    }
-}
-
-impl<'de, 'a> DeserializeSeed<'de> for JsonValue<'a> {
+impl<'de, 'py> DeserializeSeed<'de> for JsonVisitor<'py> {
     type Value = PyObject;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -46,7 +35,7 @@ impl<'de, 'a> DeserializeSeed<'de> for JsonValue<'a> {
     }
 }
 
-impl<'de, 'py> Visitor<'de> for JsonValue<'py> {
+impl<'de, 'py> Visitor<'de> for JsonVisitor<'py> {
     type Value = PyObject;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -96,7 +85,7 @@ impl<'de, 'py> Visitor<'de> for JsonValue<'py> {
     where
         A: SeqAccess<'de>,
     {
-        let mut elements = Vec::with_capacity(access.size_hint().unwrap_or(0));
+        let mut elements: Vec<PyObject> = Vec::with_capacity(access.size_hint().unwrap_or(0));
 
         while let Some(elem) = access.next_element_seed(self)? {
             elements.push(elem);

@@ -1,6 +1,7 @@
 use std::fmt;
 
 use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyList};
 
 use crate::errors::{LocItem, ValResult};
 
@@ -60,9 +61,9 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 
     fn validate_float(&self, py: Python) -> ValResult<f64>;
 
-    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn DictInput<'py> + 'py>>;
+    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyDict>;
 
-    fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn ListInput<'py> + 'py>>;
+    fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyList>;
 }
 
 // these are ugly, is there any way to avoid the maps in iter, one of the boxes and/or the duplication?

@@ -45,8 +45,8 @@ impl SchemaValidator {
         r.map_err(|e| map_validation_error(&self.title, e))
     }
 
-    fn validate_json(&self, py: Python, input: String) -> PyResult<PyObject> {
-        let result = match parse_json(py, &input) {
+    fn validate_json(&self, py: Python, json: String) -> PyResult<PyObject> {
+        let result = match parse_json(py, &json) {
             Ok(input) => {
                 let extra = Extra {
                     data: None,

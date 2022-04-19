@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use super::{build_validator, Extra, Validator};
 use crate::errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult};
-use crate::input::{Input, ToLocItem};
+use crate::input::{Input, ToLocItem, ToPy};
 use crate::utils::{dict_get, py_error};
 
 #[derive(Debug, Clone)]
@@ -79,7 +79,7 @@ impl Validator for ModelValidator {
         let dict = input.validate_dict(py)?;
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
-        let mut fields_set: HashSet<String> = HashSet::with_capacity(dict.input_len());
+        let mut fields_set: HashSet<String> = HashSet::with_capacity(dict.len());
 
         let extra = Extra {
             data: Some(output_dict),
@@ -87,7 +87,7 @@ impl Validator for ModelValidator {
         };
 
         for field in &self.fields {
-            if let Some(value) = dict.input_get(&field.name) {
+            if let Some(value) = dict.get_item(&field.name) {
                 match field.validator.validate(py, value, &extra) {
                     Ok(value) => output_dict.set_item(&field.name, value).map_err(as_internal)?,
                     Err(ValError::LineErrors(line_errors)) => {
@@ -119,7 +119,7 @@ impl Validator for ModelValidator {
             ExtraBehavior::Forbid => (true, true),
         };
         if check_extra {
-            for (raw_key, value) in dict.input_iter() {
+            for (raw_key, value) in dict.iter() {
                 let key: String = match raw_key.validate_str(py) {
                     Ok(k) => k,
                     Err(ValError::LineErrors(line_errors)) => {
