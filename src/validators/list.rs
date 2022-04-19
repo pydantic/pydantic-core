@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use super::{build_validator, Extra, ValResult, Validator};
 use crate::errors::{context, err_val_error, ErrorKind, LocItem, ValError, ValLineError};
-use crate::input::{Input, ToPy};
+use crate::input::Input;
 use crate::utils::dict_get;
 
 #[derive(Debug, Clone)]
@@ -55,7 +55,7 @@ impl Validator for ListValidator {
         let mut errors: Vec<ValLineError> = Vec::new();
         for (index, item) in list.iter().enumerate() {
             match self.item_validator {
-                Some(ref validator) => match validator.validate(py, item, extra) {
+                Some(ref validator) => match validator.validate(py, *item, extra) {
                     Ok(item) => output.push(item),
                     Err(ValError::LineErrors(line_errors)) => {
                         let loc = vec![LocItem::I(index)];

@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyList, PyString};
 
 use super::shared::{int_as_bool, str_as_bool};
-use super::traits::{Input, ToPy};
+use super::traits::{Input, ListInput, ToPy};
 use crate::errors::{as_internal, err_val_error, ErrorKind, ValResult};
 
 impl ToPy for PyDict {
@@ -108,13 +108,30 @@ impl Input for PyAny {
         }
     }
 
-    fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyList> {
+    fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn ListInput + 'py>> {
         if let Ok(list) = self.cast_as::<PyList>() {
-            Ok(list)
+            Ok(Box::new(PyListInput(list)))
             // TODO support sets, tuples, frozen set etc. like in pydantic
         } else {
             err_val_error!(py, self, kind = ErrorKind::ListType)
         }
+    }
+}
+
+struct PyListInput<'py>(&'py PyList);
+
+impl<'py> ToPy for PyListInput<'py> {
+    fn to_py(&self, py: Python) -> PyObject {
+        self.0.into_py(py)
+    }
+}
+
+impl<'py> ListInput<'py> for PyListInput<'py> {
+    fn iter(&self) -> Box<dyn Iterator<Item = Box<&'py dyn Input>> + '_> {
+        Box::new(self.0.iter().map(|item| Box::new(item as &'py dyn Input)))
+    }
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }
 

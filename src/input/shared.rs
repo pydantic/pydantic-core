@@ -17,7 +17,7 @@ lazy_static! {
 }
 
 #[inline]
-pub fn str_as_bool(py: Python, str: &String) -> ValResult<bool> {
+pub fn str_as_bool(py: Python, str: &str) -> ValResult<bool> {
     let s_lower = str.to_lowercase();
     if BOOL_FALSE_CELL.contains(s_lower.as_str()) {
         Ok(false)

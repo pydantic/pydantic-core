@@ -1,10 +1,10 @@
 use serde_json::Value;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyDict;
 
 use super::shared::{int_as_bool, str_as_bool};
-use super::traits::{Input, ToPy};
+use super::traits::{Input, ListInput, ToPy};
 use crate::errors::{err_val_error, ErrorKind, ValResult};
 
 impl ToPy for Value {
@@ -113,13 +113,27 @@ impl Input for Value {
         }
     }
 
-    fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyList> {
+    fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn ListInput<'py> + 'py>> {
         match self {
-            Value::Array(a) => {
-                let items: Vec<PyObject> = a.iter().map(|v| v.to_py(py)).collect();
-                Ok(PyList::new(py, items))
-            }
+            Value::Array(a) => Ok(Box::new(JsonListInput(a))),
             _ => err_val_error!(py, self, kind = ErrorKind::ListType),
         }
+    }
+}
+
+struct JsonListInput<'py>(&'py Vec<Value>);
+
+impl<'py> ToPy for JsonListInput<'py> {
+    fn to_py(&self, py: Python) -> PyObject {
+        self.0.iter().map(|v| v.to_py(py)).collect::<Vec<_>>().into_py(py)
+    }
+}
+
+impl<'py> ListInput<'py> for JsonListInput<'py> {
+    fn iter(&self) -> Box<dyn Iterator<Item = Box<&'py dyn Input>> + '_> {
+        Box::new(self.0.iter().map(|item| Box::new(item as &'py dyn Input)))
+    }
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }
