@@ -55,7 +55,7 @@ impl Validator for ListValidator {
         let mut errors: Vec<ValLineError> = Vec::new();
         for (index, item) in list.iter().enumerate() {
             match self.item_validator {
-                Some(ref validator) => match validator.validate(py, *item, extra) {
+                Some(ref validator) => match validator.validate(py, item, extra) {
                     Ok(item) => output.push(item),
                     Err(ValError::LineErrors(line_errors)) => {
                         let loc = vec![LocItem::I(index)];

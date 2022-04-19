@@ -6,7 +6,7 @@ use super::{build_validator, Extra, Validator};
 use crate::errors::{
     as_internal, err_val_error, val_line_error, ErrorKind, LocItem, ValError, ValLineError, ValResult,
 };
-use crate::input::{Input, ToPy};
+use crate::input::Input;
 use crate::utils::{dict_get, py_error};
 
 #[derive(Debug, Clone)]
@@ -78,7 +78,7 @@ impl Validator for ModelValidator {
             return self.validate_assignment(py, field, input, extra);
         }
 
-        let dict: &PyDict = input.validate_dict(py)?;
+        let dict = input.validate_dict(py)?;
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let mut fields_set: HashSet<String> = HashSet::with_capacity(dict.len());
@@ -121,16 +121,16 @@ impl Validator for ModelValidator {
             ExtraBehavior::Forbid => (true, true),
         };
         if check_extra {
-            for (raw_kwy, value) in dict.iter() {
-                let key: String = match raw_kwy.extract() {
+            for (raw_key, value) in dict.iter() {
+                let key: String = match raw_key.validate_str(py) {
                     Ok(k) => k,
                     Err(_) => {
-                        errors.push(val_line_error!(
-                            py,
-                            dict,
-                            kind = ErrorKind::InvalidKey,
-                            location = vec![LocItem::from_py_repr(raw_kwy)?]
-                        ));
+                        // errors.push(val_line_error!(
+                        //     py,
+                        //     dict,
+                        //     kind = ErrorKind::InvalidKey,
+                        //     location = vec![LocItem::from_py_repr(raw_key)?]
+                        // ));
                         continue;
                     }
                 };
@@ -158,7 +158,7 @@ impl Validator for ModelValidator {
                         Err(err) => return Err(err),
                     }
                 } else {
-                    output_dict.set_item(&key, value).map_err(as_internal)?;
+                    output_dict.set_item(&key, value.to_py(py)).map_err(as_internal)?;
                 }
             }
         }

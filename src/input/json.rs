@@ -2,9 +2,10 @@ use serde_json::Value;
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use serde_json::Map;
 
 use super::shared::{int_as_bool, str_as_bool};
-use super::traits::{Input, ListInput, ToPy};
+use super::traits::{DictInput, Input, ListInput, ToPy};
 use crate::errors::{err_val_error, ErrorKind, ValResult};
 
 impl ToPy for Value {
@@ -18,8 +19,7 @@ impl ToPy for Value {
                 } else if let Some(float) = n.as_f64() {
                     float.into_py(py)
                 } else {
-                    // TODO is this ok?
-                    0.into_py(py)
+                    panic!("{:?} is not a valid number", n)
                 }
             }
             Value::String(s) => s.to_string().into_py(py),
@@ -100,15 +100,9 @@ impl Input for Value {
         }
     }
 
-    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyDict> {
+    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn DictInput<'py> + 'py>> {
         match self {
-            Value::Object(o) => {
-                let dict = PyDict::new(py);
-                for (k, v) in o.iter() {
-                    dict.set_item(k.to_py(py), v.to_py(py)).unwrap();
-                }
-                Ok(dict)
-            }
+            Value::Object(dict) => Ok(Box::new(JsonDictInput(dict))),
             _ => err_val_error!(py, self, kind = ErrorKind::DictType),
         }
     }
@@ -121,6 +115,32 @@ impl Input for Value {
     }
 }
 
+struct JsonDictInput<'py>(&'py Map<String, Value>);
+
+impl<'py> ToPy for JsonDictInput<'py> {
+    fn to_py(&self, py: Python) -> PyObject {
+        let dict = PyDict::new(py);
+        for (k, v) in self.0.iter() {
+            dict.set_item(k, v.to_py(py)).unwrap();
+        }
+        dict.into_py(py)
+    }
+}
+
+impl<'py> DictInput<'py> for JsonDictInput<'py> {
+    fn iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_> {
+        Box::new(self.0.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
+    }
+
+    fn get_item(&self, key: &str) -> Option<&dyn Input> {
+        self.0.get(key).map(|item| item as &dyn Input)
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
 struct JsonListInput<'py>(&'py Vec<Value>);
 
 impl<'py> ToPy for JsonListInput<'py> {
@@ -130,10 +150,49 @@ impl<'py> ToPy for JsonListInput<'py> {
 }
 
 impl<'py> ListInput<'py> for JsonListInput<'py> {
-    fn iter(&self) -> Box<dyn Iterator<Item = Box<&'py dyn Input>> + '_> {
-        Box::new(self.0.iter().map(|item| Box::new(item as &'py dyn Input)))
+    // this is ugly, is there any way to avoid the map, one of the boxes and/or avoid the duplication?
+    fn iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_> {
+        Box::new(self.0.iter().map(|item| item as &dyn Input))
     }
+
     fn len(&self) -> usize {
         self.0.len()
+    }
+}
+
+/// Required for Dict keys so the string can behave like an Input
+impl Input for String {
+    fn validate_none(&self, py: Python) -> ValResult<()> {
+        err_val_error!(py, self, kind = ErrorKind::NoneRequired)
+    }
+
+    fn validate_str(&self, _py: Python) -> ValResult<String> {
+        Ok(self.clone())
+    }
+
+    fn validate_bool(&self, py: Python) -> ValResult<bool> {
+        str_as_bool(py, self)
+    }
+
+    fn validate_int(&self, py: Python) -> ValResult<i64> {
+        match self.parse() {
+            Ok(i) => Ok(i),
+            Err(_) => err_val_error!(py, self, kind = ErrorKind::IntParsing),
+        }
+    }
+
+    fn validate_float(&self, py: Python) -> ValResult<f64> {
+        match self.parse() {
+            Ok(i) => Ok(i),
+            Err(_) => err_val_error!(py, self, kind = ErrorKind::FloatParsing),
+        }
+    }
+
+    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn DictInput<'py> + 'py>> {
+        err_val_error!(py, self, kind = ErrorKind::DictType)
+    }
+
+    fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn ListInput<'py> + 'py>> {
+        err_val_error!(py, self, kind = ErrorKind::ListType)
     }
 }

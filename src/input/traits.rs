@@ -1,8 +1,6 @@
 use std::fmt;
 
 use pyo3::prelude::*;
-// use pyo3::types::{PyDict, PyList};
-use pyo3::types::PyDict;
 
 use crate::errors::ValResult;
 
@@ -46,13 +44,18 @@ pub trait Input: fmt::Debug + ToPy {
 
     fn validate_float(&self, py: Python) -> ValResult<f64>;
 
-    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyDict>;
-    // fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<&'py dyn InputDict<dyn Input, dyn Input>>;
+    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn DictInput<'py> + 'py>>;
 
     fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn ListInput<'py> + 'py>>;
 }
 
+pub trait DictInput<'py>: ToPy {
+    fn iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_>;
+    fn get_item(&self, key: &str) -> Option<&'_ dyn Input>;
+    fn len(&self) -> usize;
+}
+
 pub trait ListInput<'py>: ToPy {
-    fn iter(&self) -> Box<dyn Iterator<Item = Box<&'py dyn Input>> + '_>;
+    fn iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_>;
     fn len(&self) -> usize;
 }

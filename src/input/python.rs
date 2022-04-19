@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyList, PyString};
 
 use super::shared::{int_as_bool, str_as_bool};
-use super::traits::{Input, ListInput, ToPy};
+use super::traits::{DictInput, Input, ListInput, ToPy};
 use crate::errors::{as_internal, err_val_error, ErrorKind, ValResult};
 
 impl ToPy for PyDict {
@@ -99,9 +99,9 @@ impl Input for PyAny {
         }
     }
 
-    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<&'py PyDict> {
+    fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn DictInput<'py> + 'py>> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
-            Ok(dict)
+            Ok(Box::new(PyDictInput(dict)))
             // TODO we probably want to try and support mapping like things here too
         } else {
             err_val_error!(py, self, kind = ErrorKind::DictType)
@@ -118,6 +118,28 @@ impl Input for PyAny {
     }
 }
 
+struct PyDictInput<'py>(&'py PyDict);
+
+impl<'py> ToPy for PyDictInput<'py> {
+    fn to_py(&self, py: Python) -> PyObject {
+        self.0.into_py(py)
+    }
+}
+
+impl<'py> DictInput<'py> for PyDictInput<'py> {
+    fn iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_> {
+        Box::new(self.0.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
+    }
+
+    fn get_item(&self, key: &str) -> Option<&dyn Input> {
+        self.0.get_item(key).map(|item| item as &dyn Input)
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
 struct PyListInput<'py>(&'py PyList);
 
 impl<'py> ToPy for PyListInput<'py> {
@@ -127,9 +149,11 @@ impl<'py> ToPy for PyListInput<'py> {
 }
 
 impl<'py> ListInput<'py> for PyListInput<'py> {
-    fn iter(&self) -> Box<dyn Iterator<Item = Box<&'py dyn Input>> + '_> {
-        Box::new(self.0.iter().map(|item| Box::new(item as &'py dyn Input)))
+    // this is ugly, is there any way to avoid the map, one of the boxes and/or avoid the duplication?
+    fn iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_> {
+        Box::new(self.0.iter().map(|item| item as &dyn Input))
     }
+
     fn len(&self) -> usize {
         self.0.len()
     }
