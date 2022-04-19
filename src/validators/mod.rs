@@ -1,8 +1,9 @@
 use std::fmt;
 
+use ijson::IValue as JsonValue;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
-use serde_json::{from_str as parse_json, Value as JsonValue};
+use serde_json::from_str as parse_json;
 
 use crate::errors::{err_val_error, map_validation_error, ErrorKind, ValError, ValResult};
 use crate::input::{Input, ToPy};

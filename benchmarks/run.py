@@ -47,39 +47,55 @@ def benchmark_simple_validation(from_json: bool = False):
 
     data = {'name': 'John', 'age': 42, 'friends': list(range(200)), 'settings': {f'v_{i}': i / 2.0 for i in range(50)}}
 
+    benchmark_functions = []
+
+    def benchmark(f):
+        benchmark_functions.append(f)
+        return f
+
     if from_json:
         data = json.dumps(data)
 
-        def pydantic(d):
+        @benchmark
+        def pydantic_json(d):
             obj = json.loads(d)
             return PydanticModel.parse_obj(obj)
 
-        def pydantic_core(d):
+        @benchmark
+        def pydantic_core_json(d):
             output, fields_set = schema_validator.validate_json(d)
             return output
+
+        @benchmark
+        def pydantic_core_json_external(d):
+            obj = json.loads(d)
+            output, fields_set = schema_validator.validate_python(obj)
+            return output
+
     else:
-        def pydantic(d):
+        @benchmark
+        def pydantic_py(d):
             return PydanticModel.parse_obj(d)
 
-        def pydantic_core(d):
+        @benchmark
+        def pydantic_core_py(d):
             output, fields_set = schema_validator.validate_python(d)
             return output
 
-    impls = pydantic, pydantic_core
     reference_result = None
     steps = 1_000
 
-    for impl in impls:
-        print(f'{impl.__name__} (json={from_json}):')
-        result = impl(data)
+    for func in benchmark_functions:
+        print(f'{func.__name__}:')
+        result = func(data)
         # debug(result)
         if reference_result:
             assert reference_result == result
         reference_result = result
 
         t = timeit.timeit(
-            'impl(data)',
-            globals={'impl': impl, 'data': data},
+            'func(data)',
+            globals={'func': func, 'data': data},
             number=steps,
         )
         print(f'    {display_time(t / steps)}\n')
