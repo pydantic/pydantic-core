@@ -1,10 +1,12 @@
 import timeit
 from typing import List, Dict
 
+import ujson
+
 from devtools import debug
 
 
-def benchmark_simple_validation():
+def benchmark_simple_validation(from_json: bool = False):
     from pydantic import BaseModel
     from pydantic_core import SchemaValidator
 
@@ -44,19 +46,30 @@ def benchmark_simple_validation():
 
     data = {'name': 'John', 'age': 42, 'friends': list(range(200)), 'settings': {f'v_{i}': i / 2.0 for i in range(50)}}
 
-    def pydantic(d):
-        return PydanticModel.parse_obj(d)
+    if from_json:
+        data = ujson.dumps(data)
 
-    def pydantic_core(d):
-        output, fields_set = schema_validator.run(d)
-        return output
+        def pydantic(d):
+            obj = ujson.loads(d)
+            return PydanticModel.parse_obj(obj)
+
+        def pydantic_core(d):
+            output, fields_set = schema_validator.validate_json(d)
+            return output
+    else:
+        def pydantic(d):
+            return PydanticModel.parse_obj(d)
+
+        def pydantic_core(d):
+            output, fields_set = schema_validator.validate_python(d)
+            return output
 
     impls = pydantic, pydantic_core
     reference_result = None
     steps = 1_000
 
     for impl in impls:
-        print(f'{impl.__name__}:')
+        print(f'{impl.__name__} (json={from_json}):')
         result = impl(data)
         # debug(result)
         if reference_result:
@@ -87,3 +100,4 @@ def display_time(seconds: float):
 
 if __name__ == '__main__':
     benchmark_simple_validation()
+    benchmark_simple_validation(from_json=True)

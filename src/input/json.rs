@@ -87,7 +87,6 @@ impl Input for Value {
     }
 
     fn validate_int(&self, py: Python) -> ValResult<i64> {
-        dbg!(self);
         match self {
             Value::Number(n) => {
                 if let Some(int) = n.as_i64() {
