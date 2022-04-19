@@ -128,61 +128,56 @@ impl Input for Value {
 
     fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn DictInput<'py> + 'py>> {
         match self {
-            Value::Object(dict) => Ok(Box::new(JsonDictInput(dict))),
+            Value::Object(dict) => Ok(Box::new(dict)),
             _ => err_val_error!(py, self, kind = ErrorKind::DictType),
         }
     }
 
     fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn ListInput<'py> + 'py>> {
         match self {
-            Value::Array(a) => Ok(Box::new(JsonListInput(a))),
+            Value::Array(a) => Ok(Box::new(a)),
             _ => err_val_error!(py, self, kind = ErrorKind::ListType),
         }
     }
 }
 
-struct JsonDictInput<'py>(&'py Map<String, Value>);
-
-impl<'py> ToPy for JsonDictInput<'py> {
+impl ToPy for &Map<String, Value> {
     fn to_py(&self, py: Python) -> PyObject {
         let dict = PyDict::new(py);
-        for (k, v) in self.0.iter() {
+        for (k, v) in self.iter() {
             dict.set_item(k, v.to_py(py)).unwrap();
         }
         dict.into_py(py)
     }
 }
 
-impl<'py> DictInput<'py> for JsonDictInput<'py> {
-    fn iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_> {
-        Box::new(self.0.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
+impl<'py> DictInput<'py> for &'py Map<String, Value> {
+    fn input_iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_> {
+        Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
     }
 
-    fn get_item(&self, key: &str) -> Option<&dyn Input> {
-        self.0.get(key).map(|item| item as &dyn Input)
+    fn input_get(&self, key: &str) -> Option<&dyn Input> {
+        self.get(key).map(|item| item as &dyn Input)
     }
 
-    fn len(&self) -> usize {
-        self.0.len()
+    fn input_len(&self) -> usize {
+        self.len()
     }
 }
 
-struct JsonListInput<'py>(&'py Vec<Value>);
-
-impl<'py> ToPy for JsonListInput<'py> {
+impl ToPy for &Vec<Value> {
     fn to_py(&self, py: Python) -> PyObject {
-        self.0.iter().map(|v| v.to_py(py)).collect::<Vec<_>>().into_py(py)
+        self.iter().map(|v| v.to_py(py)).collect::<Vec<_>>().into_py(py)
     }
 }
 
-impl<'py> ListInput<'py> for JsonListInput<'py> {
-    // this is ugly, is there any way to avoid the map, one of the boxes and/or avoid the duplication?
-    fn iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_> {
-        Box::new(self.0.iter().map(|item| item as &dyn Input))
+impl<'py> ListInput<'py> for &Vec<Value> {
+    fn input_iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_> {
+        Box::new(self.iter().map(|item| item as &dyn Input))
     }
 
-    fn len(&self) -> usize {
-        self.0.len()
+    fn input_len(&self) -> usize {
+        self.len()
     }
 }
 

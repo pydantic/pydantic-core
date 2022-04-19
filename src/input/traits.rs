@@ -65,13 +65,15 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
     fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn ListInput<'py> + 'py>>;
 }
 
+// these are ugly, is there any way to avoid the maps in iter, one of the boxes and/or the duplication?
+// is this harming performance, particularly the .map(|item| item)?
 pub trait DictInput<'py>: ToPy {
-    fn iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_>;
-    fn get_item(&self, key: &str) -> Option<&'_ dyn Input>;
-    fn len(&self) -> usize;
+    fn input_iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_>;
+    fn input_get(&self, key: &str) -> Option<&'_ dyn Input>;
+    fn input_len(&self) -> usize;
 }
 
 pub trait ListInput<'py>: ToPy {
-    fn iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_>;
-    fn len(&self) -> usize;
+    fn input_iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_>;
+    fn input_len(&self) -> usize;
 }

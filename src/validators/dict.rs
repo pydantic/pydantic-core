@@ -37,7 +37,7 @@ impl Validator for DictValidator {
     fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
         let dict = input.validate_dict(py)?;
         if let Some(min_length) = self.min_items {
-            if dict.len() < min_length {
+            if dict.input_len() < min_length {
                 return err_val_error!(
                     py,
                     dict,
@@ -47,7 +47,7 @@ impl Validator for DictValidator {
             }
         }
         if let Some(max_length) = self.max_items {
-            if dict.len() > max_length {
+            if dict.input_len() > max_length {
                 return err_val_error!(
                     py,
                     dict,
@@ -59,7 +59,7 @@ impl Validator for DictValidator {
         let output = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
 
-        for (key, value) in dict.iter() {
+        for (key, value) in dict.input_iter() {
             let output_key: Option<PyObject> =
                 apply_validator(py, &self.key_validator, &mut errors, key, key, extra, true)?;
             let output_value: Option<PyObject> =

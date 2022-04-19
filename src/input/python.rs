@@ -116,7 +116,7 @@ impl Input for PyAny {
 
     fn validate_dict<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn DictInput<'py> + 'py>> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
-            Ok(Box::new(PyDictInput(dict)))
+            Ok(Box::new(dict))
             // TODO we probably want to try and support mapping like things here too
         } else {
             err_val_error!(py, self, kind = ErrorKind::DictType)
@@ -125,7 +125,7 @@ impl Input for PyAny {
 
     fn validate_list<'py>(&'py self, py: Python<'py>) -> ValResult<Box<dyn ListInput + 'py>> {
         if let Ok(list) = self.cast_as::<PyList>() {
-            Ok(Box::new(PyListInput(list)))
+            Ok(Box::new(list))
             // TODO support sets, tuples, frozen set etc. like in pydantic
         } else {
             err_val_error!(py, self, kind = ErrorKind::ListType)
@@ -133,44 +133,39 @@ impl Input for PyAny {
     }
 }
 
-struct PyDictInput<'py>(&'py PyDict);
-
-impl<'py> ToPy for PyDictInput<'py> {
+impl ToPy for &PyDict {
     fn to_py(&self, py: Python) -> PyObject {
-        self.0.into_py(py)
+        self.into_py(py)
     }
 }
 
-impl<'py> DictInput<'py> for PyDictInput<'py> {
-    fn iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_> {
-        Box::new(self.0.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
+impl<'py> DictInput<'py> for &'py PyDict {
+    fn input_iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_> {
+        Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
     }
 
-    fn get_item(&self, key: &str) -> Option<&dyn Input> {
-        self.0.get_item(key).map(|item| item as &dyn Input)
+    fn input_get(&self, key: &str) -> Option<&dyn Input> {
+        self.get_item(key).map(|item| item as &dyn Input)
     }
 
-    fn len(&self) -> usize {
-        self.0.len()
+    fn input_len(&self) -> usize {
+        self.len()
     }
 }
 
-struct PyListInput<'py>(&'py PyList);
-
-impl<'py> ToPy for PyListInput<'py> {
+impl ToPy for &PyList {
     fn to_py(&self, py: Python) -> PyObject {
-        self.0.into_py(py)
+        self.into_py(py)
     }
 }
 
-impl<'py> ListInput<'py> for PyListInput<'py> {
-    // this is ugly, is there any way to avoid the map, one of the boxes and/or avoid the duplication?
-    fn iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_> {
-        Box::new(self.0.iter().map(|item| item as &dyn Input))
+impl<'py> ListInput<'py> for &'py PyList {
+    fn input_iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_> {
+        Box::new(self.iter().map(|item| item as &dyn Input))
     }
 
-    fn len(&self) -> usize {
-        self.0.len()
+    fn input_len(&self) -> usize {
+        self.len()
     }
 }
 
