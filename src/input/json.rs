@@ -9,51 +9,6 @@ use crate::utils::py_error;
 use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
 
-impl ToPy for Value {
-    fn to_py(&self, py: Python) -> PyObject {
-        match self {
-            Value::Null => py.None(),
-            Value::Bool(b) => b.into_py(py),
-            Value::Number(n) => {
-                if let Some(int) = n.as_i64() {
-                    int.into_py(py)
-                } else if let Some(float) = n.as_f64() {
-                    float.into_py(py)
-                } else {
-                    panic!("{:?} is not a valid number", n)
-                }
-            }
-            Value::String(s) => s.clone().into_py(py),
-            Value::Array(a) => a.iter().map(|v| v.to_py(py)).collect::<Vec<_>>().into_py(py),
-            Value::Object(o) => {
-                let dict = PyDict::new(py);
-                for (k, v) in o.iter() {
-                    dict.set_item(k, v.to_py(py)).unwrap();
-                }
-                dict.into_py(py)
-            }
-        }
-    }
-}
-
-impl ToLocItem for Value {
-    fn to_loc(&self) -> ValResult<LocItem> {
-        match self {
-            Value::Number(n) => {
-                if let Some(int) = n.as_i64() {
-                    Ok(LocItem::I(int as usize))
-                } else if let Some(float) = n.as_f64() {
-                    Ok(LocItem::I(float as usize))
-                } else {
-                    py_error!(PyValueError; "{:?} is not a valid number", n).map_err(as_internal)
-                }
-            }
-            Value::String(s) => Ok(LocItem::S(s.to_string())),
-            v => Ok(LocItem::S(format!("{:?}", v))),
-        }
-    }
-}
-
 impl Input for Value {
     fn validate_none(&self, py: Python) -> ValResult<()> {
         match self {
@@ -140,16 +95,6 @@ impl Input for Value {
     }
 }
 
-impl ToPy for &Map<String, Value> {
-    fn to_py(&self, py: Python) -> PyObject {
-        let dict = PyDict::new(py);
-        for (k, v) in self.iter() {
-            dict.set_item(k, v.to_py(py)).unwrap();
-        }
-        dict.into_py(py)
-    }
-}
-
 impl<'py> DictInput<'py> for &'py Map<String, Value> {
     fn input_iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_> {
         Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
@@ -164,12 +109,6 @@ impl<'py> DictInput<'py> for &'py Map<String, Value> {
     }
 }
 
-impl ToPy for &Vec<Value> {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.iter().map(|v| v.to_py(py)).collect::<Vec<_>>().into_py(py)
-    }
-}
-
 impl<'py> ListInput<'py> for &Vec<Value> {
     fn input_iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_> {
         Box::new(self.iter().map(|item| item as &dyn Input))
@@ -177,6 +116,60 @@ impl<'py> ListInput<'py> for &Vec<Value> {
 
     fn input_len(&self) -> usize {
         self.len()
+    }
+}
+
+impl ToPy for Value {
+    fn to_py(&self, py: Python) -> PyObject {
+        match self {
+            Value::Null => py.None(),
+            Value::Bool(b) => b.into_py(py),
+            Value::Number(n) => {
+                if let Some(int) = n.as_i64() {
+                    int.into_py(py)
+                } else if let Some(float) = n.as_f64() {
+                    float.into_py(py)
+                } else {
+                    panic!("{:?} is not a valid number", n)
+                }
+            }
+            Value::String(s) => s.clone().into_py(py),
+            Value::Array(v) => v.to_py(py),
+            Value::Object(m) => m.to_py(py),
+        }
+    }
+}
+
+impl ToPy for &Map<String, Value> {
+    fn to_py(&self, py: Python) -> PyObject {
+        let dict = PyDict::new(py);
+        for (k, v) in self.iter() {
+            dict.set_item(k, v.to_py(py)).unwrap();
+        }
+        dict.into_py(py)
+    }
+}
+impl ToPy for &Vec<Value> {
+    fn to_py(&self, py: Python) -> PyObject {
+        self.iter().map(|v| v.to_py(py)).collect::<Vec<_>>().into_py(py)
+    }
+}
+
+impl ToLocItem for Value {
+    fn to_loc(&self) -> ValResult<LocItem> {
+        match self {
+            Value::Number(n) => {
+                if let Some(int) = n.as_i64() {
+                    Ok(LocItem::I(int as usize))
+                } else if let Some(float) = n.as_f64() {
+                    Ok(LocItem::I(float as usize))
+                } else {
+                    py_error!(PyValueError; "{:?} is not a valid number", n).map_err(as_internal)
+                }
+            }
+            Value::String(s) => Ok(LocItem::S(s.to_string())),
+            v => Ok(LocItem::S(format!("{:?}", v))),
+        }
     }
 }
 
