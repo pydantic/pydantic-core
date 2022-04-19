@@ -4,8 +4,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyList, PyString};
 
 use super::shared::{int_as_bool, str_as_bool};
-use super::traits::{DictInput, Input, ListInput, ToPy};
-use crate::errors::{as_internal, err_val_error, ErrorKind, ValResult};
+use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
+use crate::errors::{as_internal, err_val_error, ErrorKind, LocItem, ValResult};
 
 impl ToPy for PyDict {
     fn to_py(&self, py: Python) -> PyObject {
@@ -22,6 +22,21 @@ impl ToPy for PyList {
 impl ToPy for PyAny {
     fn to_py(&self, py: Python) -> PyObject {
         self.into_py(py)
+    }
+}
+
+impl ToLocItem for PyAny {
+    fn to_loc(&self) -> ValResult<LocItem> {
+        if let Ok(key_str) = self.extract::<String>() {
+            Ok(LocItem::S(key_str))
+        } else if let Ok(key_int) = self.extract::<usize>() {
+            Ok(LocItem::I(key_int))
+        } else {
+            // best effort is to use repr
+            let repr_result = self.repr().map_err(as_internal)?;
+            let repr: String = repr_result.extract().map_err(as_internal)?;
+            Ok(LocItem::S(repr))
+        }
     }
 }
 

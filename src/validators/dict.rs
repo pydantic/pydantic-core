@@ -2,8 +2,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use super::{build_validator, Extra, Validator};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, LocItem, ValError, ValLineError, ValResult};
-use crate::input::Input;
+use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValLineError, ValResult};
+use crate::input::{Input, ToLocItem};
 use crate::utils::dict_get;
 
 #[derive(Debug, Clone)]
@@ -95,13 +95,9 @@ fn apply_validator(
             Ok(value) => Ok(Some(value)),
             Err(ValError::LineErrors(line_errors)) => {
                 let loc = if key_loc {
-                    // TODO fix from_value
-                    vec![
-                        LocItem::from_py(key.to_py(py).as_ref(py))?,
-                        LocItem::S("[key]".to_string()),
-                    ]
+                    vec![key.to_loc()?, "[key]".to_loc()?]
                 } else {
-                    vec![LocItem::from_py(key.to_py(py).as_ref(py))?]
+                    vec![key.to_loc()?]
                 };
                 for err in line_errors {
                     errors.push(err.prefix_location(&loc));

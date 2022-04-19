@@ -2,7 +2,7 @@ use std::fmt;
 
 use pyo3::prelude::*;
 
-use crate::errors::ValResult;
+use crate::errors::{LocItem, ValResult};
 
 pub trait ToPy {
     fn to_py(&self, py: Python) -> PyObject;
@@ -33,7 +33,23 @@ impl ToPy for f64 {
     }
 }
 
-pub trait Input: fmt::Debug + ToPy {
+pub trait ToLocItem {
+    fn to_loc(&self) -> ValResult<LocItem>;
+}
+
+impl ToLocItem for String {
+    fn to_loc(&self) -> ValResult<LocItem> {
+        Ok(LocItem::S(self.clone()))
+    }
+}
+
+impl ToLocItem for &str {
+    fn to_loc(&self) -> ValResult<LocItem> {
+        Ok(LocItem::S(self.to_string()))
+    }
+}
+
+pub trait Input: fmt::Debug + ToPy + ToLocItem {
     fn validate_none(&self, py: Python) -> ValResult<()>;
 
     fn validate_str(&self, py: Python) -> ValResult<String>;

@@ -3,10 +3,8 @@ use pyo3::types::{PyDict, PySet};
 use std::collections::HashSet;
 
 use super::{build_validator, Extra, Validator};
-use crate::errors::{
-    as_internal, err_val_error, val_line_error, ErrorKind, LocItem, ValError, ValLineError, ValResult,
-};
-use crate::input::Input;
+use crate::errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult};
+use crate::input::{Input, ToLocItem};
 use crate::utils::{dict_get, py_error};
 
 #[derive(Debug, Clone)]
@@ -93,7 +91,7 @@ impl Validator for ModelValidator {
                 match field.validator.validate(py, value, &extra) {
                     Ok(value) => output_dict.set_item(&field.name, value).map_err(as_internal)?,
                     Err(ValError::LineErrors(line_errors)) => {
-                        let loc = vec![LocItem::S(field.name.clone())];
+                        let loc = vec![field.name.to_loc()?];
                         for err in line_errors {
                             errors.push(err.prefix_location(&loc));
                         }
@@ -110,7 +108,7 @@ impl Validator for ModelValidator {
                     py,
                     dict,
                     kind = ErrorKind::Missing,
-                    location = vec![LocItem::S(field.name.clone())]
+                    location = vec![field.name.to_loc()?]
                 ));
             }
         }
@@ -124,21 +122,20 @@ impl Validator for ModelValidator {
             for (raw_key, value) in dict.iter() {
                 let key: String = match raw_key.validate_str(py) {
                     Ok(k) => k,
-                    Err(_) => {
-                        // errors.push(val_line_error!(
-                        //     py,
-                        //     dict,
-                        //     kind = ErrorKind::InvalidKey,
-                        //     location = vec![LocItem::from_py_repr(raw_key)?]
-                        // ));
+                    Err(ValError::LineErrors(line_errors)) => {
+                        let loc = vec![raw_key.to_loc()?];
+                        for err in line_errors {
+                            errors.push(err.prefix_location(&loc));
+                        }
                         continue;
                     }
+                    Err(err) => return Err(err),
                 };
                 if fields_set.contains(&key) {
                     continue;
                 }
                 fields_set.insert(key.clone());
-                let loc = vec![LocItem::S(key.clone())];
+                let loc = vec![key.to_loc()?];
 
                 if forbid {
                     errors.push(val_line_error!(
@@ -194,7 +191,7 @@ impl ModelValidator {
         let prepare_result = |result: ValResult<PyObject>| match result {
             Ok(output) => prepare_tuple(output),
             Err(ValError::LineErrors(line_errors)) => {
-                let loc = vec![LocItem::S(field_name.clone())];
+                let loc = vec![field_name.to_loc()?];
                 let errors = line_errors.iter().map(|e| e.prefix_location(&loc)).collect();
                 Err(ValError::LineErrors(errors))
             }
@@ -214,7 +211,7 @@ impl ModelValidator {
                 // - with forbid this is obvious
                 // - with ignore the model should never be overloaded, so an error is the clearest option
                 _ => {
-                    let loc = vec![LocItem::S(field_name.clone())];
+                    let loc = vec![field_name.to_loc()?];
                     err_val_error!(py, input, location = loc, kind = ErrorKind::ExtraForbidden)
                 }
             }

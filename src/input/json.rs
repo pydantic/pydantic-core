@@ -1,12 +1,14 @@
 use serde_json::Value;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde_json::Map;
 
 use super::shared::{int_as_bool, str_as_bool};
-use super::traits::{DictInput, Input, ListInput, ToPy};
-use crate::errors::{err_val_error, ErrorKind, ValResult};
+use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
+use crate::errors::{as_internal, err_val_error, ErrorKind, LocItem, ValResult};
+use crate::utils::py_error;
 
 impl ToPy for Value {
     fn to_py(&self, py: Python) -> PyObject {
@@ -22,7 +24,7 @@ impl ToPy for Value {
                     panic!("{:?} is not a valid number", n)
                 }
             }
-            Value::String(s) => s.to_string().into_py(py),
+            Value::String(s) => s.clone().into_py(py),
             Value::Array(a) => a.iter().map(|v| v.to_py(py)).collect::<Vec<_>>().into_py(py),
             Value::Object(o) => {
                 let dict = PyDict::new(py);
@@ -31,6 +33,24 @@ impl ToPy for Value {
                 }
                 dict.into_py(py)
             }
+        }
+    }
+}
+
+impl ToLocItem for Value {
+    fn to_loc(&self) -> ValResult<LocItem> {
+        match self {
+            Value::Number(n) => {
+                if let Some(int) = n.as_i64() {
+                    Ok(LocItem::I(int as usize))
+                } else if let Some(float) = n.as_f64() {
+                    Ok(LocItem::I(float as usize))
+                } else {
+                    py_error!(PyValueError; "{:?} is not a valid number", n).map_err(as_internal)
+                }
+            }
+            Value::String(s) => Ok(LocItem::S(s.to_string())),
+            v => Ok(LocItem::S(format!("{:?}", v))),
         }
     }
 }
@@ -67,12 +87,19 @@ impl Input for Value {
     }
 
     fn validate_int(&self, py: Python) -> ValResult<i64> {
+        dbg!(self);
         match self {
             Value::Number(n) => {
                 if let Some(int) = n.as_i64() {
                     Ok(int)
+                } else if let Some(float) = n.as_f64() {
+                    if float % 1.0 == 0.0 {
+                        Ok(float as i64)
+                    } else {
+                        err_val_error!(py, float, kind = ErrorKind::IntFromFloat)
+                    }
                 } else {
-                    err_val_error!(py, self, kind = ErrorKind::IntFromFloat)
+                    err_val_error!(py, self, kind = ErrorKind::IntType)
                 }
             }
             Value::String(str) => match str.parse() {

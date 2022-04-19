@@ -25,3 +25,8 @@ def test_list():
     # language=json
     input_str = '[1, 2, "3"]'
     assert v.validate_json(input_str) == [1, 2, 3]
+
+
+def test_float_no_remainder():
+    v = SchemaValidator({'type': 'int'})
+    assert v.validate_json('123.0') == 123
