@@ -6,7 +6,7 @@ use pyo3::types::{PyDict, PyTuple};
 use pyo3::{ffi, intern, ToBorrowedObject};
 
 use super::{build_validator, Extra, ValResult, Validator};
-use crate::build_macros::{dict_get, dict_get_required, py_error};
+use crate::build_macros::{dict_get_required, py_error};
 use crate::errors::as_internal;
 use crate::input::Input;
 
@@ -25,12 +25,14 @@ impl Validator for ModelClassValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         let class = dict_get_required!(schema, "class", &PyAny)?;
         let new_method = class.getattr("__new__")?;
-        // `__new__` always exists and is always a function, no point checking `is_callable`
+        // `__new__` always exists and is always callable, no point checking `is_callable` here
+
         let model_schema = dict_get_required!(schema, "model", &PyDict)?;
-        let model_type = dict_get!(model_schema, "type", String);
-        if model_type != Some("model".to_string()) {
-            return py_error!("model-class expected a 'model' schema, got {:?}", model_type);
+        let model_type = dict_get_required!(model_schema, "type", String)?;
+        if &model_type != "model" {
+            return py_error!("model-class expected a 'model' schema, got '{}'", model_type);
         }
+
         Ok(Box::new(Self {
             validator: build_validator(model_schema, config)?,
             class: class.into(),
@@ -56,7 +58,10 @@ impl ModelClassValidator {
         let model_dict = t.get_item(0)?;
         let fields_set = t.get_item(1)?;
 
-        let instance = self.new_method.call(py, (self.class.as_ref(py),), None)?;
+        // TODO would be great if we could create `instance` without resorting to calling `__new__`,
+        // if we could convert `self.class` (a `PyObject`) to a `PyClass`, we could use `Py::new(...)`, but
+        // I can't find a way to do that.
+        let instance = self.new_method.call(py, (&self.class,), None)?;
 
         force_setattr(&instance, py, intern!(py, "__dict__"), model_dict)?;
         force_setattr(&instance, py, intern!(py, "__fields_set__"), fields_set)?;

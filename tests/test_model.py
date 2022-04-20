@@ -269,5 +269,5 @@ def test_model_class_bad_model():
     class MyModel:
         pass
 
-    with pytest.raises(SchemaError, match=re.escape('model-class expected a \'model\' schema, got Some("str")')):
+    with pytest.raises(SchemaError, match=re.escape("model-class expected a 'model' schema, got 'str'")):
         SchemaValidator({'type': 'model-class', 'class': MyModel, 'model': {'type': 'str'}})
