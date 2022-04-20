@@ -18,6 +18,7 @@ mod model;
 mod model_create;
 mod none;
 mod string;
+mod union;
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -106,6 +107,8 @@ pub fn build_validator(dict: &PyDict, config: Option<&PyDict>) -> PyResult<Box<d
         // models e.g. heterogeneous dicts
         self::model::ModelValidator,
         self::model_create::ModelClassValidator,
+        // unions
+        self::union::UnionValidator,
         // strings
         self::string::StrValidator,
         self::string::StrConstrainedValidator,
