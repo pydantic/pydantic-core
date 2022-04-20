@@ -34,7 +34,7 @@ impl Validator for DictValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'py>(&self, py: Python<'py>, input: &'py dyn Input, extra: &Extra) -> ValResult<&'py PyAny> {
         let dict = input.validate_dict(py)?;
         if let Some(min_length) = self.min_items {
             if dict.input_len() < min_length {
@@ -60,17 +60,15 @@ impl Validator for DictValidator {
         let mut errors: Vec<ValLineError> = Vec::new();
 
         for (key, value) in dict.input_iter() {
-            let output_key: Option<PyObject> =
-                apply_validator(py, &self.key_validator, &mut errors, key, key, extra, true)?;
-            let output_value: Option<PyObject> =
-                apply_validator(py, &self.value_validator, &mut errors, value, key, extra, false)?;
+            let output_key = apply_validator(py, &self.key_validator, &mut errors, key, key, extra, true)?;
+            let output_value = apply_validator(py, &self.value_validator, &mut errors, value, key, extra, false)?;
             if let (Some(key), Some(value)) = (output_key, output_value) {
                 output.set_item(key, value).map_err(as_internal)?;
             }
         }
 
         if errors.is_empty() {
-            Ok(output.into())
+            Ok(output.as_ref())
         } else {
             Err(ValError::LineErrors(errors))
         }
@@ -81,15 +79,15 @@ impl Validator for DictValidator {
     }
 }
 
-fn apply_validator(
-    py: Python,
+fn apply_validator<'py>(
+    py: Python<'py>,
     validator: &Option<Box<dyn Validator>>,
     errors: &mut Vec<ValLineError>,
-    input: &dyn Input,
-    key: &dyn Input,
-    extra: &Extra,
+    input: &'py dyn Input,
+    key: &'py dyn Input,
+    extra: &'py Extra,
     key_loc: bool,
-) -> ValResult<Option<PyObject>> {
+) -> ValResult<Option<&'py PyAny>> {
     match validator {
         Some(validator) => match validator.validate(py, input, extra) {
             Ok(value) => Ok(Some(value)),

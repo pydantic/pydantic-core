@@ -120,38 +120,42 @@ impl<'py> ListInput<'py> for &Vec<Value> {
 }
 
 impl ToPy for Value {
-    fn to_py(&self, py: Python) -> PyObject {
+    fn to_py<'py>(&'py self, py: Python<'py>) -> &'py PyAny {
         match self {
-            Value::Null => py.None(),
-            Value::Bool(b) => b.into_py(py),
+            Value::Null => py.None().into_ref(py),
+            Value::Bool(b) => b.to_py(py),
             Value::Number(n) => {
                 if let Some(int) = n.as_i64() {
-                    int.into_py(py)
+                    int.to_py(py).to_object(py).into_ref(py)
                 } else if let Some(float) = n.as_f64() {
-                    float.into_py(py)
+                    float.to_py(py).to_object(py).into_ref(py)
                 } else {
                     panic!("{:?} is not a valid number", n)
                 }
             }
-            Value::String(s) => s.clone().into_py(py),
-            Value::Array(v) => v.to_py(py),
-            Value::Object(m) => m.to_py(py),
+            Value::String(s) => s.to_py(py),
+            Value::Array(v) => v.to_py(py).to_object(py).into_ref(py),
+            Value::Object(m) => m.to_py(py).to_object(py).into_ref(py),
         }
     }
 }
 
 impl ToPy for &Map<String, Value> {
-    fn to_py(&self, py: Python) -> PyObject {
+    fn to_py<'py>(&'py self, py: Python<'py>) -> &'py PyAny {
         let dict = PyDict::new(py);
         for (k, v) in self.iter() {
             dict.set_item(k, v.to_py(py)).unwrap();
         }
-        dict.into_py(py)
+        dict.as_ref()
     }
 }
 impl ToPy for &Vec<Value> {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.iter().map(|v| v.to_py(py)).collect::<Vec<_>>().into_py(py)
+    fn to_py<'py>(&'py self, py: Python<'py>) -> &'py PyAny {
+        self.iter()
+            .map(|v| v.to_py(py))
+            .collect::<Vec<_>>()
+            .into_py(py)
+            .into_ref(py)
     }
 }
 

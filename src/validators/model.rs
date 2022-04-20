@@ -70,7 +70,7 @@ impl Validator for ModelValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'py>(&self, py: Python<'py>, input: &'py dyn Input, extra: &Extra) -> ValResult<&'py PyAny> {
         if let Some(field) = extra.field {
             // we're validating assignment, completely different logic
             return self.validate_assignment(py, field, input, extra);
@@ -161,7 +161,8 @@ impl Validator for ModelValidator {
         }
 
         if errors.is_empty() {
-            Ok((output_dict, fields_set).to_object(py))
+            let tuple = (output_dict, fields_set).to_object(py);
+            Ok(tuple.into_ref(py))
         } else {
             Err(ValError::LineErrors(errors))
         }
@@ -173,7 +174,13 @@ impl Validator for ModelValidator {
 }
 
 impl ModelValidator {
-    fn validate_assignment(&self, py: Python, field: &str, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_assignment<'py>(
+        &self,
+        py: Python<'py>,
+        field: &str,
+        input: &'py dyn Input,
+        extra: &Extra,
+    ) -> ValResult<&'py PyAny> {
         // TODO probably we should set location on errors here
         let field_name = field.to_string();
 
@@ -182,13 +189,14 @@ impl ModelValidator {
             None => panic!("data is required when validating assignment"),
         };
 
-        let prepare_tuple = |output: PyObject| {
+        let prepare_tuple = |output: &'py PyAny| {
             data.set_item(field_name.clone(), output).map_err(as_internal)?;
             let fields_set = PySet::new(py, &vec![field_name.clone()][..]).map_err(as_internal)?;
-            Ok((data, fields_set).to_object(py))
+            let tuple = (data, fields_set).to_object(py);
+            Ok(tuple.into_ref(py))
         };
 
-        let prepare_result = |result: ValResult<PyObject>| match result {
+        let prepare_result = |result: ValResult<&'py PyAny>| match result {
             Ok(output) => prepare_tuple(output),
             Err(ValError::LineErrors(line_errors)) => {
                 let loc = vec![field_name.to_loc()?];

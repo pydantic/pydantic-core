@@ -36,9 +36,10 @@ impl Validator for StrValidator {
         }
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'py>(&self, py: Python<'py>, input: &dyn Input, _extra: &Extra) -> ValResult<&'py PyAny> {
         let s = input.validate_str(py)?;
-        ValResult::Ok(s.into_py(py))
+        let py_str = PyString::new(py, s.as_str());
+        Ok(py_str.as_ref())
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -110,7 +111,7 @@ impl Validator for StrConstrainedValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'py>(&self, py: Python<'py>, input: &dyn Input, _extra: &Extra) -> ValResult<&'py PyAny> {
         let mut str = input.validate_str(py)?;
         if let Some(min_length) = self.min_length {
             if str.len() < min_length {
@@ -154,7 +155,7 @@ impl Validator for StrConstrainedValidator {
             str = str.to_uppercase()
         }
         let py_str = PyString::new(py, &str);
-        ValResult::Ok(py_str.into_py(py))
+        Ok(py_str.as_ref())
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

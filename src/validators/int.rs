@@ -18,8 +18,8 @@ impl Validator for IntValidator {
         Ok(Box::new(Self))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
-        Ok(input.validate_int(py)?.into_py(py))
+    fn validate<'py>(&self, py: Python<'py>, input: &dyn Input, _extra: &Extra) -> ValResult<&'py PyAny> {
+        Ok(input.validate_int(py)?.into_py(py).into_ref(py))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -51,7 +51,7 @@ impl Validator for IntConstrainedValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'py>(&self, py: Python<'py>, input: &dyn Input, _extra: &Extra) -> ValResult<&'py PyAny> {
         let int = input.validate_int(py)?;
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
@@ -98,7 +98,7 @@ impl Validator for IntConstrainedValidator {
                 );
             }
         }
-        Ok(int.into_py(py))
+        Ok(int.into_py(py).into_ref(py))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

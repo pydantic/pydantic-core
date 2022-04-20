@@ -2,9 +2,9 @@ use pyo3::exceptions::{PyAssertionError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
-use super::{Extra, ValError, Validator};
+use super::{Extra, Validator};
 use crate::build_macros::{dict, dict_get_required, py_error};
-use crate::errors::{map_validation_error, val_line_error, ErrorKind, ValResult};
+use crate::errors::{map_validation_error, val_line_error, ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::validators::build_validator;
 
@@ -40,14 +40,13 @@ impl FunctionBeforeValidator {
 impl Validator for FunctionBeforeValidator {
     build!();
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'py>(&self, py: Python<'py>, input: &'py dyn Input, extra: &Extra) -> ValResult<&'py PyAny> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         let value = self
             .func
             .call(py, (input.to_py(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))?;
-        let v: &PyAny = value.as_ref(py);
-        self.validator.validate(py, v, extra)
+        self.validator.validate(py, value.into_ref(py), extra)
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -69,10 +68,14 @@ impl FunctionAfterValidator {
 impl Validator for FunctionAfterValidator {
     build!();
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'py>(&self, py: Python<'py>, input: &'py dyn Input, extra: &Extra) -> ValResult<&'py PyAny> {
         let v = self.validator.validate(py, input, extra)?;
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
-        self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
+        let output = self
+            .func
+            .call(py, (v,), kwargs)
+            .map_err(|e| convert_err(py, e, input))?;
+        Ok(output.into_ref(py))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -98,11 +101,13 @@ impl Validator for FunctionPlainValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'py>(&self, py: Python<'py>, input: &'py dyn Input, extra: &Extra) -> ValResult<&'py PyAny> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
-        self.func
+        let output = self
+            .func
             .call(py, (input.to_py(py),), kwargs)
-            .map_err(|e| convert_err(py, e, input))
+            .map_err(|e| convert_err(py, e, input))?;
+        Ok(output.into_ref(py))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -124,7 +129,7 @@ impl FunctionWrapValidator {
 impl Validator for FunctionWrapValidator {
     build!();
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'py>(&self, py: Python<'py>, input: &'py dyn Input, extra: &Extra) -> ValResult<&'py PyAny> {
         let validator_kwarg = ValidatorCallable {
             validator: self.validator.clone(),
             data: extra.data.map(|d| d.into_py(py)),
@@ -136,9 +141,11 @@ impl Validator for FunctionWrapValidator {
             "data" => extra.data,
             "config" => self.config.as_ref()
         );
-        self.func
+        let output = self
+            .func
             .call(py, (input.to_py(py),), kwargs)
-            .map_err(|e| convert_err(py, e, input))
+            .map_err(|e| convert_err(py, e, input))?;
+        Ok(output.into_ref(py))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -156,7 +163,7 @@ pub struct ValidatorCallable {
 
 #[pymethods]
 impl ValidatorCallable {
-    fn __call__(&self, py: Python, arg: &PyAny) -> PyResult<PyObject> {
+    fn __call__<'py>(&self, py: Python<'py>, arg: &'py PyAny) -> PyResult<&'py PyAny> {
         let extra = Extra {
             data: self.data.as_ref().map(|data| data.as_ref(py)),
             field: self.field.as_deref(),

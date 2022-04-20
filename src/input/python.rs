@@ -9,20 +9,32 @@ use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
 
 impl ToPy for PyDict {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
+    fn to_py<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
+        self.as_ref()
+    }
+}
+
+impl ToPy for &PyDict {
+    fn to_py<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
+        self.as_ref()
     }
 }
 
 impl ToPy for PyList {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
+    fn to_py<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
+        self.as_ref()
+    }
+}
+
+impl ToPy for &PyList {
+    fn to_py<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
+        self.as_ref()
     }
 }
 
 impl ToPy for PyAny {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
+    fn to_py<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
+        self
     }
 }
 
@@ -138,12 +150,6 @@ impl Input for PyAny {
     }
 }
 
-impl ToPy for &PyDict {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
 impl<'py> DictInput<'py> for &'py PyDict {
     fn input_iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_> {
         Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
@@ -155,12 +161,6 @@ impl<'py> DictInput<'py> for &'py PyDict {
 
     fn input_len(&self) -> usize {
         self.len()
-    }
-}
-
-impl ToPy for &PyList {
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
     }
 }
 

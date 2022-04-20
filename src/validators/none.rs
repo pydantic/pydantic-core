@@ -17,9 +17,9 @@ impl Validator for NoneValidator {
         Ok(Box::new(Self))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'py>(&self, py: Python<'py>, input: &dyn Input, _extra: &Extra) -> ValResult<&'py PyAny> {
         input.validate_none(py)?;
-        ValResult::Ok(py.None())
+        ValResult::Ok(py.None().into_ref(py))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

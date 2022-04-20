@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyFloat};
 
 use super::{Extra, Validator};
 use crate::build_macros::dict_get;
@@ -18,8 +18,9 @@ impl Validator for FloatValidator {
         Ok(Box::new(Self))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
-        Ok(input.validate_float(py)?.into_py(py))
+    fn validate<'py>(&self, py: Python<'py>, input: &dyn Input, _extra: &Extra) -> ValResult<&'py PyAny> {
+        let f = PyFloat::new(py, input.validate_float(py)?);
+        Ok(f.as_ref())
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -51,7 +52,7 @@ impl Validator for FloatConstrainedValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'py>(&self, py: Python<'py>, input: &dyn Input, _extra: &Extra) -> ValResult<&'py PyAny> {
         let float = input.validate_float(py)?;
         if let Some(multiple_of) = self.multiple_of {
             if float % multiple_of != 0.0 {
@@ -103,7 +104,8 @@ impl Validator for FloatConstrainedValidator {
                 );
             }
         }
-        Ok(float.into_py(py))
+        let f = PyFloat::new(py, float);
+        Ok(f.as_ref())
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

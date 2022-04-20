@@ -5,7 +5,7 @@ use pyo3::types::{PyAny, PyDict};
 use serde_json::{from_str as parse_json, Value as JsonValue};
 
 use crate::build_macros::{dict_get, dict_get_required, py_error};
-use crate::errors::{err_val_error, map_validation_error, ErrorKind, ValError, ValResult};
+use crate::errors::{err_val_error, map_validation_error, ErrorKind, ValResult};
 use crate::input::{Input, ToPy};
 
 mod bool;
@@ -36,7 +36,7 @@ impl SchemaValidator {
         })
     }
 
-    fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
+    fn validate_python<'py>(&self, py: Python<'py>, input: &'py PyAny) -> PyResult<&'py PyAny> {
         let extra = Extra {
             data: None,
             field: None,
@@ -45,14 +45,17 @@ impl SchemaValidator {
         r.map_err(|e| map_validation_error(&self.title, e))
     }
 
-    fn validate_json(&self, py: Python, input: String) -> PyResult<PyObject> {
-        let result: ValResult<PyObject> = match parse_json::<JsonValue>(input.as_str()) {
+    fn validate_json<'py>(&self, py: Python<'py>, input: &'py str) -> PyResult<PyObject> {
+        let result: ValResult<PyObject> = match parse_json::<JsonValue>(input) {
             Ok(input) => {
                 let extra = Extra {
                     data: None,
                     field: None,
                 };
-                self.validator.validate(py, &input, &extra)
+                match self.validator.validate(py, &input, &extra) {
+                    Ok(input) => Ok(input.into_py(py)),
+                    Err(e) => Err(e),
+                }
             }
             Err(e) => err_val_error!(py, input, message = Some(e.to_string()), kind = ErrorKind::InvalidJson),
         };
@@ -60,7 +63,13 @@ impl SchemaValidator {
         result.map_err(|e| map_validation_error(&self.title, e))
     }
 
-    fn validate_assignment(&self, py: Python, field: String, input: &PyAny, data: &PyDict) -> PyResult<PyObject> {
+    fn validate_assignment<'py>(
+        &self,
+        py: Python<'py>,
+        field: String,
+        input: &'py PyAny,
+        data: &'py PyDict,
+    ) -> PyResult<&'py PyAny> {
         let extra = Extra {
             data: Some(data),
             field: Some(field.as_str()),
@@ -150,7 +159,7 @@ pub trait Validator: Send + fmt::Debug {
         Self: Sized;
 
     /// Do the actual validation for this schema/type
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject>;
+    fn validate<'py>(&self, py: Python<'py>, input: &'py dyn Input, extra: &Extra) -> ValResult<&'py PyAny>;
 
     /// Ugly, but this has to be duplicated on all types to allow for cloning of validators,
     /// cloning is required to allow the SchemaValidator to be passed around in python

@@ -62,14 +62,14 @@ pub fn map_validation_error(model_name: &str, error: ValError) -> PyErr {
 macro_rules! val_line_error {
     ($py:ident, $input:expr) => {
         crate::errors::ValLineError {
-            input_value: Some($input.into_py($py)),
+            input_value: Some($input.to_py($py).to_object($py)),
             ..Default::default()
         }
     };
 
     ($py:ident, $input:expr, $($key:ident = $val:expr),+) => {
         crate::errors::ValLineError {
-            input_value: Some($input.to_py($py)),
+            input_value: Some($input.to_py($py).to_object($py)),
             $(
                 $key: $val,
             )+
