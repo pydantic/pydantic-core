@@ -9,31 +9,31 @@ use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
 
 impl ToPy for PyDict {
-    fn to_py<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
+    fn to_pyany<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
         self.as_ref()
     }
 }
 
 impl ToPy for &PyDict {
-    fn to_py<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
+    fn to_pyany<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
         self.as_ref()
     }
 }
 
 impl ToPy for PyList {
-    fn to_py<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
+    fn to_pyany<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
         self.as_ref()
     }
 }
 
 impl ToPy for &PyList {
-    fn to_py<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
+    fn to_pyany<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
         self.as_ref()
     }
 }
 
 impl ToPy for PyAny {
-    fn to_py<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
+    fn to_pyany<'py>(&'py self, _py: Python<'py>) -> &'py PyAny {
         self
     }
 }

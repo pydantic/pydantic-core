@@ -104,6 +104,6 @@ fn apply_validator<'py>(
             }
             Err(err) => Err(err),
         },
-        None => Ok(Some(input.to_py(py))),
+        None => Ok(Some(input.to_pyany(py))),
     }
 }

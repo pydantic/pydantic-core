@@ -44,7 +44,7 @@ impl Validator for FunctionBeforeValidator {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         let value = self
             .func
-            .call(py, (input.to_py(py),), kwargs)
+            .call(py, (input.to_pyany(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))?;
         self.validator.validate(py, value.into_ref(py), extra)
     }
@@ -105,7 +105,7 @@ impl Validator for FunctionPlainValidator {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         let output = self
             .func
-            .call(py, (input.to_py(py),), kwargs)
+            .call(py, (input.to_pyany(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))?;
         Ok(output.into_ref(py))
     }
@@ -143,7 +143,7 @@ impl Validator for FunctionWrapValidator {
         );
         let output = self
             .func
-            .call(py, (input.to_py(py),), kwargs)
+            .call(py, (input.to_pyany(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))?;
         Ok(output.into_ref(py))
     }
