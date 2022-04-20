@@ -1,6 +1,8 @@
+import re
+
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
 
 def test_simple():
@@ -196,6 +198,65 @@ def test_model_class():
     v = SchemaValidator(
         {'type': 'model-class', 'class': MyModel, 'model': {'type': 'model', 'fields': {'field_a': {'type': 'str'}}}}
     )
+    assert repr(v).startswith('SchemaValidator(title="Model", validator=ModelClassValidator {\n')
     m = v.validate_python({'field_a': 'test'})
     assert isinstance(m, MyModel)
     assert m.field_a == 'test'
+
+
+def test_model_class_setattr():
+    setattr_calls = []
+
+    class MyModel:
+        field_a: str
+
+        def __setattr__(self, key, value):
+            setattr_calls.append((key, value))
+            # don't do anything
+
+    m1 = MyModel()
+    m1.foo = 'bar'
+    assert not hasattr(m1, 'foo')
+    assert setattr_calls == [('foo', 'bar')]
+    setattr_calls.clear()
+
+    v = SchemaValidator(
+        {'type': 'model-class', 'class': MyModel, 'model': {'type': 'model', 'fields': {'field_a': {'type': 'str'}}}}
+    )
+    m = v.validate_python({'field_a': 'test'})
+    assert isinstance(m, MyModel)
+    assert m.field_a == 'test'
+    assert setattr_calls == []
+
+
+def test_model_class_root_validator():
+    class MyModel:
+        pass
+
+    def f(input_value, *, validator, **kwargs):
+        output = validator(input_value)
+        return str(output)
+
+    v = SchemaValidator(
+        {
+            'title': 'Test',
+            'type': 'function-wrap',
+            'function': f,
+            'field': {
+                'type': 'model-class',
+                'class': MyModel,
+                'model': {'type': 'model', 'fields': {'field_a': {'type': 'str'}}},
+            },
+        }
+    )
+    m = v.validate_python({'field_a': 'test'})
+    assert isinstance(m, str)
+    assert 'test_model_class_root_validator.<locals>.MyModel' in m
+
+
+def test_model_class_bad_model():
+    class MyModel:
+        pass
+
+    with pytest.raises(SchemaError, match=re.escape('model-class expected a \'model\' schema, got Some("str")')):
+        SchemaValidator({'type': 'model-class', 'class': MyModel, 'model': {'type': 'str'}})
