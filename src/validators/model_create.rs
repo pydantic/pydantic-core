@@ -1,7 +1,9 @@
-use pyo3::intern;
-use pyo3::once_cell::GILOnceCell;
+use std::os::raw::c_int;
+
+use pyo3::conversion::AsPyPointer;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
+use pyo3::{ffi, intern, ToBorrowedObject};
 
 use super::{build_validator, Extra, ValResult, Validator};
 use crate::build_macros::{dict_get, dict_get_required, py_error};
@@ -55,18 +57,36 @@ impl ModelClassValidator {
         let fields_set = t.get_item(1)?;
 
         let instance = self.new_method.call(py, (self.class.as_ref(py),), None)?;
-        let setattr = get_setattr(py);
-        setattr.call((&instance, intern!(py, "__dict__"), model_dict), None)?;
-        setattr.call((&instance, intern!(py, "__fields_set__"), fields_set), None)?;
+
+        force_setattr(&instance, py, intern!(py, "__dict__"), model_dict)?;
+        force_setattr(&instance, py, intern!(py, "__fields_set__"), fields_set)?;
 
         Ok(instance)
     }
 }
 
-static SET_ATTR_CELL: GILOnceCell<PyObject> = GILOnceCell::new();
+/// copied and modified from
+/// https://github.com/PyO3/pyo3/blob/d2caa056e9aacc46374139ef491d112cb8af1a25/src/instance.rs#L587-L597
+/// to use `PyObject_GenericSetAttr` thereby bypassing `__setattr__` methods on the instance,
+/// see https://github.com/PyO3/pyo3/discussions/2321 for discussion
+pub fn force_setattr<N, V>(obj: &PyObject, py: Python<'_>, attr_name: N, value: V) -> PyResult<()>
+where
+    N: ToPyObject,
+    V: ToPyObject,
+{
+    attr_name.with_borrowed_ptr(py, move |attr_name| {
+        value.with_borrowed_ptr(py, |value| unsafe {
+            error_on_minusone(py, ffi::PyObject_GenericSetAttr(obj.as_ptr(), attr_name, value))
+        })
+    })
+}
 
-pub fn get_setattr(py: Python<'_>) -> &PyAny {
-    SET_ATTR_CELL
-        .get_or_init(py, || py.eval("object.__setattr__", None, None).unwrap().into())
-        .as_ref(py)
+// Defined here as it's not exported by pyo3
+#[inline]
+fn error_on_minusone(py: Python<'_>, result: c_int) -> PyResult<()> {
+    if result != -1 {
+        Ok(())
+    } else {
+        Err(PyErr::fetch(py))
+    }
 }
