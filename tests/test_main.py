@@ -12,7 +12,7 @@ class Err:
 
 
 @pytest.mark.parametrize(
-    'input_value,output_value',
+    'input_value,expected',
     [
         (False, False),
         (True, True),
@@ -24,9 +24,9 @@ class Err:
         ('false', False),
     ],
 )
-def test_bool(input_value, output_value):
+def test_bool(input_value, expected):
     v = SchemaValidator({'type': 'bool', 'title': 'TestModel'})
-    assert v.validate_python(input_value) == output_value
+    assert v.validate_python(input_value) == expected
 
 
 def test_bool_error():
@@ -93,50 +93,46 @@ def test_str_constrained():
 
 
 @pytest.mark.parametrize(
-    'input_value,output_value,error_msg',
-    [('foobar', 'foobar', None), (123, '123', None), (False, None, 'Value must be a valid string [kind=str_type')],
+    'input_value,expected',
+    [('foobar', 'foobar'), (123, '123'), (False, Err('Value must be a valid string [kind=str_type'))],
 )
-def test_str(input_value, output_value, error_msg):
+def test_str(input_value, expected):
     v = SchemaValidator({'type': 'str'})
-    if error_msg:
-        assert output_value is None, 'output_value should be None if error_msg is set'
-
-        with pytest.raises(ValidationError, match=re.escape(error_msg)):
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
     else:
-        assert v.validate_python(input_value) == output_value
+        assert v.validate_python(input_value) == expected
 
 
 @pytest.mark.parametrize(
-    'kwargs,input_value,output_value,error_msg',
+    'kwargs,input_value,expected',
     [
-        ({'to_upper': True}, 'fooBar', 'FOOBAR', None),
-        ({'to_lower': True}, 'fooBar', 'foobar', None),
-        ({'strip_whitespace': True}, ' foobar  ', 'foobar', None),
-        ({'strip_whitespace': True, 'to_upper': True}, ' fooBar', 'FOOBAR', None),
-        ({'min_length': 5}, '12345', '12345', None),
-        ({'min_length': 5}, '1234', None, 'String must have at least 5 characters [kind=str_too_short'),
-        ({'max_length': 5}, '12345', '12345', None),
-        ({'max_length': 5}, '123456', None, 'String must have at most 5 characters [kind=str_too_long'),
-        ({'pattern': r'^\d+$'}, '12345', '12345', None),
-        ({'pattern': r'\d+$'}, 'foobar 123', 'foobar 123', None),
-        ({'pattern': r'^\d+$'}, '12345a', None, "String must match pattern '^\\d+$' [kind=str_pattern_mismatch"),
+        ({'to_upper': True}, 'fooBar', 'FOOBAR'),
+        ({'to_lower': True}, 'fooBar', 'foobar'),
+        ({'strip_whitespace': True}, ' foobar  ', 'foobar'),
+        ({'strip_whitespace': True, 'to_upper': True}, ' fooBar', 'FOOBAR'),
+        ({'min_length': 5}, '12345', '12345'),
+        ({'min_length': 5}, '1234', Err('String must have at least 5 characters [kind=str_too_short')),
+        ({'max_length': 5}, '12345', '12345'),
+        ({'max_length': 5}, '123456', Err('String must have at most 5 characters [kind=str_too_long')),
+        ({'pattern': r'^\d+$'}, '12345', '12345'),
+        ({'pattern': r'\d+$'}, 'foobar 123', 'foobar 123'),
+        ({'pattern': r'^\d+$'}, '12345a', Err("String must match pattern '^\\d+$' [kind=str_pattern_mismatch")),
         # strip comes after length check
-        ({'max_length': 5, 'strip_whitespace': True}, '1234  ', None, 'String must have at most 5 characters'),
+        ({'max_length': 5, 'strip_whitespace': True}, '1234  ', Err('String must have at most 5 characters')),
         # to_upper and strip comes after pattern check
-        ({'to_upper': True, 'pattern': 'abc'}, 'abc', 'ABC', None),
-        ({'strip_whitespace': True, 'pattern': r'\d+$'}, 'foobar 123 ', None, "String must match pattern '\\d+$'"),
+        ({'to_upper': True, 'pattern': 'abc'}, 'abc', 'ABC'),
+        ({'strip_whitespace': True, 'pattern': r'\d+$'}, 'foobar 123 ', Err("String must match pattern '\\d+$'")),
     ],
 )
-def test_constrained_str(kwargs, input_value, output_value, error_msg):
+def test_constrained_str(kwargs, input_value, expected):
     v = SchemaValidator({'type': 'str-constrained', **kwargs})
-    if error_msg:
-        assert output_value is None, 'output_value should be None if error_msg is set'
-
-        with pytest.raises(ValidationError, match=re.escape(error_msg)):
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
     else:
-        assert v.validate_python(input_value) == output_value
+        assert v.validate_python(input_value) == expected
 
 
 def test_invalid_regex():
