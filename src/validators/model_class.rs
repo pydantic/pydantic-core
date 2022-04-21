@@ -15,6 +15,7 @@ pub struct ModelClassValidator {
     validator: Box<dyn Validator>,
     class: Py<PyType>,
     new_method: PyObject,
+    name: String,
 }
 
 impl ModelClassValidator {
@@ -37,6 +38,7 @@ impl Validator for ModelClassValidator {
             validator: build_validator(model_schema, config)?,
             class: class.into(),
             new_method: new_method.into(),
+            name: class.name().unwrap_or("UnknownClass").to_string(),
         }))
     }
 
@@ -47,6 +49,10 @@ impl Validator for ModelClassValidator {
             let output = self.validator.validate(py, input, extra)?;
             self.create_class(py, output).map_err(as_internal)
         }
+    }
+
+    fn get_name(&self) -> String {
+        self.name.clone()
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

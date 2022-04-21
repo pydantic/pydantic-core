@@ -41,6 +41,10 @@ impl Validator for StrValidator {
         ValResult::Ok(s.into_py(py))
     }
 
+    fn get_name(&self) -> String {
+        Self::EXPECTED_TYPE.to_string()
+    }
+
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -155,6 +159,10 @@ impl Validator for StrConstrainedValidator {
         }
         let py_str = PyString::new(py, &str);
         ValResult::Ok(py_str.into_py(py))
+    }
+
+    fn get_name(&self) -> String {
+        Self::EXPECTED_TYPE.to_string()
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

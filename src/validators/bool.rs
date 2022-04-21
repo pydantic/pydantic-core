@@ -24,6 +24,10 @@ impl Validator for BoolValidator {
         Ok(input.validate_bool(py)?.into_py(py))
     }
 
+    fn get_name(&self) -> String {
+        Self::EXPECTED_TYPE.to_string()
+    }
+
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }

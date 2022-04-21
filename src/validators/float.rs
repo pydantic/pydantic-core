@@ -23,6 +23,10 @@ impl Validator for FloatValidator {
         Ok(input.validate_float(py)?.into_py(py))
     }
 
+    fn get_name(&self) -> String {
+        Self::EXPECTED_TYPE.to_string()
+    }
+
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -105,6 +109,10 @@ impl Validator for FloatConstrainedValidator {
             }
         }
         Ok(float.into_py(py))
+    }
+
+    fn get_name(&self) -> String {
+        Self::EXPECTED_TYPE.to_string()
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

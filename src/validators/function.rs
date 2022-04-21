@@ -51,6 +51,10 @@ impl Validator for FunctionBeforeValidator {
         self.validator.validate(py, v, extra)
     }
 
+    fn get_name(&self) -> String {
+        Self::EXPECTED_TYPE.to_string()
+    }
+
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -74,6 +78,10 @@ impl Validator for FunctionAfterValidator {
         let v = self.validator.validate(py, input, extra)?;
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
+    }
+
+    fn get_name(&self) -> String {
+        Self::EXPECTED_TYPE.to_string()
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -104,6 +112,10 @@ impl Validator for FunctionPlainValidator {
         self.func
             .call(py, (input.to_py(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))
+    }
+
+    fn get_name(&self) -> String {
+        Self::EXPECTED_TYPE.to_string()
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -140,6 +152,10 @@ impl Validator for FunctionWrapValidator {
         self.func
             .call(py, (input.to_py(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))
+    }
+
+    fn get_name(&self) -> String {
+        Self::EXPECTED_TYPE.to_string()
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

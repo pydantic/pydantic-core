@@ -15,7 +15,7 @@ mod function;
 mod int;
 mod list;
 mod model;
-mod model_create;
+mod model_class;
 mod none;
 mod string;
 mod union;
@@ -106,7 +106,7 @@ pub fn build_validator(dict: &PyDict, config: Option<&PyDict>) -> PyResult<Box<d
         config,
         // models e.g. heterogeneous dicts
         self::model::ModelValidator,
-        self::model_create::ModelClassValidator,
+        self::model_class::ModelClassValidator,
         // unions
         self::union::UnionValidator,
         // strings
@@ -156,6 +156,8 @@ pub trait Validator: Send + fmt::Debug {
 
     /// Do the actual validation for this schema/type
     fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject>;
+
+    fn get_name(&self) -> String;
 
     /// Ugly, but this has to be duplicated on all types to allow for cloning of validators,
     /// cloning is required to allow the SchemaValidator to be passed around in python

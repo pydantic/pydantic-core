@@ -1,8 +1,14 @@
 import re
+from dataclasses import dataclass
 
 import pytest
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
+
+
+@dataclass
+class Err:
+    message: str
 
 
 @pytest.mark.parametrize(
@@ -35,6 +41,42 @@ def test_bool_error():
         '  Value must be a valid boolean, '
         'unable to interpret input [kind=bool_parsing, input_value=wrong, input_type=str]'
     )
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'bool_parsing',
+            'loc': [],
+            'message': 'Value must be a valid boolean, unable to interpret input',
+            'input_value': 'wrong',
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        (False, False),
+        (True, True),
+        (0, 0),
+        ('0', 0),
+        (1, 1),
+        (42, 42),
+        ('42', 42),
+        (42.0, 42),
+        (int(1e10), int(1e10)),
+        (True, 1),
+        (False, 0),
+        (12.5, Err('Value must be a valid integer, got a number with a fractional part [kind=int_from_float')),
+        ('wrong', Err('Value must be a valid integer, unable to parse string as an integer [kind=int_parsing')),
+        ((1, 2), Err('Value must be a valid integer [kind=int_type, input_value=(1, 2), input_type=tuple]')),
+    ],
+)
+def test_int(input_value, expected):
+    v = SchemaValidator({'type': 'int', 'title': 'TestModel'})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected
 
 
 def test_repr():
