@@ -22,11 +22,22 @@ class Err:
         ('no', False),
         ('true', True),
         ('false', False),
+        (
+            'cheese',
+            Err(
+                'Value must be a valid boolean, '
+                'unable to interpret input [kind=bool_parsing, input_value=cheese, input_type=str]'
+            ),
+        ),
     ],
 )
 def test_bool(input_value, expected):
     v = SchemaValidator({'type': 'bool', 'title': 'TestModel'})
-    assert v.validate_python(input_value) == expected
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected
 
 
 def test_bool_error():
@@ -94,7 +105,14 @@ def test_str_constrained():
 
 @pytest.mark.parametrize(
     'input_value,expected',
-    [('foobar', 'foobar'), (123, '123'), (False, Err('Value must be a valid string [kind=str_type'))],
+    [
+        ('foobar', 'foobar'),
+        (123, '123'),
+        (123.456, '123.456'),
+        (False, Err('Value must be a valid string [kind=str_type')),
+        (True, Err('Value must be a valid string [kind=str_type')),
+        ([], Err('Value must be a valid string [kind=str_type, input_value=[], input_type=list]')),
+    ],
 )
 def test_str(input_value, expected):
     v = SchemaValidator({'type': 'str'})
