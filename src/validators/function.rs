@@ -9,6 +9,38 @@ use crate::validators::build_validator;
 
 use super::{Extra, Validator};
 
+#[derive(Debug, Clone)]
+pub struct FunctionValidator;
+
+impl FunctionValidator {
+    pub const EXPECTED_TYPE: &'static str = "function";
+}
+
+impl Validator for FunctionValidator {
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
+        let mode = dict_get_required!(schema, "mode", &str)?;
+        match mode {
+            "before" => FunctionBeforeValidator::build(schema, config),
+            "after" => FunctionAfterValidator::build(schema, config),
+            "plain" => FunctionPlainValidator::build(schema, config),
+            "wrap" => FunctionWrapValidator::build(schema, config),
+            _ => py_error!("Unexpected function mode {:?}", mode),
+        }
+    }
+
+    fn validate(&self, _py: Python, _input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+        unimplemented!("FunctionValidator is never used directly")
+    }
+
+    fn get_name(&self) -> String {
+        Self::EXPECTED_TYPE.to_string()
+    }
+
+    fn clone_dyn(&self) -> Box<dyn Validator> {
+        Box::new(self.clone())
+    }
+}
+
 macro_rules! kwargs {
     ($py:ident, $($k:expr => $v:expr),*) => {{
         Some(dict!($py, $($k => $v),*))
@@ -28,14 +60,10 @@ macro_rules! build {
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionBeforeValidator {
+struct FunctionBeforeValidator {
     validator: Box<dyn Validator>,
     func: PyObject,
     config: Option<Py<PyDict>>,
-}
-
-impl FunctionBeforeValidator {
-    pub const EXPECTED_TYPE: &'static str = "function-before";
 }
 
 impl Validator for FunctionBeforeValidator {
@@ -52,7 +80,7 @@ impl Validator for FunctionBeforeValidator {
     }
 
     fn get_name(&self) -> String {
-        Self::EXPECTED_TYPE.to_string()
+        "function-before".to_string()
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -61,14 +89,10 @@ impl Validator for FunctionBeforeValidator {
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionAfterValidator {
+struct FunctionAfterValidator {
     validator: Box<dyn Validator>,
     func: PyObject,
     config: Option<Py<PyDict>>,
-}
-
-impl FunctionAfterValidator {
-    pub const EXPECTED_TYPE: &'static str = "function-after";
 }
 
 impl Validator for FunctionAfterValidator {
@@ -81,7 +105,7 @@ impl Validator for FunctionAfterValidator {
     }
 
     fn get_name(&self) -> String {
-        Self::EXPECTED_TYPE.to_string()
+        "function-after".to_string()
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -90,13 +114,9 @@ impl Validator for FunctionAfterValidator {
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionPlainValidator {
+struct FunctionPlainValidator {
     func: PyObject,
     config: Option<Py<PyDict>>,
-}
-
-impl FunctionPlainValidator {
-    pub const EXPECTED_TYPE: &'static str = "function-plain";
 }
 
 impl Validator for FunctionPlainValidator {
@@ -115,7 +135,7 @@ impl Validator for FunctionPlainValidator {
     }
 
     fn get_name(&self) -> String {
-        Self::EXPECTED_TYPE.to_string()
+        "function-plain".to_string()
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -124,14 +144,10 @@ impl Validator for FunctionPlainValidator {
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionWrapValidator {
+struct FunctionWrapValidator {
     validator: Box<dyn Validator>,
     func: PyObject,
     config: Option<Py<PyDict>>,
-}
-
-impl FunctionWrapValidator {
-    pub const EXPECTED_TYPE: &'static str = "function-wrap";
 }
 
 impl Validator for FunctionWrapValidator {
@@ -155,7 +171,7 @@ impl Validator for FunctionWrapValidator {
     }
 
     fn get_name(&self) -> String {
-        Self::EXPECTED_TYPE.to_string()
+        "function-wrap".to_string()
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -165,7 +181,7 @@ impl Validator for FunctionWrapValidator {
 
 #[pyclass]
 #[derive(Debug, Clone)]
-pub struct ValidatorCallable {
+struct ValidatorCallable {
     validator: Box<dyn Validator>,
     data: Option<Py<PyDict>>,
     field: Option<String>,

@@ -40,7 +40,7 @@ impl Validator for UnionValidator {
     fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
         // 1st pass: check if the value is an exact instance of one of the Union types
         for class in self.choices.iter().flat_map(|c| &c.class) {
-            if input.is_direct_instance_of(class.as_ref(py))? {
+            if input.strict_model_check(class.as_ref(py))? {
                 return Ok(input.to_py(py));
             }
         }
