@@ -9,12 +9,8 @@ use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
 
 impl Input for PyAny {
-    fn validate_none(&self, py: Python) -> ValResult<()> {
-        if self.is_none() {
-            Ok(())
-        } else {
-            err_val_error!(py, self, kind = ErrorKind::NoneRequired)
-        }
+    fn is_none(&self, _py: Python) -> bool {
+        self.is_none()
     }
 
     fn strict_str(&self, py: Python) -> ValResult<String> {

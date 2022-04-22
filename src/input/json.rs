@@ -10,11 +10,8 @@ use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
 
 impl Input for Value {
-    fn validate_none(&self, py: Python) -> ValResult<()> {
-        match self {
-            Value::Null => Ok(()),
-            _ => err_val_error!(py, self, kind = ErrorKind::NoneRequired),
-        }
+    fn is_none(&self, _py: Python) -> bool {
+        matches!(self, Value::Null)
     }
 
     fn strict_str(&self, py: Python) -> ValResult<String> {
@@ -230,8 +227,8 @@ impl ToLocItem for Value {
 
 /// Required for Dict keys so the string can behave like an Input
 impl Input for String {
-    fn validate_none(&self, py: Python) -> ValResult<()> {
-        err_val_error!(py, self, kind = ErrorKind::NoneRequired)
+    fn is_none(&self, _py: Python) -> bool {
+        false
     }
 
     fn strict_str(&self, _py: Python) -> ValResult<String> {

@@ -62,7 +62,7 @@ impl ToLocItem for &str {
 }
 
 pub trait Input: fmt::Debug + ToPy + ToLocItem {
-    fn validate_none(&self, py: Python) -> ValResult<()>;
+    fn is_none(&self, py: Python) -> bool;
 
     fn strict_str(&self, py: Python) -> ValResult<String>;
 
