@@ -108,7 +108,6 @@ pub fn build_validator(dict: &PyDict, config: Option<&PyDict>) -> PyResult<Box<d
         self::model_create::ModelClassValidator,
         // strings
         self::string::StrValidator,
-        self::string::StrConstrainedValidator,
         // integers
         self::int::IntValidator,
         self::int::IntConstrainedValidator,

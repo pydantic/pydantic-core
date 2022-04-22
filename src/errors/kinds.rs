@@ -14,6 +14,8 @@ pub enum ErrorKind {
     ExtraForbidden,
     #[strum(message = "Model keys must be strings")]
     InvalidKey,
+    #[strum(message = "Value must be an instance of {class_name}")]
+    ModelType,
     // None errors
     #[strum(message = "Value must not be None/null")]
     NoneForbidden,

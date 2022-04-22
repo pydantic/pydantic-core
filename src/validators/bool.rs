@@ -17,7 +17,7 @@ impl BoolValidator {
 impl Validator for BoolValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         if is_strict!(schema, config) {
-            Ok(Box::new(StrictBoolValidator {}))
+            StrictBoolValidator::build(schema, config)
         } else {
             Ok(Box::new(Self {}))
         }
@@ -35,11 +35,11 @@ impl Validator for BoolValidator {
 }
 
 #[derive(Debug, Clone)]
-pub struct StrictBoolValidator;
+struct StrictBoolValidator;
 
 impl Validator for StrictBoolValidator {
     fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        unimplemented!("should be built by BoolValidator")
+        Ok(Box::new(Self {}))
     }
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {

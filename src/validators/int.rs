@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_macros::dict_get;
+use crate::build_macros::{dict_get, is_strict};
 use crate::errors::{context, err_val_error, ErrorKind, ValResult};
 use crate::input::{Input, ToPy};
 
@@ -15,8 +15,12 @@ impl IntValidator {
 }
 
 impl Validator for IntValidator {
-    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        Ok(Box::new(Self))
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
+        if is_strict!(schema, config) {
+            StrictIntValidator::build(schema, config)
+        } else {
+            Ok(Box::new(Self))
+        }
     }
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
@@ -29,7 +33,25 @@ impl Validator for IntValidator {
 }
 
 #[derive(Debug, Clone)]
+struct StrictIntValidator;
+
+impl Validator for StrictIntValidator {
+    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
+        Ok(Box::new(Self))
+    }
+
+    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+        Ok(input.strict_int(py)?.into_py(py))
+    }
+
+    fn clone_dyn(&self) -> Box<dyn Validator> {
+        Box::new(self.clone())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct IntConstrainedValidator {
+    strict: bool,
     multiple_of: Option<i64>,
     le: Option<i64>,
     lt: Option<i64>,
@@ -42,8 +64,9 @@ impl IntConstrainedValidator {
 }
 
 impl Validator for IntConstrainedValidator {
-    fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {
+            strict: is_strict!(schema, config),
             multiple_of: dict_get!(schema, "multiple_of", i64),
             le: dict_get!(schema, "le", i64),
             lt: dict_get!(schema, "lt", i64),
@@ -53,7 +76,10 @@ impl Validator for IntConstrainedValidator {
     }
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
-        let int = input.lax_int(py)?;
+        let int = match self.strict {
+            true => input.strict_int(py)?,
+            false => input.lax_int(py)?,
+        };
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
                 return err_val_error!(

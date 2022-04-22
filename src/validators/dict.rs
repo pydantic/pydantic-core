@@ -9,9 +9,9 @@ use super::{build_validator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
+    strict: bool,
     key_validator: Option<Box<dyn Validator>>,
     value_validator: Option<Box<dyn Validator>>,
-    strict: bool,
     min_items: Option<usize>,
     max_items: Option<usize>,
     try_instance_as_dict: bool,
@@ -24,6 +24,7 @@ impl DictValidator {
 impl Validator for DictValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {
+            strict: is_strict!(schema, config),
             key_validator: match dict_get!(schema, "keys", &PyDict) {
                 Some(d) => Some(build_validator(d, config)?),
                 None => None,
@@ -32,7 +33,6 @@ impl Validator for DictValidator {
                 Some(d) => Some(build_validator(d, config)?),
                 None => None,
             },
-            strict: is_strict!(schema, config),
             min_items: dict_get!(schema, "min_items", usize),
             max_items: dict_get!(schema, "max_items", usize),
             try_instance_as_dict: dict_get!(schema, "try_instance_as_dict", bool).unwrap_or(false),

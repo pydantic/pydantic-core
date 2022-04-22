@@ -15,12 +15,33 @@ impl FloatValidator {
 }
 
 impl Validator for FloatValidator {
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
+        if is_strict!(schema, config) {
+            StrictFloatValidator::build(schema, config)
+        } else {
+            Ok(Box::new(Self))
+        }
+    }
+
+    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+        Ok(input.lax_float(py)?.into_py(py))
+    }
+
+    fn clone_dyn(&self) -> Box<dyn Validator> {
+        Box::new(self.clone())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct StrictFloatValidator;
+
+impl Validator for StrictFloatValidator {
     fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self))
     }
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
-        Ok(input.lax_float(py)?.into_py(py))
+        Ok(input.strict_float(py)?.into_py(py))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
