@@ -150,3 +150,20 @@ class TestModelClassSimilar:
         assert m2.a == 1
         assert m2.b == 'hello'
         assert m2.c == 2.0
+
+
+def test_optional():
+    v = SchemaValidator({'type': 'union', 'choices': [{'type': 'none'}, {'type': 'int'}]})
+    assert v.validate_python(None) is None
+    assert v.validate_python(1) == 1
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python('hello')
+    assert exc_info.value.errors() == [
+        {'kind': 'none_required', 'loc': ['none'], 'message': 'Value must be None/null', 'input_value': 'hello'},
+        {
+            'kind': 'int_parsing',
+            'loc': ['int'],
+            'message': 'Value must be a valid integer, unable to parse string as an integer',
+            'input_value': 'hello',
+        },
+    ]
