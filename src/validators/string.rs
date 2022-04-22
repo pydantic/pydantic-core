@@ -37,7 +37,7 @@ impl Validator for StrValidator {
     }
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
-        let s = input.validate_str(py)?;
+        let s = input.lax_str(py)?;
         ValResult::Ok(s.into_py(py))
     }
 
@@ -111,7 +111,7 @@ impl Validator for StrConstrainedValidator {
     }
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
-        let mut str = input.validate_str(py)?;
+        let mut str = input.lax_str(py)?;
         if let Some(min_length) = self.min_length {
             if str.len() < min_length {
                 // return py_error!("{} is shorter than {}", str, min_length);

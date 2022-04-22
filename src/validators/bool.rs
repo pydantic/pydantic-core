@@ -21,7 +21,7 @@ impl Validator for BoolValidator {
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool
         // and back again, might be worth profiling?
-        Ok(input.validate_bool(py)?.into_py(py))
+        Ok(input.lax_bool(py)?.into_py(py))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {

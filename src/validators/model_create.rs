@@ -41,7 +41,7 @@ impl Validator for ModelClassValidator {
     }
 
     fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
-        if input.is_direct_instance_of(self.class.as_ref(py))? {
+        if input.strict_model_check(self.class.as_ref(py))? {
             Ok(input.to_py(py))
         } else {
             let output = self.validator.validate(py, input, extra)?;

@@ -38,7 +38,7 @@ impl Validator for DictValidator {
     }
 
     fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
-        let dict = input.validate_dict(py, self.try_instance_as_dict)?;
+        let dict = input.lax_dict(py, self.try_instance_as_dict)?;
         if let Some(min_length) = self.min_items {
             if dict.input_len() < min_length {
                 return err_val_error!(

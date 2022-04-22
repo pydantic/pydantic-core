@@ -20,7 +20,7 @@ impl Validator for FloatValidator {
     }
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
-        Ok(input.validate_float(py)?.into_py(py))
+        Ok(input.lax_float(py)?.into_py(py))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
@@ -53,7 +53,7 @@ impl Validator for FloatConstrainedValidator {
     }
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
-        let float = input.validate_float(py)?;
+        let float = input.lax_float(py)?;
         if let Some(multiple_of) = self.multiple_of {
             if float % multiple_of != 0.0 {
                 return err_val_error!(

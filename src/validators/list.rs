@@ -31,7 +31,7 @@ impl Validator for ListValidator {
     }
 
     fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
-        let list = input.validate_list(py)?;
+        let list = input.lax_list(py)?;
         let length = list.input_len();
         if let Some(min_length) = self.min_items {
             if length < min_length {
