@@ -17,7 +17,7 @@ impl StrValidator {
 
 impl Validator for StrValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        let use_con_str = schema.get_item("pattern").is_some()
+        let use_constrained = schema.get_item("pattern").is_some()
             || schema.get_item("max_length").is_some()
             || schema.get_item("min_length").is_some()
             || schema.get_item("strip_whitespace").is_some()
@@ -34,7 +34,7 @@ impl Validator for StrValidator {
                 }
                 None => false,
             };
-        if use_con_str {
+        if use_constrained {
             StrConstrainedValidator::build(schema, config)
         } else if is_strict!(schema, config) {
             StrictStrValidator::build(schema, config)

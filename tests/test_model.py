@@ -143,8 +143,8 @@ def test_validate_assignment_functions():
         {
             'type': 'model',
             'fields': {
-                'field_a': {'type': 'function-after', 'function': func_a, 'field': {'type': 'str'}},
-                'field_b': {'type': 'function-after', 'function': func_b, 'field': {'type': 'int'}},
+                'field_a': {'type': 'function', 'mode': 'after', 'function': func_a, 'field': {'type': 'str'}},
+                'field_b': {'type': 'function', 'mode': 'after', 'function': func_b, 'field': {'type': 'int'}},
             },
         }
     )
@@ -279,7 +279,8 @@ def test_model_class_root_validator():
     v = SchemaValidator(
         {
             'title': 'Test',
-            'type': 'function-wrap',
+            'type': 'function',
+            'mode': 'wrap',
             'function': f,
             'field': {
                 'type': 'model-class',

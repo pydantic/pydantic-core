@@ -16,7 +16,14 @@ impl IntValidator {
 
 impl Validator for IntValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        if is_strict!(schema, config) {
+        let use_constrained = schema.get_item("multiple_of").is_some()
+            || schema.get_item("le").is_some()
+            || schema.get_item("lt").is_some()
+            || schema.get_item("ge").is_some()
+            || schema.get_item("gt").is_some();
+        if use_constrained {
+            ConstrainedIntValidator::build(schema, config)
+        } else if is_strict!(schema, config) {
             StrictIntValidator::build(schema, config)
         } else {
             Ok(Box::new(Self))
@@ -50,7 +57,7 @@ impl Validator for StrictIntValidator {
 }
 
 #[derive(Debug, Clone)]
-pub struct IntConstrainedValidator {
+struct ConstrainedIntValidator {
     strict: bool,
     multiple_of: Option<i64>,
     le: Option<i64>,
@@ -59,11 +66,7 @@ pub struct IntConstrainedValidator {
     gt: Option<i64>,
 }
 
-impl IntConstrainedValidator {
-    pub const EXPECTED_TYPE: &'static str = "int-constrained";
-}
-
-impl Validator for IntConstrainedValidator {
+impl Validator for ConstrainedIntValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {
             strict: is_strict!(schema, config),

@@ -16,7 +16,14 @@ impl FloatValidator {
 
 impl Validator for FloatValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        if is_strict!(schema, config) {
+        let use_constrained = schema.get_item("multiple_of").is_some()
+            || schema.get_item("le").is_some()
+            || schema.get_item("lt").is_some()
+            || schema.get_item("ge").is_some()
+            || schema.get_item("gt").is_some();
+        if use_constrained {
+            ConstrainedFloatValidator::build(schema, config)
+        } else if is_strict!(schema, config) {
             StrictFloatValidator::build(schema, config)
         } else {
             Ok(Box::new(Self))
@@ -50,7 +57,7 @@ impl Validator for StrictFloatValidator {
 }
 
 #[derive(Debug, Clone)]
-pub struct FloatConstrainedValidator {
+struct ConstrainedFloatValidator {
     strict: bool,
     multiple_of: Option<f64>,
     le: Option<f64>,
@@ -59,11 +66,7 @@ pub struct FloatConstrainedValidator {
     gt: Option<f64>,
 }
 
-impl FloatConstrainedValidator {
-    pub const EXPECTED_TYPE: &'static str = "float-constrained";
-}
-
-impl Validator for FloatConstrainedValidator {
+impl Validator for ConstrainedFloatValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {
             strict: is_strict!(schema, config),
