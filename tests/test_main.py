@@ -23,9 +23,16 @@ def test_bool(input_value, output_value):
     assert v.validate_python(input_value) == output_value
 
 
+def test_bool_strict():
+    v = SchemaValidator({'type': 'bool', 'strict': True, 'title': 'TestModel'})
+    assert v.validate_python(True) is True
+    error_message = 'Value must be a valid boolean [kind=bool_type, input_value=true, input_type=str]'
+    with pytest.raises(ValidationError, match=re.escape(error_message)):
+        v.validate_python('true')
+
+
 def test_bool_error():
     v = SchemaValidator({'type': 'bool', 'title': 'TestModel'})
-    assert repr(v) == 'SchemaValidator(title="TestModel", validator=BoolValidator)'
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('wrong')
@@ -39,7 +46,7 @@ def test_bool_error():
 
 def test_repr():
     v = SchemaValidator({'type': 'bool', 'title': 'TestModel'})
-    assert repr(v) == 'SchemaValidator(title="TestModel", validator=BoolValidator)'
+    assert repr(v) == 'SchemaValidator(title="TestModel", validator=BoolValidator {\n    strict: false,\n})'
 
 
 def test_str_constrained():

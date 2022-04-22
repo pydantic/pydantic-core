@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 use regex::Regex;
 
-use crate::build_macros::{dict_get, py_error};
+use crate::build_macros::{dict_get, optional_dict_get, py_error};
 use crate::errors::{context, err_val_error, ErrorKind, ValResult};
 use crate::input::{Input, ToPy};
 
@@ -58,15 +58,6 @@ pub struct StrConstrainedValidator {
 
 impl StrConstrainedValidator {
     pub const EXPECTED_TYPE: &'static str = "str-constrained";
-}
-
-macro_rules! optional_dict_get {
-    ($optional_dict:ident, $key:expr, $type:ty) => {
-        match $optional_dict {
-            Some(d) => dict_get!(d, $key, $type),
-            None => None,
-        }
-    };
 }
 
 impl Validator for StrConstrainedValidator {

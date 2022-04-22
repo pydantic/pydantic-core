@@ -18,6 +18,16 @@ macro_rules! dict_get_required {
 }
 pub(crate) use dict_get_required;
 
+macro_rules! optional_dict_get {
+    ($optional_dict:ident, $key:expr, $type:ty) => {
+        match $optional_dict {
+            Some(d) => crate::build_macros::dict_get!(d, $key, $type),
+            None => None,
+        }
+    };
+}
+pub(crate) use optional_dict_get;
+
 macro_rules! dict {
     ($py:ident, $($k:expr => $v:expr),*) => {{
         pyo3::types::IntoPyDict::into_py_dict([$(($k, $v.into_py($py)),)*], $py).into()
