@@ -25,6 +25,10 @@ impl Validator for NoneValidator {
         }
     }
 
+    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+        self.validate(py, input, extra)
+    }
+
     fn get_name(&self) -> String {
         Self::EXPECTED_TYPE.to_string()
     }

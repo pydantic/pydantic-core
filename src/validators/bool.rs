@@ -29,6 +29,10 @@ impl Validator for BoolValidator {
         Ok(input.lax_bool(py)?.into_py(py))
     }
 
+    fn validate_strict(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+        Ok(input.strict_bool(py)?.into_py(py))
+    }
+
     fn get_name(&self) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
@@ -48,6 +52,10 @@ impl Validator for StrictBoolValidator {
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
         Ok(input.strict_bool(py)?.into_py(py))
+    }
+
+    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+        self.validate(py, input, extra)
     }
 
     fn get_name(&self) -> String {

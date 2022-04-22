@@ -47,6 +47,10 @@ impl Validator for StrValidator {
         Ok(input.lax_str(py)?.into_py(py))
     }
 
+    fn validate_strict(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+        Ok(input.strict_str(py)?.into_py(py))
+    }
+
     fn get_name(&self) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
@@ -66,6 +70,10 @@ impl Validator for StrictStrValidator {
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
         Ok(input.strict_str(py)?.into_py(py))
+    }
+
+    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+        self.validate(py, input, extra)
     }
 
     fn get_name(&self) -> String {
@@ -131,10 +139,29 @@ impl Validator for StrConstrainedValidator {
     }
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
-        let mut str = match self.strict {
+        let str = match self.strict {
             true => input.strict_str(py)?,
             false => input.lax_str(py)?,
         };
+        self._validation_logic(py, str)
+    }
+
+    fn validate_strict(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+        self._validation_logic(py, input.strict_str(py)?)
+    }
+
+    fn get_name(&self) -> String {
+        "constrained-str".to_string()
+    }
+
+    fn clone_dyn(&self) -> Box<dyn Validator> {
+        Box::new(self.clone())
+    }
+}
+
+impl StrConstrainedValidator {
+    fn _validation_logic(&self, py: Python, str: String) -> ValResult<PyObject> {
+        let mut str = str;
         if let Some(min_length) = self.min_length {
             if str.len() < min_length {
                 // return py_error!("{} is shorter than {}", str, min_length);
@@ -178,14 +205,6 @@ impl Validator for StrConstrainedValidator {
         }
         let py_str = PyString::new(py, &str);
         ValResult::Ok(py_str.into_py(py))
-    }
-
-    fn get_name(&self) -> String {
-        "constrained-str".to_string()
-    }
-
-    fn clone_dyn(&self) -> Box<dyn Validator> {
-        Box::new(self.clone())
     }
 }
 

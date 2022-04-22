@@ -152,6 +152,8 @@ pub trait Validator: Send + fmt::Debug {
     /// Do the actual validation for this schema/type
     fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject>;
 
+    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject>;
+
     fn get_name(&self) -> String;
 
     /// Ugly, but this has to be duplicated on all types to allow for cloning of validators,

@@ -5,9 +5,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple, PyType};
 use pyo3::{ffi, intern, ToBorrowedObject};
 
-use super::{build_validator, Extra, ValResult, Validator};
+use super::{build_validator, Extra, Validator};
 use crate::build_macros::{dict_get, dict_get_required, py_error};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind};
+use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValResult};
 use crate::input::Input;
 
 #[derive(Debug, Clone)]
@@ -60,6 +60,15 @@ impl Validator for ModelClassValidator {
         } else {
             let output = self.validator.validate(py, input, extra)?;
             self.create_class(py, output).map_err(as_internal)
+        }
+    }
+
+    fn validate_strict(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+        if input.strict_model_check(self.class.as_ref(py))? {
+            Ok(input.to_py(py))
+        } else {
+            // errors from `validate_strict` are never used used, so we can keep this simple
+            Err(ValError::LineErrors(vec![]))
         }
     }
 
