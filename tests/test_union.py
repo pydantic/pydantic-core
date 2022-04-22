@@ -91,24 +91,9 @@ class TestModelClass:
         with pytest.raises(ValidationError) as exc_info:
             self.v.validate_python({'a': 2})
         assert exc_info.value.errors() == [
-            {
-                'kind': 'missing',
-                'loc': ['TestModelClass.ModelA', 'b'],
-                'message': 'Field required',
-                'input_value': {'a': 2},
-            },
-            {
-                'kind': 'missing',
-                'loc': ['TestModelClass.ModelB', 'c'],
-                'message': 'Field required',
-                'input_value': {'a': 2},
-            },
-            {
-                'kind': 'missing',
-                'loc': ['TestModelClass.ModelB', 'd'],
-                'message': 'Field required',
-                'input_value': {'a': 2},
-            },
+            {'kind': 'missing', 'loc': ['ModelA', 'b'], 'message': 'Field required', 'input_value': {'a': 2}},
+            {'kind': 'missing', 'loc': ['ModelB', 'c'], 'message': 'Field required', 'input_value': {'a': 2}},
+            {'kind': 'missing', 'loc': ['ModelB', 'd'], 'message': 'Field required', 'input_value': {'a': 2}},
         ]
 
 

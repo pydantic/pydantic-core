@@ -38,10 +38,11 @@ impl Validator for FloatValidator {
         Ok(input.strict_float(py)?.into_py(py))
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -63,10 +64,11 @@ impl Validator for StrictFloatValidator {
         self.validate(py, input, extra)
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         "strict-float".to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -106,10 +108,11 @@ impl Validator for ConstrainedFloatValidator {
         self._validation_logic(py, input.strict_float(py)?)
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         "constrained-float".to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }

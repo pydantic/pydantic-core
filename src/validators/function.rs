@@ -36,10 +36,11 @@ impl Validator for FunctionValidator {
         self.validate(py, input, extra)
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -87,10 +88,11 @@ impl Validator for FunctionBeforeValidator {
         self.validate(py, input, extra)
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         "function-before".to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -116,10 +118,11 @@ impl Validator for FunctionAfterValidator {
         self.validate(py, input, extra)
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         "function-after".to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -150,10 +153,11 @@ impl Validator for FunctionPlainValidator {
         self.validate(py, input, extra)
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         "function-plain".to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -190,10 +194,11 @@ impl Validator for FunctionWrapValidator {
         self.validate(py, input, extra)
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         "function-wrap".to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }

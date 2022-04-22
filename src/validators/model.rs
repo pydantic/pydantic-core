@@ -172,10 +172,11 @@ impl Validator for ModelValidator {
         self.validate(py, input, extra)
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }

@@ -44,7 +44,7 @@ impl Validator for UnionValidator {
                 Err(err) => return Err(err),
             };
 
-            let loc = vec![LocItem::S(validator.get_name())];
+            let loc = vec![LocItem::S(validator.get_name(py))];
             for err in line_errors {
                 errors.push(err.prefix_location(&loc));
             }
@@ -56,10 +56,11 @@ impl Validator for UnionValidator {
         self.validate(py, input, extra)
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }

@@ -16,7 +16,6 @@ pub struct ModelClassValidator {
     validator: Box<dyn Validator>,
     class: Py<PyType>,
     new_method: PyObject,
-    name: String,
 }
 
 impl ModelClassValidator {
@@ -42,7 +41,6 @@ impl Validator for ModelClassValidator {
             validator: build_validator(model_schema, config)?,
             class: class.into(),
             new_method: new_method.into(),
-            name: class.name().unwrap_or("UnknownClass").to_string(),
         }))
     }
 
@@ -55,7 +53,7 @@ impl Validator for ModelClassValidator {
                 py,
                 input,
                 kind = ErrorKind::ModelType,
-                context = context!("class_name" => class_name(py, class)?)
+                context = context!("class_name" => self.get_name(py))
             )
         } else {
             let output = self.validator.validate(py, input, extra)?;
@@ -72,20 +70,21 @@ impl Validator for ModelClassValidator {
         }
     }
 
-    fn get_name(&self) -> String {
-        self.name.clone()
+    fn get_name(&self, py: Python) -> String {
+        // Get the class's `__name__`, not using `class.name()` since it uses `__qualname__`
+        // which is not what we want here
+        let class = self.class.as_ref(py);
+        let name_result: PyResult<&str> = match class.getattr(intern!(py, "__name__")) {
+            Ok(name) => name.extract(),
+            Err(e) => Err(e),
+        };
+        name_result.unwrap_or("UnknownClass").to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
-}
-
-/// Get the class's `__name__`, not using `class.name()` since it uses `__qualname__` which is not what we want here
-#[inline]
-fn class_name(py: Python, class: &PyType) -> ValResult<String> {
-    let name = class.getattr(intern!(py, "__name__")).map_err(as_internal)?;
-    name.extract().map_err(as_internal)
 }
 
 impl ModelClassValidator {

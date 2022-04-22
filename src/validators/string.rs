@@ -51,10 +51,11 @@ impl Validator for StrValidator {
         Ok(input.strict_str(py)?.into_py(py))
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -76,10 +77,11 @@ impl Validator for StrictStrValidator {
         self.validate(py, input, extra)
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         "strict-str".to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
@@ -150,10 +152,11 @@ impl Validator for StrConstrainedValidator {
         self._validation_logic(py, input.strict_str(py)?)
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self, _py: Python) -> String {
         "constrained-str".to_string()
     }
 
+    #[no_coverage]
     fn clone_dyn(&self) -> Box<dyn Validator> {
         Box::new(self.clone())
     }
