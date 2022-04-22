@@ -44,9 +44,11 @@ def test_bool_error():
     )
 
 
-def test_repr():
+def test_bool_repr():
     v = SchemaValidator({'type': 'bool', 'title': 'TestModel'})
-    assert repr(v) == 'SchemaValidator(title="TestModel", validator=BoolValidator {\n    strict: false,\n})'
+    assert repr(v) == 'SchemaValidator(title="TestModel", validator=BoolValidator)'
+    v = SchemaValidator({'type': 'bool', 'strict': True, 'title': 'TestModel'})
+    assert repr(v) == 'SchemaValidator(title="TestModel", validator=StrictBoolValidator)'
 
 
 def test_str_constrained():

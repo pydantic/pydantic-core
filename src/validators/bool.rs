@@ -8,9 +8,7 @@ use crate::input::Input;
 use super::{Extra, Validator};
 
 #[derive(Debug, Clone)]
-pub struct BoolValidator {
-    strict: bool,
-}
+pub struct BoolValidator;
 
 impl BoolValidator {
     pub const EXPECTED_TYPE: &'static str = "bool";
@@ -22,18 +20,35 @@ impl Validator for BoolValidator {
             Some(v) => v,
             None => optional_dict_get!(config, "strict", bool).unwrap_or(false),
         };
-        Ok(Box::new(Self { strict }))
+
+        if strict {
+            Ok(Box::new(StrictBoolValidator {}))
+        } else {
+            Ok(Box::new(Self {}))
+        }
     }
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool
         // and back again, might be worth profiling?
-        let b = if self.strict {
-            input.strict_bool(py)?
-        } else {
-            input.lax_bool(py)?
-        };
-        Ok(b.into_py(py))
+        Ok(input.lax_bool(py)?.into_py(py))
+    }
+
+    fn clone_dyn(&self) -> Box<dyn Validator> {
+        Box::new(self.clone())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StrictBoolValidator;
+
+impl Validator for StrictBoolValidator {
+    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
+        unimplemented!("should be built by BoolValidator")
+    }
+
+    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+        Ok(input.strict_bool(py)?.into_py(py))
     }
 
     fn clone_dyn(&self) -> Box<dyn Validator> {
