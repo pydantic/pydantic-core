@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_macros::dict_get;
+use crate::build_macros::{dict_get, is_strict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValLineError, ValResult};
 use crate::input::{Input, ToLocItem};
 
@@ -11,6 +11,7 @@ use super::{build_validator, Extra, Validator};
 pub struct DictValidator {
     key_validator: Option<Box<dyn Validator>>,
     value_validator: Option<Box<dyn Validator>>,
+    strict: bool,
     min_items: Option<usize>,
     max_items: Option<usize>,
     try_instance_as_dict: bool,
@@ -31,6 +32,7 @@ impl Validator for DictValidator {
                 Some(d) => Some(build_validator(d, config)?),
                 None => None,
             },
+            strict: is_strict!(schema, config),
             min_items: dict_get!(schema, "min_items", usize),
             max_items: dict_get!(schema, "max_items", usize),
             try_instance_as_dict: dict_get!(schema, "try_instance_as_dict", bool).unwrap_or(false),
@@ -38,7 +40,10 @@ impl Validator for DictValidator {
     }
 
     fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
-        let dict = input.lax_dict(py, self.try_instance_as_dict)?;
+        let dict = match self.strict {
+            true => input.strict_dict(py)?,
+            false => input.lax_dict(py, self.try_instance_as_dict)?,
+        };
         if let Some(min_length) = self.min_items {
             if dict.input_len() < min_length {
                 return err_val_error!(

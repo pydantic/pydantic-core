@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_macros::{dict_get, optional_dict_get};
+use crate::build_macros::is_strict;
 use crate::errors::ValResult;
 use crate::input::Input;
 
@@ -16,12 +16,7 @@ impl BoolValidator {
 
 impl Validator for BoolValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        let strict = match dict_get!(schema, "strict", bool) {
-            Some(v) => v,
-            None => optional_dict_get!(config, "strict", bool).unwrap_or(false),
-        };
-
-        if strict {
+        if is_strict!(schema, config) {
             Ok(Box::new(StrictBoolValidator {}))
         } else {
             Ok(Box::new(Self {}))

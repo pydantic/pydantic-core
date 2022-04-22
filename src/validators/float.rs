@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_macros::dict_get;
+use crate::build_macros::{dict_get, is_strict};
 use crate::errors::{context, err_val_error, ErrorKind, ValResult};
 use crate::input::{Input, ToPy};
 
@@ -30,6 +30,7 @@ impl Validator for FloatValidator {
 
 #[derive(Debug, Clone)]
 pub struct FloatConstrainedValidator {
+    strict: bool,
     multiple_of: Option<f64>,
     le: Option<f64>,
     lt: Option<f64>,
@@ -42,8 +43,9 @@ impl FloatConstrainedValidator {
 }
 
 impl Validator for FloatConstrainedValidator {
-    fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {
+            strict: is_strict!(schema, config),
             multiple_of: dict_get!(schema, "multiple_of", f64),
             le: dict_get!(schema, "le", f64),
             lt: dict_get!(schema, "lt", f64),
@@ -53,7 +55,10 @@ impl Validator for FloatConstrainedValidator {
     }
 
     fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
-        let float = input.lax_float(py)?;
+        let float = match self.strict {
+            true => input.strict_float(py)?,
+            false => input.lax_float(py)?,
+        };
         if let Some(multiple_of) = self.multiple_of {
             if float % multiple_of != 0.0 {
                 return err_val_error!(
