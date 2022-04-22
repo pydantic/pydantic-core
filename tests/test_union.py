@@ -3,10 +3,44 @@ import pytest
 from pydantic_core import SchemaValidator, ValidationError
 
 
-def test_union():
+@pytest.mark.parametrize(
+    'input_value,expected_value',
+    [
+        (True, True),
+        (False, False),
+        ('true', True),
+        ('false', False),
+        (1, 1),
+        (0, 0),
+        (123, 123),
+        ('123', 123),
+        ('0', False),  # this case is different depending on the order of the choices
+        ('1', True),  # this case is different depending on the order of the choices
+    ],
+)
+def test_union_bool_int(input_value, expected_value):
     v = SchemaValidator({'type': 'union', 'choices': [{'type': 'bool'}, {'type': 'int'}]})
-    assert v.validate_python('true') is True
-    assert v.validate_python('123') == 123
+    assert v.validate_python(input_value) == expected_value
+
+
+@pytest.mark.parametrize(
+    'input_value,expected_value',
+    [
+        (True, True),
+        (False, False),
+        ('true', True),
+        ('false', False),
+        (1, 1),
+        (0, 0),
+        (123, 123),
+        ('123', 123),
+        ('0', 0),  # this case is different depending on the order of the choices
+        ('1', 1),  # this case is different depending on the order of the choices
+    ],
+)
+def test_union_int_bool(input_value, expected_value):
+    v = SchemaValidator({'type': 'union', 'choices': [{'type': 'int'}, {'type': 'bool'}]})
+    assert v.validate_python(input_value) == expected_value
 
 
 class TestModelClass:
@@ -107,16 +141,27 @@ class TestModelClassSimilar:
     )
 
     def test_model_a(self):
-        m_a = self.v.validate_python({'a': 1, 'b': 'hello'})
-        assert isinstance(m_a, self.ModelA)
-        assert m_a.a == 1
-        assert m_a.b == 'hello'
-        assert not hasattr(m_a, 'c')
+        m = self.v.validate_python({'a': 1, 'b': 'hello'})
+        assert isinstance(m, self.ModelA)
+        assert m.a == 1
+        assert m.b == 'hello'
+        assert not hasattr(m, 'c')
 
     def test_model_b_ignored(self):
         # first choice works, so second choice is not used
-        m_a = self.v.validate_python({'a': 1, 'b': 'hello', 'c': 2.0})
-        assert isinstance(m_a, self.ModelA)
-        assert m_a.a == 1
-        assert m_a.b == 'hello'
-        assert not hasattr(m_a, 'c')
+        m = self.v.validate_python({'a': 1, 'b': 'hello', 'c': 2.0})
+        assert isinstance(m, self.ModelA)
+        assert m.a == 1
+        assert m.b == 'hello'
+        assert not hasattr(m, 'c')
+
+    def test_model_b_not_ignored(self):
+        m1 = self.ModelB()
+        m1.a = 1
+        m1.b = 'hello'
+        m1.c = 2.0
+        m2 = self.v.validate_python(m1)
+        assert isinstance(m2, self.ModelB)
+        assert m2.a == 1
+        assert m2.b == 'hello'
+        assert m2.c == 2.0
