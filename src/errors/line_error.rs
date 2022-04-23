@@ -35,7 +35,6 @@ pub type Location = Vec<LocItem>;
 /// but it's the best I could come up with (for now).
 /// `#[pyclass]` is required to allow `ValidationError::new_err((line_errors, name))` - the lines are converted to
 /// a python type to create the validation error.
-#[pyclass]
 #[derive(Debug, Default, Clone)]
 pub struct ValLineError {
     pub kind: ErrorKind,
@@ -43,57 +42,6 @@ pub struct ValLineError {
     pub message: Option<String>,
     pub input_value: Option<PyObject>,
     pub context: Option<Context>,
-}
-
-impl fmt::Display for ValLineError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.format_pretty(f, None)
-    }
-}
-
-impl ValLineError {
-    fn format_pretty(&self, f: &mut fmt::Formatter<'_>, py: Option<Python>) -> fmt::Result {
-        if !self.location.is_empty() {
-            let loc = self
-                .location
-                .iter()
-                .map(|i| i.to_string())
-                .collect::<Vec<String>>()
-                .join(" -> ");
-            writeln!(f, "{}", loc)?;
-        }
-        write!(f, "  {} [kind={}", self.message(), self.kind())?;
-        if let Some(ctx) = &self.context {
-            write!(f, ", context={}", ctx)?;
-        }
-        if let Some(input_value) = &self.input_value {
-            write!(f, ", input_value={}", input_value)?;
-            if let Some(py) = py {
-                if let Ok(type_) = input_value.as_ref(py).get_type().name() {
-                    write!(f, ", input_type={}", type_)?;
-                }
-            }
-        }
-        write!(f, "]")
-    }
-
-    pub fn pretty(&self, py: Option<Python>) -> String {
-        format!("{}", Fmt(|f| self.format_pretty(f, py)))
-    }
-}
-
-// hack from https://users.rust-lang.org/t/reusing-an-fmt-formatter/8531/4
-struct Fmt<F>(pub F)
-where
-    F: Fn(&mut fmt::Formatter) -> fmt::Result;
-
-impl<F> fmt::Display for Fmt<F>
-where
-    F: Fn(&mut fmt::Formatter) -> fmt::Result,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (self.0)(f)
-    }
 }
 
 impl ValLineError {
@@ -107,6 +55,46 @@ impl ValLineError {
             new.location = [location.clone(), new.location].concat();
         }
         new
+    }
+
+    pub fn into_py_error(self) -> PyLineError {
+        PyLineError::new(self)
+    }
+}
+
+// impl IntoPy<PyLineError> for ValLineError {
+//     fn into_py(self, py: Python) -> PyLineError {
+//         PyLineError::new(self).to_object(py)
+//     }
+// }
+//
+// impl FromPyObject for PyLineError {
+//     fn extract(ob: PyAny) -> PyResult<Self> {
+//         todo!()
+//         // LineError::new(self).to_object(py)
+//     }
+// }
+
+/// `PyLineError` are the public version of `ValLineError`, as help and used in `ValidationError`s
+#[pyclass]
+#[derive(Debug, Clone)]
+pub struct PyLineError {
+    kind: ErrorKind,
+    location: Location,
+    message: Option<String>,
+    input_value: Option<PyObject>,
+    context: Option<Context>,
+}
+
+impl PyLineError {
+    pub fn new(raw_error: ValLineError) -> Self {
+        Self {
+            kind: raw_error.kind,
+            location: raw_error.location,
+            message: raw_error.message,
+            input_value: raw_error.input_value,
+            context: raw_error.context,
+        }
     }
 
     pub fn as_dict(&self, py: Python) -> PyResult<PyObject> {
@@ -157,6 +145,49 @@ impl ValLineError {
                 None => self.kind(),
             }
         }
+    }
+
+    fn format_pretty(&self, f: &mut fmt::Formatter<'_>, py: Option<Python>) -> fmt::Result {
+        if !self.location.is_empty() {
+            let loc = self
+                .location
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join(" -> ");
+            writeln!(f, "{}", loc)?;
+        }
+        write!(f, "  {} [kind={}", self.message(), self.kind())?;
+        if let Some(ctx) = &self.context {
+            write!(f, ", context={}", ctx)?;
+        }
+        if let Some(input_value) = &self.input_value {
+            write!(f, ", input_value={}", input_value)?;
+            if let Some(py) = py {
+                if let Ok(type_) = input_value.as_ref(py).get_type().name() {
+                    write!(f, ", input_type={}", type_)?;
+                }
+            }
+        }
+        write!(f, "]")
+    }
+
+    pub fn pretty(&self, py: Option<Python>) -> String {
+        format!("{}", Fmt(|f| self.format_pretty(f, py)))
+    }
+}
+
+// hack from https://users.rust-lang.org/t/reusing-an-fmt-formatter/8531/4
+struct Fmt<F>(pub F)
+where
+    F: Fn(&mut fmt::Formatter) -> fmt::Result;
+
+impl<F> fmt::Display for Fmt<F>
+where
+    F: Fn(&mut fmt::Formatter) -> fmt::Result,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        (self.0)(f)
     }
 }
 

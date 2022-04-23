@@ -8,7 +8,7 @@ mod kinds;
 mod line_error;
 mod validation_exception;
 
-use self::validation_exception::display_errors;
+use self::line_error::PyLineError;
 
 pub use self::kinds::ErrorKind;
 pub use self::line_error::{Context, LocItem, Location, ValLineError};
@@ -26,7 +26,7 @@ impl fmt::Display for ValError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ValError::LineErrors(line_errors) => {
-                write!(f, "{}", display_errors(line_errors, "Model", None))
+                write!(f, "{:?}", line_errors)
             }
             ValError::InternalErr(err) => {
                 write!(f, "Internal error: {}", err)
@@ -50,7 +50,13 @@ pub fn as_internal(err: PyErr) -> ValError {
 
 pub fn map_validation_error(model_name: &str, error: ValError) -> PyErr {
     match error {
-        ValError::LineErrors(line_errors) => ValidationError::new_err((line_errors, model_name.to_string())),
+        ValError::LineErrors(raw_errors) => {
+            let line_errors: Vec<PyLineError> = raw_errors
+                .into_iter()
+                .map(|raw_error| raw_error.into_py_error())
+                .collect();
+            ValidationError::new_err((line_errors, model_name.to_string()))
+        }
         ValError::InternalErr(err) => err,
     }
 }

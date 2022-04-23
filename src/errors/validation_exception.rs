@@ -5,12 +5,12 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::PyErrArguments;
 
-use crate::errors::ValLineError;
+use super::line_error::PyLineError;
 
 #[pyclass(extends=PyValueError)]
 #[derive(Debug)]
 pub struct ValidationError {
-    line_errors: Vec<ValLineError>,
+    line_errors: Vec<PyLineError>,
     title: String,
 }
 
@@ -41,7 +41,7 @@ impl Error for ValidationError {
 #[pymethods]
 impl ValidationError {
     #[new]
-    fn py_new(line_errors: Vec<ValLineError>, title: String) -> Self {
+    fn py_new(line_errors: Vec<PyLineError>, title: String) -> Self {
         Self { line_errors, title }
     }
 
@@ -71,7 +71,7 @@ impl ValidationError {
     }
 }
 
-pub fn display_errors(errors: &[ValLineError], title: &str, py: Option<Python>) -> String {
+pub fn display_errors(errors: &[PyLineError], title: &str, py: Option<Python>) -> String {
     let count = errors.len();
     let plural = if count == 1 { "" } else { "s" };
     let loc = errors.iter().map(|i| i.pretty(py)).collect::<Vec<String>>().join("\n");
