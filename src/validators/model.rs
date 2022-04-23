@@ -94,7 +94,7 @@ impl Validator for ModelValidator {
                     Err(ValError::LineErrors(line_errors)) => {
                         let loc = vec![field.name.to_loc()?];
                         for err in line_errors {
-                            errors.push(err.prefix_location(&loc));
+                            errors.push(err.with_prefix_location(&loc));
                         }
                     }
                     Err(err) => return Err(err),
@@ -126,7 +126,7 @@ impl Validator for ModelValidator {
                     Err(ValError::LineErrors(line_errors)) => {
                         let loc = vec![raw_key.to_loc()?];
                         for err in line_errors {
-                            errors.push(err.prefix_location(&loc));
+                            errors.push(err.with_prefix_location(&loc));
                         }
                         continue;
                     }
@@ -150,7 +150,7 @@ impl Validator for ModelValidator {
                         Ok(value) => output_dict.set_item(&key, value).map_err(as_internal)?,
                         Err(ValError::LineErrors(line_errors)) => {
                             for err in line_errors {
-                                errors.push(err.prefix_location(&loc));
+                                errors.push(err.with_prefix_location(&loc));
                             }
                         }
                         Err(err) => return Err(err),
@@ -202,7 +202,7 @@ impl ModelValidator {
             Ok(output) => prepare_tuple(output),
             Err(ValError::LineErrors(line_errors)) => {
                 let loc = vec![field_name.to_loc()?];
-                let errors = line_errors.iter().map(|e| e.prefix_location(&loc)).collect();
+                let errors = line_errors.into_iter().map(|e| e.with_prefix_location(&loc)).collect();
                 Err(ValError::LineErrors(errors))
             }
             Err(err) => Err(err),

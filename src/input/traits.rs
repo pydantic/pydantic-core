@@ -1,11 +1,12 @@
 use std::fmt;
+use std::fmt::Debug;
 
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
 use crate::errors::{LocItem, ValResult};
 
-pub trait ToPy {
+pub trait ToPy: Debug {
     fn to_py(&self, py: Python) -> PyObject;
 }
 

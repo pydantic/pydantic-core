@@ -3,6 +3,8 @@ use std::fmt;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+// use crate::input::ToPy;
+
 use super::kinds::ErrorKind;
 
 /// Used to store individual items of the error location, e.g. a string for key/field names
@@ -29,12 +31,10 @@ impl fmt::Display for LocItem {
 /// the location would be `["foo", 2]`.
 pub type Location = Vec<LocItem>;
 
-/// A `ValLineError` is a single error that occurred during validation which
-/// combine to eventually form a `ValidationError`. I don't like the name `ValLineError`,
-/// but it's the best I could come up with (for now).
-/// `#[pyclass]` is required to allow `ValidationError::new_err((line_errors, name))` - the lines are converted to
-/// a python type to create the validation error.
-#[derive(Debug, Default, Clone)]
+/// A `ValLineError` is a single error that occurred during validation which is converted to a `PyLineError`
+/// to eventually form a `ValidationError`.
+/// I don't like the name `ValLineError`, but it's the best I could come up with (for now).
+#[derive(Debug, Default)]
 pub struct ValLineError {
     pub kind: ErrorKind,
     pub location: Location,
@@ -44,16 +44,15 @@ pub struct ValLineError {
 }
 
 impl ValLineError {
-    // TODO in theory we could mutate the error since it won't be used again, but I
-    // couldn't get mut to work where this is called
-    pub fn prefix_location(&self, location: &Location) -> ValLineError {
-        let mut new = self.clone();
+    pub fn with_prefix_location(mut self, location: &Location) -> Self {
         if self.location.is_empty() {
-            new.location = location.clone();
+            self.location = location.clone();
         } else {
-            new.location = [location.clone(), new.location].concat();
+            // TODO we could perhaps instead store "reverse_location" in the ValLineError, then reverse it in
+            // `PyLineError` so we could just extend here.
+            self.location = [location.clone(), self.location].concat();
         }
-        new
+        self
     }
 }
 

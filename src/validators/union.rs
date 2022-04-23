@@ -46,7 +46,7 @@ impl Validator for UnionValidator {
 
             let loc = vec![LocItem::S(validator.get_name(py))];
             for err in line_errors {
-                errors.push(err.prefix_location(&loc));
+                errors.push(err.with_prefix_location(&loc));
             }
         }
         Err(ValError::LineErrors(errors))
