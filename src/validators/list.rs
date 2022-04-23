@@ -37,11 +37,11 @@ impl Validator for ListValidator {
             true => input.strict_list(py)?,
             false => input.lax_list(py)?,
         };
-        self._validation_logic(py, list, extra)
+        self._validation_logic(py, input, list, extra)
     }
 
     fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
-        self._validation_logic(py, input.strict_list(py)?, extra)
+        self._validation_logic(py, input, input.strict_list(py)?, extra)
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -56,17 +56,17 @@ impl Validator for ListValidator {
 
 impl ListValidator {
     fn _validation_logic<'py>(
-        &self,
+        &'py self,
         py: Python<'py>,
+        input: &'py dyn Input,
         list: Box<dyn ListInput<'py> + 'py>,
         extra: &Extra,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<'py, PyObject> {
         let length = list.input_len();
         if let Some(min_length) = self.min_items {
             if length < min_length {
                 return err_val_error!(
-                    py,
-                    list,
+                    input_value = Some(input),
                     kind = ErrorKind::ListTooShort,
                     context = context!("min_length" => min_length)
                 );
@@ -75,8 +75,7 @@ impl ListValidator {
         if let Some(max_length) = self.max_items {
             if length > max_length {
                 return err_val_error!(
-                    py,
-                    list,
+                    input_value = Some(input),
                     kind = ErrorKind::ListTooLong,
                     context = context!("max_length" => max_length)
                 );

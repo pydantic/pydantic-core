@@ -1,10 +1,8 @@
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 use serde_json::{Map, Value};
 
-use crate::build_macros::py_error;
-use crate::errors::{as_internal, err_val_error, ErrorKind, LocItem, ValResult};
+use crate::errors::{err_val_error, ErrorKind, LocItem, ValResult};
 
 use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
@@ -149,7 +147,7 @@ impl<'py> DictInput<'py> for &'py Map<String, Value> {
         Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
     }
 
-    fn input_get(&self, key: &str) -> Option<&dyn Input> {
+    fn input_get(&self, key: &str) -> Option<&'py dyn Input> {
         self.get(key).map(|item| item as &dyn Input)
     }
 
@@ -158,8 +156,8 @@ impl<'py> DictInput<'py> for &'py Map<String, Value> {
     }
 }
 
-impl<'py> ListInput<'py> for &Vec<Value> {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_> {
+impl<'py> ListInput<'py> for &'py Vec<Value> {
+    fn input_iter(&self) -> Box<dyn Iterator<Item = &'py dyn Input> + 'py> {
         Box::new(self.iter().map(|item| item as &dyn Input))
     }
 
@@ -208,19 +206,20 @@ impl ToPy for &Vec<Value> {
 }
 
 impl ToLocItem for Value {
-    fn to_loc(&self) -> ValResult<LocItem> {
+    fn to_loc(&self) -> LocItem {
         match self {
             Value::Number(n) => {
                 if let Some(int) = n.as_i64() {
-                    Ok(LocItem::I(int as usize))
+                    LocItem::I(int as usize)
                 } else if let Some(float) = n.as_f64() {
-                    Ok(LocItem::I(float as usize))
+                    LocItem::I(float as usize)
                 } else {
-                    py_error!(PyValueError; "{:?} is not a valid number", n).map_err(as_internal)
+                    // something's gone wrong, best effort
+                    LocItem::S(format!("{:?}", n))
                 }
             }
-            Value::String(s) => Ok(LocItem::S(s.to_string())),
-            v => Ok(LocItem::S(format!("{:?}", v))),
+            Value::String(s) => LocItem::S(s.to_string()),
+            v => LocItem::S(format!("{:?}", v)),
         }
     }
 }

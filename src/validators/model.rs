@@ -92,7 +92,7 @@ impl Validator for ModelValidator {
                 match field.validator.validate(py, value, &extra) {
                     Ok(value) => output_dict.set_item(&field.name, value).map_err(as_internal)?,
                     Err(ValError::LineErrors(line_errors)) => {
-                        let loc = vec![field.name.to_loc()?];
+                        let loc = vec![field.name.to_loc()];
                         for err in line_errors {
                             errors.push(err.with_prefix_location(&loc));
                         }
@@ -106,10 +106,9 @@ impl Validator for ModelValidator {
                     .map_err(as_internal)?;
             } else {
                 errors.push(val_line_error!(
-                    py,
-                    dict,
+                    input_value = Some(input), // TODO use dict?
                     kind = ErrorKind::Missing,
-                    location = vec![field.name.to_loc()?]
+                    location = vec![field.name.to_loc()]
                 ));
             }
         }
@@ -124,7 +123,7 @@ impl Validator for ModelValidator {
                 let key: String = match raw_key.lax_str(py) {
                     Ok(k) => k,
                     Err(ValError::LineErrors(line_errors)) => {
-                        let loc = vec![raw_key.to_loc()?];
+                        let loc = vec![raw_key.to_loc()];
                         for err in line_errors {
                             errors.push(err.with_prefix_location(&loc));
                         }
@@ -136,12 +135,11 @@ impl Validator for ModelValidator {
                     continue;
                 }
                 fields_set.insert(key.clone());
-                let loc = vec![key.to_loc()?];
+                let loc = vec![key.to_loc()];
 
                 if forbid {
                     errors.push(val_line_error!(
-                        py,
-                        dict,
+                        input_value = Some(input),
                         kind = ErrorKind::ExtraForbidden,
                         location = loc
                     ));
@@ -183,7 +181,13 @@ impl Validator for ModelValidator {
 }
 
 impl ModelValidator {
-    fn validate_assignment(&self, py: Python, field: &str, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_assignment<'a>(
+        &'a self,
+        py: Python<'a>,
+        field: &str,
+        input: &'a dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'a, PyObject> {
         // TODO probably we should set location on errors here
         let field_name = field.to_string();
 
@@ -198,10 +202,10 @@ impl ModelValidator {
             Ok((data, fields_set).to_object(py))
         };
 
-        let prepare_result = |result: ValResult<PyObject>| match result {
+        let prepare_result = |result: ValResult<'a, PyObject>| match result {
             Ok(output) => prepare_tuple(output),
             Err(ValError::LineErrors(line_errors)) => {
-                let loc = vec![field_name.to_loc()?];
+                let loc = vec![field_name.to_loc()];
                 let errors = line_errors.into_iter().map(|e| e.with_prefix_location(&loc)).collect();
                 Err(ValError::LineErrors(errors))
             }
@@ -221,8 +225,12 @@ impl ModelValidator {
                 // - with forbid this is obvious
                 // - with ignore the model should never be overloaded, so an error is the clearest option
                 _ => {
-                    let loc = vec![field_name.to_loc()?];
-                    err_val_error!(py, input, location = loc, kind = ErrorKind::ExtraForbidden)
+                    let loc = vec![field_name.to_loc()];
+                    err_val_error!(
+                        input_value = Some(input),
+                        location = loc,
+                        kind = ErrorKind::ExtraForbidden
+                    )
                 }
             }
         }

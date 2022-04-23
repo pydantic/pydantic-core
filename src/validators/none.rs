@@ -21,7 +21,7 @@ impl Validator for NoneValidator {
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         match input.is_none(py) {
             true => Ok(py.None()),
-            false => err_val_error!(py, input, kind = ErrorKind::NoneRequired),
+            false => err_val_error!(input_value = Some(input), kind = ErrorKind::NoneRequired),
         }
     }
 

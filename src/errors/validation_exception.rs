@@ -2,7 +2,6 @@ use std::error::Error;
 use std::fmt;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::PyErrArguments;
@@ -212,6 +211,5 @@ impl PyLineError {
 }
 
 fn repr(v: &PyAny) -> PyResult<String> {
-    let repr = v.getattr(intern!(v.py(), "__repr__"))?;
-    repr.call0()?.extract()
+    v.repr()?.extract()
 }

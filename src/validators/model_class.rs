@@ -50,8 +50,7 @@ impl Validator for ModelClassValidator {
             Ok(input.to_py(py))
         } else if self.strict {
             err_val_error!(
-                py,
-                input,
+                input_value = Some(input),
                 kind = ErrorKind::ModelType,
                 context = context!("class_name" => self.get_name(py))
             )

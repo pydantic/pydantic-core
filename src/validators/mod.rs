@@ -10,15 +10,15 @@ use crate::input::Input;
 
 mod bool;
 mod dict;
-// mod float;
+mod float;
 mod function;
-// mod int;
-// mod list;
-// mod model;
-// mod model_class;
-// mod none;
+mod int;
+mod list;
+mod model;
+mod model_class;
+mod none;
 mod string;
-// mod union;
+mod union;
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -111,26 +111,26 @@ pub fn build_validator(dict: &PyDict, config: Option<&PyDict>) -> PyResult<Box<d
         type_,
         dict,
         config,
-        // // models e.g. heterogeneous dicts
-        // self::model::ModelValidator,
-        // // unions
-        // self::union::UnionValidator,
-        // // model classes
-        // self::model_class::ModelClassValidator,
+        // models e.g. heterogeneous dicts
+        self::model::ModelValidator,
+        // unions
+        self::union::UnionValidator,
+        // model classes
+        self::model_class::ModelClassValidator,
         // strings
         self::string::StrValidator,
-        // // integers
-        // self::int::IntValidator,
+        // integers
+        self::int::IntValidator,
         // boolean
         self::bool::BoolValidator,
-        // // floats
-        // self::float::FloatValidator,
-        // // list/arrays (recursive)
-        // self::list::ListValidator,
+        // floats
+        self::float::FloatValidator,
+        // list/arrays (recursive)
+        self::list::ListValidator,
         // dicts/objects (recursive)
         self::dict::DictValidator,
-        // // None/null
-        // self::none::NoneValidator,
+        // None/null
+        self::none::NoneValidator,
         // functions - before, after, plain & wrap
         self::function::FunctionValidator,
     )

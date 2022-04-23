@@ -47,18 +47,18 @@ impl ToPy for f64 {
 }
 
 pub trait ToLocItem {
-    fn to_loc(&self) -> ValResult<LocItem>;
+    fn to_loc(&self) -> LocItem;
 }
 
 impl ToLocItem for String {
-    fn to_loc(&self) -> ValResult<LocItem> {
-        Ok(LocItem::S(self.clone()))
+    fn to_loc(&self) -> LocItem {
+        LocItem::S(self.clone())
     }
 }
 
 impl ToLocItem for &str {
-    fn to_loc(&self) -> ValResult<LocItem> {
-        Ok(LocItem::S(self.to_string()))
+    fn to_loc(&self) -> LocItem {
+        LocItem::S(self.to_string())
     }
 }
 
@@ -98,13 +98,13 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 pub trait DictInput<'py>: ToPy {
     fn input_iter(&self) -> Box<dyn Iterator<Item = (&'py dyn Input, &'py dyn Input)> + 'py>;
 
-    fn input_get(&self, key: &str) -> Option<&'_ dyn Input>;
+    fn input_get(&self, key: &str) -> Option<&'py dyn Input>;
 
     fn input_len(&self) -> usize;
 }
 
 pub trait ListInput<'py>: ToPy {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_>;
+    fn input_iter(&self) -> Box<dyn Iterator<Item = &'py dyn Input> + 'py>;
 
     fn input_len(&self) -> usize;
 }

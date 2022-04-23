@@ -210,7 +210,7 @@ impl<'py> DictInput<'py> for &'py PyDict {
         Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
     }
 
-    fn input_get(&self, key: &str) -> Option<&dyn Input> {
+    fn input_get(&self, key: &str) -> Option<&'py dyn Input> {
         self.get_item(key).map(|item| item as &dyn Input)
     }
 
@@ -220,7 +220,7 @@ impl<'py> DictInput<'py> for &'py PyDict {
 }
 
 impl<'py> ListInput<'py> for &'py PyList {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = &dyn Input> + '_> {
+    fn input_iter(&self) -> Box<dyn Iterator<Item = &'py dyn Input> + 'py> {
         Box::new(self.iter().map(|item| item as &dyn Input))
     }
 
@@ -294,16 +294,23 @@ impl ToPy for PyBytes {
 }
 
 impl ToLocItem for PyAny {
-    fn to_loc(&self) -> ValResult<LocItem> {
+    fn to_loc(&self) -> LocItem {
         if let Ok(key_str) = self.extract::<String>() {
-            Ok(LocItem::S(key_str))
+            LocItem::S(key_str)
         } else if let Ok(key_int) = self.extract::<usize>() {
-            Ok(LocItem::I(key_int))
+            LocItem::I(key_int)
         } else {
             // best effort is to use repr
-            let repr_result = self.repr().map_err(as_internal)?;
-            let repr: String = repr_result.extract().map_err(as_internal)?;
-            Ok(LocItem::S(repr))
+            match repr_string(self) {
+                Ok(s) => LocItem::S(s),
+                Err(_) => LocItem::S(format!("{:?}", self)),
+            }
         }
     }
+}
+
+fn repr_string(py_any: &PyAny) -> PyResult<String> {
+    let repr_result = py_any.repr()?;
+    let repr: String = repr_result.extract()?;
+    Ok(repr)
 }

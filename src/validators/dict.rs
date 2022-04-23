@@ -122,9 +122,9 @@ fn apply_validator<'py>(
             Ok(value) => Ok(Some(value)),
             Err(ValError::LineErrors(line_errors)) => {
                 let loc = if key_loc {
-                    vec![key.to_loc()?, "[key]".to_loc()?]
+                    vec![key.to_loc(), "[key]".to_loc()]
                 } else {
-                    vec![key.to_loc()?]
+                    vec![key.to_loc()]
                 };
                 for err in line_errors {
                     errors.push(err.with_prefix_location(&loc));
