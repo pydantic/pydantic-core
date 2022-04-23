@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
 use crate::build_macros::{dict, dict_get_required, py_error};
-use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
+use crate::errors::{as_validation_err, val_line_error, ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::validators::build_validator;
 
@@ -264,6 +264,6 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a dyn Input) -> ValError
         Err(err) => return ValError::InternalErr(err),
     };
     #[allow(clippy::redundant_field_names)]
-    let line_error = val_line_error!(input_value = InputValue::Ref(input), kind = kind, message = message);
+    let line_error = val_line_error!(input_value = Some(input), kind = kind, message = message);
     ValError::LineErrors(vec![line_error])
 }

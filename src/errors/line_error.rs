@@ -39,7 +39,7 @@ pub struct ValLineError<'a> {
     pub kind: ErrorKind,
     pub location: Location,
     pub message: Option<String>,
-    pub input_value: InputValue<'a>,
+    pub input_value: Option<&'a dyn ToPy>,
     pub context: Option<Context>,
 }
 
@@ -53,19 +53,6 @@ impl<'a> ValLineError<'a> {
             self.location = [location.clone(), self.location].concat();
         }
         self
-    }
-}
-
-#[derive(Debug)]
-pub enum InputValue<'a> {
-    None,
-    Ref(&'a dyn ToPy),
-    Owned(Box<dyn ToPy>),
-}
-
-impl Default for InputValue<'_> {
-    fn default() -> Self {
-        Self::None
     }
 }
 

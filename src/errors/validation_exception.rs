@@ -10,7 +10,7 @@ use pyo3::PyErrArguments;
 use strum::EnumMessage;
 
 use super::kinds::ErrorKind;
-use super::line_error::{Context, InputValue, LocItem, Location, ValLineError};
+use super::line_error::{Context, LocItem, Location, ValLineError};
 
 use super::ValError;
 
@@ -117,11 +117,7 @@ impl PyLineError {
             kind: raw_error.kind,
             location: raw_error.location,
             message: raw_error.message,
-            input_value: match raw_error.input_value {
-                InputValue::Ref(value) => Some(value.to_py(py)),
-                InputValue::Owned(value) => Some(value.to_py(py)),
-                InputValue::None => None,
-            },
+            input_value: raw_error.input_value.map(|value| value.to_py(py)),
             context: raw_error.context,
         }
     }
