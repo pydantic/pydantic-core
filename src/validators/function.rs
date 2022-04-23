@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
 use crate::build_macros::{dict, dict_get_required, py_error};
-use crate::errors::{as_validation_err, val_line_error, ErrorKind, ValError, ValResult};
+use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::Input;
 use crate::validators::build_validator;
 
@@ -83,7 +83,21 @@ impl Validator for FunctionBeforeValidator {
         let v: &PyAny = value.as_ref(py);
         match self.validator.validate(py, v, extra) {
             Ok(v) => Ok(v),
-            Err(_) => todo!(),
+            Err(ValError::InternalErr(err)) => Err(ValError::InternalErr(err)),
+            Err(ValError::LineErrors(line_errors)) => {
+                // we have to be explicit about copying line errors here and converting the input value
+                let new_line_errors = line_errors
+                    .iter()
+                    .map(|line_error| ValLineError {
+                        kind: line_error.kind.clone(),
+                        location: line_error.location.clone(),
+                        message: line_error.message.clone(),
+                        input_value: InputValue::PyObject(line_error.input_value.to_py(py)),
+                        context: line_error.context.clone(),
+                    })
+                    .collect();
+                Err(ValError::LineErrors(new_line_errors))
+            }
         }
     }
 
@@ -264,6 +278,10 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a dyn Input) -> ValError
         Err(err) => return ValError::InternalErr(err),
     };
     #[allow(clippy::redundant_field_names)]
-    let line_error = val_line_error!(input_value = Some(input), kind = kind, message = message);
+    let line_error = val_line_error!(
+        input_value = InputValue::InputRef(input),
+        kind = kind,
+        message = message
+    );
     ValError::LineErrors(vec![line_error])
 }

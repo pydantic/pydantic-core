@@ -39,7 +39,7 @@ pub struct ValLineError<'a> {
     pub kind: ErrorKind,
     pub location: Location,
     pub message: Option<String>,
-    pub input_value: Option<&'a dyn ToPy>,
+    pub input_value: InputValue<'a>,
     pub context: Option<Context>,
 }
 
@@ -53,6 +53,39 @@ impl<'a> ValLineError<'a> {
             self.location = [location.clone(), self.location].concat();
         }
         self
+    }
+
+    // pub fn input_value_to_py(&self, py: Python) -> Self {
+    //     Self {
+    //         kind: self.kind.clone(),
+    //         location: self.location.clone(),
+    //         message: self.message.clone(),
+    //         // input_value: InputValue::PyObject(self.input_value.to_py(py)),
+    //         context: self.context.clone(),
+    //     }
+    // }
+}
+
+#[derive(Debug)]
+pub enum InputValue<'a> {
+    None,
+    InputRef(&'a dyn ToPy),
+    PyObject(PyObject),
+}
+
+impl Default for InputValue<'_> {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+impl<'a> InputValue<'a> {
+    pub fn to_py(&self, py: Python) -> PyObject {
+        match self {
+            Self::None => py.None(),
+            Self::InputRef(input) => input.to_py(py),
+            Self::PyObject(py_obj) => py_obj.into_py(py),
+        }
     }
 }
 

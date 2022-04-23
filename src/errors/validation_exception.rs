@@ -106,7 +106,7 @@ pub struct PyLineError {
     kind: ErrorKind,
     location: Location,
     message: Option<String>,
-    input_value: Option<PyObject>,
+    input_value: PyObject,
     context: Option<Context>,
 }
 
@@ -116,7 +116,7 @@ impl PyLineError {
             kind: raw_error.kind,
             location: raw_error.location,
             message: raw_error.message,
-            input_value: raw_error.input_value.map(|value| value.to_py(py)),
+            input_value: raw_error.input_value.to_py(py),
             context: raw_error.context,
         }
     }
@@ -126,9 +126,7 @@ impl PyLineError {
         dict.set_item("kind", self.kind())?;
         dict.set_item("loc", self.location(py))?;
         dict.set_item("message", self.message())?;
-        if let Some(input_value) = &self.input_value {
-            dict.set_item("input_value", input_value)?;
-        }
+        dict.set_item("input_value", &self.input_value)?;
         if let Some(context) = &self.context {
             dict.set_item("context", context)?;
         }
@@ -189,21 +187,19 @@ impl PyLineError {
         if let Some(ctx) = &self.context {
             output.push_str(&format!(", context={}", ctx));
         }
-        if let Some(input_value) = &self.input_value {
-            if let Some(py) = py {
-                let input_value = input_value.as_ref(py);
-                if let Ok(r) = repr(input_value) {
-                    output.push_str(&format!(", input_value={}", r));
-                } else {
-                    output.push_str(&format!(", input_value={}", input_value));
-                }
-
-                if let Ok(type_) = input_value.get_type().name() {
-                    output.push_str(&format!(", input_type={}", type_));
-                }
+        if let Some(py) = py {
+            let input_value = self.input_value.as_ref(py);
+            if let Ok(r) = repr(input_value) {
+                output.push_str(&format!(", input_value={}", r));
             } else {
                 output.push_str(&format!(", input_value={}", input_value));
             }
+
+            if let Ok(type_) = input_value.get_type().name() {
+                output.push_str(&format!(", input_type={}", type_));
+            }
+        } else {
+            output.push_str(&format!(", input_value={}", self.input_value));
         }
         output.push(']');
         output

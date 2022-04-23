@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_macros::{dict_get, is_strict};
-use crate::errors::{context, err_val_error, ErrorKind, LocItem, ValError, ValLineError};
+use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
 use crate::input::{Input, ListInput};
 
 use super::{build_validator, Extra, ValResult, Validator};
@@ -66,7 +66,7 @@ impl ListValidator {
         if let Some(min_length) = self.min_items {
             if length < min_length {
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::ListTooShort,
                     context = context!("min_length" => min_length)
                 );
@@ -75,7 +75,7 @@ impl ListValidator {
         if let Some(max_length) = self.max_items {
             if length > max_length {
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::ListTooLong,
                     context = context!("max_length" => max_length)
                 );

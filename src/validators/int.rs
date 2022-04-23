@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_macros::{dict_get, is_strict};
-use crate::errors::{context, err_val_error, ErrorKind, ValResult};
+use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
 use super::{Extra, Validator};
@@ -123,7 +123,7 @@ impl ConstrainedIntValidator {
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::IntMultiple,
                     context = context!("multiple_of" => multiple_of)
                 );
@@ -132,7 +132,7 @@ impl ConstrainedIntValidator {
         if let Some(le) = self.le {
             if int > le {
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::IntLessThanEqual,
                     context = context!("le" => le)
                 );
@@ -141,7 +141,7 @@ impl ConstrainedIntValidator {
         if let Some(lt) = self.lt {
             if int >= lt {
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::IntLessThan,
                     context = context!("lt" => lt)
                 );
@@ -150,7 +150,7 @@ impl ConstrainedIntValidator {
         if let Some(ge) = self.ge {
             if int < ge {
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::IntGreaterThanEqual,
                     context = context!("ge" => ge)
                 );
@@ -159,7 +159,7 @@ impl ConstrainedIntValidator {
         if let Some(gt) = self.gt {
             if int <= gt {
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::IntGreaterThan,
                     context = context!("gt" => gt)
                 );

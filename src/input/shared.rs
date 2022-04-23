@@ -1,5 +1,5 @@
 use super::Input;
-use crate::errors::{err_val_error, ErrorKind, ValResult};
+use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
 
 #[inline]
 pub fn str_as_bool<'a>(input: &'a dyn Input, str: &str) -> ValResult<'a, bool> {
@@ -7,7 +7,7 @@ pub fn str_as_bool<'a>(input: &'a dyn Input, str: &str) -> ValResult<'a, bool> {
     match s_lower.as_str() {
         "0" | "off" | "f" | "false" | "n" | "no" => Ok(false),
         "1" | "on" | "t" | "true" | "y" | "yes" => Ok(true),
-        _ => err_val_error!(input_value = Some(input), kind = ErrorKind::BoolParsing),
+        _ => err_val_error!(input_value = InputValue::InputRef(input), kind = ErrorKind::BoolParsing),
     }
 }
 
@@ -18,6 +18,6 @@ pub fn int_as_bool(input: &dyn Input, int: i64) -> ValResult<bool> {
     } else if int == 1 {
         Ok(true)
     } else {
-        err_val_error!(input_value = Some(input), kind = ErrorKind::BoolParsing)
+        err_val_error!(input_value = InputValue::InputRef(input), kind = ErrorKind::BoolParsing)
     }
 }

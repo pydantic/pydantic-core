@@ -7,7 +7,7 @@ use pyo3::{ffi, intern, ToBorrowedObject};
 
 use super::{build_validator, Extra, Validator};
 use crate::build_macros::{dict_get, dict_get_required, py_error};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValResult};
+use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
 #[derive(Debug, Clone)]
@@ -50,7 +50,7 @@ impl Validator for ModelClassValidator {
             Ok(input.to_py(py))
         } else if self.strict {
             err_val_error!(
-                input_value = Some(input),
+                input_value = InputValue::InputRef(input),
                 kind = ErrorKind::ModelType,
                 context = context!("class_name" => self.get_name(py))
             )

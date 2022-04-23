@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::errors::{err_val_error, ErrorKind, ValResult};
+use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
 use super::{Extra, Validator};
@@ -21,7 +21,10 @@ impl Validator for NoneValidator {
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         match input.is_none(py) {
             true => Ok(py.None()),
-            false => err_val_error!(input_value = Some(input), kind = ErrorKind::NoneRequired),
+            false => err_val_error!(
+                input_value = InputValue::InputRef(input),
+                kind = ErrorKind::NoneRequired
+            ),
         }
     }
 

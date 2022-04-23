@@ -3,7 +3,9 @@ use pyo3::types::{PyDict, PySet};
 use std::collections::HashSet;
 
 use crate::build_macros::{dict_get, py_error};
-use crate::errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult};
+use crate::errors::{
+    as_internal, err_val_error, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult,
+};
 use crate::input::{Input, ToLocItem};
 
 use super::{build_validator, Extra, Validator};
@@ -106,7 +108,7 @@ impl Validator for ModelValidator {
                     .map_err(as_internal)?;
             } else {
                 errors.push(val_line_error!(
-                    input_value = Some(input), // TODO use dict?
+                    input_value = InputValue::InputRef(input), // TODO use dict?
                     kind = ErrorKind::Missing,
                     location = vec![field.name.to_loc()]
                 ));
@@ -139,7 +141,7 @@ impl Validator for ModelValidator {
 
                 if forbid {
                     errors.push(val_line_error!(
-                        input_value = Some(input),
+                        input_value = InputValue::InputRef(input),
                         kind = ErrorKind::ExtraForbidden,
                         location = loc
                     ));
@@ -227,7 +229,7 @@ impl ModelValidator {
                 _ => {
                     let loc = vec![field_name.to_loc()];
                     err_val_error!(
-                        input_value = Some(input),
+                        input_value = InputValue::InputRef(input),
                         location = loc,
                         kind = ErrorKind::ExtraForbidden
                     )

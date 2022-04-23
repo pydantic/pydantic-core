@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_macros::{dict_get, is_strict};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValLineError, ValResult};
+use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::{DictInput, Input, ToLocItem};
 
 use super::{build_validator, Extra, Validator};
@@ -72,7 +72,7 @@ impl DictValidator {
         if let Some(min_length) = self.min_items {
             if dict.input_len() < min_length {
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::DictTooShort,
                     context = context!("min_length" => min_length)
                 );
@@ -81,7 +81,7 @@ impl DictValidator {
         if let Some(max_length) = self.max_items {
             if dict.input_len() > max_length {
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::DictTooLong,
                     context = context!("max_length" => max_length)
                 );

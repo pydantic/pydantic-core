@@ -3,7 +3,7 @@ use pyo3::types::{PyDict, PyString};
 use regex::Regex;
 
 use crate::build_macros::{dict_get, is_strict, optional_dict_get, py_error};
-use crate::errors::{context, err_val_error, ErrorKind, ValResult};
+use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
 use super::{Extra, Validator};
@@ -169,7 +169,7 @@ impl StrConstrainedValidator {
             if str.len() < min_length {
                 // return py_error!("{} is shorter than {}", str, min_length);
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::StrTooShort,
                     context = context!("min_length" => min_length)
                 );
@@ -178,7 +178,7 @@ impl StrConstrainedValidator {
         if let Some(max_length) = self.max_length {
             if str.len() > max_length {
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::StrTooLong,
                     context = context!("max_length" => max_length)
                 );
@@ -187,7 +187,7 @@ impl StrConstrainedValidator {
         if let Some(pattern) = &self.pattern {
             if !pattern.is_match(&str) {
                 return err_val_error!(
-                    input_value = Some(input),
+                    input_value = InputValue::InputRef(input),
                     kind = ErrorKind::StrPatternMismatch,
                     context = context!("pattern" => pattern.to_string())
                 );

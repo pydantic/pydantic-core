@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 use serde_json::{Map, Value};
 
-use crate::errors::{err_val_error, ErrorKind, LocItem, ValResult};
+use crate::errors::{err_val_error, ErrorKind, InputValue, LocItem, ValResult};
 
 use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
@@ -15,7 +15,7 @@ impl Input for Value {
     fn strict_str(&self, _py: Python) -> ValResult<String> {
         match self {
             Value::String(s) => Ok(s.to_string()),
-            _ => err_val_error!(input_value = Some(self), kind = ErrorKind::StrType),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::StrType),
         }
     }
 
@@ -23,14 +23,14 @@ impl Input for Value {
         match self {
             Value::String(s) => Ok(s.to_string()),
             Value::Number(n) => Ok(n.to_string()),
-            _ => err_val_error!(input_value = Some(self), kind = ErrorKind::StrType),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::StrType),
         }
     }
 
     fn strict_bool(&self, _py: Python) -> ValResult<bool> {
         match self {
             Value::Bool(b) => Ok(*b),
-            _ => err_val_error!(input_value = Some(self), kind = ErrorKind::BoolType),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BoolType),
         }
     }
 
@@ -42,10 +42,10 @@ impl Input for Value {
                 if let Some(int) = n.as_i64() {
                     int_as_bool(self, int)
                 } else {
-                    err_val_error!(input_value = Some(self), kind = ErrorKind::BoolParsing)
+                    err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BoolParsing)
                 }
             }
-            _ => err_val_error!(input_value = Some(self), kind = ErrorKind::BoolType),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BoolType),
         }
     }
 
@@ -55,10 +55,10 @@ impl Input for Value {
                 if let Some(int) = n.as_i64() {
                     Ok(int)
                 } else {
-                    err_val_error!(input_value = Some(self), kind = ErrorKind::IntType)
+                    err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::IntType)
                 }
             }
-            _ => err_val_error!(input_value = Some(self), kind = ErrorKind::IntType),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::IntType),
         }
     }
 
@@ -71,17 +71,17 @@ impl Input for Value {
                     if float % 1.0 == 0.0 {
                         Ok(float as i64)
                     } else {
-                        err_val_error!(input_value = Some(self), kind = ErrorKind::IntFromFloat)
+                        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::IntFromFloat)
                     }
                 } else {
-                    err_val_error!(input_value = Some(self), kind = ErrorKind::IntType)
+                    err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::IntType)
                 }
             }
             Value::String(str) => match str.parse() {
                 Ok(i) => Ok(i),
-                Err(_) => err_val_error!(input_value = Some(self), kind = ErrorKind::IntParsing),
+                Err(_) => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::IntParsing),
             },
-            _ => err_val_error!(input_value = Some(self), kind = ErrorKind::IntType),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::IntType),
         }
     }
 
@@ -91,10 +91,10 @@ impl Input for Value {
                 if let Some(float) = n.as_f64() {
                     Ok(float)
                 } else {
-                    err_val_error!(input_value = Some(self), kind = ErrorKind::FloatParsing)
+                    err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::FloatParsing)
                 }
             }
-            _ => err_val_error!(input_value = Some(self), kind = ErrorKind::FloatType),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::FloatType),
         }
     }
 
@@ -104,14 +104,14 @@ impl Input for Value {
                 if let Some(float) = n.as_f64() {
                     Ok(float)
                 } else {
-                    err_val_error!(input_value = Some(self), kind = ErrorKind::FloatParsing)
+                    err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::FloatParsing)
                 }
             }
             Value::String(str) => match str.parse() {
                 Ok(i) => Ok(i),
-                Err(_) => err_val_error!(input_value = Some(self), kind = ErrorKind::FloatParsing),
+                Err(_) => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::FloatParsing),
             },
-            _ => err_val_error!(input_value = Some(self), kind = ErrorKind::FloatType),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::FloatType),
         }
     }
 
@@ -122,7 +122,7 @@ impl Input for Value {
     fn strict_dict<'py>(&'py self, _py: Python<'py>) -> ValResult<Box<dyn DictInput<'py> + 'py>> {
         match self {
             Value::Object(dict) => Ok(Box::new(dict)),
-            _ => err_val_error!(input_value = Some(self), kind = ErrorKind::DictType),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DictType),
         }
     }
 
@@ -133,7 +133,7 @@ impl Input for Value {
     fn strict_list<'py>(&'py self, _py: Python<'py>) -> ValResult<Box<dyn ListInput<'py> + 'py>> {
         match self {
             Value::Array(a) => Ok(Box::new(a)),
-            _ => err_val_error!(input_value = Some(self), kind = ErrorKind::ListType),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::ListType),
         }
     }
 
@@ -239,7 +239,7 @@ impl Input for String {
     }
 
     fn strict_bool(&self, _py: Python) -> ValResult<bool> {
-        err_val_error!(input_value = Some(self), kind = ErrorKind::BoolType)
+        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BoolType)
     }
 
     fn lax_bool(&self, _py: Python) -> ValResult<bool> {
@@ -247,24 +247,24 @@ impl Input for String {
     }
 
     fn strict_int(&self, _py: Python) -> ValResult<i64> {
-        err_val_error!(input_value = Some(self), kind = ErrorKind::IntType)
+        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::IntType)
     }
 
     fn lax_int<'a>(&'a self, _py: Python<'a>) -> ValResult<'a, i64> {
         match self.parse() {
             Ok(i) => Ok(i),
-            Err(_) => err_val_error!(input_value = Some(self), kind = ErrorKind::IntParsing),
+            Err(_) => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::IntParsing),
         }
     }
 
     fn strict_float(&self, _py: Python) -> ValResult<f64> {
-        err_val_error!(input_value = Some(self), kind = ErrorKind::FloatType)
+        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::FloatType)
     }
 
     fn lax_float<'a>(&'a self, _py: Python<'a>) -> ValResult<'a, f64> {
         match self.parse() {
             Ok(i) => Ok(i),
-            Err(_) => err_val_error!(input_value = Some(self), kind = ErrorKind::FloatParsing),
+            Err(_) => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::FloatParsing),
         }
     }
 
@@ -273,18 +273,18 @@ impl Input for String {
     }
 
     fn strict_dict<'py>(&'py self, _py: Python<'py>) -> ValResult<Box<dyn DictInput<'py> + 'py>> {
-        err_val_error!(input_value = Some(self), kind = ErrorKind::DictType)
+        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DictType)
     }
 
     fn lax_dict<'py>(&'py self, _py: Python<'py>, _try_instance: bool) -> ValResult<Box<dyn DictInput<'py> + 'py>> {
-        err_val_error!(input_value = Some(self), kind = ErrorKind::DictType)
+        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DictType)
     }
 
     fn strict_list<'py>(&'py self, _py: Python<'py>) -> ValResult<Box<dyn ListInput<'py> + 'py>> {
-        err_val_error!(input_value = Some(self), kind = ErrorKind::ListType)
+        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::ListType)
     }
 
     fn lax_list<'py>(&'py self, _py: Python<'py>) -> ValResult<Box<dyn ListInput<'py> + 'py>> {
-        err_val_error!(input_value = Some(self), kind = ErrorKind::ListType)
+        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::ListType)
     }
 }
