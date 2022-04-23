@@ -1,65 +1,12 @@
-use std::error::Error;
-use std::fmt;
-use std::result::Result as StdResult;
-
-use pyo3::prelude::*;
-
 mod kinds;
 mod line_error;
+mod val_error;
 mod validation_exception;
-
-use self::line_error::PyLineError;
 
 pub use self::kinds::ErrorKind;
 pub use self::line_error::{Context, LocItem, Location, ValLineError};
-pub use self::validation_exception::ValidationError;
-
-pub type ValResult<T> = StdResult<T, ValError>;
-
-#[derive(Debug)]
-pub enum ValError {
-    LineErrors(Vec<ValLineError>),
-    InternalErr(PyErr),
-}
-
-impl fmt::Display for ValError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ValError::LineErrors(line_errors) => {
-                write!(f, "{:?}", line_errors)
-            }
-            ValError::InternalErr(err) => {
-                write!(f, "Internal error: {}", err)
-            }
-        }
-    }
-}
-
-impl Error for ValError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            ValError::LineErrors(_errors) => None,
-            ValError::InternalErr(err) => Some(err),
-        }
-    }
-}
-
-pub fn as_internal(err: PyErr) -> ValError {
-    ValError::InternalErr(err)
-}
-
-pub fn map_validation_error(model_name: &str, error: ValError) -> PyErr {
-    match error {
-        ValError::LineErrors(raw_errors) => {
-            let line_errors: Vec<PyLineError> = raw_errors
-                .into_iter()
-                .map(|raw_error| raw_error.into_py_error())
-                .collect();
-            ValidationError::new_err((line_errors, model_name.to_string()))
-        }
-        ValError::InternalErr(err) => err,
-    }
-}
+pub use self::val_error::{as_internal, ValError, ValResult};
+pub use self::validation_exception::{as_validation_err, ValidationError};
 
 /// Utility for concisely creating a `ValLineError`
 /// can either take just `py` and a `value` (the given value) in which case kind `ErrorKind::ValueError` is used as kind

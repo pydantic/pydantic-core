@@ -5,7 +5,7 @@ use pyo3::types::{PyAny, PyDict};
 use serde_json::{from_str as parse_json, Value as JsonValue};
 
 use crate::build_macros::{dict_get, dict_get_required, py_error};
-use crate::errors::{err_val_error, map_validation_error, ErrorKind, ValResult};
+use crate::errors::{as_validation_err, err_val_error, ErrorKind, ValResult};
 use crate::input::{Input, ToPy};
 
 mod bool;
@@ -44,7 +44,7 @@ impl SchemaValidator {
             field: None,
         };
         let r = self.validator.validate(py, input, &extra);
-        r.map_err(|e| map_validation_error(&self.title, e))
+        r.map_err(|e| as_validation_err(&self.title, e))
     }
 
     fn validate_json(&self, py: Python, input: String) -> PyResult<PyObject> {
@@ -59,7 +59,7 @@ impl SchemaValidator {
             Err(e) => err_val_error!(py, input, message = Some(e.to_string()), kind = ErrorKind::InvalidJson),
         };
 
-        result.map_err(|e| map_validation_error(&self.title, e))
+        result.map_err(|e| as_validation_err(&self.title, e))
     }
 
     fn validate_assignment(&self, py: Python, field: String, input: &PyAny, data: &PyDict) -> PyResult<PyObject> {
@@ -68,7 +68,7 @@ impl SchemaValidator {
             field: Some(field.as_str()),
         };
         let r = self.validator.validate(py, input, &extra);
-        r.map_err(|e| map_validation_error(&self.title, e))
+        r.map_err(|e| as_validation_err(&self.title, e))
     }
 
     fn __repr__(&self) -> String {

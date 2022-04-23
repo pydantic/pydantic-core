@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
 use crate::build_macros::{dict, dict_get_required, py_error};
-use crate::errors::{map_validation_error, val_line_error, ErrorKind, ValError, ValResult};
+use crate::errors::{as_validation_err, val_line_error, ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::validators::build_validator;
 
@@ -221,7 +221,7 @@ impl ValidatorCallable {
         };
         self.validator
             .validate(py, arg, &extra)
-            .map_err(|e| map_validation_error("Model", e))
+            .map_err(|e| as_validation_err("Model", e))
     }
 
     fn __repr__(&self) -> String {
