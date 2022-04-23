@@ -4,7 +4,7 @@ use pyo3::types::{PyDict, PyType};
 use serde_json::{Map, Value};
 
 use crate::build_macros::py_error;
-use crate::errors::{as_internal, boxed_input, err_val_error, ErrorKind, InputValue, LocItem, ValResult};
+use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, LocItem, ValResult};
 
 use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
@@ -39,10 +39,10 @@ impl Input for Value {
     fn lax_bool(&self, _py: Python) -> ValResult<bool> {
         match self {
             Value::Bool(b) => Ok(*b),
-            Value::String(s) => str_as_bool(s),
+            Value::String(s) => str_as_bool(self, s),
             Value::Number(n) => {
                 if let Some(int) = n.as_i64() {
-                    int_as_bool(int)
+                    int_as_bool(self, int)
                 } else {
                     err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::BoolParsing)
                 }
@@ -73,7 +73,7 @@ impl Input for Value {
                     if float % 1.0 == 0.0 {
                         Ok(float as i64)
                     } else {
-                        err_val_error!(input_value = boxed_input!(float), kind = ErrorKind::IntFromFloat)
+                        err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::IntFromFloat)
                     }
                 } else {
                     err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::IntType)
@@ -81,7 +81,7 @@ impl Input for Value {
             }
             Value::String(str) => match str.parse() {
                 Ok(i) => Ok(i),
-                Err(_) => err_val_error!(input_value = InputValue::Ref(str), kind = ErrorKind::IntParsing),
+                Err(_) => err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::IntParsing),
             },
             _ => err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::IntType),
         }
@@ -111,7 +111,7 @@ impl Input for Value {
             }
             Value::String(str) => match str.parse() {
                 Ok(i) => Ok(i),
-                Err(_) => err_val_error!(input_value = InputValue::Ref(str), kind = ErrorKind::FloatParsing),
+                Err(_) => err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::FloatParsing),
             },
             _ => err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::FloatType),
         }
@@ -145,7 +145,7 @@ impl Input for Value {
 }
 
 impl<'py> DictInput<'py> for &'py Map<String, Value> {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_> {
+    fn input_iter(&self) -> Box<dyn Iterator<Item = (&'py dyn Input, &'py dyn Input)> + 'py> {
         Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
     }
 
@@ -244,7 +244,7 @@ impl Input for String {
     }
 
     fn lax_bool(&self, _py: Python) -> ValResult<bool> {
-        str_as_bool(self)
+        str_as_bool(self, self)
     }
 
     fn strict_int(&self, _py: Python) -> ValResult<i64> {

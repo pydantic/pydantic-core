@@ -3,7 +3,7 @@ use std::str::from_utf8;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyList, PyMapping, PyString, PyTuple, PyType};
 
-use crate::errors::{as_internal, boxed_input, err_val_error, ErrorKind, InputValue, LocItem, ValResult};
+use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, LocItem, ValResult};
 
 use super::shared::{int_as_bool, str_as_bool};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
@@ -57,9 +57,9 @@ impl Input for PyAny {
         if let Ok(bool) = self.extract::<bool>() {
             Ok(bool)
         } else if let Some(str) = _maybe_as_string(self, ErrorKind::BoolParsing)? {
-            str_as_bool(str.as_str())
+            str_as_bool(self, &str)
         } else if let Ok(int) = self.extract::<i64>() {
-            int_as_bool(int)
+            int_as_bool(self, int)
         } else {
             err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::BoolType)
         }
@@ -67,8 +67,8 @@ impl Input for PyAny {
 
     fn strict_int(&self, _py: Python) -> ValResult<i64> {
         // bool check has to come before int check as bools would be cast to ints below
-        if let Ok(bool) = self.extract::<bool>() {
-            err_val_error!(input_value = boxed_input!(bool), kind = ErrorKind::IntType)
+        if self.extract::<bool>().is_ok() {
+            err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::IntType)
         } else if let Ok(int) = self.extract::<i64>() {
             Ok(int)
         } else {
@@ -82,13 +82,13 @@ impl Input for PyAny {
         } else if let Some(str) = _maybe_as_string(self, ErrorKind::IntParsing)? {
             match str.parse() {
                 Ok(i) => Ok(i),
-                Err(_) => err_val_error!(input_value = boxed_input!(str), kind = ErrorKind::IntParsing),
+                Err(_) => err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::IntParsing),
             }
         } else if let Ok(float) = self.lax_float(py) {
             if float % 1.0 == 0.0 {
                 Ok(float as i64)
             } else {
-                err_val_error!(input_value = boxed_input!(float), kind = ErrorKind::IntFromFloat)
+                err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::IntFromFloat)
             }
         } else {
             err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::IntType)
@@ -109,7 +109,7 @@ impl Input for PyAny {
         } else if let Some(str) = _maybe_as_string(self, ErrorKind::FloatParsing)? {
             match str.parse() {
                 Ok(i) => Ok(i),
-                Err(_) => err_val_error!(input_value = boxed_input!(str), kind = ErrorKind::FloatParsing),
+                Err(_) => err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::FloatParsing),
             }
         } else {
             err_val_error!(input_value = InputValue::Ref(self), kind = ErrorKind::FloatType)
@@ -206,7 +206,7 @@ fn instance_as_dict<'py>(py: Python<'py>, instance: &'py PyAny) -> PyResult<&'py
 }
 
 impl<'py> DictInput<'py> for &'py PyDict {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_> {
+    fn input_iter(&self) -> Box<dyn Iterator<Item = (&'py dyn Input, &'py dyn Input)> + 'py> {
         Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
     }
 
@@ -236,7 +236,7 @@ fn _maybe_as_string(v: &PyAny, unicode_error: ErrorKind) -> ValResult<Option<Str
     } else if let Ok(bytes) = v.cast_as::<PyBytes>() {
         let str = match from_utf8(bytes.as_bytes()) {
             Ok(s) => s.to_string(),
-            Err(_) => return err_val_error!(input_value = InputValue::Ref(bytes), kind = unicode_error),
+            Err(_) => return err_val_error!(input_value = InputValue::Ref(v), kind = unicode_error),
         };
         Ok(Some(str))
     } else {

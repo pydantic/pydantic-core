@@ -56,12 +56,17 @@ impl<'a> ValLineError<'a> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub enum InputValue<'a> {
-    #[default]
     None,
     Ref(&'a dyn ToPy),
     Owned(Box<dyn ToPy>),
+}
+
+impl Default for InputValue<'_> {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 #[derive(Debug, Clone)]

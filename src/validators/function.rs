@@ -81,7 +81,10 @@ impl Validator for FunctionBeforeValidator {
             .call(py, (input.to_py(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))?;
         let v: &PyAny = value.as_ref(py);
-        self.validator.validate(py, v, extra)
+        match self.validator.validate(py, v, extra) {
+            Ok(v) => Ok(v),
+            Err(_) => todo!(),
+        }
     }
 
     fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {

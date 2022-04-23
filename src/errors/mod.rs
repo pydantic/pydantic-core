@@ -25,13 +25,6 @@ macro_rules! val_line_error {
 }
 pub(crate) use val_line_error;
 
-macro_rules! boxed_input {
-    ($input_value:expr) => {
-        crate::errors::InputValue::Owned(Box::new($input_value))
-    };
-}
-pub(crate) use boxed_input;
-
 /// Utility for concisely creating a `Err(ValError::LineErrors([?]))` containing a single `ValLineError`
 /// Usage matches `val_line_error`
 macro_rules! err_val_error {

@@ -96,7 +96,7 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 // is this harming performance, particularly the .map(|item| item)?
 // https://stackoverflow.com/a/47156134/949890
 pub trait DictInput<'py>: ToPy {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = (&dyn Input, &dyn Input)> + '_>;
+    fn input_iter(&self) -> Box<dyn Iterator<Item = (&'py dyn Input, &'py dyn Input)> + 'py>;
 
     fn input_get(&self, key: &str) -> Option<&'_ dyn Input>;
 

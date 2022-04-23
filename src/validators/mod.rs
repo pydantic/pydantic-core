@@ -9,7 +9,7 @@ use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, Va
 use crate::input::Input;
 
 mod bool;
-// mod dict;
+mod dict;
 // mod float;
 mod function;
 // mod int;
@@ -117,8 +117,8 @@ pub fn build_validator(dict: &PyDict, config: Option<&PyDict>) -> PyResult<Box<d
         // self::union::UnionValidator,
         // // model classes
         // self::model_class::ModelClassValidator,
-        // // strings
-        // self::string::StrValidator,
+        // strings
+        self::string::StrValidator,
         // // integers
         // self::int::IntValidator,
         // boolean
@@ -127,12 +127,12 @@ pub fn build_validator(dict: &PyDict, config: Option<&PyDict>) -> PyResult<Box<d
         // self::float::FloatValidator,
         // // list/arrays (recursive)
         // self::list::ListValidator,
-        // // dicts/objects (recursive)
-        // self::dict::DictValidator,
+        // dicts/objects (recursive)
+        self::dict::DictValidator,
         // // None/null
         // self::none::NoneValidator,
-        // // functions - before, after, plain & wrap
-        // self::function::FunctionValidator,
+        // functions - before, after, plain & wrap
+        self::function::FunctionValidator,
     )
 }
 
@@ -157,9 +157,9 @@ pub trait Validator: Send + fmt::Debug {
         Self: Sized;
 
     /// Do the actual validation for this schema/type
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject>;
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject>;
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject>;
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject>;
 
     fn get_name(&self, py: Python) -> String;
 
