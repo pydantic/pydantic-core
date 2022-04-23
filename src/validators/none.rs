@@ -18,14 +18,14 @@ impl Validator for NoneValidator {
         Ok(Box::new(Self))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         match input.is_none(py) {
             true => Ok(py.None()),
             false => err_val_error!(py, input, kind = ErrorKind::NoneRequired),
         }
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         self.validate(py, input, extra)
     }
 

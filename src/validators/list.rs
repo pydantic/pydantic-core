@@ -32,7 +32,7 @@ impl Validator for ListValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         let list = match self.strict {
             true => input.strict_list(py)?,
             false => input.lax_list(py)?,
@@ -40,7 +40,7 @@ impl Validator for ListValidator {
         self._validation_logic(py, list, extra)
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         self._validation_logic(py, input.strict_list(py)?, extra)
     }
 

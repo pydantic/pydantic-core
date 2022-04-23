@@ -44,7 +44,7 @@ impl Validator for ModelClassValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         let class = self.class.as_ref(py);
         if input.strict_model_check(class)? {
             Ok(input.to_py(py))
@@ -61,7 +61,7 @@ impl Validator for ModelClassValidator {
         }
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         if input.strict_model_check(self.class.as_ref(py))? {
             Ok(input.to_py(py))
         } else {

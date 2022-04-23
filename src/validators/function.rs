@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
 use crate::build_macros::{dict, dict_get_required, py_error};
-use crate::errors::{as_validation_err, val_line_error, ErrorKind, ValError, ValResult};
+use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 use crate::validators::build_validator;
 
@@ -32,7 +32,7 @@ impl Validator for FunctionValidator {
         unimplemented!("FunctionValidator is never used directly")
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         self.validate(py, input, extra)
     }
 
@@ -74,7 +74,7 @@ struct FunctionBeforeValidator {
 impl Validator for FunctionBeforeValidator {
     build!();
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         let value = self
             .func
@@ -84,7 +84,7 @@ impl Validator for FunctionBeforeValidator {
         self.validator.validate(py, v, extra)
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         self.validate(py, input, extra)
     }
 
@@ -108,13 +108,13 @@ struct FunctionAfterValidator {
 impl Validator for FunctionAfterValidator {
     build!();
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         let v = self.validator.validate(py, input, extra)?;
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         self.validate(py, input, extra)
     }
 
@@ -142,14 +142,14 @@ impl Validator for FunctionPlainValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func
             .call(py, (input.to_py(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         self.validate(py, input, extra)
     }
 
@@ -173,7 +173,7 @@ struct FunctionWrapValidator {
 impl Validator for FunctionWrapValidator {
     build!();
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         let validator_kwarg = ValidatorCallable {
             validator: self.validator.clone(),
             data: extra.data.map(|d| d.into_py(py)),
@@ -190,7 +190,7 @@ impl Validator for FunctionWrapValidator {
             .map_err(|e| convert_err(py, e, input))
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         self.validate(py, input, extra)
     }
 
@@ -221,7 +221,7 @@ impl ValidatorCallable {
         };
         self.validator
             .validate(py, arg, &extra)
-            .map_err(|e| as_validation_err("Model", e))
+            .map_err(|e| as_validation_err(py, "Model", e))
     }
 
     fn __repr__(&self) -> String {
@@ -245,7 +245,7 @@ fn get_function(schema: &PyDict) -> PyResult<PyObject> {
     }
 }
 
-fn convert_err(py: Python, err: PyErr, input: &dyn Input) -> ValError {
+fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a dyn Input) -> ValError<'a> {
     let kind = if err.is_instance_of::<PyValueError>(py) {
         ErrorKind::ValueError
     } else if err.is_instance_of::<PyTypeError>(py) {
@@ -261,6 +261,6 @@ fn convert_err(py: Python, err: PyErr, input: &dyn Input) -> ValError {
         Err(err) => return ValError::InternalErr(err),
     };
     #[allow(clippy::redundant_field_names)]
-    let line_error = val_line_error!(py, input, kind = kind, message = message);
+    let line_error = val_line_error!(input_value = InputValue::Ref(input), kind = kind, message = message);
     ValError::LineErrors(vec![line_error])
 }

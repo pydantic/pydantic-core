@@ -3,7 +3,7 @@ use std::fmt;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-// use crate::input::ToPy;
+use crate::input::ToPy;
 
 use super::kinds::ErrorKind;
 
@@ -35,15 +35,15 @@ pub type Location = Vec<LocItem>;
 /// to eventually form a `ValidationError`.
 /// I don't like the name `ValLineError`, but it's the best I could come up with (for now).
 #[derive(Debug, Default)]
-pub struct ValLineError {
+pub struct ValLineError<'a> {
     pub kind: ErrorKind,
     pub location: Location,
     pub message: Option<String>,
-    pub input_value: Option<PyObject>,
+    pub input_value: InputValue<'a>,
     pub context: Option<Context>,
 }
 
-impl ValLineError {
+impl<'a> ValLineError<'a> {
     pub fn with_prefix_location(mut self, location: &Location) -> Self {
         if self.location.is_empty() {
             self.location = location.clone();
@@ -54,6 +54,14 @@ impl ValLineError {
         }
         self
     }
+}
+
+#[derive(Debug, Default)]
+pub enum InputValue<'a> {
+    #[default]
+    None,
+    Ref(&'a dyn ToPy),
+    Owned(Box<dyn ToPy>),
 }
 
 #[derive(Debug, Clone)]

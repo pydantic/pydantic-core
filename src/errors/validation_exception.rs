@@ -10,7 +10,7 @@ use pyo3::PyErrArguments;
 use strum::EnumMessage;
 
 use super::kinds::ErrorKind;
-use super::line_error::{Context, LocItem, Location, ValLineError};
+use super::line_error::{Context, InputValue, LocItem, Location, ValLineError};
 
 use super::ValError;
 
@@ -21,10 +21,10 @@ pub struct ValidationError {
     title: String,
 }
 
-pub fn as_validation_err(model_name: &str, error: ValError) -> PyErr {
+pub fn as_validation_err(py: Python, model_name: &str, error: ValError) -> PyErr {
     match error {
         ValError::LineErrors(raw_errors) => {
-            let line_errors: Vec<PyLineError> = raw_errors.into_iter().map(PyLineError::new).collect();
+            let line_errors: Vec<PyLineError> = raw_errors.into_iter().map(|e| PyLineError::new(py, e)).collect();
             ValidationError::new_err((line_errors, model_name.to_string()))
         }
         ValError::InternalErr(err) => err,
@@ -112,12 +112,16 @@ pub struct PyLineError {
 }
 
 impl PyLineError {
-    pub fn new(raw_error: ValLineError) -> Self {
+    pub fn new(py: Python, raw_error: ValLineError) -> Self {
         Self {
             kind: raw_error.kind,
             location: raw_error.location,
             message: raw_error.message,
-            input_value: raw_error.input_value,
+            input_value: match raw_error.input_value {
+                InputValue::Ref(value) => Some(value.to_py(py)),
+                InputValue::Owned(value) => Some(value.to_py(py)),
+                InputValue::None => None,
+            },
             context: raw_error.context,
         }
     }

@@ -75,11 +75,11 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 
     fn strict_int(&self, py: Python) -> ValResult<i64>;
 
-    fn lax_int(&self, py: Python) -> ValResult<i64>;
+    fn lax_int<'a>(&'a self, py: Python<'a>) -> ValResult<'a, i64>;
 
     fn strict_float(&self, py: Python) -> ValResult<f64>;
 
-    fn lax_float(&self, py: Python) -> ValResult<f64>;
+    fn lax_float<'a>(&'a self, py: Python<'a>) -> ValResult<'a, f64>;
 
     fn strict_model_check(&self, class: &PyType) -> ValResult<bool>;
 

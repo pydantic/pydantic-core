@@ -39,7 +39,7 @@ impl Validator for DictValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         let dict = match self.strict {
             true => input.strict_dict(py)?,
             false => input.lax_dict(py, self.try_instance_as_dict)?,
@@ -47,7 +47,7 @@ impl Validator for DictValidator {
         self._validation_logic(py, dict, extra)
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         self._validation_logic(py, input.strict_dict(py)?, extra)
     }
 
@@ -109,15 +109,15 @@ impl DictValidator {
     }
 }
 
-fn apply_validator(
-    py: Python,
-    validator: &Option<Box<dyn Validator>>,
+fn apply_validator<'py>(
+    py: Python<'py>,
+    validator: &'py Option<Box<dyn Validator>>,
     errors: &mut Vec<ValLineError>,
-    input: &dyn Input,
-    key: &dyn Input,
+    input: &'py dyn Input,
+    key: &'py dyn Input,
     extra: &Extra,
     key_loc: bool,
-) -> ValResult<Option<PyObject>> {
+) -> ValResult<'py, Option<PyObject>> {
     match validator {
         Some(validator) => match validator.validate(py, input, extra) {
             Ok(value) => Ok(Some(value)),

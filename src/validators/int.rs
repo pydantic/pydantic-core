@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use crate::build_macros::{dict_get, is_strict};
 use crate::errors::{context, err_val_error, ErrorKind, ValResult};
-use crate::input::{Input, ToPy};
+use crate::input::{Input};
 
 use super::{Extra, Validator};
 
@@ -30,11 +30,11 @@ impl Validator for IntValidator {
         }
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         Ok(input.lax_int(py)?.into_py(py))
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         Ok(input.strict_int(py)?.into_py(py))
     }
 
@@ -56,11 +56,11 @@ impl Validator for StrictIntValidator {
         Ok(Box::new(Self))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         Ok(input.strict_int(py)?.into_py(py))
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         self.validate(py, input, extra)
     }
 
@@ -96,7 +96,7 @@ impl Validator for ConstrainedIntValidator {
         }))
     }
 
-    fn validate(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         let int = match self.strict {
             true => input.strict_int(py)?,
             false => input.lax_int(py)?,
@@ -104,7 +104,7 @@ impl Validator for ConstrainedIntValidator {
         self._validation_logic(py, int)
     }
 
-    fn validate_strict(&self, py: Python, input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
+    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         self._validation_logic(py, input.strict_int(py)?)
     }
 
