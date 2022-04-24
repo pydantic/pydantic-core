@@ -40,7 +40,7 @@ pub struct ValLineError<'a> {
     pub location: Location,
     pub message: Option<String>,
     pub input_value: InputValue<'a>,
-    pub context: Option<Context>,
+    pub context: Context,
 }
 
 impl<'a> ValLineError<'a> {
@@ -54,16 +54,6 @@ impl<'a> ValLineError<'a> {
         }
         self
     }
-
-    // pub fn input_value_to_py(&self, py: Python) -> Self {
-    //     Self {
-    //         kind: self.kind.clone(),
-    //         location: self.location.clone(),
-    //         message: self.message.clone(),
-    //         // input_value: InputValue::PyObject(self.input_value.to_py(py)),
-    //         context: self.context.clone(),
-    //     }
-    // }
 }
 
 #[derive(Debug)]
@@ -89,12 +79,16 @@ impl<'a> InputValue<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Context(Vec<(String, ContextValue)>);
 
 impl Context {
     pub fn new<K: Into<String>, V: Into<ContextValue>, I: IntoIterator<Item = (K, V)>>(raw: I) -> Self {
         Self(raw.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     pub fn render(&self, template: String) -> String {

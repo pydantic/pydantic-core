@@ -36,7 +36,7 @@ pub(crate) use err_val_error;
 
 macro_rules! context {
     ($($k:expr => $v:expr),*) => {{
-        Some(crate::errors::Context::new([$(($k, $v),)*]))
+        crate::errors::Context::new([$(($k, $v),)*])
     }};
 }
 pub(crate) use context;

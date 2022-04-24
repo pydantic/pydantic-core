@@ -107,7 +107,7 @@ pub struct PyLineError {
     location: Location,
     message: Option<String>,
     input_value: PyObject,
-    context: Option<Context>,
+    context: Context,
 }
 
 impl PyLineError {
@@ -127,8 +127,8 @@ impl PyLineError {
         dict.set_item("loc", self.location(py))?;
         dict.set_item("message", self.message())?;
         dict.set_item("input_value", &self.input_value)?;
-        if let Some(context) = &self.context {
-            dict.set_item("context", context)?;
+        if !self.context.is_empty() {
+            dict.set_item("context", &self.context)?;
         }
         Ok(dict.into_py(py))
     }
@@ -151,9 +151,10 @@ impl PyLineError {
 
     fn message(&self) -> String {
         let raw = self.raw_message();
-        match self.context {
-            Some(ref context) => context.render(raw),
-            None => raw,
+        if self.context.is_empty() {
+            raw
+        } else {
+            self.context.render(raw)
         }
     }
 
@@ -184,8 +185,8 @@ impl PyLineError {
 
         output.push_str(&format!("  {} [kind={}", self.message(), self.kind()));
 
-        if let Some(ctx) = &self.context {
-            output.push_str(&format!(", context={}", ctx));
+        if !self.context.is_empty() {
+            output.push_str(&format!(", context={}", self.context));
         }
         if let Some(py) = py {
             let input_value = self.input_value.as_ref(py);

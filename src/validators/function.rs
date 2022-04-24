@@ -80,23 +80,25 @@ impl Validator for FunctionBeforeValidator {
             .func
             .call(py, (input.to_py(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))?;
-        let v: &PyAny = value.as_ref(py);
-        match self.validator.validate(py, v, extra) {
+        // maybe there's some way to get the PyAny here and explicitly tell rust it should have lifespan 'a?
+        let new_input: &PyAny = value.as_ref(py);
+        match self.validator.validate(py, new_input, extra) {
             Ok(v) => Ok(v),
             Err(ValError::InternalErr(err)) => Err(ValError::InternalErr(err)),
             Err(ValError::LineErrors(line_errors)) => {
                 // we have to be explicit about copying line errors here and converting the input value
-                let new_line_errors = line_errors
-                    .iter()
-                    .map(|line_error| ValLineError {
-                        kind: line_error.kind.clone(),
-                        location: line_error.location.clone(),
-                        message: line_error.message.clone(),
-                        input_value: InputValue::PyObject(line_error.input_value.to_py(py)),
-                        context: line_error.context.clone(),
-                    })
-                    .collect();
-                Err(ValError::LineErrors(new_line_errors))
+                Err(ValError::LineErrors(
+                    line_errors
+                        .into_iter()
+                        .map(|line_error| ValLineError {
+                            kind: line_error.kind,
+                            location: line_error.location,
+                            message: line_error.message,
+                            input_value: InputValue::PyObject(line_error.input_value.to_py(py)),
+                            context: line_error.context,
+                        })
+                        .collect(),
+                ))
             }
         }
     }
