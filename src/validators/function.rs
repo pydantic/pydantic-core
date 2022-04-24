@@ -28,14 +28,17 @@ impl Validator for FunctionValidator {
         }
     }
 
+    #[no_coverage]
     fn validate(&self, _py: Python, _input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
         unimplemented!("FunctionValidator is never used directly")
     }
 
+    #[no_coverage]
     fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         self.validate(py, input, extra)
     }
 
+    #[no_coverage]
     fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()
     }

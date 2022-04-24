@@ -23,7 +23,7 @@ build-dev:
 .PHONY: build-coverage
 build-coverage:
 	rm -f pydantic_core/*.so
-	RUSTFLAGS='-C instrument-coverage' python setup.py develop
+	RUSTFLAGS='-C instrument-coverage -A incomplete_features' python setup.py develop
 
 .PHONY: format
 format:

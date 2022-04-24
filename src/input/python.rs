@@ -246,7 +246,7 @@ fn _maybe_as_string(v: &PyAny, unicode_error: ErrorKind) -> ValResult<Option<Str
     }
 }
 
-impl ToPy for PyDict {
+impl ToPy for PyAny {
     #[inline]
     fn to_py(&self, py: Python) -> PyObject {
         self.into_py(py)
@@ -260,35 +260,7 @@ impl ToPy for &PyDict {
     }
 }
 
-impl ToPy for PyList {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
 impl ToPy for &PyList {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for PyAny {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for &PyMapping {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for PyBytes {
     #[inline]
     fn to_py(&self, py: Python) -> PyObject {
         self.into_py(py)

@@ -224,6 +224,13 @@ impl ToLocItem for Value {
     }
 }
 
+impl ToPy for String {
+    #[inline]
+    fn to_py(&self, py: Python) -> PyObject {
+        self.into_py(py)
+    }
+}
+
 /// Required for Dict keys so the string can behave like an Input
 impl Input for String {
     fn is_none(&self, _py: Python) -> bool {
