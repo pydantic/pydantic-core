@@ -1,3 +1,4 @@
+import re
 from copy import deepcopy
 
 import pytest
@@ -190,3 +191,12 @@ def test_validate_assignment():
     m = {'field_a': 'test', 'more': 'foobar'}
     assert v.validate_python({'field_a': 'test'}) == (m, {'field_a'})
     assert v.validate_assignment('field_a', 456, m) == ({'field_a': '456', 'more': 'foobar'}, {'field_a'})
+
+
+def test_function_wrong_sig():
+    def f(input_value):
+        return input_value + ' Changed'
+
+    v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'field': {'type': 'str'}})
+    with pytest.raises(TypeError, match=re.escape("f() got an unexpected keyword argument 'data'")):
+        v.validate_python('input value')

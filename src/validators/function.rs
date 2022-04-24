@@ -1,4 +1,4 @@
-use pyo3::exceptions::{PyAssertionError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyAssertionError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
@@ -268,10 +268,10 @@ fn get_function(schema: &PyDict) -> PyResult<PyObject> {
 }
 
 fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a dyn Input) -> ValError<'a> {
+    // Only ValueError and AssertionError are considered as validation errors,
+    // TypeError is now considered as a runtime error to catch errors in function signatures
     let kind = if err.is_instance_of::<PyValueError>(py) {
         ErrorKind::ValueError
-    } else if err.is_instance_of::<PyTypeError>(py) {
-        ErrorKind::TypeError
     } else if err.is_instance_of::<PyAssertionError>(py) {
         ErrorKind::AssertionError
     } else {
