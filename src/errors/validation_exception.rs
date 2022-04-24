@@ -2,7 +2,6 @@ use std::error::Error;
 use std::fmt;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::PyErrArguments;
@@ -21,10 +20,10 @@ pub struct ValidationError {
     title: String,
 }
 
-pub fn as_validation_err(model_name: &str, error: ValError) -> PyErr {
+pub fn as_validation_err(py: Python, model_name: &str, error: ValError) -> PyErr {
     match error {
         ValError::LineErrors(raw_errors) => {
-            let line_errors: Vec<PyLineError> = raw_errors.into_iter().map(PyLineError::new).collect();
+            let line_errors: Vec<PyLineError> = raw_errors.into_iter().map(|e| PyLineError::new(py, e)).collect();
             ValidationError::new_err((line_errors, model_name.to_string()))
         }
         ValError::InternalErr(err) => err,
@@ -107,17 +106,17 @@ pub struct PyLineError {
     kind: ErrorKind,
     location: Location,
     message: Option<String>,
-    input_value: Option<PyObject>,
-    context: Option<Context>,
+    input_value: PyObject,
+    context: Context,
 }
 
 impl PyLineError {
-    pub fn new(raw_error: ValLineError) -> Self {
+    pub fn new(py: Python, raw_error: ValLineError) -> Self {
         Self {
             kind: raw_error.kind,
             location: raw_error.location,
             message: raw_error.message,
-            input_value: raw_error.input_value,
+            input_value: raw_error.input_value.to_py(py),
             context: raw_error.context,
         }
     }
@@ -127,11 +126,9 @@ impl PyLineError {
         dict.set_item("kind", self.kind())?;
         dict.set_item("loc", self.location(py))?;
         dict.set_item("message", self.message())?;
-        if let Some(input_value) = &self.input_value {
-            dict.set_item("input_value", input_value)?;
-        }
-        if let Some(context) = &self.context {
-            dict.set_item("context", context)?;
+        dict.set_item("input_value", &self.input_value)?;
+        if !self.context.is_empty() {
+            dict.set_item("context", &self.context)?;
         }
         Ok(dict.into_py(py))
     }
@@ -154,9 +151,10 @@ impl PyLineError {
 
     fn message(&self) -> String {
         let raw = self.raw_message();
-        match self.context {
-            Some(ref context) => context.render(raw),
-            None => raw,
+        if self.context.is_empty() {
+            raw
+        } else {
+            self.context.render(raw)
         }
     }
 
@@ -187,24 +185,22 @@ impl PyLineError {
 
         output.push_str(&format!("  {} [kind={}", self.message(), self.kind()));
 
-        if let Some(ctx) = &self.context {
-            output.push_str(&format!(", context={}", ctx));
+        if !self.context.is_empty() {
+            output.push_str(&format!(", context={}", self.context));
         }
-        if let Some(input_value) = &self.input_value {
-            if let Some(py) = py {
-                let input_value = input_value.as_ref(py);
-                if let Ok(r) = repr(input_value) {
-                    output.push_str(&format!(", input_value={}", r));
-                } else {
-                    output.push_str(&format!(", input_value={}", input_value));
-                }
-
-                if let Ok(type_) = input_value.get_type().name() {
-                    output.push_str(&format!(", input_type={}", type_));
-                }
+        if let Some(py) = py {
+            let input_value = self.input_value.as_ref(py);
+            if let Ok(r) = repr(input_value) {
+                output.push_str(&format!(", input_value={}", r));
             } else {
                 output.push_str(&format!(", input_value={}", input_value));
             }
+
+            if let Ok(type_) = input_value.get_type().name() {
+                output.push_str(&format!(", input_type={}", type_));
+            }
+        } else {
+            output.push_str(&format!(", input_value={}", self.input_value));
         }
         output.push(']');
         output
@@ -212,6 +208,5 @@ impl PyLineError {
 }
 
 fn repr(v: &PyAny) -> PyResult<String> {
-    let repr = v.getattr(intern!(v.py(), "__repr__"))?;
-    repr.call0()?.extract()
+    v.repr()?.extract()
 }

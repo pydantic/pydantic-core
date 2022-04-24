@@ -3,7 +3,7 @@ use std::fmt;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-// use crate::input::ToPy;
+use crate::input::ToPy;
 
 use super::kinds::ErrorKind;
 
@@ -35,15 +35,15 @@ pub type Location = Vec<LocItem>;
 /// to eventually form a `ValidationError`.
 /// I don't like the name `ValLineError`, but it's the best I could come up with (for now).
 #[derive(Debug, Default)]
-pub struct ValLineError {
+pub struct ValLineError<'a> {
     pub kind: ErrorKind,
     pub location: Location,
     pub message: Option<String>,
-    pub input_value: Option<PyObject>,
-    pub context: Option<Context>,
+    pub input_value: InputValue<'a>,
+    pub context: Context,
 }
 
-impl ValLineError {
+impl<'a> ValLineError<'a> {
     pub fn with_prefix_location(mut self, location: &Location) -> Self {
         if self.location.is_empty() {
             self.location = location.clone();
@@ -56,12 +56,39 @@ impl ValLineError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
+pub enum InputValue<'a> {
+    None,
+    InputRef(&'a dyn ToPy),
+    PyObject(PyObject),
+}
+
+impl Default for InputValue<'_> {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+impl<'a> InputValue<'a> {
+    pub fn to_py(&self, py: Python) -> PyObject {
+        match self {
+            Self::None => py.None(),
+            Self::InputRef(input) => input.to_py(py),
+            Self::PyObject(py_obj) => py_obj.into_py(py),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Context(Vec<(String, ContextValue)>);
 
 impl Context {
     pub fn new<K: Into<String>, V: Into<ContextValue>, I: IntoIterator<Item = (K, V)>>(raw: I) -> Self {
         Self(raw.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     pub fn render(&self, template: String) -> String {

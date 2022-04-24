@@ -6,15 +6,15 @@ use pyo3::prelude::*;
 
 use super::line_error::ValLineError;
 
-pub type ValResult<T> = StdResult<T, ValError>;
+pub type ValResult<'a, T> = StdResult<T, ValError<'a>>;
 
 #[derive(Debug)]
-pub enum ValError {
-    LineErrors(Vec<ValLineError>),
+pub enum ValError<'a> {
+    LineErrors(Vec<ValLineError<'a>>),
     InternalErr(PyErr),
 }
 
-impl fmt::Display for ValError {
+impl<'a> fmt::Display for ValError<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ValError::LineErrors(line_errors) => {
@@ -27,7 +27,7 @@ impl fmt::Display for ValError {
     }
 }
 
-impl Error for ValError {
+impl<'a> Error for ValError<'a> {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             ValError::LineErrors(_errors) => None,
@@ -36,6 +36,6 @@ impl Error for ValError {
     }
 }
 
-pub fn as_internal(err: PyErr) -> ValError {
+pub fn as_internal<'a>(err: PyErr) -> ValError<'a> {
     ValError::InternalErr(err)
 }
