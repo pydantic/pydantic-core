@@ -6,7 +6,7 @@ use crate::build_macros::{dict_get, is_strict, optional_dict_get, py_error};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
-use super::{Extra, Validator};
+use super::{Extra, Validator, ValidatorArc};
 
 #[derive(Debug, Clone)]
 pub struct StrValidator;
@@ -43,6 +43,8 @@ impl Validator for StrValidator {
         }
     }
 
+    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
+
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         Ok(input.lax_str(py)?.into_py(py))
     }
@@ -68,6 +70,8 @@ impl Validator for StrictStrValidator {
     fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self))
     }
+
+    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         Ok(input.strict_str(py)?.into_py(py))
@@ -139,6 +143,8 @@ impl Validator for StrConstrainedValidator {
             to_upper,
         }))
     }
+
+    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         let str = match self.strict {

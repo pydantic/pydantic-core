@@ -8,7 +8,7 @@ use crate::errors::{
 };
 use crate::input::{Input, ToLocItem};
 
-use super::{build_validator, Extra, Validator};
+use super::{build_validator, Extra, Validator, ValidatorArc};
 
 #[derive(Debug, Clone)]
 struct ModelField {
@@ -71,6 +71,15 @@ impl Validator for ModelValidator {
             extra_behavior,
             extra_validator,
         }))
+    }
+
+    fn set_ref(&mut self, validator_arc: &ValidatorArc) {
+        if let Some(ref mut extra_validator) = self.extra_validator {
+            extra_validator.set_ref(validator_arc);
+        }
+        for field in self.fields.iter_mut() {
+            field.validator.set_ref(validator_arc);
+        }
     }
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {

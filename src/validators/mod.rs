@@ -8,6 +8,8 @@ use crate::build_macros::{dict_get, dict_get_required, py_error};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
+use self::recursive::ValidatorArc;
+
 mod bool;
 mod dict;
 mod float;
@@ -17,6 +19,7 @@ mod list;
 mod model;
 mod model_class;
 mod none;
+mod recursive;
 mod string;
 mod union;
 
@@ -133,6 +136,9 @@ pub fn build_validator(dict: &PyDict, config: Option<&PyDict>) -> PyResult<Box<d
         self::none::NoneValidator,
         // functions - before, after, plain & wrap
         self::function::FunctionValidator,
+        // recursive (self-referencing) models
+        self::recursive::RecursiveValidator,
+        self::recursive::RecursiveRefValidator,
     )
 }
 
@@ -155,6 +161,8 @@ pub trait Validator: Send + fmt::Debug {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>>
     where
         Self: Sized;
+
+    fn set_ref(&mut self, validator_arc: &ValidatorArc);
 
     /// Do the actual validation for this schema/type
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject>;

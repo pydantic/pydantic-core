@@ -5,7 +5,7 @@ use crate::build_macros::{dict_get, is_strict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
 use crate::input::{Input, ListInput};
 
-use super::{build_validator, Extra, ValResult, Validator};
+use super::{build_validator, Extra, ValResult, Validator, ValidatorArc};
 
 #[derive(Debug, Clone)]
 pub struct ListValidator {
@@ -30,6 +30,12 @@ impl Validator for ListValidator {
             min_items: dict_get!(schema, "min_items", usize),
             max_items: dict_get!(schema, "max_items", usize),
         }))
+    }
+
+    fn set_ref(&mut self, validator_arc: &ValidatorArc) {
+        if let Some(ref mut item_validator) = self.item_validator {
+            item_validator.set_ref(validator_arc);
+        }
     }
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {

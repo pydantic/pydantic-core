@@ -7,7 +7,7 @@ use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, Va
 use crate::input::Input;
 use crate::validators::build_validator;
 
-use super::{Extra, Validator};
+use super::{Extra, Validator, ValidatorArc};
 
 #[derive(Debug, Clone)]
 pub struct FunctionValidator;
@@ -27,6 +27,8 @@ impl Validator for FunctionValidator {
             _ => py_error!("Unexpected function mode {:?}", mode),
         }
     }
+
+    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
     #[no_coverage]
     fn validate(&self, _py: Python, _input: &dyn Input, _extra: &Extra) -> ValResult<PyObject> {
@@ -55,7 +57,7 @@ macro_rules! kwargs {
     }};
 }
 
-macro_rules! build {
+macro_rules! build_set_ref {
     () => {
         fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
             Ok(Box::new(Self {
@@ -63,6 +65,10 @@ macro_rules! build {
                 func: get_function(schema)?,
                 config: config.map(|c| c.into()),
             }))
+        }
+
+        fn set_ref(&mut self, validator_arc: &ValidatorArc) {
+            self.validator.set_ref(validator_arc);
         }
     };
 }
@@ -75,7 +81,7 @@ struct FunctionBeforeValidator {
 }
 
 impl Validator for FunctionBeforeValidator {
-    build!();
+    build_set_ref!();
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
@@ -128,7 +134,7 @@ struct FunctionAfterValidator {
 }
 
 impl Validator for FunctionAfterValidator {
-    build!();
+    build_set_ref!();
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         let v = self.validator.validate(py, input, extra)?;
@@ -164,6 +170,8 @@ impl Validator for FunctionPlainValidator {
         }))
     }
 
+    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
+
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func
@@ -193,7 +201,7 @@ struct FunctionWrapValidator {
 }
 
 impl Validator for FunctionWrapValidator {
-    build!();
+    build_set_ref!();
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
         let validator_kwarg = ValidatorCallable {

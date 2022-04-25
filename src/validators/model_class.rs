@@ -5,10 +5,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple, PyType};
 use pyo3::{ffi, intern, ToBorrowedObject};
 
-use super::{build_validator, Extra, Validator};
 use crate::build_macros::{dict_get, dict_get_required, py_error};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
+
+use super::{build_validator, Extra, Validator, ValidatorArc};
 
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {
@@ -42,6 +43,10 @@ impl Validator for ModelClassValidator {
             class: class.into(),
             new_method: new_method.into(),
         }))
+    }
+
+    fn set_ref(&mut self, validator_arc: &ValidatorArc) {
+        self.validator.set_ref(validator_arc);
     }
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {

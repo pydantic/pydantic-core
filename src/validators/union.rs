@@ -1,10 +1,11 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use super::{build_validator, Extra, ValResult, Validator};
 use crate::build_macros::dict_get_required;
 use crate::errors::{LocItem, ValError, ValLineError};
 use crate::input::Input;
+
+use super::{build_validator, Extra, ValResult, Validator, ValidatorArc};
 
 #[derive(Debug, Clone)]
 pub struct UnionValidator {
@@ -25,6 +26,12 @@ impl Validator for UnionValidator {
         }
 
         Ok(Box::new(Self { choices }))
+    }
+
+    fn set_ref(&mut self, validator_arc: &ValidatorArc) {
+        for validator in self.choices.iter_mut() {
+            validator.set_ref(validator_arc);
+        }
     }
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {

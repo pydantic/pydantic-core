@@ -5,7 +5,7 @@ use crate::build_macros::is_strict;
 use crate::errors::ValResult;
 use crate::input::Input;
 
-use super::{Extra, Validator};
+use super::{Extra, Validator, ValidatorArc};
 
 #[derive(Debug, Clone)]
 pub struct BoolValidator;
@@ -22,6 +22,8 @@ impl Validator for BoolValidator {
             Ok(Box::new(Self {}))
         }
     }
+
+    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool
@@ -50,6 +52,8 @@ impl Validator for StrictBoolValidator {
     fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {}))
     }
+
+    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
         Ok(input.strict_bool(py)?.into_py(py))

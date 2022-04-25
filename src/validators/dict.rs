@@ -5,7 +5,7 @@ use crate::build_macros::{dict_get, is_strict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::{DictInput, Input, ToLocItem};
 
-use super::{build_validator, Extra, Validator};
+use super::{build_validator, Extra, Validator, ValidatorArc};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
@@ -37,6 +37,15 @@ impl Validator for DictValidator {
             max_items: dict_get!(schema, "max_items", usize),
             try_instance_as_dict: dict_get!(schema, "try_instance_as_dict", bool).unwrap_or(false),
         }))
+    }
+
+    fn set_ref(&mut self, validator_arc: &ValidatorArc) {
+        if let Some(ref mut key_validator) = self.key_validator {
+            key_validator.set_ref(validator_arc);
+        }
+        if let Some(ref mut value_validator) = self.value_validator {
+            value_validator.set_ref(validator_arc);
+        }
     }
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
