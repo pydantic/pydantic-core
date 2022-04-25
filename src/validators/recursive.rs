@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, RwLock, Weak};
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -9,7 +9,7 @@ use crate::input::Input;
 
 use super::{build_validator, Extra, Validator};
 
-pub type ValidatorArc = Arc<Mutex<Box<dyn Validator>>>;
+pub type ValidatorArc = Arc<RwLock<Box<dyn Validator>>>;
 
 #[derive(Debug, Clone)]
 pub struct RecursiveValidator {
@@ -17,16 +17,16 @@ pub struct RecursiveValidator {
 }
 
 impl RecursiveValidator {
-    pub const EXPECTED_TYPE: &'static str = "recursive";
+    pub const EXPECTED_TYPE: &'static str = "recursive-container";
 }
 
 impl Validator for RecursiveValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         let sub_schema = dict_get_required!(schema, "schema", &PyDict)?;
         let validator_box = build_validator(sub_schema, config)?;
-        let validator_arc = Arc::new(Mutex::new(validator_box));
+        let validator_arc = Arc::new(RwLock::new(validator_box));
         {
-            let mut validator_guard = validator_arc.lock().unwrap();
+            let mut validator_guard = validator_arc.write().unwrap();
             validator_guard.set_ref(&validator_arc);
         }
         Ok(Box::new(Self { validator_arc }))
@@ -35,7 +35,7 @@ impl Validator for RecursiveValidator {
     fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
     fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
-        let validator = self.validator_arc.lock().unwrap();
+        let validator = self.validator_arc.read().unwrap();
         match validator.validate(py, input, extra) {
             Ok(value) => Ok(value),
             Err(err) => todo!("err: {}", err),
@@ -58,7 +58,7 @@ impl Validator for RecursiveValidator {
 
 #[derive(Debug, Clone)]
 pub struct RecursiveRefValidator {
-    validator_ref: Option<Weak<Mutex<Box<dyn Validator>>>>,
+    validator_ref: Option<Weak<RwLock<Box<dyn Validator>>>>,
 }
 
 impl RecursiveRefValidator {
@@ -78,7 +78,7 @@ impl Validator for RecursiveRefValidator {
         match self.validator_ref {
             Some(ref validator_ref) => {
                 let validator_arc = validator_ref.upgrade().unwrap();
-                let validator = validator_arc.lock().unwrap();
+                let validator = validator_arc.read().unwrap();
                 match validator.validate(py, input, extra) {
                     Ok(value) => Ok(value),
                     Err(err) => todo!("err: {}", err),
