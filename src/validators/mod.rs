@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use serde_json::{from_str as parse_json, Value as JsonValue};
 
-use crate::build_macros::{dict_get, dict_get_required, py_error};
+use crate::build_macros::{dict_get_required, py_error};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
@@ -26,7 +26,6 @@ mod union;
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {
-    title: String,
     validator: Box<dyn Validator>,
 }
 
@@ -34,9 +33,7 @@ pub struct SchemaValidator {
 impl SchemaValidator {
     #[new]
     pub fn py_new(dict: &PyDict) -> PyResult<Self> {
-        let title = dict_get!(dict, "title", String).unwrap_or_else(|| "Model".to_string());
         Ok(Self {
-            title,
             validator: build_validator(dict, None)?,
         })
     }
@@ -47,7 +44,7 @@ impl SchemaValidator {
             field: None,
         };
         let r = self.validator.validate(py, input, &extra);
-        r.map_err(|e| as_validation_err(py, &self.title, e))
+        r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
     }
 
     fn validate_json(&self, py: Python, input: String) -> PyResult<PyObject> {
@@ -58,7 +55,7 @@ impl SchemaValidator {
                     field: None,
                 };
                 let r = self.validator.validate(py, &input, &extra);
-                r.map_err(|e| as_validation_err(py, &self.title, e))
+                r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
             }
             Err(e) => {
                 let line_err = val_line_error!(
@@ -67,7 +64,7 @@ impl SchemaValidator {
                     kind = ErrorKind::InvalidJson
                 );
                 let err = ValError::LineErrors(vec![line_err]);
-                Err(as_validation_err(py, &self.title, err))
+                Err(as_validation_err(py, &self.validator.get_name(py), err))
             }
         }
     }
@@ -78,13 +75,13 @@ impl SchemaValidator {
             field: Some(field.as_str()),
         };
         let r = self.validator.validate(py, input, &extra);
-        r.map_err(|e| as_validation_err(py, &self.title, e))
+        r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
     }
 
-    fn __repr__(&self) -> String {
+    fn __repr__(&self, py: Python) -> String {
         format!(
-            "SchemaValidator(title={:?}, validator={:#?})",
-            self.title, self.validator
+            "SchemaValidator(name={:?}, validator={:#?})",
+            self.validator.get_name(py), self.validator
         )
     }
 }

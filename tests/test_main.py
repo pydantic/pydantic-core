@@ -32,7 +32,7 @@ class Err:
     ],
 )
 def test_bool(input_value, expected):
-    v = SchemaValidator({'type': 'bool', 'title': 'TestModel'})
+    v = SchemaValidator({'type': 'bool'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -41,7 +41,7 @@ def test_bool(input_value, expected):
 
 
 def test_bool_strict():
-    v = SchemaValidator({'type': 'bool', 'strict': True, 'title': 'TestModel'})
+    v = SchemaValidator({'type': 'bool', 'strict': True})
     assert v.validate_python(True) is True
     error_message = "Value must be a valid boolean [kind=bool_type, input_value='true', input_type=str]"
     with pytest.raises(ValidationError, match=re.escape(error_message)):
@@ -49,13 +49,13 @@ def test_bool_strict():
 
 
 def test_bool_error():
-    v = SchemaValidator({'type': 'bool', 'title': 'TestModel'})
+    v = SchemaValidator({'type': 'bool'})
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('wrong')
 
     assert str(exc_info.value) == (
-        '1 validation error for TestModel\n'
+        '1 validation error for bool\n'
         '  Value must be a valid boolean, '
         "unable to interpret input [kind=bool_parsing, input_value='wrong', input_type=str]"
     )
@@ -89,7 +89,7 @@ def test_bool_error():
     ],
 )
 def test_int(input_value, expected):
-    v = SchemaValidator({'type': 'int', 'title': 'TestModel'})
+    v = SchemaValidator({'type': 'int'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -98,14 +98,14 @@ def test_int(input_value, expected):
 
 
 def test_bool_repr():
-    v = SchemaValidator({'type': 'bool', 'title': 'TestModel'})
-    assert repr(v) == 'SchemaValidator(title="TestModel", validator=BoolValidator)'
-    v = SchemaValidator({'type': 'bool', 'strict': True, 'title': 'TestModel'})
-    assert repr(v) == 'SchemaValidator(title="TestModel", validator=StrictBoolValidator)'
+    v = SchemaValidator({'type': 'bool'})
+    assert repr(v) == 'SchemaValidator(name="bool", validator=BoolValidator)'
+    v = SchemaValidator({'type': 'bool', 'strict': True})
+    assert repr(v) == 'SchemaValidator(name="strict-bool", validator=StrictBoolValidator)'
 
 
 def test_str_constrained():
-    v = SchemaValidator({'type': 'str', 'max_length': 5, 'title': 'TestModel'})
+    v = SchemaValidator({'type': 'str', 'max_length': 5})
     assert v.validate_python('test') == 'test'
 
     with pytest.raises(ValidationError, match='String must have at most 5 characters'):
