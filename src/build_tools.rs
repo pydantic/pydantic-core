@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::FromPyObject;
@@ -32,7 +33,7 @@ impl<'py> SchemaDict<'py> for PyDict {
     {
         match self.get_item(key) {
             Some(t) => <T>::extract(t),
-            None => py_error!(r#""{}" is required"#, key),
+            None => py_error!(PyKeyError; r#""{}" is required"#, key),
         }
     }
 }
@@ -54,7 +55,7 @@ impl<'py> SchemaDict<'py> for Option<&PyDict> {
     {
         match self {
             Some(d) => d.get_as_req(key),
-            None => py_error!(r#""{}" is required, parent null"#, key),
+            None => py_error!(PyKeyError; r#""{}" is required, parent null"#, key),
         }
     }
 }

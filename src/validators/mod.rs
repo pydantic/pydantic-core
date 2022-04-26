@@ -19,6 +19,7 @@ mod list;
 mod model;
 mod model_class;
 mod none;
+mod optional;
 mod recursive;
 mod string;
 mod union;
@@ -127,6 +128,7 @@ pub fn build_validator<'a>(
         self::model::ModelValidator,
         // unions
         self::union::UnionValidator,
+        self::optional::OptionalValidator,
         // model classes
         self::model_class::ModelClassValidator,
         // strings

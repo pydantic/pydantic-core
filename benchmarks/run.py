@@ -23,27 +23,10 @@ def benchmark_simple_validation(from_json: bool = False):
             'model_name': 'TestModel',
             'type': 'model',
             'fields': {
-                'name': {
-                    'type': 'str',
-                },
-                'age': {
-                    'type': 'int',
-                },
-                'friends': {
-                    'type': 'list',
-                    'items': {
-                        'type': 'int',
-                    },
-                },
-                'settings': {
-                    'type': 'dict',
-                    'keys': {
-                        'type': 'str',
-                    },
-                    'values': {
-                        'type': 'float',
-                    },
-                },
+                'name': {'type': 'str'},
+                'age': {'type': 'int'},
+                'friends': {'type': 'list', 'items': {'type': 'int'}},
+                'settings': {'type': 'dict', 'keys': {'type': 'str'}, 'values': {'type': 'float'}},
             },
         }
     )
@@ -97,17 +80,7 @@ def benchmark_model_create():
         name: str
         age: int
 
-    model_schema = {
-        'type': 'model',
-        'fields': {
-            'name': {
-                'type': 'str',
-            },
-            'age': {
-                'type': 'int',
-            },
-        },
-    }
+    model_schema = {'type': 'model', 'fields': {'name': {'type': 'str'}, 'age': {'type': 'int'}}}
     dict_schema_validator = SchemaValidator(model_schema)
 
     class MyCoreModel:
@@ -158,13 +131,11 @@ def benchmark_recursive_model():
                 'model': {
                     'type': 'model',
                     'fields': {
-                        'width': {
-                            'type': 'int',
-                        },
+                        'width': {'type': 'int'},
                         'branch': {
-                            'type': 'union',
+                            'type': 'optional',
                             'default': None,
-                            'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'name': 'Branch'}],
+                            'schema': {'type': 'recursive-ref', 'name': 'Branch'},
                         },
                     },
                 },
@@ -206,9 +177,7 @@ def _run_benchmarks(name: str, benchmark_functions: list, input_values: list, st
         reference_result = result
 
         t = timeit.timeit(
-            '[func(data) for data in input_values]',
-            globals={'func': func, 'input_values': input_values},
-            number=steps,
+            '[func(data) for data in input_values]', globals={'func': func, 'input_values': input_values}, number=steps
         )
         print(f'    {_display_time(t / steps)}')
 
