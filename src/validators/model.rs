@@ -45,7 +45,7 @@ impl Validator for ModelValidator {
             _ => None,
         };
 
-        let name =  dict_get!(schema, "name", String).unwrap_or_else(|| "Model".to_string());
+        let name = dict_get!(schema, "name", String).unwrap_or_else(|| "Model".to_string());
         let fields_dict: &PyDict = match dict_get!(schema, "fields", &PyDict) {
             Some(fields) => fields,
             None => {

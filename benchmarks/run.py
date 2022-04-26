@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import timeit
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 # import ujson as json
 import json
@@ -18,33 +18,35 @@ def benchmark_simple_validation(from_json: bool = False):
         friends: List[int]
         settings: Dict[str, float]
 
-    schema_validator = SchemaValidator({
-        'model_name': 'TestModel',
-        'type': 'model',
-        'fields': {
-            'name': {
-                'type': 'str',
-            },
-            'age': {
-                'type': 'int',
-            },
-            'friends': {
-                'type': 'list',
-                'items': {
-                    'type': 'int',
-                },
-            },
-            'settings': {
-                'type': 'dict',
-                'keys': {
+    schema_validator = SchemaValidator(
+        {
+            'model_name': 'TestModel',
+            'type': 'model',
+            'fields': {
+                'name': {
                     'type': 'str',
                 },
-                'values': {
-                    'type': 'float',
-                }
-            }
-        },
-    })
+                'age': {
+                    'type': 'int',
+                },
+                'friends': {
+                    'type': 'list',
+                    'items': {
+                        'type': 'int',
+                    },
+                },
+                'settings': {
+                    'type': 'dict',
+                    'keys': {
+                        'type': 'str',
+                    },
+                    'values': {
+                        'type': 'float',
+                    },
+                },
+            },
+        }
+    )
 
     data = {'name': 'John', 'age': 42, 'friends': list(range(200)), 'settings': {f'v_{i}': i / 2.0 for i in range(50)}}
 
@@ -61,6 +63,7 @@ def benchmark_simple_validation(from_json: bool = False):
 
         _run_benchmarks('simple model from JSON', [pydantic, pydantic_core], [data])
     else:
+
         def pydantic(d):
             return PydanticModel.parse_obj(d)
 
@@ -72,7 +75,6 @@ def benchmark_simple_validation(from_json: bool = False):
 
 
 def benchmark_bool():
-
     class PydanticModel(BaseModel):
         value: bool
 
@@ -103,7 +105,7 @@ def benchmark_model_create():
             },
             'age': {
                 'type': 'int',
-            }
+            },
         },
     }
     dict_schema_validator = SchemaValidator(model_schema)
@@ -115,11 +117,7 @@ def benchmark_model_create():
         name: str
         age: int
 
-    model_schema_validator = SchemaValidator({
-        'type': 'model-class',
-        'class': MyCoreModel,
-        'model': model_schema
-    })
+    model_schema_validator = SchemaValidator({'type': 'model-class', 'class': MyCoreModel, 'model': model_schema})
 
     def pydantic(d):
         m = PydanticModel(**d)
@@ -136,6 +134,62 @@ def benchmark_model_create():
     data = {'name': 'John', 'age': 42}
 
     _run_benchmarks('model_create', [pydantic, pydantic_core_dict, pydantic_core_model], [data], steps=10_000)
+
+
+def benchmark_recursive_model():
+    class PydanticBranch(BaseModel):
+        width: int
+        branch: Optional['PydanticBranch'] = None
+
+    class CoreBranch:
+        # this is not required, but it avoids `__fields_set__` being included in `__dict__`
+        __slots__ = '__dict__', '__fields_set__'
+        # these are here just as decoration
+        width: int
+        branch: Optional['CoreBranch']
+
+    v = SchemaValidator(
+        {
+            'type': 'recursive-container',
+            'name': 'Branch',
+            'schema': {
+                'type': 'model-class',
+                'class': CoreBranch,
+                'model': {
+                    'type': 'model',
+                    'fields': {
+                        'width': {
+                            'type': 'int',
+                        },
+                        'branch': {
+                            'type': 'union',
+                            'default': None,
+                            'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'name': 'Branch'}],
+                        },
+                    },
+                },
+            },
+        }
+    )
+
+    # we can't compare .__dict__ here since it contains classes that won't be equal
+
+    def pydantic(d):
+        m = PydanticBranch(**d)
+        return m.__fields_set__
+
+    def pydantic_core(d):
+        m = v.validate_python(d)
+        return m.__fields_set__
+
+    data = {'width': -1}
+
+    _data = data
+    for i in range(100):
+        _data['branch'] = {'width': i}
+        _data = _data['branch']
+
+    _run_benchmarks('model_create', [pydantic, pydantic_core], [data])
 
 
 def _run_benchmarks(name: str, benchmark_functions: list, input_values: list, steps: int = 1_000):
@@ -174,7 +228,8 @@ def _display_time(seconds: float):
 
 
 if __name__ == '__main__':
-    benchmark_simple_validation()
-    benchmark_simple_validation(from_json=True)
-    benchmark_bool()
-    benchmark_model_create()
+    # benchmark_simple_validation()
+    # benchmark_simple_validation(from_json=True)
+    # benchmark_bool()
+    # benchmark_model_create()
+    benchmark_recursive_model()

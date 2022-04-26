@@ -1,3 +1,5 @@
+from typing import Optional
+
 import pytest
 
 from pydantic_core import SchemaValidator, ValidationError
@@ -165,3 +167,48 @@ def test_multiple_intertwined():
             },
         }
     )
+
+
+def test_model_class():
+    class Branch:
+        # this is not required, but it avoids `__fields_set__` being included in `__dict__`
+        __slots__ = '__dict__', '__fields_set__'
+        # these are here just as decoration
+        width: int
+        branch: Optional['Branch']  # noqa F821
+
+    v = SchemaValidator(
+        {
+            'type': 'recursive-container',
+            'name': 'Branch',
+            'schema': {
+                'type': 'model-class',
+                'class': Branch,
+                'model': {
+                    'type': 'model',
+                    'fields': {
+                        'width': {'type': 'int'},
+                        'branch': {
+                            'type': 'union',
+                            'default': None,
+                            'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'name': 'Branch'}],
+                        },
+                    },
+                },
+            },
+        }
+    )
+    m1: Branch = v.validate_python({'width': '1'})
+    assert isinstance(m1, Branch)
+    assert m1.__fields_set__ == {'width'}
+    assert m1.__dict__ == {'width': 1, 'branch': None}
+    assert m1.width == 1
+    assert m1.branch is None
+
+    m2: Branch = v.validate_python({'width': '10', 'branch': {'width': 20}})
+    assert isinstance(m2, Branch)
+    assert m2.__fields_set__ == {'width', 'branch'}
+    assert m2.width == 10
+    assert isinstance(m2.branch, Branch)
+    assert m2.branch.width == 20
+    assert m2.branch.branch is None

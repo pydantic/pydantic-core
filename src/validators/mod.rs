@@ -81,7 +81,8 @@ impl SchemaValidator {
     fn __repr__(&self, py: Python) -> String {
         format!(
             "SchemaValidator(name={:?}, validator={:#?})",
-            self.validator.get_name(py), self.validator
+            self.validator.get_name(py),
+            self.validator
         )
     }
 }
