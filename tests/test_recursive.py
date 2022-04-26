@@ -50,7 +50,7 @@ def test_optional_error():
             'schema': {
                 'type': 'model',
                 'fields': {
-                    'width': {'type': 'int'},
+                    'width': 'int',
                     'sub_branch': {
                         'type': 'union',
                         'default': None,
@@ -90,7 +90,7 @@ def test_list():
             'schema': {
                 'type': 'model',
                 'fields': {
-                    'width': {'type': 'int'},
+                    'width': 'int',
                     'branches': {
                         'type': 'list',
                         'default': None,
@@ -132,14 +132,14 @@ def test_multiple_intertwined():
             'schema': {
                 'type': 'model',
                 'fields': {
-                    'height': {'type': 'int'},
+                    'height': 'int',
                     'bar': {
                         'type': 'recursive-container',
                         'name': 'Bar',
                         'schema': {
                             'type': 'model',
                             'fields': {
-                                'width': {'type': 'int'},
+                                'width': 'int',
                                 'bars': {
                                     'type': 'list',
                                     'default': None,
@@ -187,7 +187,7 @@ def test_model_class():
                 'model': {
                     'type': 'model',
                     'fields': {
-                        'width': {'type': 'int'},
+                        'width': 'int',
                         'branch': {
                             'type': 'union',
                             'default': None,

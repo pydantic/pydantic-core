@@ -25,10 +25,10 @@ impl RecursiveValidator {
 
 impl Validator for RecursiveValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        let sub_schema = dict_get_required!(schema, "schema", &PyDict)?;
+        let sub_schema = dict_get_required!(schema, "schema", &PyAny)?;
+        let validator = build_validator(sub_schema, config)?.0;
         let name = dict_get_required!(schema, "name", String)?;
-        let validator_box = build_validator(sub_schema, config)?;
-        let validator_arc = Arc::new(RwLock::new(validator_box));
+        let validator_arc = Arc::new(RwLock::new(validator));
         match validator_arc.write() {
             Ok(mut validator_guard) => validator_guard.set_ref(name.as_str(), &validator_arc),
             Err(err) => py_error!("Recursive container build error: {}", err),

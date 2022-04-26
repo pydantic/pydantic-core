@@ -23,8 +23,8 @@ impl Validator for ListValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {
             strict: is_strict!(schema, config),
-            item_validator: match dict_get!(schema, "items", &PyDict) {
-                Some(d) => Some(build_validator(d, config)?),
+            item_validator: match schema.get_item("items") {
+                Some(d) => Some(build_validator(d, config)?.0),
                 None => None,
             },
             min_items: dict_get!(schema, "min_items", usize),

@@ -29,7 +29,8 @@ impl Validator for ModelClassValidator {
         let new_method = class.getattr("__new__")?;
         // `__new__` always exists and is always callable, no point checking `is_callable` here
 
-        let model_schema = dict_get_required!(schema, "model", &PyDict)?;
+        let model_schema_raw = dict_get_required!(schema, "model", &PyAny)?;
+        let (validator, model_schema) = build_validator(model_schema_raw, config)?;
         let model_type = dict_get_required!(model_schema, "type", String)?;
         if &model_type != "model" {
             return py_error!("model-class expected a 'model' schema, got '{}'", model_type);
@@ -39,7 +40,7 @@ impl Validator for ModelClassValidator {
             // we don't use is_strict here since we don't wan validation to be strict in this case if
             // `config.strict` is set, only if this specific field is strict
             strict: dict_get!(schema, "strict", bool).unwrap_or(false),
-            validator: build_validator(model_schema, config)?,
+            validator,
             class: class.into(),
             new_method: new_method.into(),
         }))

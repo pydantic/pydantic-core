@@ -32,9 +32,9 @@ pub struct SchemaValidator {
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(dict: &PyDict) -> PyResult<Self> {
+    pub fn py_new(schema: &PyAny) -> PyResult<Self> {
         Ok(Self {
-            validator: build_validator(dict, None)?,
+            validator: build_validator(schema, None)?.0,
         })
     }
 
@@ -96,7 +96,7 @@ macro_rules! validator_match {
                     let val = <$validator>::build($dict, $config).map_err(|err| {
                         crate::SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", $type, err))
                     })?;
-                    Ok(val)
+                    Ok((val, $dict))
                 },
             )+
             _ => {
@@ -106,7 +106,18 @@ macro_rules! validator_match {
     };
 }
 
-pub fn build_validator(dict: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
+pub fn build_validator<'a>(
+    schema: &'a PyAny,
+    config: Option<&'a PyDict>,
+) -> PyResult<(Box<dyn Validator>, &'a PyDict)> {
+    let dict: &PyDict = match schema.cast_as() {
+        Ok(s) => s,
+        Err(_) => {
+            let dict = PyDict::new(schema.py());
+            dict.set_item("type", schema)?;
+            dict
+        }
+    };
     let type_: &str = dict_get_required!(dict, "type", &str)?;
     validator_match!(
         type_,

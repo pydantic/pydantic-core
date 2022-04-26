@@ -25,12 +25,12 @@ impl Validator for DictValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {
             strict: is_strict!(schema, config),
-            key_validator: match dict_get!(schema, "keys", &PyDict) {
-                Some(d) => Some(build_validator(d, config)?),
+            key_validator: match schema.get_item("keys") {
+                Some(schema) => Some(build_validator(schema, config)?.0),
                 None => None,
             },
-            value_validator: match dict_get!(schema, "values", &PyDict) {
-                Some(d) => Some(build_validator(d, config)?),
+            value_validator: match schema.get_item("values") {
+                Some(d) => Some(build_validator(d, config)?.0),
                 None => None,
             },
             min_items: dict_get!(schema, "min_items", usize),

@@ -73,7 +73,7 @@ macro_rules! build_set_ref {
     () => {
         fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
             Ok(Box::new(Self {
-                validator: build_validator(dict_get_required!(schema, "field", &PyDict)?, config)?,
+                validator: build_validator(dict_get_required!(schema, "field", &PyAny)?, config)?.0,
                 func: get_function(schema)?,
                 config: config.map(|c| c.into()),
             }))

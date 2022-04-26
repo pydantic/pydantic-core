@@ -7,7 +7,6 @@ use crate::errors::{
     as_internal, err_val_error, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult,
 };
 use crate::input::{Input, ToLocItem};
-use crate::SchemaError;
 
 use super::{build_validator, Extra, Validator, ValidatorArc};
 
@@ -38,8 +37,8 @@ impl Validator for ModelValidator {
 
         let extra_behavior = ExtraBehavior::from_config(config)?;
         let extra_validator = match extra_behavior {
-            ExtraBehavior::Allow => match dict_get!(schema, "extra_validator", &PyDict) {
-                Some(v) => Some(build_validator(v, config)?),
+            ExtraBehavior::Allow => match schema.get_item("extra_validator") {
+                Some(v) => Some(build_validator(v, config)?.0),
                 None => None,
             },
             _ => None,
@@ -61,12 +60,10 @@ impl Validator for ModelValidator {
         let mut fields: Vec<ModelField> = Vec::with_capacity(fields_dict.len());
 
         for (key, value) in fields_dict.iter() {
-            let field_dict: &PyDict = value
-                .cast_as()
-                .map_err(|err| SchemaError::new_err(format!("Key \"{}\":\n  {}", key, err)))?;
-
-            let validator = build_validator(field_dict, config)
-                .map_err(|err| SchemaError::new_err(format!("Key \"{}\":\n  {}", key, err)))?;
+            let (validator, field_dict) = match build_validator(value, config) {
+                Ok(v) => v,
+                Err(err) => return py_error!("Key \"{}\":\n  {}", key, err),
+            };
 
             fields.push(ModelField {
                 name: key.to_string(),

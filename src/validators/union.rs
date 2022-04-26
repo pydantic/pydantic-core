@@ -21,8 +21,7 @@ impl Validator for UnionValidator {
         let mut choices: Vec<Box<dyn Validator>> = vec![];
         let choice_schemas: &PyList = dict_get_required!(schema, "choices", &PyList)?;
         for choice in choice_schemas.iter() {
-            let choice_dict: &PyDict = choice.cast_as()?;
-            choices.push(build_validator(choice_dict, config)?);
+            choices.push(build_validator(choice, config)?.0);
         }
 
         Ok(Box::new(Self { choices }))

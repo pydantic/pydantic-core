@@ -26,3 +26,13 @@ def test_build_error_deep():
     )
     with pytest.raises(SchemaError, match=msg):
         SchemaValidator({'title': 'MyTestModel', 'type': 'model', 'fields': {'age': {'type': 'int', 'ge': 'not-int'}}})
+
+
+def test_schema_as_string():
+    v = SchemaValidator('bool')
+    assert v.validate_python('tRuE') is True
+
+
+def test_schema_wrong_type():
+    v = SchemaValidator('bool')
+    assert v.validate_python('tRuE') is True
