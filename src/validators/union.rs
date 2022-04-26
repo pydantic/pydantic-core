@@ -21,17 +21,18 @@ impl Validator for UnionValidator {
         let mut choices: Vec<Box<dyn Validator>> = vec![];
         let choice_schemas: &PyList = dict_get_required!(schema, "choices", &PyList)?;
         for choice in choice_schemas.iter() {
-            let choice_dict: &PyDict = choice.extract()?;
+            let choice_dict: &PyDict = choice.cast_as()?;
             choices.push(build_validator(choice_dict, config)?);
         }
 
         Ok(Box::new(Self { choices }))
     }
 
-    fn set_ref(&mut self, validator_arc: &ValidatorArc) {
+    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
         for validator in self.choices.iter_mut() {
-            validator.set_ref(validator_arc);
+            validator.set_ref(name, validator_arc)?;
         }
+        Ok(())
     }
 
     fn validate<'s, 'data>(

@@ -16,6 +16,7 @@ pub type ValidatorArc = Arc<RwLock<Box<dyn Validator>>>;
 #[derive(Debug, Clone)]
 pub struct RecursiveValidator {
     validator_arc: ValidatorArc,
+    name: String,
 }
 
 impl RecursiveValidator {
@@ -25,16 +26,22 @@ impl RecursiveValidator {
 impl Validator for RecursiveValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         let sub_schema = dict_get_required!(schema, "schema", &PyDict)?;
+        let name = dict_get_required!(schema, "name", String)?;
         let validator_box = build_validator(sub_schema, config)?;
         let validator_arc = Arc::new(RwLock::new(validator_box));
         match validator_arc.write() {
-            Ok(mut validator_guard) => validator_guard.set_ref(&validator_arc),
-            Err(err) => return py_error!("Recursive container build error: {}", err),
-        }
-        Ok(Box::new(Self { validator_arc }))
+            Ok(mut validator_guard) => validator_guard.set_ref(name.as_str(), &validator_arc),
+            Err(err) => py_error!("Recursive container build error: {}", err),
+        }?;
+        Ok(Box::new(Self { validator_arc, name }))
     }
 
-    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
+    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
+        match self.validator_arc.write() {
+            Ok(mut validator_guard) => validator_guard.set_ref(name, validator_arc),
+            Err(err) => py_error!("Recursive container set_ref error: {}", err),
+        }
+    }
 
     fn validate<'s, 'data>(
         &'s self,
@@ -60,7 +67,7 @@ impl Validator for RecursiveValidator {
     }
 
     fn get_name(&self, _py: Python) -> String {
-        Self::EXPECTED_TYPE.to_string()
+        self.name.clone()
     }
 
     #[no_coverage]
@@ -72,6 +79,7 @@ impl Validator for RecursiveValidator {
 #[derive(Debug, Clone)]
 pub struct RecursiveRefValidator {
     validator_ref: Option<Weak<RwLock<Box<dyn Validator>>>>,
+    name: String,
 }
 
 impl RecursiveRefValidator {
@@ -79,12 +87,18 @@ impl RecursiveRefValidator {
 }
 
 impl Validator for RecursiveRefValidator {
-    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        Ok(Box::new(Self { validator_ref: None }))
+    fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
+        Ok(Box::new(Self {
+            validator_ref: None,
+            name: dict_get_required!(schema, "name", String)?,
+        }))
     }
 
-    fn set_ref(&mut self, validator_arc: &ValidatorArc) {
-        self.validator_ref = Some(Arc::downgrade(validator_arc));
+    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
+        if self.validator_ref.is_none() && name == self.name.as_str() {
+            self.validator_ref = Some(Arc::downgrade(validator_arc));
+        }
+        Ok(())
     }
 
     fn validate<'s, 'data>(
@@ -119,7 +133,7 @@ impl Validator for RecursiveRefValidator {
     }
 
     fn get_name(&self, _py: Python) -> String {
-        Self::EXPECTED_TYPE.to_string()
+        self.name.clone()
     }
 
     #[no_coverage]

@@ -162,7 +162,7 @@ pub trait Validator: Send + Sync + fmt::Debug {
     where
         Self: Sized;
 
-    fn set_ref(&mut self, validator_arc: &ValidatorArc);
+    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()>;
 
     /// Do the actual validation for this schema/type
     fn validate<'s, 'data>(

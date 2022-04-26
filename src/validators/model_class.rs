@@ -45,8 +45,9 @@ impl Validator for ModelClassValidator {
         }))
     }
 
-    fn set_ref(&mut self, validator_arc: &ValidatorArc) {
-        self.validator.set_ref(validator_arc);
+    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
+        self.validator.set_ref(name, validator_arc)?;
+        Ok(())
     }
 
     fn validate<'s, 'data>(
@@ -92,7 +93,7 @@ impl Validator for ModelClassValidator {
             Ok(name) => name.extract(),
             Err(e) => Err(e),
         };
-        name_result.unwrap_or("UnknownClass").to_string()
+        name_result.unwrap_or("ModelClass").to_string()
     }
 
     #[no_coverage]

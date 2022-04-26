@@ -23,7 +23,9 @@ impl Validator for BoolValidator {
         }
     }
 
-    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
+    fn set_ref(&mut self, _name: &str, _validator_arc: &ValidatorArc) -> PyResult<()> {
+        Ok(())
+    }
 
     fn validate<'s, 'data>(
         &'s self,
@@ -63,7 +65,9 @@ impl Validator for StrictBoolValidator {
         Ok(Box::new(Self {}))
     }
 
-    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
+    fn set_ref(&mut self, _name: &str, _validator_arc: &ValidatorArc) -> PyResult<()> {
+        Ok(())
+    }
 
     fn validate<'s, 'data>(
         &'s self,

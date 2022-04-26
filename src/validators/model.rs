@@ -7,6 +7,7 @@ use crate::errors::{
     as_internal, err_val_error, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult,
 };
 use crate::input::{Input, ToLocItem};
+use crate::SchemaError;
 
 use super::{build_validator, Extra, Validator, ValidatorArc};
 
@@ -20,6 +21,7 @@ struct ModelField {
 
 #[derive(Debug, Clone)]
 pub struct ModelValidator {
+    name: String,
     fields: Vec<ModelField>,
     extra_behavior: ExtraBehavior,
     extra_validator: Option<Box<dyn Validator>>,
@@ -43,11 +45,13 @@ impl Validator for ModelValidator {
             _ => None,
         };
 
+        let name =  dict_get!(schema, "name", String).unwrap_or_else(|| "Model".to_string());
         let fields_dict: &PyDict = match dict_get!(schema, "fields", &PyDict) {
             Some(fields) => fields,
             None => {
                 // allow an empty model, is this is a good idea?
                 return Ok(Box::new(Self {
+                    name,
                     fields: vec![],
                     extra_behavior,
                     extra_validator,
@@ -57,29 +61,36 @@ impl Validator for ModelValidator {
         let mut fields: Vec<ModelField> = Vec::with_capacity(fields_dict.len());
 
         for (key, value) in fields_dict.iter() {
-            let field_dict: &PyDict = value.cast_as()?;
+            let field_dict: &PyDict = value
+                .cast_as()
+                .map_err(|err| SchemaError::new_err(format!("Key \"{}\":\n  {}", key, err)))?;
+
+            let validator = build_validator(field_dict, config)
+                .map_err(|err| SchemaError::new_err(format!("Key \"{}\":\n  {}", key, err)))?;
 
             fields.push(ModelField {
                 name: key.to_string(),
                 // alias: dict_get!(field_dict, "alias", String),
-                validator: build_validator(field_dict, config)?,
+                validator,
                 default: dict_get!(field_dict, "default", PyAny),
             });
         }
         Ok(Box::new(Self {
+            name,
             fields,
             extra_behavior,
             extra_validator,
         }))
     }
 
-    fn set_ref(&mut self, validator_arc: &ValidatorArc) {
+    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
         if let Some(ref mut extra_validator) = self.extra_validator {
-            extra_validator.set_ref(validator_arc);
+            extra_validator.set_ref(name, validator_arc)?;
         }
         for field in self.fields.iter_mut() {
-            field.validator.set_ref(validator_arc);
+            field.validator.set_ref(name, validator_arc)?;
         }
+        Ok(())
     }
 
     fn validate<'s, 'data>(
@@ -192,7 +203,7 @@ impl Validator for ModelValidator {
     }
 
     fn get_name(&self, _py: Python) -> String {
-        Self::EXPECTED_TYPE.to_string()
+        self.name.clone()
     }
 
     #[no_coverage]

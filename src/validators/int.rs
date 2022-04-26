@@ -30,7 +30,9 @@ impl Validator for IntValidator {
         }
     }
 
-    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
+    fn set_ref(&mut self, _name: &str, _validator_arc: &ValidatorArc) -> PyResult<()> {
+        Ok(())
+    }
 
     fn validate<'s, 'data>(
         &'s self,
@@ -68,7 +70,9 @@ impl Validator for StrictIntValidator {
         Ok(Box::new(Self))
     }
 
-    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
+    fn set_ref(&mut self, _name: &str, _validator_arc: &ValidatorArc) -> PyResult<()> {
+        Ok(())
+    }
 
     fn validate<'s, 'data>(
         &'s self,
@@ -120,7 +124,9 @@ impl Validator for ConstrainedIntValidator {
         }))
     }
 
-    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
+    fn set_ref(&mut self, _name: &str, _validator_arc: &ValidatorArc) -> PyResult<()> {
+        Ok(())
+    }
 
     fn validate<'s, 'data>(
         &'s self,

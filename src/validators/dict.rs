@@ -39,13 +39,14 @@ impl Validator for DictValidator {
         }))
     }
 
-    fn set_ref(&mut self, validator_arc: &ValidatorArc) {
+    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
         if let Some(ref mut key_validator) = self.key_validator {
-            key_validator.set_ref(validator_arc);
+            key_validator.set_ref(name, validator_arc)?;
         }
         if let Some(ref mut value_validator) = self.value_validator {
-            value_validator.set_ref(validator_arc);
+            value_validator.set_ref(name, validator_arc)?;
         }
+        Ok(())
     }
 
     fn validate<'s, 'data>(

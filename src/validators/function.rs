@@ -28,7 +28,9 @@ impl Validator for FunctionValidator {
         }
     }
 
-    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
+    fn set_ref(&mut self, _name: &str, _validator_arc: &ValidatorArc) -> PyResult<()> {
+        Ok(())
+    }
 
     #[no_coverage]
     fn validate<'s, 'data>(
@@ -77,8 +79,8 @@ macro_rules! build_set_ref {
             }))
         }
 
-        fn set_ref(&mut self, validator_arc: &ValidatorArc) {
-            self.validator.set_ref(validator_arc);
+        fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
+            self.validator.set_ref(name, validator_arc)
         }
     };
 }
@@ -200,7 +202,9 @@ impl Validator for FunctionPlainValidator {
         }))
     }
 
-    fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
+    fn set_ref(&mut self, _name: &str, _validator_arc: &ValidatorArc) -> PyResult<()> {
+        Ok(())
+    }
 
     fn validate<'s, 'data>(
         &'s self,

@@ -32,9 +32,10 @@ impl Validator for ListValidator {
         }))
     }
 
-    fn set_ref(&mut self, validator_arc: &ValidatorArc) {
-        if let Some(ref mut item_validator) = self.item_validator {
-            item_validator.set_ref(validator_arc);
+    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
+        match self.item_validator {
+            Some(ref mut item_validator) => item_validator.set_ref(name, validator_arc),
+            None => Ok(()),
         }
     }
 

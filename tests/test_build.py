@@ -20,6 +20,7 @@ def test_build_error_internal():
 def test_build_error_deep():
     msg = (
         'Error building "model" validator:\n'
+        '  SchemaError: Key "age":\n'
         '  SchemaError: Error building "int" validator:\n'
         '  TypeError: \'str\' object cannot be interpreted as an integer'  # noqa Q003
     )
