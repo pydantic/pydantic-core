@@ -4,8 +4,7 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_macros::dict_get_required;
-use crate::build_macros::py_error;
+use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, ValResult};
 use crate::input::Input;
 
@@ -25,9 +24,9 @@ impl RecursiveValidator {
 
 impl Validator for RecursiveValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        let sub_schema = dict_get_required!(schema, "schema", &PyAny)?;
+        let sub_schema: &PyAny = schema.get_as_req("schema")?;
         let validator = build_validator(sub_schema, config)?.0;
-        let name = dict_get_required!(schema, "name", String)?;
+        let name: String = schema.get_as_req("name")?;
         let validator_arc = Arc::new(RwLock::new(validator));
         match validator_arc.write() {
             Ok(mut validator_guard) => validator_guard.set_ref(name.as_str(), &validator_arc),
@@ -90,7 +89,7 @@ impl Validator for RecursiveRefValidator {
     fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {
             validator_ref: None,
-            name: dict_get_required!(schema, "name", String)?,
+            name: schema.get_as_req("name")?,
         }))
     }
 

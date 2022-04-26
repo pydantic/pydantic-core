@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use serde_json::{from_str as parse_json, Value as JsonValue};
 
-use crate::build_macros::{dict_get_required, py_error};
+use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
@@ -118,7 +118,7 @@ pub fn build_validator<'a>(
             dict
         }
     };
-    let type_: &str = dict_get_required!(dict, "type", &str)?;
+    let type_: &str = dict.get_as_req("type")?;
     validator_match!(
         type_,
         dict,

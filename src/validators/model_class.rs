@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple, PyType};
 use pyo3::{ffi, intern, ToBorrowedObject};
 
-use crate::build_macros::{dict_get, dict_get_required, py_error};
+use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
@@ -25,13 +25,13 @@ impl ModelClassValidator {
 
 impl Validator for ModelClassValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        let class = dict_get_required!(schema, "class", &PyType)?;
+        let class: &PyType = schema.get_as_req("class")?;
         let new_method = class.getattr("__new__")?;
         // `__new__` always exists and is always callable, no point checking `is_callable` here
 
-        let model_schema_raw = dict_get_required!(schema, "model", &PyAny)?;
+        let model_schema_raw: &PyAny = schema.get_as_req("model")?;
         let (validator, model_schema) = build_validator(model_schema_raw, config)?;
-        let model_type = dict_get_required!(model_schema, "type", String)?;
+        let model_type: String = model_schema.get_as_req("type")?;
         if &model_type != "model" {
             return py_error!("model-class expected a 'model' schema, got '{}'", model_type);
         }
@@ -39,7 +39,7 @@ impl Validator for ModelClassValidator {
         Ok(Box::new(Self {
             // we don't use is_strict here since we don't wan validation to be strict in this case if
             // `config.strict` is set, only if this specific field is strict
-            strict: dict_get!(schema, "strict", bool).unwrap_or(false),
+            strict: schema.get_as("strict")?.unwrap_or(false),
             validator,
             class: class.into(),
             new_method: new_method.into(),

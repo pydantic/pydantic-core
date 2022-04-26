@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet};
 use std::collections::HashSet;
 
-use crate::build_macros::{dict_get, py_error};
+use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{
     as_internal, err_val_error, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult,
 };
@@ -33,7 +33,7 @@ impl ModelValidator {
 impl Validator for ModelValidator {
     fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         // models ignore the parent config and always use the config from this model
-        let config = dict_get!(schema, "config", &PyDict);
+        let config: Option<&PyDict> = schema.get_as("config")?;
 
         let extra_behavior = ExtraBehavior::from_config(config)?;
         let extra_validator = match extra_behavior {
@@ -44,8 +44,8 @@ impl Validator for ModelValidator {
             _ => None,
         };
 
-        let name = dict_get!(schema, "name", String).unwrap_or_else(|| "Model".to_string());
-        let fields_dict: &PyDict = match dict_get!(schema, "fields", &PyDict) {
+        let name: String = schema.get_as("name")?.unwrap_or_else(|| "Model".to_string());
+        let fields_dict: &PyDict = match schema.get_as("fields")? {
             Some(fields) => fields,
             None => {
                 // allow an empty model, is this is a good idea?
@@ -67,9 +67,9 @@ impl Validator for ModelValidator {
 
             fields.push(ModelField {
                 name: key.to_string(),
-                // alias: dict_get!(field_dict, "alias", String),
+                // alias: field_dict.get_as("alias"),
                 validator,
-                default: dict_get!(field_dict, "default", PyAny),
+                default: field_dict.get_as("default")?,
             });
         }
         Ok(Box::new(Self {
@@ -216,7 +216,10 @@ impl ModelValidator {
         field: &str,
         input: &'data dyn Input,
         extra: &Extra,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, PyObject>
+    where
+        'data: 's,
+    {
         // TODO probably we should set location on errors here
         let field_name = field.to_string();
 
@@ -277,7 +280,7 @@ impl ExtraBehavior {
     pub fn from_config(config: Option<&PyDict>) -> PyResult<Self> {
         match config {
             Some(dict) => {
-                let b = dict_get!(dict, "extra", String);
+                let b: Option<String> = dict.get_as("extra")?;
                 match b {
                     Some(s) => match s.as_str() {
                         "allow" => Ok(ExtraBehavior::Allow),

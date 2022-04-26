@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use crate::build_macros::dict_get_required;
+use crate::build_tools::SchemaDict;
 use crate::errors::{LocItem, ValError, ValLineError};
 use crate::input::Input;
 
@@ -19,7 +19,7 @@ impl UnionValidator {
 impl Validator for UnionValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         let mut choices: Vec<Box<dyn Validator>> = vec![];
-        let choice_schemas: &PyList = dict_get_required!(schema, "choices", &PyList)?;
+        let choice_schemas: &PyList = schema.get_as_req("choices")?;
         for choice in choice_schemas.iter() {
             choices.push(build_validator(choice, config)?.0);
         }

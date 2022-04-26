@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_macros::{dict_get, is_strict};
+use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
 use crate::input::{Input, ListInput};
 
@@ -22,13 +22,13 @@ impl ListValidator {
 impl Validator for ListValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {
-            strict: is_strict!(schema, config),
+            strict: is_strict(schema, config)?,
             item_validator: match schema.get_item("items") {
                 Some(d) => Some(build_validator(d, config)?.0),
                 None => None,
             },
-            min_items: dict_get!(schema, "min_items", usize),
-            max_items: dict_get!(schema, "max_items", usize),
+            min_items: schema.get_as("min_items")?,
+            max_items: schema.get_as("max_items")?,
         }))
     }
 

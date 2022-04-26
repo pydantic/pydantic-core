@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_macros::{dict_get, is_strict};
+use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
@@ -23,7 +23,7 @@ impl Validator for IntValidator {
             || schema.get_item("gt").is_some();
         if use_constrained {
             ConstrainedIntValidator::build(schema, config)
-        } else if is_strict!(schema, config) {
+        } else if is_strict(schema, config)? {
             StrictIntValidator::build(schema, config)
         } else {
             Ok(Box::new(Self))
@@ -115,12 +115,12 @@ struct ConstrainedIntValidator {
 impl Validator for ConstrainedIntValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {
-            strict: is_strict!(schema, config),
-            multiple_of: dict_get!(schema, "multiple_of", i64),
-            le: dict_get!(schema, "le", i64),
-            lt: dict_get!(schema, "lt", i64),
-            ge: dict_get!(schema, "ge", i64),
-            gt: dict_get!(schema, "gt", i64),
+            strict: is_strict(schema, config)?,
+            multiple_of: schema.get_as("multiple_of")?,
+            le: schema.get_as("le")?,
+            lt: schema.get_as("lt")?,
+            ge: schema.get_as("ge")?,
+            gt: schema.get_as("gt")?,
         }))
     }
 

@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_macros::{dict_get, is_strict};
+use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::{DictInput, Input, ToLocItem};
 
@@ -24,7 +24,7 @@ impl DictValidator {
 impl Validator for DictValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         Ok(Box::new(Self {
-            strict: is_strict!(schema, config),
+            strict: is_strict(schema, config)?,
             key_validator: match schema.get_item("keys") {
                 Some(schema) => Some(build_validator(schema, config)?.0),
                 None => None,
@@ -33,9 +33,9 @@ impl Validator for DictValidator {
                 Some(d) => Some(build_validator(d, config)?.0),
                 None => None,
             },
-            min_items: dict_get!(schema, "min_items", usize),
-            max_items: dict_get!(schema, "max_items", usize),
-            try_instance_as_dict: dict_get!(schema, "try_instance_as_dict", bool).unwrap_or(false),
+            min_items: schema.get_as("min_items")?,
+            max_items: schema.get_as("max_items")?,
+            try_instance_as_dict: schema.get_as("try_instance_as_dict")?.unwrap_or(false),
         }))
     }
 

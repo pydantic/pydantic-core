@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_macros::is_strict;
+use crate::build_tools::is_strict;
 use crate::errors::ValResult;
 use crate::input::Input;
 
@@ -16,7 +16,7 @@ impl BoolValidator {
 
 impl Validator for BoolValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        if is_strict!(schema, config) {
+        if is_strict(schema, config)? {
             StrictBoolValidator::build(schema, config)
         } else {
             Ok(Box::new(Self {}))

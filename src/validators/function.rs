@@ -2,7 +2,7 @@ use pyo3::exceptions::{PyAssertionError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
-use crate::build_macros::{dict, dict_get_required, py_error};
+use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::Input;
 use crate::validators::build_validator;
@@ -18,7 +18,7 @@ impl FunctionValidator {
 
 impl Validator for FunctionValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        let mode = dict_get_required!(schema, "mode", &str)?;
+        let mode: &str = schema.get_as_req("mode")?;
         match mode {
             "before" => FunctionBeforeValidator::build(schema, config),
             "after" => FunctionAfterValidator::build(schema, config),
@@ -65,7 +65,7 @@ impl Validator for FunctionValidator {
 
 macro_rules! kwargs {
     ($py:ident, $($k:expr => $v:expr),*) => {{
-        Some(dict!($py, $($k => $v),*))
+        Some(pyo3::types::IntoPyDict::into_py_dict([$(($k, $v.into_py($py)),)*], $py).into())
     }};
 }
 
@@ -73,7 +73,7 @@ macro_rules! build_set_ref {
     () => {
         fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
             Ok(Box::new(Self {
-                validator: build_validator(dict_get_required!(schema, "field", &PyAny)?, config)?.0,
+                validator: build_validator(schema.get_as_req("field")?, config)?.0,
                 func: get_function(schema)?,
                 config: config.map(|c| c.into()),
             }))
