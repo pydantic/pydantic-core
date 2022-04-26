@@ -64,6 +64,10 @@ impl Input for Value {
 
     fn lax_int<'a>(&'a self, _py: Python<'a>) -> ValResult<'a, i64> {
         match self {
+            Value::Bool(b) => match *b {
+                true => Ok(1),
+                false => Ok(0),
+            },
             Value::Number(n) => {
                 if let Some(int) = n.as_i64() {
                     Ok(int)
@@ -100,6 +104,10 @@ impl Input for Value {
 
     fn lax_float<'a>(&'a self, _py: Python<'a>) -> ValResult<'a, f64> {
         match self {
+            Value::Bool(b) => match *b {
+                true => Ok(1.0),
+                false => Ok(0.0),
+            },
             Value::Number(n) => {
                 if let Some(float) = n.as_f64() {
                     Ok(float)
