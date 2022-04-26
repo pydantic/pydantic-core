@@ -1,6 +1,6 @@
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
 
 @pytest.mark.parametrize(
@@ -195,3 +195,10 @@ def test_union_list_bool_int():
             'input_value': 'true',
         },
     ]
+
+
+def test_no_choices():
+    with pytest.raises(SchemaError) as exc_info:
+        SchemaValidator({'type': 'union'})
+
+    assert exc_info.value.args[0] == ('Error building "union" validator:\n' '  KeyError: \'"choices" is required\'')

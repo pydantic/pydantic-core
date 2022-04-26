@@ -19,10 +19,7 @@ impl<'py> SchemaDict<'py> for PyDict {
         T: FromPyObject<'py>,
     {
         match self.get_item(key) {
-            Some(t) => {
-                let v = <T>::extract(t)?;
-                Ok(Some(v))
-            }
+            Some(t) => Ok(Some(<T>::extract(t)?)),
             None => Ok(None),
         }
     }
@@ -34,28 +31,6 @@ impl<'py> SchemaDict<'py> for PyDict {
         match self.get_item(key) {
             Some(t) => <T>::extract(t),
             None => py_error!(PyKeyError; r#""{}" is required"#, key),
-        }
-    }
-}
-
-impl<'py> SchemaDict<'py> for Option<&PyDict> {
-    fn get_as<T>(&'py self, key: &str) -> PyResult<Option<T>>
-    where
-        T: FromPyObject<'py>,
-    {
-        match self {
-            Some(d) => d.get_as(key),
-            None => Ok(None),
-        }
-    }
-
-    fn get_as_req<T>(&'py self, key: &str) -> PyResult<T>
-    where
-        T: FromPyObject<'py>,
-    {
-        match self {
-            Some(d) => d.get_as_req(key),
-            None => py_error!(PyKeyError; r#""{}" is required, parent null"#, key),
         }
     }
 }
