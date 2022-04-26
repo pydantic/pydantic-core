@@ -25,13 +25,23 @@ impl Validator for BoolValidator {
 
     fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool
         // and back again, might be worth profiling?
         Ok(input.lax_bool(py)?.into_py(py))
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         Ok(input.strict_bool(py)?.into_py(py))
     }
 
@@ -55,11 +65,21 @@ impl Validator for StrictBoolValidator {
 
     fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         Ok(input.strict_bool(py)?.into_py(py))
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         self.validate(py, input, extra)
     }
 

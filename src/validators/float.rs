@@ -32,11 +32,21 @@ impl Validator for FloatValidator {
 
     fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         Ok(input.lax_float(py)?.into_py(py))
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         Ok(input.strict_float(py)?.into_py(py))
     }
 
@@ -60,11 +70,21 @@ impl Validator for StrictFloatValidator {
 
     fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         Ok(input.strict_float(py)?.into_py(py))
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         self.validate(py, input, extra)
     }
 
@@ -102,7 +122,12 @@ impl Validator for ConstrainedFloatValidator {
 
     fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         let float = match self.strict {
             true => input.strict_float(py)?,
             false => input.lax_float(py)?,
@@ -110,7 +135,12 @@ impl Validator for ConstrainedFloatValidator {
         self._validation_logic(py, input, float)
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_float(py)?)
     }
 
@@ -125,7 +155,12 @@ impl Validator for ConstrainedFloatValidator {
 }
 
 impl ConstrainedFloatValidator {
-    fn _validation_logic<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, float: f64) -> ValResult<'a, PyObject> {
+    fn _validation_logic<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        float: f64,
+    ) -> ValResult<'data, PyObject> {
         if let Some(multiple_of) = self.multiple_of {
             if float % multiple_of != 0.0 {
                 return err_val_error!(

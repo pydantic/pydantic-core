@@ -34,7 +34,12 @@ impl Validator for UnionValidator {
         }
     }
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         // 1st pass: check if the value is an exact instance of one of the Union types
         for validator in &self.choices {
             if let Ok(output) = validator.validate_strict(py, input, extra) {
@@ -59,7 +64,12 @@ impl Validator for UnionValidator {
         Err(ValError::LineErrors(errors))
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         self.validate(py, input, extra)
     }
 

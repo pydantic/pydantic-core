@@ -82,7 +82,12 @@ impl Validator for ModelValidator {
         }
     }
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         if let Some(field) = extra.field {
             // we're validating assignment, completely different logic
             return self.validate_assignment(py, field, input, extra);
@@ -177,7 +182,12 @@ impl Validator for ModelValidator {
         }
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         self.validate(py, input, extra)
     }
 
@@ -192,13 +202,13 @@ impl Validator for ModelValidator {
 }
 
 impl ModelValidator {
-    fn validate_assignment<'a>(
-        &'a self,
-        py: Python<'a>,
+    fn validate_assignment<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
         field: &str,
-        input: &'a dyn Input,
+        input: &'data dyn Input,
         extra: &Extra,
-    ) -> ValResult<'a, PyObject> {
+    ) -> ValResult<'data, PyObject> {
         // TODO probably we should set location on errors here
         let field_name = field.to_string();
 
@@ -213,7 +223,7 @@ impl ModelValidator {
             Ok((data, fields_set).to_object(py))
         };
 
-        let prepare_result = |result: ValResult<'a, PyObject>| match result {
+        let prepare_result = |result: ValResult<'data, PyObject>| match result {
             Ok(output) => prepare_tuple(output),
             Err(ValError::LineErrors(line_errors)) => {
                 let loc = vec![field_name.to_loc()];

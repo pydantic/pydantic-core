@@ -38,7 +38,12 @@ impl Validator for ListValidator {
         }
     }
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         let list = match self.strict {
             true => input.strict_list(py)?,
             false => input.lax_list(py)?,
@@ -46,7 +51,12 @@ impl Validator for ListValidator {
         self._validation_logic(py, input, list, extra)
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_list(py)?, extra)
     }
 
@@ -61,13 +71,13 @@ impl Validator for ListValidator {
 }
 
 impl ListValidator {
-    fn _validation_logic<'py>(
-        &'py self,
-        py: Python<'py>,
-        input: &'py dyn Input,
-        list: Box<dyn ListInput<'py> + 'py>,
+    fn _validation_logic<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        list: Box<dyn ListInput<'data> + 'data>,
         extra: &Extra,
-    ) -> ValResult<'py, PyObject> {
+    ) -> ValResult<'data, PyObject> {
         let length = list.input_len();
         if let Some(min_length) = self.min_items {
             if length < min_length {

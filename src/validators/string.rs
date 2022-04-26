@@ -45,11 +45,21 @@ impl Validator for StrValidator {
 
     fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         Ok(input.lax_str(py)?.into_py(py))
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         Ok(input.strict_str(py)?.into_py(py))
     }
 
@@ -73,11 +83,21 @@ impl Validator for StrictStrValidator {
 
     fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         Ok(input.strict_str(py)?.into_py(py))
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         self.validate(py, input, extra)
     }
 
@@ -146,7 +166,12 @@ impl Validator for StrConstrainedValidator {
 
     fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         let str = match self.strict {
             true => input.strict_str(py)?,
             false => input.lax_str(py)?,
@@ -154,7 +179,12 @@ impl Validator for StrConstrainedValidator {
         self._validation_logic(py, input, str)
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, _extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        _extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_str(py)?)
     }
 
@@ -169,7 +199,12 @@ impl Validator for StrConstrainedValidator {
 }
 
 impl StrConstrainedValidator {
-    fn _validation_logic<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, str: String) -> ValResult<'a, PyObject> {
+    fn _validation_logic<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        str: String,
+    ) -> ValResult<'data, PyObject> {
         let mut str = str;
         if let Some(min_length) = self.min_length {
             if str.len() < min_length {

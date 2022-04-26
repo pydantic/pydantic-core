@@ -1,10 +1,12 @@
 use std::sync::{Arc, RwLock, Weak};
 
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_macros::dict_get_required;
-use crate::errors::ValResult;
+use crate::build_macros::py_error;
+use crate::errors::{as_internal, ValResult};
 use crate::input::Input;
 
 use super::{build_validator, Extra, Validator};
@@ -34,15 +36,22 @@ impl Validator for RecursiveValidator {
 
     fn set_ref(&mut self, _validator_arc: &ValidatorArc) {}
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         let validator = self.validator_arc.read().unwrap();
-        match validator.validate(py, input, extra) {
-            Ok(value) => Ok(value),
-            Err(err) => todo!("err: {}", err),
-        }
+        validator.validate(py, input, extra)
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         self.validate(py, input, extra)
     }
 
@@ -74,21 +83,28 @@ impl Validator for RecursiveRefValidator {
         self.validator_ref = Some(Arc::downgrade(validator_arc));
     }
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         match self.validator_ref {
             Some(ref validator_ref) => {
                 let validator_arc = validator_ref.upgrade().unwrap();
                 let validator = validator_arc.read().unwrap();
-                match validator.validate(py, input, extra) {
-                    Ok(value) => Ok(value),
-                    Err(err) => todo!("err: {}", err),
-                }
+                validator.validate(py, input, extra)
             }
-            None => todo!(),
+            None => py_error!(PyRuntimeError; "ref not yet set on validator").map_err(as_internal),
         }
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         self.validate(py, input, extra)
     }
 

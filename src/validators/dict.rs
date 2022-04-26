@@ -48,7 +48,12 @@ impl Validator for DictValidator {
         }
     }
 
-    fn validate<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         let dict = match self.strict {
             true => input.strict_dict(py)?,
             false => input.lax_dict(py, self.try_instance_as_dict)?,
@@ -56,7 +61,12 @@ impl Validator for DictValidator {
         self._validation_logic(py, input, dict, extra)
     }
 
-    fn validate_strict<'a>(&'a self, py: Python<'a>, input: &'a dyn Input, extra: &Extra) -> ValResult<'a, PyObject> {
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_dict(py)?, extra)
     }
 
@@ -71,13 +81,13 @@ impl Validator for DictValidator {
 }
 
 impl DictValidator {
-    fn _validation_logic<'py>(
-        &'py self,
-        py: Python<'py>,
-        input: &'py dyn Input,
-        dict: Box<dyn DictInput<'py> + 'py>,
+    fn _validation_logic<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        dict: Box<dyn DictInput<'data> + 'data>,
         extra: &Extra,
-    ) -> ValResult<'py, PyObject> {
+    ) -> ValResult<'data, PyObject> {
         if let Some(min_length) = self.min_items {
             if dict.input_len() < min_length {
                 return err_val_error!(
@@ -117,15 +127,15 @@ impl DictValidator {
     }
 }
 
-fn apply_validator<'py>(
-    py: Python<'py>,
-    validator: &'py Option<Box<dyn Validator>>,
-    errors: &mut Vec<ValLineError<'py>>,
-    input: &'py dyn Input,
-    key: &'py dyn Input,
+fn apply_validator<'s, 'data>(
+    py: Python<'data>,
+    validator: &'s Option<Box<dyn Validator>>,
+    errors: &mut Vec<ValLineError<'data>>,
+    input: &'data dyn Input,
+    key: &'data dyn Input,
     extra: &Extra,
     key_loc: bool,
-) -> ValResult<'py, Option<PyObject>> {
+) -> ValResult<'data, Option<PyObject>> {
     match validator {
         Some(validator) => match validator.validate(py, input, extra) {
             Ok(value) => Ok(Some(value)),
