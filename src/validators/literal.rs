@@ -24,19 +24,19 @@ impl Validator for LiteralValidator {
         } else if expected.len() == 1 {
             let first = expected.get_item(0)?;
             if let Ok(str) = first.extract::<String>() {
-                return SingleStringValidator::new(str);
+                return Ok(Box::new(SingleStringValidator::new(str)));
             }
             if let Ok(int) = first.extract::<i64>() {
-                return SingleIntValidator::new(int);
+                return Ok(Box::new(SingleIntValidator::new(int)));
             }
         }
 
         if let Some(v) = MultipleStringsValidator::new(expected) {
-            Ok(v)
+            Ok(Box::new(v))
         } else if let Some(v) = MultipleIntsValidator::new(expected) {
-            Ok(v)
+            Ok(Box::new(v))
         } else {
-            GeneralValidator::new(expected)
+            Ok(Box::new(GeneralValidator::new(expected)?))
         }
     }
 
@@ -50,9 +50,9 @@ struct SingleStringValidator {
 }
 
 impl SingleStringValidator {
-    fn new(expected: String) -> PyResult<Box<dyn Validator>> {
+    fn new(expected: String) -> Self {
         let repr = format!("'{}'", expected);
-        Ok(Box::new(Self { expected, repr }))
+        Self { expected, repr }
     }
 }
 
@@ -89,8 +89,8 @@ struct SingleIntValidator {
 }
 
 impl SingleIntValidator {
-    fn new(expected: i64) -> PyResult<Box<dyn Validator>> {
-        Ok(Box::new(Self { expected }))
+    fn new(expected: i64) -> Self {
+        Self { expected }
     }
 }
 
@@ -128,7 +128,7 @@ struct MultipleStringsValidator {
 }
 
 impl MultipleStringsValidator {
-    fn new(expected_list: &PyList) -> Option<Box<dyn Validator>> {
+    fn new(expected_list: &PyList) -> Option<Self> {
         let mut expected: HashSet<String> = HashSet::new();
         let mut repr_args = Vec::new();
         for item in expected_list.iter() {
@@ -140,10 +140,10 @@ impl MultipleStringsValidator {
             }
         }
 
-        Some(Box::new(Self {
+        Some(Self {
             expected,
             repr: repr_args.join(", "),
-        }))
+        })
     }
 }
 
@@ -180,7 +180,7 @@ struct MultipleIntsValidator {
 }
 
 impl MultipleIntsValidator {
-    fn new(expected_list: &PyList) -> Option<Box<dyn Validator>> {
+    fn new(expected_list: &PyList) -> Option<Self> {
         let mut expected: HashSet<i64> = HashSet::new();
         let mut repr_args = Vec::new();
         for item in expected_list.iter() {
@@ -192,10 +192,10 @@ impl MultipleIntsValidator {
             }
         }
 
-        Some(Box::new(Self {
+        Some(Self {
             expected,
             repr: repr_args.join(", "),
-        }))
+        })
     }
 }
 
@@ -235,7 +235,7 @@ struct GeneralValidator {
 }
 
 impl GeneralValidator {
-    fn new(expected: &PyList) -> PyResult<Box<dyn Validator>> {
+    fn new(expected: &PyList) -> PyResult<Self> {
         let mut expected_int = HashSet::new();
         let mut expected_str = HashSet::new();
         let py = expected.py();
@@ -251,12 +251,12 @@ impl GeneralValidator {
                 expected_py.append(item)?;
             }
         }
-        Ok(Box::new(Self {
+        Ok(Self {
             expected_int,
             expected_str,
             expected_py: expected_py.into_py(py),
             repr: repr_args.join(", "),
-        }))
+        })
     }
 }
 
@@ -290,10 +290,8 @@ impl Validator for GeneralValidator {
         let py_value = input.to_py(py);
 
         let expected_py = self.expected_py.as_ref(py);
-        if !expected_py.is_empty() {
-            if expected_py.contains(&py_value).map_err(as_internal)? {
-                return Ok(py_value);
-            }
+        if !expected_py.is_empty() && expected_py.contains(&py_value).map_err(as_internal)? {
+            return Ok(py_value);
         }
 
         err_val_error!(
