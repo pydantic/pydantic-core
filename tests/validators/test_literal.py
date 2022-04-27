@@ -14,7 +14,7 @@ from ..conftest import Err
         pytest.param(
             [1],
             2,
-            Err('Value must be 1 [kind=literal_single_error, context={expected: 1}, input_value=2, input_type=int]'),
+            Err('Value must be 1 [kind=literal_error, context={expected: 1}, input_value=2, input_type=int]'),
             id='wrong-single-int',
         ),
         (['foo'], 'foo', 'foo'),
@@ -23,7 +23,7 @@ from ..conftest import Err
             'bar',
             Err(
                 "Value must be 'foo' "
-                "[kind=literal_single_error, context={expected: 'foo'}, input_value='bar', input_type=str]"
+                "[kind=literal_error, context={expected: 'foo'}, input_value='bar', input_type=str]"
             ),
             id='wrong-single-str',
         ),
@@ -34,7 +34,7 @@ from ..conftest import Err
             3,
             Err(
                 'Value must be one of: 1, 2 '
-                '[kind=literal_multiple_error, context={expected: 1, 2}, input_value=3, input_type=int]'
+                '[kind=literal_error, context={expected: 1, 2}, input_value=3, input_type=int]'
             ),
             id='wrong-multiple-int',
         ),
@@ -44,7 +44,7 @@ from ..conftest import Err
             'c',
             Err(
                 "Value must be one of: 'a', 'b' "
-                "[kind=literal_multiple_error, context={expected: 'a', 'b'}, input_value=\'c\', input_type=str]"
+                "[kind=literal_error, context={expected: 'a', 'b'}, input_value=\'c\', input_type=str]"
             ),
             id='wrong-multiple-str',
         ),
@@ -55,7 +55,7 @@ from ..conftest import Err
             '2',
             Err(
                 "Value must be one of: 1, '1' "
-                "[kind=literal_multiple_error, context={expected: 1, '1'}, input_value='2', input_type=str]"
+                "[kind=literal_error, context={expected: 1, '1'}, input_value='2', input_type=str]"
             ),
             id='wrong-str-int',
         ),
@@ -81,7 +81,7 @@ def test_literal_py_or_json(py_or_json, kwarg_expected, input_value, expected):
             3,
             Err(
                 "Value must be one of: 1, b'whatever' "
-                "[kind=literal_multiple_error, context={expected: 1, b'whatever'}, input_value=3, input_type=int]"
+                "[kind=literal_error, context={expected: 1, b'whatever'}, input_value=3, input_type=int]"
             ),
             id='wrong-general',
         ),
