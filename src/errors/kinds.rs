@@ -106,7 +106,7 @@ pub enum ErrorKind {
     // literals
     #[strum(message = "Value must be {expected}")]
     LiteralSingleError,
-    #[strum(message = "Value must be one of {expected:,}")]
+    #[strum(message = "Value must be one of: {expected}")]
     LiteralMultipleError,
 }
 
