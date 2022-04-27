@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError, SchemaError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
 from ..conftest import Err
 
