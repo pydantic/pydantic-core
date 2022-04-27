@@ -148,6 +148,7 @@ impl MultipleStringsValidator {
 }
 
 impl Validator for MultipleStringsValidator {
+    #[no_coverage]
     fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
         unimplemented!("use ::new(value) instead")
     }

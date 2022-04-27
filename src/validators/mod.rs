@@ -236,10 +236,12 @@ macro_rules! unused_validator {
             unimplemented!("{} is never used directly", $name)
         }
 
+        #[no_coverage]
         fn get_name(&self, _py: Python) -> String {
             unimplemented!()
         }
 
+        #[no_coverage]
         fn clone_dyn(&self) -> Box<dyn Validator> {
             unimplemented!()
         }
