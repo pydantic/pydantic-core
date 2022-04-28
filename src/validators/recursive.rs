@@ -1,4 +1,4 @@
-use std::sync::{Arc, RwLock, Weak};
+use std::sync::{Arc, Weak};
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -10,7 +10,8 @@ use crate::input::Input;
 
 use super::{build_validator, Extra, Validator};
 
-pub type ValidatorArc = Arc<RwLock<Box<dyn Validator>>>;
+pub type ValidatorArc = Arc<Box<dyn Validator>>;
+pub type ValidatorWeak = Weak<Box<dyn Validator>>;
 
 #[derive(Debug, Clone)]
 pub struct RecursiveValidator {
@@ -27,19 +28,14 @@ impl Validator for RecursiveValidator {
         let sub_schema: &PyAny = schema.get_as_req("schema")?;
         let validator = build_validator(sub_schema, config)?.0;
         let name: String = schema.get_as_req("name")?;
-        let validator_arc = Arc::new(RwLock::new(validator));
-        match validator_arc.write() {
-            Ok(mut validator_guard) => validator_guard.set_ref(name.as_str(), &validator_arc),
-            Err(err) => py_error!("Recursive container build error: {}", err),
-        }?;
-        Ok(Box::new(Self { validator_arc, name }))
-    }
 
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
-        match self.validator_arc.write() {
-            Ok(mut validator_guard) => validator_guard.set_ref(name, validator_arc),
-            Err(err) => py_error!("Recursive container set_ref error: {}", err),
+        let mut validator_arc = Arc::new(validator);
+        let val_weak = Arc::downgrade(&validator_arc);
+
+        unsafe {
+            Arc::get_mut_unchecked(&mut validator_arc).set_ref(name.as_str(), val_weak)?;
         }
+        Ok(Box::new(Self { validator_arc, name }))
     }
 
     fn validate<'s, 'data>(
@@ -48,12 +44,11 @@ impl Validator for RecursiveValidator {
         input: &'data dyn Input,
         extra: &Extra,
     ) -> ValResult<'data, PyObject> {
-        match self.validator_arc.read() {
-            Ok(validator) => validator.validate(py, input, extra),
-            Err(err) => {
-                py_error!(PyRuntimeError; "Recursive container error: {}", err.to_string()).map_err(as_internal)
-            }
-        }
+        self.validator_arc.validate(py, input, extra)
+    }
+
+    fn set_ref(&mut self, name: &str, validator_weak: ValidatorWeak) -> PyResult<()> {
+        unsafe { Arc::get_mut_unchecked(&mut self.validator_arc).set_ref(name, validator_weak) }
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -68,7 +63,7 @@ impl Validator for RecursiveValidator {
 
 #[derive(Debug, Clone)]
 pub struct RecursiveRefValidator {
-    validator_ref: Option<Weak<RwLock<Box<dyn Validator>>>>,
+    validator_ref: Option<Weak<Box<dyn Validator>>>,
     name: String,
 }
 
@@ -91,24 +86,18 @@ impl Validator for RecursiveRefValidator {
         extra: &Extra,
     ) -> ValResult<'data, PyObject> {
         let error_msg: String = match self.validator_ref {
-            Some(ref validator_ref) => {
-                if let Some(validator_arc) = validator_ref.upgrade() {
-                    match validator_arc.read() {
-                        Ok(validator) => return validator.validate(py, input, extra),
-                        Err(err) => format!("PoisonError: {}", err),
-                    }
-                } else {
-                    "unable to upgrade weak reference".to_string()
-                }
-            }
+            Some(ref validator_ref) => match validator_ref.upgrade() {
+                Some(validator_arc) => return validator_arc.validate(py, input, extra),
+                None => "unable to upgrade weak reference".to_string(),
+            },
             None => "ref not yet set".to_string(),
         };
         py_error!(PyRuntimeError; "Recursive reference error: {}", error_msg).map_err(as_internal)
     }
 
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
+    fn set_ref(&mut self, name: &str, validator_weak: ValidatorWeak) -> PyResult<()> {
         if self.validator_ref.is_none() && name == self.name.as_str() {
-            self.validator_ref = Some(Arc::downgrade(validator_arc));
+            self.validator_ref = Some(validator_weak);
         }
         Ok(())
     }

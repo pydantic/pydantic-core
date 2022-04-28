@@ -7,7 +7,7 @@ use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, Va
 use crate::input::Input;
 use crate::validators::build_validator;
 
-use super::{unused_validator, validator_boilerplate, Extra, Validator, ValidatorArc};
+use super::{unused_validator, validator_boilerplate, Extra, Validator, ValidatorWeak};
 
 #[derive(Debug)]
 pub struct FunctionValidator;
@@ -47,8 +47,8 @@ macro_rules! build_set_ref {
             }))
         }
 
-        fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
-            self.validator.set_ref(name, validator_arc)
+        fn set_ref(&mut self, name: &str, validator_weak: ValidatorWeak) -> PyResult<()> {
+            self.validator.set_ref(name, validator_weak)
         }
     };
 }

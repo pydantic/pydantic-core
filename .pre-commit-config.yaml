@@ -27,8 +27,3 @@ repos:
     entry: make mypy
     types: [python]
     language: system
-  - id: build
-    name: Build
-    entry: make build-dev
-    types: [rust]
-    language: system

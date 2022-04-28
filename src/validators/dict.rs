@@ -1,3 +1,5 @@
+use std::sync::Weak;
+
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -5,7 +7,7 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::{DictInput, Input, ToLocItem};
 
-use super::{build_validator, Extra, Validator, ValidatorArc};
+use super::{build_validator, Extra, Validator, ValidatorWeak};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
@@ -61,12 +63,12 @@ impl Validator for DictValidator {
         self._validation_logic(py, input, input.strict_dict()?, extra)
     }
 
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
+    fn set_ref(&mut self, name: &str, validator_weak: ValidatorWeak) -> PyResult<()> {
         if let Some(ref mut key_validator) = self.key_validator {
-            key_validator.set_ref(name, validator_arc)?;
+            key_validator.set_ref(name, Weak::clone(&validator_weak))?;
         }
         if let Some(ref mut value_validator) = self.value_validator {
-            value_validator.set_ref(name, validator_arc)?;
+            value_validator.set_ref(name, Weak::clone(&validator_weak))?;
         }
         Ok(())
     }

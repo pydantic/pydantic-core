@@ -1,3 +1,5 @@
+use std::sync::Weak;
+
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet};
 use std::collections::HashSet;
@@ -8,7 +10,7 @@ use crate::errors::{
 };
 use crate::input::{Input, ToLocItem};
 
-use super::{build_validator, Extra, Validator, ValidatorArc};
+use super::{build_validator, Extra, Validator, ValidatorWeak};
 
 #[derive(Debug, Clone)]
 struct ModelField {
@@ -180,12 +182,12 @@ impl Validator for ModelValidator {
         }
     }
 
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
+    fn set_ref(&mut self, name: &str, validator_weak: ValidatorWeak) -> PyResult<()> {
         if let Some(ref mut extra_validator) = self.extra_validator {
-            extra_validator.set_ref(name, validator_arc)?;
+            extra_validator.set_ref(name, Weak::clone(&validator_weak))?;
         }
         for field in self.fields.iter_mut() {
-            field.validator.set_ref(name, validator_arc)?;
+            field.validator.set_ref(name, Weak::clone(&validator_weak))?;
         }
         Ok(())
     }

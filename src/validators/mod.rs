@@ -9,7 +9,7 @@ use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, Va
 use crate::input::Input;
 use crate::SchemaError;
 
-use self::recursive::ValidatorArc;
+use self::recursive::ValidatorWeak;
 
 mod bool;
 mod dict;
@@ -202,7 +202,7 @@ pub trait Validator: Send + Sync + fmt::Debug {
         self.validate(py, input, extra)
     }
 
-    fn set_ref(&mut self, _name: &str, _validator_arc: &ValidatorArc) -> PyResult<()> {
+    fn set_ref(&mut self, _name: &str, _validator_weak: ValidatorWeak) -> PyResult<()> {
         Ok(())
     }
 

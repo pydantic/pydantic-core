@@ -15,9 +15,9 @@ def test_branch_optional():
                 'fields': {
                     'name': {'type': 'str'},
                     'sub_branch': {
-                        'type': 'union',
+                        'type': 'optional',
                         'default': None,
-                        'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'name': 'Branch'}],
+                        'schema': {'type': 'recursive-ref', 'name': 'Branch'},
                     },
                 },
             },

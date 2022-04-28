@@ -1,3 +1,5 @@
+use std::sync::Weak;
+
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -5,7 +7,7 @@ use crate::build_tools::SchemaDict;
 use crate::errors::{LocItem, ValError, ValLineError};
 use crate::input::Input;
 
-use super::{build_validator, Extra, ValResult, Validator, ValidatorArc};
+use super::{build_validator, Extra, ValResult, Validator, ValidatorWeak};
 
 #[derive(Debug, Clone)]
 pub struct UnionValidator {
@@ -57,9 +59,9 @@ impl Validator for UnionValidator {
         Err(ValError::LineErrors(errors))
     }
 
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
+    fn set_ref(&mut self, name: &str, validator_weak: ValidatorWeak) -> PyResult<()> {
         for validator in self.choices.iter_mut() {
-            validator.set_ref(name, validator_arc)?;
+            validator.set_ref(name, Weak::clone(&validator_weak))?;
         }
         Ok(())
     }

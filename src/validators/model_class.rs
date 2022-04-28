@@ -9,7 +9,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, Extra, Validator, ValidatorArc};
+use super::{build_validator, Extra, Validator, ValidatorWeak};
 
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {
@@ -81,9 +81,8 @@ impl Validator for ModelClassValidator {
         }
     }
 
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
-        self.validator.set_ref(name, validator_arc)?;
-        Ok(())
+    fn set_ref(&mut self, name: &str, validator_weak: ValidatorWeak) -> PyResult<()> {
+        self.validator.set_ref(name, validator_weak)
     }
 
     fn get_name(&self, py: Python) -> String {
