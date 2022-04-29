@@ -190,23 +190,29 @@ impl PyLineError {
         }
         if let Some(py) = py {
             let input_value = self.input_value.as_ref(py);
-            let mut input_str = match repr(input_value) {
+            let input_str = match repr(input_value) {
                 Ok(s) => s,
                 Err(_) => input_value.to_string(),
             };
-            if input_str.len() > 50 {
-                input_str = format!("{}...{}", &input_str[0..25], &input_str[input_str.len() - 24..]);
-            }
-            output.push_str(&format!(", input_value={}", input_str));
+            output.push_str(", input_value=");
+            output.push_str(&truncate(input_str));
 
             if let Ok(type_) = input_value.get_type().name() {
                 output.push_str(&format!(", input_type={}", type_));
             }
         } else {
-            output.push_str(&format!(", input_value={}", self.input_value));
+            output.push_str(&truncate(self.input_value.to_string()));
         }
         output.push(']');
         output
+    }
+}
+
+fn truncate(s: String) -> String {
+    if s.len() > 50 {
+        format!("{}...{}", &s[0..25], &s[s.len() - 24..])
+    } else {
+        s
     }
 }
 
