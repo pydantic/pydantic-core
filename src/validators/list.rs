@@ -110,9 +110,11 @@ impl ListValidator {
                         Ok(item) => output.push(item),
                         Err(ValError::LineErrors(line_errors)) => {
                             let loc = vec![LocItem::I(index)];
-                            for err in line_errors {
-                                errors.push(err.with_prefix_location(&loc));
-                            }
+                            errors.extend(
+                                line_errors
+                                        .into_iter()
+                                        .map(|err| err.with_prefix_location(&loc))
+                            );
                         }
                         Err(err) => return Err(err),
                     }
