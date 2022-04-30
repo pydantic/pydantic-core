@@ -105,10 +105,10 @@ impl SetValidator {
         match self.item_validator {
             Some(ref validator) => {
                 let mut errors: Vec<ValLineError> = Vec::new();
-                let output = PySet::empty(py).map_err(as_internal)?;
+                let mut output: Vec<PyObject> = Vec::with_capacity(length);
                 for (index, item) in set.input_iter().enumerate() {
                     match validator.validate(py, item, extra) {
-                        Ok(item) => output.add(item).map_err(as_internal)?,
+                        Ok(item) => output.push(item),
                         Err(ValError::LineErrors(line_errors)) => {
                             let loc = vec![LocItem::I(index)];
                             errors.extend(line_errors.into_iter().map(|err| err.with_prefix_location(&loc)));
@@ -117,14 +117,14 @@ impl SetValidator {
                     };
                 }
                 if errors.is_empty() {
-                    Ok(output.into_py(py))
+                    Ok(PySet::new(py, &output).map_err(as_internal)?.into_py(py))
                 } else {
                     Err(ValError::LineErrors(errors))
                 }
             }
             None => {
-                let items: Vec<PyObject> = set.input_iter().map(|item| item.to_py(py)).collect();
-                Ok(PySet::new(py, &items).map_err(as_internal)?.into_py(py))
+                let output: Vec<PyObject> = set.input_iter().map(|item| item.to_py(py)).collect();
+                Ok(PySet::new(py, &output).map_err(as_internal)?.into_py(py))
             }
         }
     }
