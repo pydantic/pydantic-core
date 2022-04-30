@@ -103,20 +103,24 @@ impl ListValidator {
         }
         let mut output: Vec<PyObject> = Vec::with_capacity(length);
         let mut errors: Vec<ValLineError> = Vec::new();
-        for (index, item) in list.input_iter().enumerate() {
-            match self.item_validator {
-                Some(ref validator) => match validator.validate(py, item, extra) {
-                    Ok(item) => output.push(item),
-                    Err(ValError::LineErrors(line_errors)) => {
-                        let loc = vec![LocItem::I(index)];
-                        for err in line_errors {
-                            errors.push(err.with_prefix_location(&loc));
+        match self.item_validator {
+            Some(ref validator) => {
+                for (index, item) in list.input_iter().enumerate() {
+                    match validator.validate(py, item, extra) {
+                        Ok(item) => output.push(item),
+                        Err(ValError::LineErrors(line_errors)) => {
+                            let loc = vec![LocItem::I(index)];
+                            for err in line_errors {
+                                errors.push(err.with_prefix_location(&loc));
+                            }
                         }
+                        Err(err) => return Err(err),
                     }
-                    Err(err) => return Err(err),
-                },
-                None => output.push(item.to_py(py)),
+                }
             }
+            None => {
+                output.extend(list.input_iter().map(|item| item.to_py(py)));
+            },
         }
 
         if errors.is_empty() {
