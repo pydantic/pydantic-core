@@ -67,3 +67,24 @@ def test_set_multiple_errors():
         {'kind': 'int_type', 'loc': [1], 'message': 'Value must be a valid integer', 'input_value': (1, 2)},
         {'kind': 'int_type', 'loc': [2], 'message': 'Value must be a valid integer', 'input_value': []},
     ]
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ({1, 2, 3}, {1, 2, 3}),
+        (set(), set()),
+        ([1, 2, 3, 2, 3], Err('Value must be a valid list/array')),
+        ([], Err('Value must be a valid list/array')),
+        ((), Err('Value must be a valid list/array')),
+        ((1, 2, 3), Err('Value must be a valid list/array')),
+        ('abc', Err('Value must be a valid list/array')),
+    ],
+)
+def test_set_ints_strict(input_value, expected):
+    v = SchemaValidator({'type': 'set', 'strict': True})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected
