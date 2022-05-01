@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
@@ -101,10 +101,11 @@ impl ListValidator {
                 );
             }
         }
-        let mut output: Vec<PyObject> = Vec::with_capacity(length);
-        let mut errors: Vec<ValLineError> = Vec::new();
+
         match self.item_validator {
             Some(ref validator) => {
+                let mut output: Vec<PyObject> = Vec::with_capacity(length);
+                let mut errors: Vec<ValLineError> = Vec::new();
                 for (index, item) in list.input_iter().enumerate() {
                     match validator.validate(py, item, extra) {
                         Ok(item) => output.push(item),
@@ -115,16 +116,16 @@ impl ListValidator {
                         Err(err) => return Err(err),
                     }
                 }
+                if errors.is_empty() {
+                    Ok(output.into_py(py))
+                } else {
+                    Err(ValError::LineErrors(errors))
+                }
             }
             None => {
-                output.extend(list.input_iter().map(|item| item.to_py(py)));
+                let output: Vec<PyObject> = list.input_iter().map(|item| item.to_py(py)).collect();
+                Ok(PyList::new(py, &output).into_py(py))
             }
-        }
-
-        if errors.is_empty() {
-            Ok(output.into_py(py))
-        } else {
-            Err(ValError::LineErrors(errors))
         }
     }
 }
