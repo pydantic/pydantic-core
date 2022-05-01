@@ -52,11 +52,7 @@ impl Validator for UnionValidator {
             };
 
             let loc = vec![LocItem::S(validator.get_name(py))];
-            errors.extend(
-                line_errors
-                    .into_iter()
-                    .map(|err| err.with_prefix_location(&loc)),
-            );
+            errors.extend(line_errors.into_iter().map(|err| err.with_prefix_location(&loc)));
         }
 
         Err(ValError::LineErrors(errors))
@@ -65,8 +61,7 @@ impl Validator for UnionValidator {
     fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
         self.choices
             .iter_mut()
-            .map(|validator| validator.set_ref(name, validator_arc))
-            .collect()
+            .try_for_each(|validator| validator.set_ref(name, validator_arc))
     }
 
     fn get_name(&self, _py: Python) -> String {
