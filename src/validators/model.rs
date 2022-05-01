@@ -168,7 +168,7 @@ impl Validator for ModelValidator {
                         Err(err) => return Err(err),
                     }
                 } else {
-                    output_dict.set_item(&key, value.to_py(py)).map_err(as_internal)?;
+                    output_dict.set_item(&key, value.into_py(py)).map_err(as_internal)?;
                 }
             }
         }
@@ -242,7 +242,7 @@ impl ModelValidator {
                 // with allow we either want to set the value
                 ExtraBehavior::Allow => match self.extra_validator {
                     Some(ref validator) => prepare_result(validator.validate(py, input, extra)),
-                    None => prepare_tuple(input.to_py(py)),
+                    None => prepare_tuple(input.into_py(py)),
                 },
                 // otherwise we raise an error:
                 // - with forbid this is obvious

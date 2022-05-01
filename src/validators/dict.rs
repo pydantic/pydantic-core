@@ -153,6 +153,6 @@ fn apply_validator<'s, 'data>(
             }
             Err(err) => Err(err),
         },
-        None => Ok(Some(input.to_py(py))),
+        None => Ok(Some(input.into_py(py))),
     }
 }

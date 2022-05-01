@@ -6,10 +6,6 @@ use pyo3::types::PyType;
 
 use crate::errors::{LocItem, ValResult};
 
-pub trait ToPy: Debug {
-    fn to_py(&self, py: Python) -> PyObject;
-}
-
 pub trait ToLocItem {
     fn to_loc(&self) -> LocItem;
 }
@@ -26,7 +22,7 @@ impl ToLocItem for &str {
     }
 }
 
-pub trait Input: fmt::Debug + ToPy + ToLocItem {
+pub trait Input: fmt::Debug + ToPyObject + ToLocItem {
     fn is_none(&self) -> bool;
 
     fn strict_str(&self) -> ValResult<String>;
@@ -69,7 +65,7 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 // these are ugly, is there any way to avoid the maps in iter, one of the boxes and/or the duplication?
 // is this harming performance, particularly the .map(|item| item)?
 // https://stackoverflow.com/a/47156134/949890
-pub trait DictInput<'data>: ToPy {
+pub trait DictInput<'data>: ToPyObject {
     fn input_iter(&self) -> Box<dyn Iterator<Item = (&'data dyn Input, &'data dyn Input)> + 'data>;
 
     fn input_get(&self, key: &str) -> Option<&'data dyn Input>;
@@ -77,7 +73,7 @@ pub trait DictInput<'data>: ToPy {
     fn input_len(&self) -> usize;
 }
 
-pub trait ListInput<'data>: ToPy {
+pub trait ListInput<'data>: ToPyObject {
     fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data>;
 
     fn input_len(&self) -> usize;

@@ -6,9 +6,9 @@ use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet,
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, LocItem, ValResult};
 
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
-use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
+use super::traits::{DictInput, Input, ListInput, ToLocItem};
 
-impl Input for PyAny {
+impl Input for &PyAny {
     fn is_none(&self) -> bool {
         self.is_none()
     }
@@ -298,49 +298,7 @@ fn _maybe_as_string(v: &PyAny, unicode_error: ErrorKind) -> ValResult<Option<Str
     }
 }
 
-impl ToPy for PyAny {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for &PyDict {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for &PyList {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for &PyTuple {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for &PySet {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToPy for &PyFrozenSet {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
-    }
-}
-
-impl ToLocItem for PyAny {
+impl ToLocItem for &PyAny {
     fn to_loc(&self) -> LocItem {
         if let Ok(key_str) = self.extract::<String>() {
             LocItem::S(key_str)

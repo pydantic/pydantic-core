@@ -123,7 +123,7 @@ impl SetValidator {
                 }
             }
             None => {
-                let output: Vec<PyObject> = set.input_iter().map(|item| item.to_py(py)).collect();
+                let output: Vec<PyObject> = set.input_iter().map(|item| item.into_py(py)).collect();
                 Ok(PySet::new(py, &output).map_err(as_internal)?.into_py(py))
             }
         }

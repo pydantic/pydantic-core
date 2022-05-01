@@ -3,8 +3,6 @@ use std::fmt;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::input::ToPy;
-
 use super::kinds::ErrorKind;
 
 /// Used to store individual items of the error location, e.g. a string for key/field names
@@ -59,7 +57,7 @@ impl<'a> ValLineError<'a> {
 #[derive(Debug)]
 pub enum InputValue<'a> {
     None,
-    InputRef(&'a dyn ToPy),
+    InputRef(&'a dyn ToPyObject),
     PyObject(PyObject),
 }
 
@@ -73,7 +71,7 @@ impl<'a> InputValue<'a> {
     pub fn to_py(&self, py: Python) -> PyObject {
         match self {
             Self::None => py.None(),
-            Self::InputRef(input) => input.to_py(py),
+            Self::InputRef(input) => input.into_py(py),
             Self::PyObject(py_obj) => py_obj.into_py(py),
         }
     }

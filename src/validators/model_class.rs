@@ -54,7 +54,7 @@ impl Validator for ModelClassValidator {
     ) -> ValResult<'data, PyObject> {
         let class = self.class.as_ref(py);
         if input.strict_model_check(class)? {
-            Ok(input.to_py(py))
+            Ok(input.into_py(py))
         } else if self.strict {
             err_val_error!(
                 input_value = InputValue::InputRef(input),
@@ -74,7 +74,7 @@ impl Validator for ModelClassValidator {
         _extra: &Extra,
     ) -> ValResult<'data, PyObject> {
         if input.strict_model_check(self.class.as_ref(py))? {
-            Ok(input.to_py(py))
+            Ok(input.into_py(py))
         } else {
             // errors from `validate_strict` are never used used, so we can keep this simple
             Err(ValError::LineErrors(vec![]))

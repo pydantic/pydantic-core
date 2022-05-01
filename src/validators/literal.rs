@@ -70,7 +70,7 @@ impl Validator for SingleStringValidator {
     ) -> ValResult<'data, PyObject> {
         let str = input.strict_str()?;
         if str == self.expected {
-            Ok(input.to_py(py))
+            Ok(input.into_py(py))
         } else {
             err_val_error!(
                 input_value = InputValue::InputRef(input),
@@ -108,7 +108,7 @@ impl Validator for SingleIntValidator {
     ) -> ValResult<'data, PyObject> {
         let str = input.strict_int()?;
         if str == self.expected {
-            Ok(input.to_py(py))
+            Ok(input.into_py(py))
         } else {
             err_val_error!(
                 input_value = InputValue::InputRef(input),
@@ -161,7 +161,7 @@ impl Validator for MultipleStringsValidator {
     ) -> ValResult<'data, PyObject> {
         let str = input.strict_str()?;
         if self.expected.contains(&str) {
-            Ok(input.to_py(py))
+            Ok(input.into_py(py))
         } else {
             err_val_error!(
                 input_value = InputValue::InputRef(input),
@@ -214,7 +214,7 @@ impl Validator for MultipleIntsValidator {
     ) -> ValResult<'data, PyObject> {
         let int = input.strict_int()?;
         if self.expected.contains(&int) {
-            Ok(input.to_py(py))
+            Ok(input.into_py(py))
         } else {
             err_val_error!(
                 input_value = InputValue::InputRef(input),
@@ -276,19 +276,19 @@ impl Validator for GeneralValidator {
         if !self.expected_int.is_empty() {
             if let Ok(int) = input.strict_int() {
                 if self.expected_int.contains(&int) {
-                    return Ok(input.to_py(py));
+                    return Ok(input.into_py(py));
                 }
             }
         }
         if !self.expected_str.is_empty() {
             if let Ok(str) = input.strict_str() {
                 if self.expected_str.contains(&str) {
-                    return Ok(input.to_py(py));
+                    return Ok(input.into_py(py));
                 }
             }
         }
 
-        let py_value = input.to_py(py);
+        let py_value = input.into_py(py);
 
         let expected_py = self.expected_py.as_ref(py);
         if !expected_py.is_empty() && expected_py.contains(&py_value).map_err(as_internal)? {

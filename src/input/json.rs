@@ -5,9 +5,12 @@ use serde_json::{Map, Value};
 use crate::errors::{err_val_error, ErrorKind, InputValue, LocItem, ValResult};
 
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
-use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
+use super::traits::{DictInput, Input, ListInput, ToLocItem};
 
-impl Input for Value {
+#[derive(Debug)]
+struct JsonInput(Value);
+
+impl Input for JsonInput {
     fn is_none(&self) -> bool {
         matches!(self, Value::Null)
     }
@@ -167,10 +170,9 @@ impl<'data> ListInput<'data> for &'data Vec<Value> {
     }
 }
 
-impl ToPy for Value {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        match self {
+impl ToPyObject for JsonInput {
+    fn to_object(&self, py: Python) -> PyObject {
+        match &self.0 {
             Value::Null => py.None(),
             Value::Bool(b) => b.into_py(py),
             Value::Number(n) => {
@@ -189,26 +191,27 @@ impl ToPy for Value {
     }
 }
 
-impl ToPy for &Map<String, Value> {
+// impl ToPyObject for &Map<String, Value> {
+//     #[inline]
+//     fn into_py(&self, py: Python) -> PyObject {
+//         let dict = PyDict::new(py);
+//         for (k, v) in self.iter() {
+//             dict.set_item(k, v.to_py(py)).unwrap();
+//         }
+//         dict.into_py(py)
+//     }
+// }
+
+impl ToPyObject for &Vec<JsonInput> {
     #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        let dict = PyDict::new(py);
-        for (k, v) in self.iter() {
-            dict.set_item(k, v.to_py(py)).unwrap();
-        }
-        dict.into_py(py)
-    }
-}
-impl ToPy for &Vec<Value> {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
+    fn into_py(&self, py: Python) -> PyObject {
         self.iter().map(|v| v.to_py(py)).collect::<Vec<_>>().into_py(py)
     }
 }
 
-impl ToLocItem for Value {
+impl ToLocItem for JsonInput {
     fn to_loc(&self) -> LocItem {
-        match self {
+        match &self.0 {
             Value::Number(n) => {
                 if let Some(int) = n.as_i64() {
                     LocItem::I(int as usize)
@@ -222,13 +225,6 @@ impl ToLocItem for Value {
             Value::String(s) => LocItem::S(s.to_string()),
             v => LocItem::S(format!("{:?}", v)),
         }
-    }
-}
-
-impl ToPy for String {
-    #[inline]
-    fn to_py(&self, py: Python) -> PyObject {
-        self.into_py(py)
     }
 }
 
