@@ -120,6 +120,48 @@ def benchmark_model_create():
     _run_benchmarks('model_create', [pydantic, pydantic_core_dict, pydantic_core_model], [data], steps=10_000)
 
 
+def benchmark_create_many_models():
+    class SimpleMode(BaseModel):
+        age: int
+
+    class PydanticModel(BaseModel):
+        __root__: List[SimpleMode]
+
+    model_schema = {'type': 'list', 'items': {'type': 'model', 'fields': {'age': 'int'}}}
+    dict_schema_validator = SchemaValidator(model_schema)
+
+    class MyCoreModel:
+        __slots__ = '__dict__', '__fields_set__'
+
+    model_schema_validator = SchemaValidator({
+        'type': 'list',
+        'items': {
+            'type': 'model-class',
+            'class': MyCoreModel,
+            'model': {
+                'type': 'model',
+                'fields': {'age': 'int'}
+            }
+        }
+    })
+
+    def pydantic(d):
+        m = PydanticModel.parse_obj(d)
+        return [v.age for v in m.__root__]
+
+    def pydantic_core_dict(d):
+        output = dict_schema_validator.validate_python(d)
+        return [v[0]['age'] for v in output]
+
+    def pydantic_core_model(d):
+        m = model_schema_validator.validate_python(d)
+        return [v.age for v in m]
+
+    data = [{'age': i} for i in range(1000)]
+
+    _run_benchmarks('create_many_models', [pydantic, pydantic_core_dict, pydantic_core_model], [data])
+
+
 def benchmark_recursive_model():
     class PydanticBranch(BaseModel):
         width: int
@@ -333,6 +375,7 @@ if __name__ == '__main__':
     benchmark_bool()
     benchmark_model_create()
     benchmark_recursive_model()
+    benchmark_create_many_models()
     benchmark_list_of_dict_models()
     benchmark_list_of_ints(True)
     benchmark_list_of_ints(False)
