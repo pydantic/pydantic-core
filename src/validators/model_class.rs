@@ -1,4 +1,5 @@
 use std::os::raw::c_int;
+use std::ptr::null_mut;
 
 use pyo3::conversion::{AsPyPointer, FromPyPointer};
 use pyo3::exceptions::PyTypeError;
@@ -105,13 +106,13 @@ impl ModelClassValidator {
         let model_dict = t.get_item(0)?;
         let fields_set = t.get_item(1)?;
 
-        // based on the following but with the second argument of new_func set to an empty tuple to avoid seg faulting
+        // based on the following but with the second argument of new_func set to an empty tuple as required
         // https://github.com/PyO3/pyo3/blob/d2caa056e9aacc46374139ef491d112cb8af1a25/src/pyclass_init.rs#L35-L77
         let args = PyTuple::empty(py);
         let raw_type = self.class.as_ref(py).as_type_ptr();
         let instance_ptr = match (*raw_type).tp_new {
             Some(new_func) => {
-                let obj = new_func(raw_type, args.as_ptr(), std::ptr::null_mut());
+                let obj = new_func(raw_type, args.as_ptr(), null_mut());
                 if obj.is_null() {
                     return Err(PyErr::fetch(py));
                 } else {
