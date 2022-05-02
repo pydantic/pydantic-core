@@ -5,40 +5,41 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::{DictInput, Input, ToLocItem};
 
-use super::{build_validator, Extra, Validator, ValidatorArc};
+use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
     strict: bool,
-    key_validator: Option<Box<dyn Validator>>,
-    value_validator: Option<Box<dyn Validator>>,
+    key_validator: Option<Box<ValidateEnum>>,
+    value_validator: Option<Box<ValidateEnum>>,
     min_items: Option<usize>,
     max_items: Option<usize>,
     try_instance_as_dict: bool,
 }
 
-impl DictValidator {
-    pub const EXPECTED_TYPE: &'static str = "dict";
-}
+impl BuildValidator for DictValidator {
+    const EXPECTED_TYPE: &'static str = "dict";
 
-impl Validator for DictValidator {
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        Ok(Box::new(Self {
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+        Ok(Self {
             strict: is_strict(schema, config)?,
             key_validator: match schema.get_item("keys") {
-                Some(schema) => Some(build_validator(schema, config)?.0),
+                Some(schema) => Some(Box::new(build_validator(schema, config)?.0)),
                 None => None,
             },
             value_validator: match schema.get_item("values") {
-                Some(d) => Some(build_validator(d, config)?.0),
+                Some(d) => Some(Box::new(build_validator(d, config)?.0)),
                 None => None,
             },
             min_items: schema.get_as("min_items")?,
             max_items: schema.get_as("max_items")?,
             try_instance_as_dict: schema.get_as("try_instance_as_dict")?.unwrap_or(false),
-        }))
+        }
+        .into())
     }
+}
 
+impl Validator for DictValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -73,11 +74,6 @@ impl Validator for DictValidator {
 
     fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()
-    }
-
-    #[no_coverage]
-    fn clone_dyn(&self) -> Box<dyn Validator> {
-        Box::new(self.clone())
     }
 }
 
@@ -130,7 +126,7 @@ impl DictValidator {
 
 fn apply_validator<'s, 'data>(
     py: Python<'data>,
-    validator: &'s Option<Box<dyn Validator>>,
+    validator: &'s Option<Box<ValidateEnum>>,
     errors: &mut Vec<ValLineError<'data>>,
     input: &'data dyn Input,
     key: &'data dyn Input,
