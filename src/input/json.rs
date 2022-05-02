@@ -3,9 +3,9 @@ use pyo3::types::{PyDict, PyType};
 
 use crate::errors::{err_val_error, ErrorKind, InputValue, LocItem, ValResult};
 
+use super::parse_json::{JsonArray, JsonInput, JsonObject};
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
-use super::parse_json::{JsonInput, JsonArray, JsonObject};
 
 impl Input for JsonInput {
     fn is_none(&self) -> bool {

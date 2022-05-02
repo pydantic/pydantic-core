@@ -1,8 +1,7 @@
 use std::fmt;
-use std::marker::PhantomData;
 
 use indexmap::IndexMap;
-use serde::de::{Deserialize, MapAccess, SeqAccess, Visitor, Error as SerdeError};
+use serde::de::{Deserialize, DeserializeSeed, Error as SerdeError, MapAccess, SeqAccess, Visitor};
 
 // taken from `serde_json`
 // We only use our own error type; no need for From conversions provided by the
@@ -114,7 +113,7 @@ impl<'de> Deserialize<'de> for JsonInput {
             where
                 V: MapAccess<'de>,
             {
-                match visitor.next_key_seed(PhantomData::<String>)? {
+                match visitor.next_key_seed(KeyDeserializer)? {
                     Some(first_key) => {
                         let mut values = IndexMap::new();
 
@@ -128,9 +127,43 @@ impl<'de> Deserialize<'de> for JsonInput {
                     None => Ok(JsonInput::Object(IndexMap::new())),
                 }
             }
-
         }
 
         deserializer.deserialize_any(JsonVisitor)
+    }
+}
+
+struct KeyDeserializer;
+
+impl<'de> DeserializeSeed<'de> for KeyDeserializer {
+    type Value = String;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_str(self)
+    }
+}
+
+impl<'de> Visitor<'de> for KeyDeserializer {
+    type Value = String;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a string key")
+    }
+
+    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(s.to_string())
+    }
+
+    fn visit_string<E>(self, s: String) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(s)
     }
 }

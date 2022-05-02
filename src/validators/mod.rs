@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use enum_dispatch::enum_dispatch;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
-use serde_json::{from_str as parse_json};
+use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
