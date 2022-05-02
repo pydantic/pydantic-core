@@ -6,9 +6,7 @@ use crate::errors::{err_val_error, ErrorKind, InputValue, LocItem, ValResult};
 
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 use super::traits::{DictInput, Input, ListInput, ToLocItem};
-
-#[derive(Debug)]
-struct JsonInput(Value);
+use super::parse_json::{JsonInput, JsonArray, JsonObject};
 
 impl Input for JsonInput {
     fn is_none(&self) -> bool {
@@ -142,88 +140,6 @@ impl Input for JsonInput {
         match self {
             Value::Array(a) => Ok(Box::new(a)),
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType),
-        }
-    }
-}
-
-impl<'data> DictInput<'data> for &'data Map<String, Value> {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = (&'data dyn Input, &'data dyn Input)> + 'data> {
-        Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
-    }
-
-    fn input_get(&self, key: &str) -> Option<&'data dyn Input> {
-        self.get(key).map(|item| item as &dyn Input)
-    }
-
-    fn input_len(&self) -> usize {
-        self.len()
-    }
-}
-
-impl<'data> ListInput<'data> for &'data Vec<Value> {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data> {
-        Box::new(self.iter().map(|item| item as &dyn Input))
-    }
-
-    fn input_len(&self) -> usize {
-        self.len()
-    }
-}
-
-impl ToPyObject for JsonInput {
-    fn to_object(&self, py: Python) -> PyObject {
-        match &self.0 {
-            Value::Null => py.None(),
-            Value::Bool(b) => b.into_py(py),
-            Value::Number(n) => {
-                if let Some(int) = n.as_i64() {
-                    int.into_py(py)
-                } else if let Some(float) = n.as_f64() {
-                    float.into_py(py)
-                } else {
-                    panic!("{:?} is not a valid number", n)
-                }
-            }
-            Value::String(s) => s.clone().into_py(py),
-            Value::Array(v) => v.to_py(py),
-            Value::Object(m) => m.to_py(py),
-        }
-    }
-}
-
-// impl ToPyObject for &Map<String, Value> {
-//     #[inline]
-//     fn into_py(&self, py: Python) -> PyObject {
-//         let dict = PyDict::new(py);
-//         for (k, v) in self.iter() {
-//             dict.set_item(k, v.to_py(py)).unwrap();
-//         }
-//         dict.into_py(py)
-//     }
-// }
-
-impl ToPyObject for &Vec<JsonInput> {
-    #[inline]
-    fn into_py(&self, py: Python) -> PyObject {
-        self.iter().map(|v| v.to_py(py)).collect::<Vec<_>>().into_py(py)
-    }
-}
-
-impl ToLocItem for JsonInput {
-    fn to_loc(&self) -> LocItem {
-        match &self.0 {
-            Value::Number(n) => {
-                if let Some(int) = n.as_i64() {
-                    LocItem::I(int as usize)
-                } else if let Some(float) = n.as_f64() {
-                    LocItem::I(float as usize)
-                } else {
-                    // something's gone wrong, best effort
-                    LocItem::S(format!("{:?}", n))
-                }
-            }
-            Value::String(s) => LocItem::S(s.to_string()),
-            v => LocItem::S(format!("{:?}", v)),
         }
     }
 }
