@@ -10,6 +10,7 @@ use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, Va
 use crate::input::Input;
 use crate::SchemaError;
 
+mod any;
 mod bool;
 mod dict;
 mod float;
@@ -172,6 +173,8 @@ pub fn build_validator<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> PyR
         self::recursive::RecursiveRefValidator,
         // literals
         self::literal::LiteralBuilder,
+        // any
+        self::any::AnyValidator,
     )
 }
 
@@ -234,6 +237,8 @@ pub enum ValidateEnum {
     LiteralMultipleStrings(self::literal::LiteralMultipleStringsValidator),
     LiteralMultipleInts(self::literal::LiteralMultipleIntsValidator),
     LiteralGeneral(self::literal::LiteralGeneralValidator),
+    // any
+    Any(self::any::AnyValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
