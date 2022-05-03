@@ -69,7 +69,7 @@ impl<'de> Deserialize<'de> for JsonInput {
             where
                 E: SerdeError,
             {
-                self.visit_string(value.to_string())
+                Ok(JsonInput::String(value.to_string()))
             }
 
             #[inline]
@@ -121,7 +121,6 @@ impl<'de> Deserialize<'de> for JsonInput {
                         while let Some((key, value)) = tri!(visitor.next_entry()) {
                             values.insert(key, value);
                         }
-
                         Ok(JsonInput::Object(values))
                     }
                     None => Ok(JsonInput::Object(IndexMap::new())),
