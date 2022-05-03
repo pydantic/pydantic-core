@@ -7,14 +7,14 @@ use crate::errors::{
 };
 use crate::input::{Input, ToLocItem};
 
-use super::{build_validator, BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
 #[derive(Debug, Clone)]
 struct ModelField {
     name: String,
     // alias: Option<String>,
     default: Option<PyObject>,
-    validator: ValidateEnum,
+    validator: CombinedValidator,
 }
 
 #[derive(Debug, Clone)]
@@ -22,13 +22,17 @@ pub struct ModelValidator {
     name: String,
     fields: Vec<ModelField>,
     extra_behavior: ExtraBehavior,
-    extra_validator: Option<Box<ValidateEnum>>,
+    extra_validator: Option<Box<CombinedValidator>>,
 }
 
 impl BuildValidator for ModelValidator {
     const EXPECTED_TYPE: &'static str = "model";
 
-    fn build(schema: &PyDict, _config: Option<&PyDict>, slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        _config: Option<&PyDict>,
+        slots_builder: &mut SlotsBuilder,
+    ) -> PyResult<CombinedValidator> {
         // models ignore the parent config and always use the config from this model
         let config: Option<&PyDict> = schema.get_as("config")?;
 
@@ -86,7 +90,7 @@ impl Validator for ModelValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         if let Some(field) = extra.field {
             // we're validating assignment, completely different logic
@@ -195,7 +199,7 @@ impl ModelValidator {
         field: &str,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject>
     where
         'data: 's,

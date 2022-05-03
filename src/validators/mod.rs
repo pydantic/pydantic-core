@@ -31,8 +31,8 @@ mod union;
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {
-    validator: ValidateEnum,
-    slots: Vec<ValidateEnum>,
+    validator: CombinedValidator,
+    slots: Vec<CombinedValidator>,
 }
 
 #[pymethods]
@@ -107,7 +107,11 @@ pub trait BuildValidator: Sized {
 
     /// Build a new validator from the schema, the return type is a trait to provide a way for validators
     /// to return other validators, see `string.rs`, `int.rs`, `float.rs` and `function.rs` for examples
-    fn build(schema: &PyDict, config: Option<&PyDict>, _slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum>;
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        _slots_builder: &mut SlotsBuilder,
+    ) -> PyResult<CombinedValidator>;
 }
 
 // macro to build the match statement for validator selection
@@ -133,7 +137,7 @@ pub fn build_validator<'a>(
     schema: &'a PyAny,
     config: Option<&'a PyDict>,
     slots_builder: &mut SlotsBuilder,
-) -> PyResult<(ValidateEnum, &'a PyDict)> {
+) -> PyResult<(CombinedValidator, &'a PyDict)> {
     let dict: &PyDict = match schema.cast_as() {
         Ok(s) => s,
         Err(_) => {
@@ -197,7 +201,7 @@ pub struct Extra<'a> {
 
 #[derive(Debug, Clone)]
 #[enum_dispatch]
-pub enum ValidateEnum {
+pub enum CombinedValidator {
     // models e.g. heterogeneous dicts
     Model(self::model::ModelValidator),
     // unions
@@ -249,7 +253,7 @@ pub enum ValidateEnum {
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
 /// validators defined in `build_validator` also need `EXPECTED_TYPE` as a const, but that can't be part of the trait
-#[enum_dispatch(ValidateEnum)]
+#[enum_dispatch(CombinedValidator)]
 pub trait Validator: Send + Sync + Clone + Debug {
     /// Do the actual validation for this schema/type
     fn validate<'s, 'data>(
@@ -257,7 +261,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject>;
 
     /// This is used in unions for the first pass to see if we have an "exact match",
@@ -267,7 +271,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         self.validate(py, input, extra, slots)
     }
@@ -278,12 +282,12 @@ pub trait Validator: Send + Sync + Clone + Debug {
 }
 
 pub struct SlotsBuilder {
-    named_slots: Vec<(Option<String>, Option<ValidateEnum>)>,
+    named_slots: Vec<(Option<String>, Option<CombinedValidator>)>,
 }
 
 impl SlotsBuilder {
     pub fn new() -> Self {
-        let named_slots: Vec<(Option<String>, Option<ValidateEnum>)> = Vec::new();
+        let named_slots: Vec<(Option<String>, Option<CombinedValidator>)> = Vec::new();
         SlotsBuilder { named_slots }
     }
 
@@ -296,7 +300,7 @@ impl SlotsBuilder {
     }
 
     pub fn find_id(&self, name: &str) -> PyResult<usize> {
-        let is_match = |(n, _): &(Option<String>, Option<ValidateEnum>)| match n {
+        let is_match = |(n, _): &(Option<String>, Option<CombinedValidator>)| match n {
             Some(n) => n == name,
             None => false,
         };
@@ -306,7 +310,7 @@ impl SlotsBuilder {
         }
     }
 
-    pub fn into_slots(self) -> PyResult<Vec<ValidateEnum>> {
+    pub fn into_slots(self) -> PyResult<Vec<CombinedValidator>> {
         self.named_slots
             .into_iter()
             .map(|(_, opt_validator)| match opt_validator {

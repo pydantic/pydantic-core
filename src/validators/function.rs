@@ -6,7 +6,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
 #[derive(Debug)]
 pub struct FunctionBuilder;
@@ -14,7 +14,11 @@ pub struct FunctionBuilder;
 impl BuildValidator for FunctionBuilder {
     const EXPECTED_TYPE: &'static str = "function";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>, slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        slots_builder: &mut SlotsBuilder,
+    ) -> PyResult<CombinedValidator> {
         let mode: &str = schema.get_as_req("mode")?;
         match mode {
             "before" => FunctionBeforeValidator::build(schema, config, slots_builder),
@@ -39,7 +43,7 @@ macro_rules! impl_build {
                 schema: &PyDict,
                 config: Option<&PyDict>,
                 slots_builder: &mut SlotsBuilder,
-            ) -> PyResult<ValidateEnum> {
+            ) -> PyResult<CombinedValidator> {
                 Ok(Self {
                     validator: Box::new(build_validator(schema.get_as_req("schema")?, config, slots_builder)?.0),
                     func: get_function(schema)?,
@@ -53,7 +57,7 @@ macro_rules! impl_build {
 
 #[derive(Debug, Clone)]
 pub struct FunctionBeforeValidator {
-    validator: Box<ValidateEnum>,
+    validator: Box<CombinedValidator>,
     func: PyObject,
     config: Option<Py<PyDict>>,
 }
@@ -66,7 +70,7 @@ impl Validator for FunctionBeforeValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         let value = self
@@ -103,7 +107,7 @@ impl Validator for FunctionBeforeValidator {
 
 #[derive(Debug, Clone)]
 pub struct FunctionAfterValidator {
-    validator: Box<ValidateEnum>,
+    validator: Box<CombinedValidator>,
     func: PyObject,
     config: Option<Py<PyDict>>,
 }
@@ -116,7 +120,7 @@ impl Validator for FunctionAfterValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let v = self.validator.validate(py, input, extra, slots)?;
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
@@ -135,7 +139,7 @@ pub struct FunctionPlainValidator {
 }
 
 impl FunctionPlainValidator {
-    pub fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+    pub fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedValidator> {
         Ok(Self {
             func: get_function(schema)?,
             config: config.map(|c| c.into()),
@@ -150,7 +154,7 @@ impl Validator for FunctionPlainValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        _slots: &'data [ValidateEnum],
+        _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func
@@ -165,7 +169,7 @@ impl Validator for FunctionPlainValidator {
 
 #[derive(Debug, Clone)]
 pub struct FunctionWrapValidator {
-    validator: Box<ValidateEnum>,
+    validator: Box<CombinedValidator>,
     func: PyObject,
     config: Option<Py<PyDict>>,
 }
@@ -178,7 +182,7 @@ impl Validator for FunctionWrapValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let validator_kwarg = ValidatorCallable {
             validator: self.validator.clone(),
@@ -205,8 +209,8 @@ impl Validator for FunctionWrapValidator {
 #[pyclass]
 #[derive(Debug, Clone)]
 struct ValidatorCallable {
-    validator: Box<ValidateEnum>,
-    slots: Vec<ValidateEnum>,
+    validator: Box<CombinedValidator>,
+    slots: Vec<CombinedValidator>,
     data: Option<Py<PyDict>>,
     field: Option<String>,
 }

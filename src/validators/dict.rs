@@ -6,13 +6,13 @@ use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, 
 use crate::input::{DictInput, Input, ToLocItem};
 
 use super::any::AnyValidator;
-use super::{build_validator, BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
     strict: bool,
-    key_validator: Box<ValidateEnum>,
-    value_validator: Box<ValidateEnum>,
+    key_validator: Box<CombinedValidator>,
+    value_validator: Box<CombinedValidator>,
     min_items: Option<usize>,
     max_items: Option<usize>,
     try_instance_as_dict: bool,
@@ -21,7 +21,11 @@ pub struct DictValidator {
 impl BuildValidator for DictValidator {
     const EXPECTED_TYPE: &'static str = "dict";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>, slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        slots_builder: &mut SlotsBuilder,
+    ) -> PyResult<CombinedValidator> {
         Ok(Self {
             strict: is_strict(schema, config)?,
             key_validator: match schema.get_item("keys") {
@@ -46,7 +50,7 @@ impl Validator for DictValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let dict = match self.strict {
             true => input.strict_dict()?,
@@ -60,7 +64,7 @@ impl Validator for DictValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_dict()?, extra, slots)
     }
@@ -77,7 +81,7 @@ impl DictValidator {
         input: &'data dyn Input,
         dict: Box<dyn DictInput<'data> + 'data>,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         if let Some(min_length) = self.min_items {
             if dict.input_len() < min_length {
@@ -121,12 +125,12 @@ impl DictValidator {
 #[allow(clippy::too_many_arguments)]
 fn apply_validator<'s, 'data>(
     py: Python<'data>,
-    validator: &'s ValidateEnum,
+    validator: &'s CombinedValidator,
     errors: &mut Vec<ValLineError<'data>>,
     input: &'data dyn Input,
     key: &'data dyn Input,
     extra: &Extra,
-    slots: &'data [ValidateEnum],
+    slots: &'data [CombinedValidator],
     key_loc: bool,
 ) -> ValResult<'data, Option<PyObject>> {
     match validator.validate(py, input, extra, slots) {

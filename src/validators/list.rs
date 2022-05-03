@@ -5,12 +5,12 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
 use crate::input::{Input, ListInput};
 
-use super::{build_validator, BuildValidator, Extra, SlotsBuilder, ValResult, ValidateEnum, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ListValidator {
     strict: bool,
-    item_validator: Option<Box<ValidateEnum>>,
+    item_validator: Option<Box<CombinedValidator>>,
     min_items: Option<usize>,
     max_items: Option<usize>,
 }
@@ -18,7 +18,11 @@ pub struct ListValidator {
 impl BuildValidator for ListValidator {
     const EXPECTED_TYPE: &'static str = "list";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>, slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        slots_builder: &mut SlotsBuilder,
+    ) -> PyResult<CombinedValidator> {
         Ok(Self {
             strict: is_strict(schema, config)?,
             item_validator: match schema.get_item("items") {
@@ -38,7 +42,7 @@ impl Validator for ListValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let list = match self.strict {
             true => input.strict_list()?,
@@ -52,7 +56,7 @@ impl Validator for ListValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_list()?, extra, slots)
     }
@@ -72,7 +76,7 @@ impl ListValidator {
         input: &'data dyn Input,
         list: Box<dyn ListInput<'data> + 'data>,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let length = list.input_len();
         if let Some(min_length) = self.min_items {

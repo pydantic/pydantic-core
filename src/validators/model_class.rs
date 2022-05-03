@@ -11,19 +11,23 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {
     strict: bool,
-    validator: Box<ValidateEnum>,
+    validator: Box<CombinedValidator>,
     class: Py<PyType>,
 }
 
 impl BuildValidator for ModelClassValidator {
     const EXPECTED_TYPE: &'static str = "model-class";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>, slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        slots_builder: &mut SlotsBuilder,
+    ) -> PyResult<CombinedValidator> {
         let class: &PyType = schema.get_as_req("class")?;
 
         let model_schema_raw: &PyAny = schema.get_as_req("model")?;
@@ -50,7 +54,7 @@ impl Validator for ModelClassValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data [ValidateEnum],
+        slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let class = self.class.as_ref(py);
         if input.strict_model_check(class)? {
@@ -72,7 +76,7 @@ impl Validator for ModelClassValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data [ValidateEnum],
+        _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         if input.strict_model_check(self.class.as_ref(py))? {
             Ok(input.to_py(py))

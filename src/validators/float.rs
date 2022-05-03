@@ -5,7 +5,7 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
-use super::{BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
+use super::{BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
 #[derive(Debug, Clone)]
 pub struct FloatValidator;
@@ -13,7 +13,11 @@ pub struct FloatValidator;
 impl BuildValidator for FloatValidator {
     const EXPECTED_TYPE: &'static str = "float";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>, _slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        _slots_builder: &mut SlotsBuilder,
+    ) -> PyResult<CombinedValidator> {
         let use_constrained = schema.get_item("multiple_of").is_some()
             || schema.get_item("le").is_some()
             || schema.get_item("lt").is_some()
@@ -35,7 +39,7 @@ impl Validator for FloatValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data [ValidateEnum],
+        _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         Ok(input.lax_float()?.into_py(py))
     }
@@ -45,7 +49,7 @@ impl Validator for FloatValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data [ValidateEnum],
+        _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_float()?.into_py(py))
     }
@@ -59,7 +63,7 @@ impl Validator for FloatValidator {
 pub struct StrictFloatValidator;
 
 impl StrictFloatValidator {
-    pub fn build() -> PyResult<ValidateEnum> {
+    pub fn build() -> PyResult<CombinedValidator> {
         Ok(Self.into())
     }
 }
@@ -70,7 +74,7 @@ impl Validator for StrictFloatValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data [ValidateEnum],
+        _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_float()?.into_py(py))
     }
@@ -96,7 +100,7 @@ impl Validator for ConstrainedFloatValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data [ValidateEnum],
+        _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let float = match self.strict {
             true => input.strict_float()?,
@@ -110,7 +114,7 @@ impl Validator for ConstrainedFloatValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data [ValidateEnum],
+        _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_float()?)
     }
@@ -121,7 +125,7 @@ impl Validator for ConstrainedFloatValidator {
 }
 
 impl ConstrainedFloatValidator {
-    pub fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+    pub fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedValidator> {
         Ok(Self {
             strict: is_strict(schema, config)?,
             multiple_of: schema.get_as("multiple_of")?,
