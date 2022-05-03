@@ -14,7 +14,7 @@ pub struct StrValidator;
 impl BuildValidator for StrValidator {
     const EXPECTED_TYPE: &'static str = "str";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, config: Option<&PyDict>, _slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
         let use_constrained = schema.get_item("pattern").is_some()
             || schema.get_item("max_length").is_some()
             || schema.get_item("min_length").is_some()
@@ -48,6 +48,7 @@ impl Validator for StrValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         Ok(input.lax_str()?.into_py(py))
     }
@@ -57,6 +58,7 @@ impl Validator for StrValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_str()?.into_py(py))
     }
@@ -81,6 +83,7 @@ impl Validator for StrictStrValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_str()?.into_py(py))
     }
@@ -107,6 +110,7 @@ impl Validator for StrConstrainedValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         let str = match self.strict {
             true => input.strict_str()?,
@@ -120,6 +124,7 @@ impl Validator for StrConstrainedValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_str()?)
     }

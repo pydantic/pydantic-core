@@ -15,7 +15,7 @@ pub struct LiteralBuilder;
 impl BuildValidator for LiteralBuilder {
     const EXPECTED_TYPE: &'static str = "literal";
 
-    fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, _config: Option<&PyDict>, _slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
         let expected: &PyList = schema.get_as_req("expected")?;
         if expected.is_empty() {
             return py_error!(r#""expected" must have length > 0"#);
@@ -58,6 +58,7 @@ impl Validator for LiteralSingleStringValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         let str = input.strict_str()?;
         if str == self.expected {
@@ -93,6 +94,7 @@ impl Validator for LiteralSingleIntValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         let str = input.strict_int()?;
         if str == self.expected {
@@ -143,6 +145,7 @@ impl Validator for LiteralMultipleStringsValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         let str = input.strict_str()?;
         if self.expected.contains(&str) {
@@ -193,6 +196,7 @@ impl Validator for LiteralMultipleIntsValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         let int = input.strict_int()?;
         if self.expected.contains(&int) {
@@ -251,6 +255,7 @@ impl Validator for LiteralGeneralValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         if !self.expected_int.is_empty() {
             if let Ok(int) = input.strict_int() {

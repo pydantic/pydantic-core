@@ -12,7 +12,7 @@ pub struct NoneValidator;
 impl BuildValidator for NoneValidator {
     const EXPECTED_TYPE: &'static str = "none";
 
-    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+    fn build(_schema: &PyDict, _config: Option<&PyDict>, _slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
         Ok(Self.into())
     }
 }
@@ -23,6 +23,7 @@ impl Validator for NoneValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),

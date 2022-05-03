@@ -21,16 +21,16 @@ pub struct DictValidator {
 impl BuildValidator for DictValidator {
     const EXPECTED_TYPE: &'static str = "dict";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, config: Option<&PyDict>, slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
         Ok(Self {
             strict: is_strict(schema, config)?,
             key_validator: match schema.get_item("keys") {
-                Some(schema) => Box::new(build_validator(schema, config)?.0),
-                None => Box::new(AnyValidator::build(schema, config)?),
+                Some(schema) => Box::new(build_validator(schema, config, slots)?.0),
+                None => Box::new(AnyValidator::build(schema, config, slots)?),
             },
             value_validator: match schema.get_item("values") {
-                Some(d) => Box::new(build_validator(d, config)?.0),
-                None => Box::new(AnyValidator::build(schema, config)?),
+                Some(d) => Box::new(build_validator(d, config, slots)?.0),
+                None => Box::new(AnyValidator::build(schema, config, slots)?),
             },
             min_items: schema.get_as("min_items")?,
             max_items: schema.get_as("max_items")?,
@@ -46,12 +46,13 @@ impl Validator for DictValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
+        slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         let dict = match self.strict {
             true => input.strict_dict()?,
             false => input.lax_dict(self.try_instance_as_dict)?,
         };
-        self._validation_logic(py, input, dict, extra)
+        self._validation_logic(py, input, dict, extra, slots)
     }
 
     fn validate_strict<'s, 'data>(
@@ -59,8 +60,9 @@ impl Validator for DictValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
+        slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_dict()?, extra)
+        self._validation_logic(py, input, input.strict_dict()?, extra, slots)
     }
 
     fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
@@ -80,6 +82,7 @@ impl DictValidator {
         input: &'data dyn Input,
         dict: Box<dyn DictInput<'data> + 'data>,
         extra: &Extra,
+        slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         if let Some(min_length) = self.min_items {
             if dict.input_len() < min_length {
@@ -104,9 +107,9 @@ impl DictValidator {
 
         for (key, value) in dict.input_iter() {
             let output_key: Option<PyObject> =
-                apply_validator(py, &*self.key_validator, &mut errors, key, key, extra, true)?;
+                apply_validator(py, &*self.key_validator, &mut errors, key, key, extra, slots, true)?;
             let output_value: Option<PyObject> =
-                apply_validator(py, &*self.value_validator, &mut errors, value, key, extra, false)?;
+                apply_validator(py, &*self.value_validator, &mut errors, value, key, extra, slots, false)?;
             if let (Some(key), Some(value)) = (output_key, output_value) {
                 output.set_item(key, value).map_err(as_internal)?;
             }
@@ -127,9 +130,10 @@ fn apply_validator<'s, 'data>(
     input: &'data dyn Input,
     key: &'data dyn Input,
     extra: &Extra,
+    slots: &'data Vec<ValidateEnum>,
     key_loc: bool,
 ) -> ValResult<'data, Option<PyObject>> {
-    match validator.validate(py, input, extra) {
+    match validator.validate(py, input, extra, slots) {
         Ok(value) => Ok(Some(value)),
         Err(ValError::LineErrors(line_errors)) => {
             let loc = if key_loc {

@@ -33,13 +33,15 @@ use self::recursive::ValidatorArc;
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {
     validator: ValidateEnum,
+    slots: Vec<ValidateEnum>,
 }
 
 #[pymethods]
 impl SchemaValidator {
     #[new]
     pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
-        let validator = match build_validator(schema, None) {
+        let mut slots: Vec<ValidateEnum> = vec![];
+        let validator = match build_validator(schema, None, &mut slots) {
             Ok((v, _)) => v,
             Err(err) => {
                 return Err(match err.is_instance_of::<SchemaError>(py) {
@@ -49,7 +51,7 @@ impl SchemaValidator {
             }
         };
 
-        Ok(Self { validator })
+        Ok(Self { validator, slots })
     }
 
     fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
@@ -57,7 +59,7 @@ impl SchemaValidator {
             data: None,
             field: None,
         };
-        let r = self.validator.validate(py, input, &extra);
+        let r = self.validator.validate(py, input, &extra, &self.slots);
         r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
     }
 
@@ -68,7 +70,7 @@ impl SchemaValidator {
                     data: None,
                     field: None,
                 };
-                let r = self.validator.validate(py, &input, &extra);
+                let r = self.validator.validate(py, &input, &extra, &self.slots);
                 r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
             }
             Err(e) => {
@@ -88,7 +90,7 @@ impl SchemaValidator {
             data: Some(data),
             field: Some(field.as_str()),
         };
-        let r = self.validator.validate(py, input, &extra);
+        let r = self.validator.validate(py, input, &extra, &self.slots);
         r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
     }
 
@@ -106,16 +108,16 @@ pub trait BuildValidator: Sized {
 
     /// Build a new validator from the schema, the return type is a trait to provide a way for validators
     /// to return other validators, see `string.rs`, `int.rs`, `float.rs` and `function.rs` for examples
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum>;
+    fn build(schema: &PyDict, config: Option<&PyDict>, _slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum>;
 }
 
 // macro to build the match statement for validator selection
 macro_rules! validator_match {
-    ($type:ident, $dict:ident, $config:ident, $($validator:path,)+) => {
+    ($type:ident, $dict:ident, $config:ident, $slots:ident, $($validator:path,)+) => {
         match $type {
             $(
                 <$validator>::EXPECTED_TYPE => {
-                    let val = <$validator>::build($dict, $config).map_err(|err| {
+                    let val = <$validator>::build($dict, $config, $slots).map_err(|err| {
                         crate::SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", $type, err))
                     })?;
                     Ok((val, $dict))
@@ -128,7 +130,11 @@ macro_rules! validator_match {
     };
 }
 
-pub fn build_validator<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> PyResult<(ValidateEnum, &'a PyDict)> {
+pub fn build_validator<'a>(
+    schema: &'a PyAny,
+    config: Option<&'a PyDict>,
+    slots: &mut Vec<ValidateEnum>,
+) -> PyResult<(ValidateEnum, &'a PyDict)> {
     let dict: &PyDict = match schema.cast_as() {
         Ok(s) => s,
         Err(_) => {
@@ -142,6 +148,7 @@ pub fn build_validator<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> PyR
         type_,
         dict,
         config,
+        slots,
         // models e.g. heterogeneous dicts
         self::model::ModelValidator,
         // unions
@@ -251,6 +258,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
+        slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject>;
 
     /// This is used in unions for the first pass to see if we have an "exact match",
@@ -260,8 +268,9 @@ pub trait Validator: Send + Sync + Clone + Debug {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
+        slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
-        self.validate(py, input, extra)
+        self.validate(py, input, extra, slots)
     }
 
     /// `set_ref` is used in recursive models to set the weak reference in the `RecursiveRefValidator`,

@@ -23,11 +23,11 @@ pub struct ModelClassValidator {
 impl BuildValidator for ModelClassValidator {
     const EXPECTED_TYPE: &'static str = "model-class";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, config: Option<&PyDict>, slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
         let class: &PyType = schema.get_as_req("class")?;
 
         let model_schema_raw: &PyAny = schema.get_as_req("model")?;
-        let (validator, model_schema) = build_validator(model_schema_raw, config)?;
+        let (validator, model_schema) = build_validator(model_schema_raw, config, slots)?;
         let model_type: String = model_schema.get_as_req("type")?;
         if &model_type != "model" {
             return py_error!("model-class expected a 'model' schema, got '{}'", model_type);
@@ -50,6 +50,7 @@ impl Validator for ModelClassValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
+        slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         let class = self.class.as_ref(py);
         if input.strict_model_check(class)? {
@@ -61,7 +62,7 @@ impl Validator for ModelClassValidator {
                 context = context!("class_name" => self.get_name(py))
             )
         } else {
-            let output = self.validator.validate(py, input, extra)?;
+            let output = self.validator.validate(py, input, extra, slots)?;
             unsafe { self.create_class(py, output).map_err(as_internal) }
         }
     }
@@ -71,6 +72,7 @@ impl Validator for ModelClassValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         if input.strict_model_check(self.class.as_ref(py))? {
             Ok(input.to_py(py))

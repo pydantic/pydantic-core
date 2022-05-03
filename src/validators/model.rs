@@ -28,14 +28,14 @@ pub struct ModelValidator {
 impl BuildValidator for ModelValidator {
     const EXPECTED_TYPE: &'static str = "model";
 
-    fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, _config: Option<&PyDict>, slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
         // models ignore the parent config and always use the config from this model
         let config: Option<&PyDict> = schema.get_as("config")?;
 
         let extra_behavior = ExtraBehavior::from_config(config)?;
         let extra_validator = match extra_behavior {
             ExtraBehavior::Allow => match schema.get_item("extra_validator") {
-                Some(v) => Some(Box::new(build_validator(v, config)?.0)),
+                Some(v) => Some(Box::new(build_validator(v, config, slots)?.0)),
                 None => None,
             },
             _ => None,
@@ -58,7 +58,7 @@ impl BuildValidator for ModelValidator {
         let mut fields: Vec<ModelField> = Vec::with_capacity(fields_dict.len());
 
         for (key, value) in fields_dict.iter() {
-            let (validator, field_dict) = match build_validator(value, config) {
+            let (validator, field_dict) = match build_validator(value, config, slots) {
                 Ok(v) => v,
                 Err(err) => return py_error!("Key \"{}\":\n  {}", key, err),
             };
@@ -86,10 +86,11 @@ impl Validator for ModelValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
+        slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         if let Some(field) = extra.field {
             // we're validating assignment, completely different logic
-            return self.validate_assignment(py, field, input, extra);
+            return self.validate_assignment(py, field, input, extra, slots);
         }
 
         // TODO we shouldn't always use try_instance=true here
@@ -105,7 +106,7 @@ impl Validator for ModelValidator {
 
         for field in &self.fields {
             if let Some(value) = dict.input_get(&field.name) {
-                match field.validator.validate(py, value, &extra) {
+                match field.validator.validate(py, value, &extra, slots) {
                     Ok(value) => output_dict.set_item(&field.name, value).map_err(as_internal)?,
                     Err(ValError::LineErrors(line_errors)) => {
                         let loc = vec![field.name.to_loc()];
@@ -160,7 +161,7 @@ impl Validator for ModelValidator {
                         location = loc
                     ));
                 } else if let Some(ref validator) = self.extra_validator {
-                    match validator.validate(py, value, &extra) {
+                    match validator.validate(py, value, &extra, slots) {
                         Ok(value) => output_dict.set_item(&key, value).map_err(as_internal)?,
                         Err(ValError::LineErrors(line_errors)) => {
                             for err in line_errors {
@@ -204,6 +205,7 @@ impl ModelValidator {
         field: &str,
         input: &'data dyn Input,
         extra: &Extra,
+        slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject>
     where
         'data: 's,
@@ -231,12 +233,12 @@ impl ModelValidator {
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field) {
-            prepare_result(field.validator.validate(py, input, extra))
+            prepare_result(field.validator.validate(py, input, extra, slots))
         } else {
             match self.extra_behavior {
                 // with allow we either want to set the value
                 ExtraBehavior::Allow => match self.extra_validator {
-                    Some(ref validator) => prepare_result(validator.validate(py, input, extra)),
+                    Some(ref validator) => prepare_result(validator.validate(py, input, extra, slots)),
                     None => prepare_tuple(input.to_py(py)),
                 },
                 // otherwise we raise an error:

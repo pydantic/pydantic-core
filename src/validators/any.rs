@@ -13,7 +13,7 @@ pub struct AnyValidator;
 impl BuildValidator for AnyValidator {
     const EXPECTED_TYPE: &'static str = "any";
 
-    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+    fn build(_schema: &PyDict, _config: Option<&PyDict>, _slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
         Ok(Self.into())
     }
 }
@@ -24,6 +24,7 @@ impl Validator for AnyValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         Ok(input.to_py(py))
     }

@@ -14,13 +14,13 @@ pub struct FunctionBuilder;
 impl BuildValidator for FunctionBuilder {
     const EXPECTED_TYPE: &'static str = "function";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, config: Option<&PyDict>, slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
         let mode: &str = schema.get_as_req("mode")?;
         match mode {
-            "before" => FunctionBeforeValidator::build(schema, config),
-            "after" => FunctionAfterValidator::build(schema, config),
-            "plain" => FunctionPlainValidator::build(schema, config),
-            "wrap" => FunctionWrapValidator::build(schema, config),
+            "before" => FunctionBeforeValidator::build(schema, config, slots),
+            "after" => FunctionAfterValidator::build(schema, config, slots),
+            "plain" => FunctionPlainValidator::build(schema, config, slots),
+            "wrap" => FunctionWrapValidator::build(schema, config, slots),
             _ => py_error!("Unexpected function mode {:?}", mode),
         }
     }
@@ -35,9 +35,13 @@ macro_rules! kwargs {
 macro_rules! impl_build {
     ($name:ident) => {
         impl $name {
-            pub fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+            pub fn build(
+                schema: &PyDict,
+                config: Option<&PyDict>,
+                slots: &mut Vec<ValidateEnum>,
+            ) -> PyResult<ValidateEnum> {
                 Ok(Self {
-                    validator: Box::new(build_validator(schema.get_as_req("schema")?, config)?.0),
+                    validator: Box::new(build_validator(schema.get_as_req("schema")?, config, slots)?.0),
                     func: get_function(schema)?,
                     config: config.map(|c| c.into()),
                 }
@@ -62,6 +66,7 @@ impl Validator for FunctionBeforeValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
+        slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         let value = self
@@ -70,7 +75,7 @@ impl Validator for FunctionBeforeValidator {
             .map_err(|e| convert_err(py, e, input))?;
         // maybe there's some way to get the PyAny here and explicitly tell rust it should have lifespan 'a?
         let new_input: &PyAny = value.as_ref(py);
-        match self.validator.validate(py, new_input, extra) {
+        match self.validator.validate(py, new_input, extra, slots) {
             Ok(v) => Ok(v),
             Err(ValError::InternalErr(err)) => Err(ValError::InternalErr(err)),
             Err(ValError::LineErrors(line_errors)) => {
@@ -115,8 +120,9 @@ impl Validator for FunctionAfterValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
+        slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
-        let v = self.validator.validate(py, input, extra)?;
+        let v = self.validator.validate(py, input, extra, slots)?;
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
     }
@@ -137,7 +143,7 @@ pub struct FunctionPlainValidator {
 }
 
 impl FunctionPlainValidator {
-    pub fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+    pub fn build(schema: &PyDict, config: Option<&PyDict>, _slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
         Ok(Self {
             func: get_function(schema)?,
             config: config.map(|c| c.into()),
@@ -152,6 +158,7 @@ impl Validator for FunctionPlainValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func
@@ -179,6 +186,7 @@ impl Validator for FunctionWrapValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
+        _slots: &'data Vec<ValidateEnum>,
     ) -> ValResult<'data, PyObject> {
         let validator_kwarg = ValidatorCallable {
             validator: self.validator.clone(),
@@ -215,14 +223,15 @@ struct ValidatorCallable {
 
 #[pymethods]
 impl ValidatorCallable {
-    fn __call__(&self, py: Python, arg: &PyAny) -> PyResult<PyObject> {
-        let extra = Extra {
-            data: self.data.as_ref().map(|data| data.as_ref(py)),
-            field: self.field.as_deref(),
-        };
-        self.validator
-            .validate(py, arg, &extra)
-            .map_err(|e| as_validation_err(py, "Model", e))
+    fn __call__(&self, _py: Python, _arg: &PyAny) -> PyResult<PyObject> {
+        todo!()
+        // let extra = Extra {
+        //     data: self.data.as_ref().map(|data| data.as_ref(py)),
+        //     field: self.field.as_deref(),
+        // };
+        // self.validator
+        //     .validate(py, arg, &extra)
+        //     .map_err(|e| as_validation_err(py, "Model", e))
     }
 
     fn __repr__(&self) -> String {
