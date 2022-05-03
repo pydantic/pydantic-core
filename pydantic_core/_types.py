@@ -1,8 +1,17 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Sequence, TypedDict, Union
+import sys
+from typing import Any, Dict, List, Sequence, TypedDict, Union
 
-from typing_extensions import NotRequired
+if sys.version_info < (3, 11):
+    from typing_extensions import NotRequired
+else:
+    from typing import NotRequired
+
+if sys.version_info < (3, 8):
+    from typing_extensions import Literal
+else:
+    from typing import Literal
 
 
 class AnySchema(TypedDict):
