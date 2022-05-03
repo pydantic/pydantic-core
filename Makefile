@@ -23,6 +23,14 @@ build-dev:
 	@rm -f target/debug/lib_pydantic_core.d
 	@mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
+.PHONY: build-fast
+build-fast:
+	pip uninstall -y pydantic_core
+	@rm -f pydantic_core/*.so
+	cargo build --release
+	@rm -f target/release/lib_pydantic_core.d
+	@mv target/release/lib_pydantic_core.* pydantic_core/_pydantic_core.so
+
 .PHONY: build-coverage
 build-coverage:
 	pip uninstall -y pydantic_core
@@ -63,6 +71,10 @@ mypy:
 test:
 	coverage run -m pytest
 
+.PHONY: benchmark
+benchmark:
+	pytest tests/test_benchmarks.py --benchmark-enable
+
 .PHONY: testcov
 testcov: build-coverage test
 	@rm -rf htmlcov
@@ -78,11 +90,11 @@ flame:
 	@rm -rf perf.data*
 	@rm -rf flame
 	@mkdir -p flame
-	perf record -g benchmarks/minimal.py
+	perf record -g benchmarks/dict_model.py
 	perf script --max-stack 20 | stackcollapse-perf.pl | flamegraph.pl > flame/python.svg
 	perf script --max-stack 20 | stackcollapse-perf.pl > flame/python.txt
 	@rm perf.data
-	JSON=1 perf record -g benchmarks/minimal.py
+	JSON=1 perf record -g benchmarks/dict_model.py
 	perf script --max-stack 20 | stackcollapse-perf.pl | flamegraph.pl > flame/json.svg
 	perf script --max-stack 20 | stackcollapse-perf.pl > flame/json.txt
 	@rm perf.data
