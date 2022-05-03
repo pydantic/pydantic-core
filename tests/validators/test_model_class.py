@@ -16,7 +16,10 @@ def test_model_class():
         {
             'type': 'model-class',
             'class': MyModel,
-            'model': {'type': 'model', 'fields': {'field_a': {'type': 'str'}, 'field_b': {'type': 'int'}}},
+            'model': {
+                'type': 'model',
+                'fields': {'field_a': {'type': 'str'}, 'field_b': {'type': 'int'}}
+            },
         }
     )
     assert repr(v).startswith('SchemaValidator(name="MyModel", validator=ModelClass(\n')

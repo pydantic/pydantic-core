@@ -4,7 +4,7 @@ use pyo3::types::PyDict;
 use crate::build_tools::SchemaDict;
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, Extra, ValResult, ValidateEnum, Validator, SlotsBuilder, get_validator};
+use super::{BuildValidator, Extra, ValResult, ValidateEnum, Validator, SlotsBuilder, get_validator};
 
 #[derive(Debug, Clone)]
 pub struct OptionalValidator {
@@ -20,8 +20,7 @@ impl BuildValidator for OptionalValidator {
         slots_builder: &mut SlotsBuilder,
     ) -> PyResult<ValidateEnum> {
         let sub_schema: &PyAny = schema.get_as_req("schema")?;
-        let validator = build_validator(sub_schema, config, slots_builder)?.0;
-        let validator_id = slots_builder.add_anon(validator);
+        let validator_id = slots_builder.build_add_anon(sub_schema, config)?;
         Ok(Self { validator_id }.into())
     }
 }
