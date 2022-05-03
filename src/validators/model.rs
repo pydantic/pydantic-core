@@ -5,7 +5,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{
     as_internal, err_val_error, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult,
 };
-use crate::input::{Input, ToLocItem};
+use crate::input::{CombinedInput, Input, ToLocItem, ToPy};
 
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
@@ -88,7 +88,7 @@ impl Validator for ModelValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -127,7 +127,7 @@ impl Validator for ModelValidator {
                     .map_err(as_internal)?;
             } else {
                 errors.push(val_line_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = InputValue::InputRef(&input),
                     kind = ErrorKind::Missing,
                     location = vec![field.name.to_loc()]
                 ));
@@ -160,7 +160,7 @@ impl Validator for ModelValidator {
 
                 if forbid {
                     errors.push(val_line_error!(
-                        input_value = InputValue::InputRef(input),
+                        input_value = InputValue::InputRef(&input),
                         kind = ErrorKind::ExtraForbidden,
                         location = loc
                     ));
@@ -197,7 +197,7 @@ impl ModelValidator {
         &'s self,
         py: Python<'data>,
         field: &str,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject>
@@ -241,7 +241,7 @@ impl ModelValidator {
                 _ => {
                     let loc = vec![field.to_loc()];
                     err_val_error!(
-                        input_value = InputValue::InputRef(input),
+                        input_value = InputValue::InputRef(&input),
                         location = loc,
                         kind = ErrorKind::ExtraForbidden
                     )

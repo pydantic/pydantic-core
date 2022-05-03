@@ -3,11 +3,13 @@ use pyo3::types::{PyDict, PyType};
 
 use crate::errors::{err_val_error, ErrorKind, InputValue, LocItem, ValResult};
 
+use super::generic_dict::GenericDict;
+use super::generic_list::ListInput;
 use super::parse_json::{JsonArray, JsonInput, JsonObject};
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
-use super::traits::{DictInput, Input, ListInput, ToLocItem, ToPy};
+use super::traits::{Input, ToLocItem, ToPy};
 
-impl Input for JsonInput {
+impl<'data> Input<'data> for &'data JsonInput {
     fn is_none(&self) -> bool {
         matches!(self, JsonInput::Null)
     }
@@ -93,24 +95,24 @@ impl Input for JsonInput {
         Ok(false)
     }
 
-    fn strict_dict<'data>(&'data self) -> ValResult<Box<dyn DictInput<'data> + 'data>> {
+    fn strict_dict(&'data self) -> ValResult<GenericDict<'data>> {
         match self {
-            JsonInput::Object(dict) => Ok(Box::new(dict)),
+            JsonInput::Object(dict) => Ok(dict.into()),
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DictType),
         }
     }
 
-    fn strict_list<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>> {
+    fn strict_list(&'data self) -> ValResult<ListInput<'data>> {
         match self {
-            JsonInput::Array(a) => Ok(Box::new(a)),
+            JsonInput::Array(a) => Ok(a.into()),
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::ListType),
         }
     }
 
-    fn strict_set<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>> {
+    fn strict_set(&'data self) -> ValResult<ListInput<'data>> {
         // we allow a list here since otherwise it would be impossible to create a set from JSON
         match self {
-            JsonInput::Array(a) => Ok(Box::new(a)),
+            JsonInput::Array(a) => Ok(a.into()),
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType),
         }
     }
@@ -123,15 +125,15 @@ impl ToPy for &JsonArray {
     }
 }
 
-impl<'data> ListInput<'data> for &'data JsonArray {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data> {
-        Box::new(self.iter().map(|item| item as &dyn Input))
-    }
-
-    fn input_len(&self) -> usize {
-        self.len()
-    }
-}
+// impl<'data> ListInput<'data> for &'data JsonArray {
+//     fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data> {
+//         Box::new(self.iter().map(|item| item as &dyn Input))
+//     }
+//
+//     fn input_len(&self) -> usize {
+//         self.len()
+//     }
+// }
 
 impl ToPy for &JsonObject {
     #[inline]
@@ -144,21 +146,21 @@ impl ToPy for &JsonObject {
     }
 }
 
-impl<'data> DictInput<'data> for &'data JsonObject {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = (&'data dyn Input, &'data dyn Input)> + 'data> {
-        Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
-    }
+// impl<'data> DictInput<'data> for &'data JsonObject {
+//     fn input_iter(&self) -> Box<dyn Iterator<Item = (&'data dyn Input, &'data dyn Input)> + 'data> {
+//         Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
+//     }
+//
+//     fn input_get(&self, key: &str) -> Option<&'data dyn Input> {
+//         self.get(key).map(|item| item as &dyn Input)
+//     }
+//
+//     fn input_len(&self) -> usize {
+//         self.len()
+//     }
+// }
 
-    fn input_get(&self, key: &str) -> Option<&'data dyn Input> {
-        self.get(key).map(|item| item as &dyn Input)
-    }
-
-    fn input_len(&self) -> usize {
-        self.len()
-    }
-}
-
-impl ToPy for JsonInput {
+impl ToPy for &JsonInput {
     fn to_py(&self, py: Python) -> PyObject {
         match self {
             JsonInput::Null => py.None(),
@@ -172,7 +174,7 @@ impl ToPy for JsonInput {
     }
 }
 
-impl ToLocItem for JsonInput {
+impl ToLocItem for &JsonInput {
     fn to_loc(&self) -> LocItem {
         match self {
             JsonInput::Int(i) => LocItem::I(*i as usize),
@@ -189,18 +191,25 @@ impl ToPy for String {
     }
 }
 
+impl ToPy for &String {
+    #[inline]
+    fn to_py(&self, py: Python) -> PyObject {
+        self.into_py(py)
+    }
+}
+
 /// Required for Dict keys so the string can behave like an Input
-impl Input for String {
+impl<'data> Input<'data> for &'data String {
     fn is_none(&self) -> bool {
         false
     }
 
     fn strict_str(&self) -> ValResult<String> {
-        Ok(self.clone())
+        Ok(self.to_string())
     }
 
     fn lax_str(&self) -> ValResult<String> {
-        Ok(self.clone())
+        Ok(self.to_string())
     }
 
     fn strict_bool(&self) -> ValResult<bool> {
@@ -237,15 +246,15 @@ impl Input for String {
         Ok(false)
     }
 
-    fn strict_dict<'data>(&'data self) -> ValResult<Box<dyn DictInput<'data> + 'data>> {
+    fn strict_dict(&'data self) -> ValResult<GenericDict<'data>> {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DictType)
     }
 
-    fn strict_list<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>> {
+    fn strict_list(&'data self) -> ValResult<ListInput<'data>> {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::ListType)
     }
 
-    fn strict_set<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>> {
+    fn strict_set(&'data self) -> ValResult<ListInput<'data>> {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType)
     }
 }

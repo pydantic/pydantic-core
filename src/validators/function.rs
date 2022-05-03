@@ -4,7 +4,7 @@ use pyo3::types::{PyAny, PyDict};
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
-use crate::input::Input;
+use crate::input::{CombinedInput, Input, ToPy};
 
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
@@ -68,7 +68,7 @@ impl Validator for FunctionBeforeValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -79,7 +79,7 @@ impl Validator for FunctionBeforeValidator {
             .map_err(|e| convert_err(py, e, input))?;
         // maybe there's some way to get the PyAny here and explicitly tell rust it should have lifespan 'a?
         let new_input: &PyAny = value.as_ref(py);
-        match self.validator.validate(py, new_input, extra, slots) {
+        match self.validator.validate(py, new_input.into(), extra, slots) {
             Ok(v) => Ok(v),
             Err(ValError::InternalErr(err)) => Err(ValError::InternalErr(err)),
             Err(ValError::LineErrors(line_errors)) => {
@@ -118,7 +118,7 @@ impl Validator for FunctionAfterValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -152,7 +152,7 @@ impl Validator for FunctionPlainValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -180,7 +180,7 @@ impl Validator for FunctionWrapValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -223,7 +223,7 @@ impl ValidatorCallable {
             field: self.field.as_deref(),
         };
         self.validator
-            .validate(py, arg, &extra, &self.slots)
+            .validate(py, arg.into(), &extra, &self.slots)
             .map_err(|e| as_validation_err(py, "Model", e))
     }
 
@@ -248,7 +248,7 @@ fn get_function(schema: &PyDict) -> PyResult<PyObject> {
     }
 }
 
-fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a dyn Input) -> ValError<'a> {
+fn convert_err<'a>(py: Python<'a>, err: PyErr, input: CombinedInput<'a>) -> ValError<'a> {
     // Only ValueError and AssertionError are considered as validation errors,
     // TypeError is now considered as a runtime error to catch errors in function signatures
     let kind = if err.is_instance_of::<PyValueError>(py) {
@@ -265,7 +265,7 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a dyn Input) -> ValError
     };
     #[allow(clippy::redundant_field_names)]
     let line_error = val_line_error!(
-        input_value = InputValue::InputRef(input),
+        input_value = InputValue::InputRef(&input),
         kind = kind,
         message = message
     );

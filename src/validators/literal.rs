@@ -5,7 +5,7 @@ use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::Input;
+use crate::input::{CombinedInput, Input, ToPy};
 
 use super::{BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
@@ -60,7 +60,7 @@ impl Validator for LiteralSingleStringValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -69,7 +69,7 @@ impl Validator for LiteralSingleStringValidator {
             Ok(input.to_py(py))
         } else {
             err_val_error!(
-                input_value = InputValue::InputRef(input),
+                input_value = InputValue::InputRef(&input),
                 kind = ErrorKind::LiteralSingleError,
                 context = context!("expected" => self.repr.clone()),
             )
@@ -96,7 +96,7 @@ impl Validator for LiteralSingleIntValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -105,7 +105,7 @@ impl Validator for LiteralSingleIntValidator {
             Ok(input.to_py(py))
         } else {
             err_val_error!(
-                input_value = InputValue::InputRef(input),
+                input_value = InputValue::InputRef(&input),
                 kind = ErrorKind::LiteralSingleError,
                 context = context!("expected" => self.expected)
             )
@@ -147,7 +147,7 @@ impl Validator for LiteralMultipleStringsValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -156,7 +156,7 @@ impl Validator for LiteralMultipleStringsValidator {
             Ok(input.to_py(py))
         } else {
             err_val_error!(
-                input_value = InputValue::InputRef(input),
+                input_value = InputValue::InputRef(&input),
                 kind = ErrorKind::LiteralMultipleError,
                 context = context!("expected" => self.repr.clone()),
             )
@@ -198,7 +198,7 @@ impl Validator for LiteralMultipleIntsValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -207,7 +207,7 @@ impl Validator for LiteralMultipleIntsValidator {
             Ok(input.to_py(py))
         } else {
             err_val_error!(
-                input_value = InputValue::InputRef(input),
+                input_value = InputValue::InputRef(&input),
                 kind = ErrorKind::LiteralMultipleError,
                 context = context!("expected" => self.repr.clone())
             )
@@ -257,7 +257,7 @@ impl Validator for LiteralGeneralValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

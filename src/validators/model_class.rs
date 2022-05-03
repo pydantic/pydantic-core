@@ -9,7 +9,7 @@ use pyo3::{ffi, intern, ToBorrowedObject};
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
-use crate::input::Input;
+use crate::input::{CombinedInput, Input, ToPy};
 
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
@@ -52,7 +52,7 @@ impl Validator for ModelClassValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -61,7 +61,7 @@ impl Validator for ModelClassValidator {
             Ok(input.to_py(py))
         } else if self.strict {
             err_val_error!(
-                input_value = InputValue::InputRef(input),
+                input_value = InputValue::InputRef(&input),
                 kind = ErrorKind::ModelType,
                 context = context!("class_name" => self.get_name(py))
             )
@@ -74,7 +74,7 @@ impl Validator for ModelClassValidator {
     fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

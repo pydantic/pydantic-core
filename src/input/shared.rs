@@ -25,7 +25,7 @@ pub fn str_as_bool<'a>(input: &'a dyn Input, str: &str) -> ValResult<'a, bool> {
 }
 
 #[inline]
-pub fn int_as_bool(input: &dyn Input, int: i64) -> ValResult<bool> {
+pub fn int_as_bool<'a>(input: &'a dyn Input, int: i64) -> ValResult<'a, bool> {
     if int == 0 {
         Ok(false)
     } else if int == 1 {
@@ -46,7 +46,7 @@ pub fn str_as_int<'s, 'l>(input: &'s dyn Input, str: &'l str) -> ValResult<'s, i
     }
 }
 
-pub fn float_as_int(input: &dyn Input, float: f64) -> ValResult<i64> {
+pub fn float_as_int<'a>(input: &'a dyn Input, float: f64) -> ValResult<'a, i64> {
     if float == f64::INFINITY {
         err_val_error!(
             input_value = InputValue::InputRef(input),

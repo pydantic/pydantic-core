@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::is_strict;
 use crate::errors::ValResult;
-use crate::input::Input;
+use crate::input::{CombinedInput, Input};
 
 use super::{BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
@@ -30,7 +30,7 @@ impl Validator for BoolValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -42,7 +42,7 @@ impl Validator for BoolValidator {
     fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -67,7 +67,7 @@ impl Validator for StrictBoolValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

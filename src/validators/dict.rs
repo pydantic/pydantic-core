@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
-use crate::input::{DictInput, Input, ToLocItem};
+use crate::input::{CombinedInput, GenericDict, Input, ToLocItem};
 
 use super::any::AnyValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
@@ -48,7 +48,7 @@ impl Validator for DictValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -62,7 +62,7 @@ impl Validator for DictValidator {
     fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -78,15 +78,15 @@ impl DictValidator {
     fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
-        dict: Box<dyn DictInput<'data> + 'data>,
+        input: CombinedInput<'data>,
+        dict: GenericDict<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         if let Some(min_length) = self.min_items {
             if dict.input_len() < min_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = InputValue::InputRef(&input),
                     kind = ErrorKind::DictTooShort,
                     context = context!("min_length" => min_length)
                 );
@@ -95,7 +95,7 @@ impl DictValidator {
         if let Some(max_length) = self.max_items {
             if dict.input_len() > max_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = InputValue::InputRef(&input),
                     kind = ErrorKind::DictTooLong,
                     context = context!("max_length" => max_length)
                 );
@@ -127,8 +127,8 @@ fn apply_validator<'s, 'data>(
     py: Python<'data>,
     validator: &'s CombinedValidator,
     errors: &mut Vec<ValLineError<'data>>,
-    input: &'data dyn Input,
-    key: &'data dyn Input,
+    input: CombinedInput<'data>,
+    key: CombinedInput<'data>,
     extra: &Extra,
     slots: &'data [CombinedValidator],
     key_loc: bool,

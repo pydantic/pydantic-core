@@ -8,7 +8,7 @@ use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
-use crate::input::{Input, JsonInput};
+use crate::input::{CombinedInput, Input, JsonInput, ToPy};
 use crate::SchemaError;
 
 mod any;
@@ -58,7 +58,7 @@ impl SchemaValidator {
             data: None,
             field: None,
         };
-        let r = self.validator.validate(py, input, &extra, &self.slots);
+        let r = self.validator.validate(py, input.into(), &extra, &self.slots);
         r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
     }
 
@@ -69,7 +69,8 @@ impl SchemaValidator {
                     data: None,
                     field: None,
                 };
-                let r = self.validator.validate(py, &input, &extra, &self.slots);
+                let generic_input: CombinedInput = (&input).into();
+                let r = self.validator.validate(py, generic_input, &extra, &self.slots);
                 r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
             }
             Err(e) => {
@@ -89,7 +90,7 @@ impl SchemaValidator {
             data: Some(data),
             field: Some(field.as_str()),
         };
-        let r = self.validator.validate(py, input, &extra, &self.slots);
+        let r = self.validator.validate(py, input.into(), &extra, &self.slots);
         r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
     }
 
@@ -259,7 +260,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject>;
@@ -269,7 +270,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
     fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

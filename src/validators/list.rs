@@ -3,7 +3,7 @@ use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
-use crate::input::{Input, ListInput};
+use crate::input::{CombinedInput, Input, ListInput, ToPy};
 
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, ValResult, Validator};
 
@@ -40,7 +40,7 @@ impl Validator for ListValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -54,7 +54,7 @@ impl Validator for ListValidator {
     fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -73,8 +73,8 @@ impl ListValidator {
     fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
-        list: Box<dyn ListInput<'data> + 'data>,
+        input: CombinedInput<'data>,
+        list: ListInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -82,7 +82,7 @@ impl ListValidator {
         if let Some(min_length) = self.min_items {
             if length < min_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = InputValue::InputRef(&input),
                     kind = ErrorKind::ListTooShort,
                     context = context!("min_length" => min_length)
                 );
@@ -91,7 +91,7 @@ impl ListValidator {
         if let Some(max_length) = self.max_items {
             if length > max_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = InputValue::InputRef(&input),
                     kind = ErrorKind::ListTooLong,
                     context = context!("max_length" => max_length)
                 );

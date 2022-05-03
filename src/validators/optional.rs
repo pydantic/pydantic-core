@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::SchemaDict;
-use crate::input::Input;
+use crate::input::{CombinedInput, Input};
 
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, ValResult, Validator};
 
@@ -31,7 +31,7 @@ impl Validator for OptionalValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -44,7 +44,7 @@ impl Validator for OptionalValidator {
     fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

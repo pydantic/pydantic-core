@@ -3,7 +3,7 @@ use std::fmt;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::input::ToPy;
+use crate::input::{CombinedInput, ToPy};
 
 use super::kinds::ErrorKind;
 

@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::Input;
+use crate::input::{CombinedInput, Input};
 
 use super::{BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
@@ -25,14 +25,14 @@ impl Validator for NoneValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),
             false => err_val_error!(
-                input_value = InputValue::InputRef(input),
+                input_value = InputValue::InputRef(&input),
                 kind = ErrorKind::NoneRequired
             ),
         }

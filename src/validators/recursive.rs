@@ -4,7 +4,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, ValResult};
-use crate::input::Input;
+use crate::input::{CombinedInput, Input};
 
 use super::{BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
@@ -32,7 +32,7 @@ impl Validator for RecursiveValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -68,7 +68,7 @@ impl Validator for RecursiveRefValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

@@ -3,7 +3,7 @@ use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::SchemaDict;
 use crate::errors::{LocItem, ValError, ValLineError};
-use crate::input::Input;
+use crate::input::{CombinedInput, Input};
 
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, ValResult, Validator};
 
@@ -33,7 +33,7 @@ impl Validator for UnionValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

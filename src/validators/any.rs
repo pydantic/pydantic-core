@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::errors::ValResult;
-use crate::input::Input;
+use crate::input::{CombinedInput, Input, ToPy};
 
 use super::{BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
@@ -26,7 +26,7 @@ impl Validator for AnyValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

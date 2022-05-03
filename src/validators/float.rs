@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::Input;
+use crate::input::{CombinedInput, Input};
 
 use super::{BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 
@@ -37,7 +37,7 @@ impl Validator for FloatValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -47,7 +47,7 @@ impl Validator for FloatValidator {
     fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -72,7 +72,7 @@ impl Validator for StrictFloatValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -98,7 +98,7 @@ impl Validator for ConstrainedFloatValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -112,7 +112,7 @@ impl Validator for ConstrainedFloatValidator {
     fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -140,13 +140,13 @@ impl ConstrainedFloatValidator {
     fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: CombinedInput<'data>,
         float: f64,
     ) -> ValResult<'data, PyObject> {
         if let Some(multiple_of) = self.multiple_of {
             if float % multiple_of != 0.0 {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = InputValue::InputRef(&input),
                     kind = ErrorKind::FloatMultiple,
                     context = context!("multiple_of" => multiple_of)
                 );
@@ -155,7 +155,7 @@ impl ConstrainedFloatValidator {
         if let Some(le) = self.le {
             if float > le {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = InputValue::InputRef(&input),
                     kind = ErrorKind::FloatLessThanEqual,
                     context = context!("le" => le)
                 );
@@ -164,7 +164,7 @@ impl ConstrainedFloatValidator {
         if let Some(lt) = self.lt {
             if float >= lt {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = InputValue::InputRef(&input),
                     kind = ErrorKind::FloatLessThan,
                     context = context!("lt" => lt)
                 );
@@ -173,7 +173,7 @@ impl ConstrainedFloatValidator {
         if let Some(ge) = self.ge {
             if float < ge {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = InputValue::InputRef(&input),
                     kind = ErrorKind::FloatGreaterThanEqual,
                     context = context!("ge" => ge)
                 );
@@ -182,7 +182,7 @@ impl ConstrainedFloatValidator {
         if let Some(gt) = self.gt {
             if float <= gt {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = InputValue::InputRef(&input),
                     kind = ErrorKind::FloatGreaterThan,
                     context = context!("gt" => gt)
                 );

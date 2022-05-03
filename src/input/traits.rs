@@ -1,15 +1,28 @@
 use std::fmt;
 use std::fmt::Debug;
 
+use enum_dispatch::enum_dispatch;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
+use super::generic_dict::GenericDict;
+use super::generic_list::ListInput;
+use super::parse_json::JsonInput;
 use crate::errors::{LocItem, ValResult};
 
+#[enum_dispatch]
+#[derive(Debug)]
+pub enum CombinedInput<'data> {
+    Py(&'data PyAny),
+    Json(&'data JsonInput),
+}
+
+#[enum_dispatch(CombinedInput)]
 pub trait ToPy: Debug {
     fn to_py(&self, py: Python) -> PyObject;
 }
 
+#[enum_dispatch(CombinedInput)]
 pub trait ToLocItem {
     fn to_loc(&self) -> LocItem;
 }
@@ -20,13 +33,20 @@ impl ToLocItem for String {
     }
 }
 
+impl ToLocItem for &String {
+    fn to_loc(&self) -> LocItem {
+        LocItem::S(self.to_string())
+    }
+}
+
 impl ToLocItem for &str {
     fn to_loc(&self) -> LocItem {
         LocItem::S(self.to_string())
     }
 }
 
-pub trait Input: fmt::Debug + ToPy + ToLocItem {
+#[enum_dispatch(CombinedInput)]
+pub trait Input<'data>: fmt::Debug + ToPy + ToLocItem {
     fn is_none(&self) -> bool;
 
     fn strict_str(&self) -> ValResult<String>;
@@ -47,38 +67,21 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 
     fn strict_model_check(&self, class: &PyType) -> ValResult<bool>;
 
-    fn strict_dict<'data>(&'data self) -> ValResult<Box<dyn DictInput<'data> + 'data>>;
+    fn strict_dict(&'data self) -> ValResult<GenericDict<'data>>;
 
-    fn lax_dict<'data>(&'data self, _try_instance: bool) -> ValResult<Box<dyn DictInput<'data> + 'data>> {
+    fn lax_dict(&'data self, _try_instance: bool) -> ValResult<GenericDict<'data>> {
         self.strict_dict()
     }
 
-    fn strict_list<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>>;
+    fn strict_list(&'data self) -> ValResult<ListInput<'data>>;
 
-    fn lax_list<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>> {
+    fn lax_list(&'data self) -> ValResult<ListInput<'data>> {
         self.strict_list()
     }
 
-    fn strict_set<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>>;
+    fn strict_set(&'data self) -> ValResult<ListInput<'data>>;
 
-    fn lax_set<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>> {
+    fn lax_set(&'data self) -> ValResult<ListInput<'data>> {
         self.strict_set()
     }
-}
-
-// these are ugly, is there any way to avoid the maps in iter, one of the boxes and/or the duplication?
-// is this harming performance, particularly the .map(|item| item)?
-// https://stackoverflow.com/a/47156134/949890
-pub trait DictInput<'data>: ToPy {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = (&'data dyn Input, &'data dyn Input)> + 'data>;
-
-    fn input_get(&self, key: &str) -> Option<&'data dyn Input>;
-
-    fn input_len(&self) -> usize;
-}
-
-pub trait ListInput<'data>: ToPy {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data>;
-
-    fn input_len(&self) -> usize;
 }
