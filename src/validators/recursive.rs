@@ -1,5 +1,3 @@
-// use std::sync::{Arc, RwLock, Weak};
-
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -20,12 +18,18 @@ pub struct RecursiveValidator {
 impl BuildValidator for RecursiveValidator {
     const EXPECTED_TYPE: &'static str = "recursive-container";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>, slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+    ) -> PyResult<ValidateEnum> {
         let sub_schema: &PyAny = schema.get_as_req("schema")?;
-        let slot_id = slots.len();
-        let validator = build_validator(sub_schema, config, slots)?.0;
-        slots.push(validator);
-        Ok(Self { validator_id: slot_id }.into())
+        let name: String = schema.get_as_req("name")?;
+        let validator_id = named_slots.len();
+        named_slots.push((Some(name), None));
+        let validator = build_validator(sub_schema, config, named_slots)?.0;
+        named_slots[validator_id] = (None, Some(validator));
+        Ok(Self { validator_id }.into())
     }
 }
 
@@ -35,20 +39,12 @@ impl Validator for RecursiveValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data Vec<ValidateEnum>,
+        slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         match slots.get(self.validator_id) {
             Some(validator) => validator.validate(py, input, extra, slots),
             None => py_error!(PyRuntimeError; "Recursive container error").map_err(as_internal),
         }
-    }
-
-    fn set_ref(&mut self, _name: &str, _validator_arc: &ValidatorArc) -> PyResult<()> {
-        // match self.validator_arc.write() {
-        //     Ok(mut validator_guard) => validator_guard.set_ref(name, validator_arc),
-        //     Err(err) => py_error!("Recursive container set_ref error: {}", err),
-        // }
-        Ok(())
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -65,11 +61,23 @@ pub struct RecursiveRefValidator {
 impl BuildValidator for RecursiveRefValidator {
     const EXPECTED_TYPE: &'static str = "recursive-ref";
 
-    fn build(_schema: &PyDict, _config: Option<&PyDict>, slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
-        Ok(Self {
-            validator_id: slots.len(),
-        }
-        .into())
+    fn build(
+        schema: &PyDict,
+        _config: Option<&PyDict>,
+        named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+    ) -> PyResult<ValidateEnum> {
+        let name: String = schema.get_as_req("name")?;
+        let is_match = |(n, _): &(Option<String>, Option<ValidateEnum>)| match n {
+            Some(n) => n == &name,
+            None => false,
+        };
+        let validator_id = match named_slots.iter().position(is_match) {
+            Some(id) => id,
+            None => {
+                return py_error!(PyRuntimeError; "Recursive reference error: ref '{}' not found", name);
+            }
+        };
+        Ok(Self { validator_id }.into())
     }
 }
 
@@ -79,7 +87,7 @@ impl Validator for RecursiveRefValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data Vec<ValidateEnum>,
+        slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         match slots.get(self.validator_id) {
             Some(validator) => validator.validate(py, input, extra, slots),

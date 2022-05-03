@@ -13,7 +13,11 @@ pub struct IntValidator;
 impl BuildValidator for IntValidator {
     const EXPECTED_TYPE: &'static str = "int";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>, _slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        _named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+    ) -> PyResult<ValidateEnum> {
         let use_constrained = schema.get_item("multiple_of").is_some()
             || schema.get_item("le").is_some()
             || schema.get_item("lt").is_some()
@@ -35,7 +39,7 @@ impl Validator for IntValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data Vec<ValidateEnum>,
+        _slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         Ok(input.lax_int()?.into_py(py))
     }
@@ -45,7 +49,7 @@ impl Validator for IntValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data Vec<ValidateEnum>,
+        _slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_int()?.into_py(py))
     }
@@ -70,7 +74,7 @@ impl Validator for StrictIntValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data Vec<ValidateEnum>,
+        _slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_int()?.into_py(py))
     }
@@ -96,7 +100,7 @@ impl Validator for ConstrainedIntValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data Vec<ValidateEnum>,
+        _slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         let int = match self.strict {
             true => input.strict_int()?,
@@ -110,7 +114,7 @@ impl Validator for ConstrainedIntValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data Vec<ValidateEnum>,
+        _slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_int()?)
     }

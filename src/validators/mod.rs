@@ -40,8 +40,8 @@ pub struct SchemaValidator {
 impl SchemaValidator {
     #[new]
     pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
-        let mut slots: Vec<ValidateEnum> = vec![];
-        let validator = match build_validator(schema, None, &mut slots) {
+        let mut named_slots: Vec<(Option<String>, Option<ValidateEnum>)> = vec![];
+        let validator = match build_validator(schema, None, &mut named_slots) {
             Ok((v, _)) => v,
             Err(err) => {
                 return Err(match err.is_instance_of::<SchemaError>(py) {
@@ -50,7 +50,13 @@ impl SchemaValidator {
                 });
             }
         };
-
+        let slots = named_slots
+            .into_iter()
+            .map(|(_, opt_validator)| match opt_validator {
+                Some(validator) => Ok(validator),
+                None => py_error!("Schema build error: missing named slot"),
+            })
+            .collect::<PyResult<Vec<ValidateEnum>>>()?;
         Ok(Self { validator, slots })
     }
 
@@ -108,16 +114,20 @@ pub trait BuildValidator: Sized {
 
     /// Build a new validator from the schema, the return type is a trait to provide a way for validators
     /// to return other validators, see `string.rs`, `int.rs`, `float.rs` and `function.rs` for examples
-    fn build(schema: &PyDict, config: Option<&PyDict>, _slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum>;
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        _named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+    ) -> PyResult<ValidateEnum>;
 }
 
 // macro to build the match statement for validator selection
 macro_rules! validator_match {
-    ($type:ident, $dict:ident, $config:ident, $slots:ident, $($validator:path,)+) => {
+    ($type:ident, $dict:ident, $config:ident, $named_slots:ident, $($validator:path,)+) => {
         match $type {
             $(
                 <$validator>::EXPECTED_TYPE => {
-                    let val = <$validator>::build($dict, $config, $slots).map_err(|err| {
+                    let val = <$validator>::build($dict, $config, $named_slots).map_err(|err| {
                         crate::SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", $type, err))
                     })?;
                     Ok((val, $dict))
@@ -133,7 +143,7 @@ macro_rules! validator_match {
 pub fn build_validator<'a>(
     schema: &'a PyAny,
     config: Option<&'a PyDict>,
-    slots: &mut Vec<ValidateEnum>,
+    named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
 ) -> PyResult<(ValidateEnum, &'a PyDict)> {
     let dict: &PyDict = match schema.cast_as() {
         Ok(s) => s,
@@ -148,7 +158,7 @@ pub fn build_validator<'a>(
         type_,
         dict,
         config,
-        slots,
+        named_slots,
         // models e.g. heterogeneous dicts
         self::model::ModelValidator,
         // unions
@@ -258,7 +268,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data Vec<ValidateEnum>,
+        slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject>;
 
     /// This is used in unions for the first pass to see if we have an "exact match",
@@ -268,7 +278,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data Vec<ValidateEnum>,
+        slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         self.validate(py, input, extra, slots)
     }

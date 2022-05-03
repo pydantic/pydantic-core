@@ -13,7 +13,11 @@ pub struct BoolValidator;
 impl BuildValidator for BoolValidator {
     const EXPECTED_TYPE: &'static str = "bool";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>, _slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        _named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+    ) -> PyResult<ValidateEnum> {
         if is_strict(schema, config)? {
             StrictBoolValidator::build()
         } else {
@@ -28,7 +32,7 @@ impl Validator for BoolValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data Vec<ValidateEnum>,
+        _slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool
         // and back again, might be worth profiling?
@@ -40,7 +44,7 @@ impl Validator for BoolValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data Vec<ValidateEnum>,
+        _slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_bool()?.into_py(py))
     }
@@ -65,7 +69,7 @@ impl Validator for StrictBoolValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         _extra: &Extra,
-        _slots: &'data Vec<ValidateEnum>,
+        _slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_bool()?.into_py(py))
     }

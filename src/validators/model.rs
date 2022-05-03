@@ -28,14 +28,18 @@ pub struct ModelValidator {
 impl BuildValidator for ModelValidator {
     const EXPECTED_TYPE: &'static str = "model";
 
-    fn build(schema: &PyDict, _config: Option<&PyDict>, slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        _config: Option<&PyDict>,
+        named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+    ) -> PyResult<ValidateEnum> {
         // models ignore the parent config and always use the config from this model
         let config: Option<&PyDict> = schema.get_as("config")?;
 
         let extra_behavior = ExtraBehavior::from_config(config)?;
         let extra_validator = match extra_behavior {
             ExtraBehavior::Allow => match schema.get_item("extra_validator") {
-                Some(v) => Some(Box::new(build_validator(v, config, slots)?.0)),
+                Some(v) => Some(Box::new(build_validator(v, config, named_slots)?.0)),
                 None => None,
             },
             _ => None,
@@ -58,7 +62,7 @@ impl BuildValidator for ModelValidator {
         let mut fields: Vec<ModelField> = Vec::with_capacity(fields_dict.len());
 
         for (key, value) in fields_dict.iter() {
-            let (validator, field_dict) = match build_validator(value, config, slots) {
+            let (validator, field_dict) = match build_validator(value, config, named_slots) {
                 Ok(v) => v,
                 Err(err) => return py_error!("Key \"{}\":\n  {}", key, err),
             };
@@ -86,7 +90,7 @@ impl Validator for ModelValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data Vec<ValidateEnum>,
+        slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         if let Some(field) = extra.field {
             // we're validating assignment, completely different logic
@@ -205,7 +209,7 @@ impl ModelValidator {
         field: &str,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data Vec<ValidateEnum>,
+        slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject>
     where
         'data: 's,

@@ -14,10 +14,14 @@ pub struct OptionalValidator {
 impl BuildValidator for OptionalValidator {
     const EXPECTED_TYPE: &'static str = "optional";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>, slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+    ) -> PyResult<ValidateEnum> {
         let schema: &PyAny = schema.get_as_req("schema")?;
         Ok(Self {
-            validator: Box::new(build_validator(schema, config, slots)?.0),
+            validator: Box::new(build_validator(schema, config, named_slots)?.0),
         }
         .into())
     }
@@ -29,7 +33,7 @@ impl Validator for OptionalValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data Vec<ValidateEnum>,
+        slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),
@@ -42,7 +46,7 @@ impl Validator for OptionalValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data Vec<ValidateEnum>,
+        slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),

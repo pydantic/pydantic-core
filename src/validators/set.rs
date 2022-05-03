@@ -18,11 +18,15 @@ pub struct SetValidator {
 impl BuildValidator for SetValidator {
     const EXPECTED_TYPE: &'static str = "set";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>, slots: &mut Vec<ValidateEnum>) -> PyResult<ValidateEnum> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+    ) -> PyResult<ValidateEnum> {
         Ok(Self {
             strict: is_strict(schema, config)?,
             item_validator: match schema.get_item("items") {
-                Some(d) => Some(Box::new(build_validator(d, config, slots)?.0)),
+                Some(d) => Some(Box::new(build_validator(d, config, named_slots)?.0)),
                 None => None,
             },
             min_items: schema.get_as("min_items")?,
@@ -38,7 +42,7 @@ impl Validator for SetValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data Vec<ValidateEnum>,
+        slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         let set = match self.strict {
             true => input.strict_set()?,
@@ -52,7 +56,7 @@ impl Validator for SetValidator {
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
-        slots: &'data Vec<ValidateEnum>,
+        slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_set()?, extra, slots)
     }
@@ -79,7 +83,7 @@ impl SetValidator {
         input: &'data dyn Input,
         set: Box<dyn ListInput<'data> + 'data>,
         extra: &Extra,
-        slots: &'data Vec<ValidateEnum>,
+        slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         let length = set.input_len();
         if let Some(min_length) = self.min_items {
