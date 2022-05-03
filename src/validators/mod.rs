@@ -65,11 +65,17 @@ impl SchemaValidator {
         match args.get_item(0) {
             Ok(schema) => {
                 let (validator, slots) = Self::build(py, schema)?;
-                Ok(Self {raw_schema: schema.into_py(py), validator, slots })
+                Ok(Self {
+                    raw_schema: schema.into_py(py),
+                    validator,
+                    slots,
+                })
             }
-            Err(_) => {
-                Ok(Self {raw_schema: py.None(), validator: AnyValidator::new().into(), slots: vec![]})
-            }
+            Err(_) => Ok(Self {
+                raw_schema: py.None(),
+                validator: AnyValidator::new().into(),
+                slots: vec![],
+            }),
         }
     }
 
@@ -119,7 +125,7 @@ impl SchemaValidator {
     }
 
     fn __setstate__(&mut self, py: Python, state: PyObject) -> PyResult<()> {
-        let (validator, slots) = Self::build(py,state.as_ref(py))?;
+        let (validator, slots) = Self::build(py, state.as_ref(py))?;
         self.raw_schema = state;
         self.validator = validator;
         self.slots = slots;
