@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := all
 isort = isort pydantic_core tests setup.py
 black = black pydantic_core tests setup.py
+pyright = pyright pydantic_core tests/test_types.py
 
 .PHONY: install
 install:
@@ -51,6 +52,7 @@ lint-python:
 	flake8 --max-complexity 10 --max-line-length 120 --ignore E203,W503 pydantic_core tests setup.py
 	$(isort) --check-only --df
 	$(black) --check --diff
+	$(pyright)
 
 .PHONY: lint-rust
 lint-rust:
@@ -63,9 +65,9 @@ lint-rust:
 .PHONY: lint
 lint: lint-python lint-rust
 
-.PHONY: mypy
-mypy:
-	mypy pydantic_core
+.PHONY: pyright
+pyright:
+	$(pyright)
 
 .PHONY: test
 test:
@@ -83,7 +85,7 @@ testcov: build-coverage test
 	./tests/rust_coverage_html.sh
 
 .PHONY: all
-all: format build-dev lint mypy test
+all: format build-dev lint pyright test
 
 .PHONY: flame
 flame:
@@ -110,7 +112,6 @@ clean:
 	rm -rf flame
 	rm -rf htmlcov
 	rm -rf .pytest_cache
-	rm -rf .mypy_cache
 	rm -rf *.egg-info
 	rm -f .coverage
 	rm -f .coverage.*

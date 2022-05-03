@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Any, Dict, List, Sequence, Union
+from typing import Any, Callable, Dict, List, Sequence, Union
 
 if sys.version_info < (3, 11):
     from typing_extensions import NotRequired
@@ -47,9 +47,12 @@ class FloatSchema(TypedDict):
     default: NotRequired[float]
 
 
+# TODO: function could be typed based on mode
 class FunctionSchema(TypedDict):
     type: Literal['function']
     mode: Literal['before', 'after', 'plain', 'wrap']
+    function: Callable[..., Any]
+    schema: NotRequired[Schema]  # type: ignore[misc]
 
 
 class IntSchema(TypedDict):
@@ -132,6 +135,7 @@ class UnionSchema(TypedDict):
     type: Literal['union']
     choices: List[Schema]  # type: ignore[misc]
     strict: NotRequired[bool]
+    default: NotRequired[Any]
 
 
 Type = str
