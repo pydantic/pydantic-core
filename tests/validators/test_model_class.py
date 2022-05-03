@@ -14,7 +14,7 @@ def test_model_class():
 
     v = SchemaValidator(
         {
-            'type': 'model_class',
+            'type': 'model-class',
             'class_type': MyModel,
             'model': {'type': 'model', 'fields': {'field_a': {'type': 'str'}, 'field_b': {'type': 'int'}}},
         }
@@ -46,7 +46,7 @@ def test_model_class_setattr():
 
     v = SchemaValidator(
         {
-            'type': 'model_class',
+            'type': 'model-class',
             'class_type': MyModel,
             'model': {'type': 'model', 'fields': {'field_a': {'type': 'str'}}},
         }
@@ -73,7 +73,7 @@ def test_model_class_root_validator():
             'mode': 'wrap',
             'function': f,
             'schema': {
-                'type': 'model_class',
+                'type': 'model-class',
                 'class_type': MyModel,
                 'model': {'type': 'model', 'fields': {'field_a': {'type': 'str'}}},
             },
@@ -88,13 +88,13 @@ def test_model_class_bad_model():
     class MyModel:
         pass
 
-    with pytest.raises(SchemaError, match=re.escape("model_class expected a 'model' schema, got 'str'")):
-        SchemaValidator({'type': 'model_class', 'class_type': MyModel, 'model': {'type': 'str'}})
+    with pytest.raises(SchemaError, match=re.escape("model-class expected a 'model' schema, got 'str'")):
+        SchemaValidator({'type': 'model-class', 'class_type': MyModel, 'model': {'type': 'str'}})
 
 
 def test_model_class_not_type():
     with pytest.raises(SchemaError, match=re.escape("TypeError: 'int' object cannot be converted to 'PyType'")):
-        SchemaValidator({'type': 'model_class', 'class_type': 123})
+        SchemaValidator({'type': 'model-class', 'class_type': 123})
 
 
 def test_model_class_instance_direct():
@@ -107,7 +107,7 @@ def test_model_class_instance_direct():
 
     v = SchemaValidator(
         {
-            'type': 'model_class',
+            'type': 'model-class',
             'class_type': MyModel,
             'model': {'type': 'model', 'fields': {'field_a': {'type': 'str'}}},
         }
@@ -140,7 +140,7 @@ def test_model_class_instance_subclass():
 
     v = SchemaValidator(
         {
-            'type': 'model_class',
+            'type': 'model-class',
             'class_type': MyModel,
             'model': {'type': 'model', 'fields': {'field_a': {'type': 'str'}}},
         }
@@ -162,7 +162,7 @@ def test_model_class_strict():
 
     v = SchemaValidator(
         {
-            'type': 'model_class',
+            'type': 'model-class',
             'strict': True,
             'class_type': MyModel,
             'model': {'type': 'model', 'fields': {'field_a': {'type': 'str'}, 'field_b': {'type': 'int'}}},

@@ -78,7 +78,7 @@ class LiteralSchema(TypedDict):
 
 
 class ModelClassSchema(TypedDict):
-    type: Literal['model_class']
+    type: Literal['model-class']
     class_type: type
     model: ModelSchema  # type: ignore[misc]
 
