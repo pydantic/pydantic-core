@@ -11,21 +11,19 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, Extra, Validator, ValidatorArc};
+use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc};
 
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {
     strict: bool,
-    validator: Box<dyn Validator>,
+    validator: Box<ValidateEnum>,
     class: Py<PyType>,
 }
 
-impl ModelClassValidator {
-    pub const EXPECTED_TYPE: &'static str = "model-class";
-}
+impl BuildValidator for ModelClassValidator {
+    const EXPECTED_TYPE: &'static str = "model-class";
 
-impl Validator for ModelClassValidator {
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
         let class: &PyType = schema.get_as_req("class")?;
 
         let model_schema_raw: &PyAny = schema.get_as_req("model")?;
@@ -35,15 +33,18 @@ impl Validator for ModelClassValidator {
             return py_error!("model-class expected a 'model' schema, got '{}'", model_type);
         }
 
-        Ok(Box::new(Self {
+        Ok(Self {
             // we don't use is_strict here since we don't wan validation to be strict in this case if
             // `config.strict` is set, only if this specific field is strict
             strict: schema.get_as("strict")?.unwrap_or(false),
-            validator,
+            validator: Box::new(validator),
             class: class.into(),
-        }))
+        }
+        .into())
     }
+}
 
+impl Validator for ModelClassValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -92,11 +93,6 @@ impl Validator for ModelClassValidator {
             Err(e) => Err(e),
         };
         name_result.unwrap_or("ModelClass").to_string()
-    }
-
-    #[no_coverage]
-    fn clone_dyn(&self) -> Box<dyn Validator> {
-        Box::new(self.clone())
     }
 }
 

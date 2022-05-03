@@ -8,9 +8,9 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, Extra, Validator};
+use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator};
 
-pub type ValidatorArc = Arc<RwLock<Box<dyn Validator>>>;
+pub type ValidatorArc = Arc<RwLock<ValidateEnum>>;
 
 #[derive(Debug, Clone)]
 pub struct RecursiveValidator {
@@ -18,12 +18,10 @@ pub struct RecursiveValidator {
     name: String,
 }
 
-impl RecursiveValidator {
-    pub const EXPECTED_TYPE: &'static str = "recursive-container";
-}
+impl BuildValidator for RecursiveValidator {
+    const EXPECTED_TYPE: &'static str = "recursive-container";
 
-impl Validator for RecursiveValidator {
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
         let sub_schema: &PyAny = schema.get_as_req("schema")?;
         let validator = build_validator(sub_schema, config)?.0;
         let name: String = schema.get_as_req("name")?;
@@ -32,9 +30,11 @@ impl Validator for RecursiveValidator {
             Ok(mut validator_guard) => validator_guard.set_ref(name.as_str(), &validator_arc),
             Err(err) => py_error!("Recursive container build error: {}", err),
         }?;
-        Ok(Box::new(Self { validator_arc, name }))
+        Ok(Self { validator_arc, name }.into())
     }
+}
 
+impl Validator for RecursiveValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -43,9 +43,7 @@ impl Validator for RecursiveValidator {
     ) -> ValResult<'data, PyObject> {
         match self.validator_arc.read() {
             Ok(validator) => validator.validate(py, input, extra),
-            Err(err) => {
-                py_error!(PyRuntimeError; "Recursive container error: {}", err.to_string()).map_err(as_internal)
-            }
+            Err(err) => py_error!(PyRuntimeError; "Recursive container error: {}", err).map_err(as_internal),
         }
     }
 
@@ -59,48 +57,45 @@ impl Validator for RecursiveValidator {
     fn get_name(&self, _py: Python) -> String {
         self.name.clone()
     }
-
-    #[no_coverage]
-    fn clone_dyn(&self) -> Box<dyn Validator> {
-        Box::new(self.clone())
-    }
 }
 
 #[derive(Debug, Clone)]
 pub struct RecursiveRefValidator {
-    validator_ref: Option<Weak<RwLock<Box<dyn Validator>>>>,
+    validator_ref: Option<Weak<RwLock<ValidateEnum>>>,
     name: String,
 }
 
-impl RecursiveRefValidator {
-    pub const EXPECTED_TYPE: &'static str = "recursive-ref";
+impl BuildValidator for RecursiveRefValidator {
+    const EXPECTED_TYPE: &'static str = "recursive-ref";
+
+    fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<ValidateEnum> {
+        Ok(Self {
+            validator_ref: None,
+            name: schema.get_as_req("name")?,
+        }
+        .into())
+    }
 }
 
 impl Validator for RecursiveRefValidator {
-    fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<Box<dyn Validator>> {
-        Ok(Box::new(Self {
-            validator_ref: None,
-            name: schema.get_as_req("name")?,
-        }))
-    }
-
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
         input: &'data dyn Input,
         extra: &Extra,
     ) -> ValResult<'data, PyObject> {
-        let error_msg: String = match self.validator_ref {
+        match self.validator_ref {
             Some(ref validator_ref) => match validator_ref.upgrade() {
                 Some(validator_arc) => match validator_arc.read() {
-                    Ok(validator) => return validator.validate(py, input, extra),
-                    Err(err) => format!("PoisonError: {}", err),
+                    Ok(validator) => validator.validate(py, input, extra),
+                    Err(err) => py_error!(PyRuntimeError; "Recursive reference error: PoisonError: {}", err)
+                        .map_err(as_internal),
                 },
-                None => "unable to upgrade weak reference".to_string(),
+                None => py_error!(PyRuntimeError; "Recursive reference error: unable to upgrade weak reference")
+                    .map_err(as_internal),
             },
-            None => "ref not yet set".to_string(),
-        };
-        py_error!(PyRuntimeError; "Recursive reference error: {}", error_msg).map_err(as_internal)
+            None => py_error!(PyRuntimeError; "Recursive reference error: ref not yet set").map_err(as_internal),
+        }
     }
 
     fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
@@ -112,10 +107,5 @@ impl Validator for RecursiveRefValidator {
 
     fn get_name(&self, _py: Python) -> String {
         self.name.clone()
-    }
-
-    #[no_coverage]
-    fn clone_dyn(&self) -> Box<dyn Validator> {
-        Box::new(self.clone())
     }
 }
