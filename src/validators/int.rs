@@ -5,7 +5,7 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
-use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
+use super::{BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
 
 #[derive(Debug, Clone)]
 pub struct IntValidator;
@@ -13,11 +13,7 @@ pub struct IntValidator;
 impl BuildValidator for IntValidator {
     const EXPECTED_TYPE: &'static str = "int";
 
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        _slots_builder: &mut SlotsBuilder,
-    ) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, config: Option<&PyDict>, _slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
         let use_constrained = schema.get_item("multiple_of").is_some()
             || schema.get_item("le").is_some()
             || schema.get_item("lt").is_some()

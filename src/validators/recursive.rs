@@ -1,11 +1,12 @@
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_tools::{SchemaDict};
-use crate::errors::{ValResult};
+use crate::build_tools::{py_error, SchemaDict};
+use crate::errors::{as_internal, ValResult};
 use crate::input::Input;
 
-use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder, get_validator};
+use super::{BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
 
 #[derive(Debug, Clone)]
 pub struct RecursiveValidator {
@@ -15,11 +16,7 @@ pub struct RecursiveValidator {
 impl BuildValidator for RecursiveValidator {
     const EXPECTED_TYPE: &'static str = "recursive-container";
 
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        slots_builder: &mut SlotsBuilder,
-    ) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, config: Option<&PyDict>, slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
         let sub_schema: &PyAny = schema.get_as_req("schema")?;
         let name: String = schema.get_as_req("name")?;
         let validator_id = slots_builder.build_add_named(name, sub_schema, config)?;
@@ -52,11 +49,7 @@ pub struct RecursiveRefValidator {
 impl BuildValidator for RecursiveRefValidator {
     const EXPECTED_TYPE: &'static str = "recursive-ref";
 
-    fn build(
-        schema: &PyDict,
-        _config: Option<&PyDict>,
-        slots_builder: &mut SlotsBuilder,
-    ) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, _config: Option<&PyDict>, slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
         let name: String = schema.get_as_req("name")?;
         let validator_id = slots_builder.find_id(&name)?;
         Ok(Self { validator_id }.into())
@@ -77,5 +70,12 @@ impl Validator for RecursiveRefValidator {
 
     fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()
+    }
+}
+
+fn get_validator(slots: &[ValidateEnum], id: usize) -> ValResult<&ValidateEnum> {
+    match slots.get(id) {
+        Some(validator) => Ok(validator),
+        None => py_error!(PyRuntimeError; "Unable to find validator {}", id).map_err(as_internal),
     }
 }

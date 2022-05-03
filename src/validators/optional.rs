@@ -4,24 +4,22 @@ use pyo3::types::PyDict;
 use crate::build_tools::SchemaDict;
 use crate::input::Input;
 
-use super::{BuildValidator, Extra, ValResult, ValidateEnum, Validator, SlotsBuilder, get_validator};
+use super::{build_validator, BuildValidator, Extra, SlotsBuilder, ValResult, ValidateEnum, Validator};
 
 #[derive(Debug, Clone)]
 pub struct OptionalValidator {
-    validator_id: usize,
+    validator: Box<ValidateEnum>,
 }
 
 impl BuildValidator for OptionalValidator {
     const EXPECTED_TYPE: &'static str = "optional";
 
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        slots_builder: &mut SlotsBuilder,
-    ) -> PyResult<ValidateEnum> {
-        let sub_schema: &PyAny = schema.get_as_req("schema")?;
-        let validator_id = slots_builder.build_add_anon(sub_schema, config)?;
-        Ok(Self { validator_id }.into())
+    fn build(schema: &PyDict, config: Option<&PyDict>, slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
+        let schema: &PyAny = schema.get_as_req("schema")?;
+        Ok(Self {
+            validator: Box::new(build_validator(schema, config, slots_builder)?.0),
+        }
+        .into())
     }
 }
 
@@ -35,10 +33,7 @@ impl Validator for OptionalValidator {
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),
-            false => {
-                let validator = get_validator(slots, self.validator_id)?;
-                validator.validate(py, input, extra, slots)
-            },
+            false => self.validator.validate(py, input, extra, slots),
         }
     }
 
@@ -51,10 +46,7 @@ impl Validator for OptionalValidator {
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),
-            false => {
-                let validator = get_validator(slots, self.validator_id)?;
-                validator.validate_strict(py, input, extra, slots)
-            },
+            false => self.validator.validate_strict(py, input, extra, slots),
         }
     }
 

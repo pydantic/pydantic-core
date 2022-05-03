@@ -11,7 +11,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
+use super::{build_validator, BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {
@@ -23,11 +23,7 @@ pub struct ModelClassValidator {
 impl BuildValidator for ModelClassValidator {
     const EXPECTED_TYPE: &'static str = "model-class";
 
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        slots_builder: &mut SlotsBuilder,
-    ) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, config: Option<&PyDict>, slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
         let class: &PyType = schema.get_as_req("class")?;
 
         let model_schema_raw: &PyAny = schema.get_as_req("model")?;

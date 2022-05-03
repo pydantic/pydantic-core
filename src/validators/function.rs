@@ -6,7 +6,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
+use super::{build_validator, BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
 
 #[derive(Debug)]
 pub struct FunctionBuilder;
@@ -14,11 +14,7 @@ pub struct FunctionBuilder;
 impl BuildValidator for FunctionBuilder {
     const EXPECTED_TYPE: &'static str = "function";
 
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        slots_builder: &mut SlotsBuilder,
-    ) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, config: Option<&PyDict>, slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
         let mode: &str = schema.get_as_req("mode")?;
         match mode {
             "before" => FunctionBeforeValidator::build(schema, config, slots_builder),

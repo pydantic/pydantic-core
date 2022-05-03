@@ -4,7 +4,7 @@ use pyo3::types::PyDict;
 use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
-use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
+use super::{BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
 
 #[derive(Debug, Clone)]
 pub struct NoneValidator;
@@ -12,11 +12,7 @@ pub struct NoneValidator;
 impl BuildValidator for NoneValidator {
     const EXPECTED_TYPE: &'static str = "none";
 
-    fn build(
-        _schema: &PyDict,
-        _config: Option<&PyDict>,
-        _slots_builder: &mut SlotsBuilder,
-    ) -> PyResult<ValidateEnum> {
+    fn build(_schema: &PyDict, _config: Option<&PyDict>, _slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
         Ok(Self.into())
     }
 }

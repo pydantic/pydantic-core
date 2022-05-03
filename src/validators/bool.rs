@@ -5,7 +5,7 @@ use crate::build_tools::is_strict;
 use crate::errors::ValResult;
 use crate::input::Input;
 
-use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
+use super::{BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
 
 #[derive(Debug, Clone)]
 pub struct BoolValidator;
@@ -13,11 +13,7 @@ pub struct BoolValidator;
 impl BuildValidator for BoolValidator {
     const EXPECTED_TYPE: &'static str = "bool";
 
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        _slots_builder: &mut SlotsBuilder,
-    ) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, config: Option<&PyDict>, _slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
         if is_strict(schema, config)? {
             StrictBoolValidator::build()
         } else {

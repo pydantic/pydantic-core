@@ -7,7 +7,7 @@ use crate::errors::{
 };
 use crate::input::{Input, ToLocItem};
 
-use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
+use super::{build_validator, BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
 
 #[derive(Debug, Clone)]
 struct ModelField {
@@ -28,11 +28,7 @@ pub struct ModelValidator {
 impl BuildValidator for ModelValidator {
     const EXPECTED_TYPE: &'static str = "model";
 
-    fn build(
-        schema: &PyDict,
-        _config: Option<&PyDict>,
-        slots_builder: &mut SlotsBuilder,
-    ) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, _config: Option<&PyDict>, slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
         // models ignore the parent config and always use the config from this model
         let config: Option<&PyDict> = schema.get_as("config")?;
 

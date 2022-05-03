@@ -5,7 +5,7 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
-use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
+use super::{BuildValidator, Extra, SlotsBuilder, ValidateEnum, Validator};
 
 #[derive(Debug, Clone)]
 pub struct FloatValidator;
@@ -13,11 +13,7 @@ pub struct FloatValidator;
 impl BuildValidator for FloatValidator {
     const EXPECTED_TYPE: &'static str = "float";
 
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        _slots_builder: &mut SlotsBuilder,
-    ) -> PyResult<ValidateEnum> {
+    fn build(schema: &PyDict, config: Option<&PyDict>, _slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum> {
         let use_constrained = schema.get_item("multiple_of").is_some()
             || schema.get_item("le").is_some()
             || schema.get_item("lt").is_some()

@@ -2,13 +2,12 @@ use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
 
-use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult, as_internal};
+use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::{Input, JsonInput};
 use crate::SchemaError;
 
@@ -108,11 +107,7 @@ pub trait BuildValidator: Sized {
 
     /// Build a new validator from the schema, the return type is a trait to provide a way for validators
     /// to return other validators, see `string.rs`, `int.rs`, `float.rs` and `function.rs` for examples
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        _slots_builder: &mut SlotsBuilder,
-    ) -> PyResult<ValidateEnum>;
+    fn build(schema: &PyDict, config: Option<&PyDict>, _slots_builder: &mut SlotsBuilder) -> PyResult<ValidateEnum>;
 }
 
 // macro to build the match statement for validator selection
@@ -282,37 +277,14 @@ pub trait Validator: Send + Sync + Clone + Debug {
     fn get_name(&self, py: Python) -> String;
 }
 
-fn get_validator(slots: &[ValidateEnum], id: usize) -> ValResult<&ValidateEnum> {
-    match slots.get(id) {
-        Some(validator) => Ok(validator),
-        None => py_error!(PyRuntimeError; "Unable to find validator {}", id).map_err(as_internal),
-    }
-}
-
 pub struct SlotsBuilder {
-    named_slots: Vec<(Option<String>, Option<ValidateEnum>)>
+    named_slots: Vec<(Option<String>, Option<ValidateEnum>)>,
 }
 
 impl SlotsBuilder {
     pub fn new() -> Self {
-        let mut named_slots: Vec<(Option<String>, Option<ValidateEnum>)> = Vec::new();
-        named_slots.push((None, Some(self::any::AnyValidator::build_simple())));
+        let named_slots: Vec<(Option<String>, Option<ValidateEnum>)> = Vec::new();
         SlotsBuilder { named_slots }
-    }
-
-    pub fn get_any_validator(&self) -> usize {
-        0
-    }
-
-    pub fn add_anon(&mut self, validator: ValidateEnum) -> usize {
-        let id = self.named_slots.len();
-        self.named_slots.push((None, Some(validator)));
-        id
-    }
-
-    pub fn build_add_anon(&mut self, schema: &PyAny, config: Option<&PyDict>) -> PyResult<usize> {
-        let validator = build_validator(schema, config, self)?.0;
-        Ok(self.add_anon(validator))
     }
 
     pub fn build_add_named(&mut self, name: String, schema: &PyAny, config: Option<&PyDict>) -> PyResult<usize> {
@@ -330,7 +302,7 @@ impl SlotsBuilder {
         };
         match self.named_slots.iter().position(is_match) {
             Some(id) => Ok(id),
-            None => py_error!("Recursive reference error: ref '{}' not found", name)
+            None => py_error!("Recursive reference error: ref '{}' not found", name),
         }
     }
 
