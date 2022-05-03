@@ -44,8 +44,9 @@ def test_schema_wrong_type():
 
 
 def test_pickle():
-    v = SchemaValidator({'type': 'bool'})
-    assert v.validate_python('tRuE') is True
-    p = pickle.dumps(v)
+    v1 = SchemaValidator({'type': 'bool'})
+    assert v1.validate_python('tRuE') is True
+    p = pickle.dumps(v1)
     v2 = pickle.loads(p)
     assert v2.validate_python('tRuE') is True
+    assert repr(v1) == repr(v2)

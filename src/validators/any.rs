@@ -11,8 +11,8 @@ use super::{BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 pub struct AnyValidator;
 
 impl AnyValidator {
-    pub fn build_simple() -> CombinedValidator {
-        AnyValidator.into()
+    pub fn new() -> Self {
+        AnyValidator
     }
 }
 
