@@ -7,7 +7,7 @@ use crate::errors::{
 };
 use crate::input::{Input, ToLocItem};
 
-use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc};
+use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc, SlotsBuilder};
 
 #[derive(Debug, Clone)]
 struct ModelField {
@@ -31,7 +31,7 @@ impl BuildValidator for ModelValidator {
     fn build(
         schema: &PyDict,
         _config: Option<&PyDict>,
-        named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+        slots_builder: &mut SlotsBuilder,
     ) -> PyResult<ValidateEnum> {
         // models ignore the parent config and always use the config from this model
         let config: Option<&PyDict> = schema.get_as("config")?;
@@ -39,7 +39,7 @@ impl BuildValidator for ModelValidator {
         let extra_behavior = ExtraBehavior::from_config(config)?;
         let extra_validator = match extra_behavior {
             ExtraBehavior::Allow => match schema.get_item("extra_validator") {
-                Some(v) => Some(Box::new(build_validator(v, config, named_slots)?.0)),
+                Some(v) => Some(Box::new(build_validator(v, config, slots_builder)?.0)),
                 None => None,
             },
             _ => None,
@@ -62,7 +62,7 @@ impl BuildValidator for ModelValidator {
         let mut fields: Vec<ModelField> = Vec::with_capacity(fields_dict.len());
 
         for (key, value) in fields_dict.iter() {
-            let (validator, field_dict) = match build_validator(value, config, named_slots) {
+            let (validator, field_dict) = match build_validator(value, config, slots_builder) {
                 Ok(v) => v,
                 Err(err) => return py_error!("Key \"{}\":\n  {}", key, err),
             };

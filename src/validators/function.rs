@@ -6,7 +6,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc};
+use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc, SlotsBuilder};
 
 #[derive(Debug)]
 pub struct FunctionBuilder;
@@ -17,14 +17,14 @@ impl BuildValidator for FunctionBuilder {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+        slots_builder: &mut SlotsBuilder,
     ) -> PyResult<ValidateEnum> {
         let mode: &str = schema.get_as_req("mode")?;
         match mode {
-            "before" => FunctionBeforeValidator::build(schema, config, named_slots),
-            "after" => FunctionAfterValidator::build(schema, config, named_slots),
+            "before" => FunctionBeforeValidator::build(schema, config, slots_builder),
+            "after" => FunctionAfterValidator::build(schema, config, slots_builder),
             "plain" => FunctionPlainValidator::build(schema, config),
-            "wrap" => FunctionWrapValidator::build(schema, config, named_slots),
+            "wrap" => FunctionWrapValidator::build(schema, config, slots_builder),
             _ => py_error!("Unexpected function mode {:?}", mode),
         }
     }
@@ -42,10 +42,10 @@ macro_rules! impl_build {
             pub fn build(
                 schema: &PyDict,
                 config: Option<&PyDict>,
-                named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+                slots_builder: &mut SlotsBuilder,
             ) -> PyResult<ValidateEnum> {
                 Ok(Self {
-                    validator: Box::new(build_validator(schema.get_as_req("schema")?, config, named_slots)?.0),
+                    validator: Box::new(build_validator(schema.get_as_req("schema")?, config, slots_builder)?.0),
                     func: get_function(schema)?,
                     config: config.map(|c| c.into()),
                 }

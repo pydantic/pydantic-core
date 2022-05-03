@@ -40,8 +40,8 @@ pub struct SchemaValidator {
 impl SchemaValidator {
     #[new]
     pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
-        let mut named_slots: Vec<(Option<String>, Option<ValidateEnum>)> = vec![];
-        let validator = match build_validator(schema, None, &mut named_slots) {
+        let mut slots_builder = SlotsBuilder::new();
+        let validator = match build_validator(schema, None, &mut slots_builder) {
             Ok((v, _)) => v,
             Err(err) => {
                 return Err(match err.is_instance_of::<SchemaError>(py) {
@@ -50,13 +50,7 @@ impl SchemaValidator {
                 });
             }
         };
-        let slots = named_slots
-            .into_iter()
-            .map(|(_, opt_validator)| match opt_validator {
-                Some(validator) => Ok(validator),
-                None => py_error!("Schema build error: missing named slot"),
-            })
-            .collect::<PyResult<Vec<ValidateEnum>>>()?;
+        let slots = slots_builder.into_slots()?;
         Ok(Self { validator, slots })
     }
 
@@ -117,17 +111,17 @@ pub trait BuildValidator: Sized {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        _named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+        _slots_builder: &mut SlotsBuilder,
     ) -> PyResult<ValidateEnum>;
 }
 
 // macro to build the match statement for validator selection
 macro_rules! validator_match {
-    ($type:ident, $dict:ident, $config:ident, $named_slots:ident, $($validator:path,)+) => {
+    ($type:ident, $dict:ident, $config:ident, $slots_builder:ident, $($validator:path,)+) => {
         match $type {
             $(
                 <$validator>::EXPECTED_TYPE => {
-                    let val = <$validator>::build($dict, $config, $named_slots).map_err(|err| {
+                    let val = <$validator>::build($dict, $config, $slots_builder).map_err(|err| {
                         crate::SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", $type, err))
                     })?;
                     Ok((val, $dict))
@@ -143,7 +137,7 @@ macro_rules! validator_match {
 pub fn build_validator<'a>(
     schema: &'a PyAny,
     config: Option<&'a PyDict>,
-    named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+    slots_builder: &mut SlotsBuilder,
 ) -> PyResult<(ValidateEnum, &'a PyDict)> {
     let dict: &PyDict = match schema.cast_as() {
         Ok(s) => s,
@@ -158,7 +152,7 @@ pub fn build_validator<'a>(
         type_,
         dict,
         config,
-        named_slots,
+        slots_builder,
         // models e.g. heterogeneous dicts
         self::model::ModelValidator,
         // unions
@@ -292,4 +286,51 @@ pub trait Validator: Send + Sync + Clone + Debug {
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`
     fn get_name(&self, py: Python) -> String;
+}
+
+pub struct SlotsBuilder {
+    named_slots: Vec<(Option<String>, Option<ValidateEnum>)>
+}
+
+impl SlotsBuilder {
+    pub fn new() -> Self {
+        SlotsBuilder {
+            named_slots: Vec::new()
+        }
+    }
+
+    pub fn add_anon(&mut self, validator: ValidateEnum) -> usize {
+        let id = self.named_slots.len();
+        self.named_slots.push((None, Some(validator)));
+        id
+    }
+
+    pub fn build_add(&mut self, name: String, schema: &PyAny, config: Option<&PyDict>) -> PyResult<usize> {
+        let id = self.named_slots.len();
+        self.named_slots.push((Some(name), None));
+        let validator = build_validator(schema, config, self)?.0;
+        self.named_slots[id] = (None, Some(validator));
+        Ok(id)
+    }
+
+    pub fn find_id(&self, name: &str) -> PyResult<usize> {
+        let is_match = |(n, _): &(Option<String>, Option<ValidateEnum>)| match n {
+            Some(n) => n == name,
+            None => false,
+        };
+        match self.named_slots.iter().position(is_match) {
+            Some(id) => Ok(id),
+            None => py_error!("Recursive reference error: ref '{}' not found", name)
+        }
+    }
+
+    pub fn into_slots(self) -> PyResult<Vec<ValidateEnum>> {
+        self.named_slots
+            .into_iter()
+            .map(|(_, opt_validator)| match opt_validator {
+                Some(validator) => Ok(validator),
+                None => py_error!("Schema build error: missing named slot"),
+            })
+            .collect()
+    }
 }

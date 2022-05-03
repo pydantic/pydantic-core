@@ -5,7 +5,7 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
 use crate::input::{Input, ListInput};
 
-use super::{build_validator, BuildValidator, Extra, ValResult, ValidateEnum, Validator, ValidatorArc};
+use super::{build_validator, BuildValidator, Extra, ValResult, ValidateEnum, Validator, ValidatorArc, SlotsBuilder};
 
 #[derive(Debug, Clone)]
 pub struct SetValidator {
@@ -21,12 +21,12 @@ impl BuildValidator for SetValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+        slots_builder: &mut SlotsBuilder,
     ) -> PyResult<ValidateEnum> {
         Ok(Self {
             strict: is_strict(schema, config)?,
             item_validator: match schema.get_item("items") {
-                Some(d) => Some(Box::new(build_validator(d, config, named_slots)?.0)),
+                Some(d) => Some(Box::new(build_validator(d, config, slots_builder)?.0)),
                 None => None,
             },
             min_items: schema.get_as("min_items")?,

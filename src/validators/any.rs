@@ -4,7 +4,7 @@ use pyo3::types::PyDict;
 use crate::errors::ValResult;
 use crate::input::Input;
 
-use super::{BuildValidator, Extra, ValidateEnum, Validator};
+use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
 
 /// This might seem useless, but it's useful in DictValidator to avoid Option<Validator> a lot
 #[derive(Debug, Clone)]
@@ -16,7 +16,7 @@ impl BuildValidator for AnyValidator {
     fn build(
         _schema: &PyDict,
         _config: Option<&PyDict>,
-        _named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+        _slots_builder: &mut SlotsBuilder,
     ) -> PyResult<ValidateEnum> {
         Ok(Self.into())
     }

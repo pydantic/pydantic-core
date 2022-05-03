@@ -6,7 +6,7 @@ use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, 
 use crate::input::{DictInput, Input, ToLocItem};
 
 use super::any::AnyValidator;
-use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc};
+use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc, SlotsBuilder};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
@@ -24,17 +24,17 @@ impl BuildValidator for DictValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+        slots_builder: &mut SlotsBuilder,
     ) -> PyResult<ValidateEnum> {
         Ok(Self {
             strict: is_strict(schema, config)?,
             key_validator: match schema.get_item("keys") {
-                Some(schema) => Box::new(build_validator(schema, config, named_slots)?.0),
-                None => Box::new(AnyValidator::build(schema, config, named_slots)?),
+                Some(schema) => Box::new(build_validator(schema, config, slots_builder)?.0),
+                None => Box::new(AnyValidator::build(schema, config, slots_builder)?),
             },
             value_validator: match schema.get_item("values") {
-                Some(d) => Box::new(build_validator(d, config, named_slots)?.0),
-                None => Box::new(AnyValidator::build(schema, config, named_slots)?),
+                Some(d) => Box::new(build_validator(d, config, slots_builder)?.0),
+                None => Box::new(AnyValidator::build(schema, config, slots_builder)?),
             },
             min_items: schema.get_as("min_items")?,
             max_items: schema.get_as("max_items")?,

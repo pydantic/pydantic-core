@@ -5,7 +5,7 @@ use crate::build_tools::is_strict;
 use crate::errors::ValResult;
 use crate::input::Input;
 
-use super::{BuildValidator, Extra, ValidateEnum, Validator};
+use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
 
 #[derive(Debug, Clone)]
 pub struct BoolValidator;
@@ -16,7 +16,7 @@ impl BuildValidator for BoolValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        _named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+        _slots_builder: &mut SlotsBuilder,
     ) -> PyResult<ValidateEnum> {
         if is_strict(schema, config)? {
             StrictBoolValidator::build()

@@ -11,7 +11,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc};
+use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc, SlotsBuilder};
 
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {
@@ -26,12 +26,12 @@ impl BuildValidator for ModelClassValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+        slots_builder: &mut SlotsBuilder,
     ) -> PyResult<ValidateEnum> {
         let class: &PyType = schema.get_as_req("class")?;
 
         let model_schema_raw: &PyAny = schema.get_as_req("model")?;
-        let (validator, model_schema) = build_validator(model_schema_raw, config, named_slots)?;
+        let (validator, model_schema) = build_validator(model_schema_raw, config, slots_builder)?;
         let model_type: String = model_schema.get_as_req("type")?;
         if &model_type != "model" {
             return py_error!("model-class expected a 'model' schema, got '{}'", model_type);

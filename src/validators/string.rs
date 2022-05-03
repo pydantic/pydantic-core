@@ -6,7 +6,7 @@ use crate::build_tools::{is_strict, py_error, schema_or_config};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
-use super::{BuildValidator, Extra, ValidateEnum, Validator};
+use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
 
 #[derive(Debug, Clone)]
 pub struct StrValidator;
@@ -17,7 +17,7 @@ impl BuildValidator for StrValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        _named_slots: &mut Vec<(Option<String>, Option<ValidateEnum>)>,
+        _slots_builder: &mut SlotsBuilder,
     ) -> PyResult<ValidateEnum> {
         let use_constrained = schema.get_item("pattern").is_some()
             || schema.get_item("max_length").is_some()
