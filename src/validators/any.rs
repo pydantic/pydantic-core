@@ -10,6 +10,12 @@ use super::{BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
 #[derive(Debug, Clone)]
 pub struct AnyValidator;
 
+impl AnyValidator {
+    pub fn build_simple() -> CombinedValidator {
+        AnyValidator.into()
+    }
+}
+
 impl BuildValidator for AnyValidator {
     const EXPECTED_TYPE: &'static str = "any";
 

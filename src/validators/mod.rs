@@ -3,13 +3,15 @@ use std::fmt::Debug;
 use enum_dispatch::enum_dispatch;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::types::{PyAny, PyDict, PyTuple};
 use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::{Input, JsonInput};
 use crate::SchemaError;
+
+use self::any::AnyValidator;
 
 mod any;
 mod bool;
@@ -28,17 +30,16 @@ mod set;
 mod string;
 mod union;
 
-#[pyclass]
+#[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {
+    raw_schema: PyObject,
     validator: CombinedValidator,
     slots: Vec<CombinedValidator>,
 }
 
-#[pymethods]
 impl SchemaValidator {
-    #[new]
-    pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
+    fn prepare(py: Python, schema: &PyAny) -> PyResult<(CombinedValidator, Vec<CombinedValidator>)> {
         let mut slots_builder = SlotsBuilder::new();
         let validator = match build_validator(schema, None, &mut slots_builder) {
             Ok((v, _)) => v,
@@ -50,7 +51,26 @@ impl SchemaValidator {
             }
         };
         let slots = slots_builder.into_slots()?;
-        Ok(Self { validator, slots })
+        Ok((validator, slots))
+    }
+}
+
+#[pymethods]
+impl SchemaValidator {
+    /// Allow pickling of `SchemaValidator` - when pickling `__new__` is called with no arguments, hence we have
+    /// accept this case, albeit return a useless validator
+    #[new]
+    #[args(args = "*")]
+    fn py_new(py: Python, args: &PyTuple) -> PyResult<Self> {
+        match args.get_item(0) {
+            Ok(schema) => {
+                let (validator, slots) = Self::prepare(py, schema)?;
+                Ok(Self {raw_schema: schema.into_py(py), validator, slots })
+            }
+            Err(_) => {
+                Ok(Self {raw_schema: py.None(), validator: AnyValidator::build_simple(), slots: vec![]})
+            }
+        }
     }
 
     fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
@@ -91,6 +111,19 @@ impl SchemaValidator {
         };
         let r = self.validator.validate(py, input, &extra, &self.slots);
         r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
+    }
+
+    // https://gist.github.com/ethanhs/fd4123487974c91c7e5960acc9aa2a77
+    fn __getstate__(&self) -> PyResult<PyObject> {
+        Ok(self.raw_schema.clone())
+    }
+
+    fn __setstate__(&mut self, py: Python, state: PyObject) -> PyResult<()> {
+        let (validator, slots) = Self::prepare(py,state.as_ref(py))?;
+        self.raw_schema = state;
+        self.validator = validator;
+        self.slots = slots;
+        Ok(())
     }
 
     fn __repr__(&self, py: Python) -> String {
@@ -184,7 +217,7 @@ pub fn build_validator<'a>(
         // literals
         self::literal::LiteralBuilder,
         // any
-        self::any::AnyValidator,
+        AnyValidator,
     )
 }
 
@@ -248,7 +281,7 @@ pub enum CombinedValidator {
     LiteralMultipleInts(self::literal::LiteralMultipleIntsValidator),
     LiteralGeneral(self::literal::LiteralGeneralValidator),
     // any
-    Any(self::any::AnyValidator),
+    Any(AnyValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
