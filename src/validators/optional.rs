@@ -4,7 +4,7 @@ use pyo3::types::PyDict;
 use crate::build_tools::SchemaDict;
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, Extra, ValResult, ValidateEnum, Validator, SlotsBuilder};
+use super::{build_validator, BuildValidator, Extra, ValResult, ValidateEnum, Validator, SlotsBuilder, get_validator};
 
 #[derive(Debug, Clone)]
 pub struct OptionalValidator {
@@ -36,9 +36,9 @@ impl Validator for OptionalValidator {
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),
-            false => match slots.get(self.validator_id) {
-                Some(validator) => validator.validate(py, input, extra, slots),
-                None => todo!(),
+            false => {
+                let validator = get_validator(slots, self.validator_id)?;
+                validator.validate(py, input, extra, slots)
             },
         }
     }
@@ -52,16 +52,12 @@ impl Validator for OptionalValidator {
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),
-            false => match slots.get(self.validator_id) {
-                Some(validator) => validator.validate_strict(py, input, extra, slots),
-                None => todo!(),
+            false => {
+                let validator = get_validator(slots, self.validator_id)?;
+                validator.validate_strict(py, input, extra, slots)
             },
         }
     }
-
-    // fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
-    //     self.validator.set_ref(name, validator_arc)
-    // }
 
     fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()

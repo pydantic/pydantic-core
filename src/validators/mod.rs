@@ -1,12 +1,14 @@
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
+
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
+use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult, as_internal};
 use crate::input::{Input, JsonInput};
 use crate::SchemaError;
 
@@ -26,8 +28,6 @@ mod recursive;
 mod set;
 mod string;
 mod union;
-
-use self::recursive::ValidatorArc;
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -277,15 +277,16 @@ pub trait Validator: Send + Sync + Clone + Debug {
         self.validate(py, input, extra, slots)
     }
 
-    /// `set_ref` is used in recursive models to set the weak reference in the `RecursiveRefValidator`,
-    /// I can't imagine any other use, but then maybe I'm not very imaginative...
-    fn set_ref(&mut self, _name: &str, _validator_arc: &ValidatorArc) -> PyResult<()> {
-        Ok(())
-    }
-
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`
     fn get_name(&self, py: Python) -> String;
+}
+
+fn get_validator(slots: &[ValidateEnum], id: usize) -> ValResult<&ValidateEnum> {
+    match slots.get(id) {
+        Some(validator) => Ok(validator),
+        None => py_error!(PyRuntimeError; "Unable to find validator {}", id).map_err(as_internal),
+    }
 }
 
 pub struct SlotsBuilder {

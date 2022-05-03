@@ -5,7 +5,7 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
 use crate::input::{Input, ListInput};
 
-use super::{build_validator, BuildValidator, Extra, ValResult, ValidateEnum, Validator, ValidatorArc, SlotsBuilder};
+use super::{build_validator, BuildValidator, Extra, ValResult, ValidateEnum, Validator, SlotsBuilder};
 
 #[derive(Debug, Clone)]
 pub struct ListValidator {
@@ -59,13 +59,6 @@ impl Validator for ListValidator {
         slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_list()?, extra, slots)
-    }
-
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
-        match self.item_validator {
-            Some(ref mut item_validator) => item_validator.set_ref(name, validator_arc),
-            None => Ok(()),
-        }
     }
 
     fn get_name(&self, py: Python) -> String {

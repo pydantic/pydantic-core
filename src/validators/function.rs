@@ -6,7 +6,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc, SlotsBuilder};
+use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
 
 #[derive(Debug)]
 pub struct FunctionBuilder;
@@ -100,10 +100,6 @@ impl Validator for FunctionBeforeValidator {
         }
     }
 
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
-        self.validator.set_ref(name, validator_arc)
-    }
-
     fn get_name(&self, _py: Python) -> String {
         "function-before".to_string()
     }
@@ -129,10 +125,6 @@ impl Validator for FunctionAfterValidator {
         let v = self.validator.validate(py, input, extra, slots)?;
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
-    }
-
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
-        self.validator.set_ref(name, validator_arc)
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -207,10 +199,6 @@ impl Validator for FunctionWrapValidator {
         self.func
             .call(py, (input.to_py(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))
-    }
-
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
-        self.validator.set_ref(name, validator_arc)
     }
 
     fn get_name(&self, _py: Python) -> String {

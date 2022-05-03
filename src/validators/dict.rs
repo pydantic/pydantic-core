@@ -6,7 +6,7 @@ use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, 
 use crate::input::{DictInput, Input, ToLocItem};
 
 use super::any::AnyValidator;
-use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc, SlotsBuilder};
+use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
@@ -67,11 +67,6 @@ impl Validator for DictValidator {
         slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_dict()?, extra, slots)
-    }
-
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
-        self.key_validator.set_ref(name, validator_arc)?;
-        self.value_validator.set_ref(name, validator_arc)
     }
 
     fn get_name(&self, _py: Python) -> String {

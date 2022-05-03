@@ -1,14 +1,11 @@
-use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_internal, ValResult};
+use crate::build_tools::{SchemaDict};
+use crate::errors::{ValResult};
 use crate::input::Input;
 
-use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
-
-pub type ValidatorArc = Box<ValidateEnum>;
+use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder, get_validator};
 
 #[derive(Debug, Clone)]
 pub struct RecursiveValidator {
@@ -38,15 +35,12 @@ impl Validator for RecursiveValidator {
         extra: &Extra,
         slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
-        match slots.get(self.validator_id) {
-            Some(validator) => validator.validate(py, input, extra, slots),
-            None => py_error!(PyRuntimeError; "Recursive container error").map_err(as_internal),
-        }
+        let validator = get_validator(slots, self.validator_id)?;
+        validator.validate(py, input, extra, slots)
     }
 
     fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()
-        // self.name.clone()
     }
 }
 
@@ -77,21 +71,11 @@ impl Validator for RecursiveRefValidator {
         extra: &Extra,
         slots: &'data [ValidateEnum],
     ) -> ValResult<'data, PyObject> {
-        match slots.get(self.validator_id) {
-            Some(validator) => validator.validate(py, input, extra, slots),
-            None => py_error!(PyRuntimeError; "Recursive reference error: validator not found").map_err(as_internal),
-        }
-    }
-
-    fn set_ref(&mut self, _name: &str, _validator_arc: &ValidatorArc) -> PyResult<()> {
-        // if self.validator_ref.is_none() && name == self.name.as_str() {
-        //     self.validator_ref = Some(Arc::downgrade(validator_arc));
-        // }
-        Ok(())
+        let validator = get_validator(slots, self.validator_id)?;
+        validator.validate(py, input, extra, slots)
     }
 
     fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()
-        // self.name.clone()
     }
 }

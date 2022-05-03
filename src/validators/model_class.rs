@@ -11,7 +11,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, ValidatorArc, SlotsBuilder};
+use super::{build_validator, BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
 
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {
@@ -84,10 +84,6 @@ impl Validator for ModelClassValidator {
             // errors from `validate_strict` are never used used, so we can keep this simple
             Err(ValError::LineErrors(vec![]))
         }
-    }
-
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
-        self.validator.set_ref(name, validator_arc)
     }
 
     fn get_name(&self, py: Python) -> String {

@@ -5,7 +5,7 @@ use crate::build_tools::SchemaDict;
 use crate::errors::{LocItem, ValError, ValLineError};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, Extra, ValResult, ValidateEnum, Validator, ValidatorArc, SlotsBuilder};
+use super::{build_validator, BuildValidator, Extra, ValResult, ValidateEnum, Validator, SlotsBuilder};
 
 #[derive(Debug, Clone)]
 pub struct UnionValidator {
@@ -61,12 +61,6 @@ impl Validator for UnionValidator {
         }
 
         Err(ValError::LineErrors(errors))
-    }
-
-    fn set_ref(&mut self, name: &str, validator_arc: &ValidatorArc) -> PyResult<()> {
-        self.choices
-            .iter_mut()
-            .try_for_each(|validator| validator.set_ref(name, validator_arc))
     }
 
     fn get_name(&self, _py: Python) -> String {
