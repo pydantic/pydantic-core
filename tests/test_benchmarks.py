@@ -8,7 +8,7 @@ from pydantic_core import SchemaValidator
 try:
     from pydantic import BaseModel
 except ImportError:
-    BaseModel = None
+    BaseModel = None  # type: ignore
 
 
 pytestmark = pytest.mark.skipif(BaseModel is None, reason='pydantic not installed; tests fail on 3.7')
@@ -32,8 +32,8 @@ class TestBenchmarkSimpleModel:
 
         return SchemaValidator(
             {
-                'type': 'model-class',
-                'class': CoreModel,
+                'type': 'model_class',
+                'class_type': CoreModel,
                 'model': {
                     'type': 'model',
                     'fields': {
@@ -125,8 +125,8 @@ def test_small_class_core_model(benchmark):
 
     model_schema_validator = SchemaValidator(
         {
-            'type': 'model-class',
-            'class': MyCoreModel,
+            'type': 'model_class',
+            'class_type': MyCoreModel,
             'model': {'type': 'model', 'fields': {'name': {'type': 'str'}, 'age': {'type': 'int'}}},
         }
     )
@@ -164,8 +164,8 @@ def test_recursive_model_core(recursive_model_data, benchmark):
             'type': 'recursive-container',
             'name': 'Branch',
             'schema': {
-                'type': 'model-class',
-                'class': CoreBranch,
+                'type': 'model_class',
+                'class_type': CoreBranch,
                 'model': {
                     'type': 'model',
                     'fields': {
@@ -382,8 +382,8 @@ def test_many_models_core_model(benchmark):
         {
             'type': 'list',
             'items': {
-                'type': 'model-class',
-                'class': MyCoreModel,
+                'type': 'model_class',
+                'class_type': MyCoreModel,
                 'model': {'type': 'model', 'fields': {'age': 'int'}},
             },
         }

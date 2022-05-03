@@ -43,6 +43,5 @@ combine_as_imports = true
 color_output = true
 
 [tool.mypy]
-strict = true
 warn_return_any = false
 show_error_codes = true

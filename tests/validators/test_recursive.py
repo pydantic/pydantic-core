@@ -182,8 +182,8 @@ def test_model_class():
             'type': 'recursive-container',
             'name': 'Branch',
             'schema': {
-                'type': 'model-class',
-                'class': Branch,
+                'type': 'model_class',
+                'class_type': Branch,
                 'model': {
                     'type': 'model',
                     'fields': {

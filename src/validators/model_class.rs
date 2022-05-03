@@ -21,16 +21,16 @@ pub struct ModelClassValidator {
 }
 
 impl BuildValidator for ModelClassValidator {
-    const EXPECTED_TYPE: &'static str = "model-class";
+    const EXPECTED_TYPE: &'static str = "model_class";
 
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<ValidateEnum> {
-        let class: &PyType = schema.get_as_req("class")?;
+        let class: &PyType = schema.get_as_req("class_type")?;
 
         let model_schema_raw: &PyAny = schema.get_as_req("model")?;
         let (validator, model_schema) = build_validator(model_schema_raw, config)?;
         let model_type: String = model_schema.get_as_req("type")?;
         if &model_type != "model" {
-            return py_error!("model-class expected a 'model' schema, got '{}'", model_type);
+            return py_error!("model_class expected a 'model' schema, got '{}'", model_type);
         }
 
         Ok(Self {

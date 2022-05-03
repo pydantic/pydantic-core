@@ -55,13 +55,13 @@ class TestModelClass:
             'type': 'union',
             'choices': [
                 {
-                    'type': 'model-class',
-                    'class': ModelA,
+                    'type': 'model_class',
+                    'class_type': ModelA,
                     'model': {'type': 'model', 'fields': {'a': {'type': 'int'}, 'b': {'type': 'str'}}},
                 },
                 {
-                    'type': 'model-class',
-                    'class': ModelB,
+                    'type': 'model_class',
+                    'class_type': ModelB,
                     'model': {'type': 'model', 'fields': {'c': {'type': 'int'}, 'd': {'type': 'str'}}},
                 },
             ],
@@ -109,13 +109,13 @@ class TestModelClassSimilar:
             'type': 'union',
             'choices': [
                 {
-                    'type': 'model-class',
-                    'class': ModelA,
+                    'type': 'model_class',
+                    'class_type': ModelA,
                     'model': {'type': 'model', 'fields': {'a': {'type': 'int'}, 'b': {'type': 'str'}}},
                 },
                 {
-                    'type': 'model-class',
-                    'class': ModelB,
+                    'type': 'model_class',
+                    'class_type': ModelB,
                     'model': {
                         'type': 'model',
                         'fields': {'a': {'type': 'int'}, 'b': {'type': 'str'}, 'c': {'type': 'float', 'default': 1.0}},
