@@ -10,8 +10,8 @@ use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder, get_va
 #[derive(Debug, Clone)]
 pub struct DictValidator {
     strict: bool,
-    key_validator_id: Option<usize>,
-    value_validator_id: Option<usize>,
+    key_validator_id: usize,
+    value_validator_id: usize,
     min_items: Option<usize>,
     max_items: Option<usize>,
     try_instance_as_dict: bool,
@@ -28,12 +28,12 @@ impl BuildValidator for DictValidator {
         Ok(Self {
             strict: is_strict(schema, config)?,
             key_validator_id: match schema.get_item("keys") {
-                Some(schema) => Some(slots_builder.build_add_anon(schema, config)?),
-                None => None,
+                Some(schema) => slots_builder.build_add_anon(schema, config)?,
+                None => slots_builder.get_any_validator(),
             },
             value_validator_id: match schema.get_item("values") {
-                Some(schema) => Some(slots_builder.build_add_anon(schema, config)?),
-                None => None,
+                Some(schema) => slots_builder.build_add_anon(schema, config)?,
+                None => slots_builder.get_any_validator(),
             },
             min_items: schema.get_as("min_items")?,
             max_items: schema.get_as("max_items")?,
@@ -124,7 +124,7 @@ impl DictValidator {
 #[allow(clippy::too_many_arguments)]
 fn apply_validator<'s, 'data>(
     py: Python<'data>,
-    opt_validator_id: Option<usize>,
+    validator_id: usize,
     errors: &mut Vec<ValLineError<'data>>,
     input: &'data dyn Input,
     key: &'data dyn Input,
@@ -132,25 +132,20 @@ fn apply_validator<'s, 'data>(
     slots: &'data [ValidateEnum],
     key_loc: bool,
 ) -> ValResult<'data, Option<PyObject>> {
-    match opt_validator_id {
-        Some(validator_id) => {
-            let validator = get_validator(slots, validator_id)?;
-            match validator.validate(py, input, extra, slots) {
-                Ok(value) => Ok(Some(value)),
-                Err(ValError::LineErrors(line_errors)) => {
-                    let loc = if key_loc {
-                        vec![key.to_loc(), "[key]".to_loc()]
-                    } else {
-                        vec![key.to_loc()]
-                    };
-                    for err in line_errors {
-                        errors.push(err.with_prefix_location(&loc));
-                    }
-                    Ok(None)
-                }
-                Err(err) => Err(err),
+    let validator = get_validator(slots, validator_id)?;
+    match validator.validate(py, input, extra, slots) {
+        Ok(value) => Ok(Some(value)),
+        Err(ValError::LineErrors(line_errors)) => {
+            let loc = if key_loc {
+                vec![key.to_loc(), "[key]".to_loc()]
+            } else {
+                vec![key.to_loc()]
+            };
+            for err in line_errors {
+                errors.push(err.with_prefix_location(&loc));
             }
+            Ok(None)
         }
-        None => Ok(Some(input.to_py(py))),
+        Err(err) => Err(err),
     }
 }

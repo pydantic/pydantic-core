@@ -10,6 +10,13 @@ use super::{BuildValidator, Extra, ValidateEnum, Validator, SlotsBuilder};
 #[derive(Debug, Clone)]
 pub struct AnyValidator;
 
+
+impl AnyValidator {
+    pub fn build_simple() -> ValidateEnum {
+        Self.into()
+    }
+}
+
 impl BuildValidator for AnyValidator {
     const EXPECTED_TYPE: &'static str = "any";
 

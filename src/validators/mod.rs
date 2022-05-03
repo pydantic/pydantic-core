@@ -295,9 +295,13 @@ pub struct SlotsBuilder {
 
 impl SlotsBuilder {
     pub fn new() -> Self {
-        SlotsBuilder {
-            named_slots: Vec::new()
-        }
+        let mut named_slots: Vec<(Option<String>, Option<ValidateEnum>)> = Vec::new();
+        named_slots.push((None, Some(self::any::AnyValidator::build_simple())));
+        SlotsBuilder { named_slots }
+    }
+
+    pub fn get_any_validator(&self) -> usize {
+        0
     }
 
     pub fn add_anon(&mut self, validator: ValidateEnum) -> usize {
