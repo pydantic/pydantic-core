@@ -3,7 +3,7 @@ use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
-use crate::input::{Input, ListInput};
+use crate::input::{Input, GenericSequence};
 
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, ValResult, Validator};
 
@@ -74,7 +74,7 @@ impl ListValidator {
         &'s self,
         py: Python<'data>,
         input: &'data dyn Input,
-        list: ListInput<'data>,
+        list: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

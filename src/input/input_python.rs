@@ -5,7 +5,7 @@ use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet,
 
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
 
-use super::generics::{DictInput, ListInput};
+use super::generics::{DictInput, GenericSequence};
 use super::input_abstract::Input;
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 
@@ -160,7 +160,7 @@ impl Input for PyAny {
         }
     }
 
-    fn strict_list<'data>(&'data self) -> ValResult<ListInput<'data>> {
+    fn strict_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
         } else {
@@ -168,7 +168,7 @@ impl Input for PyAny {
         }
     }
 
-    fn lax_list<'data>(&'data self) -> ValResult<ListInput<'data>> {
+    fn lax_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
@@ -182,7 +182,7 @@ impl Input for PyAny {
         }
     }
 
-    fn strict_set<'data>(&'data self) -> ValResult<ListInput<'data>> {
+    fn strict_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         if let Ok(set) = self.cast_as::<PySet>() {
             Ok(set.into())
         } else {
@@ -190,7 +190,7 @@ impl Input for PyAny {
         }
     }
 
-    fn lax_set<'data>(&'data self) -> ValResult<ListInput<'data>> {
+    fn lax_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         if let Ok(set) = self.cast_as::<PySet>() {
             Ok(set.into())
         } else if let Ok(list) = self.cast_as::<PyList>() {

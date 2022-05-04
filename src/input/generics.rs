@@ -6,7 +6,7 @@ use pyo3::{ffi, AsPyPointer};
 use super::parse_json::{JsonArray, JsonObject};
 use super::{Input, ToPy};
 
-pub enum ListInput<'data> {
+pub enum GenericSequence<'data> {
     List(&'data PyList),
     Tuple(&'data PyTuple),
     Set(&'data PySet),
@@ -14,37 +14,37 @@ pub enum ListInput<'data> {
     JsonArray(&'data JsonArray),
 }
 
-impl<'data> From<&'data PyList> for ListInput<'data> {
+impl<'data> From<&'data PyList> for GenericSequence<'data> {
     fn from(sequence: &'data PyList) -> Self {
         Self::List(sequence)
     }
 }
 
-impl<'data> From<&'data PyTuple> for ListInput<'data> {
+impl<'data> From<&'data PyTuple> for GenericSequence<'data> {
     fn from(sequence: &'data PyTuple) -> Self {
         Self::Tuple(sequence)
     }
 }
 
-impl<'data> From<&'data PySet> for ListInput<'data> {
+impl<'data> From<&'data PySet> for GenericSequence<'data> {
     fn from(sequence: &'data PySet) -> Self {
         Self::Set(sequence)
     }
 }
 
-impl<'data> From<&'data PyFrozenSet> for ListInput<'data> {
+impl<'data> From<&'data PyFrozenSet> for GenericSequence<'data> {
     fn from(sequence: &'data PyFrozenSet) -> Self {
         Self::FrozenSet(sequence)
     }
 }
 
-impl<'data> From<&'data JsonArray> for ListInput<'data> {
+impl<'data> From<&'data JsonArray> for GenericSequence<'data> {
     fn from(sequence: &'data JsonArray) -> Self {
         Self::JsonArray(sequence)
     }
 }
 
-impl<'data> ListInput<'data> {
+impl<'data> GenericSequence<'data> {
     pub fn len(&self) -> usize {
         match self {
             Self::List(sequence) => sequence.len(),
@@ -191,127 +191,6 @@ impl<'data> SequenceNext<'data> for JsonArrayIterator<'data> {
         }
     }
 }
-
-// impl<'data> Iterator for JsonArrayIterator<'data> {
-//     type Item = &'data dyn Input;
-//
-//     #[inline]
-//     fn next(&mut self) -> Option<&'data dyn Input> {
-//         match self.list.get(self.index) {
-//             Some(item) => {
-//                 self.index += 1;
-//                 Some(item)
-//             }
-//             None => None,
-//         }
-//     }
-//
-//     #[inline]
-//     fn size_hint(&self) -> (usize, Option<usize>) {
-//         let len = self.list.len();
-//         (
-//             len.saturating_sub(self.index),
-//             Some(len.saturating_sub(self.index)),
-//         )
-//     }
-// }
-
-// impl<'data> InputSequence for JsonArrayIterator<'data> {
-//     #[inline]
-//     fn next(&mut self) -> Option<&dyn Input> {
-//         match self.list.get(self.index) {
-//             Some(item) => {
-//                 self.index += 1;
-//                 Some(item)
-//             }
-//             None => None,
-//         }
-//     }
-//
-//     #[inline]
-//     fn size_hint(&self) -> (usize, Option<usize>) {
-//         let len = self.list.len();
-//         (
-//             len.saturating_sub(self.index),
-//             Some(len.saturating_sub(self.index)),
-//         )
-//     }
-//
-//     fn input_len(&self) -> usize {
-//         self.list.len()
-//     }
-// }
-
-// impl<'data> ListIter<'data> for ListIterEnum<'data> {
-//     fn input_iter(&self) -> Box<dyn Iterator<Item=&'data dyn Input> + 'data> {
-//         match self {
-//             ListIterEnum::List(list) => Box::new(list.iter().map(|item| item as &dyn Input)),
-//             // ListIterEnum::Tuple(tuple) => Box::new(tuple.iter()),
-//             // ListIterEnum::Set(set) => Box::new(set.iter()),
-//             // ListIterEnum::FrozenSet(frozen_set) => Box::new(frozen_set.iter()),
-//             ListIterEnum::JsonArray(json_array) => Box::new(json_array.iter().map(|item| item as &dyn Input)),
-//         }
-//     }
-// }
-
-// // these are ugly, is there any way to avoid the maps in iter, one of the boxes and/or the duplication?
-// // is this harming performance, particularly the .map(|item| item)?
-// // https://stackoverflow.com/a/47156134/949890
-// pub trait ListInput<'data>: ToPy {
-//     fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data>;
-//
-//     fn input_len(&self) -> usize;
-// }
-//
-// impl<'data> ListInput<'data> for &'data PyList {
-//     fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data> {
-//         Box::new(self.iter().map(|item| item as &dyn Input))
-//     }
-//
-//     fn input_len(&self) -> usize {
-//         self.len()
-//     }
-// }
-//
-// impl<'data> ListInput<'data> for &'data PyTuple {
-//     fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data> {
-//         Box::new(self.iter().map(|item| item as &dyn Input))
-//     }
-//
-//     fn input_len(&self) -> usize {
-//         self.len()
-//     }
-// }
-//
-// impl<'data> ListInput<'data> for &'data PySet {
-//     fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data> {
-//         Box::new(self.iter().map(|item| item as &dyn Input))
-//     }
-//
-//     fn input_len(&self) -> usize {
-//         self.len()
-//     }
-// }
-//
-// impl<'data> ListInput<'data> for &'data PyFrozenSet {
-//     fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data> {
-//         Box::new(self.iter().map(|item| item as &dyn Input))
-//     }
-//
-//     fn input_len(&self) -> usize {
-//         self.len()
-//     }
-// }
-//
-// impl<'data> ListInput<'data> for &'data JsonArray {
-//     fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data> {
-//         Box::new(self.iter().map(|item| item as &dyn Input))
-//     }
-//
-//     fn input_len(&self) -> usize {
-//         self.len()
-//     }
-// }
 
 ///////////////////////
 

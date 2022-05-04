@@ -3,7 +3,7 @@ use pyo3::types::{PyDict, PySet};
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
-use crate::input::{Input, ListInput};
+use crate::input::{Input, GenericSequence};
 
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, ValResult, Validator};
 
@@ -74,7 +74,7 @@ impl SetValidator {
         &'s self,
         py: Python<'data>,
         input: &'data dyn Input,
-        set: ListInput<'data>,
+        set: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

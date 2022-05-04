@@ -4,7 +4,7 @@ use pyo3::types::PyType;
 
 use crate::errors::ValResult;
 
-use super::{DictInput, ListInput, ToLocItem, ToPy};
+use super::{DictInput, GenericSequence, ToLocItem, ToPy};
 
 pub trait Input: fmt::Debug + ToPy + ToLocItem {
     fn is_none(&self) -> bool;
@@ -33,15 +33,15 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
         self.strict_dict()
     }
 
-    fn strict_list<'data>(&'data self) -> ValResult<ListInput<'data>>;
+    fn strict_list<'data>(&'data self) -> ValResult<GenericSequence<'data>>;
 
-    fn lax_list<'data>(&'data self) -> ValResult<ListInput<'data>> {
+    fn lax_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         self.strict_list()
     }
 
-    fn strict_set<'data>(&'data self) -> ValResult<ListInput<'data>>;
+    fn strict_set<'data>(&'data self) -> ValResult<GenericSequence<'data>>;
 
-    fn lax_set<'data>(&'data self) -> ValResult<ListInput<'data>> {
+    fn lax_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         self.strict_set()
     }
 }

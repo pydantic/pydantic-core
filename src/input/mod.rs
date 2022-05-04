@@ -7,7 +7,7 @@ mod shared;
 mod to_loc_item;
 mod to_py;
 
-pub use generics::{DictInput, ListInput, SequenceNext};
+pub use generics::{DictInput, GenericSequence, SequenceNext};
 pub use input_abstract::Input;
 pub use parse_json::JsonInput;
 pub use to_loc_item::ToLocItem;
