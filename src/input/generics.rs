@@ -228,28 +228,34 @@ pub trait MappingLenIter<'data> {
 }
 
 impl<'data> MappingLenIter<'data> for &'data PyDict {
+    #[inline]
     fn generic_len(&self) -> usize {
         self.len()
     }
 
+    #[inline]
     fn generic_get(&self, key: &str) -> Option<&'data dyn Input> {
         self.get_item(key).map(|v| v as &dyn Input)
     }
 
+    #[inline]
     fn generic_iter(&self) -> GenericMappingIter<'data> {
         GenericMappingIter::PyDict(PyDictIterator { dict: self, index: 0 })
     }
 }
 
 impl<'data> MappingLenIter<'data> for &'data JsonObject {
+    #[inline]
     fn generic_len(&self) -> usize {
         self.len()
     }
 
+    #[inline]
     fn generic_get(&self, key: &str) -> Option<&'data dyn Input> {
         self.get(key).map(|v| v as &dyn Input)
     }
 
+    #[inline]
     fn generic_iter(&self) -> GenericMappingIter<'data> {
         GenericMappingIter::JsonObject(JsonObjectIterator { iter: self.iter() })
     }
