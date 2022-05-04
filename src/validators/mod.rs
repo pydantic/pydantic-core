@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use enum_dispatch::enum_dispatch;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyTuple};
+use pyo3::types::{PyAny, PyDict};
 use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
@@ -28,46 +28,36 @@ mod set;
 mod string;
 mod union;
 
-#[pyclass]
+#[pyclass(subclass)]
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {
-    validator: ValidateEnum,
+    validator: CombinedValidator,
     slots: Vec<CombinedValidator>,
+    #[pyo3(get, name = "_schema")]
     schema: Py<PyAny>,
-}
-
-fn build_schema_validator(py: Python, schema: &PyAny) -> PyResult<SchemaValidator> {
-    let mut slots_builder = SlotsBuilder::new();
-    let validator = match build_validator(schema, None, &mut slots_builder) {
-        Ok((v, _)) => v,
-        Err(err) => {
-            return Err(match err.is_instance_of::<SchemaError>(py) {
-                true => err,
-                false => SchemaError::new_err(format!("Schema build error:\n  {}", err)),
-            });
-        }
-    };
-    let slots = slots_builder.into_slots()?;
-    Ok(Self { validator, slots })
-}
-
-#[pyfunction]
-fn build_schema_validator_py(schema: &PyAny) -> PyResult<SchemaValidator> {
-    Python::with_gil(|py| build_schema_validator(py, schema))
 }
 
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(py: Python, schema: &PyAny) -> PyResult<SchemaValidator> {
-        build_schema_validator(py, schema)
-    }
-
-    fn __reduce__<'py>(&self, py: Python<'py>) -> &'py PyTuple {
-        PyTuple::new(py, vec![self.schema.as_ref(py)]) // TODO: return a ref to build_schema_validator_py?
-
     pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
-        build_schema_validator(py, schema)
+        let mut slots_builder = SlotsBuilder::new();
+        let validator = match build_validator(schema, None, &mut slots_builder) {
+            Ok((v, _)) => v,
+            Err(err) => {
+                return Err(match err.is_instance_of::<SchemaError>(py) {
+                    true => err,
+                    false => SchemaError::new_err(format!("Schema build error:\n  {}", err)),
+                });
+            }
+        };
+        let pyschema: Py<PyAny> = schema.into();
+        let slots = slots_builder.into_slots()?;
+        Ok(Self {
+            validator,
+            slots,
+            schema: pyschema,
+        })
     }
 
     fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
