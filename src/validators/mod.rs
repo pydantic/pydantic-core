@@ -3,12 +3,12 @@ use std::fmt::Debug;
 use enum_dispatch::enum_dispatch;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::types::{PyAny, PyDict, PyTuple};
 use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
-use crate::input::{Input, JsonInput};
+use crate::input::{Input, JsonInput, ToPy};
 use crate::SchemaError;
 
 mod any;
@@ -28,19 +28,18 @@ mod set;
 mod string;
 mod union;
 
-#[pyclass(subclass)]
+#[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {
     validator: CombinedValidator,
     slots: Vec<CombinedValidator>,
-    #[pyo3(get, name = "_schema")]
     schema: Py<PyAny>,
 }
 
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
+    pub fn py_new(py: Python, schema: &PyAny) -> PyResult<SchemaValidator> {
         let mut slots_builder = SlotsBuilder::new();
         let validator = match build_validator(schema, None, &mut slots_builder) {
             Ok((v, _)) => v,
@@ -52,11 +51,17 @@ impl SchemaValidator {
             }
         };
         let slots = slots_builder.into_slots()?;
-        Ok(Self {
+        Ok(SchemaValidator {
             validator,
             slots,
             schema: Into::<Py<PyAny>>::into(schema),
         })
+    }
+
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<&'py PyTuple> {
+        let args = PyTuple::new(py, vec![self.schema.as_ref(py)]);
+        let cls = Py::new(py, self.to_owned())?.getattr(py, "__class__")?;
+        Ok(PyTuple::new(py, vec![cls, args.to_py(py)]))
     }
 
     fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
