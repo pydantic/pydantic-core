@@ -3,7 +3,7 @@ use pyo3::types::{PyDict, PySet};
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
-use crate::input::{GenericSequence, Input};
+use crate::input::{GenericSequence, Input, SequenceLenIter};
 
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, ValResult, Validator};
 
@@ -78,7 +78,7 @@ impl SetValidator {
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        let length = set.len();
+        let length = set.length();
         if let Some(min_length) = self.min_items {
             if length < min_length {
                 return err_val_error!(

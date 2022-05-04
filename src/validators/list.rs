@@ -3,7 +3,7 @@ use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
-use crate::input::{GenericSequence, Input};
+use crate::input::{GenericSequence, Input, SequenceLenIter};
 
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, ValResult, Validator};
 
@@ -78,7 +78,7 @@ impl ListValidator {
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        let length = list.len();
+        let length = list.length();
         if let Some(min_length) = self.min_items {
             if length < min_length {
                 return err_val_error!(

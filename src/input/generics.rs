@@ -7,6 +7,7 @@ use pyo3::{ffi, AsPyPointer};
 use super::parse_json::{JsonArray, JsonInput, JsonObject};
 use super::Input;
 
+#[enum_dispatch]
 pub enum GenericSequence<'data> {
     List(&'data PyList),
     Tuple(&'data PyTuple),
@@ -15,59 +16,59 @@ pub enum GenericSequence<'data> {
     JsonArray(&'data JsonArray),
 }
 
-impl<'data> From<&'data PyList> for GenericSequence<'data> {
-    fn from(sequence: &'data PyList) -> Self {
-        Self::List(sequence)
+#[enum_dispatch(GenericSequence)]
+pub trait SequenceLenIter<'data> {
+    fn length(&self) -> usize;
+    fn iter(&self) -> GenericSequenceIter<'data>;
+}
+
+impl<'data> SequenceLenIter<'data> for &'data PyList {
+    fn length(&self) -> usize {
+        self.len()
+    }
+    fn iter(&self) -> GenericSequenceIter<'data> {
+        GenericSequenceIter::List(PyListIterator { sequence: self, index: 0 })
     }
 }
 
-impl<'data> From<&'data PyTuple> for GenericSequence<'data> {
-    fn from(sequence: &'data PyTuple) -> Self {
-        Self::Tuple(sequence)
+impl<'data> SequenceLenIter<'data> for &'data PyTuple {
+    fn length(&self) -> usize {
+        self.len()
+    }
+    fn iter(&self) -> GenericSequenceIter<'data> {
+        GenericSequenceIter::Tuple(PyTupleIterator {
+            sequence: self,
+            index: 0,
+            length: self.len(),
+        })
     }
 }
 
-impl<'data> From<&'data PySet> for GenericSequence<'data> {
-    fn from(sequence: &'data PySet) -> Self {
-        Self::Set(sequence)
+impl<'data> SequenceLenIter<'data> for &'data PySet {
+    fn length(&self) -> usize {
+        self.len()
+    }
+    fn iter(&self) -> GenericSequenceIter<'data> {
+        GenericSequenceIter::Set(PySetIterator { sequence: self, index: 0 })
     }
 }
 
-impl<'data> From<&'data PyFrozenSet> for GenericSequence<'data> {
-    fn from(sequence: &'data PyFrozenSet) -> Self {
-        Self::FrozenSet(sequence)
+impl<'data> SequenceLenIter<'data> for &'data PyFrozenSet {
+    fn length(&self) -> usize {
+        self.len()
+    }
+    fn iter(&self) -> GenericSequenceIter<'data> {
+        GenericSequenceIter::FrozenSet(PyFrozenSetIterator { sequence: self, index: 0 })
     }
 }
 
-impl<'data> From<&'data JsonArray> for GenericSequence<'data> {
-    fn from(sequence: &'data JsonArray) -> Self {
-        Self::JsonArray(sequence)
-    }
-}
-
-impl<'data> GenericSequence<'data> {
-    pub fn len(&self) -> usize {
-        match self {
-            Self::List(sequence) => sequence.len(),
-            Self::Tuple(sequence) => sequence.len(),
-            Self::Set(sequence) => sequence.len(),
-            Self::FrozenSet(sequence) => sequence.len(),
-            Self::JsonArray(sequence) => sequence.len(),
-        }
+impl<'data> SequenceLenIter<'data> for &'data JsonArray {
+    fn length(&self) -> usize {
+        self.len()
     }
 
-    pub fn iter(&self) -> GenericSequenceIter<'data> {
-        match self {
-            Self::List(sequence) => GenericSequenceIter::List(PyListIterator { sequence, index: 0 }),
-            Self::Tuple(sequence) => GenericSequenceIter::Tuple(PyTupleIterator {
-                sequence,
-                index: 0,
-                length: sequence.len(),
-            }),
-            Self::Set(sequence) => GenericSequenceIter::Set(PySetIterator { sequence, index: 0 }),
-            Self::FrozenSet(sequence) => GenericSequenceIter::FrozenSet(PyFrozenSetIterator { sequence, index: 0 }),
-            Self::JsonArray(sequence) => GenericSequenceIter::JsonArray(JsonArrayIterator { sequence, index: 0 }),
-        }
+    fn iter(&self) -> GenericSequenceIter<'data> {
+        GenericSequenceIter::JsonArray(JsonArrayIterator { sequence: self, index: 0 })
     }
 }
 
