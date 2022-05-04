@@ -15,6 +15,17 @@ use crate::errors::{LocItem, ValResult};
 pub enum CombinedInput<'data> {
     Py(&'data PyAny),
     Json(&'data JsonInput),
+    String(&'data String),
+}
+
+impl<'data> CombinedInput<'data> {
+    pub fn duplicate(&'data self) -> CombinedInput<'data> {
+        match self {
+            CombinedInput::Py(py) => CombinedInput::Py(py),
+            CombinedInput::Json(json) => CombinedInput::Json(json),
+            CombinedInput::String(string) => CombinedInput::String(string),
+        }
+    }
 }
 
 #[enum_dispatch(CombinedInput)]

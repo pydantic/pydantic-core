@@ -58,7 +58,8 @@ impl SchemaValidator {
             data: None,
             field: None,
         };
-        let r = self.validator.validate(py, input.into(), &extra, &self.slots);
+        let generic_input: CombinedInput = input.into();
+        let r = self.validator.validate(py, generic_input, &extra, &self.slots);
         r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
     }
 
@@ -90,7 +91,8 @@ impl SchemaValidator {
             data: Some(data),
             field: Some(field.as_str()),
         };
-        let r = self.validator.validate(py, input.into(), &extra, &self.slots);
+        let generic_input: CombinedInput = input.into();
+        let r = self.validator.validate(py, generic_input, &extra, &self.slots);
         r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
     }
 

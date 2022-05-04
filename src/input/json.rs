@@ -125,16 +125,6 @@ impl ToPy for &JsonArray {
     }
 }
 
-// impl<'data> ListInput<'data> for &'data JsonArray {
-//     fn input_iter(&self) -> Box<dyn Iterator<Item = &'data dyn Input> + 'data> {
-//         Box::new(self.iter().map(|item| item as &dyn Input))
-//     }
-//
-//     fn input_len(&self) -> usize {
-//         self.len()
-//     }
-// }
-
 impl ToPy for &JsonObject {
     #[inline]
     fn to_py(&self, py: Python) -> PyObject {
@@ -145,20 +135,6 @@ impl ToPy for &JsonObject {
         dict.into_py(py)
     }
 }
-
-// impl<'data> DictInput<'data> for &'data JsonObject {
-//     fn input_iter(&self) -> Box<dyn Iterator<Item = (&'data dyn Input, &'data dyn Input)> + 'data> {
-//         Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
-//     }
-//
-//     fn input_get(&self, key: &str) -> Option<&'data dyn Input> {
-//         self.get(key).map(|item| item as &dyn Input)
-//     }
-//
-//     fn input_len(&self) -> usize {
-//         self.len()
-//     }
-// }
 
 impl ToPy for &JsonInput {
     fn to_py(&self, py: Python) -> PyObject {

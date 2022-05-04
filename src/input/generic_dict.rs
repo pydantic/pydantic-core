@@ -22,14 +22,14 @@ impl<'d> From<&'d JsonObject> for GenericDict<'d> {
 }
 
 impl<'data> GenericDict<'data> {
-    pub fn input_iter(&self) -> impl Iterator<Item = (CombinedInput, CombinedInput)> {
+    pub fn input_iter(&self) -> Box<dyn Iterator<Item = (CombinedInput<'data>, CombinedInput<'data>)> + 'data> {
         match self {
-            Self::Py(list) => list.iter().map(|(k, v)| (k.into(), v.into())),
-            Self::Json(json) => json.iter().map(|item| item.into()),
+            Self::Py(list) => Box::new(list.iter().map(|(k, v)| (k.into(), v.into()))),
+            Self::Json(json) => Box::new(json.iter().map(|(k, v)| (k.into(), v.into()))),
         }
     }
 
-    pub fn input_get(&self, key: &str) -> Option<CombinedInput> {
+    pub fn input_get(&self, key: &str) -> Option<CombinedInput<'data>> {
         match self {
             Self::Py(list) => list.get_item(key).map(|v| v.into()),
             Self::Json(json) => json.get(key).map(|v| v.into()),

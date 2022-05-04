@@ -43,12 +43,13 @@ impl<'d> From<&'d JsonArray> for ListInput<'d> {
 }
 
 impl<'data> ListInput<'data> {
-    pub fn input_iter(&self) -> impl Iterator<Item = CombinedInput> {
+    pub fn input_iter(&self) -> Box<dyn Iterator<Item = CombinedInput<'data>> + 'data> {
         match self {
-            Self::PyList(list) => list.iter().map(|item| item.into()),
-            Self::PySet(set) => set.iter().map(|item| item.into()),
-            Self::PyTuple(tuple) => tuple.iter().map(|item| item.into()),
-            Self::Json(json) => json.iter().map(|item| item.into()),
+            Self::PyList(list) => Box::new(list.iter().map(|item| item.into())),
+            Self::PySet(set) => Box::new(set.iter().map(|item| item.into())),
+            Self::PyTuple(tuple) => Box::new(tuple.iter().map(|item| item.into())),
+            Self::PyFrozenSet(s) => Box::new(s.iter().map(|item| item.into())),
+            Self::Json(json) => Box::new(json.iter().map(|item| item.into())),
         }
     }
 
@@ -57,6 +58,7 @@ impl<'data> ListInput<'data> {
             Self::PyList(list) => list.len(),
             Self::PySet(set) => set.len(),
             Self::PyTuple(tuple) => tuple.len(),
+            Self::PyFrozenSet(set) => set.len(),
             Self::Json(json) => json.len(),
         }
     }

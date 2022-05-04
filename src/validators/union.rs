@@ -41,7 +41,7 @@ impl Validator for UnionValidator {
         if let Some(res) = self
             .choices
             .iter()
-            .map(|validator| validator.validate_strict(py, input, extra, slots))
+            .map(|validator| validator.validate_strict(py, input.duplicate(), extra, slots))
             .find(ValResult::is_ok)
         {
             return res;
@@ -51,7 +51,7 @@ impl Validator for UnionValidator {
 
         // 3rd pass: check if the value can be coerced into one of the Union types
         for validator in &self.choices {
-            let line_errors = match validator.validate(py, input, extra, slots) {
+            let line_errors = match validator.validate(py, input.duplicate(), extra, slots) {
                 Err(ValError::LineErrors(line_errors)) => line_errors,
                 otherwise => return otherwise,
             };
