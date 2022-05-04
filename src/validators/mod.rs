@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::types::{PyAny, PyDict, PyTuple};
 use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
@@ -33,23 +33,40 @@ use self::recursive::ValidatorArc;
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {
     validator: ValidateEnum,
+    schema: Py<PyAny>,
+}
+
+fn build_schema_validator(py: Python, schema: &PyAny) -> PyResult<SchemaValidator> {
+    let validator = match build_validator(schema, None) {
+        Ok((v, _)) => v,
+        Err(err) => {
+            return Err(match err.is_instance_of::<SchemaError>(py) {
+                true => err,
+                false => SchemaError::new_err(format!("Schema build error:\n  {}", err)),
+            });
+        }
+    };
+    let pyschema: Py<PyAny> = schema.into();
+    Ok(SchemaValidator {
+        validator,
+        schema: pyschema,
+    })
+}
+
+#[pyfunction]
+fn build_schema_validator_py(schema: &PyAny) -> PyResult<SchemaValidator> {
+    Python::with_gil(|py| build_schema_validator(py, schema))
 }
 
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
-        let validator = match build_validator(schema, None) {
-            Ok((v, _)) => v,
-            Err(err) => {
-                return Err(match err.is_instance_of::<SchemaError>(py) {
-                    true => err,
-                    false => SchemaError::new_err(format!("Schema build error:\n  {}", err)),
-                });
-            }
-        };
+    pub fn py_new(py: Python, schema: &PyAny) -> PyResult<SchemaValidator> {
+        build_schema_validator(py, schema)
+    }
 
-        Ok(Self { validator })
+    fn __reduce__<'py>(&self, py: Python<'py>) -> &'py PyTuple {
+        PyTuple::new(py, vec![self.schema.as_ref(py)]) // TODO: return a ref to build_schema_validator_py?
     }
 
     fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {

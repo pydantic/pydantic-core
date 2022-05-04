@@ -1,3 +1,5 @@
+import pickle
+
 import pytest
 
 from pydantic_core import SchemaError, SchemaValidator
@@ -39,3 +41,12 @@ def test_schema_wrong_type():
     assert exc_info.value.args[0] == (
         "Schema build error:\n  TypeError: 'int' object cannot be converted to 'PyString'"
     )
+
+
+def test_pickle():
+    v1 = SchemaValidator({'type': 'bool'})
+    assert v1.validate_python('tRuE') is True
+    p = pickle.dumps(v1)
+    v2 = pickle.loads(p)
+    assert v2.validate_python('tRuE') is True
+    assert repr(v1) == repr(v2)
