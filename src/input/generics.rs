@@ -1,10 +1,11 @@
 use enum_dispatch::enum_dispatch;
+use indexmap::map::Iter;
 
 use pyo3::types::{PyAny, PyDict, PyFrozenSet, PyList, PySet, PyTuple};
 use pyo3::{ffi, AsPyPointer};
 
-use super::parse_json::{JsonArray, JsonObject};
-use super::{Input, ToPy};
+use super::parse_json::{JsonArray, JsonInput, JsonObject};
+use super::Input;
 
 pub enum GenericSequence<'data> {
     List(&'data PyList),
@@ -192,40 +193,99 @@ impl<'data> SequenceNext<'data> for JsonArrayIterator<'data> {
     }
 }
 
-///////////////////////
-
-pub trait DictInput<'data>: ToPy {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = (&'data dyn Input, &'data dyn Input)> + 'data>;
-
-    fn input_get(&self, key: &str) -> Option<&'data dyn Input>;
-
-    fn input_len(&self) -> usize;
+pub enum GenericMapping<'data> {
+    PyDict(&'data PyDict),
+    JsonObject(&'data JsonObject),
 }
 
-impl<'data> DictInput<'data> for &'data PyDict {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = (&'data dyn Input, &'data dyn Input)> + 'data> {
-        Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
-    }
-
-    fn input_get(&self, key: &str) -> Option<&'data dyn Input> {
-        self.get_item(key).map(|item| item as &dyn Input)
-    }
-
-    fn input_len(&self) -> usize {
-        self.len()
+impl<'data> From<&'data PyDict> for GenericMapping<'data> {
+    fn from(dict: &'data PyDict) -> Self {
+        Self::PyDict(dict)
     }
 }
 
-impl<'data> DictInput<'data> for &'data JsonObject {
-    fn input_iter(&self) -> Box<dyn Iterator<Item = (&'data dyn Input, &'data dyn Input)> + 'data> {
-        Box::new(self.iter().map(|(k, v)| (k as &dyn Input, v as &dyn Input)))
+impl<'data> From<&'data JsonObject> for GenericMapping<'data> {
+    fn from(dict: &'data JsonObject) -> Self {
+        Self::JsonObject(dict)
+    }
+}
+
+impl<'data> GenericMapping<'data> {
+    pub fn len(&self) -> usize {
+        match self {
+            Self::PyDict(dict) => dict.len(),
+            Self::JsonObject(dict) => dict.len(),
+        }
     }
 
-    fn input_get(&self, key: &str) -> Option<&'data dyn Input> {
-        self.get(key).map(|item| item as &dyn Input)
+    pub fn get(&self, key: &str) -> Option<&'data dyn Input> {
+        match self {
+            Self::PyDict(dict) => dict.get_item(key).map(|v| v as &dyn Input),
+            Self::JsonObject(dict) => dict.get(key).map(|v| v as &dyn Input),
+        }
     }
 
-    fn input_len(&self) -> usize {
-        self.len()
+    pub fn iter(&self) -> GenericMappingIter<'data> {
+        match self {
+            Self::PyDict(dict) => GenericMappingIter::PyDict(PyDictIterator { dict, index: 0 }),
+            Self::JsonObject(dict) => GenericMappingIter::JsonObject(JsonObjectIterator { iter: dict.iter() }),
+        }
+    }
+}
+
+#[enum_dispatch]
+pub enum GenericMappingIter<'data> {
+    PyDict(PyDictIterator<'data>),
+    JsonObject(JsonObjectIterator<'data>),
+}
+
+/// helper trait implemented by all types in GenericMappingIter which is used when for the shared implementation of
+/// `Iterator` for `GenericMappingIter`
+#[enum_dispatch(GenericMappingIter)]
+pub trait DictNext<'data> {
+    fn _next(&mut self) -> Option<(&'data dyn Input, &'data dyn Input)>;
+}
+
+impl<'data> Iterator for GenericMappingIter<'data> {
+    type Item = (&'data dyn Input, &'data dyn Input);
+
+    #[inline]
+    fn next(&mut self) -> Option<(&'data dyn Input, &'data dyn Input)> {
+        self._next()
+    }
+}
+
+pub struct PyDictIterator<'data> {
+    dict: &'data PyDict,
+    index: isize,
+}
+
+impl<'data> DictNext<'data> for PyDictIterator<'data> {
+    #[inline]
+    fn _next(&mut self) -> Option<(&'data dyn Input, &'data dyn Input)> {
+        unsafe {
+            let mut key: *mut ffi::PyObject = std::ptr::null_mut();
+            let mut value: *mut ffi::PyObject = std::ptr::null_mut();
+            if ffi::PyDict_Next(self.dict.as_ptr(), &mut self.index, &mut key, &mut value) != 0 {
+                let py = self.dict.py();
+                // PyDict_Next returns borrowed values; for safety must make them owned (see #890)
+                let key: &PyAny = py.from_owned_ptr(ffi::_Py_NewRef(key));
+                let value: &PyAny = py.from_owned_ptr(ffi::_Py_NewRef(value));
+                Some((key, value))
+            } else {
+                None
+            }
+        }
+    }
+}
+
+pub struct JsonObjectIterator<'a> {
+    iter: Iter<'a, String, JsonInput>,
+}
+
+impl<'data> DictNext<'data> for JsonObjectIterator<'data> {
+    #[inline]
+    fn _next(&mut self) -> Option<(&'data dyn Input, &'data dyn Input)> {
+        self.iter.next().map(|(k, v)| (k as &dyn Input, v as &dyn Input))
     }
 }

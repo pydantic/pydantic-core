@@ -5,7 +5,7 @@ use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet,
 
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
 
-use super::generics::{DictInput, GenericSequence};
+use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 
@@ -118,17 +118,17 @@ impl Input for PyAny {
         self.get_type().eq(class).map_err(as_internal)
     }
 
-    fn strict_dict<'data>(&'data self) -> ValResult<Box<dyn DictInput<'data> + 'data>> {
+    fn strict_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
-            Ok(Box::new(dict))
+            Ok(dict.into())
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DictType)
         }
     }
 
-    fn lax_dict<'data>(&'data self, try_instance: bool) -> ValResult<Box<dyn DictInput<'data> + 'data>> {
+    fn lax_dict<'data>(&'data self, try_instance: bool) -> ValResult<GenericMapping<'data>> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
-            Ok(Box::new(dict))
+            Ok(dict.into())
         } else if let Ok(mapping) = self.cast_as::<PyMapping>() {
             // this is ugly, but we'd have to do it in `input_iter` anyway
             // we could perhaps use an indexmap instead of a python dict?
@@ -142,7 +142,7 @@ impl Input for PyAny {
                     )
                 }
             };
-            Ok(Box::new(dict))
+            Ok(dict.into())
         } else if try_instance {
             let inner_dict = match instance_as_dict(self) {
                 Ok(dict) => dict,
