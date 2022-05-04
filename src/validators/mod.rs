@@ -51,12 +51,11 @@ impl SchemaValidator {
                 });
             }
         };
-        let pyschema: Py<PyAny> = schema.into();
         let slots = slots_builder.into_slots()?;
         Ok(Self {
             validator,
             slots,
-            schema: pyschema,
+            schema: Into::<Py<PyAny>>::into(schema),
         })
     }
 
