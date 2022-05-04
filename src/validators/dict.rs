@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input, ToLocItem};
+use crate::input::{GenericMapping, Input, MappingLenIter, ToLocItem};
 
 use super::any::AnyValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, SlotsBuilder, Validator};
@@ -84,7 +84,7 @@ impl DictValidator {
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         if let Some(min_length) = self.min_items {
-            if dict.len() < min_length {
+            if dict.generic_len() < min_length {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::DictTooShort,
@@ -93,7 +93,7 @@ impl DictValidator {
             }
         }
         if let Some(max_length) = self.max_items {
-            if dict.len() > max_length {
+            if dict.generic_len() > max_length {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::DictTooLong,
@@ -104,7 +104,7 @@ impl DictValidator {
         let output = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
 
-        for (key, value) in dict.iter() {
+        for (key, value) in dict.generic_iter() {
             let output_key: Option<PyObject> =
                 apply_validator(py, &self.key_validator, &mut errors, key, key, extra, slots, true)?;
             let output_value: Option<PyObject> =

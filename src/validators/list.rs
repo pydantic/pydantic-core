@@ -78,7 +78,7 @@ impl ListValidator {
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        let length = list.length();
+        let length = list.generic_len();
         if let Some(min_length) = self.min_items {
             if length < min_length {
                 return err_val_error!(
@@ -102,7 +102,7 @@ impl ListValidator {
             Some(ref validator) => {
                 let mut output: Vec<PyObject> = Vec::with_capacity(length);
                 let mut errors: Vec<ValLineError> = Vec::new();
-                for (index, item) in list.iter().enumerate() {
+                for (index, item) in list.generic_iter().enumerate() {
                     match validator.validate(py, item, extra, slots) {
                         Ok(item) => output.push(item),
                         Err(ValError::LineErrors(line_errors)) => {
@@ -119,7 +119,7 @@ impl ListValidator {
                 }
             }
             None => {
-                let output: Vec<PyObject> = list.iter().map(|item| item.to_py(py)).collect();
+                let output: Vec<PyObject> = list.generic_iter().map(|item| item.to_py(py)).collect();
                 Ok(PyList::new(py, &output).into_py(py))
             }
         }

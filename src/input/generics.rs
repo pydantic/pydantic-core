@@ -18,24 +18,30 @@ pub enum GenericSequence<'data> {
 
 #[enum_dispatch(GenericSequence)]
 pub trait SequenceLenIter<'data> {
-    fn length(&self) -> usize;
-    fn iter(&self) -> GenericSequenceIter<'data>;
+    fn generic_len(&self) -> usize;
+
+    fn generic_iter(&self) -> GenericSequenceIter<'data>;
 }
 
 impl<'data> SequenceLenIter<'data> for &'data PyList {
-    fn length(&self) -> usize {
+    fn generic_len(&self) -> usize {
         self.len()
     }
-    fn iter(&self) -> GenericSequenceIter<'data> {
-        GenericSequenceIter::List(PyListIterator { sequence: self, index: 0 })
+
+    fn generic_iter(&self) -> GenericSequenceIter<'data> {
+        GenericSequenceIter::List(PyListIterator {
+            sequence: self,
+            index: 0,
+        })
     }
 }
 
 impl<'data> SequenceLenIter<'data> for &'data PyTuple {
-    fn length(&self) -> usize {
+    fn generic_len(&self) -> usize {
         self.len()
     }
-    fn iter(&self) -> GenericSequenceIter<'data> {
+
+    fn generic_iter(&self) -> GenericSequenceIter<'data> {
         GenericSequenceIter::Tuple(PyTupleIterator {
             sequence: self,
             index: 0,
@@ -45,30 +51,41 @@ impl<'data> SequenceLenIter<'data> for &'data PyTuple {
 }
 
 impl<'data> SequenceLenIter<'data> for &'data PySet {
-    fn length(&self) -> usize {
+    fn generic_len(&self) -> usize {
         self.len()
     }
-    fn iter(&self) -> GenericSequenceIter<'data> {
-        GenericSequenceIter::Set(PySetIterator { sequence: self, index: 0 })
+
+    fn generic_iter(&self) -> GenericSequenceIter<'data> {
+        GenericSequenceIter::Set(PySetIterator {
+            sequence: self,
+            index: 0,
+        })
     }
 }
 
 impl<'data> SequenceLenIter<'data> for &'data PyFrozenSet {
-    fn length(&self) -> usize {
+    fn generic_len(&self) -> usize {
         self.len()
     }
-    fn iter(&self) -> GenericSequenceIter<'data> {
-        GenericSequenceIter::FrozenSet(PyFrozenSetIterator { sequence: self, index: 0 })
+
+    fn generic_iter(&self) -> GenericSequenceIter<'data> {
+        GenericSequenceIter::FrozenSet(PyFrozenSetIterator {
+            sequence: self,
+            index: 0,
+        })
     }
 }
 
 impl<'data> SequenceLenIter<'data> for &'data JsonArray {
-    fn length(&self) -> usize {
+    fn generic_len(&self) -> usize {
         self.len()
     }
 
-    fn iter(&self) -> GenericSequenceIter<'data> {
-        GenericSequenceIter::JsonArray(JsonArrayIterator { sequence: self, index: 0 })
+    fn generic_iter(&self) -> GenericSequenceIter<'data> {
+        GenericSequenceIter::JsonArray(JsonArrayIterator {
+            sequence: self,
+            index: 0,
+        })
     }
 }
 
@@ -194,43 +211,47 @@ impl<'data> SequenceNext<'data> for JsonArrayIterator<'data> {
     }
 }
 
+#[enum_dispatch]
 pub enum GenericMapping<'data> {
     PyDict(&'data PyDict),
     JsonObject(&'data JsonObject),
 }
 
-impl<'data> From<&'data PyDict> for GenericMapping<'data> {
-    fn from(dict: &'data PyDict) -> Self {
-        Self::PyDict(dict)
+// TODO work out how to avoid recursive error - should be `len`, `get` and `iter`
+#[enum_dispatch(GenericMapping)]
+pub trait MappingLenIter<'data> {
+    fn generic_len(&self) -> usize;
+
+    fn generic_get(&self, key: &str) -> Option<&'data dyn Input>;
+
+    fn generic_iter(&self) -> GenericMappingIter<'data>;
+}
+
+impl<'data> MappingLenIter<'data> for &'data PyDict {
+    fn generic_len(&self) -> usize {
+        self.len()
+    }
+
+    fn generic_get(&self, key: &str) -> Option<&'data dyn Input> {
+        self.get_item(key).map(|v| v as &dyn Input)
+    }
+
+    fn generic_iter(&self) -> GenericMappingIter<'data> {
+        GenericMappingIter::PyDict(PyDictIterator { dict: self, index: 0 })
     }
 }
 
-impl<'data> From<&'data JsonObject> for GenericMapping<'data> {
-    fn from(dict: &'data JsonObject) -> Self {
-        Self::JsonObject(dict)
-    }
-}
-
-impl<'data> GenericMapping<'data> {
-    pub fn len(&self) -> usize {
-        match self {
-            Self::PyDict(dict) => dict.len(),
-            Self::JsonObject(dict) => dict.len(),
-        }
+impl<'data> MappingLenIter<'data> for &'data JsonObject {
+    fn generic_len(&self) -> usize {
+        self.len()
     }
 
-    pub fn get(&self, key: &str) -> Option<&'data dyn Input> {
-        match self {
-            Self::PyDict(dict) => dict.get_item(key).map(|v| v as &dyn Input),
-            Self::JsonObject(dict) => dict.get(key).map(|v| v as &dyn Input),
-        }
+    fn generic_get(&self, key: &str) -> Option<&'data dyn Input> {
+        self.get(key).map(|v| v as &dyn Input)
     }
 
-    pub fn iter(&self) -> GenericMappingIter<'data> {
-        match self {
-            Self::PyDict(dict) => GenericMappingIter::PyDict(PyDictIterator { dict, index: 0 }),
-            Self::JsonObject(dict) => GenericMappingIter::JsonObject(JsonObjectIterator { iter: dict.iter() }),
-        }
+    fn generic_iter(&self) -> GenericMappingIter<'data> {
+        GenericMappingIter::JsonObject(JsonObjectIterator { iter: self.iter() })
     }
 }
 
