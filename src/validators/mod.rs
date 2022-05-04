@@ -39,7 +39,7 @@ pub struct SchemaValidator {
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(py: Python, schema: &PyAny) -> PyResult<SchemaValidator> {
+    pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
         let mut slots_builder = SlotsBuilder::new();
         let validator = match build_validator(schema, None, &mut slots_builder) {
             Ok((v, _)) => v,
@@ -51,7 +51,7 @@ impl SchemaValidator {
             }
         };
         let slots = slots_builder.into_slots()?;
-        Ok(SchemaValidator {
+        Ok(Self {
             validator,
             slots,
             schema: Into::<Py<PyAny>>::into(schema),
