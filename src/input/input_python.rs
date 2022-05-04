@@ -160,45 +160,45 @@ impl Input for PyAny {
         }
     }
 
-    fn strict_list<'data>(&'data self) -> ValResult<Box<dyn ListInput + 'data>> {
+    fn strict_list<'data>(&'data self) -> ValResult<ListInput<'data>> {
         if let Ok(list) = self.cast_as::<PyList>() {
-            Ok(Box::new(list))
+            Ok(list.into())
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::ListType)
         }
     }
 
-    fn lax_list<'data>(&'data self) -> ValResult<Box<dyn ListInput + 'data>> {
+    fn lax_list<'data>(&'data self) -> ValResult<ListInput<'data>> {
         if let Ok(list) = self.cast_as::<PyList>() {
-            Ok(Box::new(list))
+            Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
-            Ok(Box::new(tuple))
+            Ok(tuple.into())
         } else if let Ok(set) = self.cast_as::<PySet>() {
-            Ok(Box::new(set))
+            Ok(set.into())
         } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
-            Ok(Box::new(frozen_set))
+            Ok(frozen_set.into())
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::ListType)
         }
     }
 
-    fn strict_set<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>> {
+    fn strict_set<'data>(&'data self) -> ValResult<ListInput<'data>> {
         if let Ok(set) = self.cast_as::<PySet>() {
-            Ok(Box::new(set))
+            Ok(set.into())
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType)
         }
     }
 
-    fn lax_set<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>> {
+    fn lax_set<'data>(&'data self) -> ValResult<ListInput<'data>> {
         if let Ok(set) = self.cast_as::<PySet>() {
-            Ok(Box::new(set))
+            Ok(set.into())
         } else if let Ok(list) = self.cast_as::<PyList>() {
-            Ok(Box::new(list))
+            Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
-            Ok(Box::new(tuple))
+            Ok(tuple.into())
         } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
-            Ok(Box::new(frozen_set))
+            Ok(frozen_set.into())
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType)
         }

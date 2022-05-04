@@ -33,15 +33,15 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
         self.strict_dict()
     }
 
-    fn strict_list<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>>;
+    fn strict_list<'data>(&'data self) -> ValResult<ListInput<'data>>;
 
-    fn lax_list<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>> {
+    fn lax_list<'data>(&'data self) -> ValResult<ListInput<'data>> {
         self.strict_list()
     }
 
-    fn strict_set<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>>;
+    fn strict_set<'data>(&'data self) -> ValResult<ListInput<'data>>;
 
-    fn lax_set<'data>(&'data self) -> ValResult<Box<dyn ListInput<'data> + 'data>> {
+    fn lax_set<'data>(&'data self) -> ValResult<ListInput<'data>> {
         self.strict_set()
     }
 }
