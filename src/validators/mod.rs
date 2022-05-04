@@ -59,7 +59,7 @@ impl SchemaValidator {
     }
 
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<&'py PyTuple> {
-        let args = PyTuple::new(py, vec![self.schema.as_ref(py)]);
+        let args = PyTuple::new(py, [self.schema.as_ref(py)]);
         let cls = Py::new(py, self.to_owned())?.getattr(py, "__class__")?;
         Ok(PyTuple::new(py, [cls, args.to_py(py)]))
     }
