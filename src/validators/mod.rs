@@ -8,7 +8,7 @@ use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
-use crate::input::{Input, JsonInput, ToPy};
+use crate::input::{Input, JsonInput};
 use crate::SchemaError;
 
 mod any;
@@ -61,7 +61,7 @@ impl SchemaValidator {
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<&'py PyTuple> {
         let args = PyTuple::new(py, [self.schema.as_ref(py)]);
         let cls = Py::new(py, self.to_owned())?.getattr(py, "__class__")?;
-        Ok(PyTuple::new(py, [cls, args.to_py(py)]))
+        Ok(PyTuple::new(py, [cls.as_ref(py), args.as_ref()]))
     }
 
     fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
