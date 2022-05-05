@@ -67,7 +67,7 @@ impl Validator for ModelClassValidator {
             )
         } else {
             let output = self.validator.validate(py, input, extra, slots)?;
-            unsafe { self.create_class(py, output).map_err(as_internal) }
+            self.create_class(py, output).map_err(as_internal)
         }
     }
 
@@ -99,34 +99,18 @@ impl Validator for ModelClassValidator {
 }
 
 impl ModelClassValidator {
-    unsafe fn create_class(&self, py: Python, output: PyObject) -> PyResult<PyObject> {
+    fn create_class(&self, py: Python, output: PyObject) -> PyResult<PyObject> {
         let t: &PyTuple = output.extract(py)?;
         let model_dict = t.get_item(0)?;
         let fields_set = t.get_item(1)?;
 
-        // based on the following but with the second argument of new_func set to an empty tuple as required
-        // https://github.com/PyO3/pyo3/blob/d2caa056e9aacc46374139ef491d112cb8af1a25/src/pyclass_init.rs#L35-L77
-        let args = PyTuple::empty(py);
-        let raw_type = self.class.as_ref(py).as_type_ptr();
-        let instance_ptr = match (*raw_type).tp_new {
-            Some(new_func) => {
-                let obj = new_func(raw_type, args.as_ptr(), null_mut());
-                if obj.is_null() {
-                    return Err(PyErr::fetch(py));
-                } else {
-                    obj
-                }
-            }
-            None => return Err(PyTypeError::new_err("base type without tp_new")),
-        };
+        let instance = self.class.call0(py)?;
+        let instance_ptr = instance.as_ptr();
 
         force_setattr(instance_ptr, py, intern!(py, "__dict__"), model_dict)?;
         force_setattr(instance_ptr, py, intern!(py, "__fields_set__"), fields_set)?;
 
-        match PyAny::from_borrowed_ptr_or_opt(py, instance_ptr) {
-            Some(instance) => Ok(instance.into()),
-            None => Err(PyTypeError::new_err("failed to create instance of class")),
-        }
+        Ok(instance)
     }
 }
 
