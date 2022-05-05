@@ -1,8 +1,6 @@
 use std::os::raw::c_int;
-use std::ptr::null_mut;
 
-use pyo3::conversion::{AsPyPointer, FromPyPointer};
-use pyo3::exceptions::PyTypeError;
+use pyo3::conversion::AsPyPointer;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple, PyType};
 use pyo3::{ffi, intern, ToBorrowedObject};
