@@ -123,7 +123,7 @@ impl ModelClassValidator {
         force_setattr(instance_ptr, py, intern!(py, "__dict__"), model_dict)?;
         force_setattr(instance_ptr, py, intern!(py, "__fields_set__"), fields_set)?;
 
-        match PyAny::from_borrowed_ptr_or_opt(py, instance_ptr) {
+        match PyAny::from_owned_ptr_or_opt(py, instance_ptr) {
             Some(instance) => Ok(instance.into()),
             None => Err(PyTypeError::new_err("failed to create instance of class")),
         }
