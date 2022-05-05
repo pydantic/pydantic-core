@@ -105,10 +105,28 @@ impl DictValidator {
         let mut errors: Vec<ValLineError> = Vec::new();
 
         for (key, value) in dict.generic_iter() {
-            let output_key: Option<PyObject> =
-                apply_validator(py, &self.key_validator, &mut errors, key, key, extra, slots, true)?;
-            let output_value: Option<PyObject> =
-                apply_validator(py, &self.value_validator, &mut errors, value, key, extra, slots, false)?;
+            let output_key = match self.key_validator.validate(py, key, extra, slots) {
+                Ok(value) => Some(value),
+                Err(ValError::LineErrors(line_errors)) => {
+                    let loc = vec![key.to_loc(), "[key]".to_loc()];
+                    for err in line_errors {
+                        errors.push(err.with_prefix_location(&loc));
+                    }
+                    None
+                }
+                Err(err) => return Err(err),
+            };
+            let output_value = match self.value_validator.validate(py, value, extra, slots) {
+                Ok(value) => Some(value),
+                Err(ValError::LineErrors(line_errors)) => {
+                    let loc = vec![key.to_loc()];
+                    for err in line_errors {
+                        errors.push(err.with_prefix_location(&loc));
+                    }
+                    None
+                }
+                Err(err) => return Err(err),
+            };
             if let (Some(key), Some(value)) = (output_key, output_value) {
                 output.set_item(key, value).map_err(as_internal)?;
             }
@@ -119,33 +137,5 @@ impl DictValidator {
         } else {
             Err(ValError::LineErrors(errors))
         }
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn apply_validator<'s, 'data>(
-    py: Python<'data>,
-    validator: &'s CombinedValidator,
-    errors: &mut Vec<ValLineError<'data>>,
-    input: &'data dyn Input,
-    key: &'data dyn Input,
-    extra: &Extra,
-    slots: &'data [CombinedValidator],
-    key_loc: bool,
-) -> ValResult<'data, Option<PyObject>> {
-    match validator.validate(py, input, extra, slots) {
-        Ok(value) => Ok(Some(value)),
-        Err(ValError::LineErrors(line_errors)) => {
-            let loc = if key_loc {
-                vec![key.to_loc(), "[key]".to_loc()]
-            } else {
-                vec![key.to_loc()]
-            };
-            for err in line_errors {
-                errors.push(err.with_prefix_location(&loc));
-            }
-            Ok(None)
-        }
-        Err(err) => Err(err),
     }
 }
