@@ -4,7 +4,7 @@ import sys
 from typing import Any, Callable, Dict, List, Sequence, Union
 
 if sys.version_info < (3, 11):
-    from typing_extensions import NotRequired
+    from typing_extensions import NotRequired, Required
 else:
     from typing import NotRequired
 
@@ -23,28 +23,28 @@ class BoolSchema(TypedDict):
     strict: NotRequired[bool]
 
 
-class ConfigSchema(TypedDict):
-    strict: NotRequired[bool]
-    extra: NotRequired[Literal['allow', 'forbid', 'ignore']]
+class ConfigSchema(TypedDict, total=False):
+    strict: bool
+    extra: Literal['allow', 'forbid', 'ignore']
 
 
-class DictSchema(TypedDict):
-    type: Literal['dict']
-    keys: Schema  # type: ignore[misc]
-    values: Schema  # type: ignore[misc]
-    min_items: NotRequired[int]
-    max_items: NotRequired[int]
+class DictSchema(TypedDict, total=False):
+    type: Required[Literal['dict']]
+    keys: Schema  # default: AnySchema
+    values: Schema  # default: AnySchema
+    min_items: int
+    max_items: int
 
 
-class FloatSchema(TypedDict):
-    type: Literal['float']
-    multiple_of: NotRequired[float]
-    le: NotRequired[float]
-    ge: NotRequired[float]
-    lt: NotRequired[float]
-    gt: NotRequired[float]
-    strict: NotRequired[bool]
-    default: NotRequired[float]
+class FloatSchema(TypedDict, total=False):
+    type: Required[Literal['float']]
+    multiple_of: float
+    le: float
+    ge: float
+    lt: float
+    gt: float
+    strict: bool
+    default: float
 
 
 # TODO: function could be typed based on mode
@@ -55,21 +55,21 @@ class FunctionSchema(TypedDict):
     schema: NotRequired[Schema]  # type: ignore[misc]
 
 
-class IntSchema(TypedDict):
-    type: Literal['int']
-    multiple_of: NotRequired[int]
-    le: NotRequired[int]
-    ge: NotRequired[int]
-    lt: NotRequired[int]
-    gt: NotRequired[int]
-    strict: NotRequired[bool]
+class IntSchema(TypedDict, total=False):
+    type: Required[Literal['int']]
+    multiple_of: int
+    le: int
+    ge: int
+    lt: int
+    gt: int
+    strict: bool
 
 
-class ListSchema(TypedDict):
-    type: Literal['list']
-    items: Schema  # type: ignore[misc]
-    min_items: NotRequired[int]
-    max_items: NotRequired[int]
+class ListSchema(TypedDict, total=False):
+    type: Required[Literal['list']]
+    items: Schema  # default: AnySchema
+    min_items: int
+    max_items: int
 
 
 class LiteralSchema(TypedDict):
@@ -80,14 +80,14 @@ class LiteralSchema(TypedDict):
 class ModelClassSchema(TypedDict):
     type: Literal['model-class']
     class_type: type
-    model: ModelSchema  # type: ignore[misc]
+    model: ModelSchema
 
 
 class ModelSchema(TypedDict):
     type: Literal['model']
-    fields: Dict[str, Schema]  # type: ignore[misc]
+    fields: Dict[str, Schema]
     name: NotRequired[str]
-    extra_validator: NotRequired[Schema]  # type: ignore[misc]
+    extra_validator: NotRequired[Schema]
     config: NotRequired[ConfigSchema]
 
 
@@ -109,12 +109,12 @@ class RecursiveReferenceSchema(TypedDict):
 class RecursiveContainerSchema(TypedDict):
     type: Literal['recursive-container']
     name: str
-    schema: Schema  # type: ignore[misc]
+    schema: Schema
 
 
 class SetSchema(TypedDict):
     type: Literal['set']
-    items: Schema  # type: ignore[misc]
+    items: Schema
     min_items: NotRequired[int]
     max_items: NotRequired[int]
     strict: NotRequired[bool]
@@ -133,12 +133,28 @@ class StringSchema(TypedDict, total=False):
 
 class UnionSchema(TypedDict):
     type: Literal['union']
-    choices: List[Schema]  # type: ignore[misc]
+    choices: List[Schema]
     strict: NotRequired[bool]
     default: NotRequired[Any]
 
 
-Type = str
+Type = Literal[
+    'any',
+    'bool',
+    'dict',
+    'float',
+    'function',
+    'int',
+    'list',
+    'model' 'model-class',
+    'none',
+    'optional',
+    'recursive-container',
+    'recursive-reference',
+    'set',
+    'str',
+    'union',
+]
 
 Schema = Union[  # type: ignore[misc]
     Type,  # bare type,  'str'
