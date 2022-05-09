@@ -10,9 +10,13 @@ extern crate serde;
 extern crate serde_json;
 extern crate strum;
 
+use mimalloc::MiMalloc;
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 mod build_tools;
 mod errors;
