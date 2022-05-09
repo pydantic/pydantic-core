@@ -50,7 +50,6 @@ lint-python:
 	flake8 --max-complexity 10 --max-line-length 120 --ignore E203,W503 pydantic_core tests setup.py
 	$(isort) --check-only --df
 	$(black) --check --diff
-	$(pyright)
 
 .PHONY: lint-rust
 lint-rust:
