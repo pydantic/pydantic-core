@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := all
 isort = isort pydantic_core tests setup.py
 black = black pydantic_core tests setup.py
-pyright = pyright pydantic_core tests/test_types.py
+pyright = pyright pydantic_core tests/test_typing.py
 
 .PHONY: install
 install:
