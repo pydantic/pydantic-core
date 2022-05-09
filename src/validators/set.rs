@@ -99,9 +99,10 @@ impl SetValidator {
         }
 
         match self.item_validator {
-            Some(ref validator) => {
+            Some(ref validator_box) => {
                 let mut errors: Vec<ValLineError> = Vec::new();
                 let mut output: Vec<PyObject> = Vec::with_capacity(length);
+                let validator: &CombinedValidator = validator_box.as_ref();
                 for (index, item) in set.input_iter().enumerate() {
                     match validator.validate(py, item, extra, slots) {
                         Ok(item) => output.push(item),

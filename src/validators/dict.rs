@@ -104,11 +104,13 @@ impl DictValidator {
         let output = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
 
+        let key_validator = self.key_validator.as_ref();
+        let value_validator = self.value_validator.as_ref();
         for (key, value) in dict.input_iter() {
             let output_key: Option<PyObject> =
-                apply_validator(py, &self.key_validator, &mut errors, key, key, extra, slots, true)?;
+                apply_validator(py, key_validator, &mut errors, key, key, extra, slots, true)?;
             let output_value: Option<PyObject> =
-                apply_validator(py, &self.value_validator, &mut errors, value, key, extra, slots, false)?;
+                apply_validator(py, value_validator, &mut errors, value, key, extra, slots, false)?;
             if let (Some(key), Some(value)) = (output_key, output_value) {
                 output.set_item(key, value).map_err(as_internal)?;
             }
