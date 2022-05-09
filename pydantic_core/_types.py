@@ -121,14 +121,14 @@ class SetSchema(TypedDict):
 
 
 class StringSchema(TypedDict, total=False):
-    type: Literal['str']
-    pattern: NotRequired[str]
-    max_length: NotRequired[int]
-    min_length: NotRequired[int]
-    strip_whitespace: NotRequired[bool]
-    to_lower: NotRequired[bool]
-    to_upper: NotRequired[bool]
-    strict: NotRequired[bool]
+    type: Required[Literal['str']]
+    pattern: str
+    max_length: int
+    min_length: int
+    strip_whitespace: bool
+    to_lower: bool
+    to_upper: bool
+    strict: bool
 
 
 class UnionSchema(TypedDict):
