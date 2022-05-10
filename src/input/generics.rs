@@ -2,7 +2,7 @@ use enum_dispatch::enum_dispatch;
 use indexmap::map::Iter;
 
 use pyo3::types::{PyAny, PyDict, PyFrozenSet, PyList, PySet, PyTuple};
-use pyo3::{ffi, AsPyPointer, Python};
+use pyo3::{ffi, AsPyPointer};
 
 use super::parse_json::{JsonArray, JsonInput, JsonObject};
 use super::Input;
@@ -59,7 +59,6 @@ impl<'a> SequenceLenIter<'a> for &'a PySet {
         GenericSequenceIter::Set(PySetIterator {
             sequence: self,
             index: 0,
-            py: self.py(),
         })
     }
 }
@@ -70,10 +69,9 @@ impl<'a> SequenceLenIter<'a> for &'a PyFrozenSet {
     }
 
     fn generic_iter(&self) -> GenericSequenceIter<'a> {
-        GenericSequenceIter::FrozenSet(PyFrozenSetIterator {
+        GenericSequenceIter::Set(PySetIterator {
             sequence: self,
             index: 0,
-            py: self.py(),
         })
     }
 }
@@ -96,7 +94,6 @@ pub enum GenericSequenceIter<'a> {
     List(PyListIterator<'a>),
     Tuple(PyTupleIterator<'a>),
     Set(PySetIterator<'a>),
-    FrozenSet(PyFrozenSetIterator<'a>),
     JsonArray(JsonArrayIterator<'a>),
 }
 
@@ -154,9 +151,8 @@ impl<'a> SequenceNext<'a> for PyTupleIterator<'a> {
 }
 
 pub struct PySetIterator<'a> {
-    sequence: &'a PySet,
+    sequence: &'a PyAny,
     index: isize,
-    py: Python<'a>,
 }
 
 impl<'a> SequenceNext<'a> for PySetIterator<'a> {
@@ -168,31 +164,7 @@ impl<'a> SequenceNext<'a> for PySetIterator<'a> {
             let index = self.index as usize;
             if ffi::_PySet_NextEntry(self.sequence.as_ptr(), &mut self.index, &mut key, &mut hash) != 0 {
                 // _PySet_NextEntry returns borrowed object; for safety must make owned (see #890)
-                let item: &PyAny = self.py.from_owned_ptr(ffi::_Py_NewRef(key));
-                Some((index, item))
-            } else {
-                None
-            }
-        }
-    }
-}
-
-pub struct PyFrozenSetIterator<'a> {
-    sequence: &'a PyFrozenSet,
-    index: isize,
-    py: Python<'a>,
-}
-
-impl<'a> SequenceNext<'a> for PyFrozenSetIterator<'a> {
-    #[inline]
-    fn _next(&mut self) -> Option<(usize, &'a dyn Input)> {
-        unsafe {
-            let mut key: *mut ffi::PyObject = std::ptr::null_mut();
-            let mut hash: ffi::Py_hash_t = 0;
-            let index = self.index as usize;
-            if ffi::_PySet_NextEntry(self.sequence.as_ptr(), &mut self.index, &mut key, &mut hash) != 0 {
-                // _PySet_NextEntry returns borrowed object; for safety must make owned (see #890)
-                let item: &PyAny = self.py.from_owned_ptr(ffi::_Py_NewRef(key));
+                let item: &PyAny = self.sequence.py().from_owned_ptr(ffi::_Py_NewRef(key));
                 Some((index, item))
             } else {
                 None
@@ -249,7 +221,7 @@ impl<'a> MappingLenIter<'a> for &'a PyDict {
 
     #[inline]
     fn generic_iter(&self) -> GenericMappingIter<'a> {
-        GenericMappingIter::PyDict(PyDictIterator { dict: self, index: 0, py: self.py() })
+        GenericMappingIter::PyDict(PyDictIterator { dict: self, index: 0 })
     }
 }
 
@@ -295,7 +267,6 @@ impl<'a> Iterator for GenericMappingIter<'a> {
 pub struct PyDictIterator<'a> {
     dict: &'a PyDict,
     index: isize,
-    py: Python<'a>,
 }
 
 impl<'a> DictNext<'a> for PyDictIterator<'a> {
@@ -306,8 +277,9 @@ impl<'a> DictNext<'a> for PyDictIterator<'a> {
             let mut value: *mut ffi::PyObject = std::ptr::null_mut();
             if ffi::PyDict_Next(self.dict.as_ptr(), &mut self.index, &mut key, &mut value) != 0 {
                 // PyDict_Next returns borrowed values; for safety must make them owned (see #890)
-                let key: &PyAny = self.py.from_owned_ptr(ffi::_Py_NewRef(key));
-                let value: &PyAny = self.py.from_owned_ptr(ffi::_Py_NewRef(value));
+                let py = self.dict.py();
+                let key: &PyAny = py.from_owned_ptr(ffi::_Py_NewRef(key));
+                let value: &PyAny = py.from_owned_ptr(ffi::_Py_NewRef(value));
                 Some((key, value))
             } else {
                 None
