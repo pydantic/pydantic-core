@@ -70,6 +70,8 @@ jobs:
     - run: pip freeze
 
     - run: make test
+      env:
+        BENCHMARK_VS_PYDANTIC: 1
 
     - run: coverage xml
 
@@ -162,7 +164,12 @@ jobs:
     # this is required so that pytest uses the installed package
     - run: rm tests/__init__.py
 
-    - run: pytest tests/test_benchmarks.py --benchmark-enable --benchmark-json output.json
+    - run: >
+        pytest tests/test_benchmarks.py
+        --benchmark-enable
+        --benchmark-warmup=on
+        --benchmark-warmup-iterations=10000
+        --benchmark-json output.json
 
     - uses: benchmark-action/github-action-benchmark@v1
       with:
