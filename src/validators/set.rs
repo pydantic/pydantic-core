@@ -102,7 +102,7 @@ impl SetValidator {
             Some(ref validator) => {
                 let mut errors: Vec<ValLineError> = Vec::new();
                 let mut output: Vec<PyObject> = Vec::with_capacity(length);
-                for (index, item) in set.generic_iter().enumerate() {
+                for (index, item) in set.generic_iter() {
                     match validator.validate(py, item, extra, slots) {
                         Ok(item) => output.push(item),
                         Err(ValError::LineErrors(line_errors)) => {
@@ -119,7 +119,7 @@ impl SetValidator {
                 }
             }
             None => {
-                let output: Vec<PyObject> = set.generic_iter().map(|item| item.to_py(py)).collect();
+                let output: Vec<PyObject> = set.generic_iter().map(|(_, item)| item.to_py(py)).collect();
                 Ok(PySet::new(py, &output).map_err(as_internal)?.into_py(py))
             }
         }

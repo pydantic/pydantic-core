@@ -102,7 +102,7 @@ impl ListValidator {
             Some(ref validator) => {
                 let mut output: Vec<PyObject> = Vec::with_capacity(length);
                 let mut errors: Vec<ValLineError> = Vec::new();
-                for (index, item) in list.generic_iter().enumerate() {
+                for (index, item) in list.generic_iter() {
                     match validator.validate(py, item, extra, slots) {
                         Ok(item) => output.push(item),
                         Err(ValError::LineErrors(line_errors)) => {
@@ -119,7 +119,7 @@ impl ListValidator {
                 }
             }
             None => {
-                let output: Vec<PyObject> = list.generic_iter().map(|item| item.to_py(py)).collect();
+                let output: Vec<PyObject> = list.generic_iter().map(|(_, item)| item.to_py(py)).collect();
                 Ok(PyList::new(py, &output).into_py(py))
             }
         }
