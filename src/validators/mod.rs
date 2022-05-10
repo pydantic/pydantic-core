@@ -33,7 +33,7 @@ mod union;
 pub struct SchemaValidator {
     validator: CombinedValidator,
     slots: Vec<CombinedValidator>,
-    schema: Py<PyAny>,
+    schema: PyObject,
 }
 
 #[pymethods]
