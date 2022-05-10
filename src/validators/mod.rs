@@ -54,7 +54,7 @@ impl SchemaValidator {
         Ok(Self {
             validator,
             slots,
-            schema: Into::<Py<PyAny>>::into(schema),
+            schema: Into: schema.into_py(py),
         })
     }
 
