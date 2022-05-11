@@ -1,5 +1,3 @@
-import pytest
-
 from pydantic_core import Schema, SchemaError, SchemaValidator
 
 
@@ -57,5 +55,10 @@ def test_schema_validator() -> None:
 
 
 def test_schema_validator_wrong() -> None:
-    with pytest.raises(SchemaError):
+    # use this instead of pytest.raises since pyright complains about input when pytest isn't installed
+    try:
         SchemaValidator('bad')  # type: ignore
+    except SchemaError:
+        pass
+    else:
+        raise AssertionError('SchemaValidator did not raise SchemaError')
