@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
 
+use pyo3::exceptions::PyRecursionError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use serde_json::from_str as parse_json;
@@ -318,7 +319,7 @@ impl BuildContext {
     pub fn incr_check_depth(&mut self) -> PyResult<()> {
         self.depth += 1;
         if self.depth > MAX_DEPTH {
-            py_error!("Recursive detected, depth exceeded max allowed value of {}", MAX_DEPTH)
+            py_error!(PyRecursionError; "Recursive detected, depth exceeded max allowed value of {}", MAX_DEPTH)
         } else {
             Ok(())
         }
