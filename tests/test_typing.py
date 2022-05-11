@@ -1,4 +1,6 @@
-from pydantic_core import Schema, SchemaValidator
+import pytest
+
+from pydantic_core import Schema, SchemaError, SchemaValidator
 
 
 class Foo:
@@ -55,4 +57,5 @@ def test_schema_validator() -> None:
 
 
 def test_schema_validator_wrong() -> None:
-    SchemaValidator('bad')  # type: ignore
+    with pytest.raises(SchemaError):
+        SchemaValidator('bad')  # type: ignore
