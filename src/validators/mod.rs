@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use enum_dispatch::enum_dispatch;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyTuple};
+use pyo3::types::{PyAny, PyDict};
 use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
@@ -59,9 +59,9 @@ impl SchemaValidator {
     }
 
     fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
-        let args = PyTuple::new(py, [self.schema.as_ref(py)]);
+        let args = (self.schema.as_ref(py),);
         let cls = Py::new(py, self.to_owned())?.getattr(py, "__class__")?;
-        Ok(PyTuple::new(py, [cls.as_ref(py), args.as_ref()]).into_py(py))
+        Ok((cls, args).into_py(py))
     }
 
     fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
