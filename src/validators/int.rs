@@ -5,7 +5,7 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
-use super::{BuildValidator, CombinedValidator, Extra, BuildContext, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct IntValidator;

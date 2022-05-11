@@ -6,7 +6,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, CombinedValidator, Extra, BuildContext, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug)]
 pub struct FunctionBuilder;

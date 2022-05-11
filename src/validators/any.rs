@@ -4,7 +4,7 @@ use pyo3::types::PyDict;
 use crate::errors::ValResult;
 use crate::input::Input;
 
-use super::{BuildValidator, CombinedValidator, Extra, BuildContext, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 /// This might seem useless, but it's useful in DictValidator to avoid Option<Validator> a lot
 #[derive(Debug, Clone)]

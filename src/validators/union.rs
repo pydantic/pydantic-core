@@ -5,7 +5,7 @@ use crate::build_tools::SchemaDict;
 use crate::errors::{LocItem, ValError, ValLineError};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, CombinedValidator, Extra, BuildContext, ValResult, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct UnionValidator {

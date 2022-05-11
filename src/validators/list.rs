@@ -5,7 +5,7 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
 use crate::input::{GenericSequence, Input, SequenceLenIter};
 
-use super::{build_validator, BuildValidator, CombinedValidator, Extra, BuildContext, ValResult, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ListValidator {

@@ -7,7 +7,7 @@ use crate::errors::{
 };
 use crate::input::{Input, MappingLenIter, ToLocItem};
 
-use super::{build_validator, BuildValidator, CombinedValidator, Extra, BuildContext, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 struct ModelField {

@@ -4,7 +4,7 @@ use pyo3::types::PyDict;
 use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
-use super::{BuildValidator, CombinedValidator, Extra, BuildContext, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct NoneValidator;

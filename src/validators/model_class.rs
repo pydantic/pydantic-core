@@ -11,7 +11,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildValidator, CombinedValidator, Extra, BuildContext, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {

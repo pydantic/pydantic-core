@@ -6,7 +6,7 @@ use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, 
 use crate::input::{GenericMapping, Input, MappingLenIter, ToLocItem};
 
 use super::any::AnyValidator;
-use super::{build_validator, BuildValidator, CombinedValidator, Extra, BuildContext, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {

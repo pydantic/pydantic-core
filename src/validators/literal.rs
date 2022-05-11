@@ -7,7 +7,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
-use super::{BuildValidator, CombinedValidator, Extra, BuildContext, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug)]
 pub struct LiteralBuilder;
