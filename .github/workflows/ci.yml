@@ -168,7 +168,7 @@ jobs:
         pytest tests/test_benchmarks.py
         --benchmark-enable
         --benchmark-warmup=on
-        --benchmark-warmup-iterations=10000
+        --benchmark-warmup-iterations=1000
         --benchmark-json output.json
 
     - uses: benchmark-action/github-action-benchmark@v1
