@@ -41,3 +41,7 @@ include_trailing_comma = true
 force_grid_wrap = 0
 combine_as_imports = true
 color_output = true
+
+[tool.pyright]
+include = ["pydantic_core", "tests/test_typing.py"]
+reportUnnecessaryTypeIgnoreComment = true

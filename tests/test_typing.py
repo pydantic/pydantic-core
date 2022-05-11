@@ -1,4 +1,4 @@
-from pydantic_core import Schema
+from pydantic_core import Schema, SchemaValidator
 
 
 class Foo:
@@ -14,6 +14,7 @@ def test_schema_typing() -> None:
     _: Schema = {
         'type': 'union',
         'choices': [
+            'int',
             {'type': 'int', 'ge': 1},
             {'type': 'float', 'lt': 1.0},
             {'type': 'str', 'pattern': r'http:\/\/.*'},
@@ -43,3 +44,15 @@ def test_schema_typing() -> None:
             },
         ],
     }
+
+
+def test_schema_typing_error() -> None:
+    _: Schema = {'type': 'wrong'}  # type: ignore
+
+
+def test_schema_validator() -> None:
+    SchemaValidator('int')
+
+
+def test_schema_validator_wrong() -> None:
+    SchemaValidator('bad')  # type: ignore

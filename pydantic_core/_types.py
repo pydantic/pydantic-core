@@ -52,7 +52,7 @@ class FunctionSchema(TypedDict):
     type: Literal['function']
     mode: Literal['before', 'after', 'plain', 'wrap']
     function: Callable[..., Any]
-    schema: NotRequired[Schema]  # type: ignore[misc]
+    schema: NotRequired[Schema]
 
 
 class IntSchema(TypedDict, total=False):
@@ -97,7 +97,7 @@ class NoneSchema(TypedDict):
 
 class OptionalSchema(TypedDict):
     type: Literal['optional']
-    schema: Schema  # type: ignore[misc]
+    schema: Schema
     strict: NotRequired[bool]
 
 
@@ -138,7 +138,9 @@ class UnionSchema(TypedDict):
     default: NotRequired[Any]
 
 
-Type = Literal[
+# pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
+# 'int' is equivalent to {'type': 'int'}
+BareType = Literal[
     'any',
     'bool',
     'dict',
@@ -146,7 +148,8 @@ Type = Literal[
     'function',
     'int',
     'list',
-    'model' 'model-class',
+    'model',
+    'model-class',
     'none',
     'optional',
     'recursive-container',
@@ -156,8 +159,8 @@ Type = Literal[
     'union',
 ]
 
-Schema = Union[  # type: ignore[misc]
-    Type,  # bare type,  'str'
+Schema = Union[
+    BareType,
     AnySchema,
     BoolSchema,
     DictSchema,

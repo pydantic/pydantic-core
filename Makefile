@@ -1,7 +1,6 @@
 .DEFAULT_GOAL := all
 isort = isort pydantic_core tests setup.py
 black = black pydantic_core tests setup.py
-pyright = pyright pydantic_core tests/test_typing.py
 
 .PHONY: install
 install:
@@ -64,7 +63,7 @@ lint: lint-python lint-rust
 
 .PHONY: pyright
 pyright:
-	$(pyright)
+	pyright
 
 .PHONY: test
 test:
