@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt;
+use std::fmt::Write;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -48,13 +49,17 @@ impl ValidationError {
     fn display(&self, py: Option<Python>) -> String {
         let count = self.line_errors.len();
         let plural = if count == 1 { "" } else { "s" };
-        let loc = self
+        let line_errors = self
             .line_errors
             .iter()
             .map(|i| i.pretty(py))
-            .collect::<Vec<String>>()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_or_else(|err| vec![format!("[error formatting line errors: {}]", err)])
             .join("\n");
-        format!("{} validation error{} for {}\n{}", count, plural, self.title, loc)
+        format!(
+            "{} validation error{} for {}\n{}",
+            count, plural, self.title, line_errors
+        )
     }
 }
 
@@ -83,11 +88,12 @@ impl ValidationError {
     }
 
     fn errors(&self, py: Python) -> PyResult<PyObject> {
-        let mut errors: Vec<PyObject> = Vec::with_capacity(self.line_errors.len());
-        for line_error in &self.line_errors {
-            errors.push(line_error.as_dict(py)?);
-        }
-        Ok(errors.into_py(py))
+        Ok(self
+            .line_errors
+            .iter()
+            .map(|e| e.as_dict(py))
+            .collect::<PyResult<Vec<PyObject>>>()?
+            .into_py(py))
     }
 
     fn __repr__(&self, py: Python) -> String {
@@ -97,6 +103,21 @@ impl ValidationError {
     fn __str__(&self, py: Python) -> String {
         self.__repr__(py)
     }
+}
+
+macro_rules! truncate_input_value {
+    ($out:expr, $value:expr) => {
+        if $value.len() > 50 {
+            write!(
+                $out,
+                ", input_value={}...{}",
+                &$value[0..25],
+                &$value[$value.len() - 24..]
+            )?;
+        } else {
+            write!($out, ", input_value={}", $value)?;
+        }
+    };
 }
 
 /// `PyLineError` are the public version of `ValLineError`, as help and used in `ValidationError`s
@@ -170,7 +191,7 @@ impl PyLineError {
         }
     }
 
-    fn pretty(&self, py: Option<Python>) -> String {
+    fn pretty(&self, py: Option<Python>) -> Result<String, fmt::Error> {
         let mut output = String::with_capacity(200);
         if !self.location.is_empty() {
             let loc = self
@@ -179,14 +200,13 @@ impl PyLineError {
                 .map(|i| i.to_string())
                 .collect::<Vec<String>>()
                 .join(" -> ");
-            output.push_str(&loc);
-            output.push('\n');
+            writeln!(output, "{}", &loc)?;
         }
 
-        output.push_str(&format!("  {} [kind={}", self.message(), self.kind()));
+        write!(output, "  {} [kind={}", self.message(), self.kind())?;
 
         if !self.context.is_empty() {
-            output.push_str(&format!(", context={}", self.context));
+            write!(output, ", context={}", self.context)?;
         }
         if let Some(py) = py {
             let input_value = self.input_value.as_ref(py);
@@ -194,25 +214,16 @@ impl PyLineError {
                 Ok(s) => s,
                 Err(_) => input_value.to_string(),
             };
-            output.push_str(", input_value=");
-            output.push_str(&truncate(input_str));
+            truncate_input_value!(output, input_str);
 
             if let Ok(type_) = input_value.get_type().name() {
-                output.push_str(&format!(", input_type={}", type_));
+                write!(output, ", input_type={}", type_)?;
             }
         } else {
-            output.push_str(&truncate(self.input_value.to_string()));
+            truncate_input_value!(output, self.input_value.to_string());
         }
         output.push(']');
-        output
-    }
-}
-
-fn truncate(s: String) -> String {
-    if s.len() > 50 {
-        format!("{}...{}", &s[0..25], &s[s.len() - 24..])
-    } else {
-        s
+        Ok(output)
     }
 }
 
