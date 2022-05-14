@@ -1,5 +1,9 @@
 [build-system]
-requires = ['setuptools', 'wheel', 'setuptools-rust']
+requires = ["maturin>=0.12,<0.13"]
+build-backend = "maturin"
+
+[tool.maturin]
+bindings = "pyo3"
 
 [tool.pytest.ini_options]
 testpaths = 'tests'

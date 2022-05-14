@@ -18,6 +18,9 @@ mimalloc = { version = "0.1.29", default-features = false }
 name = "_pydantic_core"
 crate-type = ["cdylib"]
 
+[package.metadata.maturin]
+name = "pydantic_core._pydantic_core"
+
 [profile.release]
 lto = "fat"
 codegen-units = 1
