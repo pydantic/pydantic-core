@@ -2,6 +2,10 @@
 name = "pydantic-core"
 version = "0.0.1"
 edition = "2021"
+license = "MIT"
+homepage = "https://github.com/samuelcolvin/pydantic-core"
+repository = "https://github.com/samuelcolvin/pydantic-core.git"
+readme = "README.md"
 
 [dependencies]
 pyo3 = {version = "0.16.3", features = ["extension-module"]}
