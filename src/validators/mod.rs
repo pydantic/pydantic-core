@@ -1,14 +1,15 @@
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
-
 use pyo3::exceptions::PyRecursionError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
+use crate::errors::{
+    as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult,
+};
 use crate::input::{Input, JsonInput};
 use crate::SchemaError;
 
@@ -96,7 +97,13 @@ impl SchemaValidator {
         }
     }
 
-    fn validate_assignment(&self, py: Python, field: String, input: &PyAny, data: &PyDict) -> PyResult<PyObject> {
+    fn validate_assignment(
+        &self,
+        py: Python,
+        field: String,
+        input: &PyAny,
+        data: &PyDict,
+    ) -> PyResult<PyObject> {
         let extra = Extra {
             data: Some(data),
             field: Some(field.as_str()),
@@ -305,10 +312,18 @@ const MAX_DEPTH: usize = 100;
 impl BuildContext {
     pub fn new() -> Self {
         let named_slots: Vec<(Option<String>, Option<CombinedValidator>)> = Vec::new();
-        BuildContext { named_slots, depth: 0 }
+        BuildContext {
+            named_slots,
+            depth: 0,
+        }
     }
 
-    pub fn add_named_slot(&mut self, name: String, schema: &PyAny, config: Option<&PyDict>) -> PyResult<usize> {
+    pub fn add_named_slot(
+        &mut self,
+        name: String,
+        schema: &PyAny,
+        config: Option<&PyDict>,
+    ) -> PyResult<usize> {
         let id = self.named_slots.len();
         self.named_slots.push((Some(name), None));
         let validator = build_validator(schema, config, self)?.0;
