@@ -57,6 +57,14 @@ pub enum ErrorKind {
     #[strum(message = "List must have at most {max_length} items")]
     ListTooLong,
     // ---------------------
+    // tuple errors
+    #[strum(message = "Value must be a valid tuple")]
+    TupleType,
+    #[strum(message = "Tuple must have at least {min_length} items")]
+    TupleTooShort,
+    #[strum(message = "Tuple must have at most {max_length} items")]
+    TupleTooLong,
+    // ---------------------
     // set errors
     #[strum(message = "Value must be a valid list/array")]
     SetType,

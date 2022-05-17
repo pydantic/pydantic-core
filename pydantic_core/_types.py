@@ -138,6 +138,14 @@ class UnionSchema(TypedDict):
     default: NotRequired[Any]
 
 
+class TupleSchema(TypedDict, total=False):
+    type: Literal['tuple']
+    items: Schema  # default: AnySchema
+    min_items: NotRequired[int]
+    max_items: NotRequired[int]
+    strict: NotRequired[bool]
+
+
 # pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
 # 'int' is equivalent to {'type': 'int'}
 BareType = Literal[
@@ -156,6 +164,7 @@ BareType = Literal[
     'recursive-reference',
     'set',
     'str',
+    'tuple',
     'union',
 ]
 
@@ -177,5 +186,6 @@ Schema = Union[
     RecursiveReferenceSchema,
     SetSchema,
     StringSchema,
+    TupleSchema,
     UnionSchema,
 ]

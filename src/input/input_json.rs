@@ -114,6 +114,14 @@ impl Input for JsonInput {
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType),
         }
     }
+
+    fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        // just as in set's case, List has to be allowed
+        match self {
+            JsonInput::Array(a) => Ok(a.into()),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::TupleType),
+        }
+    }
 }
 
 /// Required for Dict keys so the string can behave like an Input
@@ -174,5 +182,9 @@ impl Input for String {
 
     fn strict_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType)
+    }
+
+    fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::TupleType)
     }
 }
