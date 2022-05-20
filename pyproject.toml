@@ -1,5 +1,64 @@
 [build-system]
-requires = ['setuptools', 'wheel', 'setuptools-rust']
+requires = ['wheel', 'maturin>0.12,<0.13']
+build-backend = "maturin"
+
+[project]
+name = 'pydantic_core'
+readme = "README.md"
+requires-python = '>=3.7'
+classifiers = [
+  'Development Status :: 3 - Alpha',
+  'Environment :: Console',
+  'Programming Language :: Python',
+  'Programming Language :: Python :: 3',
+  'Programming Language :: Python :: 3 :: Only',
+  'Programming Language :: Python :: 3.7',
+  'Programming Language :: Python :: 3.8',
+  'Programming Language :: Python :: 3.9',
+  'Programming Language :: Python :: 3.10',
+  'Intended Audience :: Developers',
+  'Intended Audience :: Information Technology',
+  'Intended Audience :: System Administrators',
+  'License :: OSI Approved :: MIT License',
+  'Operating System :: POSIX :: Linux',
+  'Operating System :: Microsoft :: Windows',
+  'Operating System :: MacOS',
+  'Environment :: MacOS X',
+  'Topic :: Software Development :: Libraries :: Python Modules',
+]
+authors = [{ name = 'Samuel Colvin', email = 's@muelcolvin.com' }]
+license = { text = 'MIT' }
+dependencies = ['typing_extensions; python_version < "3.11.0"']
+
+[project.urls]
+homepage = 'https://github.com/samuelcolvin/pydantic_core'
+# documentation = "readthedocs.org"
+repository = 'https://github.com/samuelcolvin/pydantic_core'
+# changelog = "github.com/me/spam/blob/master/CHANGELOG.md"
+Funding = 'https://github.com/sponsors/samuelcolvin'
+Source = 'https://github.com/samuelcolvin/pydantic_core'
+
+[project.optional-dependencies]
+testing = [
+  'coverage==6.3.2',
+  'dirty-equals==0.4',
+  'pytest==7.1.2',
+  'pytest-benchmark==3.4.1',
+  'pytest-mock==3.7.0',
+  'pytest-sugar==0.9.4',
+  'pytest-timeout==2.1.0',
+  'pydantic==1.9.0;python_version>="3.8"',
+]
+linting = [
+  'black==22.3.0',
+  'flake8==4.0.1',
+  'flake8-quotes==3.3.1',
+  'isort[colors]==5.10.1',
+  'pyright==1.1.246',
+  'pycodestyle==2.8.0',
+  'pyflakes==2.4.0',
+  'trio==0.20.0',
+]
 
 [tool.pytest.ini_options]
 testpaths = 'tests'
@@ -8,9 +67,11 @@ filterwarnings = 'error'
 timeout = 30
 # min, max, mean, stddev, median, iqr, outliers, ops, rounds, iterations
 addopts = [
-    '--benchmark-columns', 'min,mean,stddev,outliers,rounds,iterations',
-    '--benchmark-group-by', 'group',
-    '--benchmark-disable',  # this is enable by `make benchmark` when you actually want to run benchmarks
+  '--benchmark-columns',
+  'min,mean,stddev,outliers,rounds,iterations',
+  '--benchmark-group-by',
+  'group',
+  '--benchmark-disable',                        # this is enable by `make benchmark` when you actually want to run benchmarks
 ]
 
 [tool.coverage.run]
@@ -20,11 +81,11 @@ branch = true
 [tool.coverage.report]
 precision = 2
 exclude_lines = [
-    'pragma: no cover',
-    'raise NotImplementedError',
-    'raise NotImplemented',
-    'if TYPE_CHECKING:',
-    '@overload',
+  'pragma: no cover',
+  'raise NotImplementedError',
+  'raise NotImplemented',
+  'if TYPE_CHECKING:',
+  '@overload',
 ]
 
 [tool.black]
