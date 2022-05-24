@@ -37,7 +37,7 @@ pub fn int_as_bool(input: &dyn Input, int: i64) -> ValResult<bool> {
 
 #[inline]
 pub fn str_as_int<'s, 'l>(input: &'s dyn Input, str: &'l str) -> ValResult<'s, i64> {
-    if let Ok(i) = str.parse::<i64>() {
+    if let Some(i) = fast_parse(str) {
         Ok(i)
     } else if let Ok(f) = str.parse::<f64>() {
         float_as_int(input, f)
@@ -73,4 +73,32 @@ pub fn float_as_int(input: &dyn Input, float: f64) -> ValResult<i64> {
     } else {
         Ok(float as i64)
     }
+}
+
+/// This is around 40x faster than using `str::parse::<i64>()`
+pub fn fast_parse(s: &str) -> Option<i64> {
+    let mut bytes = s.bytes();
+    let mut result: u64 = 0;
+    let sign: i64 = match bytes.next() {
+        Some(b'-') => -1,
+        Some(c) if b'0' <= c && c <= b'9' => {
+            result = (c & 0x0f) as u64;
+            1
+        }
+        _ => return None,
+    };
+
+    for digit in bytes {
+        match digit {
+            b'0'..=b'9' => {
+                result *= 10;
+                result += (digit & 0x0f) as u64;
+                if result >= i64::MAX as u64 {
+                    return None;
+                }
+            },
+            _ => return None,
+        }
+    }
+    Some((sign * (result as i64)).into())
 }
