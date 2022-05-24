@@ -81,7 +81,7 @@ pub fn fast_parse(s: &str) -> Option<i64> {
     let mut result: u64 = 0;
     let sign: i64 = match bytes.next() {
         Some(b'-') => -1,
-        Some(c) if b'0' <= c && c <= b'9' => {
+        Some(c) if (b'0'..=b'9').contains(&c) => {
             result = (c & 0x0f) as u64;
             1
         }
@@ -96,9 +96,9 @@ pub fn fast_parse(s: &str) -> Option<i64> {
                 if result >= i64::MAX as u64 {
                     return None;
                 }
-            },
+            }
             _ => return None,
         }
     }
-    Some((sign * (result as i64)).into())
+    Some(sign * (result as i64))
 }
