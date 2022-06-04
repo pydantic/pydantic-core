@@ -39,6 +39,7 @@ dynamic = [
 ]
 
 [project.urls]
+Homepage = 'https://github.com/samuelcolvin/pydantic-core'
 Funding = "https://github.com/sponsors/samuelcolvin"
 Source = "https://github.com/samuelcolvin/pydantic-core"
 
