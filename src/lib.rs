@@ -1,5 +1,6 @@
 #![feature(no_coverage)]
 #![feature(trait_upcasting)]
+#![allow(clippy::borrow_deref_ref)]
 
 extern crate core;
 extern crate enum_dispatch;
