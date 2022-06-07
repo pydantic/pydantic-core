@@ -138,8 +138,14 @@ class UnionSchema(TypedDict):
     default: NotRequired[Any]
 
 
-class TupleSchema(TypedDict, total=False):
-    type: Literal['tuple']
+class TupleFixLenSchema(TypedDict):
+    type: Literal['tuple-fix-len']
+    items: List[Schema]
+    strict: NotRequired[bool]
+
+
+class TupleVarLenSchema(TypedDict):
+    type: Literal['tuple-var-len']
     items: Schema  # default: AnySchema
     min_items: NotRequired[int]
     max_items: NotRequired[int]
@@ -164,7 +170,8 @@ BareType = Literal[
     'recursive-reference',
     'set',
     'str',
-    'tuple',
+    # tuple-fix-len cannot be created without more typing information
+    'tuple-var-len',
     'union',
 ]
 
@@ -186,6 +193,7 @@ Schema = Union[
     RecursiveReferenceSchema,
     SetSchema,
     StringSchema,
-    TupleSchema,
+    TupleFixLenSchema,
+    TupleVarLenSchema,
     UnionSchema,
 ]
