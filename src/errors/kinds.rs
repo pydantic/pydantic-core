@@ -58,7 +58,7 @@ pub enum ErrorKind {
     ListTooLong,
     // ---------------------
     // set errors
-    #[strum(message = "Value must be a valid list/array")]
+    #[strum(message = "Value must be a valid set")]
     SetType,
     #[strum(message = "Set must have at least {min_length} items")]
     SetTooShort,
@@ -118,6 +118,12 @@ pub enum ErrorKind {
     LiteralSingleError,
     #[strum(serialize = "literal_error", message = "Value must be one of: {expected}")]
     LiteralMultipleError,
+    // ---------------------
+    // date errors
+    #[strum(message = "Value must be a valid date")]
+    DateType,
+    #[strum(message = "Value must be a valid date in the format YYYY-MM-DD, {parsing_error}")]
+    DateParsing,
 }
 
 impl Default for ErrorKind {

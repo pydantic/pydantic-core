@@ -1,5 +1,7 @@
-use super::Input;
+use speedate::Date;
+
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
+use super::Input;
 
 #[inline]
 pub fn str_as_bool<'a>(input: &'a dyn Input, str: &str) -> ValResult<'a, bool> {
@@ -74,3 +76,36 @@ pub fn float_as_int(input: &dyn Input, float: f64) -> ValResult<i64> {
         Ok(float as i64)
     }
 }
+
+pub fn string_as_date<'a>(input: &'a dyn Input, str: &str) -> ValResult<'a, Date> {
+    match Date::parse_str(str) {
+        Ok(date) => Ok(date),
+        Err(err) => {
+            err_val_error!(
+                input_value = InputValue::InputRef(input),
+                kind = ErrorKind::DateParsing,
+                context = context!("parsing_error" => err.to_string())
+            )
+        }
+    }
+}
+
+pub fn int_as_date<'a>(input: &'a dyn Input, int: i64) -> ValResult<'a, Date> {
+    match Date::from_timestamp(int) {
+        Ok(date) => Ok(date),
+        Err(err) => {
+            err_val_error!(
+                input_value = InputValue::InputRef(input),
+                kind = ErrorKind::DateParsing,
+                context = context!("parsing_error" => err.to_string())
+            )
+        }
+    }
+}
+
+macro_rules! date_as_py_date {
+    ($py:ident, $date:ident) => {
+        pyo3::types::PyDate::new($py, $date.year as i32, $date.month, $date.day).map_err(crate::errors::as_internal)
+    };
+}
+pub(crate) use date_as_py_date;

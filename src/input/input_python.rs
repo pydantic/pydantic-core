@@ -1,13 +1,13 @@
 use std::str::from_utf8;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet, PyString, PyTuple, PyType};
+use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet, PyString, PyTuple, PyType, PyDate};
 
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
 
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
-use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
+use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int, int_as_date, string_as_date, date_as_py_date};
 
 impl Input for PyAny {
     fn is_none(&self) -> bool {
@@ -102,8 +102,8 @@ impl Input for PyAny {
     }
 
     fn lax_float(&self) -> ValResult<f64> {
-        if let Ok(int) = self.extract::<f64>() {
-            Ok(int)
+        if let Ok(float) = self.extract::<f64>() {
+            Ok(float)
         } else if let Some(str) = _maybe_as_string(self, ErrorKind::FloatParsing)? {
             match str.parse() {
                 Ok(i) => Ok(i),
@@ -201,6 +201,33 @@ impl Input for PyAny {
             Ok(frozen_set.into())
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType)
+        }
+    }
+
+    fn strict_date<'data>(&'data self, _py: Python<'data>) -> ValResult<&'data PyDate> {
+        if let Ok(date) = self.cast_as::<PyDate>() {
+            Ok(date)
+        } else {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
+        }
+    }
+
+    fn lax_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
+        if let Ok(date) = self.cast_as::<PyDate>() {
+            Ok(date)
+        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+            let str = py_str.extract().map_err(as_internal)?;
+            let d = string_as_date(self, str)?;
+            date_as_py_date!(py, d)
+        } else if let Ok(int) = self.extract::<i64>() {
+            let d = int_as_date(self, int)?;
+            date_as_py_date!(py, d)
+        } else if let Ok(float) = self.extract::<f64>() {
+            let int = float_as_int(self, float)?;
+            let d = int_as_date(self, int)?;
+            date_as_py_date!(py, d)
+        } else {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
         }
     }
 }

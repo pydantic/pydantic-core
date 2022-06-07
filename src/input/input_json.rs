@@ -1,11 +1,12 @@
-use pyo3::types::PyType;
+use pyo3::prelude::*;
+use pyo3::types::{PyDate, PyType};
 
 use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
 
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
 use super::parse_json::JsonInput;
-use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
+use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int, string_as_date, int_as_date, date_as_py_date};
 
 impl Input for JsonInput {
     fn is_none(&self) -> bool {
@@ -114,6 +115,17 @@ impl Input for JsonInput {
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType),
         }
     }
+
+    fn lax_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
+        let date = match self {
+            JsonInput::String(v) => string_as_date(self, v),
+            JsonInput::Int(v) => int_as_date(self, *v),
+            JsonInput::Float(v) => int_as_date(self, float_as_int(self, *v)?),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType),
+        }?;
+
+        return date_as_py_date!(py, date);
+    }
 }
 
 /// Required for Dict keys so the string can behave like an Input
@@ -187,5 +199,9 @@ impl Input for String {
     #[no_coverage]
     fn strict_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType)
+    }
+
+    fn lax_date<'data>(&'data self, _py: Python<'data>) -> ValResult<&'data PyDate> {
+        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
     }
 }

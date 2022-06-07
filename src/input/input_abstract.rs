@@ -1,6 +1,7 @@
 use std::fmt;
 
-use pyo3::types::PyType;
+use pyo3::prelude::*;
+use pyo3::types::{PyType, PyDate};
 
 use crate::errors::ValResult;
 
@@ -44,4 +45,9 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
     fn lax_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         self.strict_set()
     }
+    fn strict_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
+        self.lax_date(py)
+    }
+
+    fn lax_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate>;
 }
