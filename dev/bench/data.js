@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1654678700817,
+  "lastUpdate": 1654697485910,
   "repoUrl": "https://github.com/samuelcolvin/pydantic-core",
   "entries": {
     "Benchmark": [
@@ -1489,6 +1489,142 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.634346056137345e-7",
             "extra": "mean: 30.34959320265842 usec\nrounds: 33899"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "s@muelcolvin.com",
+            "name": "Samuel Colvin",
+            "username": "samuelcolvin"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a4afcb67701bf9765bf442bd850ad3d6b2572fed",
+          "message": "improving coverage (#78)\n\n* improving coverage\r\n\r\n* improving to_loc and function coverage",
+          "timestamp": "2022-06-08T15:09:42+01:00",
+          "tree_id": "171e18fd5953e618bc0e3d73c3845363f0026824",
+          "url": "https://github.com/samuelcolvin/pydantic-core/commit/a4afcb67701bf9765bf442bd850ad3d6b2572fed"
+        },
+        "date": 1654697485474,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/test_benchmarks.py::TestBenchmarkSimpleModel::test_core_python",
+            "value": 47490.01824546574,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000012883146343932272",
+            "extra": "mean: 21.057056555152577 usec\nrounds: 48077"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestBenchmarkSimpleModel::test_core_json",
+            "value": 28905.881455235834,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000014820035519265808",
+            "extra": "mean: 34.59503566942312 usec\nrounds: 31848"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_bool_core",
+            "value": 211417.78693842815,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000017243557680592826",
+            "extra": "mean: 4.729970994783107 usec\nrounds: 117634"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_small_class_core_dict",
+            "value": 866611.0355725328,
+            "unit": "iter/sec",
+            "range": "stddev: 1.827038840024979e-7",
+            "extra": "mean: 1.1539202236659067 usec\nrounds: 91744"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_small_class_core_model",
+            "value": 741514.133008035,
+            "unit": "iter/sec",
+            "range": "stddev: 6.917137666394715e-8",
+            "extra": "mean: 1.3485919626957594 usec\nrounds: 74627"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_recursive_model_core",
+            "value": 9508.609003098773,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004512050466906279",
+            "extra": "mean: 105.16785364442987 usec\nrounds: 10331"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_list_of_dict_models_core",
+            "value": 17450.85549193271,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001949816194837994",
+            "extra": "mean: 57.30378092135862 usec\nrounds: 19121"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_list_of_ints_core_py",
+            "value": 3011.0326386626316,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000071292317785244575",
+            "extra": "mean: 332.1119761903863 usec\nrounds: 3276"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_list_of_ints_core_json",
+            "value": 5850.062775606873,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006243834966959953",
+            "extra": "mean: 170.938336622595 usec\nrounds: 7195"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_set_of_ints_core",
+            "value": 2502.9685014590727,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001527680174484164",
+            "extra": "mean: 399.525603065745 usec\nrounds: 3066"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_set_of_ints_core_json",
+            "value": 4483.976622429334,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008554539027128086",
+            "extra": "mean: 223.01632773861758 usec\nrounds: 5541"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_dict_of_ints_core",
+            "value": 796.6257388035033,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000021287208505593248",
+            "extra": "mean: 1.2552946148864785 msec\nrounds: 927"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_dict_of_ints_core_json",
+            "value": 1420.3251044285128,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001867773564847241",
+            "extra": "mean: 704.0641588901321 usec\nrounds: 1693"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_many_models_core_dict",
+            "value": 1125.8181936665628,
+            "unit": "iter/sec",
+            "range": "stddev: 0.001772403411194497",
+            "extra": "mean: 888.242884708766 usec\nrounds: 1648"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_many_models_core_model",
+            "value": 771.4874019863694,
+            "unit": "iter/sec",
+            "range": "stddev: 0.002382660954010357",
+            "extra": "mean: 1.296197445901609 msec\nrounds: 1220"
+          },
+          {
+            "name": "tests/test_benchmarks.py::test_list_of_optional_core",
+            "value": 27101.37960097393,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000014554689213091879",
+            "extra": "mean: 36.898490583264014 usec\nrounds: 27398"
           }
         ]
       }
