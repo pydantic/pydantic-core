@@ -46,9 +46,15 @@ def test_date(input_value, expected):
                 'Datetimes provided to dates must have zero time - e.g. be exact dates [kind=date_from_datetime_inexact'
             ),
         ),
-        ('wrong', Err('Value must be a valid date or datetime, day value is outside expected range [kind=date_from_datetime_parsing')),
+        ('wrong', Err('Value must be a valid date or datetime, input is too short [kind=date_from_datetime_parsing')),
         ('2000-02-29', date(2000, 2, 29)),
-        ('2001-02-29', Err('Value must be a valid date in the format YYYY-MM-DD, day value is outside expected range')),
+        (
+            '2001-02-29',
+            Err(
+                'Value must be a valid date or datetime, '
+                'day value is outside expected range [kind=date_from_datetime_parsing'
+            ),
+        ),
         ([1], Err('Value must be a valid date [kind=date_type')),
     ],
 )
@@ -78,6 +84,27 @@ def test_date_strict(input_value, expected):
             v.validate_python(input_value)
     else:
         output = v.validate_python(input_value)
+        assert output == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ('"2022-06-08"', date(2022, 6, 8)),
+        (
+            '"foobar"',
+            Err('Value must be a valid date in the format YYYY-MM-DD, input is too short [kind=date_parsing,'),
+        ),
+        ('1654646400', Err('Value must be a valid date [kind=date_type')),
+    ],
+)
+def test_date_strict_json(input_value, expected):
+    v = SchemaValidator({'type': 'date', 'strict': True})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_json(input_value)
+    else:
+        output = v.validate_json(input_value)
         assert output == expected
 
 

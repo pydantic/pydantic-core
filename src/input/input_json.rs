@@ -7,8 +7,8 @@ use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
 use super::parse_json::JsonInput;
 use super::shared::{
-    bytes_as_date, bytes_as_datetime, date_as_py_date, datetime_as_py_datetime, float_as_datetime,
-    float_as_int, int_as_bool, int_as_datetime, str_as_bool, str_as_int,
+    bytes_as_date, bytes_as_datetime, date_as_py_date, datetime_as_py_datetime, float_as_datetime, float_as_int,
+    int_as_bool, int_as_datetime, str_as_bool, str_as_int,
 };
 
 impl Input for JsonInput {

@@ -44,7 +44,6 @@ impl Validator for DateValidator {
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-
         let date = match self.strict {
             true => input.strict_date(py)?,
             false => {
@@ -60,19 +59,17 @@ impl Validator for DateValidator {
                                             match line_error.kind {
                                                 ErrorKind::DateTimeParsing => {
                                                     line_error.kind = ErrorKind::DateFromDatetimeParsing;
-                                                },
+                                                }
                                                 _ => {
                                                     return Err(date_err);
                                                 }
                                             }
                                         }
                                         Err(ValError::LineErrors(line_errors))
-                                    },
-                                    ValError::InternalErr(internal_err) => {
-                                        Err(ValError::InternalErr(internal_err))
-                                    },
+                                    }
+                                    ValError::InternalErr(internal_err) => Err(ValError::InternalErr(internal_err)),
                                 };
-                            },
+                            }
                         };
                         // TODO replace all this with raw rust types once github.com/samuelcolvin/speedate#6 is done
 
@@ -97,7 +94,7 @@ impl Validator for DateValidator {
                         }
                     }
                 }
-            },
+            }
         };
         self.validation_comparison(py, input, date)
     }
