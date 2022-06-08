@@ -124,7 +124,7 @@ impl Input for JsonInput {
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType),
         }?;
 
-        return date_as_py_date!(py, date);
+        date_as_py_date!(py, date)
     }
 }
 

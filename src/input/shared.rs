@@ -92,7 +92,7 @@ pub fn string_as_date<'a>(input: &'a dyn Input, str: &str) -> ValResult<'a, Date
     }
 }
 
-pub fn int_as_date<'a>(input: &'a dyn Input, int: i64) -> ValResult<'a, Date> {
+pub fn int_as_date(input: &dyn Input, int: i64) -> ValResult<Date> {
     match Date::from_timestamp(int) {
         Ok(date) => Ok(date),
         Err(err) => {
