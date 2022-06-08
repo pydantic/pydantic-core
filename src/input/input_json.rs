@@ -1,12 +1,15 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyDate, PyType};
+use pyo3::types::{PyDate, PyDateTime, PyType};
 
 use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
 
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
 use super::parse_json::JsonInput;
-use super::shared::{date_as_py_date, float_as_int, int_as_bool, int_as_date, str_as_bool, str_as_int, string_as_date};
+use super::shared::{
+    bytes_as_date, bytes_as_datetime, date_as_py_date, date_from_datetime, datetime_as_py_datetime, float_as_datetime,
+    float_as_int, int_as_bool, int_as_datetime, str_as_bool, str_as_int,
+};
 
 impl Input for JsonInput {
     fn is_none(&self) -> bool {
@@ -116,15 +119,34 @@ impl Input for JsonInput {
         }
     }
 
-    fn lax_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
-        let date = match self {
-            JsonInput::String(v) => string_as_date(self, v),
-            JsonInput::Int(v) => int_as_date(self, *v),
-            JsonInput::Float(v) => int_as_date(self, float_as_int(self, *v)?),
+    fn strict_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
+        match self {
+            JsonInput::String(v) => {
+                let date = bytes_as_date(self, v.as_bytes())?;
+                date_as_py_date!(py, date)
+            }
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType),
-        }?;
+        }
+    }
 
-        date_as_py_date!(py, date)
+    fn lax_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
+        match self.strict_date(py) {
+            Ok(date) => Ok(date),
+            Err(err) => match self.lax_datetime(py) {
+                Ok(dt) => date_from_datetime(self, py, dt),
+                _ => Err(err),
+            },
+        }
+    }
+
+    fn strict_datetime<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDateTime> {
+        let dt = match self {
+            JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes()),
+            JsonInput::Int(v) => int_as_datetime(self, *v, 0),
+            JsonInput::Float(v) => float_as_datetime(self, *v),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType),
+        }?;
+        datetime_as_py_datetime!(py, dt)
     }
 }
 
@@ -201,7 +223,13 @@ impl Input for String {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType)
     }
 
-    fn lax_date<'data>(&'data self, _py: Python<'data>) -> ValResult<&'data PyDate> {
+    #[no_coverage]
+    fn strict_date<'data>(&'data self, _py: Python<'data>) -> ValResult<&'data PyDate> {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
+    }
+
+    #[no_coverage]
+    fn strict_datetime<'data>(&'data self, _py: Python<'data>) -> ValResult<&'data PyDateTime> {
+        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
     }
 }

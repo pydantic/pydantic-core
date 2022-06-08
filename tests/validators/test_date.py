@@ -13,14 +13,17 @@ from ..conftest import Err
     'input_value,expected',
     [
         (date(2022, 6, 8), date(2022, 6, 8)),
+        ('2022-06-08', date(2022, 6, 8)),
         (b'2022-06-08', date(2022, 6, 8)),
         ((1,), Err('Value must be a valid date [kind=date_type')),
         (Decimal('1654646400'), date(2022, 6, 8)),
-        (253_402_300_800_000, Err('format YYYY-MM-DD, dates after 9999 are not supported as unix timestamps')),
-        (-20_000_000_000, Err('format YYYY-MM-DD, dates before 1600 are not supported as unix timestamps')),
+        # (253_402_300_800_000, Err('format YYYY-MM-DD, dates after 9999 are not supported as unix timestamps')),
+        (253_402_300_800_000, Err('Value must be a valid date')),
+        # (-20_000_000_000, Err('format YYYY-MM-DD, dates before 1600 are not supported as unix timestamps')),
+        (-20_000_000_000, Err('Value must be a valid date')),
     ],
 )
-def test_float(input_value, expected):
+def test_date(input_value, expected):
     v = SchemaValidator({'type': 'date'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -37,13 +40,19 @@ def test_float(input_value, expected):
         ('1453-01-28', date(1453, 1, 28)),
         (1654646400, date(2022, 6, 8)),
         (1654646400.0, date(2022, 6, 8)),
+        (
+            1654646401,
+            Err(
+                'Datetimes provided to dates must have zero time - e.g. be exact dates [kind=date_from_datetime_inexact'
+            ),
+        ),
         ('wrong', Err('Value must be a valid date in the format YYYY-MM-DD, input is too short [kind=date_parsing')),
         ('2000-02-29', date(2000, 2, 29)),
         ('2001-02-29', Err('Value must be a valid date in the format YYYY-MM-DD, day value is outside expected range')),
         ([1], Err('Value must be a valid date [kind=date_type')),
     ],
 )
-def test_float_json(py_or_json, input_value, expected):
+def test_date_json(py_or_json, input_value, expected):
     v = py_or_json({'type': 'date'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -62,7 +71,7 @@ def test_float_json(py_or_json, input_value, expected):
         (1654646400, Err('Value must be a valid date [kind=date_type')),
     ],
 )
-def test_float_strict(input_value, expected):
+def test_date_strict(input_value, expected):
     v = SchemaValidator({'type': 'date', 'strict': True})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):

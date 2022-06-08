@@ -1,13 +1,19 @@
 use std::str::from_utf8;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDate, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet, PyString, PyTuple, PyType};
+use pyo3::types::{
+    PyBytes, PyDate, PyDateTime, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet, PyString, PyTuple, PyType,
+};
 
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
+use crate::input::shared::bytes_as_datetime;
 
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
-use super::shared::{date_as_py_date, float_as_int, int_as_bool, int_as_date, str_as_bool, str_as_int, string_as_date};
+use super::shared::{
+    bytes_as_date, date_as_py_date, date_from_datetime, datetime_as_py_datetime, float_as_datetime, float_as_int,
+    int_as_bool, int_as_datetime, str_as_bool, str_as_int,
+};
 
 impl Input for PyAny {
     fn is_none(&self) -> bool {
@@ -214,19 +220,55 @@ impl Input for PyAny {
 
     fn lax_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
         if let Ok(date) = self.cast_as::<PyDate>() {
-            Ok(date)
-        } else if let Some(str) = _maybe_as_string(self, ErrorKind::DateType)? {
-            let d = string_as_date(self, &str)?;
-            date_as_py_date!(py, d)
-        } else if let Ok(int) = self.extract::<i64>() {
-            let d = int_as_date(self, int)?;
-            date_as_py_date!(py, d)
-        } else if let Ok(float) = self.extract::<f64>() {
-            let int = float_as_int(self, float)?;
-            let d = int_as_date(self, int)?;
-            date_as_py_date!(py, d)
+            return Ok(date);
+        }
+
+        let parse_date = || {
+            if let Ok(str) = self.extract::<String>() {
+                let date = bytes_as_date(self, str.as_bytes())?;
+                date_as_py_date!(py, date)
+            } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+                let date = bytes_as_date(self, py_bytes.as_bytes())?;
+                date_as_py_date!(py, date)
+            } else {
+                err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
+            }
+        };
+
+        match parse_date() {
+            Ok(date) => Ok(date),
+            Err(err) => match self.lax_datetime(py) {
+                Ok(dt) => date_from_datetime(self, py, dt),
+                _ => Err(err),
+            },
+        }
+    }
+
+    fn strict_datetime<'data>(&'data self, _py: Python<'data>) -> ValResult<&'data PyDateTime> {
+        if let Ok(dt) = self.cast_as::<PyDateTime>() {
+            Ok(dt)
         } else {
-            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
+        }
+    }
+
+    fn lax_datetime<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDateTime> {
+        if let Ok(dt) = self.cast_as::<PyDateTime>() {
+            Ok(dt)
+        } else if let Ok(str) = self.extract::<String>() {
+            let dt = bytes_as_datetime(self, str.as_bytes())?;
+            datetime_as_py_datetime!(py, dt)
+        } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            let dt = bytes_as_datetime(self, py_bytes.as_bytes())?;
+            datetime_as_py_datetime!(py, dt)
+        } else if let Ok(int) = self.extract::<i64>() {
+            let dt = int_as_datetime(self, int, 0)?;
+            datetime_as_py_datetime!(py, dt)
+        } else if let Ok(float) = self.extract::<f64>() {
+            let dt = float_as_datetime(self, float)?;
+            datetime_as_py_datetime!(py, dt)
+        } else {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
         }
     }
 }

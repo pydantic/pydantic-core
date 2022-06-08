@@ -15,6 +15,7 @@ use crate::SchemaError;
 mod any;
 mod bool;
 mod date;
+mod datetime;
 mod dict;
 mod float;
 mod function;
@@ -168,40 +169,42 @@ pub fn build_validator<'a>(
         config,
         build_context,
         // models e.g. heterogeneous dicts
-        self::model::ModelValidator,
+        model::ModelValidator,
         // unions
-        self::union::UnionValidator,
+        union::UnionValidator,
         // optional e.g. nullable
-        self::optional::OptionalValidator,
+        optional::OptionalValidator,
         // model classes
-        self::model_class::ModelClassValidator,
+        model_class::ModelClassValidator,
         // strings
-        self::string::StrValidator,
+        string::StrValidator,
         // integers
-        self::int::IntValidator,
+        int::IntValidator,
         // boolean
-        self::bool::BoolValidator,
+        bool::BoolValidator,
         // floats
-        self::float::FloatValidator,
+        float::FloatValidator,
         // list/arrays
-        self::list::ListValidator,
+        list::ListValidator,
         // sets - unique lists
-        self::set::SetValidator,
+        set::SetValidator,
         // dicts/objects (recursive)
-        self::dict::DictValidator,
+        dict::DictValidator,
         // None/null
-        self::none::NoneValidator,
+        none::NoneValidator,
         // functions - before, after, plain & wrap
-        self::function::FunctionBuilder,
+        function::FunctionBuilder,
         // recursive (self-referencing) models
-        self::recursive::RecursiveValidator,
-        self::recursive::RecursiveRefValidator,
+        recursive::RecursiveValidator,
+        recursive::RecursiveRefValidator,
         // literals
-        self::literal::LiteralBuilder,
+        literal::LiteralBuilder,
         // any
-        self::any::AnyValidator,
+        any::AnyValidator,
         // dates
-        self::date::DateValidator,
+        date::DateValidator,
+        // datetimes
+        datetime::DateTimeValidator,
     )
 }
 
@@ -268,6 +271,8 @@ pub enum CombinedValidator {
     Any(any::AnyValidator),
     // dates
     Date(date::DateValidator),
+    // datetimes
+    Datetime(datetime::DateTimeValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
