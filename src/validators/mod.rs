@@ -14,6 +14,7 @@ use crate::SchemaError;
 
 mod any;
 mod bool;
+mod bytes;
 mod dict;
 mod float;
 mod function;
@@ -199,6 +200,8 @@ pub fn build_validator<'a>(
         self::literal::LiteralBuilder,
         // any
         self::any::AnyValidator,
+        // bytes
+        self::bytes::BytesValidator,
     )
 }
 
@@ -263,6 +266,10 @@ pub enum CombinedValidator {
     LiteralGeneral(self::literal::LiteralGeneralValidator),
     // any
     Any(self::any::AnyValidator),
+    // bytes
+    Bytes(self::bytes::BytesValidator),
+    StrictBytes(self::bytes::StrictBytesValidator),
+    ConstrainedBytes(self::bytes::BytesConstrainedValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

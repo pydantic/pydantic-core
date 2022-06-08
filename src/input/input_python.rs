@@ -203,6 +203,30 @@ impl Input for PyAny {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType)
         }
     }
+
+    fn strict_bytes(&self) -> ValResult<Vec<u8>> {
+        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            py_bytes.extract().map_err(as_internal)
+        } else {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BytesType)
+        }
+    }
+
+    fn lax_bytes(&self) -> ValResult<Vec<u8>> {
+        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            py_bytes.extract().map_err(as_internal)
+        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+            Ok(py_str.to_string().into_bytes())
+        } else if self.extract::<bool>().is_ok() {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BytesType)
+        } else if let Ok(int) = self.extract::<i64>() {
+            Ok(int.to_ne_bytes().to_vec())
+        } else if let Ok(float) = f64::extract(self) {
+            Ok(float.to_ne_bytes().to_vec())
+        } else {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BytesType)
+        }
+    }
 }
 
 fn mapping_as_dict(mapping: &PyMapping) -> PyResult<&PyDict> {
