@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
 from ..conftest import Err
 
@@ -16,6 +16,8 @@ from ..conftest import Err
         (b'2022-06-08', date(2022, 6, 8)),
         ((1,), Err('Value must be a valid date [kind=date_type')),
         (Decimal('1654646400'), date(2022, 6, 8)),
+        (253_402_300_800_000, Err('format YYYY-MM-DD, dates after 9999 are not supported as unix timestamps')),
+        (-20_000_000_000, Err('format YYYY-MM-DD, dates before 1600 are not supported as unix timestamps')),
     ],
 )
 def test_float(input_value, expected):
@@ -38,6 +40,7 @@ def test_float(input_value, expected):
         ('wrong', Err('Value must be a valid date in the format YYYY-MM-DD, input is too short [kind=date_parsing')),
         ('2000-02-29', date(2000, 2, 29)),
         ('2001-02-29', Err('Value must be a valid date in the format YYYY-MM-DD, day value is outside expected range')),
+        ([1], Err('Value must be a valid date [kind=date_type')),
     ],
 )
 def test_float_json(py_or_json, input_value, expected):
@@ -99,3 +102,8 @@ def test_date_kwargs(kwargs, input_value, expected):
     else:
         output = v.validate_python(input_value)
         assert output == expected
+
+
+def test_invalid_constraint():
+    with pytest.raises(SchemaError, match="'str' object cannot be converted to 'PyDate'"):
+        SchemaValidator({'type': 'date', 'gt': '2000-01-01'})
