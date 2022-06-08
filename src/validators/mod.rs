@@ -14,6 +14,7 @@ use crate::SchemaError;
 
 mod any;
 mod bool;
+mod date;
 mod dict;
 mod float;
 mod function;
@@ -199,6 +200,8 @@ pub fn build_validator<'a>(
         self::literal::LiteralBuilder,
         // any
         self::any::AnyValidator,
+        // dates
+        self::date::DateValidator,
     )
 }
 
@@ -217,52 +220,54 @@ pub struct Extra<'a> {
 #[enum_dispatch]
 pub enum CombinedValidator {
     // models e.g. heterogeneous dicts
-    Model(self::model::ModelValidator),
+    Model(model::ModelValidator),
     // unions
-    Union(self::union::UnionValidator),
+    Union(union::UnionValidator),
     // optional e.g. nullable
-    Optional(self::optional::OptionalValidator),
+    Optional(optional::OptionalValidator),
     // model classes
-    ModelClass(self::model_class::ModelClassValidator),
+    ModelClass(model_class::ModelClassValidator),
     // strings
-    Str(self::string::StrValidator),
-    StrictStr(self::string::StrictStrValidator),
-    StrConstrained(self::string::StrConstrainedValidator),
+    Str(string::StrValidator),
+    StrictStr(string::StrictStrValidator),
+    StrConstrained(string::StrConstrainedValidator),
     // integers
-    Int(self::int::IntValidator),
-    StrictInt(self::int::StrictIntValidator),
-    ConstrainedInt(self::int::ConstrainedIntValidator),
+    Int(int::IntValidator),
+    StrictInt(int::StrictIntValidator),
+    ConstrainedInt(int::ConstrainedIntValidator),
     // booleans
-    Bool(self::bool::BoolValidator),
-    StrictBool(self::bool::StrictBoolValidator),
+    Bool(bool::BoolValidator),
+    StrictBool(bool::StrictBoolValidator),
     // floats
-    Float(self::float::FloatValidator),
-    StrictFloat(self::float::StrictFloatValidator),
-    ConstrainedFloat(self::float::ConstrainedFloatValidator),
+    Float(float::FloatValidator),
+    StrictFloat(float::StrictFloatValidator),
+    ConstrainedFloat(float::ConstrainedFloatValidator),
     // lists
-    List(self::list::ListValidator),
+    List(list::ListValidator),
     // sets - unique lists
-    Set(self::set::SetValidator),
+    Set(set::SetValidator),
     // dicts/objects (recursive)
-    Dict(self::dict::DictValidator),
+    Dict(dict::DictValidator),
     // None/null
-    None(self::none::NoneValidator),
+    None(none::NoneValidator),
     // functions
-    FunctionBefore(self::function::FunctionBeforeValidator),
-    FunctionAfter(self::function::FunctionAfterValidator),
-    FunctionPlain(self::function::FunctionPlainValidator),
-    FunctionWrap(self::function::FunctionWrapValidator),
+    FunctionBefore(function::FunctionBeforeValidator),
+    FunctionAfter(function::FunctionAfterValidator),
+    FunctionPlain(function::FunctionPlainValidator),
+    FunctionWrap(function::FunctionWrapValidator),
     // recursive (self-referencing) models
-    Recursive(self::recursive::RecursiveValidator),
-    RecursiveRef(self::recursive::RecursiveRefValidator),
+    Recursive(recursive::RecursiveValidator),
+    RecursiveRef(recursive::RecursiveRefValidator),
     // literals
-    LiteralSingleString(self::literal::LiteralSingleStringValidator),
-    LiteralSingleInt(self::literal::LiteralSingleIntValidator),
-    LiteralMultipleStrings(self::literal::LiteralMultipleStringsValidator),
-    LiteralMultipleInts(self::literal::LiteralMultipleIntsValidator),
-    LiteralGeneral(self::literal::LiteralGeneralValidator),
+    LiteralSingleString(literal::LiteralSingleStringValidator),
+    LiteralSingleInt(literal::LiteralSingleIntValidator),
+    LiteralMultipleStrings(literal::LiteralMultipleStringsValidator),
+    LiteralMultipleInts(literal::LiteralMultipleIntsValidator),
+    LiteralGeneral(literal::LiteralGeneralValidator),
     // any
-    Any(self::any::AnyValidator),
+    Any(any::AnyValidator),
+    // dates
+    Date(date::DateValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

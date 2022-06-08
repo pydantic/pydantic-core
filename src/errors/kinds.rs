@@ -24,9 +24,21 @@ pub enum ErrorKind {
     // boolean errors
     #[strum(message = "Value must be a valid boolean")]
     Bool,
-    #[strum(message = "Value must be a valid string")]
+    // ---------------------
+    // comparison errors
+    #[strum(message = "Value must be a multiple of {multiple_of}")]
+    IntMultipleOf,
+    #[strum(message = "Value must be greater than {gt}")]
+    GreaterThan,
+    #[strum(message = "Value must be greater than or equal to {ge}")]
+    GreaterThanEqual,
+    #[strum(message = "Value must be less than {lt}")]
+    LessThan,
+    #[strum(message = "Value must be less than or equal to {le}")]
+    LessThanEqual,
     // ---------------------
     // string errors
+    #[strum(message = "Value must be a valid string")]
     StrType,
     #[strum(message = "Value must be a valid string, unable to parse raw data as a unicode string")]
     StrUnicode,

@@ -1,13 +1,13 @@
 use std::str::from_utf8;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet, PyString, PyTuple, PyType, PyDate};
+use pyo3::types::{PyBytes, PyDate, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet, PyString, PyTuple, PyType};
 
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
 
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
-use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int, int_as_date, string_as_date, date_as_py_date};
+use super::shared::{date_as_py_date, float_as_int, int_as_bool, int_as_date, str_as_bool, str_as_int, string_as_date};
 
 impl Input for PyAny {
     fn is_none(&self) -> bool {
@@ -215,9 +215,8 @@ impl Input for PyAny {
     fn lax_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
         if let Ok(date) = self.cast_as::<PyDate>() {
             Ok(date)
-        } else if let Ok(py_str) = self.cast_as::<PyString>() {
-            let str = py_str.extract().map_err(as_internal)?;
-            let d = string_as_date(self, str)?;
+        } else if let Some(str) = _maybe_as_string(self, ErrorKind::DateType)? {
+            let d = string_as_date(self, &str)?;
             date_as_py_date!(py, d)
         } else if let Ok(int) = self.extract::<i64>() {
             let d = int_as_date(self, int)?;

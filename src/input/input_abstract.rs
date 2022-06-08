@@ -1,7 +1,7 @@
 use std::fmt;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyType, PyDate};
+use pyo3::types::{PyDate, PyType};
 
 use crate::errors::ValResult;
 

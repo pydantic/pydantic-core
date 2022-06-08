@@ -1,7 +1,8 @@
 use speedate::Date;
+use strum::EnumMessage;
 
-use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use super::Input;
+use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 
 #[inline]
 pub fn str_as_bool<'a>(input: &'a dyn Input, str: &str) -> ValResult<'a, bool> {
@@ -81,10 +82,11 @@ pub fn string_as_date<'a>(input: &'a dyn Input, str: &str) -> ValResult<'a, Date
     match Date::parse_str(str) {
         Ok(date) => Ok(date),
         Err(err) => {
+            let msg = err.get_documentation().unwrap_or_default();
             err_val_error!(
                 input_value = InputValue::InputRef(input),
                 kind = ErrorKind::DateParsing,
-                context = context!("parsing_error" => err.to_string())
+                context = context!("parsing_error" => msg)
             )
         }
     }
@@ -94,10 +96,11 @@ pub fn int_as_date<'a>(input: &'a dyn Input, int: i64) -> ValResult<'a, Date> {
     match Date::from_timestamp(int) {
         Ok(date) => Ok(date),
         Err(err) => {
+            let msg = err.get_documentation().unwrap_or_default();
             err_val_error!(
                 input_value = InputValue::InputRef(input),
                 kind = ErrorKind::DateParsing,
-                context = context!("parsing_error" => err.to_string())
+                context = context!("parsing_error" => msg)
             )
         }
     }

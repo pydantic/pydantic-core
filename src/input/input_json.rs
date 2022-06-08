@@ -6,7 +6,7 @@ use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
 use super::parse_json::JsonInput;
-use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int, string_as_date, int_as_date, date_as_py_date};
+use super::shared::{date_as_py_date, float_as_int, int_as_bool, int_as_date, str_as_bool, str_as_int, string_as_date};
 
 impl Input for JsonInput {
     fn is_none(&self) -> bool {
