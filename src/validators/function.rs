@@ -230,6 +230,7 @@ impl ValidatorCallable {
     fn __repr__(&self) -> String {
         format!("ValidatorCallable({:?})", self.validator)
     }
+
     fn __str__(&self) -> String {
         self.__repr__()
     }
@@ -241,7 +242,7 @@ fn get_function(schema: &PyDict) -> PyResult<PyObject> {
             if obj.is_callable() {
                 Ok(obj.into())
             } else {
-                return py_error!("function must be callable");
+                py_error!("function must be callable")
             }
         }
         None => py_error!(r#""function" key is required"#),
