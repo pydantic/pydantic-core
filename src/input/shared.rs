@@ -1,10 +1,8 @@
-use pyo3::prelude::*;
-use pyo3::types::{PyDate, PyDateTime, PyTime};
 use speedate::{Date, DateTime};
 use strum::EnumMessage;
 
 use super::Input;
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
+use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 
 #[inline]
 pub fn str_as_bool<'a>(input: &'a dyn Input, str: &str) -> ValResult<'a, bool> {
@@ -130,30 +128,6 @@ pub fn float_as_datetime(input: &dyn Input, timestamp: f64) -> ValResult<DateTim
         );
     }
     int_as_datetime(input, timestamp.floor() as i64, microseconds as u32)
-}
-
-pub fn date_from_datetime<'a>(input: &'a dyn Input, py: Python<'a>, dt: &'a PyDateTime) -> ValResult<'a, &'a PyDate> {
-    // TODO replace all this with raw rust types once github.com/samuelcolvin/speedate#6 is done
-    // we want to make sure the time is zero - e.g. the dt is an "exact date"
-
-    let dt_time: &PyTime = dt
-        .call_method0("time")
-        .map_err(as_internal)?
-        .extract()
-        .map_err(as_internal)?;
-
-    let zero_time = PyTime::new(py, 0, 0, 0, 0, None).map_err(as_internal)?;
-    if dt_time.eq(zero_time).map_err(as_internal)? {
-        dt.call_method0("date")
-            .map_err(as_internal)?
-            .extract()
-            .map_err(as_internal)
-    } else {
-        err_val_error!(
-            input_value = InputValue::InputRef(input),
-            kind = ErrorKind::DateFromDatetimeInexact
-        )
-    }
 }
 
 macro_rules! date_as_py_date {

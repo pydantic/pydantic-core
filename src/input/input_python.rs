@@ -11,7 +11,7 @@ use crate::input::shared::bytes_as_datetime;
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
 use super::shared::{
-    bytes_as_date, date_as_py_date, date_from_datetime, datetime_as_py_datetime, float_as_datetime, float_as_int,
+    bytes_as_date, date_as_py_date, datetime_as_py_datetime, float_as_datetime, float_as_int,
     int_as_bool, int_as_datetime, str_as_bool, str_as_int,
 };
 
@@ -223,24 +223,14 @@ impl Input for PyAny {
             return Ok(date);
         }
 
-        let parse_date = || {
-            if let Ok(str) = self.extract::<String>() {
-                let date = bytes_as_date(self, str.as_bytes())?;
-                date_as_py_date!(py, date)
-            } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
-                let date = bytes_as_date(self, py_bytes.as_bytes())?;
-                date_as_py_date!(py, date)
-            } else {
-                err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
-            }
-        };
-
-        match parse_date() {
-            Ok(date) => Ok(date),
-            Err(err) => match self.lax_datetime(py) {
-                Ok(dt) => date_from_datetime(self, py, dt),
-                _ => Err(err),
-            },
+        if let Ok(str) = self.extract::<String>() {
+            let date = bytes_as_date(self, str.as_bytes())?;
+            date_as_py_date!(py, date)
+        } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            let date = bytes_as_date(self, py_bytes.as_bytes())?;
+            date_as_py_date!(py, date)
+        } else {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
         }
     }
 

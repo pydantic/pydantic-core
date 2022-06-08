@@ -46,7 +46,7 @@ def test_date(input_value, expected):
                 'Datetimes provided to dates must have zero time - e.g. be exact dates [kind=date_from_datetime_inexact'
             ),
         ),
-        ('wrong', Err('Value must be a valid date in the format YYYY-MM-DD, input is too short [kind=date_parsing')),
+        ('wrong', Err('Value must be a valid date or datetime, day value is outside expected range [kind=date_from_datetime_parsing')),
         ('2000-02-29', date(2000, 2, 29)),
         ('2001-02-29', Err('Value must be a valid date in the format YYYY-MM-DD, day value is outside expected range')),
         ([1], Err('Value must be a valid date [kind=date_type')),

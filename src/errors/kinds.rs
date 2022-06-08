@@ -136,9 +136,8 @@ pub enum ErrorKind {
     DateType,
     #[strum(message = "Value must be a valid date in the format YYYY-MM-DD, {parsing_error}")]
     DateParsing,
-    // TODO
-    // #[strum(message = "Value must be a valid date or datetime, {parsing_error}")]
-    // DateOrDateTimeParsing,
+    #[strum(message = "Value must be a valid date or datetime, {parsing_error}")]
+    DateFromDatetimeParsing,
     #[strum(message = "Datetimes provided to dates must have zero time - e.g. be exact dates")]
     DateFromDatetimeInexact,
     // ---------------------

@@ -1,9 +1,9 @@
 use pyo3::prelude::*;
 use pyo3::pyclass::CompareOp;
-use pyo3::types::{PyDate, PyDict};
+use pyo3::types::{PyDate, PyDict, PyTime};
 
 use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
+use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
 use crate::input::Input;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -44,9 +44,60 @@ impl Validator for DateValidator {
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
+
         let date = match self.strict {
             true => input.strict_date(py)?,
-            false => input.lax_date(py)?,
+            false => {
+                match input.lax_date(py) {
+                    Ok(date) => date,
+                    Err(date_err) => {
+                        let dt = match input.lax_datetime(py) {
+                            Ok(dt) => dt,
+                            Err(dt_err) => {
+                                return match dt_err {
+                                    ValError::LineErrors(mut line_errors) => {
+                                        for line_error in line_errors.iter_mut() {
+                                            match line_error.kind {
+                                                ErrorKind::DateTimeParsing => {
+                                                    line_error.kind = ErrorKind::DateFromDatetimeParsing;
+                                                },
+                                                _ => {
+                                                    return Err(date_err);
+                                                }
+                                            }
+                                        }
+                                        Err(ValError::LineErrors(line_errors))
+                                    },
+                                    ValError::InternalErr(internal_err) => {
+                                        Err(ValError::InternalErr(internal_err))
+                                    },
+                                };
+                            },
+                        };
+                        // TODO replace all this with raw rust types once github.com/samuelcolvin/speedate#6 is done
+
+                        // we want to make sure the time is zero - e.g. the dt is an "exact date"
+                        let dt_time: &PyTime = dt
+                            .call_method0("time")
+                            .map_err(as_internal)?
+                            .extract()
+                            .map_err(as_internal)?;
+
+                        let zero_time = PyTime::new(py, 0, 0, 0, 0, None).map_err(as_internal)?;
+                        if dt_time.eq(zero_time).map_err(as_internal)? {
+                            dt.call_method0("date")
+                                .map_err(as_internal)?
+                                .extract()
+                                .map_err(as_internal)?
+                        } else {
+                            return err_val_error!(
+                                input_value = InputValue::InputRef(input),
+                                kind = ErrorKind::DateFromDatetimeInexact
+                            );
+                        }
+                    }
+                }
+            },
         };
         self.validation_comparison(py, input, date)
     }

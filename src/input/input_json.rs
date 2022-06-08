@@ -7,7 +7,7 @@ use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
 use super::parse_json::JsonInput;
 use super::shared::{
-    bytes_as_date, bytes_as_datetime, date_as_py_date, date_from_datetime, datetime_as_py_datetime, float_as_datetime,
+    bytes_as_date, bytes_as_datetime, date_as_py_date, datetime_as_py_datetime, float_as_datetime,
     float_as_int, int_as_bool, int_as_datetime, str_as_bool, str_as_int,
 };
 
@@ -126,16 +126,6 @@ impl Input for JsonInput {
                 date_as_py_date!(py, date)
             }
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType),
-        }
-    }
-
-    fn lax_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
-        match self.strict_date(py) {
-            Ok(date) => Ok(date),
-            Err(err) => match self.lax_datetime(py) {
-                Ok(dt) => date_from_datetime(self, py, dt),
-                _ => Err(err),
-            },
         }
     }
 
