@@ -12,6 +12,8 @@ pub enum ValError<'a> {
     InternalErr(PyErr),
 }
 
+// ValError used to implement Error, see #78 for removed code
+
 pub fn as_internal<'a>(err: PyErr) -> ValError<'a> {
     ValError::InternalErr(err)
 }
