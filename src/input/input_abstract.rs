@@ -1,7 +1,7 @@
 use std::fmt;
 
-use pyo3::prelude::*;
-use pyo3::types::{PyDate, PyDateTime, PyType};
+use pyo3::types::PyType;
+use speedate::{Date, DateTime};
 
 use crate::errors::ValResult;
 
@@ -46,15 +46,15 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
         self.strict_set()
     }
 
-    fn strict_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate>;
+    fn strict_date(&self) -> ValResult<Date>;
 
-    fn lax_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
-        self.strict_date(py)
+    fn lax_date(&self) -> ValResult<Date> {
+        self.strict_date()
     }
 
-    fn strict_datetime<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDateTime>;
+    fn strict_datetime(&self) -> ValResult<DateTime>;
 
-    fn lax_datetime<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDateTime> {
-        self.strict_datetime(py)
+    fn lax_datetime(&self) -> ValResult<DateTime> {
+        self.strict_datetime()
     }
 }

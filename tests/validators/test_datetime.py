@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -15,6 +15,7 @@ from ..conftest import Err
         (datetime(2022, 6, 8, 12, 13, 14), datetime(2022, 6, 8, 12, 13, 14)),
         ('2022-06-08T12:13:14', datetime(2022, 6, 8, 12, 13, 14)),
         (b'2022-06-08T12:13:14', datetime(2022, 6, 8, 12, 13, 14)),
+        (b'2022-06-08T12:13:14Z', datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone.utc)),
         ((1,), Err('Value must be a valid datetime [kind=date_time_type')),
         (Decimal('1654646400'), datetime(2022, 6, 8)),
         (253_402_300_800_000, Err('must be a valid datetime, dates after 9999 are not supported as unix timestamps')),

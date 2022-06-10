@@ -129,28 +129,3 @@ pub fn float_as_datetime(input: &dyn Input, timestamp: f64) -> ValResult<DateTim
     }
     int_as_datetime(input, timestamp.floor() as i64, microseconds as u32)
 }
-
-macro_rules! date_as_py_date {
-    ($py:ident, $date:ident) => {
-        pyo3::types::PyDate::new($py, $date.year as i32, $date.month, $date.day).map_err(crate::errors::as_internal)
-    };
-}
-pub(crate) use date_as_py_date;
-
-macro_rules! datetime_as_py_datetime {
-    ($py:ident, $datetime:ident) => {
-        pyo3::types::PyDateTime::new(
-            $py,
-            $datetime.date.year as i32,
-            $datetime.date.month,
-            $datetime.date.day,
-            $datetime.time.hour,
-            $datetime.time.minute,
-            $datetime.time.second,
-            $datetime.time.microsecond,
-            None,
-        )
-        .map_err(crate::errors::as_internal)
-    };
-}
-pub(crate) use datetime_as_py_datetime;
