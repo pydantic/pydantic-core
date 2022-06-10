@@ -16,7 +16,7 @@ def test_bytes_constrained():
 
 
 @pytest.mark.parametrize(
-    'opts,input,expected', [({}, 'foo', b'foo'), ({'strict': True}, 'foo', Err("Value must be a valid bytes"))]
+    'opts,input,expected', [({}, 'foo', b'foo'), ({'strict': True}, 'foo', Err('Value must be a valid bytes'))]
 )
 def test_constrained_bytes(py_or_json, opts, input, expected):
     v = py_or_json({'type': 'bytes', **opts})
