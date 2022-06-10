@@ -86,7 +86,7 @@ impl TupleVarLenValidator {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::TupleTooShort,
-                    context = context!("min_items" => min_length)
+                    context = context!("min_length" => min_length)
                 );
             }
         }
@@ -95,7 +95,7 @@ impl TupleVarLenValidator {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::TupleTooLong,
-                    context = context!("max_items" => max_length)
+                    context = context!("max_length" => max_length)
                 );
             }
         }

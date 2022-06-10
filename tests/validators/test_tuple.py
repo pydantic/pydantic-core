@@ -1,7 +1,11 @@
+import re
+
 import pytest
 from dirty_equals import IsNonNegative, IsTuple
 
 from pydantic_core import SchemaValidator, ValidationError
+
+from ..conftest import Err
 
 
 @pytest.mark.parametrize('input_value,expected', [([1, 2, 3], (1, 2, 3)), ([1, 2, '3'], (1, 2, 3))])
@@ -39,6 +43,22 @@ def test_tuple_strict_fails_without_tuple(wrong_coll_type, tuple_variant, items)
             'input_value': wrong_coll_type([1, 2, '33']),
         }
     ]
+
+
+@pytest.mark.parametrize(
+    'kwargs,input_value,expected',
+    [
+        ({'min_items': 3}, (1, 2), Err('Tuple must have at least 3 items [kind=tuple_too_short,')),
+        ({'max_items': 3}, (1, 2, 3, 4), Err('Tuple must have at most 3 items [kind=tuple_too_long,')),
+    ],
+)
+def test_tuple_kwargs(kwargs, input_value, expected):
+    v = SchemaValidator({'type': 'tuple-var-len', **kwargs})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected
 
 
 @pytest.mark.parametrize(
