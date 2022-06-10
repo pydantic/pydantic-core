@@ -82,14 +82,6 @@ pub enum ErrorKind {
     IntNan,
     #[strum(message = "Value must be a multiple of {multiple_of}")]
     IntMultiple,
-    #[strum(message = "Value must be greater than {gt}")]
-    IntGreaterThan,
-    #[strum(message = "Value must be greater than or equal to {ge}")]
-    IntGreaterThanEqual,
-    #[strum(message = "Value must be less than {lt}")]
-    IntLessThan,
-    #[strum(message = "Value must be less than or equal to {le}")]
-    IntLessThanEqual,
     // ---------------------
     // float errors
     #[strum(message = "Value must be a valid number")]
@@ -98,14 +90,6 @@ pub enum ErrorKind {
     FloatParsing,
     #[strum(message = "Value must be a multiple of {multiple_of}")]
     FloatMultiple,
-    #[strum(message = "Value must be greater than {gt}")]
-    FloatGreaterThan,
-    #[strum(message = "Value must be greater than or equal to {ge}")]
-    FloatGreaterThanEqual,
-    #[strum(message = "Value must be less than {lt}")]
-    FloatLessThan,
-    #[strum(message = "Value must be less than or equal to {le}")]
-    FloatLessThanEqual,
     // ---------------------
     // python errors from functions (the messages here will not be used as we sett message in these cases)
     #[strum(message = "Invalid value")]
@@ -118,6 +102,16 @@ pub enum ErrorKind {
     LiteralSingleError,
     #[strum(serialize = "literal_error", message = "Value must be one of: {expected}")]
     LiteralMultipleError,
+    // ---------------------
+    // comparison errors
+    #[strum(message = "Value must be greater than {gt}")]
+    ValueGreaterThan,
+    #[strum(message = "Value must be greater than or equal to {ge}")]
+    ValueGreaterThanEqual,
+    #[strum(message = "Value must be less than {lt}")]
+    ValueLessThan,
+    #[strum(message = "Value must be less than or equal to {le}")]
+    ValueLessThanEqual,
 }
 
 impl Default for ErrorKind {

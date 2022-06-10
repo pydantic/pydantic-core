@@ -151,7 +151,7 @@ impl ConstrainedIntValidator {
             if int > le {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
-                    kind = ErrorKind::IntLessThanEqual,
+                    kind = ErrorKind::ValueLessThanEqual,
                     context = context!("le" => le)
                 );
             }
@@ -160,7 +160,7 @@ impl ConstrainedIntValidator {
             if int >= lt {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
-                    kind = ErrorKind::IntLessThan,
+                    kind = ErrorKind::ValueLessThan,
                     context = context!("lt" => lt)
                 );
             }
@@ -169,7 +169,7 @@ impl ConstrainedIntValidator {
             if int < ge {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
-                    kind = ErrorKind::IntGreaterThanEqual,
+                    kind = ErrorKind::ValueGreaterThanEqual,
                     context = context!("ge" => ge)
                 );
             }
@@ -178,7 +178,7 @@ impl ConstrainedIntValidator {
             if int <= gt {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
-                    kind = ErrorKind::IntGreaterThan,
+                    kind = ErrorKind::ValueGreaterThan,
                     context = context!("gt" => gt)
                 );
             }
