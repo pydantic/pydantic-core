@@ -7,6 +7,8 @@ use crate::input::{GenericSequence, Input, SequenceLenIter};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
+trait TupleValidator {}
+
 #[derive(Debug, Clone)]
 pub struct TupleVarLenValidator {
     strict: bool,
@@ -171,15 +173,15 @@ impl Validator for TupleFixLenValidator {
         self._validation_logic(py, input, tuple, extra, slots)
     }
 
-    // fn validate_strict<'s, 'data>(
-    //     &'s self,
-    //     py: Python<'data>,
-    //     input: &'data dyn Input,
-    //     extra: &Extra,
-    //     slots: &'data [CombinedValidator],
-    // ) -> ValResult<'data, PyObject> {
-    //     self._validation_logic(py, input, input.strict_tuple()?, extra, slots)
-    // }
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data dyn Input,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+    ) -> ValResult<'data, PyObject> {
+        self._validation_logic(py, input, input.strict_tuple()?, extra, slots)
+    }
 
     fn get_name(&self, _py: Python) -> String {
         Self::EXPECTED_TYPE.to_string()
