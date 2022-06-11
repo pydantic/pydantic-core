@@ -33,7 +33,7 @@ build-fast:
 build-coverage:
 	pip uninstall -y pydantic_core
 	rm -f pydantic_core/*.so
-	cargo build
+	RUSTFLAGS='-C instrument-coverage -A incomplete_features -C link-arg=-undefined -C link-arg=dynamic_lookup' cargo build
 	@rm -f target/debug/lib_pydantic_core.d
 	mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
