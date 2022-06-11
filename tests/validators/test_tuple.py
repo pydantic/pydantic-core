@@ -8,9 +8,15 @@ from pydantic_core import SchemaValidator, ValidationError
 from ..conftest import Err
 
 
-@pytest.mark.parametrize('input_value,expected', [([1, 2, 3], (1, 2, 3)), ([1, 2, '3'], (1, 2, 3))])
-def test_tuple_json(py_or_json, input_value, expected):
-    v = py_or_json({'type': 'tuple-var-len', 'items': {'type': 'int'}})
+@pytest.mark.parametrize(
+    'tuple_variant,items,input_value,expected',
+    [
+        ('tuple-var-len', {'type': 'int'}, [1, 2, 3], (1, 2, 3)),
+        ('tuple-fix-len', [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}], [1, 2, '3'], (1, 2, 3)),
+    ],
+)
+def test_tuple_json(py_or_json, tuple_variant, items, input_value, expected):
+    v = py_or_json({'type': tuple_variant, 'items': items})
     assert v.validate_test(input_value) == expected
 
 
