@@ -118,8 +118,6 @@ impl Input for JsonInput {
     fn strict_bytes(&self) -> ValResult<Vec<u8>> {
         match self {
             JsonInput::String(s) => Ok(s.clone().into_bytes()),
-            JsonInput::Int(int) => Ok(int.to_ne_bytes().to_vec()),
-            JsonInput::Float(f) => Ok(f.to_ne_bytes().to_vec()),
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BytesType),
         }
     }
