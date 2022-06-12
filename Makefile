@@ -37,6 +37,14 @@ build-coverage:
 	@rm -f target/debug/lib_pydantic_core.d
 	mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
+.PHONY: build-cov-windows
+build-cov-windows:
+	pip uninstall -y pydantic_core
+	rm -f pydantic_core/*.so
+	RUSTFLAGS='-C instrument-coverage -A incomplete_features' cargo build
+	@rm -f target/debug/lib_pydantic_core.d
+	mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
+
 .PHONY: format
 format:
 	$(isort)
@@ -79,6 +87,14 @@ testcov: build-coverage test
 	@mkdir -p htmlcov
 	coverage html -d htmlcov/python
 	./tests/rust_coverage_html.sh
+
+.PHONY: testcov-windows
+testcov-windows: build-cov-windows test
+	@rm -rf htmlcov
+	@mkdir -p htmlcov
+	coverage html -d htmlcov/python
+	./tests/rust_coverage_html.sh
+
 
 .PHONY: all
 all: format build-dev lint pyright test

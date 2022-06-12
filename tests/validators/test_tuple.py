@@ -12,12 +12,28 @@ from ..conftest import Err
     'tuple_variant,items,input_value,expected',
     [
         ('tuple-var-len', {'type': 'int'}, [1, 2, 3], (1, 2, 3)),
+        (
+            'tuple-var-len',
+            {'type': 'int'},
+            1,
+            Err('Value must be a valid tuple [kind=tuple_type, input_value=1, input_type=int]'),
+        ),
         ('tuple-fix-len', [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}], [1, 2, '3'], (1, 2, 3)),
+        (
+            'tuple-fix-len',
+            [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}],
+            5,
+            Err('Value must be a valid tuple [kind=tuple_type, input_value=5, input_type=int]'),
+        ),
     ],
 )
 def test_tuple_json(py_or_json, tuple_variant, items, input_value, expected):
     v = py_or_json({'type': tuple_variant, 'items': items})
-    assert v.validate_test(input_value) == expected
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_test(input_value)
+    else:
+        assert v.validate_test(input_value) == expected
 
 
 @pytest.mark.parametrize(
