@@ -5,16 +5,15 @@ use pyo3::types::{
     PyBool, PyBytes, PyDate, PyDateTime, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet, PyString, PyTuple,
     PyType,
 };
-use speedate::{Date, DateTime};
 
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::shared::bytes_as_datetime;
 
+use super::datetime::{
+    bytes_as_date, bytes_as_datetime, float_as_datetime, int_as_datetime, EitherDate, EitherDateTime,
+};
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
-use super::shared::{
-    bytes_as_date, float_as_datetime, float_as_int, int_as_bool, int_as_datetime, str_as_bool, str_as_int,
-};
+use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 
 impl Input for PyAny {
     fn is_none(&self) -> bool {
@@ -211,26 +210,24 @@ impl Input for PyAny {
         }
     }
 
-    fn strict_date(&self) -> ValResult<Date> {
+    fn strict_date(&self) -> ValResult<EitherDate> {
         if self.cast_as::<PyDateTime>().is_ok() {
             // have to check if it's a datetime first, otherwise the line below converts to a date
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
         } else if let Ok(date) = self.cast_as::<PyDate>() {
-            let d_str: &str = date.str().map_err(as_internal)?.extract().map_err(as_internal)?;
-            bytes_as_date(self, d_str.as_bytes())
+            Ok(EitherDate::Python(date))
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
         }
     }
 
-    fn lax_date(&self) -> ValResult<Date> {
+    fn lax_date(&self) -> ValResult<EitherDate> {
         if self.cast_as::<PyDateTime>().is_ok() {
             // have to check if it's a datetime first, otherwise the line below converts to a date
             // even if we later try coercion from a datetime, we don't want to return a datetime now
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
         } else if let Ok(date) = self.cast_as::<PyDate>() {
-            let d_str: &str = date.str().map_err(as_internal)?.extract().map_err(as_internal)?;
-            bytes_as_date(self, d_str.as_bytes())
+            Ok(EitherDate::Python(date))
         } else if let Ok(str) = self.extract::<String>() {
             bytes_as_date(self, str.as_bytes())
         } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
@@ -240,19 +237,17 @@ impl Input for PyAny {
         }
     }
 
-    fn strict_datetime(&self) -> ValResult<DateTime> {
+    fn strict_datetime(&self) -> ValResult<EitherDateTime> {
         if let Ok(dt) = self.cast_as::<PyDateTime>() {
-            let dt_str: &str = dt.str().map_err(as_internal)?.extract().map_err(as_internal)?;
-            bytes_as_datetime(self, dt_str.as_bytes())
+            Ok(EitherDateTime::Python(dt))
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
         }
     }
 
-    fn lax_datetime(&self) -> ValResult<DateTime> {
+    fn lax_datetime(&self) -> ValResult<EitherDateTime> {
         if let Ok(dt) = self.cast_as::<PyDateTime>() {
-            let dt_str: &str = dt.str().map_err(as_internal)?.extract().map_err(as_internal)?;
-            bytes_as_datetime(self, dt_str.as_bytes())
+            Ok(EitherDateTime::Python(dt))
         } else if let Ok(str) = self.extract::<String>() {
             bytes_as_datetime(self, str.as_bytes())
         } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {

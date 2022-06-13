@@ -6,13 +6,18 @@ use strum::EnumMessage;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
-use crate::input::Input;
+use crate::input::{EitherDate, Input};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DateValidator {
     strict: bool,
+    constraints: Option<DateConstraints>,
+}
+
+#[derive(Debug, Clone)]
+struct DateConstraints {
     le: Option<Date>,
     lt: Option<Date>,
     ge: Option<Date>,
@@ -27,12 +32,22 @@ impl BuildValidator for DateValidator {
         config: Option<&PyDict>,
         _build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
+        let has_constraints = schema.get_item("le").is_some()
+            || schema.get_item("lt").is_some()
+            || schema.get_item("ge").is_some()
+            || schema.get_item("gt").is_some();
+
         Ok(Self {
             strict: is_strict(schema, config)?,
-            le: py_date_as_date(schema, "le")?,
-            lt: py_date_as_date(schema, "lt")?,
-            ge: py_date_as_date(schema, "ge")?,
-            gt: py_date_as_date(schema, "gt")?,
+            constraints: match has_constraints {
+                true => Some(DateConstraints {
+                    le: py_date_as_date(schema, "le")?,
+                    lt: py_date_as_date(schema, "lt")?,
+                    ge: py_date_as_date(schema, "ge")?,
+                    gt: py_date_as_date(schema, "gt")?,
+                }),
+                false => None,
+            },
         }
         .into())
     }
@@ -81,35 +96,41 @@ impl DateValidator {
         &'s self,
         py: Python<'data>,
         input: &'data dyn Input,
-        date: Date,
+        date: EitherDate<'data>,
     ) -> ValResult<'data, PyObject> {
-        macro_rules! check_constraint {
-            ($constraint:ident, $error:path, $key:literal) => {
-                if let Some(constraint) = &self.$constraint {
-                    if !date.$constraint(constraint) {
-                        return err_val_error!(
-                            input_value = InputValue::InputRef(input),
-                            kind = $error,
-                            context = context!($key => constraint.to_string())
-                        );
-                    }
-                }
-            };
-        }
+        if let Some(constraints) = &self.constraints {
+            let speedate_date = date.as_speedate().map_err(as_internal)?;
 
-        check_constraint!(le, ErrorKind::LessThanEqual, "le");
-        check_constraint!(lt, ErrorKind::LessThan, "lt");
-        check_constraint!(ge, ErrorKind::GreaterThanEqual, "ge");
-        check_constraint!(gt, ErrorKind::GreaterThan, "gt");
-        let py_date = PyDate::new(py, date.year as i32, date.month, date.day).map_err(as_internal)?;
-        Ok(py_date.into_py(py))
+            macro_rules! check_constraint {
+                ($constraint:ident, $error:path, $key:literal) => {
+                    if let Some(constraint) = &constraints.$constraint {
+                        if !speedate_date.$constraint(constraint) {
+                            return err_val_error!(
+                                input_value = InputValue::InputRef(input),
+                                kind = $error,
+                                context = context!($key => constraint.to_string())
+                            );
+                        }
+                    }
+                };
+            }
+
+            check_constraint!(le, ErrorKind::LessThanEqual, "le");
+            check_constraint!(lt, ErrorKind::LessThan, "lt");
+            check_constraint!(ge, ErrorKind::GreaterThanEqual, "ge");
+            check_constraint!(gt, ErrorKind::GreaterThan, "gt");
+        }
+        Ok(date.as_python(py).map_err(as_internal)?.into_py(py))
     }
 }
 
 /// In lax mode, if the input is not a date, we try parsing the input as a datetime, then check it is an
 /// "exact date", e.g. has a zero time component.
-fn date_from_datetime<'data>(input: &'data dyn Input, date_err: ValError<'data>) -> ValResult<'data, Date> {
-    let dt = match input.lax_datetime() {
+fn date_from_datetime<'data>(
+    input: &'data dyn Input,
+    date_err: ValError<'data>,
+) -> ValResult<'data, EitherDate<'data>> {
+    let either_dt = match input.lax_datetime() {
         Ok(dt) => dt,
         Err(dt_err) => {
             return match dt_err {
@@ -132,6 +153,7 @@ fn date_from_datetime<'data>(input: &'data dyn Input, date_err: ValError<'data>)
             };
         }
     };
+    let dt = either_dt.as_speedate().map_err(as_internal)?;
     let zero_time = Time {
         hour: 0,
         minute: 0,
@@ -139,7 +161,7 @@ fn date_from_datetime<'data>(input: &'data dyn Input, date_err: ValError<'data>)
         microsecond: 0,
     };
     if dt.time == zero_time && dt.offset.is_none() {
-        Ok(dt.date)
+        Ok(EitherDate::Speedate(dt.date))
     } else {
         err_val_error!(
             input_value = InputValue::InputRef(input),

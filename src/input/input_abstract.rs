@@ -1,10 +1,10 @@
 use std::fmt;
 
 use pyo3::types::PyType;
-use speedate::{Date, DateTime};
 
 use crate::errors::ValResult;
 
+use super::datetime::{EitherDate, EitherDateTime};
 use super::{GenericMapping, GenericSequence, ToLocItem, ToPy};
 
 pub trait Input: fmt::Debug + ToPy + ToLocItem {
@@ -46,15 +46,15 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
         self.strict_set()
     }
 
-    fn strict_date(&self) -> ValResult<Date>;
+    fn strict_date(&self) -> ValResult<EitherDate>;
 
-    fn lax_date(&self) -> ValResult<Date> {
+    fn lax_date(&self) -> ValResult<EitherDate> {
         self.strict_date()
     }
 
-    fn strict_datetime(&self) -> ValResult<DateTime>;
+    fn strict_datetime(&self) -> ValResult<EitherDateTime>;
 
-    fn lax_datetime(&self) -> ValResult<DateTime> {
+    fn lax_datetime(&self) -> ValResult<EitherDateTime> {
         self.strict_datetime()
     }
 }
