@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Set
 
 import pytest
@@ -432,7 +432,7 @@ def test_list_of_optional_core(benchmark):
     benchmark(v.validate_python, list_of_optional_data)
 
 
-class TestBenchmarkDateTimeModel:
+class TestBenchmarkDateTime:
     @pytest.fixture(scope='class')
     def pydantic_model(self):
         class PydanticModel(BaseModel):
@@ -509,3 +509,25 @@ class TestBenchmarkDateTimeModel:
         v = SchemaValidator({'type': 'datetime', 'gt': datetime.now()})
 
         benchmark(v.validate_python, datetime_str)
+
+
+class TestBenchmarkDateX:
+    @pytest.fixture(scope='class')
+    def validator(self):
+        return SchemaValidator({'type': 'date'})
+
+    @pytest.mark.benchmark(group='date from date')
+    def test_date_from_date(self, benchmark, validator):
+        benchmark(validator.validate_python, date.today())
+
+    @pytest.mark.benchmark(group='date from str')
+    def test_date_from_str(self, benchmark, validator):
+        benchmark(validator.validate_python, str(date.today()))
+
+    @pytest.mark.benchmark(group='date from datetime')
+    def test_date_from_datetime(self, benchmark, validator):
+        benchmark(validator.validate_python, datetime(2000, 1, 1))
+
+    @pytest.mark.benchmark(group='date from datetime str')
+    def test_date_from_datetime_str(self, benchmark, validator):
+        benchmark(validator.validate_python, str(datetime(2000, 1, 1)))

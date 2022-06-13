@@ -2,7 +2,8 @@ use std::str::from_utf8;
 
 use pyo3::prelude::*;
 use pyo3::types::{
-    PyBytes, PyDate, PyDateTime, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet, PyString, PyTuple, PyType,
+    PyBool, PyBytes, PyDate, PyDateTime, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet, PyString, PyTuple,
+    PyType,
 };
 use speedate::{Date, DateTime};
 
@@ -39,7 +40,7 @@ impl Input for PyAny {
                 }
             };
             Ok(str)
-        } else if self.extract::<bool>().is_ok() {
+        } else if self.cast_as::<PyBool>().is_ok() {
             // do this before int and float parsing as `False` is cast to `0` and we don't want False to
             // be returned as a string
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::StrType)
@@ -211,7 +212,10 @@ impl Input for PyAny {
     }
 
     fn strict_date(&self) -> ValResult<Date> {
-        if let Ok(date) = self.cast_as::<PyDate>() {
+        if self.cast_as::<PyDateTime>().is_ok() {
+            // have to check if it's a datetime first, otherwise the line below converts to a date
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
+        } else if let Ok(date) = self.cast_as::<PyDate>() {
             let d_str: &str = date.str().map_err(as_internal)?.extract().map_err(as_internal)?;
             bytes_as_date(self, d_str.as_bytes())
         } else {
@@ -220,7 +224,11 @@ impl Input for PyAny {
     }
 
     fn lax_date(&self) -> ValResult<Date> {
-        if let Ok(date) = self.cast_as::<PyDate>() {
+        if self.cast_as::<PyDateTime>().is_ok() {
+            // have to check if it's a datetime first, otherwise the line below converts to a date
+            // even if we later try coercion from a datetime, we don't want to return a datetime now
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
+        } else if let Ok(date) = self.cast_as::<PyDate>() {
             let d_str: &str = date.str().map_err(as_internal)?.extract().map_err(as_internal)?;
             bytes_as_date(self, d_str.as_bytes())
         } else if let Ok(str) = self.extract::<String>() {
@@ -249,6 +257,8 @@ impl Input for PyAny {
             bytes_as_datetime(self, str.as_bytes())
         } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
             bytes_as_datetime(self, py_bytes.as_bytes())
+        } else if self.cast_as::<PyBool>().is_ok() {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
         } else if let Ok(int) = self.extract::<i64>() {
             int_as_datetime(self, int, 0)
         } else if let Ok(float) = self.extract::<f64>() {

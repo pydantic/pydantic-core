@@ -1,5 +1,5 @@
 import re
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -12,15 +12,26 @@ from ..conftest import Err
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        (date(2022, 6, 8), date(2022, 6, 8)),
-        ('2022-06-08', date(2022, 6, 8)),
-        (b'2022-06-08', date(2022, 6, 8)),
-        ((1,), Err('Value must be a valid date [kind=date_type')),
-        (Decimal('1654646400'), date(2022, 6, 8)),
+        pytest.param(date(2022, 6, 8), date(2022, 6, 8), id='date'),
+        pytest.param('2022-06-08', date(2022, 6, 8), id='str'),
+        pytest.param(b'2022-06-08', date(2022, 6, 8), id='bytes'),
+        pytest.param((1,), Err('Value must be a valid date [kind=date_type'), id='tuple'),
+        pytest.param(1654646400, date(2022, 6, 8), id='int'),
+        pytest.param(1654646400.00, date(2022, 6, 8), id='float'),
+        pytest.param(Decimal('1654646400'), date(2022, 6, 8), id='decimal'),
         # (253_402_300_800_000, Err('format YYYY-MM-DD, dates after 9999 are not supported as unix timestamps')),
-        (253_402_300_800_000, Err('Value must be a valid date')),
+        pytest.param(253_402_300_800_000, Err('Value must be a valid date'), id='int-too-high'),
         # (-20_000_000_000, Err('format YYYY-MM-DD, dates before 1600 are not supported as unix timestamps')),
-        (-20_000_000_000, Err('Value must be a valid date')),
+        pytest.param(-20_000_000_000, Err('Value must be a valid date'), id='int-too-low'),
+        pytest.param(datetime(2022, 6, 8), date(2022, 6, 8), id='datetime-exact'),
+        pytest.param(
+            datetime(2022, 6, 8, 12),
+            Err(
+                'Datetimes provided to dates must have zero time - e.g. be exact dates [kind=date_from_datetime_inexact'
+            ),
+            id='datetime-inexact',
+        ),
+        pytest.param(True, Err('Value must be a valid date'), id='bool'),
     ],
 )
 def test_date(input_value, expected):
@@ -75,6 +86,8 @@ def test_date_json(py_or_json, input_value, expected):
         ('2022-06-08', Err('Value must be a valid date [kind=date_type')),
         (b'2022-06-08', Err('Value must be a valid date [kind=date_type')),
         (1654646400, Err('Value must be a valid date [kind=date_type')),
+        (True, Err('Value must be a valid date [kind=date_type')),
+        (datetime(2022, 6, 8), Err('Value must be a valid date [kind=date_type')),
     ],
 )
 def test_date_strict(input_value, expected):
