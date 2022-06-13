@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set
 
 import pytest
@@ -245,7 +246,7 @@ def test_list_of_ints_core_py(benchmark):
 
 
 @skip_pydantic
-@pytest.mark.benchmark(group='list of ints')
+@pytest.mark.benchmark(group='list of ints JSON')
 def test_list_of_ints_pyd_json(benchmark):
     class PydanticModel(BaseModel):
         __root__: List[int]
@@ -258,7 +259,7 @@ def test_list_of_ints_pyd_json(benchmark):
         PydanticModel.parse_obj(json.loads(json_data[1]))
 
 
-@pytest.mark.benchmark(group='list of ints')
+@pytest.mark.benchmark(group='list of ints JSON')
 def test_list_of_ints_core_json(benchmark):
     v = SchemaValidator({'type': 'list', 'items': {'type': 'int'}})
 
@@ -296,7 +297,7 @@ def test_set_of_ints_core(benchmark):
 
 
 @skip_pydantic
-@pytest.mark.benchmark(group='set of ints')
+@pytest.mark.benchmark(group='set of ints JSON')
 def test_set_of_ints_pyd_json(benchmark):
     class PydanticModel(BaseModel):
         __root__: Set[int]
@@ -309,7 +310,7 @@ def test_set_of_ints_pyd_json(benchmark):
         PydanticModel.parse_obj(json.loads(json_data[1]))
 
 
-@pytest.mark.benchmark(group='set of ints')
+@pytest.mark.benchmark(group='set of ints JSON')
 def test_set_of_ints_core_json(benchmark):
     v = SchemaValidator({'type': 'set', 'items': {'type': 'int'}})
 
@@ -347,7 +348,7 @@ def test_dict_of_ints_core(benchmark):
 
 
 @skip_pydantic
-@pytest.mark.benchmark(group='dict of ints')
+@pytest.mark.benchmark(group='dict of ints JSON')
 def test_dict_of_ints_pyd_json(benchmark):
     class PydanticModel(BaseModel):
         __root__: Dict[str, int]
@@ -360,7 +361,7 @@ def test_dict_of_ints_pyd_json(benchmark):
         PydanticModel.parse_obj(json.loads(json_data[1]))
 
 
-@pytest.mark.benchmark(group='dict of ints')
+@pytest.mark.benchmark(group='dict of ints JSON')
 def test_dict_of_ints_core_json(benchmark):
     v = SchemaValidator({'type': 'dict', 'keys': 'str', 'values': 'int'})
 
@@ -429,3 +430,82 @@ def test_list_of_optional_core(benchmark):
     v = SchemaValidator({'type': 'list', 'items': {'type': 'optional', 'schema': 'int'}})
 
     benchmark(v.validate_python, list_of_optional_data)
+
+
+class TestBenchmarkDateTimeModel:
+    @pytest.fixture(scope='class')
+    def pydantic_model(self):
+        class PydanticModel(BaseModel):
+            dt: datetime
+
+        return PydanticModel
+
+    @pytest.fixture(scope='class')
+    def core_validator(self):
+        class CoreModel:
+            __slots__ = '__dict__', '__fields_set__'
+
+        return SchemaValidator(
+            {'type': 'model-class', 'class_type': CoreModel, 'model': {'type': 'model', 'fields': {'dt': 'datetime'}}}
+        )
+
+    @pytest.fixture(scope='class')
+    def datetime_raw(self):
+        return datetime.now() + timedelta(days=1)
+
+    @pytest.fixture(scope='class')
+    def datetime_str(self, datetime_raw):
+        return str(datetime_raw)
+
+    @pytest.fixture(scope='class')
+    def python_data_dict(self, datetime_raw):
+        return {'dt': datetime_raw}
+
+    @pytest.fixture(scope='class')
+    def json_dict_data(self, datetime_str):
+        return json.dumps({'dt': datetime_str})
+
+    @skip_pydantic
+    @pytest.mark.benchmark(group='datetime model - python')
+    def test_pyd_python(self, pydantic_model, benchmark, python_data_dict):
+        benchmark(pydantic_model.parse_obj, python_data_dict)
+
+    @pytest.mark.benchmark(group='datetime model - python')
+    def test_core_python(self, core_validator, benchmark, python_data_dict):
+        benchmark(core_validator.validate_python, python_data_dict)
+
+    @skip_pydantic
+    @pytest.mark.benchmark(group='datetime model - JSON')
+    def test_model_spyd_json(self, pydantic_model, benchmark, json_dict_data):
+        @benchmark
+        def pydantic_json():
+            obj = json.loads(json_dict_data)
+            return pydantic_model.parse_obj(obj)
+
+    @pytest.mark.benchmark(group='datetime model - JSON')
+    def test_model_core_json(self, core_validator, benchmark, json_dict_data):
+        benchmark(core_validator.validate_json, json_dict_data)
+
+    @pytest.mark.benchmark(group='datetime datetime')
+    def test_core_raw(self, benchmark, datetime_raw):
+        v = SchemaValidator({'type': 'datetime'})
+
+        benchmark(v.validate_python, datetime_raw)
+
+    @pytest.mark.benchmark(group='datetime str')
+    def test_core_str(self, benchmark, datetime_str):
+        v = SchemaValidator({'type': 'datetime'})
+
+        benchmark(v.validate_python, datetime_str)
+
+    @pytest.mark.benchmark(group='datetime future')
+    def test_core_future(self, benchmark, datetime_raw):
+        v = SchemaValidator({'type': 'datetime', 'gt': datetime.now()})
+
+        benchmark(v.validate_python, datetime_raw)
+
+    @pytest.mark.benchmark(group='datetime future str')
+    def test_core_future_str(self, benchmark, datetime_str):
+        v = SchemaValidator({'type': 'datetime', 'gt': datetime.now()})
+
+        benchmark(v.validate_python, datetime_str)
