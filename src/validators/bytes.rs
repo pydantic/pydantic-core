@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 
-use crate::build_tools::{is_strict, schema_or_config};
+use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::Input;
 
@@ -18,14 +18,7 @@ impl BuildValidator for BytesValidator {
         config: Option<&PyDict>,
         _build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
-        let use_constrained = schema.get_item("max_length").is_some()
-            || schema.get_item("min_length").is_some()
-            || match config {
-                Some(config) => {
-                    config.get_item("bytes_max_length").is_some() || config.get_item("bytes_min_length").is_some()
-                }
-                None => false,
-            };
+        let use_constrained = schema.get_item("max_length").is_some() || schema.get_item("min_length").is_some();
         if use_constrained {
             BytesConstrainedValidator::build(schema, config)
         } else if is_strict(schema, config)? {
@@ -126,13 +119,10 @@ impl Validator for BytesConstrainedValidator {
 
 impl BytesConstrainedValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedValidator> {
-        let min_length: Option<usize> = schema_or_config(schema, config, "min_length", "bytes_min_length")?;
-        let max_length: Option<usize> = schema_or_config(schema, config, "max_length", "bytes_max_length")?;
-
         Ok(Self {
             strict: is_strict(schema, config)?,
-            min_length,
-            max_length,
+            min_length: schema.get_as("min_length")?,
+            max_length: schema.get_as("max_length")?,
         }
         .into())
     }
