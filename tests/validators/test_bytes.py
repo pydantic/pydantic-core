@@ -11,7 +11,7 @@ def test_strict_bytes_validator():
     v = SchemaValidator({'type': 'bytes', 'strict': True})
 
     assert v.validate_python(b'foo') == b'foo'
-    assert v.validate_json('foo') == b'foo'
+    assert v.validate_json('"foo"') == b'foo'
 
     with pytest.raises(ValidationError, match='Value must be a valid bytes'):
         assert v.validate_python('foo') == b'foo'
@@ -23,7 +23,7 @@ def test_lax_bytes_validator():
     assert v.validate_python(b'foo') == b'foo'
     assert v.validate_python('foo') == b'foo'
 
-    assert v.validate_json('foo') == b'foo'
+    assert v.validate_json('"foo"') == b'foo'
 
 
 @pytest.mark.parametrize(
