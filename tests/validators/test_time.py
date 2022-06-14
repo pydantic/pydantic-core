@@ -22,11 +22,8 @@ from ..conftest import Err
         pytest.param(123, time(0, 2, 3), id='int'),
         pytest.param(Decimal('123'), time(0, 2, 3), id='decimal'),
         pytest.param(Decimal('123.123456'), time(0, 2, 3, 123456), id='decimal-6dig'),
-        pytest.param(
-            Decimal('123.1234567'),
-            Err('Value must be in a valid time format, second fraction must contain 6 digits of fewer'),
-            id='decimal-6dig',
-        ),
+        pytest.param(Decimal('123.1234562'), time(0, 2, 3, 123456), id='decimal-7dig-up'),
+        pytest.param(Decimal('123.1234568'), time(0, 2, 3, 123457), id='decimal-7dig-down'),
     ],
 )
 def test_time(input_value, expected):
@@ -127,6 +124,8 @@ def test_time_strict_json(input_value, expected):
         ({'le': time(1)}, '00:12', time(0, 12)),
         ({'le': time(1)}, '01:00', time(1, 0)),
         ({'le': time(1)}, '01:01', Err('Value must be less than or equal to 01:00:00')),
+        ({'le': time(1)}, time(1), time(1, 0)),
+        ({'le': time(1)}, time(1, 1), Err('Value must be less than or equal to 01:00:00')),
         ({'lt': time(1)}, '00:59', time(0, 59)),
         ({'lt': time(1)}, '01:00', Err('Value must be less than 01:00:00')),
         ({'ge': time(1)}, '01:00', time(1)),

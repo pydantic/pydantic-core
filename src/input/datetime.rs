@@ -228,18 +228,9 @@ pub fn int_as_datetime(input: &dyn Input, timestamp: i64, timestamp_microseconds
 
 pub fn float_as_datetime(input: &dyn Input, timestamp: f64) -> ValResult<EitherDateTime> {
     let microseconds = timestamp.fract().abs() * 1_000_000.0;
-    // WARNING: 0.1 is plucked virtually from thin air to make it work
-    // since an input of timestamp=1655205632.331557, gives microseconds=331557.035446167
-    // it maybe need to be adjusted, up OR down
-    if microseconds % 1.0 > 0.1 {
-        return err_val_error!(
-            input_value = InputValue::InputRef(input),
-            kind = ErrorKind::DateTimeParsing,
-            // message copied from speedate
-            context = context!("parsing_error" => "second fraction must contain 6 digits of fewer")
-        );
-    }
-    int_as_datetime(input, timestamp.floor() as i64, microseconds as u32)
+    // checking for extra digits in microseconds is unreliable with large floats,
+    // so we just round to the nearest microsecond
+    int_as_datetime(input, timestamp.floor() as i64, microseconds.round() as u32)
 }
 
 pub fn date_as_datetime(date: &PyDate) -> PyResult<EitherDateTime> {
@@ -288,16 +279,8 @@ pub fn int_as_time(input: &dyn Input, timestamp: i64, timestamp_microseconds: u3
 
 pub fn float_as_time(input: &dyn Input, timestamp: f64) -> ValResult<EitherTime> {
     let microseconds = timestamp.fract().abs() * 1_000_000.0;
-    // WARNING: as above
-    if microseconds % 1.0 > 0.1 {
-        return err_val_error!(
-            input_value = InputValue::InputRef(input),
-            kind = ErrorKind::TimeParsing,
-            // message copied from speedate
-            context = context!("parsing_error" => "second fraction must contain 6 digits of fewer")
-        );
-    }
-    int_as_time(input, timestamp.floor() as i64, microseconds as u32)
+    // round for same reason as above
+    int_as_time(input, timestamp.floor() as i64, microseconds.round() as u32)
 }
 
 #[pyclass(module = "pydantic_core._pydantic_core", extends = PyTzInfo)]
