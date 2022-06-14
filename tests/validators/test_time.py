@@ -148,3 +148,23 @@ def test_time_kwargs(kwargs, input_value, expected):
 def test_invalid_constraint():
     with pytest.raises(SchemaError, match="'str' object cannot be converted to 'PyTime'"):
         SchemaValidator({'type': 'time', 'gt': '12:13:14'})
+
+
+def test_dict_py():
+    v = SchemaValidator({'type': 'dict', 'keys': 'time', 'values': 'int'})
+    assert v.validate_python({time(12, 1, 1): 2, time(12, 1, 2): 4}) == {time(12, 1, 1): 2, time(12, 1, 2): 4}
+
+
+def test_dict(py_or_json):
+    v = py_or_json({'type': 'dict', 'keys': 'time', 'values': 'int'})
+    assert v.validate_test({'12:01:01': 2, '12:01:02': 4}) == {time(12, 1, 1): 2, time(12, 1, 2): 4}
+
+
+def test_union():
+    v = SchemaValidator({'type': 'union', 'choices': ['str', 'time']})
+    assert v.validate_python('12:01:02') == '12:01:02'
+    assert v.validate_python(time(12, 1, 2)) == time(12, 1, 2)
+
+    v = SchemaValidator({'type': 'union', 'choices': ['time', 'str']})
+    assert v.validate_python('12:01:02') == '12:01:02'
+    assert v.validate_python(time(12, 1, 2)) == time(12, 1, 2)

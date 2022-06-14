@@ -36,6 +36,28 @@ def test_datetime(input_value, expected):
         assert output == expected
 
 
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        (datetime(2022, 6, 8, 12, 13, 14), datetime(2022, 6, 8, 12, 13, 14)),
+        (date(2022, 6, 8), Err('Value must be a valid datetime [kind=datetime_type')),
+        ('2022-06-08T12:13:14', Err('Value must be a valid datetime [kind=datetime_type')),
+        (b'2022-06-08T12:13:14', Err('Value must be a valid datetime [kind=datetime_type')),
+        (time(1, 2, 3), Err('Value must be a valid datetime [kind=datetime_type')),
+        (1654646400, Err('Value must be a valid datetime [kind=datetime_type')),
+        (Decimal('1654646400'), Err('Value must be a valid datetime [kind=datetime_type')),
+    ],
+)
+def test_datetime_strict(input_value, expected):
+    v = SchemaValidator({'type': 'datetime', 'strict': True})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        output = v.validate_python(input_value)
+        assert output == expected
+
+
 def test_keep_tz():
     tz = pytz.timezone('Europe/London')
     dt = tz.localize(datetime(2022, 6, 14, 12, 13, 14))
@@ -195,3 +217,29 @@ def test_custom_invalid_tz():
             'context': {'processing_error': 'NotImplementedError'},
         }
     ]
+
+
+def test_dict_py():
+    v = SchemaValidator({'type': 'dict', 'keys': 'datetime', 'values': 'int'})
+    assert v.validate_python({datetime(2000, 1, 1): 2, datetime(2000, 1, 2): 4}) == {
+        datetime(2000, 1, 1): 2,
+        datetime(2000, 1, 2): 4,
+    }
+
+
+def test_dict(py_or_json):
+    v = py_or_json({'type': 'dict', 'keys': 'datetime', 'values': 'int'})
+    assert v.validate_test({'2000-01-01T00:00': 2, '2000-01-02T00:00': 4}) == {
+        datetime(2000, 1, 1): 2,
+        datetime(2000, 1, 2): 4,
+    }
+
+
+def test_union():
+    v = SchemaValidator({'type': 'union', 'choices': ['str', 'datetime']})
+    assert v.validate_python('2022-01-02T00:00') == '2022-01-02T00:00'
+    assert v.validate_python(datetime(2022, 1, 2)) == datetime(2022, 1, 2)
+
+    v = SchemaValidator({'type': 'union', 'choices': ['datetime', 'str']})
+    assert v.validate_python('2022-01-02T00:00') == '2022-01-02T00:00'
+    assert v.validate_python(datetime(2022, 1, 2)) == datetime(2022, 1, 2)

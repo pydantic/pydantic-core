@@ -235,19 +235,15 @@ impl Input for String {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType)
     }
 
-    // TODO these need implementing and testing
-    #[no_coverage]
     fn strict_date(&self) -> ValResult<EitherDate> {
-        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
+        bytes_as_date(self, self.as_bytes())
     }
 
-    #[no_coverage]
     fn strict_time(&self) -> ValResult<EitherTime> {
-        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::TimeType)
+        bytes_as_time(self, self.as_bytes())
     }
 
-    #[no_coverage]
     fn strict_datetime(&self) -> ValResult<EitherDateTime> {
-        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
+        bytes_as_datetime(self, self.as_bytes())
     }
 }

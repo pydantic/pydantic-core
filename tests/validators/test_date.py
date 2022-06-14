@@ -157,3 +157,23 @@ def test_date_kwargs(kwargs, input_value, expected):
 def test_invalid_constraint():
     with pytest.raises(SchemaError, match="'str' object cannot be converted to 'PyDate'"):
         SchemaValidator({'type': 'date', 'gt': '2000-01-01'})
+
+
+def test_dict_py():
+    v = SchemaValidator({'type': 'dict', 'keys': 'date', 'values': 'int'})
+    assert v.validate_python({date(2000, 1, 1): 2, date(2000, 1, 2): 4}) == {date(2000, 1, 1): 2, date(2000, 1, 2): 4}
+
+
+def test_dict(py_or_json):
+    v = py_or_json({'type': 'dict', 'keys': 'date', 'values': 'int'})
+    assert v.validate_test({'2000-01-01': 2, '2000-01-02': 4}) == {date(2000, 1, 1): 2, date(2000, 1, 2): 4}
+
+
+def test_union():
+    v = SchemaValidator({'type': 'union', 'choices': ['str', 'date']})
+    assert v.validate_python('2022-01-02') == '2022-01-02'
+    assert v.validate_python(date(2022, 1, 2)) == date(2022, 1, 2)
+
+    v = SchemaValidator({'type': 'union', 'choices': ['date', 'str']})
+    assert v.validate_python('2022-01-02') == '2022-01-02'
+    assert v.validate_python(date(2022, 1, 2)) == date(2022, 1, 2)
