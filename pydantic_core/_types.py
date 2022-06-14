@@ -139,6 +139,13 @@ class UnionSchema(TypedDict):
     default: NotRequired[Any]
 
 
+class BytesSchema(TypedDict):
+    type: Literal['bytes']
+    max_length: NotRequired[int]
+    min_length: NotRequired[int]
+    strict: NotRequired[bool]
+
+
 class DateSchema(TypedDict, total=False):
     type: Required[Literal['date']]
     strict: bool
@@ -188,6 +195,7 @@ class TupleVarLenSchema(TypedDict):
 BareType = Literal[
     'any',
     'bool',
+    'bytes',
     'dict',
     'float',
     'function',
@@ -210,6 +218,7 @@ Schema = Union[
     BareType,
     AnySchema,
     BoolSchema,
+    BytesSchema,
     DictSchema,
     FloatSchema,
     FunctionSchema,

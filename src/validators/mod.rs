@@ -14,6 +14,7 @@ use crate::SchemaError;
 
 mod any;
 mod bool;
+mod bytes;
 mod date;
 mod datetime;
 mod dict;
@@ -206,6 +207,8 @@ pub fn build_validator<'a>(
         literal::LiteralBuilder,
         // any
         any::AnyValidator,
+        // bytes
+        bytes::BytesValidator,
         // dates
         date::DateValidator,
         // times
@@ -279,6 +282,10 @@ pub enum CombinedValidator {
     LiteralGeneral(literal::LiteralGeneralValidator),
     // any
     Any(any::AnyValidator),
+    // bytes
+    Bytes(bytes::BytesValidator),
+    StrictBytes(bytes::StrictBytesValidator),
+    ConstrainedBytes(bytes::BytesConstrainedValidator),
     // dates
     Date(date::DateValidator),
     // times
