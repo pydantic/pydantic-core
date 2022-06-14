@@ -111,7 +111,7 @@ impl DateTimeValidator {
             check_constraint!(ge, ErrorKind::GreaterThanEqual, "ge");
             check_constraint!(gt, ErrorKind::GreaterThan, "gt");
         }
-        Ok(datetime.as_python(py).map_err(as_internal)?.into_py(py))
+        datetime.try_into_py(py).map_err(as_internal)
     }
 }
 

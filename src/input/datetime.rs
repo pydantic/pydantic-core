@@ -30,11 +30,12 @@ impl<'a> EitherDate<'a> {
         }
     }
 
-    pub fn as_python(&self, py: Python<'a>) -> PyResult<&'a PyDate> {
-        match self {
-            Self::Speedate(date) => PyDate::new(py, date.year as i32, date.month, date.day),
+    pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
+        let date = match self {
             Self::Python(date) => Ok(date),
-        }
+            Self::Speedate(date) => PyDate::new(py, date.year as i32, date.month, date.day),
+        }?;
+        Ok(date.into_py(py))
     }
 }
 
@@ -61,12 +62,12 @@ impl<'a> EitherDateTime<'a> {
         }
     }
 
-    pub fn as_python(&self, py: Python<'a>) -> PyResult<&'a PyDateTime> {
-        match self {
+    pub fn try_into_py(self, py: Python<'a>) -> PyResult<PyObject> {
+        let dt = match self {
             Self::Speedate(datetime) => {
                 let tz: Option<PyObject> = match datetime.offset {
                     Some(offset) => {
-                        let tz_info = TzClass::new(offset);
+                        let tz_info = TzInfo::new(offset);
                         Some(Py::new(py, tz_info)?.to_object(py))
                     }
                     None => None,
@@ -81,10 +82,11 @@ impl<'a> EitherDateTime<'a> {
                     datetime.time.second,
                     datetime.time.microsecond,
                     tz.as_ref(),
-                )
+                )?
             }
-            Self::Python(dt) => Ok(dt),
-        }
+            Self::Python(dt) => dt,
+        };
+        Ok(dt.into_py(py))
     }
 }
 
@@ -129,7 +131,10 @@ pub fn int_as_datetime(input: &dyn Input, timestamp: i64, timestamp_microseconds
 
 pub fn float_as_datetime(input: &dyn Input, timestamp: f64) -> ValResult<EitherDateTime> {
     let microseconds = timestamp.fract().abs() * 1_000_000.0;
-    if microseconds % 1.0 > 1e-3 {
+    // warning 0.1 is pluck from thin air to make it work
+    // since an input of timestamp=1655205632.331557, gives microseconds=331557.035446167
+    // it maybe need to be adjusted, up OR down
+    if microseconds % 1.0 > 0.1 {
         return err_val_error!(
             input_value = InputValue::InputRef(input),
             kind = ErrorKind::DateTimeParsing,
@@ -142,12 +147,12 @@ pub fn float_as_datetime(input: &dyn Input, timestamp: f64) -> ValResult<EitherD
 
 #[pyclass(module = "pydantic_core._pydantic_core", extends = PyTzInfo)]
 #[derive(Debug, Clone)]
-struct TzClass {
+struct TzInfo {
     seconds: i32,
 }
 
 #[pymethods]
-impl TzClass {
+impl TzInfo {
     #[new]
     fn new(seconds: i32) -> Self {
         Self { seconds }
@@ -158,15 +163,23 @@ impl TzClass {
     }
 
     fn tzname(&self, _py: Python<'_>, _dt: &PyDateTime) -> String {
+        self.__str__()
+    }
+
+    fn dst(&self, _py: Python<'_>, _dt: &PyDateTime) -> Option<&PyDelta> {
+        None
+    }
+
+    fn __repr__(&self) -> String {
+        format!("TzInfo({})", self.__str__())
+    }
+
+    fn __str__(&self) -> String {
         if self.seconds == 0 {
             "UTC".to_string()
         } else {
             let mins = self.seconds / 60;
             format!("{:+03}:{:02}", mins / 60, (mins % 60).abs())
         }
-    }
-
-    fn dst(&self, _py: Python<'_>, _dt: &PyDateTime) -> Option<&PyDelta> {
-        None
     }
 }

@@ -120,7 +120,7 @@ impl DateValidator {
             check_constraint!(ge, ErrorKind::GreaterThanEqual, "ge");
             check_constraint!(gt, ErrorKind::GreaterThan, "gt");
         }
-        Ok(date.as_python(py).map_err(as_internal)?.into_py(py))
+        date.try_into_py(py).map_err(as_internal)
     }
 }
 
