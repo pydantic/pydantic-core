@@ -9,7 +9,7 @@ use super::datetime::{
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
 use super::parse_json::JsonInput;
-use super::return_enums::EitherBytes;
+use super::return_enums::{EitherBytes, EitherString};
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 
 impl Input for JsonInput {
@@ -17,18 +17,18 @@ impl Input for JsonInput {
         matches!(self, JsonInput::Null)
     }
 
-    fn strict_str(&self) -> ValResult<String> {
+    fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
         match self {
-            JsonInput::String(s) => Ok(s.to_string()),
+            JsonInput::String(s) => Ok(s.to_string().into()),
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::StrType),
         }
     }
 
-    fn lax_str(&self) -> ValResult<String> {
+    fn lax_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
         match self {
-            JsonInput::String(s) => Ok(s.to_string()),
-            JsonInput::Int(int) => Ok(int.to_string()),
-            JsonInput::Float(float) => Ok(float.to_string()),
+            JsonInput::String(s) => Ok(s.to_string().into()),
+            JsonInput::Int(int) => Ok(int.to_string().into()),
+            JsonInput::Float(float) => Ok(float.to_string().into()),
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::StrType),
         }
     }
@@ -122,7 +122,7 @@ impl Input for JsonInput {
 
     fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
         match self {
-            JsonInput::String(s) => Ok(EitherBytes::Rust(s.clone().into_bytes())),
+            JsonInput::String(s) => Ok(s.clone().into_bytes().into()),
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BytesType),
         }
     }
@@ -177,14 +177,8 @@ impl Input for String {
         false
     }
 
-    #[no_coverage]
-    fn strict_str(&self) -> ValResult<String> {
-        Ok(self.clone())
-    }
-
-    #[no_coverage]
-    fn lax_str(&self) -> ValResult<String> {
-        Ok(self.clone())
+    fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
+        Ok(self.clone().into())
     }
 
     #[no_coverage]
@@ -192,7 +186,6 @@ impl Input for String {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BoolType)
     }
 
-    #[no_coverage]
     fn lax_bool(&self) -> ValResult<bool> {
         str_as_bool(self, self)
     }
@@ -244,7 +237,7 @@ impl Input for String {
     }
 
     fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
-        Ok(EitherBytes::Rust(self.clone().into_bytes()))
+        Ok(self.clone().into_bytes().into())
     }
 
     fn strict_date(&self) -> ValResult<EitherDate> {

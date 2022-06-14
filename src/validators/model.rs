@@ -142,7 +142,7 @@ impl Validator for ModelValidator {
         if check_extra {
             for (raw_key, value) in dict.generic_iter() {
                 let key: String = match raw_key.lax_str() {
-                    Ok(k) => k,
+                    Ok(k) => k.as_raw().map_err(as_internal)?,
                     Err(ValError::LineErrors(line_errors)) => {
                         let loc = vec![raw_key.to_loc()];
                         for err in line_errors {
