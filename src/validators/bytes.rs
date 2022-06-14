@@ -99,7 +99,7 @@ impl Validator for BytesConstrainedValidator {
             true => input.strict_bytes()?,
             false => input.lax_bytes()?,
         };
-        self._validation_logic(py, input, bytes)
+        self._validation_logic(py, input, &bytes)
     }
 
     fn validate_strict<'s, 'data>(
@@ -109,7 +109,7 @@ impl Validator for BytesConstrainedValidator {
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_bytes()?)
+        self._validation_logic(py, input, &input.strict_bytes()?)
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -131,9 +131,8 @@ impl BytesConstrainedValidator {
         &'s self,
         py: Python<'data>,
         input: &'data dyn Input,
-        bytes: Vec<u8>,
+        bytes: &[u8],
     ) -> ValResult<'data, PyObject> {
-        let bytes = bytes;
         if let Some(min_length) = self.min_length {
             if bytes.len() < min_length {
                 return err_val_error!(
