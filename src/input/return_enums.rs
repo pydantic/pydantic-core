@@ -7,17 +7,19 @@ pub enum EitherBytes<'a> {
 }
 
 impl<'a> EitherBytes<'a> {
-    pub fn into_pybytes(self, py: Python<'a>) -> &'a PyBytes {
-        match self {
-            EitherBytes::Rust(bytes) => PyBytes::new(py, &bytes),
-            EitherBytes::Python(py_bytes) => py_bytes,
-        }
-    }
-
     pub fn len(&'a self) -> PyResult<usize> {
         match self {
             EitherBytes::Rust(bytes) => Ok(bytes.len()),
             EitherBytes::Python(py_bytes) => py_bytes.len(),
+        }
+    }
+}
+
+impl<'a> IntoPy<PyObject> for EitherBytes<'a> {
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        match self {
+            EitherBytes::Rust(bytes) => PyBytes::new(py, &bytes).into_py(py),
+            EitherBytes::Python(py_bytes) => py_bytes.into_py(py),
         }
     }
 }

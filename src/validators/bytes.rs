@@ -38,7 +38,7 @@ impl Validator for BytesValidator {
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let either_bytes = input.lax_bytes()?;
-        Ok(either_bytes.into_pybytes(py).into_py(py))
+        Ok(either_bytes.into_py(py))
     }
 
     fn validate_strict<'s, 'data>(
@@ -49,7 +49,7 @@ impl Validator for BytesValidator {
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let either_bytes = input.strict_bytes()?;
-        Ok(either_bytes.into_pybytes(py).into_py(py))
+        Ok(either_bytes.into_py(py))
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -75,7 +75,7 @@ impl Validator for StrictBytesValidator {
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let either_bytes = input.strict_bytes()?;
-        Ok(either_bytes.into_pybytes(py).into_py(py))
+        Ok(either_bytes.into_py(py))
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -157,6 +157,6 @@ impl BytesConstrainedValidator {
             }
         }
 
-        Ok(either_bytes.into_pybytes(py).into_py(py))
+        Ok(either_bytes.into_py(py))
     }
 }
