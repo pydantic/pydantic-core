@@ -7,14 +7,13 @@ use pyo3::types::{
 };
 
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::shared::bytes_as_datetime;
 
+use super::datetime::{
+    bytes_as_date, bytes_as_datetime, float_as_datetime, int_as_datetime, EitherDate, EitherDateTime,
+};
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
-use super::shared::{
-    bytes_as_date, date_as_py_date, datetime_as_py_datetime, float_as_datetime, float_as_int, int_as_bool,
-    int_as_datetime, str_as_bool, str_as_int,
-};
+use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 
 impl Input for PyAny {
     fn is_none(&self) -> bool {
@@ -211,62 +210,54 @@ impl Input for PyAny {
         }
     }
 
-    fn strict_date<'data>(&'data self, _py: Python<'data>) -> ValResult<&'data PyDate> {
+    fn strict_date(&self) -> ValResult<EitherDate> {
         if self.cast_as::<PyDateTime>().is_ok() {
             // have to check if it's a datetime first, otherwise the line below converts to a date
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
         } else if let Ok(date) = self.cast_as::<PyDate>() {
-            Ok(date)
+            Ok(EitherDate::Python(date))
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
         }
     }
 
-    fn lax_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
+    fn lax_date(&self) -> ValResult<EitherDate> {
         if self.cast_as::<PyDateTime>().is_ok() {
             // have to check if it's a datetime first, otherwise the line below converts to a date
             // even if we later try coercion from a datetime, we don't want to return a datetime now
-            return err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType);
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
         } else if let Ok(date) = self.cast_as::<PyDate>() {
-            return Ok(date);
-        }
-
-        if let Ok(str) = self.extract::<String>() {
-            let date = bytes_as_date(self, str.as_bytes())?;
-            date_as_py_date!(py, date)
+            Ok(EitherDate::Python(date))
+        } else if let Ok(str) = self.extract::<String>() {
+            bytes_as_date(self, str.as_bytes())
         } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
-            let date = bytes_as_date(self, py_bytes.as_bytes())?;
-            date_as_py_date!(py, date)
+            bytes_as_date(self, py_bytes.as_bytes())
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
         }
     }
 
-    fn strict_datetime<'data>(&'data self, _py: Python<'data>) -> ValResult<&'data PyDateTime> {
+    fn strict_datetime(&self) -> ValResult<EitherDateTime> {
         if let Ok(dt) = self.cast_as::<PyDateTime>() {
-            Ok(dt)
+            Ok(EitherDateTime::Python(dt))
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
         }
     }
 
-    fn lax_datetime<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDateTime> {
+    fn lax_datetime(&self) -> ValResult<EitherDateTime> {
         if let Ok(dt) = self.cast_as::<PyDateTime>() {
-            Ok(dt)
+            Ok(EitherDateTime::Python(dt))
         } else if let Ok(str) = self.extract::<String>() {
-            let dt = bytes_as_datetime(self, str.as_bytes())?;
-            datetime_as_py_datetime!(py, dt)
+            bytes_as_datetime(self, str.as_bytes())
         } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
-            let dt = bytes_as_datetime(self, py_bytes.as_bytes())?;
-            datetime_as_py_datetime!(py, dt)
+            bytes_as_datetime(self, py_bytes.as_bytes())
         } else if self.cast_as::<PyBool>().is_ok() {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
         } else if let Ok(int) = self.extract::<i64>() {
-            let dt = int_as_datetime(self, int, 0)?;
-            datetime_as_py_datetime!(py, dt)
+            int_as_datetime(self, int, 0)
         } else if let Ok(float) = self.extract::<f64>() {
-            let dt = float_as_datetime(self, float)?;
-            datetime_as_py_datetime!(py, dt)
+            float_as_datetime(self, float)
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
         }

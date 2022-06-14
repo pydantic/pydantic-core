@@ -1,15 +1,14 @@
-use pyo3::prelude::*;
-use pyo3::types::{PyDate, PyDateTime, PyType};
+use pyo3::types::PyType;
 
 use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
 
+use super::datetime::{
+    bytes_as_date, bytes_as_datetime, float_as_datetime, int_as_datetime, EitherDate, EitherDateTime,
+};
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
 use super::parse_json::JsonInput;
-use super::shared::{
-    bytes_as_date, bytes_as_datetime, date_as_py_date, datetime_as_py_datetime, float_as_datetime, float_as_int,
-    int_as_bool, int_as_datetime, str_as_bool, str_as_int,
-};
+use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 
 impl Input for JsonInput {
     fn is_none(&self) -> bool {
@@ -119,24 +118,20 @@ impl Input for JsonInput {
         }
     }
 
-    fn strict_date<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDate> {
+    fn strict_date(&self) -> ValResult<EitherDate> {
         match self {
-            JsonInput::String(v) => {
-                let date = bytes_as_date(self, v.as_bytes())?;
-                date_as_py_date!(py, date)
-            }
+            JsonInput::String(v) => bytes_as_date(self, v.as_bytes()),
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType),
         }
     }
 
-    fn strict_datetime<'data>(&'data self, py: Python<'data>) -> ValResult<&'data PyDateTime> {
-        let dt = match self {
+    fn strict_datetime(&self) -> ValResult<EitherDateTime> {
+        match self {
             JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes()),
             JsonInput::Int(v) => int_as_datetime(self, *v, 0),
             JsonInput::Float(v) => float_as_datetime(self, *v),
             _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType),
-        }?;
-        datetime_as_py_datetime!(py, dt)
+        }
     }
 }
 
@@ -214,12 +209,12 @@ impl Input for String {
     }
 
     #[no_coverage]
-    fn strict_date<'data>(&'data self, _py: Python<'data>) -> ValResult<&'data PyDate> {
+    fn strict_date(&self) -> ValResult<EitherDate> {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
     }
 
     #[no_coverage]
-    fn strict_datetime<'data>(&'data self, _py: Python<'data>) -> ValResult<&'data PyDateTime> {
+    fn strict_datetime(&self) -> ValResult<EitherDateTime> {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
     }
 }

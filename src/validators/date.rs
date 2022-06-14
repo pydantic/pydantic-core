@@ -1,20 +1,27 @@
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::pyclass::CompareOp;
-use pyo3::types::{PyDate, PyDict, PyTime};
+use pyo3::types::{PyDate, PyDict};
+use speedate::{Date, Time};
+use strum::EnumMessage;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
-use crate::input::Input;
+use crate::input::{EitherDate, Input};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DateValidator {
     strict: bool,
-    le: Option<Py<PyDate>>,
-    lt: Option<Py<PyDate>>,
-    ge: Option<Py<PyDate>>,
-    gt: Option<Py<PyDate>>,
+    constraints: Option<DateConstraints>,
+}
+
+#[derive(Debug, Clone)]
+struct DateConstraints {
+    le: Option<Date>,
+    lt: Option<Date>,
+    ge: Option<Date>,
+    gt: Option<Date>,
 }
 
 impl BuildValidator for DateValidator {
@@ -25,12 +32,22 @@ impl BuildValidator for DateValidator {
         config: Option<&PyDict>,
         _build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
+        let has_constraints = schema.get_item("le").is_some()
+            || schema.get_item("lt").is_some()
+            || schema.get_item("ge").is_some()
+            || schema.get_item("gt").is_some();
+
         Ok(Self {
             strict: is_strict(schema, config)?,
-            le: schema.get_as("le")?,
-            lt: schema.get_as("lt")?,
-            ge: schema.get_as("ge")?,
-            gt: schema.get_as("gt")?,
+            constraints: match has_constraints {
+                true => Some(DateConstraints {
+                    le: py_date_as_date(schema, "le")?,
+                    lt: py_date_as_date(schema, "lt")?,
+                    ge: py_date_as_date(schema, "ge")?,
+                    gt: py_date_as_date(schema, "gt")?,
+                }),
+                false => None,
+            },
         }
         .into())
     }
@@ -45,54 +62,14 @@ impl Validator for DateValidator {
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let date = match self.strict {
-            true => input.strict_date(py)?,
+            true => input.strict_date()?,
             false => {
-                match input.lax_date(py) {
+                match input.lax_date() {
                     Ok(date) => date,
-                    Err(date_err) => {
-                        let dt = match input.lax_datetime(py) {
-                            Ok(dt) => dt,
-                            Err(dt_err) => {
-                                return match dt_err {
-                                    ValError::LineErrors(mut line_errors) => {
-                                        for line_error in line_errors.iter_mut() {
-                                            match line_error.kind {
-                                                ErrorKind::DateTimeParsing => {
-                                                    line_error.kind = ErrorKind::DateFromDatetimeParsing;
-                                                }
-                                                _ => {
-                                                    return Err(date_err);
-                                                }
-                                            }
-                                        }
-                                        Err(ValError::LineErrors(line_errors))
-                                    }
-                                    ValError::InternalErr(internal_err) => Err(ValError::InternalErr(internal_err)),
-                                };
-                            }
-                        };
-                        // TODO replace all this with raw rust types once github.com/samuelcolvin/speedate#6 is done
-
-                        // we want to make sure the time is zero - e.g. the dt is an "exact date"
-                        let dt_time: &PyTime = dt
-                            .call_method0("time")
-                            .map_err(as_internal)?
-                            .extract()
-                            .map_err(as_internal)?;
-
-                        let zero_time = PyTime::new(py, 0, 0, 0, 0, None).map_err(as_internal)?;
-                        if dt_time.eq(zero_time).map_err(as_internal)? {
-                            dt.call_method0("date")
-                                .map_err(as_internal)?
-                                .extract()
-                                .map_err(as_internal)?
-                        } else {
-                            return err_val_error!(
-                                input_value = InputValue::InputRef(input),
-                                kind = ErrorKind::DateFromDatetimeInexact
-                            );
-                        }
-                    }
+                    // if the date error was an internal error, return that immediately
+                    Err(ValError::InternalErr(internal_err)) => return Err(ValError::InternalErr(internal_err)),
+                    // otherwise, try creating a date from a datetime input
+                    Err(date_err) => date_from_datetime(input, date_err)?,
                 }
             }
         };
@@ -106,7 +83,7 @@ impl Validator for DateValidator {
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        self.validation_comparison(py, input, input.strict_date(py)?)
+        self.validation_comparison(py, input, input.strict_date()?)
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -119,29 +96,94 @@ impl DateValidator {
         &'s self,
         py: Python<'data>,
         input: &'data dyn Input,
-        date: &'data PyDate,
+        date: EitherDate<'data>,
     ) -> ValResult<'data, PyObject> {
-        macro_rules! check_constraint {
-            ($constraint_op:expr, $op:path, $error:path, $key:literal) => {
-                if let Some(constraint_py) = &$constraint_op {
-                    let constraint: &PyDate = constraint_py.extract(py).map_err(as_internal)?;
-                    let comparison_py = date.rich_compare(constraint, $op).map_err(as_internal)?;
-                    let comparison: bool = comparison_py.extract().map_err(as_internal)?;
-                    if !comparison {
-                        return err_val_error!(
-                            input_value = InputValue::InputRef(input),
-                            kind = $error,
-                            context = context!($key => constraint.to_string())
-                        );
+        if let Some(constraints) = &self.constraints {
+            let speedate_date = date.as_speedate().map_err(as_internal)?;
+
+            macro_rules! check_constraint {
+                ($constraint:ident, $error:path, $key:literal) => {
+                    if let Some(constraint) = &constraints.$constraint {
+                        if !speedate_date.$constraint(constraint) {
+                            return err_val_error!(
+                                input_value = InputValue::InputRef(input),
+                                kind = $error,
+                                context = context!($key => constraint.to_string())
+                            );
+                        }
                     }
+                };
+            }
+
+            check_constraint!(le, ErrorKind::LessThanEqual, "le");
+            check_constraint!(lt, ErrorKind::LessThan, "lt");
+            check_constraint!(ge, ErrorKind::GreaterThanEqual, "ge");
+            check_constraint!(gt, ErrorKind::GreaterThan, "gt");
+        }
+        Ok(date.as_python(py).map_err(as_internal)?.into_py(py))
+    }
+}
+
+/// In lax mode, if the input is not a date, we try parsing the input as a datetime, then check it is an
+/// "exact date", e.g. has a zero time component.
+fn date_from_datetime<'data>(
+    input: &'data dyn Input,
+    date_err: ValError<'data>,
+) -> ValResult<'data, EitherDate<'data>> {
+    let either_dt = match input.lax_datetime() {
+        Ok(dt) => dt,
+        Err(dt_err) => {
+            return match dt_err {
+                ValError::LineErrors(mut line_errors) => {
+                    // if we got a errors while parsing the datetime,
+                    // convert DateTimeParsing -> DateFromDatetimeParsing but keep the rest of the error unchanged
+                    for line_error in line_errors.iter_mut() {
+                        match line_error.kind {
+                            ErrorKind::DateTimeParsing => {
+                                line_error.kind = ErrorKind::DateFromDatetimeParsing;
+                            }
+                            _ => {
+                                return Err(date_err);
+                            }
+                        }
+                    }
+                    Err(ValError::LineErrors(line_errors))
                 }
+                ValError::InternalErr(internal_err) => Err(ValError::InternalErr(internal_err)),
             };
         }
+    };
+    let dt = either_dt.as_speedate().map_err(as_internal)?;
+    let zero_time = Time {
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: 0,
+    };
+    if dt.time == zero_time && dt.offset.is_none() {
+        Ok(EitherDate::Speedate(dt.date))
+    } else {
+        err_val_error!(
+            input_value = InputValue::InputRef(input),
+            kind = ErrorKind::DateFromDatetimeInexact
+        )
+    }
+}
 
-        check_constraint!(self.le, CompareOp::Le, ErrorKind::LessThanEqual, "le");
-        check_constraint!(self.lt, CompareOp::Lt, ErrorKind::LessThan, "lt");
-        check_constraint!(self.ge, CompareOp::Ge, ErrorKind::GreaterThanEqual, "ge");
-        check_constraint!(self.gt, CompareOp::Gt, ErrorKind::GreaterThan, "gt");
-        Ok(date.into_py(py))
+fn py_date_as_date(schema: &PyDict, field: &str) -> PyResult<Option<Date>> {
+    let py_date: Option<&PyDate> = schema.get_as(field)?;
+    match py_date {
+        Some(py_date) => {
+            let date_str: &str = py_date.str()?.extract()?;
+            match Date::parse_str(date_str) {
+                Ok(date) => Ok(Some(date)),
+                Err(err) => {
+                    let error_description = err.get_documentation().unwrap_or_default();
+                    let msg = format!("Unable to parse date {}, error: {}", date_str, error_description);
+                    Err(PyValueError::new_err(msg))
+                }
+            }
+        }
+        None => Ok(None),
     }
 }
