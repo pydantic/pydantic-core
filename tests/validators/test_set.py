@@ -14,7 +14,7 @@ from ..conftest import Err
         ([1, 2, 3], {1, 2, 3}),
         ([1, 2, '3'], {1, 2, 3}),
         ([1, 2, 3, 2, 3], {1, 2, 3}),
-        (5, Err('Value must be a valid list/array [kind=set_type, input_value=5, input_type=int]')),
+        (5, Err('Value must be a valid set [kind=set_type, input_value=5, input_type=int]')),
     ],
 )
 def test_set_ints_both(py_or_json, input_value, expected):
