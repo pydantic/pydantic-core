@@ -24,9 +24,21 @@ pub enum ErrorKind {
     // boolean errors
     #[strum(message = "Value must be a valid boolean")]
     Bool,
-    #[strum(message = "Value must be a valid string")]
+    // ---------------------
+    // comparison errors
+    #[strum(message = "Value must be a multiple of {multiple_of}")]
+    IntMultipleOf,
+    #[strum(message = "Value must be greater than {gt}")]
+    GreaterThan,
+    #[strum(message = "Value must be greater than or equal to {ge}")]
+    GreaterThanEqual,
+    #[strum(message = "Value must be less than {lt}")]
+    LessThan,
+    #[strum(message = "Value must be less than or equal to {le}")]
+    LessThanEqual,
     // ---------------------
     // string errors
+    #[strum(message = "Value must be a valid string")]
     StrType,
     #[strum(message = "Value must be a valid string, unable to parse raw data as a unicode string")]
     StrUnicode,
@@ -58,7 +70,7 @@ pub enum ErrorKind {
     ListTooLong,
     // ---------------------
     // set errors
-    #[strum(message = "Value must be a valid list/array")]
+    #[strum(message = "Value must be a valid set")]
     SetType,
     #[strum(message = "Set must have at least {min_length} items")]
     SetTooShort,
@@ -82,6 +94,14 @@ pub enum ErrorKind {
     IntNan,
     #[strum(message = "Value must be a multiple of {multiple_of}")]
     IntMultiple,
+    #[strum(message = "Value must be greater than {gt}")]
+    IntGreaterThan,
+    #[strum(message = "Value must be greater than or equal to {ge}")]
+    IntGreaterThanEqual,
+    #[strum(message = "Value must be less than {lt}")]
+    IntLessThan,
+    #[strum(message = "Value must be less than or equal to {le}")]
+    IntLessThanEqual,
     // ---------------------
     // float errors
     #[strum(message = "Value must be a valid number")]
@@ -103,15 +123,36 @@ pub enum ErrorKind {
     #[strum(serialize = "literal_error", message = "Value must be one of: {expected}")]
     LiteralMultipleError,
     // ---------------------
-    // comparison errors
-    #[strum(message = "Value must be greater than {gt}")]
-    ValueGreaterThan,
-    #[strum(message = "Value must be greater than or equal to {ge}")]
-    ValueGreaterThanEqual,
-    #[strum(message = "Value must be less than {lt}")]
-    ValueLessThan,
-    #[strum(message = "Value must be less than or equal to {le}")]
-    ValueLessThanEqual,
+    // date errors
+    #[strum(message = "Value must be a valid date")]
+    DateType,
+    #[strum(message = "Value must be a valid date in the format YYYY-MM-DD, {parsing_error}")]
+    DateParsing,
+    #[strum(message = "Value must be a valid date or datetime, {parsing_error}")]
+    DateFromDatetimeParsing,
+    #[strum(message = "Datetimes provided to dates must have zero time - e.g. be exact dates")]
+    DateFromDatetimeInexact,
+    // ---------------------
+    // date errors
+    #[strum(message = "Value must be a valid time")]
+    TimeType,
+    #[strum(message = "Value must be in a valid time format, {parsing_error}")]
+    TimeParsing,
+    // ---------------------
+    // datetime errors
+    #[strum(serialize = "datetime_type", message = "Value must be a valid datetime")]
+    DateTimeType,
+    // TODO #[strum(message = "Value must be in a valid datetime format, {parsing_error}")]
+    #[strum(
+        serialize = "datetime_parsing",
+        message = "Value must be a valid datetime, {parsing_error}"
+    )]
+    DateTimeParsing,
+    #[strum(
+        serialize = "datetime_object_invalid",
+        message = "Invalid datetime object, got {processing_error}"
+    )]
+    DateTimeObjectInvalid,
 }
 
 impl Default for ErrorKind {
