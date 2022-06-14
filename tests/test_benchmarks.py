@@ -431,33 +431,20 @@ def test_list_of_optional_core(benchmark):
     benchmark(v.validate_python, list_of_optional_data)
 
 
-long_bytes = b'0' * 1000
-list_of_long_bytes = [long_bytes * 1000]
+some_bytes = b'0' * 1000
+
 
 @pytest.mark.benchmark(group='bytes')
-def test_long_bytes_core(benchmark):
+def test_bytes_core(benchmark):
     v = SchemaValidator({'type': 'bytes'})
 
-    benchmark(v.validate_python, long_bytes)
+    benchmark(v.validate_python, some_bytes)
 
-@pytest.mark.benchmark(group='bytes')
-def test_list_of_long_bytes_core(benchmark):
-    v = SchemaValidator({'type': 'list', 'items': {'type': 'bytes'}})
-
-    benchmark(v.validate_python, list_of_long_bytes)
 
 @skip_pydantic
 @pytest.mark.benchmark(group='bytes')
-def test_long_bytes_pyd(benchmark):
+def test_bytes_pyd(benchmark):
     class PydanticModel(BaseModel):
-        __root__: bytes 
+        __root__: bytes
 
-    benchmark(PydanticModel.parse_obj, long_bytes)
-
-@skip_pydantic
-@pytest.mark.benchmark(group='bytes')
-def test_list_of_long_bytes_pyd(benchmark):
-    class PydanticModel(BaseModel):
-        __root__: List[bytes]
-
-    benchmark(PydanticModel.parse_obj, list_of_long_bytes)
+    benchmark(PydanticModel.parse_obj, some_bytes)

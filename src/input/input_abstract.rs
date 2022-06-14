@@ -2,6 +2,7 @@ use std::fmt;
 
 use pyo3::types::PyType;
 
+use super::return_enums::EitherBytes;
 use crate::errors::ValResult;
 
 use super::{GenericMapping, GenericSequence, ToLocItem, ToPy};
@@ -45,9 +46,9 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
         self.strict_set()
     }
 
-    fn strict_bytes(&self) -> ValResult<Vec<u8>>;
+    fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>>;
 
-    fn lax_bytes(&self) -> ValResult<Vec<u8>> {
+    fn lax_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
         self.strict_bytes()
     }
 }

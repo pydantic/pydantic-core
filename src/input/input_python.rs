@@ -7,6 +7,7 @@ use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult
 
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
+use super::return_enums::EitherBytes;
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 
 impl Input for PyAny {
@@ -204,19 +205,20 @@ impl Input for PyAny {
         }
     }
 
-    fn strict_bytes(&self) -> ValResult<Vec<u8>> {
+    fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
         if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
-            py_bytes.extract().map_err(as_internal)
+            Ok(EitherBytes::Python(py_bytes))
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BytesType)
         }
     }
 
-    fn lax_bytes(&self) -> ValResult<Vec<u8>> {
+    fn lax_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
         if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
-            py_bytes.extract().map_err(as_internal)
+            Ok(EitherBytes::Python(py_bytes))
         } else if let Ok(py_str) = self.cast_as::<PyString>() {
-            Ok(py_str.to_string().into_bytes())
+            let str: String = py_str.extract().map_err(as_internal)?;
+            Ok(EitherBytes::Rust(str.into_bytes()))
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BytesType)
         }

@@ -1,9 +1,9 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::PyDict;
 
 use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::Input;
+use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
+use crate::input::{EitherBytes, Input};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -37,7 +37,8 @@ impl Validator for BytesValidator {
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        Ok(PyBytes::new(py, &input.lax_bytes()?).into_py(py))
+        let either_bytes = input.lax_bytes()?;
+        Ok(either_bytes.into_pybytes(py).into_py(py))
     }
 
     fn validate_strict<'s, 'data>(
@@ -47,7 +48,8 @@ impl Validator for BytesValidator {
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        Ok(PyBytes::new(py, &input.strict_bytes()?).into_py(py))
+        let either_bytes = input.strict_bytes()?;
+        Ok(either_bytes.into_pybytes(py).into_py(py))
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -72,7 +74,8 @@ impl Validator for StrictBytesValidator {
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        Ok(PyBytes::new(py, &input.strict_bytes()?).into_py(py))
+        let either_bytes = input.strict_bytes()?;
+        Ok(either_bytes.into_pybytes(py).into_py(py))
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -99,7 +102,7 @@ impl Validator for BytesConstrainedValidator {
             true => input.strict_bytes()?,
             false => input.lax_bytes()?,
         };
-        self._validation_logic(py, input, &bytes)
+        self._validation_logic(py, input, bytes)
     }
 
     fn validate_strict<'s, 'data>(
@@ -109,7 +112,7 @@ impl Validator for BytesConstrainedValidator {
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, &input.strict_bytes()?)
+        self._validation_logic(py, input, input.strict_bytes()?)
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -131,10 +134,12 @@ impl BytesConstrainedValidator {
         &'s self,
         py: Python<'data>,
         input: &'data dyn Input,
-        bytes: &[u8],
+        either_bytes: EitherBytes<'data>,
     ) -> ValResult<'data, PyObject> {
+        let len = either_bytes.len().map_err(as_internal)?;
+
         if let Some(min_length) = self.min_length {
-            if bytes.len() < min_length {
+            if len < min_length {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::BytesTooShort,
@@ -143,7 +148,7 @@ impl BytesConstrainedValidator {
             }
         }
         if let Some(max_length) = self.max_length {
-            if bytes.len() > max_length {
+            if len > max_length {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::BytesTooLong,
@@ -152,7 +157,6 @@ impl BytesConstrainedValidator {
             }
         }
 
-        let py_bytes = PyBytes::new(py, &bytes);
-        Ok(py_bytes.into_py(py))
+        Ok(either_bytes.into_pybytes(py).into_py(py))
     }
 }
