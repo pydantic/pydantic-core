@@ -94,14 +94,6 @@ pub enum ErrorKind {
     IntNan,
     #[strum(message = "Value must be a multiple of {multiple_of}")]
     IntMultiple,
-    #[strum(message = "Value must be greater than {gt}")]
-    IntGreaterThan,
-    #[strum(message = "Value must be greater than or equal to {ge}")]
-    IntGreaterThanEqual,
-    #[strum(message = "Value must be less than {lt}")]
-    IntLessThan,
-    #[strum(message = "Value must be less than or equal to {le}")]
-    IntLessThanEqual,
     // ---------------------
     // float errors
     #[strum(message = "Value must be a valid number")]
