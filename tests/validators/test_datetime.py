@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from decimal import Decimal
 
 import pytest
@@ -111,3 +111,61 @@ def test_custom_timezone_utc_repr():
     assert output.tzinfo.tzname(output) == 'UTC'
     assert str(output.tzinfo) == 'UTC'
     assert repr(output.tzinfo) == 'TzInfo(UTC)'
+
+
+def test_tz_comparison():
+    tz = pytz.timezone('Europe/London')
+    uk_3pm = tz.localize(datetime(2022, 1, 1, 15, 0, 0))
+
+    # two times are the same instant, therefore le and ge are both ok
+    v = SchemaValidator({'type': 'datetime', 'le': uk_3pm}).validate_python('2022-01-01T16:00:00+01:00')
+    assert v == datetime(2022, 1, 1, 16, 0, 0, tzinfo=timezone(timedelta(hours=1)))
+
+    v = SchemaValidator({'type': 'datetime', 'ge': uk_3pm}).validate_python('2022-01-01T16:00:00+01:00')
+    assert v == datetime(2022, 1, 1, 16, 0, 0, tzinfo=timezone(timedelta(hours=1)))
+
+    # but not gt
+    with pytest.raises(ValidationError, match=r'Value must be greater than 2022-01-01T15:00:00Z \[kind=greater_than'):
+        SchemaValidator({'type': 'datetime', 'gt': uk_3pm}).validate_python('2022-01-01T16:00:00+01:00')
+
+
+def test_custom_tz():
+    class CustomTz(tzinfo):
+        def utcoffset(self, _dt):
+            return None
+
+        def dst(self, _dt):
+            return None
+
+        def tzname(self, _dt):
+            return 'CustomTZ'
+
+    schema = SchemaValidator({'type': 'datetime', 'gt': datetime(2022, 1, 1, 15, 0, 0)})
+
+    dt = datetime(2022, 1, 1, 16, 0, 0, tzinfo=CustomTz())
+    outcome = schema.validate_python(dt)
+    assert outcome == dt
+
+
+def test_custom_invalid_tz():
+    class CustomTz(tzinfo):
+        # utcoffset is not implemented!
+
+        def tzname(self, _dt):
+            return 'CustomTZ'
+
+    schema = SchemaValidator({'type': 'datetime', 'gt': datetime(2022, 1, 1, 15, 0, 0)})
+
+    dt = datetime(2022, 1, 1, 16, 0, 0, tzinfo=CustomTz())
+    # perhaps this should be a ValidationError? but we don't catch other errors
+    with pytest.raises(ValidationError) as excinfo:
+        schema.validate_python(dt)
+    assert excinfo.value.errors() == [
+        {
+            'kind': 'date_time_object_invalid',
+            'loc': [],
+            'message': 'Invalid datetime object, got NotImplementedError',
+            'input_value': dt,
+            'context': {'processing_error': 'NotImplementedError'},
+        }
+    ]

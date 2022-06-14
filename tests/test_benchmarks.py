@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional, Set
 
 import pytest
@@ -451,7 +451,7 @@ class TestBenchmarkDateTime:
 
     @pytest.fixture(scope='class')
     def datetime_raw(self):
-        return datetime.now() + timedelta(days=1)
+        return datetime.utcnow().replace(tzinfo=timezone.utc) + timedelta(days=1)
 
     @pytest.fixture(scope='class')
     def datetime_str(self, datetime_raw):
@@ -476,7 +476,7 @@ class TestBenchmarkDateTime:
 
     @skip_pydantic
     @pytest.mark.benchmark(group='datetime model - JSON')
-    def test_model_spyd_json(self, pydantic_model, benchmark, json_dict_data):
+    def test_model_pyd_json(self, pydantic_model, benchmark, json_dict_data):
         @benchmark
         def pydantic_json():
             obj = json.loads(json_dict_data)
@@ -504,7 +504,7 @@ class TestBenchmarkDateTime:
 
         benchmark(v.validate_python, datetime_raw)
 
-    @pytest.mark.benchmark(group='datetime future str')
+    @pytest.mark.benchmark(group='datetime future')
     def test_core_future_str(self, benchmark, datetime_str):
         v = SchemaValidator({'type': 'datetime', 'gt': datetime.now()})
 
@@ -531,3 +531,15 @@ class TestBenchmarkDateX:
     @pytest.mark.benchmark(group='date from datetime str')
     def test_date_from_datetime_str(self, benchmark, validator):
         benchmark(validator.validate_python, str(datetime(2000, 1, 1)))
+
+    @pytest.mark.benchmark(group='date future')
+    def test_core_future(self, benchmark):
+        v = SchemaValidator({'type': 'date', 'gt': date.today()})
+
+        benchmark(v.validate_python, date(2032, 1, 1))
+
+    @pytest.mark.benchmark(group='date future')
+    def test_core_future_str(self, benchmark):
+        v = SchemaValidator({'type': 'date', 'gt': date.today()})
+
+        benchmark(v.validate_python, str(date(2032, 1, 1)))

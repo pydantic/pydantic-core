@@ -56,7 +56,6 @@ addopts = [
     '--benchmark-columns', 'min,mean,stddev,outliers,rounds,iterations',
     '--benchmark-group-by', 'group',
     '--benchmark-warmup', 'on',
-    '--benchmark-warmup-iterations', '1000',
     '--benchmark-disable',  # this is enable by `make benchmark` when you actually want to run benchmarks
 ]
 

@@ -146,6 +146,8 @@ pub enum ErrorKind {
     DateTimeType,
     #[strum(message = "Value must be a valid datetime, {parsing_error}")]
     DateTimeParsing,
+    #[strum(message = "Invalid datetime object, got {processing_error}")]
+    DateTimeObjectInvalid,
 }
 
 impl Default for ErrorKind {

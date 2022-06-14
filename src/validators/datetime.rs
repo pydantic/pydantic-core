@@ -91,7 +91,19 @@ impl DateTimeValidator {
         datetime: EitherDateTime,
     ) -> ValResult<'data, PyObject> {
         if let Some(constraints) = &self.constraints {
-            let speedate_dt = datetime.as_speedate().map_err(as_internal)?;
+            // if we get an error from as_speedate, it's probably because the input datetime was invalid
+            // specifically had an invalid tzinfo, hence here we return a validation error
+            let speedate_dt = match datetime.as_speedate() {
+                Ok(dt) => dt,
+                Err(err) => {
+                    let error_name = err.get_type(py).name().map_err(as_internal)?;
+                    return err_val_error!(
+                        input_value = InputValue::InputRef(input),
+                        kind = ErrorKind::DateTimeObjectInvalid,
+                        context = context!("processing_error" => error_name)
+                    );
+                }
+            };
             macro_rules! check_constraint {
                 ($constraint:ident, $error:path, $key:literal) => {
                     if let Some(constraint) = &constraints.$constraint {

@@ -1,7 +1,7 @@
-use pyo3::exceptions::PyValueError;
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDate, PyDateTime, PyDelta, PyTzInfo};
-use speedate::{Date, DateTime};
+use speedate::{Date, DateTime, Time};
 use strum::EnumMessage;
 
 use super::Input;
@@ -17,15 +17,12 @@ impl<'a> EitherDate<'a> {
         match self {
             Self::Speedate(date) => Ok(date.clone()),
             Self::Python(py_date) => {
-                let date_str: &str = py_date.str()?.extract()?;
-                match Date::parse_str(date_str) {
-                    Ok(date) => Ok(date),
-                    Err(err) => {
-                        let error_description = err.get_documentation().unwrap_or_default();
-                        let msg = format!("Unable to parse date {}, error: {}", date_str, error_description);
-                        Err(PyValueError::new_err(msg))
-                    }
-                }
+                let py = py_date.py();
+                Ok(Date {
+                    year: py_date.getattr(intern!(py, "year"))?.extract()?,
+                    month: py_date.getattr(intern!(py, "month"))?.extract()?,
+                    day: py_date.getattr(intern!(py, "day"))?.extract()?,
+                })
             }
         }
     }
@@ -49,15 +46,34 @@ impl<'a> EitherDateTime<'a> {
         match self {
             Self::Speedate(dt) => Ok(dt.clone()),
             Self::Python(py_dt) => {
-                let dt_str: &str = py_dt.str()?.extract()?;
-                match DateTime::parse_str(dt_str) {
-                    Ok(dt) => Ok(dt),
-                    Err(err) => {
-                        let error_description = err.get_documentation().unwrap_or_default();
-                        let msg = format!("Unable to parse datetime {}, error: {}", dt_str, error_description);
-                        Err(PyValueError::new_err(msg))
+                let py = py_dt.py();
+
+                let mut offset: Option<i32> = None;
+                let tzinfo = py_dt.getattr(intern!(py, "tzinfo"))?;
+                if !tzinfo.is_none() {
+                    let offset_delta = tzinfo.getattr(intern!(py, "utcoffset"))?.call1((py_dt.as_ref(),))?;
+                    // as per the docs, utcoffset() can return None
+                    if !offset_delta.is_none() {
+                        let offset_seconds: f64 =
+                            offset_delta.getattr(intern!(py, "total_seconds"))?.call0()?.extract()?;
+                        offset = Some(offset_seconds.round() as i32);
                     }
                 }
+
+                Ok(DateTime {
+                    date: Date {
+                        year: py_dt.getattr(intern!(py, "year"))?.extract()?,
+                        month: py_dt.getattr(intern!(py, "month"))?.extract()?,
+                        day: py_dt.getattr(intern!(py, "day"))?.extract()?,
+                    },
+                    time: Time {
+                        hour: py_dt.getattr(intern!(py, "hour"))?.extract()?,
+                        minute: py_dt.getattr(intern!(py, "minute"))?.extract()?,
+                        second: py_dt.getattr(intern!(py, "second"))?.extract()?,
+                        microsecond: py_dt.getattr(intern!(py, "microsecond"))?.extract()?,
+                    },
+                    offset,
+                })
             }
         }
     }
@@ -162,11 +178,11 @@ impl TzInfo {
         PyDelta::new(py, 0, self.seconds, 0, true)
     }
 
-    fn tzname(&self, _py: Python<'_>, _dt: &PyDateTime) -> String {
+    fn tzname(&self, _dt: &PyDateTime) -> String {
         self.__str__()
     }
 
-    fn dst(&self, _py: Python<'_>, _dt: &PyDateTime) -> Option<&PyDelta> {
+    fn dst(&self, _dt: &PyDateTime) -> Option<&PyDelta> {
         None
     }
 
