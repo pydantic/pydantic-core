@@ -3,7 +3,8 @@ use pyo3::types::PyType;
 use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
 
 use super::datetime::{
-    bytes_as_date, bytes_as_datetime, float_as_datetime, int_as_datetime, EitherDate, EitherDateTime,
+    bytes_as_date, bytes_as_datetime, bytes_as_time, float_as_datetime, float_as_time, int_as_datetime, int_as_time,
+    EitherDate, EitherDateTime, EitherTime,
 };
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
@@ -125,7 +126,34 @@ impl Input for JsonInput {
         }
     }
 
+    // NO custom `lax_date` implementation, if strict_date fails, the validator will fallback to lax_datetime
+    // then check there's no remainder
+
+    fn strict_time(&self) -> ValResult<EitherTime> {
+        match self {
+            JsonInput::String(v) => bytes_as_time(self, v.as_bytes()),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::TimeType),
+        }
+    }
+
+    fn lax_time(&self) -> ValResult<EitherTime> {
+        match self {
+            JsonInput::String(v) => bytes_as_time(self, v.as_bytes()),
+            JsonInput::Int(v) => int_as_time(self, *v, 0),
+            JsonInput::Float(v) => float_as_time(self, *v),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::TimeType),
+        }
+    }
+
+    // FIXME needs testing
     fn strict_datetime(&self) -> ValResult<EitherDateTime> {
+        match self {
+            JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes()),
+            _ => err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType),
+        }
+    }
+
+    fn lax_datetime(&self) -> ValResult<EitherDateTime> {
         match self {
             JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes()),
             JsonInput::Int(v) => int_as_datetime(self, *v, 0),
@@ -208,9 +236,15 @@ impl Input for String {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::SetType)
     }
 
+    // TODO these need implementing and testing
     #[no_coverage]
     fn strict_date(&self) -> ValResult<EitherDate> {
         err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateType)
+    }
+
+    #[no_coverage]
+    fn strict_time(&self) -> ValResult<EitherTime> {
+        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::TimeType)
     }
 
     #[no_coverage]

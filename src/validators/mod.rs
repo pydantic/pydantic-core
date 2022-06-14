@@ -29,6 +29,7 @@ mod optional;
 mod recursive;
 mod set;
 mod string;
+mod time;
 mod union;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
@@ -203,6 +204,8 @@ pub fn build_validator<'a>(
         any::AnyValidator,
         // dates
         date::DateValidator,
+        // times
+        time::TimeValidator,
         // datetimes
         datetime::DateTimeValidator,
     )
@@ -271,6 +274,8 @@ pub enum CombinedValidator {
     Any(any::AnyValidator),
     // dates
     Date(date::DateValidator),
+    // times
+    Time(time::TimeValidator),
     // datetimes
     Datetime(datetime::DateTimeValidator),
 }

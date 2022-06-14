@@ -1,6 +1,6 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDate, PyDateTime, PyDelta, PyTzInfo};
+use pyo3::types::{PyDate, PyDateTime, PyDelta, PyTime, PyTzInfo};
 use speedate::{Date, DateTime, Time};
 use strum::EnumMessage;
 
@@ -8,79 +8,147 @@ use super::Input;
 use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 
 pub enum EitherDate<'a> {
-    Speedate(Date),
-    Python(&'a PyDate),
+    Raw(Date),
+    Py(&'a PyDate),
 }
 
+impl<'a> From<Date> for EitherDate<'a> {
+    fn from(date: Date) -> Self {
+        Self::Raw(date)
+    }
+}
+
+impl<'a> From<&'a PyDate> for EitherDate<'a> {
+    fn from(date: &'a PyDate) -> Self {
+        Self::Py(date)
+    }
+}
+
+macro_rules! pydate_as_date {
+    ($py_date:expr) => {
+        speedate::Date {
+            year: $py_date.getattr(pyo3::intern!($py_date.py(), "year"))?.extract()?,
+            month: $py_date.getattr(pyo3::intern!($py_date.py(), "month"))?.extract()?,
+            day: $py_date.getattr(pyo3::intern!($py_date.py(), "day"))?.extract()?,
+        }
+    };
+}
+pub(crate) use pydate_as_date;
+
 impl<'a> EitherDate<'a> {
-    pub fn as_speedate(&self) -> PyResult<Date> {
+    pub fn as_raw(&self) -> PyResult<Date> {
         match self {
-            Self::Speedate(date) => Ok(date.clone()),
-            Self::Python(py_date) => {
-                let py = py_date.py();
-                Ok(Date {
-                    year: py_date.getattr(intern!(py, "year"))?.extract()?,
-                    month: py_date.getattr(intern!(py, "month"))?.extract()?,
-                    day: py_date.getattr(intern!(py, "day"))?.extract()?,
-                })
-            }
+            Self::Raw(date) => Ok(date.clone()),
+            Self::Py(py_date) => Ok(pydate_as_date!(py_date)),
         }
     }
 
     pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
         let date = match self {
-            Self::Python(date) => Ok(date),
-            Self::Speedate(date) => PyDate::new(py, date.year as i32, date.month, date.day),
+            Self::Py(date) => Ok(date),
+            Self::Raw(date) => PyDate::new(py, date.year as i32, date.month, date.day),
         }?;
         Ok(date.into_py(py))
     }
 }
 
+pub enum EitherTime<'a> {
+    Raw(Time),
+    Py(&'a PyTime),
+}
+
+impl<'a> From<Time> for EitherTime<'a> {
+    fn from(time: Time) -> Self {
+        Self::Raw(time)
+    }
+}
+
+impl<'a> From<&'a PyTime> for EitherTime<'a> {
+    fn from(time: &'a PyTime) -> Self {
+        Self::Py(time)
+    }
+}
+
+macro_rules! pytime_as_time {
+    ($py_time:expr) => {
+        speedate::Time {
+            hour: $py_time.getattr(pyo3::intern!($py_time.py(), "hour"))?.extract()?,
+            minute: $py_time.getattr(pyo3::intern!($py_time.py(), "minute"))?.extract()?,
+            second: $py_time.getattr(pyo3::intern!($py_time.py(), "second"))?.extract()?,
+            microsecond: $py_time
+                .getattr(pyo3::intern!($py_time.py(), "microsecond"))?
+                .extract()?,
+        }
+    };
+}
+pub(crate) use pytime_as_time;
+
+impl<'a> EitherTime<'a> {
+    pub fn as_raw(&self) -> PyResult<Time> {
+        match self {
+            Self::Raw(time) => Ok(time.clone()),
+            Self::Py(py_time) => Ok(pytime_as_time!(py_time)),
+        }
+    }
+
+    pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
+        let time = match self {
+            Self::Py(time) => Ok(time),
+            Self::Raw(time) => PyTime::new(py, time.hour, time.minute, time.second, time.microsecond, None),
+        }?;
+        Ok(time.into_py(py))
+    }
+}
+
 pub enum EitherDateTime<'a> {
-    Speedate(DateTime),
-    Python(&'a PyDateTime),
+    Raw(DateTime),
+    Py(&'a PyDateTime),
+}
+
+impl<'a> From<DateTime> for EitherDateTime<'a> {
+    fn from(dt: DateTime) -> Self {
+        Self::Raw(dt)
+    }
+}
+
+impl<'a> From<&'a PyDateTime> for EitherDateTime<'a> {
+    fn from(dt: &'a PyDateTime) -> Self {
+        Self::Py(dt)
+    }
+}
+
+pub fn pydatetime_as_datetime(py_dt: &PyDateTime) -> PyResult<DateTime> {
+    let py = py_dt.py();
+
+    let mut offset: Option<i32> = None;
+    let tzinfo = py_dt.getattr(intern!(py, "tzinfo"))?;
+    if !tzinfo.is_none() {
+        let offset_delta = tzinfo.getattr(intern!(py, "utcoffset"))?.call1((py_dt.as_ref(),))?;
+        // as per the docs, utcoffset() can return None
+        if !offset_delta.is_none() {
+            let offset_seconds: f64 = offset_delta.getattr(intern!(py, "total_seconds"))?.call0()?.extract()?;
+            offset = Some(offset_seconds.round() as i32);
+        }
+    }
+
+    Ok(DateTime {
+        date: pydate_as_date!(py_dt),
+        time: pytime_as_time!(py_dt),
+        offset,
+    })
 }
 
 impl<'a> EitherDateTime<'a> {
-    pub fn as_speedate(&self) -> PyResult<DateTime> {
+    pub fn as_raw(&self) -> PyResult<DateTime> {
         match self {
-            Self::Speedate(dt) => Ok(dt.clone()),
-            Self::Python(py_dt) => {
-                let py = py_dt.py();
-
-                let mut offset: Option<i32> = None;
-                let tzinfo = py_dt.getattr(intern!(py, "tzinfo"))?;
-                if !tzinfo.is_none() {
-                    let offset_delta = tzinfo.getattr(intern!(py, "utcoffset"))?.call1((py_dt.as_ref(),))?;
-                    // as per the docs, utcoffset() can return None
-                    if !offset_delta.is_none() {
-                        let offset_seconds: f64 =
-                            offset_delta.getattr(intern!(py, "total_seconds"))?.call0()?.extract()?;
-                        offset = Some(offset_seconds.round() as i32);
-                    }
-                }
-
-                Ok(DateTime {
-                    date: Date {
-                        year: py_dt.getattr(intern!(py, "year"))?.extract()?,
-                        month: py_dt.getattr(intern!(py, "month"))?.extract()?,
-                        day: py_dt.getattr(intern!(py, "day"))?.extract()?,
-                    },
-                    time: Time {
-                        hour: py_dt.getattr(intern!(py, "hour"))?.extract()?,
-                        minute: py_dt.getattr(intern!(py, "minute"))?.extract()?,
-                        second: py_dt.getattr(intern!(py, "second"))?.extract()?,
-                        microsecond: py_dt.getattr(intern!(py, "microsecond"))?.extract()?,
-                    },
-                    offset,
-                })
-            }
+            Self::Raw(dt) => Ok(dt.clone()),
+            Self::Py(py_dt) => pydatetime_as_datetime(py_dt),
         }
     }
 
     pub fn try_into_py(self, py: Python<'a>) -> PyResult<PyObject> {
         let dt = match self {
-            Self::Speedate(datetime) => {
+            Self::Raw(datetime) => {
                 let tz: Option<PyObject> = match datetime.offset {
                     Some(offset) => {
                         let tz_info = TzInfo::new(offset);
@@ -100,7 +168,7 @@ impl<'a> EitherDateTime<'a> {
                     tz.as_ref(),
                 )?
             }
-            Self::Python(dt) => dt,
+            Self::Py(dt) => dt,
         };
         Ok(dt.into_py(py))
     }
@@ -108,7 +176,7 @@ impl<'a> EitherDateTime<'a> {
 
 pub fn bytes_as_date<'a>(input: &'a dyn Input, bytes: &[u8]) -> ValResult<'a, EitherDate<'a>> {
     match Date::parse_bytes(bytes) {
-        Ok(date) => Ok(EitherDate::Speedate(date)),
+        Ok(date) => Ok(date.into()),
         Err(err) => {
             err_val_error!(
                 input_value = InputValue::InputRef(input),
@@ -119,9 +187,22 @@ pub fn bytes_as_date<'a>(input: &'a dyn Input, bytes: &[u8]) -> ValResult<'a, Ei
     }
 }
 
+pub fn bytes_as_time<'a>(input: &'a dyn Input, bytes: &[u8]) -> ValResult<'a, EitherTime<'a>> {
+    match Time::parse_bytes(bytes) {
+        Ok(date) => Ok(date.into()),
+        Err(err) => {
+            err_val_error!(
+                input_value = InputValue::InputRef(input),
+                kind = ErrorKind::TimeParsing,
+                context = context!("parsing_error" => err.get_documentation().unwrap_or_default())
+            )
+        }
+    }
+}
+
 pub fn bytes_as_datetime<'a, 'b>(input: &'a dyn Input, bytes: &'b [u8]) -> ValResult<'a, EitherDateTime<'a>> {
     match DateTime::parse_bytes(bytes) {
-        Ok(dt) => Ok(EitherDateTime::Speedate(dt)),
+        Ok(dt) => Ok(dt.into()),
         Err(err) => {
             err_val_error!(
                 input_value = InputValue::InputRef(input),
@@ -134,7 +215,7 @@ pub fn bytes_as_datetime<'a, 'b>(input: &'a dyn Input, bytes: &'b [u8]) -> ValRe
 
 pub fn int_as_datetime(input: &dyn Input, timestamp: i64, timestamp_microseconds: u32) -> ValResult<EitherDateTime> {
     match DateTime::from_timestamp(timestamp, timestamp_microseconds) {
-        Ok(dt) => Ok(EitherDateTime::Speedate(dt)),
+        Ok(dt) => Ok(dt.into()),
         Err(err) => {
             err_val_error!(
                 input_value = InputValue::InputRef(input),
@@ -147,7 +228,7 @@ pub fn int_as_datetime(input: &dyn Input, timestamp: i64, timestamp_microseconds
 
 pub fn float_as_datetime(input: &dyn Input, timestamp: f64) -> ValResult<EitherDateTime> {
     let microseconds = timestamp.fract().abs() * 1_000_000.0;
-    // warning 0.1 is pluck from thin air to make it work
+    // WARNING: 0.1 is plucked virtually from thin air to make it work
     // since an input of timestamp=1655205632.331557, gives microseconds=331557.035446167
     // it maybe need to be adjusted, up OR down
     if microseconds % 1.0 > 0.1 {
@@ -155,10 +236,52 @@ pub fn float_as_datetime(input: &dyn Input, timestamp: f64) -> ValResult<EitherD
             input_value = InputValue::InputRef(input),
             kind = ErrorKind::DateTimeParsing,
             // message copied from speedate
-            context = context!("parsing_error" => "second fraction value is more than 6 digits long")
+            context = context!("parsing_error" => "second fraction must contain 6 digits of fewer")
         );
     }
     int_as_datetime(input, timestamp.floor() as i64, microseconds as u32)
+}
+
+const MAX_U32: i64 = u32::MAX as i64;
+
+pub fn int_as_time(input: &dyn Input, timestamp: i64, timestamp_microseconds: u32) -> ValResult<EitherTime> {
+    let time_timestamp: u32 = match timestamp {
+        t if t < 0_i64 => {
+            return err_val_error!(
+                input_value = InputValue::InputRef(input),
+                kind = ErrorKind::TimeParsing,
+                context = context!("parsing_error" => "time in seconds must be positive")
+            );
+        }
+        // continue and use the speedate error for >86400
+        t if t > MAX_U32 => u32::MAX,
+        // ok
+        t => t as u32,
+    };
+    match Time::from_timestamp(time_timestamp, timestamp_microseconds) {
+        Ok(dt) => Ok(dt.into()),
+        Err(err) => {
+            err_val_error!(
+                input_value = InputValue::InputRef(input),
+                kind = ErrorKind::TimeParsing,
+                context = context!("parsing_error" => err.get_documentation().unwrap_or_default())
+            )
+        }
+    }
+}
+
+pub fn float_as_time(input: &dyn Input, timestamp: f64) -> ValResult<EitherTime> {
+    let microseconds = timestamp.fract().abs() * 1_000_000.0;
+    // WARNING: as above
+    if microseconds % 1.0 > 0.1 {
+        return err_val_error!(
+            input_value = InputValue::InputRef(input),
+            kind = ErrorKind::TimeParsing,
+            // message copied from speedate
+            context = context!("parsing_error" => "second fraction must contain 6 digits of fewer")
+        );
+    }
+    int_as_time(input, timestamp.floor() as i64, microseconds as u32)
 }
 
 #[pyclass(module = "pydantic_core._pydantic_core", extends = PyTzInfo)]

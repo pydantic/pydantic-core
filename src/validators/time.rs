@@ -1,29 +1,29 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyDateTime, PyDict};
-use speedate::DateTime;
+use pyo3::types::{PyDict, PyTime};
+use speedate::Time;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::{pydatetime_as_datetime, EitherDateTime, Input};
+use crate::input::{pytime_as_time, EitherTime, Input};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
-pub struct DateTimeValidator {
+pub struct TimeValidator {
     strict: bool,
-    constraints: Option<DateTimeConstraints>,
+    constraints: Option<TimeConstraints>,
 }
 
 #[derive(Debug, Clone)]
-struct DateTimeConstraints {
-    le: Option<DateTime>,
-    lt: Option<DateTime>,
-    ge: Option<DateTime>,
-    gt: Option<DateTime>,
+struct TimeConstraints {
+    le: Option<Time>,
+    lt: Option<Time>,
+    ge: Option<Time>,
+    gt: Option<Time>,
 }
 
-impl BuildValidator for DateTimeValidator {
-    const EXPECTED_TYPE: &'static str = "datetime";
+impl BuildValidator for TimeValidator {
+    const EXPECTED_TYPE: &'static str = "time";
 
     fn build(
         schema: &PyDict,
@@ -38,11 +38,11 @@ impl BuildValidator for DateTimeValidator {
         Ok(Self {
             strict: is_strict(schema, config)?,
             constraints: match has_constraints {
-                true => Some(DateTimeConstraints {
-                    le: py_datetime_as_datetime(schema, "le")?,
-                    lt: py_datetime_as_datetime(schema, "lt")?,
-                    ge: py_datetime_as_datetime(schema, "ge")?,
-                    gt: py_datetime_as_datetime(schema, "gt")?,
+                true => Some(TimeConstraints {
+                    le: convert_pytime(schema, "le")?,
+                    lt: convert_pytime(schema, "lt")?,
+                    ge: convert_pytime(schema, "ge")?,
+                    gt: convert_pytime(schema, "gt")?,
                 }),
                 false => None,
             },
@@ -51,7 +51,7 @@ impl BuildValidator for DateTimeValidator {
     }
 }
 
-impl Validator for DateTimeValidator {
+impl Validator for TimeValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -59,11 +59,11 @@ impl Validator for DateTimeValidator {
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        let date = match self.strict {
-            true => input.strict_datetime()?,
-            false => input.lax_datetime()?,
+        let time = match self.strict {
+            true => input.strict_time()?,
+            false => input.lax_time()?,
         };
-        self.validation_comparison(py, input, date)
+        self.validation_comparison(py, input, time)
     }
 
     fn validate_strict<'s, 'data>(
@@ -73,7 +73,7 @@ impl Validator for DateTimeValidator {
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        self.validation_comparison(py, input, input.strict_datetime()?)
+        self.validation_comparison(py, input, input.strict_time()?)
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -81,31 +81,20 @@ impl Validator for DateTimeValidator {
     }
 }
 
-impl DateTimeValidator {
+impl TimeValidator {
     fn validation_comparison<'s, 'data>(
         &'s self,
         py: Python<'data>,
         input: &'data dyn Input,
-        datetime: EitherDateTime,
+        time: EitherTime<'data>,
     ) -> ValResult<'data, PyObject> {
         if let Some(constraints) = &self.constraints {
-            // if we get an error from as_speedate, it's probably because the input datetime was invalid
-            // specifically had an invalid tzinfo, hence here we return a validation error
-            let speedate_dt = match datetime.as_raw() {
-                Ok(dt) => dt,
-                Err(err) => {
-                    let error_name = err.get_type(py).name().map_err(as_internal)?;
-                    return err_val_error!(
-                        input_value = InputValue::InputRef(input),
-                        kind = ErrorKind::DateTimeObjectInvalid,
-                        context = context!("processing_error" => error_name)
-                    );
-                }
-            };
+            let raw_time = time.as_raw().map_err(as_internal)?;
+
             macro_rules! check_constraint {
                 ($constraint:ident, $error:path, $key:literal) => {
                     if let Some(constraint) = &constraints.$constraint {
-                        if !speedate_dt.$constraint(constraint) {
+                        if !raw_time.$constraint(constraint) {
                             return err_val_error!(
                                 input_value = InputValue::InputRef(input),
                                 kind = $error,
@@ -121,14 +110,14 @@ impl DateTimeValidator {
             check_constraint!(ge, ErrorKind::GreaterThanEqual, "ge");
             check_constraint!(gt, ErrorKind::GreaterThan, "gt");
         }
-        datetime.try_into_py(py).map_err(as_internal)
+        time.try_into_py(py).map_err(as_internal)
     }
 }
 
-fn py_datetime_as_datetime(schema: &PyDict, field: &str) -> PyResult<Option<DateTime>> {
-    let py_dt: Option<&PyDateTime> = schema.get_as(field)?;
-    match py_dt {
-        Some(py_dt) => pydatetime_as_datetime(py_dt).map(Some),
+fn convert_pytime(schema: &PyDict, field: &str) -> PyResult<Option<Time>> {
+    let py_time: Option<&PyTime> = schema.get_as(field)?;
+    match py_time {
+        Some(py_time) => Ok(Some(pytime_as_time!(py_time))),
         None => Ok(None),
     }
 }

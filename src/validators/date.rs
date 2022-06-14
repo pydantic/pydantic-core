@@ -1,12 +1,10 @@
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDate, PyDict};
 use speedate::{Date, Time};
-use strum::EnumMessage;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
-use crate::input::{EitherDate, Input};
+use crate::input::{pydate_as_date, EitherDate, Input};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -41,10 +39,10 @@ impl BuildValidator for DateValidator {
             strict: is_strict(schema, config)?,
             constraints: match has_constraints {
                 true => Some(DateConstraints {
-                    le: py_date_as_date(schema, "le")?,
-                    lt: py_date_as_date(schema, "lt")?,
-                    ge: py_date_as_date(schema, "ge")?,
-                    gt: py_date_as_date(schema, "gt")?,
+                    le: convert_pydate(schema, "le")?,
+                    lt: convert_pydate(schema, "lt")?,
+                    ge: convert_pydate(schema, "ge")?,
+                    gt: convert_pydate(schema, "gt")?,
                 }),
                 false => None,
             },
@@ -99,12 +97,12 @@ impl DateValidator {
         date: EitherDate<'data>,
     ) -> ValResult<'data, PyObject> {
         if let Some(constraints) = &self.constraints {
-            let speedate_date = date.as_speedate().map_err(as_internal)?;
+            let raw_date = date.as_raw().map_err(as_internal)?;
 
             macro_rules! check_constraint {
                 ($constraint:ident, $error:path, $key:literal) => {
                     if let Some(constraint) = &constraints.$constraint {
-                        if !speedate_date.$constraint(constraint) {
+                        if !raw_date.$constraint(constraint) {
                             return err_val_error!(
                                 input_value = InputValue::InputRef(input),
                                 kind = $error,
@@ -153,7 +151,7 @@ fn date_from_datetime<'data>(
             };
         }
     };
-    let dt = either_dt.as_speedate().map_err(as_internal)?;
+    let dt = either_dt.as_raw().map_err(as_internal)?;
     let zero_time = Time {
         hour: 0,
         minute: 0,
@@ -161,7 +159,7 @@ fn date_from_datetime<'data>(
         microsecond: 0,
     };
     if dt.time == zero_time && dt.offset.is_none() {
-        Ok(EitherDate::Speedate(dt.date))
+        Ok(EitherDate::Raw(dt.date))
     } else {
         err_val_error!(
             input_value = InputValue::InputRef(input),
@@ -170,20 +168,10 @@ fn date_from_datetime<'data>(
     }
 }
 
-fn py_date_as_date(schema: &PyDict, field: &str) -> PyResult<Option<Date>> {
+fn convert_pydate(schema: &PyDict, field: &str) -> PyResult<Option<Date>> {
     let py_date: Option<&PyDate> = schema.get_as(field)?;
     match py_date {
-        Some(py_date) => {
-            let date_str: &str = py_date.str()?.extract()?;
-            match Date::parse_str(date_str) {
-                Ok(date) => Ok(Some(date)),
-                Err(err) => {
-                    let error_description = err.get_documentation().unwrap_or_default();
-                    let msg = format!("Unable to parse date {}, error: {}", date_str, error_description);
-                    Err(PyValueError::new_err(msg))
-                }
-            }
-        }
+        Some(py_date) => Ok(Some(pydate_as_date!(py_date))),
         None => Ok(None),
     }
 }

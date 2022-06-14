@@ -3,6 +3,7 @@ use std::fmt;
 use pyo3::types::PyType;
 
 use crate::errors::ValResult;
+use crate::input::datetime::EitherTime;
 
 use super::datetime::{EitherDate, EitherDateTime};
 use super::{GenericMapping, GenericSequence, ToLocItem, ToPy};
@@ -50,6 +51,12 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 
     fn lax_date(&self) -> ValResult<EitherDate> {
         self.strict_date()
+    }
+
+    fn strict_time(&self) -> ValResult<EitherTime>;
+
+    fn lax_time(&self) -> ValResult<EitherTime> {
+        self.strict_time()
     }
 
     fn strict_datetime(&self) -> ValResult<EitherDateTime>;

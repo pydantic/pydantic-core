@@ -141,9 +141,16 @@ pub enum ErrorKind {
     #[strum(message = "Datetimes provided to dates must have zero time - e.g. be exact dates")]
     DateFromDatetimeInexact,
     // ---------------------
+    // date errors
+    #[strum(message = "Value must be a valid time")]
+    TimeType,
+    #[strum(message = "Value must be in a valid time format, {parsing_error}")]
+    TimeParsing,
+    // ---------------------
     // datetime errors
     #[strum(message = "Value must be a valid datetime")]
     DateTimeType,
+    // TODO #[strum(message = "Value must be in a valid datetime format, {parsing_error}")]
     #[strum(message = "Value must be a valid datetime, {parsing_error}")]
     DateTimeParsing,
     #[strum(message = "Invalid datetime object, got {processing_error}")]
