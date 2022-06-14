@@ -145,7 +145,6 @@ impl Input for JsonInput {
         }
     }
 
-    // FIXME needs testing
     fn strict_datetime(&self) -> ValResult<EitherDateTime> {
         match self {
             JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes()),

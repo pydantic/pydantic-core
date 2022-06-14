@@ -1,5 +1,6 @@
+import json
 import re
-from datetime import datetime, timedelta, timezone, tzinfo
+from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from decimal import Decimal
 
 import pytest
@@ -14,10 +15,12 @@ from ..conftest import Err
     'input_value,expected',
     [
         (datetime(2022, 6, 8, 12, 13, 14), datetime(2022, 6, 8, 12, 13, 14)),
+        (date(2022, 6, 8), datetime(2022, 6, 8)),
         ('2022-06-08T12:13:14', datetime(2022, 6, 8, 12, 13, 14)),
         (b'2022-06-08T12:13:14', datetime(2022, 6, 8, 12, 13, 14)),
         (b'2022-06-08T12:13:14Z', datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone.utc)),
         ((1,), Err('Value must be a valid datetime [kind=date_time_type')),
+        (time(1, 2, 3), Err('Value must be a valid datetime [kind=date_time_type')),
         (Decimal('1654646400'), datetime(2022, 6, 8)),
         (253_402_300_800_000, Err('must be a valid datetime, dates after 9999 are not supported as unix timestamps')),
         (-20_000_000_000, Err('must be a valid datetime, dates before 1600 are not supported as unix timestamps')),
@@ -81,6 +84,9 @@ def test_keep_tz_bound():
             '2022-06-08T12:13:14+24:00',
             Err('Value must be a valid datetime, timezone offset must be less than 24 hours [kind=date_time_parsing,'),
         ),
+        (True, Err('Value must be a valid datetime [kind=date_time_type')),
+        (None, Err('Value must be a valid datetime [kind=date_time_type')),
+        ([1, 2, 3], Err('Value must be a valid datetime [kind=date_time_type')),
     ],
 )
 def test_datetime_json(py_or_json, input_value, expected):
@@ -90,6 +96,26 @@ def test_datetime_json(py_or_json, input_value, expected):
             v.validate_test(input_value)
     else:
         output = v.validate_test(input_value)
+        assert output == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ('2022-06-08T12:13:14', datetime(2022, 6, 8, 12, 13, 14)),
+        ('2022-06-08T12:13:14Z', datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone.utc)),
+        (123, Err('Value must be a valid datetime [kind=date_time_type')),
+        (123.4, Err('Value must be a valid datetime [kind=date_time_type')),
+        (True, Err('Value must be a valid datetime [kind=date_time_type')),
+    ],
+)
+def test_datetime_strict_json(input_value, expected):
+    v = SchemaValidator({'type': 'datetime', 'strict': True})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_json(json.dumps(input_value))
+    else:
+        output = v.validate_json(json.dumps(input_value))
         assert output == expected
 
 

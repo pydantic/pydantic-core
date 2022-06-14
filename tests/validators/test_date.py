@@ -1,5 +1,5 @@
 import re
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 
 import pytest
@@ -32,6 +32,7 @@ from ..conftest import Err
             id='datetime-inexact',
         ),
         pytest.param(True, Err('Value must be a valid date'), id='bool'),
+        pytest.param(time(1, 2, 3), Err('Value must be a valid date [kind=date_type'), id='time'),
     ],
 )
 def test_date(input_value, expected):

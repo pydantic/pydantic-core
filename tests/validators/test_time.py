@@ -132,7 +132,7 @@ def test_time_strict_json(input_value, expected):
         ({'ge': time(1)}, '01:00', time(1)),
         ({'ge': time(1)}, '00:59', Err('Value must be greater than or equal to 01:00:00')),
         ({'gt': time(12, 13, 14, 123_456)}, '12:13:14.123457', time(12, 13, 14, 123_457)),
-        ({'gt': time(12, 13, 14, 123_456)}, '01:01', Err('Value must be greater than 12:13:14.123456')),
+        ({'gt': time(12, 13, 14, 123_456)}, '12:13:14.123456', Err('Value must be greater than 12:13:14.123456')),
     ],
 )
 def test_time_kwargs(kwargs, input_value, expected):

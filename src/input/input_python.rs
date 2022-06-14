@@ -9,8 +9,8 @@ use pyo3::types::{
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
 
 use super::datetime::{
-    bytes_as_date, bytes_as_datetime, bytes_as_time, float_as_datetime, float_as_time, int_as_datetime, int_as_time,
-    EitherDate, EitherDateTime, EitherTime,
+    bytes_as_date, bytes_as_datetime, bytes_as_time, date_as_datetime, float_as_datetime, float_as_time,
+    int_as_datetime, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
@@ -285,6 +285,8 @@ impl Input for PyAny {
             int_as_datetime(self, int, 0)
         } else if let Ok(float) = self.extract::<f64>() {
             float_as_datetime(self, float)
+        } else if let Ok(date) = self.cast_as::<PyDate>() {
+            date_as_datetime(date).map_err(as_internal)
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
         }

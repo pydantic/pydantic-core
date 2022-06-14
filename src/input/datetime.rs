@@ -242,6 +242,22 @@ pub fn float_as_datetime(input: &dyn Input, timestamp: f64) -> ValResult<EitherD
     int_as_datetime(input, timestamp.floor() as i64, microseconds as u32)
 }
 
+pub fn date_as_datetime(date: &PyDate) -> PyResult<EitherDateTime> {
+    let py = date.py();
+    let dt = PyDateTime::new(
+        py,
+        date.getattr(intern!(py, "year"))?.extract()?,
+        date.getattr(intern!(py, "month"))?.extract()?,
+        date.getattr(intern!(py, "day"))?.extract()?,
+        0,
+        0,
+        0,
+        0,
+        None,
+    )?;
+    Ok(dt.into())
+}
+
 const MAX_U32: i64 = u32::MAX as i64;
 
 pub fn int_as_time(input: &dyn Input, timestamp: i64, timestamp_microseconds: u32) -> ValResult<EitherTime> {
