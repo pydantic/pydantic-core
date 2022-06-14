@@ -4,7 +4,9 @@ use pyo3::types::PyType;
 
 use super::return_enums::EitherBytes;
 use crate::errors::ValResult;
+use crate::input::datetime::EitherTime;
 
+use super::datetime::{EitherDate, EitherDateTime};
 use super::{GenericMapping, GenericSequence, ToLocItem, ToPy};
 
 pub trait Input: fmt::Debug + ToPy + ToLocItem {
@@ -50,5 +52,23 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 
     fn lax_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
         self.strict_bytes()
+    }
+
+    fn strict_date(&self) -> ValResult<EitherDate>;
+
+    fn lax_date(&self) -> ValResult<EitherDate> {
+        self.strict_date()
+    }
+
+    fn strict_time(&self) -> ValResult<EitherTime>;
+
+    fn lax_time(&self) -> ValResult<EitherTime> {
+        self.strict_time()
+    }
+
+    fn strict_datetime(&self) -> ValResult<EitherDateTime>;
+
+    fn lax_datetime(&self) -> ValResult<EitherDateTime> {
+        self.strict_datetime()
     }
 }
