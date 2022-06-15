@@ -20,6 +20,7 @@ build-dev:
 	@rm -f pydantic_core/*.so
 	cargo build
 	@rm -f target/debug/lib_pydantic_core.d
+	@rm -f target/debug/lib_pydantic_core.rlib
 	@mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: build-prod
@@ -27,6 +28,7 @@ build-prod:
 	@rm -f pydantic_core/*.so
 	cargo build --release
 	@rm -f target/release/lib_pydantic_core.d
+	@rm -f target/release/lib_pydantic_core.rlib
 	@mv target/release/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: build-coverage
@@ -77,9 +79,13 @@ pyright:
 test:
 	coverage run -m pytest
 
-.PHONY: benchmark
-benchmark:
+.PHONY: py-benchmark
+py-benchmark:
 	pytest tests/test_benchmarks.py --benchmark-enable --benchmark-autosave
+
+.PHONY: rust-benchmark
+rust-benchmark:
+	cargo rust-bench
 
 .PHONY: testcov
 testcov: build-coverage test
