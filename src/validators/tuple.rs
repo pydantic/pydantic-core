@@ -197,7 +197,7 @@ impl TupleFixLenValidator {
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        let mut output: Vec<PyObject> = Vec::with_capacity(self.item_validators.len());
+        let mut output: Vec<PyObject> = Vec::with_capacity(self.items_validators.len());
         let mut errors: Vec<ValLineError> = Vec::new();
 
         for (validator, (index, item)) in self.items_validators.iter().zip(tuple.generic_iter()) {
