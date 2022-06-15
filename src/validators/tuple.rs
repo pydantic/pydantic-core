@@ -184,7 +184,7 @@ impl Validator for TupleFixLenValidator {
     }
 
     fn get_name(&self, _py: Python) -> String {
-        Self::EXPECTED_TYPE.to_string()
+        format!("{}-{}-items", Self::EXPECTED_TYPE, self.items_validators.len())
     }
 }
 
