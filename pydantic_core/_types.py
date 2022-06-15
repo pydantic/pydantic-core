@@ -121,6 +121,14 @@ class SetSchema(TypedDict):
     strict: NotRequired[bool]
 
 
+class FrozenSetSchema(TypedDict):
+    type: Literal['frozenset']
+    items: Schema
+    min_items: NotRequired[int]
+    max_items: NotRequired[int]
+    strict: NotRequired[bool]
+
+
 class StringSchema(TypedDict, total=False):
     type: Required[Literal['str']]
     pattern: str
@@ -232,6 +240,7 @@ Schema = Union[
     RecursiveContainerSchema,
     RecursiveReferenceSchema,
     SetSchema,
+    FrozenSetSchema,
     StringSchema,
     TupleFixLenSchema,
     TupleVarLenSchema,

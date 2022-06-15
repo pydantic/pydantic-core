@@ -212,6 +212,34 @@ impl Input for PyAny {
         }
     }
 
+    fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        if let Ok(set) = self.cast_as::<PyFrozenSet>() {
+            Ok(set.into())
+        } else {
+            err_val_error!(
+                input_value = InputValue::InputRef(self),
+                kind = ErrorKind::FrozenSetType
+            )
+        }
+    }
+
+    fn lax_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
+            Ok(frozen_set.into())
+        } else if let Ok(set) = self.cast_as::<PySet>() {
+            Ok(set.into())
+        } else if let Ok(list) = self.cast_as::<PyList>() {
+            Ok(list.into())
+        } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else {
+            err_val_error!(
+                input_value = InputValue::InputRef(self),
+                kind = ErrorKind::FrozenSetType
+            )
+        }
+    }
+
     fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
         if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
             Ok(EitherBytes::Python(py_bytes))
