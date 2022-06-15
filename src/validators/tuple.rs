@@ -146,13 +146,14 @@ impl BuildValidator for TupleFixLenValidator {
         if items.is_empty() {
             return py_error!("Missing schemas for tuple elements");
         }
+        let validators: Vec<CombinedValidator> = items
+            .iter()
+            .map(|item| build_validator(item, config, build_context).map(|result| result.0))
+            .collect::<PyResult<Vec<CombinedValidator>>>()?;
 
         Ok(Self {
             strict: is_strict(schema, config)?,
-            items_validators: items
-                .iter()
-                .map(|item| build_validator(item, config, build_context).unwrap().0)
-                .collect(),
+            items_validators: validators,
         }
         .into())
     }
@@ -192,7 +193,7 @@ impl TupleFixLenValidator {
     fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        _input: &'data dyn Input,
+        input: &'data dyn Input,
         tuple: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
@@ -200,6 +201,13 @@ impl TupleFixLenValidator {
         let mut output: Vec<PyObject> = Vec::with_capacity(self.items_validators.len());
         let mut errors: Vec<ValLineError> = Vec::new();
 
+        if self.items_validators.len() != tuple.generic_len() {
+            return err_val_error!(
+                input_value = InputValue::InputRef(input),
+                kind = ErrorKind::TupleFixLenInputMismatch,
+                context = context!("input_len" => tuple.generic_len(), "schemas_len" => self.items_validators.len())
+            );
+        }
         for (validator, (index, item)) in self.items_validators.iter().zip(tuple.generic_iter()) {
             match validator.validate(py, item, extra, slots) {
                 Ok(item) => output.push(item),

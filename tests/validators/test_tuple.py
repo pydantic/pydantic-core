@@ -153,3 +153,25 @@ def test_tuple_fix_len_errors(input_value, items, index):
             'input_value': 'wrong',
         }
     ]
+
+
+@pytest.mark.parametrize(
+    'items,input_value,expected',
+    [
+        (
+            [{'type': 'int'}],
+            [1, 2, 3],
+            Err('Fix length tuple input must be equal to the quantity of schemas provided. Input: 3, schemas: 1'),
+        ),
+        (
+            [{'type': 'int'}, {'type': 'int'}],
+            [1],
+            Err('Fix length tuple input must be equal to the quantity of schemas provided. Input: 1, schemas: 2'),
+        ),
+    ],
+    ids=['too few schemas', 'input too short'],
+)
+def test_tuple_fix_len_input_and_schemas_len_mismatch(items, input_value, expected):
+    v = SchemaValidator({'type': 'tuple-fix-len', 'items': items})
+    with pytest.raises(ValidationError, match=re.escape(expected.message)):
+        v.validate_python(input_value)

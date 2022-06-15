@@ -176,18 +176,18 @@ class DatetimeSchema(TypedDict, total=False):
     default: datetime
 
 
-class TupleFixLenSchema(TypedDict):
+class TupleFixLenSchema(TypedDict, total=False):
     type: Literal['tuple-fix-len']
     items: List[Schema]
-    strict: NotRequired[bool]
+    strict: bool
 
 
-class TupleVarLenSchema(TypedDict):
+class TupleVarLenSchema(TypedDict, total=False):
     type: Literal['tuple-var-len']
-    items: Schema  # default: AnySchema
-    min_items: NotRequired[int]
-    max_items: NotRequired[int]
-    strict: NotRequired[bool]
+    items: Schema
+    min_items: int
+    max_items: int
+    strict: bool
 
 
 # pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
