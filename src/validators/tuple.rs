@@ -7,8 +7,6 @@ use crate::input::{GenericSequence, Input, SequenceLenIter};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
-trait TupleValidator {}
-
 #[derive(Debug, Clone)]
 pub struct TupleVarLenValidator {
     strict: bool,
@@ -198,16 +196,23 @@ impl TupleFixLenValidator {
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        let mut output: Vec<PyObject> = Vec::with_capacity(self.items_validators.len());
-        let mut errors: Vec<ValLineError> = Vec::new();
+        let expected_length = self.items_validators.len();
 
-        if self.items_validators.len() != tuple.generic_len() {
+        if expected_length != tuple.generic_len() {
+            let plural = if expected_length == 1 { "" } else { "s" };
             return err_val_error!(
                 input_value = InputValue::InputRef(input),
-                kind = ErrorKind::TupleFixLenInputMismatch,
-                context = context!("input_len" => tuple.generic_len(), "schemas_len" => self.items_validators.len())
+                kind = ErrorKind::TupleLengthMismatch,
+                // TODO fix Context::new so context! accepts different value types
+                context = context!(
+                    "expected_length" => expected_length.to_string(),
+                    "plural" => plural.to_string(),
+                )
             );
         }
+        let mut output: Vec<PyObject> = Vec::with_capacity(expected_length);
+        let mut errors: Vec<ValLineError> = Vec::new();
+
         for (validator, (index, item)) in self.items_validators.iter().zip(tuple.generic_iter()) {
             match validator.validate(py, item, extra, slots) {
                 Ok(item) => output.push(item),

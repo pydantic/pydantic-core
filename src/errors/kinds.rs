@@ -76,10 +76,8 @@ pub enum ErrorKind {
     TupleTooShort,
     #[strum(message = "Tuple must have at most {max_length} items")]
     TupleTooLong,
-    #[strum(
-        message = "Fix length tuple input must be equal to the quantity of schemas provided. Input: {input_len}, schemas: {schemas_len}"
-    )]
-    TupleFixLenInputMismatch,
+    #[strum(message = "Tuple must have exactly {expected_length} item{plural}")]
+    TupleLengthMismatch,
     // ---------------------
     // set errors
     #[strum(message = "Value must be a valid set")]

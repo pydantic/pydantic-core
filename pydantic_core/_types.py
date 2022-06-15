@@ -177,14 +177,14 @@ class DatetimeSchema(TypedDict, total=False):
 
 
 class TupleFixLenSchema(TypedDict, total=False):
-    type: Literal['tuple-fix-len']
+    type: Required[Literal['tuple-fix-len']]
     items: List[Schema]
     strict: bool
 
 
 class TupleVarLenSchema(TypedDict, total=False):
-    type: Literal['tuple-var-len']
-    items: Schema
+    type: Required[Literal['tuple-var-len']]
+    items: Required[Schema]
     min_items: int
     max_items: int
     strict: bool
