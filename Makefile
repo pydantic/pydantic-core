@@ -45,6 +45,7 @@ build-cov-windows:
 	rm -f pydantic_core/*.so
 	RUSTFLAGS='-C instrument-coverage -A incomplete_features' cargo build
 	@rm -f target/debug/lib_pydantic_core.d
+	@rm -f target/debug/lib_pydantic_core.rlib
 	mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: format

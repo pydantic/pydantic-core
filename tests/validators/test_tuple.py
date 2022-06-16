@@ -3,7 +3,7 @@ import re
 import pytest
 from dirty_equals import IsNonNegative, IsTuple
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
 from ..conftest import Err
 
@@ -71,6 +71,7 @@ def test_tuple_strict_fails_without_tuple(wrong_coll_type, tuple_variant, items)
 @pytest.mark.parametrize(
     'kwargs,input_value,expected',
     [
+        ({}, (1, 2, 3, 4), (1, 2, 3, 4)),
         ({'min_items': 3}, (1, 2), Err('Tuple must have at least 3 items [kind=tuple_too_short,')),
         ({'max_items': 3}, (1, 2, 3, 4), Err('Tuple must have at most 3 items [kind=tuple_too_long,')),
     ],
@@ -167,3 +168,111 @@ def test_tuple_fix_len_input_and_schemas_len_mismatch(items, input_value, expect
     v = SchemaValidator({'type': 'tuple-fix-len', 'items': items})
     with pytest.raises(ValidationError, match=re.escape(expected.message)):
         v.validate_python(input_value)
+
+
+@pytest.mark.parametrize('items,expected', [([], Err('Missing schemas for tuple elements'))])
+def test_tuple_fix_len_schema_error(items, expected):
+    with pytest.raises(SchemaError, match=expected.message):
+        SchemaValidator({'type': 'tuple-fix-len', 'items': items})
+
+
+@pytest.mark.parametrize('input_value,expected', [((1, 2, 3), (1, 2, 3)), ([1, 2, 3], [1, 2, 3])])
+def test_union_tuple_list(input_value, expected):
+    v = SchemaValidator({'type': 'union', 'choices': [{'type': 'tuple-var-len'}, {'type': 'list'}]})
+    assert v.validate_python(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ((1, 2, 3), (1, 2, 3)),
+        (('a', 'b', 'c'), ('a', 'b', 'c')),
+        (('a', 1, 'c'), ('a', '1', 'c')),
+        (
+            [5],
+            Err(
+                '2 validation errors for union',
+                errors=[
+                    {
+                        # first of all, not a tuple of ints ..
+                        'kind': 'tuple_type',
+                        'loc': ['tuple-var-len-int'],
+                        'message': 'Value must be a valid tuple',
+                        'input_value': [5],
+                    },
+                    # .. and not a tuple of strings, either
+                    {
+                        'kind': 'tuple_type',
+                        'loc': ['tuple-var-len-str'],
+                        'message': 'Value must be a valid tuple',
+                        'input_value': [5],
+                    },
+                ],
+            ),
+        ),
+    ],
+)
+def test_union_tuple_var_len(input_value, expected):
+    v = SchemaValidator(
+        {
+            'type': 'union',
+            'choices': [
+                {'type': 'tuple-var-len', 'items': {'type': 'int'}, 'strict': True},
+                {'type': 'tuple-var-len', 'items': {'type': 'str'}, 'strict': True},
+            ],
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_python(input_value)
+        if expected.errors is not None:
+            assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_python(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ((1, 2, 3), (1, 2, 3)),
+        (('a', 'b', 'c'), ('a', 'b', 'c')),
+        (('a', 1, 'c'), ('a', '1', 'c')),
+        (
+            [5, '1', 1],
+            Err(
+                '2 validation errors for union',
+                errors=[
+                    {
+                        'kind': 'tuple_type',
+                        'loc': ['tuple-fix-len-3-items'],
+                        'message': 'Value must be a valid tuple',
+                        'input_value': [5, '1', 1],
+                    },
+                    {
+                        'kind': 'tuple_type',
+                        'loc': ['tuple-fix-len-3-items'],
+                        'message': 'Value must be a valid tuple',
+                        'input_value': [5, '1', 1],
+                    },
+                ],
+            ),
+        ),
+    ],
+)
+def test_union_tuple_fix_len(input_value, expected):
+    v = SchemaValidator(
+        {
+            'type': 'union',
+            'choices': [
+                {'type': 'tuple-fix-len', 'items': [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}], 'strict': True},
+                {'type': 'tuple-fix-len', 'items': [{'type': 'str'}, {'type': 'str'}, {'type': 'str'}], 'strict': True},
+            ],
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_python(input_value)
+        if expected.errors is not None:
+            assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_python(input_value) == expected
