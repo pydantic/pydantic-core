@@ -52,11 +52,11 @@ def test_function_before_error():
         v.validate_python('12345')
     assert exc_info.value.errors() == [
         {
-            'kind': 'str_too_long',
+            'kind': 'too_long',
             'loc': [],
             'message': 'String must have at most 5 characters',
             'input_value': '12345x',
-            'context': {'max_length': 5},
+            'context': {'type': 'String', 'max_length': 5, 'element_name': 'characters'},
         }
     ]
 
@@ -82,11 +82,11 @@ def test_function_before_error_model():
         v.validate_python({'my_field': '12345'})
     assert exc_info.value.errors() == [
         {
-            'kind': 'str_too_long',
+            'kind': 'too_long',
             'loc': ['my_field'],
             'message': 'String must have at most 5 characters',
             'input_value': '12345x',
-            'context': {'max_length': 5},
+            'context': {'type': 'String', 'max_length': 5, 'element_name': 'characters'},
         }
     ]
 

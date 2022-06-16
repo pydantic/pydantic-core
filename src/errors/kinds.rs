@@ -36,16 +36,18 @@ pub enum ErrorKind {
     LessThan,
     #[strum(message = "Value must be less than or equal to {le}")]
     LessThanEqual,
+
+    #[strum(message = "{type} must have at least {min_length} {element_name}")]
+    TooShort,
+    #[strum(message = "{type} must have at most {max_length} {element_name}")]
+    TooLong,
+
     // ---------------------
     // string errors
     #[strum(message = "Value must be a valid string")]
     StrType,
     #[strum(message = "Value must be a valid string, unable to parse raw data as a unicode string")]
     StrUnicode,
-    #[strum(message = "String must have at least {min_length} characters")]
-    StrTooShort,
-    #[strum(message = "String must have at most {max_length} characters")]
-    StrTooLong,
     #[strum(message = "String must match pattern '{pattern}'")]
     StrPatternMismatch,
     // ---------------------
@@ -56,36 +58,20 @@ pub enum ErrorKind {
     DictFromMapping,
     #[strum(message = "Unable extract dict from object")]
     DictFromObject,
-    #[strum(message = "Dictionary must have at least {min_length} items")]
-    DictTooShort,
-    #[strum(message = "Dictionary must have at most {max_length} items")]
-    DictTooLong,
     // ---------------------
     // list errors
     #[strum(message = "Value must be a valid list/array")]
     ListType,
-    #[strum(message = "List must have at least {min_length} items")]
-    ListTooShort,
-    #[strum(message = "List must have at most {max_length} items")]
-    ListTooLong,
     // ---------------------
     // tuple errors
     #[strum(message = "Value must be a valid tuple")]
     TupleType,
-    #[strum(message = "Tuple must have at least {min_length} items")]
-    TupleTooShort,
-    #[strum(message = "Tuple must have at most {max_length} items")]
-    TupleTooLong,
     #[strum(message = "Tuple must have exactly {expected_length} item{plural}")]
     TupleLengthMismatch,
     // ---------------------
     // set errors
     #[strum(message = "Value must be a valid set")]
     SetType,
-    #[strum(message = "Set must have at least {min_length} items")]
-    SetTooShort,
-    #[strum(message = "Set must have at most {max_length} items")]
-    SetTooLong,
     // ---------------------
     // bool errors
     #[strum(message = "Value must be a valid boolean")]
@@ -116,10 +102,6 @@ pub enum ErrorKind {
     // bytes errors
     #[strum(message = "Value must be a valid bytes")]
     BytesType,
-    #[strum(message = "Bytes must have at least {min_length} characters")]
-    BytesTooShort,
-    #[strum(message = "Bytes must have at most {max_length} characters")]
-    BytesTooLong,
     // ---------------------
     // python errors from functions (the messages here will not be used as we sett message in these cases)
     #[strum(message = "Invalid value")]
