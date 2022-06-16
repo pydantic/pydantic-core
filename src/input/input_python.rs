@@ -14,6 +14,7 @@ use super::datetime::{
 };
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
+use super::return_enums::EitherBytes;
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 
 impl Input for PyAny {
@@ -211,6 +212,25 @@ impl Input for PyAny {
         }
     }
 
+    fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
+        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            Ok(EitherBytes::Python(py_bytes))
+        } else {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BytesType)
+        }
+    }
+
+    fn lax_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
+        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            Ok(EitherBytes::Python(py_bytes))
+        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+            let str: String = py_str.extract().map_err(as_internal)?;
+            Ok(EitherBytes::Rust(str.into_bytes()))
+        } else {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::BytesType)
+        }
+    }
+
     fn strict_date(&self) -> ValResult<EitherDate> {
         if self.cast_as::<PyDateTime>().is_ok() {
             // have to check if it's a datetime first, otherwise the line below converts to a date
@@ -289,6 +309,28 @@ impl Input for PyAny {
             date_as_datetime(date).map_err(as_internal)
         } else {
             err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::DateTimeType)
+        }
+    }
+
+    fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::TupleType)
+        }
+    }
+
+    fn lax_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else if let Ok(list) = self.cast_as::<PyList>() {
+            Ok(list.into())
+        } else if let Ok(set) = self.cast_as::<PySet>() {
+            Ok(set.into())
+        } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
+            Ok(frozen_set.into())
+        } else {
+            err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::TupleType)
         }
     }
 }

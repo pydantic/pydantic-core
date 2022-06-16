@@ -69,6 +69,16 @@ pub enum ErrorKind {
     #[strum(message = "List must have at most {max_length} items")]
     ListTooLong,
     // ---------------------
+    // tuple errors
+    #[strum(message = "Value must be a valid tuple")]
+    TupleType,
+    #[strum(message = "Tuple must have at least {min_length} items")]
+    TupleTooShort,
+    #[strum(message = "Tuple must have at most {max_length} items")]
+    TupleTooLong,
+    #[strum(message = "Tuple must have exactly {expected_length} item{plural}")]
+    TupleLengthMismatch,
+    // ---------------------
     // set errors
     #[strum(message = "Value must be a valid set")]
     SetType,
@@ -102,6 +112,14 @@ pub enum ErrorKind {
     FloatParsing,
     #[strum(message = "Value must be a multiple of {multiple_of}")]
     FloatMultiple,
+    // ---------------------
+    // bytes errors
+    #[strum(message = "Value must be a valid bytes")]
+    BytesType,
+    #[strum(message = "Bytes must have at least {min_length} characters")]
+    BytesTooShort,
+    #[strum(message = "Bytes must have at most {max_length} characters")]
+    BytesTooLong,
     // ---------------------
     // python errors from functions (the messages here will not be used as we sett message in these cases)
     #[strum(message = "Invalid value")]

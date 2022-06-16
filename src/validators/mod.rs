@@ -14,6 +14,7 @@ use crate::SchemaError;
 
 mod any;
 mod bool;
+mod bytes;
 mod date;
 mod datetime;
 mod dict;
@@ -30,6 +31,7 @@ mod recursive;
 mod set;
 mod string;
 mod time;
+mod tuple;
 mod union;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
@@ -62,13 +64,13 @@ impl SchemaValidator {
         })
     }
 
-    fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
+    pub fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
         let args = (self.schema.as_ref(py),);
         let cls = Py::new(py, self.to_owned())?.getattr(py, "__class__")?;
         Ok((cls, args).into_py(py))
     }
 
-    fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
+    pub fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
         let extra = Extra {
             data: None,
             field: None,
@@ -77,7 +79,7 @@ impl SchemaValidator {
         r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
     }
 
-    fn validate_json(&self, py: Python, input: String) -> PyResult<PyObject> {
+    pub fn validate_json(&self, py: Python, input: String) -> PyResult<PyObject> {
         match parse_json::<JsonInput>(&input) {
             Ok(input) => {
                 let extra = Extra {
@@ -99,7 +101,7 @@ impl SchemaValidator {
         }
     }
 
-    fn validate_assignment(&self, py: Python, field: String, input: &PyAny, data: &PyDict) -> PyResult<PyObject> {
+    pub fn validate_assignment(&self, py: Python, field: String, input: &PyAny, data: &PyDict) -> PyResult<PyObject> {
         let extra = Extra {
             data: Some(data),
             field: Some(field.as_str()),
@@ -108,7 +110,7 @@ impl SchemaValidator {
         r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
     }
 
-    fn __repr__(&self, py: Python) -> String {
+    pub fn __repr__(&self, py: Python) -> String {
         format!(
             "SchemaValidator(name={:?}, validator={:#?})",
             self.validator.get_name(py),
@@ -185,6 +187,9 @@ pub fn build_validator<'a>(
         bool::BoolValidator,
         // floats
         float::FloatValidator,
+        // tuples
+        tuple::TupleVarLenValidator,
+        tuple::TupleFixLenValidator,
         // list/arrays
         list::ListValidator,
         // sets - unique lists
@@ -202,6 +207,8 @@ pub fn build_validator<'a>(
         literal::LiteralBuilder,
         // any
         any::AnyValidator,
+        // bytes
+        bytes::BytesValidator,
         // dates
         date::DateValidator,
         // times
@@ -215,7 +222,7 @@ pub fn build_validator<'a>(
 /// but that would confuse it with context as per samuelcolvin/pydantic#1549
 #[derive(Debug)]
 pub struct Extra<'a> {
-    /// This is used as the `data` kwargs to validator functions, it's also represents the current model
+    /// This is used as the `data` kwargs to validator functions, it also represents the current model
     /// data when validating assignment
     pub data: Option<&'a PyDict>,
     /// The field being assigned to when validating assignment
@@ -252,6 +259,9 @@ pub enum CombinedValidator {
     List(list::ListValidator),
     // sets - unique lists
     Set(set::SetValidator),
+    // tuples
+    TupleVarLen(tuple::TupleVarLenValidator),
+    TupleFixLen(tuple::TupleFixLenValidator),
     // dicts/objects (recursive)
     Dict(dict::DictValidator),
     // None/null
@@ -272,6 +282,10 @@ pub enum CombinedValidator {
     LiteralGeneral(literal::LiteralGeneralValidator),
     // any
     Any(any::AnyValidator),
+    // bytes
+    Bytes(bytes::BytesValidator),
+    StrictBytes(bytes::StrictBytesValidator),
+    ConstrainedBytes(bytes::BytesConstrainedValidator),
     // dates
     Date(date::DateValidator),
     // times

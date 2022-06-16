@@ -2,6 +2,7 @@ use std::fmt;
 
 use pyo3::types::PyType;
 
+use super::return_enums::EitherBytes;
 use crate::errors::ValResult;
 use crate::input::datetime::EitherTime;
 
@@ -47,6 +48,12 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
         self.strict_set()
     }
 
+    fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>>;
+
+    fn lax_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
+        self.strict_bytes()
+    }
+
     fn strict_date(&self) -> ValResult<EitherDate>;
 
     fn lax_date(&self) -> ValResult<EitherDate> {
@@ -63,5 +70,11 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 
     fn lax_datetime(&self) -> ValResult<EitherDateTime> {
         self.strict_datetime()
+    }
+
+    fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>>;
+
+    fn lax_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        self.strict_tuple()
     }
 }

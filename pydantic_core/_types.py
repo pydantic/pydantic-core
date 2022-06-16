@@ -139,6 +139,13 @@ class UnionSchema(TypedDict):
     default: NotRequired[Any]
 
 
+class BytesSchema(TypedDict):
+    type: Literal['bytes']
+    max_length: NotRequired[int]
+    min_length: NotRequired[int]
+    strict: NotRequired[bool]
+
+
 class DateSchema(TypedDict, total=False):
     type: Required[Literal['date']]
     strict: bool
@@ -169,11 +176,26 @@ class DatetimeSchema(TypedDict, total=False):
     default: datetime
 
 
+class TupleFixLenSchema(TypedDict, total=False):
+    type: Required[Literal['tuple-fix-len']]
+    items: List[Schema]
+    strict: bool
+
+
+class TupleVarLenSchema(TypedDict, total=False):
+    type: Required[Literal['tuple-var-len']]
+    items: Required[Schema]
+    min_items: int
+    max_items: int
+    strict: bool
+
+
 # pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
 # 'int' is equivalent to {'type': 'int'}
 BareType = Literal[
     'any',
     'bool',
+    'bytes',
     'dict',
     'float',
     'function',
@@ -187,6 +209,8 @@ BareType = Literal[
     'recursive-reference',
     'set',
     'str',
+    # tuple-fix-len cannot be created without more typing information
+    'tuple-var-len',
     'union',
 ]
 
@@ -194,6 +218,7 @@ Schema = Union[
     BareType,
     AnySchema,
     BoolSchema,
+    BytesSchema,
     DictSchema,
     FloatSchema,
     FunctionSchema,
@@ -208,6 +233,8 @@ Schema = Union[
     RecursiveReferenceSchema,
     SetSchema,
     StringSchema,
+    TupleFixLenSchema,
+    TupleVarLenSchema,
     UnionSchema,
     DateSchema,
     TimeSchema,
