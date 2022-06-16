@@ -84,7 +84,7 @@ pub struct Context(Vec<(String, ContextValue)>);
 
 impl Context {
     pub fn new<I: IntoIterator<Item = (String, ContextValue)>>(raw: I) -> Self {
-        Self(raw.into_iter().map(|(k, v)| (k.into(), v)).collect())
+        Self(raw.into_iter().collect())
     }
 
     pub fn is_empty(&self) -> bool {

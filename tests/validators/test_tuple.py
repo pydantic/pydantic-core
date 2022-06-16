@@ -305,5 +305,5 @@ def test_tuple_fix_error():
             'message': 'Tuple must have exactly 2 items',
             'input_value': [1],
             'context': {'expected_length': 2, 'plural': 's'},
-        },
+        }
     ]
