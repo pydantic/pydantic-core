@@ -13,7 +13,9 @@ from ..conftest import Err
 )
 def test_frozenset_ints_both(py_or_json, input_value, expected):
     v = py_or_json({'type': 'frozenset', 'items': {'type': 'int'}})
-    assert v.validate_test(input_value) == expected
+    output = v.validate_test(input_value)
+    assert output == expected
+    assert isinstance(output, frozenset)
 
 
 @pytest.mark.parametrize(
@@ -32,7 +34,9 @@ def test_frozenset_no_validators_both(py_or_json, input_value, expected):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
     else:
-        assert v.validate_test(input_value) == expected
+        output = v.validate_test(input_value)
+        assert output == expected
+        assert isinstance(output, frozenset)
 
 
 @pytest.mark.parametrize(
@@ -58,13 +62,17 @@ def test_frozenset_ints_python(input_value, expected):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
     else:
-        assert v.validate_python(input_value) == expected
+        output = v.validate_python(input_value)
+        assert output == expected
+        assert isinstance(output, frozenset)
 
 
 @pytest.mark.parametrize('input_value,expected', [([1, 2.5, '3'], {1, 2.5, '3'}), ([(1, 2), (3, 4)], {(1, 2), (3, 4)})])
 def test_frozenset_no_validators_python(input_value, expected):
     v = SchemaValidator({'type': 'frozenset'})
-    assert v.validate_python(input_value) == expected
+    output = v.validate_python(input_value)
+    assert output == expected
+    assert isinstance(output, frozenset)
 
 
 def test_frozenset_multiple_errors():
@@ -106,7 +114,9 @@ def test_frozenset_kwargs_python(kwargs, input_value, expected):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
     else:
-        assert v.validate_python(input_value) == expected
+        output = v.validate_python(input_value)
+        assert output == expected
+        assert isinstance(output, frozenset)
 
 
 @pytest.mark.parametrize('input_value,expected', [({1, 2, 3}, {1, 2, 3}), ([1, 2, 3], [1, 2, 3])])
@@ -116,7 +126,7 @@ def test_union_frozenset_list(input_value, expected):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
     else:
-        assert v.validate_python(input_value) == expected
+        v.validate_python(input_value)
 
 
 @pytest.mark.parametrize(
@@ -147,7 +157,7 @@ def test_union_frozenset_list(input_value, expected):
         ),
     ],
 )
-def test_union_frozenset_int_set_str(input_value, expected):
+def test_union_frozenset_int_frozenset_str(input_value, expected):
     v = SchemaValidator(
         {
             'type': 'union',
@@ -163,7 +173,9 @@ def test_union_frozenset_int_set_str(input_value, expected):
         if expected.errors is not None:
             assert exc_info.value.errors() == expected.errors
     else:
-        assert v.validate_python(input_value) == expected
+        output = v.validate_python(input_value)
+        assert output == expected
+        assert isinstance(output, frozenset)
 
 
 def test_frozenset_as_dict_keys(py_or_json):
