@@ -263,7 +263,10 @@ impl Input for String {
 
     #[no_coverage]
     fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        err_val_error!(input_value = InputValue::InputRef(self), kind = ErrorKind::FrozenSetType)
+        err_val_error!(
+            input_value = InputValue::InputRef(self),
+            kind = ErrorKind::FrozenSetType
+        )
     }
 
     fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
