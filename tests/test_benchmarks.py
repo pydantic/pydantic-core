@@ -330,7 +330,7 @@ def test_set_of_ints_core_json(benchmark):
         v.validate_json(json_data[1])
 
 
-frozenset_of_ints_data = ({i for i in range(1000)}, {str(i) for i in range(1000)})
+frozenset_of_ints = frozenset({i for i in range(1000)})
 
 
 @skip_pydantic
@@ -339,46 +339,14 @@ def test_frozenset_of_ints_pyd(benchmark):
     class PydanticModel(BaseModel):
         __root__: FrozenSet[int]
 
-    @benchmark
-    def t():
-        PydanticModel.parse_obj(set_of_ints_data[0])
-        PydanticModel.parse_obj(set_of_ints_data[1])
+    benchmark(PydanticModel.parse_obj, frozenset_of_ints)
 
 
 @pytest.mark.benchmark(group='frozenset of ints')
 def test_frozenset_of_ints_core(benchmark):
-    v = SchemaValidator({'type': 'set', 'items': {'type': 'int'}})
-
-    @benchmark
-    def t():
-        v.validate_python(set_of_ints_data[0])
-        v.validate_python(set_of_ints_data[1])
-
-
-@skip_pydantic
-@pytest.mark.benchmark(group='frozenset of ints JSON')
-def test_frozenset_of_ints_pyd_json(benchmark):
-    class PydanticModel(BaseModel):
-        __root__: FrozenSet[int]
-
-    json_data = [json.dumps(list(d)) for d in frozenset_of_ints_data]
-
-    @benchmark
-    def t():
-        PydanticModel.parse_obj(json.loads(json_data[0]))
-        PydanticModel.parse_obj(json.loads(json_data[1]))
-
-
-@pytest.mark.benchmark(group='frozenset of ints JSON')
-def test_frozenset_of_ints_core_json(benchmark):
     v = SchemaValidator({'type': 'frozenset', 'items': {'type': 'int'}})
 
-    json_data = [json.dumps(list(d)) for d in frozenset_of_ints_data]
-
-    @benchmark
-    def t():
-        v.validate_json(json_data[0])
-        v.validate_json(json_data[1])
+    benchmark(v.validate_python, frozenset_of_ints)
 
 
 dict_of_ints_data = ({i: i for i in range(1000)}, {i: str(i) for i in range(1000)})
