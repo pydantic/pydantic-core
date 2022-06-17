@@ -20,10 +20,10 @@ def test_frozenset_ints_both(py_or_json, input_value, expected):
     'input_value,expected',
     [
         ([1, 2.5, '3'], {1, 2.5, '3'}),
-        ("foo", Err("Value must be a valid frozenset")),
-        (1, Err("Value must be a valid frozenset")),
-        (1.0, Err("Value must be a valid frozenset")),
-        (False, Err("Value must be a valid frozenset")),
+        ('foo', Err('Value must be a valid frozenset')),
+        (1, Err('Value must be a valid frozenset')),
+        (1.0, Err('Value must be a valid frozenset')),
+        (False, Err('Value must be a valid frozenset')),
     ],
 )
 def test_frozenset_no_validators_both(py_or_json, input_value, expected):
@@ -168,5 +168,5 @@ def test_union_frozenset_int_set_str(input_value, expected):
 
 def test_frozenset_as_dict_keys(py_or_json):
     v = py_or_json({'type': 'dict', 'keys': {'type': 'frozenset'}, 'value': 'int'})
-    with pytest.raises(ValidationError, match=re.escape("Value must be a valid frozenset")):
-        v.validate_test({"foo": "bar"})
+    with pytest.raises(ValidationError, match=re.escape('Value must be a valid frozenset')):
+        v.validate_test({'foo': 'bar'})
