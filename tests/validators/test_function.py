@@ -56,7 +56,7 @@ def test_function_before_error():
             'loc': [],
             'message': 'String must have at most 5 characters',
             'input_value': '12345x',
-            'context': {'type': 'String', 'max_length': 5, 'element_name': 'characters'},
+            'context': {'type': 'String', 'max_length': 5},
         }
     ]
 
@@ -86,7 +86,7 @@ def test_function_before_error_model():
             'loc': ['my_field'],
             'message': 'String must have at most 5 characters',
             'input_value': '12345x',
-            'context': {'type': 'String', 'max_length': 5, 'element_name': 'characters'},
+            'context': {'type': 'String', 'max_length': 5},
         }
     ]
 

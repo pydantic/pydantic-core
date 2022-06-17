@@ -142,8 +142,8 @@ impl BytesConstrainedValidator {
             if len < min_length {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
-                    kind = ErrorKind::TooShort,
-                    context = context!("type" => "Bytes", "min_length" => min_length, "element_name"=> "characters")
+                    kind = ErrorKind::BytesTooShort,
+                    context = context!("type" => "Bytes", "min_length" => min_length)
                 );
             }
         }
@@ -151,8 +151,8 @@ impl BytesConstrainedValidator {
             if len > max_length {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
-                    kind = ErrorKind::TooLong,
-                    context = context!("type" => "Bytes", "max_length" => max_length, "element_name"=> "characters")
+                    kind = ErrorKind::BytesTooLong,
+                    context = context!("type" => "Bytes", "max_length" => max_length)
                 );
             }
         }

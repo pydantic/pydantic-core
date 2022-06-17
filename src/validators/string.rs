@@ -177,8 +177,8 @@ impl StrConstrainedValidator {
                 // return py_error!("{} is shorter than {}", str, min_length);
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
-                    kind = ErrorKind::TooShort,
-                    context = context!("type" => "String","min_length" => min_length, "element_name"=> "characters")
+                    kind = ErrorKind::StrTooShort,
+                    context = context!("type" => "String","min_length" => min_length)
                 );
             }
         }
@@ -186,8 +186,8 @@ impl StrConstrainedValidator {
             if str.len() > max_length {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
-                    kind = ErrorKind::TooLong,
-                    context = context!("type" => "String","max_length" => max_length, "element_name"=> "characters")
+                    kind = ErrorKind::StrTooLong,
+                    context = context!("type" => "String","max_length" => max_length)
                 );
             }
         }

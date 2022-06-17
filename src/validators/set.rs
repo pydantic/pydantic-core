@@ -84,7 +84,7 @@ impl SetValidator {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::TooShort,
-                    context = context!("type" => "Set","min_length" => min_length, "element_name"=> "items")
+                    context = context!("type" => "Set","min_length" => min_length)
                 );
             }
         }
@@ -93,7 +93,7 @@ impl SetValidator {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::TooLong,
-                    context = context!("type" => "Set","max_length" => max_length, "element_name"=> "items")
+                    context = context!("type" => "Set","max_length" => max_length)
                 );
             }
         }
