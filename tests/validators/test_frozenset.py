@@ -168,5 +168,5 @@ def test_union_frozenset_int_set_str(input_value, expected):
 
 def test_frozenset_as_dict_keys(py_or_json):
     v = py_or_json({'type': 'dict', 'keys': {'type': 'frozenset'}, 'value': 'int'})
-    with pytest.raises(ValidationError, match=re.escape("Type cannot be used in this context")):
+    with pytest.raises(ValidationError, match=re.escape("Value must be a valid frozenset")):
         v.validate_test({"foo": "bar"})

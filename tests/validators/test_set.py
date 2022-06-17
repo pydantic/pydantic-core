@@ -26,12 +26,6 @@ def test_set_ints_both(py_or_json, input_value, expected):
         assert v.validate_test(input_value) == expected
 
 
-def test_set_as_dict_keys(py_or_json):
-    v = py_or_json({'type': 'dict', 'keys': {'type': 'set'}, 'value': 'int'})
-    with pytest.raises(ValidationError, match=re.escape("Value must be a valid set")):
-        v.validate_test({"foo": "bar"})
-
-
 @pytest.mark.parametrize('input_value,expected', [([1, 2.5, '3'], {1, 2.5, '3'})])
 def test_set_no_validators_both(py_or_json, input_value, expected):
     v = py_or_json({'type': 'set'})
@@ -186,3 +180,9 @@ def test_union_set_int_set_str(input_value, expected):
             assert exc_info.value.errors() == expected.errors
     else:
         assert v.validate_python(input_value) == expected
+
+
+def test_set_as_dict_keys(py_or_json):
+    v = py_or_json({'type': 'dict', 'keys': {'type': 'set'}, 'value': 'int'})
+    with pytest.raises(ValidationError, match=re.escape("Value must be a valid set")):
+        v.validate_test({"foo": "bar"})
