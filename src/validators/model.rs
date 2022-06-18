@@ -38,6 +38,12 @@ impl BuildValidator for ModelValidator {
         // models ignore the parent config and always use the config from this model
         let config: Option<&PyDict> = schema.get_as("config")?;
 
+        let model_type = ModelType::from_config(config)?;
+        let field_default_required = match model_type {
+            ModelType::Total => true,
+            ModelType::Partial => false,
+        };
+
         let extra_behavior = ExtraBehavior::from_config(config)?;
         let extra_validator = match extra_behavior {
             ExtraBehavior::Allow => match schema.get_item("extra_validator") {
@@ -77,7 +83,7 @@ impl BuildValidator for ModelValidator {
                 dict_key: PyString::intern(py, &key_str).into(),
                 validator,
                 default: field_dict.get_as("default")?,
-                required: field_dict.get_as("required")?.unwrap_or(true),
+                required: field_dict.get_as("required")?.unwrap_or(field_default_required),
             });
         }
         Ok(Self {
@@ -283,6 +289,24 @@ impl ExtraBehavior {
                 }
             }
             None => Ok(ExtraBehavior::Ignore),
+        }
+    }
+}
+
+enum ModelType {
+    Total,   // all fields are required by default
+    Partial, // all fields are optional by default
+}
+
+impl ModelType {
+    pub fn from_config(config: Option<&PyDict>) -> PyResult<Self> {
+        if let Some(dict) = config {
+            match dict.get_as("partial")? {
+                Some(true) => Ok(ModelType::Partial),
+                _ => Ok(ModelType::Total),
+            }
+        } else {
+            Ok(ModelType::Total)
         }
     }
 }

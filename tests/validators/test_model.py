@@ -246,3 +246,33 @@ def test_not_required_fields_default():
     assert exc_info.value.errors() == [
         {'kind': 'str_type', 'loc': ['y'], 'message': 'Value must be a valid string', 'input_value': 123}
     ]
+
+
+def test_partial_model():
+    v = SchemaValidator(
+        {'type': 'model', 'config': {'partial': True}, 'fields': {'x': {'type': 'str'}, 'y': {'type': 'str'}}}
+    )
+
+    assert v.validate_python({'x': 'pika', 'y': 'chu'}) == ({'x': 'pika', 'y': 'chu'}, {'x', 'y'})
+    assert v.validate_python({'x': 'pika'}) == ({'x': 'pika'}, {'x'})
+    assert v.validate_python({'y': 'chu'}) == ({'y': 'chu'}, {'y'})
+
+
+def test_partial_model_with_required():
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'config': {'partial': True},
+            'fields': {'x': {'type': 'str', 'required': True}, 'y': {'type': 'str'}},
+        }
+    )
+
+    assert v.validate_python({'x': 'pika', 'y': 'chu'}) == ({'x': 'pika', 'y': 'chu'}, {'x', 'y'})
+    assert v.validate_python({'x': 'pika'}) == ({'x': 'pika'}, {'x'})
+
+    with pytest.raises(ValidationError) as exc_info:
+        assert v.validate_python({'y': 'chu'})
+
+    assert exc_info.value.errors() == [
+        {'kind': 'missing', 'loc': ['x'], 'message': 'Field required', 'input_value': {'y': 'chu'}}
+    ]
