@@ -230,3 +230,19 @@ def test_json_error():
             'input_value': 'wrong',
         }
     ]
+
+
+def test_not_required_fields_default():
+    v = SchemaValidator(
+        {'type': 'model', 'fields': {'x': {'type': 'str'}, 'y': {'type': 'str', 'strict': True, 'required': False}}}
+    )
+
+    assert v.validate_python({'x': 'pika', 'y': 'chu'}) == ({'x': 'pika', 'y': 'chu'}, {'x', 'y'})
+    assert v.validate_python({'x': 'pika'}) == ({'x': 'pika'}, {'x'})
+
+    with pytest.raises(ValidationError) as exc_info:
+        assert v.validate_python({'x': 'pika', 'y': 123})
+
+    assert exc_info.value.errors() == [
+        {'kind': 'str_type', 'loc': ['y'], 'message': 'Value must be a valid string', 'input_value': 123}
+    ]

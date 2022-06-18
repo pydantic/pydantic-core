@@ -16,6 +16,7 @@ struct ModelField {
     dict_key: Py<PyString>,
     default: Option<PyObject>,
     validator: CombinedValidator,
+    required: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +77,7 @@ impl BuildValidator for ModelValidator {
                 dict_key: PyString::intern(py, &key_str).into(),
                 validator,
                 default: field_dict.get_as("default")?,
+                required: field_dict.get_as("required")?.unwrap_or(true),
             });
         }
         Ok(Self {
@@ -128,6 +130,8 @@ impl Validator for ModelValidator {
                 fields_set.add(py_key).map_err(as_internal)?;
             } else if let Some(ref default) = field.default {
                 output_dict.set_item(py_key, default.as_ref(py)).map_err(as_internal)?;
+            } else if !field.required {
+                continue;
             } else {
                 errors.push(val_line_error!(
                     input_value = InputValue::InputRef(input),
