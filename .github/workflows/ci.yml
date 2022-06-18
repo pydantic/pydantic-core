@@ -31,10 +31,6 @@ jobs:
 
     - name: install rust
       uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: nightly
-        override: true
 
     - id: cache-rust
       name: cache rust
@@ -92,11 +88,6 @@ jobs:
 
     - name: install rust
       uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: nightly
-        override: true
-        components: rustfmt, clippy
 
     - name: cache rust
       uses: Swatinem/rust-cache@v1
@@ -136,10 +127,6 @@ jobs:
 
     - name: install rust
       uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: nightly
-        override: true
 
     - name: cache rust
       uses: Swatinem/rust-cache@v1
@@ -220,7 +207,6 @@ jobs:
       - name: build wheels
         uses: messense/maturin-action@v1
         with:
-          rust-toolchain: nightly
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
