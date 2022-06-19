@@ -108,8 +108,8 @@ impl DictValidator {
         let value_validator = self.value_validator.as_ref();
 
         macro_rules! iter {
-            ($iterator:expr) => {
-                for (key, value) in $iterator {
+            ($dict:ident) => {
+                for (key, value) in $dict.iter() {
                     let output_key = match key_validator.validate(py, key, extra, slots) {
                         Ok(value) => Some(value),
                         Err(ValError::LineErrors(line_errors)) => {
@@ -139,8 +139,8 @@ impl DictValidator {
             };
         }
         match dict {
-            GenericMapping::PyDict(d) => iter!(d.iter()),
-            GenericMapping::JsonObject(d) => iter!(d.iter()),
+            GenericMapping::PyDict(d) => iter!(d),
+            GenericMapping::JsonObject(d) => iter!(d),
         }
 
         if errors.is_empty() {

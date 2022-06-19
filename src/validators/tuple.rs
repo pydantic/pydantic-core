@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::{is_strict, py_error, SchemaDict};
-use crate::errors::{context, err_val_error, ErrorKind, InputValue};
+use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
 use crate::input::{GenericSequence, Input};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
@@ -195,8 +195,33 @@ impl TupleFixLenValidator {
                 )
             );
         }
-        let output: Vec<PyObject> =
-            tuple.validate_fixed_tuple(py, expected_length, &self.items_validators, extra, slots)?;
-        Ok(PyTuple::new(py, &output).into_py(py))
+        let mut output: Vec<PyObject> = Vec::with_capacity(expected_length);
+        let mut errors: Vec<ValLineError> = Vec::new();
+        macro_rules! iter {
+            ($sequence:expr) => {
+                for (validator, (index, item)) in self.items_validators.iter().zip($sequence.iter().enumerate()) {
+                    match validator.validate(py, item, extra, slots) {
+                        Ok(item) => output.push(item),
+                        Err(ValError::LineErrors(line_errors)) => {
+                            let loc = vec![LocItem::I(index)];
+                            errors.extend(line_errors.into_iter().map(|err| err.with_prefix_location(&loc)));
+                        }
+                        Err(err) => return Err(err),
+                    }
+                }
+            };
+        }
+        match tuple {
+            GenericSequence::List(sequence) => iter!(sequence),
+            GenericSequence::Tuple(sequence) => iter!(sequence),
+            GenericSequence::Set(sequence) => iter!(sequence),
+            GenericSequence::FrozenSet(sequence) => iter!(sequence),
+            GenericSequence::JsonArray(sequence) => iter!(sequence),
+        }
+        if errors.is_empty() {
+            Ok(PyTuple::new(py, &output).into_py(py))
+        } else {
+            Err(ValError::LineErrors(errors))
+        }
     }
 }

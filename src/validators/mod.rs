@@ -23,7 +23,7 @@ mod function;
 mod int;
 mod list;
 mod literal;
-// mod model;
+mod model;
 mod model_class;
 mod none;
 mod nullable;
@@ -171,8 +171,8 @@ pub fn build_validator<'a>(
         dict,
         config,
         build_context,
-        // // models e.g. heterogeneous dicts
-        // model::ModelValidator,
+        // models e.g. heterogeneous dicts
+        model::ModelValidator,
         // unions
         union::UnionValidator,
         // nullables
@@ -232,8 +232,8 @@ pub struct Extra<'a> {
 #[derive(Debug, Clone)]
 #[enum_dispatch]
 pub enum CombinedValidator {
-    // // models e.g. heterogeneous dicts
-    // Model(model::ModelValidator),
+    // models e.g. heterogeneous dicts
+    Model(model::ModelValidator),
     // unions
     Union(union::UnionValidator),
     // nullables

@@ -5,7 +5,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{
     as_internal, err_val_error, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult,
 };
-use crate::input::{Input, MappingLenIter, ToLocItem};
+use crate::input::{GenericMapping, Input, ToLocItem, ToPy};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -112,77 +112,87 @@ impl Validator for ModelValidator {
             field: None,
         };
 
-        for field in &self.fields {
-            let py_key: &PyString = field.dict_key.as_ref(py);
-            if let Some(value) = dict.generic_get(&field.name) {
-                match field.validator.validate(py, value, &extra, slots) {
-                    Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
-                    Err(ValError::LineErrors(line_errors)) => {
-                        let loc = vec![field.name.to_loc()];
-                        for err in line_errors {
-                            errors.push(err.with_prefix_location(&loc));
-                        }
-                    }
-                    Err(err) => return Err(err),
-                }
-                fields_set.add(py_key).map_err(as_internal)?;
-            } else if let Some(ref default) = field.default {
-                output_dict.set_item(py_key, default.as_ref(py)).map_err(as_internal)?;
-            } else {
-                errors.push(val_line_error!(
-                    input_value = InputValue::InputRef(input),
-                    kind = ErrorKind::Missing,
-                    location = vec![field.name.to_loc()]
-                ));
-            }
-        }
-
-        let (check_extra, forbid) = match self.extra_behavior {
-            ExtraBehavior::Ignore => (false, false),
-            ExtraBehavior::Allow => (true, false),
-            ExtraBehavior::Forbid => (true, true),
-        };
-        if check_extra {
-            for (raw_key, value) in dict.generic_iter() {
-                // TODO use strict_str here if the model is strict
-                let key: String = match raw_key.lax_str() {
-                    Ok(k) => k,
-                    Err(ValError::LineErrors(line_errors)) => {
-                        let loc = vec![raw_key.to_loc()];
-                        for err in line_errors {
-                            errors.push(err.with_prefix_location(&loc));
-                        }
-                        continue;
-                    }
-                    Err(err) => return Err(err),
-                };
-                let py_key = PyString::new(py, &key);
-                if fields_set.contains(py_key).map_err(as_internal)? {
-                    continue;
-                }
-                fields_set.add(py_key).map_err(as_internal)?;
-                let loc = vec![key.to_loc()];
-
-                if forbid {
-                    errors.push(val_line_error!(
-                        input_value = InputValue::InputRef(input),
-                        kind = ErrorKind::ExtraForbidden,
-                        location = loc
-                    ));
-                } else if let Some(ref validator) = self.extra_validator {
-                    match validator.validate(py, value, &extra, slots) {
-                        Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
-                        Err(ValError::LineErrors(line_errors)) => {
-                            for err in line_errors {
-                                errors.push(err.with_prefix_location(&loc));
+        macro_rules! process {
+            ($dict:ident, $get_method:ident) => {{
+                for field in &self.fields {
+                    let py_key: &PyString = field.dict_key.as_ref(py);
+                    if let Some(value) = $dict.$get_method(&field.name) {
+                        match field.validator.validate(py, value, &extra, slots) {
+                            Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
+                            Err(ValError::LineErrors(line_errors)) => {
+                                let loc = vec![field.name.to_loc()];
+                                for err in line_errors {
+                                    errors.push(err.with_prefix_location(&loc));
+                                }
                             }
+                            Err(err) => return Err(err),
                         }
-                        Err(err) => return Err(err),
+                        fields_set.add(py_key).map_err(as_internal)?;
+                    } else if let Some(ref default) = field.default {
+                        output_dict
+                            .set_item(py_key, default.as_ref(py))
+                            .map_err(as_internal)?;
+                    } else {
+                        errors.push(val_line_error!(
+                            input_value = InputValue::InputRef(input),
+                            kind = ErrorKind::Missing,
+                            location = vec![field.name.to_loc()]
+                        ));
                     }
-                } else {
-                    output_dict.set_item(&key, value.to_py(py)).map_err(as_internal)?;
                 }
-            }
+
+                let (check_extra, forbid) = match self.extra_behavior {
+                    ExtraBehavior::Ignore => (false, false),
+                    ExtraBehavior::Allow => (true, false),
+                    ExtraBehavior::Forbid => (true, true),
+                };
+                if check_extra {
+                    for (raw_key, value) in $dict.iter() {
+                        // TODO use strict_str here if the model is strict
+                        let key: String = match raw_key.lax_str() {
+                            Ok(k) => k,
+                            Err(ValError::LineErrors(line_errors)) => {
+                                let loc = vec![raw_key.to_loc()];
+                                for err in line_errors {
+                                    errors.push(err.with_prefix_location(&loc));
+                                }
+                                continue;
+                            }
+                            Err(err) => return Err(err),
+                        };
+                        let py_key = PyString::new(py, &key);
+                        if fields_set.contains(py_key).map_err(as_internal)? {
+                            continue;
+                        }
+                        fields_set.add(py_key).map_err(as_internal)?;
+                        let loc = vec![key.to_loc()];
+
+                        if forbid {
+                            errors.push(val_line_error!(
+                                input_value = InputValue::InputRef(input),
+                                kind = ErrorKind::ExtraForbidden,
+                                location = loc
+                            ));
+                        } else if let Some(ref validator) = self.extra_validator {
+                            match validator.validate(py, value, &extra, slots) {
+                                Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
+                                Err(ValError::LineErrors(line_errors)) => {
+                                    for err in line_errors {
+                                        errors.push(err.with_prefix_location(&loc));
+                                    }
+                                }
+                                Err(err) => return Err(err),
+                            }
+                        } else {
+                            output_dict.set_item(&key, value.to_py(py)).map_err(as_internal)?;
+                        }
+                    }
+                }
+            }};
+        }
+        match dict {
+            GenericMapping::PyDict(d) => process!(d, get_item),
+            GenericMapping::JsonObject(d) => process!(d, get),
         }
 
         if errors.is_empty() {
@@ -198,11 +208,11 @@ impl Validator for ModelValidator {
 }
 
 impl ModelValidator {
-    fn validate_assignment<'s, 'data>(
+    fn validate_assignment<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
         field: &str,
-        input: &'data dyn Input,
+        input: &'data I,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject>

@@ -80,44 +80,6 @@ impl<'a> GenericSequence<'a> {
         }
     }
 
-    pub fn validate_fixed_tuple<'s>(
-        &self,
-        py: Python<'a>,
-        length: usize,
-        items_validators: &'s [CombinedValidator],
-        extra: &Extra,
-        slots: &'a [CombinedValidator],
-    ) -> ValResult<'a, Vec<PyObject>> {
-        let mut output: Vec<PyObject> = Vec::with_capacity(length);
-        let mut errors: Vec<ValLineError> = Vec::new();
-        macro_rules! iter {
-            ($iterator:expr) => {
-                for (validator, (index, item)) in items_validators.iter().zip($iterator.enumerate()) {
-                    match validator.validate(py, item, extra, slots) {
-                        Ok(item) => output.push(item),
-                        Err(ValError::LineErrors(line_errors)) => {
-                            let loc = vec![LocItem::I(index)];
-                            errors.extend(line_errors.into_iter().map(|err| err.with_prefix_location(&loc)));
-                        }
-                        Err(err) => return Err(err),
-                    }
-                }
-            };
-        }
-        match self {
-            Self::List(sequence) => iter!(sequence.iter()),
-            Self::Tuple(sequence) => iter!(sequence.iter()),
-            Self::Set(sequence) => iter!(sequence.iter()),
-            Self::FrozenSet(sequence) => iter!(sequence.iter()),
-            Self::JsonArray(sequence) => iter!(sequence.iter()),
-        }
-        if errors.is_empty() {
-            Ok(output)
-        } else {
-            Err(ValError::LineErrors(errors))
-        }
-    }
-
     pub fn copy_to_vec(&self, py: Python<'_>) -> Vec<PyObject> {
         macro_rules! to_vec {
             ($iterator:expr) => {
