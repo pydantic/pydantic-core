@@ -19,12 +19,12 @@ mod date;
 mod datetime;
 // mod dict;
 mod float;
-// mod function;
+mod function;
 mod int;
 mod list;
 mod literal;
 // mod model;
-// mod model_class;
+mod model_class;
 mod none;
 mod nullable;
 mod recursive;
@@ -32,7 +32,7 @@ mod set;
 mod string;
 mod time;
 mod tuple;
-// mod union;
+mod union;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
@@ -173,12 +173,12 @@ pub fn build_validator<'a>(
         build_context,
         // // models e.g. heterogeneous dicts
         // model::ModelValidator,
-        // // unions
-        // union::UnionValidator,
+        // unions
+        union::UnionValidator,
         // nullables
         nullable::NullableValidator,
-        // // model classes
-        // model_class::ModelClassValidator,
+        // model classes
+        model_class::ModelClassValidator,
         // strings
         string::StrValidator,
         // integers
@@ -198,8 +198,8 @@ pub fn build_validator<'a>(
         // dict::DictValidator,
         // None/null
         none::NoneValidator,
-        // // functions - before, after, plain & wrap
-        // function::FunctionBuilder,
+        // functions - before, after, plain & wrap
+        function::FunctionBuilder,
         // recursive (self-referencing) models
         recursive::RecursiveValidator,
         recursive::RecursiveRefValidator,
@@ -234,12 +234,12 @@ pub struct Extra<'a> {
 pub enum CombinedValidator {
     // // models e.g. heterogeneous dicts
     // Model(model::ModelValidator),
-    // // unions
-    // Union(union::UnionValidator),
+    // unions
+    Union(union::UnionValidator),
     // nullables
     Nullable(nullable::NullableValidator),
-    // // model classes
-    // ModelClass(model_class::ModelClassValidator),
+    // model classes
+    ModelClass(model_class::ModelClassValidator),
     // strings
     Str(string::StrValidator),
     StrictStr(string::StrictStrValidator),
@@ -266,11 +266,11 @@ pub enum CombinedValidator {
     // Dict(dict::DictValidator),
     // None/null
     None(none::NoneValidator),
-    // // functions
-    // FunctionBefore(function::FunctionBeforeValidator),
-    // FunctionAfter(function::FunctionAfterValidator),
-    // FunctionPlain(function::FunctionPlainValidator),
-    // FunctionWrap(function::FunctionWrapValidator),
+    // functions
+    FunctionBefore(function::FunctionBeforeValidator),
+    FunctionAfter(function::FunctionAfterValidator),
+    FunctionPlain(function::FunctionPlainValidator),
+    FunctionWrap(function::FunctionWrapValidator),
     // recursive (self-referencing) models
     Recursive(recursive::RecursiveValidator),
     RecursiveRef(recursive::RecursiveRefValidator),

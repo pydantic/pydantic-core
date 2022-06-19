@@ -88,7 +88,7 @@ impl<'a> GenericSequence<'a> {
         &self,
         py: Python<'a>,
         length: usize,
-        items_validators: &'s Vec<CombinedValidator>,
+        items_validators: &'s [CombinedValidator],
         extra: &Extra,
         slots: &'a [CombinedValidator],
     ) -> ValResult<'a, Vec<PyObject>> {

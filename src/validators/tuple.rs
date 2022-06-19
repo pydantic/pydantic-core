@@ -195,7 +195,8 @@ impl TupleFixLenValidator {
                 )
             );
         }
-        let output: Vec<PyObject> = tuple.validate_fixed_tuple(py, expected_length, &self.items_validators, extra, slots)?;
+        let output: Vec<PyObject> =
+            tuple.validate_fixed_tuple(py, expected_length, &self.items_validators, extra, slots)?;
         Ok(PyTuple::new(py, &output).into_py(py))
     }
 }
