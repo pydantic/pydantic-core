@@ -28,10 +28,10 @@ impl BuildValidator for RecursiveValidator {
 }
 
 impl Validator for RecursiveValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -64,10 +64,10 @@ impl BuildValidator for RecursiveRefValidator {
 }
 
 impl Validator for RecursiveRefValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

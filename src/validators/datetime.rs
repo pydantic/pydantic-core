@@ -52,10 +52,10 @@ impl BuildValidator for DateTimeValidator {
 }
 
 impl Validator for DateTimeValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -66,10 +66,10 @@ impl Validator for DateTimeValidator {
         self.validation_comparison(py, input, date)
     }
 
-    fn validate_strict<'s, 'data>(
+    fn validate_strict<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

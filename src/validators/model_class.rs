@@ -49,10 +49,10 @@ impl BuildValidator for ModelClassValidator {
 }
 
 impl Validator for ModelClassValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -71,10 +71,10 @@ impl Validator for ModelClassValidator {
         }
     }
 
-    fn validate_strict<'s, 'data>(
+    fn validate_strict<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

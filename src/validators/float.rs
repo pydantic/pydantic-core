@@ -34,20 +34,20 @@ impl BuildValidator for FloatValidator {
 }
 
 impl Validator for FloatValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         Ok(input.lax_float()?.into_py(py))
     }
 
-    fn validate_strict<'s, 'data>(
+    fn validate_strict<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -69,10 +69,10 @@ impl StrictFloatValidator {
 }
 
 impl Validator for StrictFloatValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -95,10 +95,10 @@ pub struct ConstrainedFloatValidator {
 }
 
 impl Validator for ConstrainedFloatValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -109,10 +109,10 @@ impl Validator for ConstrainedFloatValidator {
         self._validation_logic(py, input, float)
     }
 
-    fn validate_strict<'s, 'data>(
+    fn validate_strict<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

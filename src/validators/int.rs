@@ -34,20 +34,20 @@ impl BuildValidator for IntValidator {
 }
 
 impl Validator for IntValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         Ok(input.lax_int()?.into_py(py))
     }
 
-    fn validate_strict<'s, 'data>(
+    fn validate_strict<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -69,10 +69,10 @@ impl StrictIntValidator {
 }
 
 impl Validator for StrictIntValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -95,10 +95,10 @@ pub struct ConstrainedIntValidator {
 }
 
 impl Validator for ConstrainedIntValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -109,10 +109,10 @@ impl Validator for ConstrainedIntValidator {
         self._validation_logic(py, input, int)
     }
 
-    fn validate_strict<'s, 'data>(
+    fn validate_strict<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

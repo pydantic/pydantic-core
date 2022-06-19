@@ -16,23 +16,23 @@ mod any;
 mod bool;
 mod bytes;
 mod date;
-mod datetime;
-mod dict;
-mod float;
-mod function;
+// mod datetime;
+// mod dict;
+// mod float;
+// mod function;
 mod int;
 mod list;
-mod literal;
-mod model;
-mod model_class;
-mod none;
-mod nullable;
-mod recursive;
-mod set;
-mod string;
-mod time;
-mod tuple;
-mod union;
+// mod literal;
+// mod model;
+// mod model_class;
+// mod none;
+// mod nullable;
+// mod recursive;
+// mod set;
+// mod string;
+// mod time;
+// mod tuple;
+// mod union;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
@@ -171,50 +171,50 @@ pub fn build_validator<'a>(
         dict,
         config,
         build_context,
-        // models e.g. heterogeneous dicts
-        model::ModelValidator,
-        // unions
-        union::UnionValidator,
-        // nullables
-        nullable::NullableValidator,
-        // model classes
-        model_class::ModelClassValidator,
-        // strings
-        string::StrValidator,
+        // // models e.g. heterogeneous dicts
+        // model::ModelValidator,
+        // // unions
+        // union::UnionValidator,
+        // // nullables
+        // nullable::NullableValidator,
+        // // model classes
+        // model_class::ModelClassValidator,
+        // // strings
+        // string::StrValidator,
         // integers
         int::IntValidator,
         // boolean
         bool::BoolValidator,
-        // floats
-        float::FloatValidator,
-        // tuples
-        tuple::TupleVarLenValidator,
-        tuple::TupleFixLenValidator,
+        // // floats
+        // float::FloatValidator,
+        // // tuples
+        // tuple::TupleVarLenValidator,
+        // tuple::TupleFixLenValidator,
         // list/arrays
         list::ListValidator,
-        // sets - unique lists
-        set::SetValidator,
-        // dicts/objects (recursive)
-        dict::DictValidator,
-        // None/null
-        none::NoneValidator,
-        // functions - before, after, plain & wrap
-        function::FunctionBuilder,
-        // recursive (self-referencing) models
-        recursive::RecursiveValidator,
-        recursive::RecursiveRefValidator,
-        // literals
-        literal::LiteralBuilder,
+        // // sets - unique lists
+        // set::SetValidator,
+        // // dicts/objects (recursive)
+        // dict::DictValidator,
+        // // None/null
+        // none::NoneValidator,
+        // // functions - before, after, plain & wrap
+        // function::FunctionBuilder,
+        // // recursive (self-referencing) models
+        // recursive::RecursiveValidator,
+        // recursive::RecursiveRefValidator,
+        // // literals
+        // literal::LiteralBuilder,
         // any
         any::AnyValidator,
         // bytes
         bytes::BytesValidator,
         // dates
         date::DateValidator,
-        // times
-        time::TimeValidator,
-        // datetimes
-        datetime::DateTimeValidator,
+        // // times
+        // time::TimeValidator,
+        // // datetimes
+        // datetime::DateTimeValidator,
     )
 }
 
@@ -232,18 +232,18 @@ pub struct Extra<'a> {
 #[derive(Debug, Clone)]
 #[enum_dispatch]
 pub enum CombinedValidator {
-    // models e.g. heterogeneous dicts
-    Model(model::ModelValidator),
-    // unions
-    Union(union::UnionValidator),
-    // nullables
-    Nullable(nullable::NullableValidator),
-    // model classes
-    ModelClass(model_class::ModelClassValidator),
-    // strings
-    Str(string::StrValidator),
-    StrictStr(string::StrictStrValidator),
-    StrConstrained(string::StrConstrainedValidator),
+    // // models e.g. heterogeneous dicts
+    // Model(model::ModelValidator),
+    // // unions
+    // Union(union::UnionValidator),
+    // // nullables
+    // Nullable(nullable::NullableValidator),
+    // // model classes
+    // ModelClass(model_class::ModelClassValidator),
+    // // strings
+    // Str(string::StrValidator),
+    // StrictStr(string::StrictStrValidator),
+    // StrConstrained(string::StrConstrainedValidator),
     // integers
     Int(int::IntValidator),
     StrictInt(int::StrictIntValidator),
@@ -251,35 +251,35 @@ pub enum CombinedValidator {
     // booleans
     Bool(bool::BoolValidator),
     StrictBool(bool::StrictBoolValidator),
-    // floats
-    Float(float::FloatValidator),
-    StrictFloat(float::StrictFloatValidator),
-    ConstrainedFloat(float::ConstrainedFloatValidator),
+    // // floats
+    // Float(float::FloatValidator),
+    // StrictFloat(float::StrictFloatValidator),
+    // ConstrainedFloat(float::ConstrainedFloatValidator),
     // lists
     List(list::ListValidator),
-    // sets - unique lists
-    Set(set::SetValidator),
-    // tuples
-    TupleVarLen(tuple::TupleVarLenValidator),
-    TupleFixLen(tuple::TupleFixLenValidator),
-    // dicts/objects (recursive)
-    Dict(dict::DictValidator),
-    // None/null
-    None(none::NoneValidator),
-    // functions
-    FunctionBefore(function::FunctionBeforeValidator),
-    FunctionAfter(function::FunctionAfterValidator),
-    FunctionPlain(function::FunctionPlainValidator),
-    FunctionWrap(function::FunctionWrapValidator),
-    // recursive (self-referencing) models
-    Recursive(recursive::RecursiveValidator),
-    RecursiveRef(recursive::RecursiveRefValidator),
-    // literals
-    LiteralSingleString(literal::LiteralSingleStringValidator),
-    LiteralSingleInt(literal::LiteralSingleIntValidator),
-    LiteralMultipleStrings(literal::LiteralMultipleStringsValidator),
-    LiteralMultipleInts(literal::LiteralMultipleIntsValidator),
-    LiteralGeneral(literal::LiteralGeneralValidator),
+    // // sets - unique lists
+    // Set(set::SetValidator),
+    // // tuples
+    // TupleVarLen(tuple::TupleVarLenValidator),
+    // TupleFixLen(tuple::TupleFixLenValidator),
+    // // dicts/objects (recursive)
+    // Dict(dict::DictValidator),
+    // // None/null
+    // None(none::NoneValidator),
+    // // functions
+    // FunctionBefore(function::FunctionBeforeValidator),
+    // FunctionAfter(function::FunctionAfterValidator),
+    // FunctionPlain(function::FunctionPlainValidator),
+    // FunctionWrap(function::FunctionWrapValidator),
+    // // recursive (self-referencing) models
+    // Recursive(recursive::RecursiveValidator),
+    // RecursiveRef(recursive::RecursiveRefValidator),
+    // // literals
+    // LiteralSingleString(literal::LiteralSingleStringValidator),
+    // LiteralSingleInt(literal::LiteralSingleIntValidator),
+    // LiteralMultipleStrings(literal::LiteralMultipleStringsValidator),
+    // LiteralMultipleInts(literal::LiteralMultipleIntsValidator),
+    // LiteralGeneral(literal::LiteralGeneralValidator),
     // any
     Any(any::AnyValidator),
     // bytes
@@ -288,10 +288,10 @@ pub enum CombinedValidator {
     ConstrainedBytes(bytes::BytesConstrainedValidator),
     // dates
     Date(date::DateValidator),
-    // times
-    Time(time::TimeValidator),
-    // datetimes
-    Datetime(datetime::DateTimeValidator),
+    // // times
+    // Time(time::TimeValidator),
+    // // datetimes
+    // Datetime(datetime::DateTimeValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
@@ -299,20 +299,20 @@ pub enum CombinedValidator {
 #[enum_dispatch(CombinedValidator)]
 pub trait Validator: Send + Sync + Clone + Debug {
     /// Do the actual validation for this schema/type
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject>;
 
     /// This is used in unions for the first pass to see if we have an "exact match",
     /// implementations should generally use the same logic as with `config.strict = true`
-    fn validate_strict<'s, 'data>(
+    fn validate_strict<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

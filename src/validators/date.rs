@@ -52,10 +52,10 @@ impl BuildValidator for DateValidator {
 }
 
 impl Validator for DateValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -74,10 +74,10 @@ impl Validator for DateValidator {
         self.validation_comparison(py, input, date)
     }
 
-    fn validate_strict<'s, 'data>(
+    fn validate_strict<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -90,10 +90,10 @@ impl Validator for DateValidator {
 }
 
 impl DateValidator {
-    fn validation_comparison<'s, 'data>(
+    fn validation_comparison<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         date: EitherDate<'data>,
     ) -> ValResult<'data, PyObject> {
         if let Some(constraints) = &self.constraints {
@@ -124,8 +124,8 @@ impl DateValidator {
 
 /// In lax mode, if the input is not a date, we try parsing the input as a datetime, then check it is an
 /// "exact date", e.g. has a zero time component.
-fn date_from_datetime<'data>(
-    input: &'data dyn Input,
+fn date_from_datetime<'data, I: Input>(
+    input: &'data I,
     date_err: ValError<'data>,
 ) -> ValResult<'data, EitherDate<'data>> {
     let either_dt = match input.lax_datetime() {

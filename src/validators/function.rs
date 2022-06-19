@@ -65,10 +65,10 @@ pub struct FunctionBeforeValidator {
 impl_build!(FunctionBeforeValidator);
 
 impl Validator for FunctionBeforeValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -115,10 +115,10 @@ pub struct FunctionAfterValidator {
 impl_build!(FunctionAfterValidator);
 
 impl Validator for FunctionAfterValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -149,10 +149,10 @@ impl FunctionPlainValidator {
 }
 
 impl Validator for FunctionPlainValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -177,10 +177,10 @@ pub struct FunctionWrapValidator {
 impl_build!(FunctionWrapValidator);
 
 impl Validator for FunctionWrapValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, I: Input>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data I,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
