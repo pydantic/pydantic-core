@@ -16,22 +16,22 @@ mod any;
 mod bool;
 mod bytes;
 mod date;
-// mod datetime;
+mod datetime;
 // mod dict;
-// mod float;
+mod float;
 // mod function;
 mod int;
 mod list;
-// mod literal;
+mod literal;
 // mod model;
 // mod model_class;
-// mod none;
-// mod nullable;
-// mod recursive;
-// mod set;
-// mod string;
-// mod time;
-// mod tuple;
+mod none;
+mod nullable;
+mod recursive;
+mod set;
+mod string;
+mod time;
+mod tuple;
 // mod union;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
@@ -175,46 +175,46 @@ pub fn build_validator<'a>(
         // model::ModelValidator,
         // // unions
         // union::UnionValidator,
-        // // nullables
-        // nullable::NullableValidator,
+        // nullables
+        nullable::NullableValidator,
         // // model classes
         // model_class::ModelClassValidator,
-        // // strings
-        // string::StrValidator,
+        // strings
+        string::StrValidator,
         // integers
         int::IntValidator,
         // boolean
         bool::BoolValidator,
-        // // floats
-        // float::FloatValidator,
-        // // tuples
-        // tuple::TupleVarLenValidator,
-        // tuple::TupleFixLenValidator,
+        // floats
+        float::FloatValidator,
+        // tuples
+        tuple::TupleVarLenValidator,
+        tuple::TupleFixLenValidator,
         // list/arrays
         list::ListValidator,
-        // // sets - unique lists
-        // set::SetValidator,
+        // sets - unique lists
+        set::SetValidator,
         // // dicts/objects (recursive)
         // dict::DictValidator,
-        // // None/null
-        // none::NoneValidator,
+        // None/null
+        none::NoneValidator,
         // // functions - before, after, plain & wrap
         // function::FunctionBuilder,
-        // // recursive (self-referencing) models
-        // recursive::RecursiveValidator,
-        // recursive::RecursiveRefValidator,
-        // // literals
-        // literal::LiteralBuilder,
+        // recursive (self-referencing) models
+        recursive::RecursiveValidator,
+        recursive::RecursiveRefValidator,
+        // literals
+        literal::LiteralBuilder,
         // any
         any::AnyValidator,
         // bytes
         bytes::BytesValidator,
         // dates
         date::DateValidator,
-        // // times
-        // time::TimeValidator,
-        // // datetimes
-        // datetime::DateTimeValidator,
+        // times
+        time::TimeValidator,
+        // datetimes
+        datetime::DateTimeValidator,
     )
 }
 
@@ -236,14 +236,14 @@ pub enum CombinedValidator {
     // Model(model::ModelValidator),
     // // unions
     // Union(union::UnionValidator),
-    // // nullables
-    // Nullable(nullable::NullableValidator),
+    // nullables
+    Nullable(nullable::NullableValidator),
     // // model classes
     // ModelClass(model_class::ModelClassValidator),
-    // // strings
-    // Str(string::StrValidator),
-    // StrictStr(string::StrictStrValidator),
-    // StrConstrained(string::StrConstrainedValidator),
+    // strings
+    Str(string::StrValidator),
+    StrictStr(string::StrictStrValidator),
+    StrConstrained(string::StrConstrainedValidator),
     // integers
     Int(int::IntValidator),
     StrictInt(int::StrictIntValidator),
@@ -251,35 +251,35 @@ pub enum CombinedValidator {
     // booleans
     Bool(bool::BoolValidator),
     StrictBool(bool::StrictBoolValidator),
-    // // floats
-    // Float(float::FloatValidator),
-    // StrictFloat(float::StrictFloatValidator),
-    // ConstrainedFloat(float::ConstrainedFloatValidator),
+    // floats
+    Float(float::FloatValidator),
+    StrictFloat(float::StrictFloatValidator),
+    ConstrainedFloat(float::ConstrainedFloatValidator),
     // lists
     List(list::ListValidator),
-    // // sets - unique lists
-    // Set(set::SetValidator),
-    // // tuples
-    // TupleVarLen(tuple::TupleVarLenValidator),
-    // TupleFixLen(tuple::TupleFixLenValidator),
+    // sets - unique lists
+    Set(set::SetValidator),
+    // tuples
+    TupleVarLen(tuple::TupleVarLenValidator),
+    TupleFixLen(tuple::TupleFixLenValidator),
     // // dicts/objects (recursive)
     // Dict(dict::DictValidator),
-    // // None/null
-    // None(none::NoneValidator),
+    // None/null
+    None(none::NoneValidator),
     // // functions
     // FunctionBefore(function::FunctionBeforeValidator),
     // FunctionAfter(function::FunctionAfterValidator),
     // FunctionPlain(function::FunctionPlainValidator),
     // FunctionWrap(function::FunctionWrapValidator),
-    // // recursive (self-referencing) models
-    // Recursive(recursive::RecursiveValidator),
-    // RecursiveRef(recursive::RecursiveRefValidator),
-    // // literals
-    // LiteralSingleString(literal::LiteralSingleStringValidator),
-    // LiteralSingleInt(literal::LiteralSingleIntValidator),
-    // LiteralMultipleStrings(literal::LiteralMultipleStringsValidator),
-    // LiteralMultipleInts(literal::LiteralMultipleIntsValidator),
-    // LiteralGeneral(literal::LiteralGeneralValidator),
+    // recursive (self-referencing) models
+    Recursive(recursive::RecursiveValidator),
+    RecursiveRef(recursive::RecursiveRefValidator),
+    // literals
+    LiteralSingleString(literal::LiteralSingleStringValidator),
+    LiteralSingleInt(literal::LiteralSingleIntValidator),
+    LiteralMultipleStrings(literal::LiteralMultipleStringsValidator),
+    LiteralMultipleInts(literal::LiteralMultipleIntsValidator),
+    LiteralGeneral(literal::LiteralGeneralValidator),
     // any
     Any(any::AnyValidator),
     // bytes
@@ -288,10 +288,10 @@ pub enum CombinedValidator {
     ConstrainedBytes(bytes::BytesConstrainedValidator),
     // dates
     Date(date::DateValidator),
-    // // times
-    // Time(time::TimeValidator),
-    // // datetimes
-    // Datetime(datetime::DateTimeValidator),
+    // times
+    Time(time::TimeValidator),
+    // datetimes
+    Datetime(datetime::DateTimeValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

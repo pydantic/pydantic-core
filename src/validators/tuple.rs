@@ -2,8 +2,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::{is_strict, py_error, SchemaDict};
-use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
-use crate::input::{GenericSequence, Input, SequenceLenIter};
+use crate::errors::{context, err_val_error, ErrorKind, InputValue};
+use crate::input::{GenericSequence, Input};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
@@ -100,26 +100,11 @@ impl TupleVarLenValidator {
 
         match self.item_validator {
             Some(ref validator) => {
-                let mut output: Vec<PyObject> = Vec::with_capacity(length);
-                let mut errors: Vec<ValLineError> = Vec::new();
-                for (index, item) in tuple.generic_iter() {
-                    match validator.validate(py, item, extra, slots) {
-                        Ok(item) => output.push(item),
-                        Err(ValError::LineErrors(line_errors)) => {
-                            let loc = vec![LocItem::I(index)];
-                            errors.extend(line_errors.into_iter().map(|err| err.with_prefix_location(&loc)));
-                        }
-                        Err(err) => return Err(err),
-                    }
-                }
-                if errors.is_empty() {
-                    Ok(PyTuple::new(py, &output).into_py(py))
-                } else {
-                    Err(ValError::LineErrors(errors))
-                }
+                let output = tuple.validate_to_vec(py, length, validator, extra, slots)?;
+                Ok(PyTuple::new(py, &output).into_py(py))
             }
             None => {
-                let output: Vec<PyObject> = tuple.generic_iter().map(|(_, item)| item.to_py(py)).collect();
+                let output: Vec<PyObject> = tuple.copy_to_vec(py);
                 Ok(PyTuple::new(py, &output).into_py(py))
             }
         }
@@ -210,23 +195,7 @@ impl TupleFixLenValidator {
                 )
             );
         }
-        let mut output: Vec<PyObject> = Vec::with_capacity(expected_length);
-        let mut errors: Vec<ValLineError> = Vec::new();
-
-        for (validator, (index, item)) in self.items_validators.iter().zip(tuple.generic_iter()) {
-            match validator.validate(py, item, extra, slots) {
-                Ok(item) => output.push(item),
-                Err(ValError::LineErrors(line_errors)) => {
-                    let loc = vec![LocItem::I(index)];
-                    errors.extend(line_errors.into_iter().map(|err| err.with_prefix_location(&loc)));
-                }
-                Err(err) => return Err(err),
-            }
-        }
-        if errors.is_empty() {
-            Ok(PyTuple::new(py, &output).into_py(py))
-        } else {
-            Err(ValError::LineErrors(errors))
-        }
+        let output: Vec<PyObject> = tuple.validate_fixed_tuple(py, expected_length, &self.items_validators, extra, slots)?;
+        Ok(PyTuple::new(py, &output).into_py(py))
     }
 }

@@ -2,8 +2,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
-use crate::input::{GenericSequence, Input, ToPy};
+use crate::errors::{context, err_val_error, ErrorKind, InputValue};
+use crate::input::{GenericSequence, Input};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
@@ -100,26 +100,11 @@ impl ListValidator {
 
         match self.item_validator {
             Some(ref validator) => {
-                let mut output: Vec<PyObject> = Vec::with_capacity(length);
-                let mut errors: Vec<ValLineError> = Vec::new();
-                for (index, item) in list.generic_iter() {
-                    match validator.validate(py, item, extra, slots) {
-                        Ok(item) => output.push(item),
-                        Err(ValError::LineErrors(line_errors)) => {
-                            let loc = vec![LocItem::I(index)];
-                            errors.extend(line_errors.into_iter().map(|err| err.with_prefix_location(&loc)));
-                        }
-                        Err(err) => return Err(err),
-                    }
-                }
-                if errors.is_empty() {
-                    Ok(output.into_py(py))
-                } else {
-                    Err(ValError::LineErrors(errors))
-                }
+                let output = list.validate_to_vec(py, length, validator, extra, slots)?;
+                Ok(output.into_py(py))
             }
             None => {
-                let output: Vec<PyObject> = list.generic_iter().map(|(_, item)| item.to_py(py)).collect();
+                let output: Vec<PyObject> = list.copy_to_vec(py);
                 Ok(PyList::new(py, &output).into_py(py))
             }
         }
