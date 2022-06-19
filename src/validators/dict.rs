@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input, MappingLenIter, ToLocItem};
+use crate::input::{GenericMapping, Input, ToLocItem};
 
 use super::any::AnyValidator;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -106,32 +106,41 @@ impl DictValidator {
 
         let key_validator = self.key_validator.as_ref();
         let value_validator = self.value_validator.as_ref();
-        for (key, value) in dict.generic_iter() {
-            let output_key = match key_validator.validate(py, key, extra, slots) {
-                Ok(value) => Some(value),
-                Err(ValError::LineErrors(line_errors)) => {
-                    let loc = vec![key.to_loc(), "[key]".to_loc()];
-                    for err in line_errors {
-                        errors.push(err.with_prefix_location(&loc));
+
+        macro_rules! iter {
+            ($iterator:expr) => {
+                for (key, value) in $iterator {
+                    let output_key = match key_validator.validate(py, key, extra, slots) {
+                        Ok(value) => Some(value),
+                        Err(ValError::LineErrors(line_errors)) => {
+                            let loc = vec![key.to_loc(), "[key]".to_loc()];
+                            for err in line_errors {
+                                errors.push(err.with_prefix_location(&loc));
+                            }
+                            None
+                        }
+                        Err(err) => return Err(err),
+                    };
+                    let output_value = match value_validator.validate(py, value, extra, slots) {
+                        Ok(value) => Some(value),
+                        Err(ValError::LineErrors(line_errors)) => {
+                            let loc = vec![key.to_loc()];
+                            for err in line_errors {
+                                errors.push(err.with_prefix_location(&loc));
+                            }
+                            None
+                        }
+                        Err(err) => return Err(err),
+                    };
+                    if let (Some(key), Some(value)) = (output_key, output_value) {
+                        output.set_item(key, value).map_err(as_internal)?;
                     }
-                    None
                 }
-                Err(err) => return Err(err),
             };
-            let output_value = match value_validator.validate(py, value, extra, slots) {
-                Ok(value) => Some(value),
-                Err(ValError::LineErrors(line_errors)) => {
-                    let loc = vec![key.to_loc()];
-                    for err in line_errors {
-                        errors.push(err.with_prefix_location(&loc));
-                    }
-                    None
-                }
-                Err(err) => return Err(err),
-            };
-            if let (Some(key), Some(value)) = (output_key, output_value) {
-                output.set_item(key, value).map_err(as_internal)?;
-            }
+        }
+        match dict {
+            GenericMapping::PyDict(d) => iter!(d.iter()),
+            GenericMapping::JsonObject(d) => iter!(d.iter()),
         }
 
         if errors.is_empty() {

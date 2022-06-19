@@ -17,7 +17,7 @@ mod bool;
 mod bytes;
 mod date;
 mod datetime;
-// mod dict;
+mod dict;
 mod float;
 mod function;
 mod int;
@@ -194,8 +194,8 @@ pub fn build_validator<'a>(
         list::ListValidator,
         // sets - unique lists
         set::SetValidator,
-        // // dicts/objects (recursive)
-        // dict::DictValidator,
+        // dicts/objects (recursive)
+        dict::DictValidator,
         // None/null
         none::NoneValidator,
         // functions - before, after, plain & wrap
@@ -262,8 +262,8 @@ pub enum CombinedValidator {
     // tuples
     TupleVarLen(tuple::TupleVarLenValidator),
     TupleFixLen(tuple::TupleFixLenValidator),
-    // // dicts/objects (recursive)
-    // Dict(dict::DictValidator),
+    // dicts/objects (recursive)
+    Dict(dict::DictValidator),
     // None/null
     None(none::NoneValidator),
     // functions

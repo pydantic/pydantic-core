@@ -12,7 +12,7 @@ mod to_py;
 pub(crate) use datetime::{
     pydate_as_date, pydatetime_as_datetime, pytime_as_time, EitherDate, EitherDateTime, EitherTime,
 };
-pub use generics::{GenericMapping, GenericSequence, MappingLenIter};
+pub use generics::{GenericMapping, GenericSequence};
 pub use input_abstract::Input;
 pub use parse_json::JsonInput;
 pub use return_enums::EitherBytes;
