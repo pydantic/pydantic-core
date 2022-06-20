@@ -13,6 +13,6 @@ pub(crate) use datetime::{
 };
 pub use generics::{GenericMapping, GenericSequence};
 pub use input_abstract::Input;
-pub use parse_json::JsonInput;
+pub use parse_json::{JsonInput, JsonObject};
 pub use return_enums::EitherBytes;
 pub use to_loc_item::ToLocItem;

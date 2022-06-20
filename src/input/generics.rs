@@ -29,6 +29,43 @@ derive_from!(GenericSequence, PySet, Set);
 derive_from!(GenericSequence, PyFrozenSet, FrozenSet);
 derive_from!(GenericSequence, JsonArray, JsonArray);
 
+macro_rules! build_validate_to_vec {
+    ($name:ident, $sequence_type:ty) => {
+        fn $name<'a, 's>(
+            py: Python<'a>,
+            sequence: &'a $sequence_type,
+            length: usize,
+            validator: &'s CombinedValidator,
+            extra: &Extra,
+            slots: &'a [CombinedValidator],
+        ) -> ValResult<'a, Vec<PyObject>> {
+            let mut output: Vec<PyObject> = Vec::with_capacity(length);
+            let mut errors: Vec<ValLineError> = Vec::new();
+            for (index, item) in sequence.iter().enumerate() {
+                match validator.validate(py, item, extra, slots) {
+                    Ok(item) => output.push(item),
+                    Err(ValError::LineErrors(line_errors)) => {
+                        let loc = vec![LocItem::I(index)];
+                        errors.extend(line_errors.into_iter().map(|err| err.with_prefix_location(&loc)));
+                    }
+                    Err(err) => return Err(err),
+                }
+            }
+
+            if errors.is_empty() {
+                Ok(output)
+            } else {
+                Err(ValError::LineErrors(errors))
+            }
+        }
+    };
+}
+build_validate_to_vec!(validate_to_vec_list, PyList);
+build_validate_to_vec!(validate_to_vec_tuple, PyTuple);
+build_validate_to_vec!(validate_to_vec_set, PySet);
+build_validate_to_vec!(validate_to_vec_frozenset, PyFrozenSet);
+build_validate_to_vec!(validate_to_vec_jsonarray, JsonArray);
+
 impl<'a> GenericSequence<'a> {
     pub fn generic_len(&self) -> usize {
         match self {
@@ -48,35 +85,12 @@ impl<'a> GenericSequence<'a> {
         extra: &Extra,
         slots: &'a [CombinedValidator],
     ) -> ValResult<'a, Vec<PyObject>> {
-        let mut output: Vec<PyObject> = Vec::with_capacity(length);
-        let mut errors: Vec<ValLineError> = Vec::new();
-
-        macro_rules! iter {
-            ($iterator:expr) => {
-                for (index, item) in $iterator.enumerate() {
-                    match validator.validate(py, item, extra, slots) {
-                        Ok(item) => output.push(item),
-                        Err(ValError::LineErrors(line_errors)) => {
-                            let loc = vec![LocItem::I(index)];
-                            errors.extend(line_errors.into_iter().map(|err| err.with_prefix_location(&loc)));
-                        }
-                        Err(err) => return Err(err),
-                    }
-                }
-            };
-        }
-
         match self {
-            Self::List(sequence) => iter!(sequence.iter()),
-            Self::Tuple(sequence) => iter!(sequence.iter()),
-            Self::Set(sequence) => iter!(sequence.iter()),
-            Self::FrozenSet(sequence) => iter!(sequence.iter()),
-            Self::JsonArray(sequence) => iter!(sequence.iter()),
-        }
-        if errors.is_empty() {
-            Ok(output)
-        } else {
-            Err(ValError::LineErrors(errors))
+            Self::List(sequence) => validate_to_vec_list(py, sequence, length, validator, extra, slots),
+            Self::Tuple(sequence) => validate_to_vec_tuple(py, sequence, length, validator, extra, slots),
+            Self::Set(sequence) => validate_to_vec_set(py, sequence, length, validator, extra, slots),
+            Self::FrozenSet(sequence) => validate_to_vec_frozenset(py, sequence, length, validator, extra, slots),
+            Self::JsonArray(sequence) => validate_to_vec_jsonarray(py, sequence, length, validator, extra, slots),
         }
     }
 }
@@ -88,12 +102,3 @@ pub enum GenericMapping<'a> {
 
 derive_from!(GenericMapping, PyDict, PyDict);
 derive_from!(GenericMapping, JsonObject, JsonObject);
-
-impl<'a> GenericMapping<'a> {
-    pub fn generic_len(&self) -> usize {
-        match self {
-            Self::PyDict(d) => d.len(),
-            Self::JsonObject(d) => d.len(),
-        }
-    }
-}
