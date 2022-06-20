@@ -27,6 +27,7 @@ class BoolSchema(TypedDict):
 class ConfigSchema(TypedDict, total=False):
     strict: bool
     extra: Literal['allow', 'forbid', 'ignore']
+    model_full: bool
 
 
 class DictSchema(TypedDict, total=False):
@@ -86,6 +87,7 @@ class ModelClassSchema(TypedDict):
 
 class ModelField(TypedDict):
     schema: Schema
+    required: NotRequired[bool]
     default: NotRequired[Any]
     # alias: str
 

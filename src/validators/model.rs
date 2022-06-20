@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySet, PyString};
+use pyo3::types::{PyBool, PyDict, PySet, PyString};
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult};
@@ -12,6 +12,7 @@ struct ModelField {
     name: String,
     // alias: Option<String>,
     dict_key: Py<PyString>,
+    required: bool,
     default: Option<PyObject>,
     validator: CombinedValidator,
 }
@@ -34,6 +35,11 @@ impl BuildValidator for ModelValidator {
     ) -> PyResult<CombinedValidator> {
         // models ignore the parent config and always use the config from this model
         let config: Option<&PyDict> = schema.get_as("config")?;
+
+        let field_default_required = match config {
+            Some(dict) => !matches!(dict.get_as("model_full")?, Some(false)),
+            None => true,
+        };
 
         let extra_behavior = ExtraBehavior::from_config(config)?;
         let extra_validator = match extra_behavior {
@@ -71,12 +77,26 @@ impl BuildValidator for ModelValidator {
             };
 
             let key_str = key.to_string();
+
+            let default = field_infos.get_as("default")?;
+            let required = match field_infos.get_as::<&PyBool>("required")? {
+                Some(r) => {
+                    let required = r.extract()?;
+                    if required && default.is_some() {
+                        return py_error!("Key \"{}\":\n a required key cannot have a default value", key);
+                    }
+                    required
+                }
+                None => field_default_required,
+            };
+
             fields.push(ModelField {
                 name: key_str.clone(),
                 // alias: field_infos.get_as("alias"),
                 dict_key: PyString::intern(py, &key_str).into(),
                 validator,
-                default: field_infos.get_as("default")?,
+                required,
+                default,
             });
         }
         Ok(Self {
@@ -133,6 +153,8 @@ impl Validator for ModelValidator {
                         output_dict
                             .set_item(py_key, default.as_ref(py))
                             .map_err(as_internal)?;
+                    } else if !field.required {
+                        continue;
                     } else {
                         errors.push(val_line_error!(
                             input_value = input.as_error_value(),
