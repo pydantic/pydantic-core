@@ -168,7 +168,7 @@ impl StrConstrainedValidator {
     fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data impl Input,
         str: String,
     ) -> ValResult<'data, PyObject> {
         let mut str = str;

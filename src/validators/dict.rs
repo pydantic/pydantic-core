@@ -78,7 +78,7 @@ impl DictValidator {
     fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data impl Input,
         dict: GenericMapping<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],

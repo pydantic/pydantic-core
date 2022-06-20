@@ -3,7 +3,7 @@ use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
 use super::Input;
 
 #[inline]
-pub fn str_as_bool<'a>(input: &'a dyn Input, str: &str) -> ValResult<'a, bool> {
+pub fn str_as_bool<'a>(input: &'a impl Input, str: &str) -> ValResult<'a, bool> {
     if str == "0"
         || str.eq_ignore_ascii_case("f")
         || str.eq_ignore_ascii_case("n")
@@ -26,7 +26,7 @@ pub fn str_as_bool<'a>(input: &'a dyn Input, str: &str) -> ValResult<'a, bool> {
 }
 
 #[inline]
-pub fn int_as_bool(input: &dyn Input, int: i64) -> ValResult<bool> {
+pub fn int_as_bool(input: &impl Input, int: i64) -> ValResult<bool> {
     if int == 0 {
         Ok(false)
     } else if int == 1 {
@@ -37,7 +37,7 @@ pub fn int_as_bool(input: &dyn Input, int: i64) -> ValResult<bool> {
 }
 
 #[inline]
-pub fn str_as_int<'s, 'l>(input: &'s dyn Input, str: &'l str) -> ValResult<'s, i64> {
+pub fn str_as_int<'s, 'l>(input: &'s impl Input, str: &'l str) -> ValResult<'s, i64> {
     if let Ok(i) = str.parse::<i64>() {
         Ok(i)
     } else if let Ok(f) = str.parse::<f64>() {
@@ -47,7 +47,7 @@ pub fn str_as_int<'s, 'l>(input: &'s dyn Input, str: &'l str) -> ValResult<'s, i
     }
 }
 
-pub fn float_as_int(input: &dyn Input, float: f64) -> ValResult<i64> {
+pub fn float_as_int(input: &impl Input, float: f64) -> ValResult<i64> {
     if float == f64::INFINITY {
         err_val_error!(
             input_value = InputValue::InputRef(input),

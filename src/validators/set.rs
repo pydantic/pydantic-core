@@ -71,7 +71,7 @@ impl SetValidator {
     fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data impl Input,
         list: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],

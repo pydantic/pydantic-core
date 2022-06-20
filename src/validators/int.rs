@@ -137,7 +137,7 @@ impl ConstrainedIntValidator {
         .into())
     }
 
-    fn _validation_logic<'a>(&self, py: Python<'a>, input: &'a dyn Input, int: i64) -> ValResult<'a, PyObject> {
+    fn _validation_logic<'a>(&self, py: Python<'a>, input: &'a impl Input, int: i64) -> ValResult<'a, PyObject> {
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
                 return err_val_error!(

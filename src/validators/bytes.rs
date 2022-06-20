@@ -133,7 +133,7 @@ impl BytesConstrainedValidator {
     fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data impl Input,
         either_bytes: EitherBytes<'data>,
     ) -> ValResult<'data, PyObject> {
         let len = either_bytes.len().map_err(as_internal)?;

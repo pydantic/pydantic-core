@@ -1,7 +1,7 @@
 use std::fmt;
 
-use pyo3::prelude::*;
 use indexmap::IndexMap;
+use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde::de::{Deserialize, DeserializeSeed, Error as SerdeError, MapAccess, SeqAccess, Visitor};
 
@@ -40,16 +40,14 @@ impl IntoPy<PyObject> for JsonInput {
             JsonInput::Int(i) => i.into_py(py),
             JsonInput::Float(f) => f.into_py(py),
             JsonInput::String(s) => s.into_py(py),
-            JsonInput::Array(v) => {
-                v.into_iter().map(|v| v.clone().into_py(py)).collect::<Vec<_>>().into_py(py)
-            },
+            JsonInput::Array(v) => v.into_iter().map(|v| v.into_py(py)).collect::<Vec<_>>().into_py(py),
             JsonInput::Object(o) => {
                 let dict = PyDict::new(py);
                 for (k, v) in o.into_iter() {
-                    dict.set_item(k, v.clone().into_py(py)).unwrap();
+                    dict.set_item(k, v.into_py(py)).unwrap();
                 }
                 dict.into_py(py)
-            },
+            }
         }
     }
 }

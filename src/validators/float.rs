@@ -140,7 +140,7 @@ impl ConstrainedFloatValidator {
     fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data impl Input,
         float: f64,
     ) -> ValResult<'data, PyObject> {
         if let Some(multiple_of) = self.multiple_of {
