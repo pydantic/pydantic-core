@@ -1,16 +1,21 @@
 use std::fmt;
 
-use pyo3::types::PyType;
-use pyo3::ToPyObject;
+use pyo3::{types::PyType, ToPyObject};
 
 use super::return_enums::EitherBytes;
-use crate::errors::ValResult;
-use crate::input::datetime::EitherTime;
+use crate::{
+    errors::{InputValue, ValResult},
+    input::datetime::EitherTime,
+};
 
-use super::datetime::{EitherDate, EitherDateTime};
-use super::{GenericMapping, GenericSequence, ToLocItem};
+use super::{
+    datetime::{EitherDate, EitherDateTime},
+    GenericMapping, GenericSequence, ToLocItem,
+};
 
-pub trait Input: fmt::Debug + ToPyObject + ToLocItem {
+pub trait Input<'a>: fmt::Debug + ToPyObject + ToLocItem {
+    fn as_error_value(&'a self) -> InputValue<'a>;
+
     fn is_none(&self) -> bool;
 
     fn strict_str(&self) -> ValResult<String>;

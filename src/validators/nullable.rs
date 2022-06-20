@@ -1,8 +1,6 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::{prelude::*, types::PyDict};
 
-use crate::build_tools::SchemaDict;
-use crate::input::Input;
+use crate::{build_tools::SchemaDict, input::Input};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
@@ -28,7 +26,7 @@ impl BuildValidator for NullableValidator {
 }
 
 impl Validator for NullableValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -41,7 +39,7 @@ impl Validator for NullableValidator {
         }
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,

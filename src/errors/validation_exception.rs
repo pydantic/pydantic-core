@@ -1,16 +1,13 @@
-use std::error::Error;
-use std::fmt;
-use std::fmt::Write;
+use std::{error::Error, fmt, fmt::Write};
 
-use pyo3::exceptions::PyValueError;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use pyo3::PyErrArguments;
+use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict, PyErrArguments};
 
 use strum::EnumMessage;
 
-use super::kinds::ErrorKind;
-use super::line_error::{Context, LocItem, Location, ValLineError};
+use super::{
+    kinds::ErrorKind,
+    line_error::{Context, LocItem, Location, ValLineError},
+};
 
 use super::ValError;
 

@@ -1,9 +1,10 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::{prelude::*, types::PyDict};
 
-use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::{EitherBytes, Input};
+use crate::{
+    build_tools::{is_strict, SchemaDict},
+    errors::{as_internal, context, err_val_error, ErrorKind, ValResult},
+    input::{EitherBytes, Input},
+};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -30,7 +31,7 @@ impl BuildValidator for BytesValidator {
 }
 
 impl Validator for BytesValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -41,7 +42,7 @@ impl Validator for BytesValidator {
         Ok(either_bytes.into_py(py))
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -67,7 +68,7 @@ impl StrictBytesValidator {
 }
 
 impl Validator for StrictBytesValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -91,7 +92,7 @@ pub struct BytesConstrainedValidator {
 }
 
 impl Validator for BytesConstrainedValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -105,7 +106,7 @@ impl Validator for BytesConstrainedValidator {
         self._validation_logic(py, input, bytes)
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -130,10 +131,10 @@ impl BytesConstrainedValidator {
         .into())
     }
 
-    fn _validation_logic<'s, 'data>(
+    fn _validation_logic<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
-        input: &'data impl Input,
+        input: &'data I,
         either_bytes: EitherBytes<'data>,
     ) -> ValResult<'data, PyObject> {
         let len = either_bytes.len().map_err(as_internal)?;
@@ -141,7 +142,7 @@ impl BytesConstrainedValidator {
         if let Some(min_length) = self.min_length {
             if len < min_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::BytesTooShort,
                     context = context!("min_length" => min_length)
                 );
@@ -150,7 +151,7 @@ impl BytesConstrainedValidator {
         if let Some(max_length) = self.max_length {
             if len > max_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::BytesTooLong,
                     context = context!("max_length" => max_length)
                 );

@@ -1,10 +1,14 @@
-use pyo3::prelude::*;
-use pyo3::types::{PyDate, PyDict};
+use pyo3::{
+    prelude::*,
+    types::{PyDate, PyDict},
+};
 use speedate::{Date, Time};
 
-use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValResult};
-use crate::input::{pydate_as_date, EitherDate, Input};
+use crate::{
+    build_tools::{is_strict, SchemaDict},
+    errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValResult},
+    input::{pydate_as_date, EitherDate, Input},
+};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -52,7 +56,7 @@ impl BuildValidator for DateValidator {
 }
 
 impl Validator for DateValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -74,7 +78,7 @@ impl Validator for DateValidator {
         self.validation_comparison(py, input, date)
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -90,7 +94,7 @@ impl Validator for DateValidator {
 }
 
 impl DateValidator {
-    fn validation_comparison<'s, 'data, I: Input>(
+    fn validation_comparison<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -104,7 +108,7 @@ impl DateValidator {
                     if let Some(constraint) = &constraints.$constraint {
                         if !raw_date.$constraint(constraint) {
                             return err_val_error!(
-                                input_value = InputValue::InputRef(input),
+                                input_value = input.as_error_value(),
                                 kind = $error,
                                 context = context!($key => constraint.to_string())
                             );
@@ -124,7 +128,7 @@ impl DateValidator {
 
 /// In lax mode, if the input is not a date, we try parsing the input as a datetime, then check it is an
 /// "exact date", e.g. has a zero time component.
-fn date_from_datetime<'data, I: Input>(
+fn date_from_datetime<'data, I: Input<'data>>(
     input: &'data I,
     date_err: ValError<'data>,
 ) -> ValResult<'data, EitherDate<'data>> {
@@ -162,7 +166,7 @@ fn date_from_datetime<'data, I: Input>(
         Ok(EitherDate::Raw(dt.date))
     } else {
         err_val_error!(
-            input_value = InputValue::InputRef(input),
+            input_value = input.as_error_value(),
             kind = ErrorKind::DateFromDatetimeInexact
         )
     }

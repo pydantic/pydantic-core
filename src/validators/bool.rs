@@ -1,9 +1,6 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::{prelude::*, types::PyDict};
 
-use crate::build_tools::is_strict;
-use crate::errors::ValResult;
-use crate::input::Input;
+use crate::{build_tools::is_strict, errors::ValResult, input::Input};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -27,7 +24,7 @@ impl BuildValidator for BoolValidator {
 }
 
 impl Validator for BoolValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -39,7 +36,7 @@ impl Validator for BoolValidator {
         Ok(input.lax_bool()?.into_py(py))
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -64,7 +61,7 @@ impl StrictBoolValidator {
 }
 
 impl Validator for StrictBoolValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,

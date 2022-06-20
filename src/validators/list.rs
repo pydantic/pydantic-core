@@ -1,12 +1,14 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::{prelude::*, types::PyDict};
 
-use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{context, err_val_error, ErrorKind, InputValue};
-use crate::input::{GenericSequence, Input};
+use crate::{
+    build_tools::{is_strict, SchemaDict},
+    errors::{context, err_val_error, ErrorKind},
+    input::{GenericSequence, Input},
+};
 
-use super::any::AnyValidator;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
+use super::{
+    any::AnyValidator, build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator,
+};
 
 #[derive(Debug, Clone)]
 pub struct ListValidator {
@@ -38,7 +40,7 @@ impl BuildValidator for ListValidator {
 }
 
 impl Validator for ListValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -52,7 +54,7 @@ impl Validator for ListValidator {
         self._validation_logic(py, input, list, extra, slots)
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -68,10 +70,10 @@ impl Validator for ListValidator {
 }
 
 impl ListValidator {
-    fn _validation_logic<'s, 'data>(
+    fn _validation_logic<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
-        input: &'data impl Input,
+        input: &'data I,
         list: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
@@ -80,7 +82,7 @@ impl ListValidator {
         if let Some(min_length) = self.min_items {
             if length < min_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::ListTooShort,
                     context = context!("min_length" => min_length)
                 );
@@ -89,7 +91,7 @@ impl ListValidator {
         if let Some(max_length) = self.max_items {
             if length > max_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::ListTooLong,
                     context = context!("max_length" => max_length)
                 );

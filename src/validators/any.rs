@@ -1,8 +1,6 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::{prelude::*, types::PyDict};
 
-use crate::errors::ValResult;
-use crate::input::Input;
+use crate::{errors::ValResult, input::Input};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -23,7 +21,7 @@ impl BuildValidator for AnyValidator {
 }
 
 impl Validator for AnyValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,

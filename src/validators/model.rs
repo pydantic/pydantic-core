@@ -1,11 +1,13 @@
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySet, PyString};
-
-use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{
-    as_internal, err_val_error, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult,
+use pyo3::{
+    prelude::*,
+    types::{PyDict, PySet, PyString},
 };
-use crate::input::{GenericMapping, Input, ToLocItem};
+
+use crate::{
+    build_tools::{py_error, SchemaDict},
+    errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult},
+    input::{GenericMapping, Input, ToLocItem},
+};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -89,7 +91,7 @@ impl BuildValidator for ModelValidator {
 }
 
 impl Validator for ModelValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -134,7 +136,7 @@ impl Validator for ModelValidator {
                             .map_err(as_internal)?;
                     } else {
                         errors.push(val_line_error!(
-                            input_value = InputValue::InputRef(input),
+                            input_value = input.as_error_value(),
                             kind = ErrorKind::Missing,
                             location = vec![field.name.to_loc()]
                         ));
@@ -169,7 +171,7 @@ impl Validator for ModelValidator {
 
                         if forbid {
                             errors.push(val_line_error!(
-                                input_value = InputValue::InputRef(input),
+                                input_value = input.as_error_value(),
                                 kind = ErrorKind::ExtraForbidden,
                                 location = loc
                             ));
@@ -210,7 +212,7 @@ impl Validator for ModelValidator {
 }
 
 impl ModelValidator {
-    fn validate_assignment<'s, 'data, I: Input>(
+    fn validate_assignment<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         field: &str,
@@ -258,7 +260,7 @@ impl ModelValidator {
                 _ => {
                     let loc = vec![field.to_loc()];
                     err_val_error!(
-                        input_value = InputValue::InputRef(input),
+                        input_value = input.as_error_value(),
                         location = loc,
                         kind = ErrorKind::ExtraForbidden
                     )

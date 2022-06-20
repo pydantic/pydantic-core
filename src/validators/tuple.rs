@@ -1,12 +1,17 @@
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyTuple};
+use pyo3::{
+    prelude::*,
+    types::{PyDict, PyList, PyTuple},
+};
 
-use crate::build_tools::{is_strict, py_error, SchemaDict};
-use crate::errors::{context, err_val_error, ErrorKind, InputValue, LocItem, ValError, ValLineError};
-use crate::input::{GenericSequence, Input};
+use crate::{
+    build_tools::{is_strict, py_error, SchemaDict},
+    errors::{context, err_val_error, ErrorKind, LocItem, ValError, ValLineError},
+    input::{GenericSequence, Input},
+};
 
-use super::any::AnyValidator;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
+use super::{
+    any::AnyValidator, build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator,
+};
 
 #[derive(Debug, Clone)]
 pub struct TupleVarLenValidator {
@@ -38,7 +43,7 @@ impl BuildValidator for TupleVarLenValidator {
 }
 
 impl Validator for TupleVarLenValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -52,7 +57,7 @@ impl Validator for TupleVarLenValidator {
         self._validation_logic(py, input, tuple, extra, slots)
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -68,7 +73,7 @@ impl Validator for TupleVarLenValidator {
 }
 
 impl TupleVarLenValidator {
-    fn _validation_logic<'s, 'data, I: Input>(
+    fn _validation_logic<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -80,7 +85,7 @@ impl TupleVarLenValidator {
         if let Some(min_length) = self.min_items {
             if length < min_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::TupleTooShort,
                     context = context!("min_length" => min_length)
                 );
@@ -89,7 +94,7 @@ impl TupleVarLenValidator {
         if let Some(max_length) = self.max_items {
             if length > max_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::TupleTooLong,
                     context = context!("max_length" => max_length)
                 );
@@ -133,7 +138,7 @@ impl BuildValidator for TupleFixLenValidator {
 }
 
 impl Validator for TupleFixLenValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -147,7 +152,7 @@ impl Validator for TupleFixLenValidator {
         self._validation_logic(py, input, tuple, extra, slots)
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -163,7 +168,7 @@ impl Validator for TupleFixLenValidator {
 }
 
 impl TupleFixLenValidator {
-    fn _validation_logic<'s, 'data, I: Input>(
+    fn _validation_logic<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -176,7 +181,7 @@ impl TupleFixLenValidator {
         if expected_length != tuple.generic_len() {
             let plural = if expected_length == 1 { "" } else { "s" };
             return err_val_error!(
-                input_value = InputValue::InputRef(input),
+                input_value = input.as_error_value(),
                 kind = ErrorKind::TupleLengthMismatch,
                 // TODO fix Context::new so context! accepts different value types
                 context = context!(

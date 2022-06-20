@@ -1,8 +1,7 @@
 use std::fmt;
 
 use indexmap::IndexMap;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::{prelude::*, types::PyDict};
 use serde::de::{Deserialize, DeserializeSeed, Error as SerdeError, MapAccess, SeqAccess, Visitor};
 
 // taken from `serde_json`

@@ -2,15 +2,19 @@ use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
 
-use pyo3::exceptions::PyRecursionError;
-use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::{
+    exceptions::PyRecursionError,
+    prelude::*,
+    types::{PyAny, PyDict},
+};
 use serde_json::from_str as parse_json;
 
-use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
-use crate::input::{Input, JsonInput};
-use crate::SchemaError;
+use crate::{
+    build_tools::{py_error, SchemaDict},
+    errors::{as_validation_err, val_line_error, ErrorKind, ValError, ValResult},
+    input::{Input, JsonInput},
+    SchemaError,
+};
 
 mod any;
 mod bool;
@@ -91,7 +95,7 @@ impl SchemaValidator {
             }
             Err(e) => {
                 let line_err = val_line_error!(
-                    input_value = InputValue::InputRef(&input),
+                    input_value = input.as_error_value(),
                     message = Some(e.to_string()),
                     kind = ErrorKind::InvalidJson
                 );
@@ -299,7 +303,7 @@ pub enum CombinedValidator {
 #[enum_dispatch(CombinedValidator)]
 pub trait Validator: Send + Sync + Clone + Debug {
     /// Do the actual validation for this schema/type
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -309,7 +313,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
 
     /// This is used in unions for the first pass to see if we have an "exact match",
     /// implementations should generally use the same logic as with `config.strict = true`
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,

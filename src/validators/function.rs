@@ -1,10 +1,14 @@
-use pyo3::exceptions::{PyAssertionError, PyValueError};
-use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::{
+    exceptions::{PyAssertionError, PyValueError},
+    prelude::*,
+    types::{PyAny, PyDict},
+};
 
-use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
-use crate::input::Input;
+use crate::{
+    build_tools::{py_error, SchemaDict},
+    errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult},
+    input::Input,
+};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -65,7 +69,7 @@ pub struct FunctionBeforeValidator {
 impl_build!(FunctionBeforeValidator);
 
 impl Validator for FunctionBeforeValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -115,7 +119,7 @@ pub struct FunctionAfterValidator {
 impl_build!(FunctionAfterValidator);
 
 impl Validator for FunctionAfterValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -149,7 +153,7 @@ impl FunctionPlainValidator {
 }
 
 impl Validator for FunctionPlainValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -177,7 +181,7 @@ pub struct FunctionWrapValidator {
 impl_build!(FunctionWrapValidator);
 
 impl Validator for FunctionWrapValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -249,7 +253,7 @@ fn get_function(schema: &PyDict) -> PyResult<PyObject> {
     }
 }
 
-fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input) -> ValError<'a> {
+fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> ValError<'a> {
     // Only ValueError and AssertionError are considered as validation errors,
     // TypeError is now considered as a runtime error to catch errors in function signatures
     let kind = if err.is_instance_of::<PyValueError>(py) {
@@ -265,10 +269,6 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input) -> ValErro
         Err(err) => return ValError::InternalErr(err),
     };
     #[allow(clippy::redundant_field_names)]
-    let line_error = val_line_error!(
-        input_value = InputValue::InputRef(input),
-        kind = kind,
-        message = message
-    );
+    let line_error = val_line_error!(input_value = input.as_error_value(), kind = kind, message = message);
     ValError::LineErrors(vec![line_error])
 }

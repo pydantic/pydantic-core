@@ -1,12 +1,12 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::{prelude::*, types::PyDict};
 
-use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input, ToLocItem};
+use crate::{
+    build_tools::{is_strict, SchemaDict},
+    errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValLineError, ValResult},
+    input::{GenericMapping, Input, ToLocItem},
+};
 
-use super::any::AnyValidator;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{any::AnyValidator, build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
@@ -45,7 +45,7 @@ impl BuildValidator for DictValidator {
 }
 
 impl Validator for DictValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -59,7 +59,7 @@ impl Validator for DictValidator {
         self._validation_logic(py, input, dict, extra, slots)
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -75,10 +75,10 @@ impl Validator for DictValidator {
 }
 
 impl DictValidator {
-    fn _validation_logic<'s, 'data>(
+    fn _validation_logic<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
-        input: &'data impl Input,
+        input: &'data I,
         dict: GenericMapping<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
@@ -86,7 +86,7 @@ impl DictValidator {
         if let Some(min_length) = self.min_items {
             if dict.generic_len() < min_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::DictTooShort,
                     context = context!("min_length" => min_length)
                 );
@@ -95,7 +95,7 @@ impl DictValidator {
         if let Some(max_length) = self.max_items {
             if dict.generic_len() > max_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::DictTooLong,
                     context = context!("max_length" => max_length)
                 );

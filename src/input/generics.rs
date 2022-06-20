@@ -1,8 +1,12 @@
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyFrozenSet, PyList, PySet, PyTuple};
+use pyo3::{
+    prelude::*,
+    types::{PyDict, PyFrozenSet, PyList, PySet, PyTuple},
+};
 
-use crate::errors::{LocItem, ValError, ValLineError, ValResult};
-use crate::validators::{CombinedValidator, Extra, Validator};
+use crate::{
+    errors::{LocItem, ValError, ValLineError, ValResult},
+    validators::{CombinedValidator, Extra, Validator},
+};
 
 use super::parse_json::{JsonArray, JsonObject};
 

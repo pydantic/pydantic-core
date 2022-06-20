@@ -1,10 +1,14 @@
-use pyo3::prelude::*;
-use pyo3::types::{PyDateTime, PyDict};
+use pyo3::{
+    prelude::*,
+    types::{PyDateTime, PyDict},
+};
 use speedate::DateTime;
 
-use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::{pydatetime_as_datetime, EitherDateTime, Input};
+use crate::{
+    build_tools::{is_strict, SchemaDict},
+    errors::{as_internal, context, err_val_error, ErrorKind, ValResult},
+    input::{pydatetime_as_datetime, EitherDateTime, Input},
+};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -52,7 +56,7 @@ impl BuildValidator for DateTimeValidator {
 }
 
 impl Validator for DateTimeValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -66,7 +70,7 @@ impl Validator for DateTimeValidator {
         self.validation_comparison(py, input, date)
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -82,10 +86,10 @@ impl Validator for DateTimeValidator {
 }
 
 impl DateTimeValidator {
-    fn validation_comparison<'s, 'data>(
+    fn validation_comparison<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
-        input: &'data impl Input,
+        input: &'data I,
         datetime: EitherDateTime,
     ) -> ValResult<'data, PyObject> {
         if let Some(constraints) = &self.constraints {
@@ -96,7 +100,7 @@ impl DateTimeValidator {
                 Err(err) => {
                     let error_name = err.get_type(py).name().map_err(as_internal)?;
                     return err_val_error!(
-                        input_value = InputValue::InputRef(input),
+                        input_value = input.as_error_value(),
                         kind = ErrorKind::DateTimeObjectInvalid,
                         context = context!("processing_error" => error_name)
                     );
@@ -107,7 +111,7 @@ impl DateTimeValidator {
                     if let Some(constraint) = &constraints.$constraint {
                         if !speedate_dt.$constraint(constraint) {
                             return err_val_error!(
-                                input_value = InputValue::InputRef(input),
+                                input_value = input.as_error_value(),
                                 kind = $error,
                                 context = context!($key => constraint.to_string())
                             );

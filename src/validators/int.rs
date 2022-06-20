@@ -1,9 +1,10 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::{prelude::*, types::PyDict};
 
-use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::Input;
+use crate::{
+    build_tools::{is_strict, SchemaDict},
+    errors::{context, err_val_error, ErrorKind, ValResult},
+    input::Input,
+};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -34,7 +35,7 @@ impl BuildValidator for IntValidator {
 }
 
 impl Validator for IntValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -44,7 +45,7 @@ impl Validator for IntValidator {
         Ok(input.lax_int()?.into_py(py))
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -69,7 +70,7 @@ impl StrictIntValidator {
 }
 
 impl Validator for StrictIntValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -95,7 +96,7 @@ pub struct ConstrainedIntValidator {
 }
 
 impl Validator for ConstrainedIntValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -109,7 +110,7 @@ impl Validator for ConstrainedIntValidator {
         self._validation_logic(py, input, int)
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -137,11 +138,11 @@ impl ConstrainedIntValidator {
         .into())
     }
 
-    fn _validation_logic<'a>(&self, py: Python<'a>, input: &'a impl Input, int: i64) -> ValResult<'a, PyObject> {
+    fn _validation_logic<'a, I: Input<'a>>(&self, py: Python<'a>, input: &'a I, int: i64) -> ValResult<'a, PyObject> {
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::IntMultiple,
                     context = context!("multiple_of" => multiple_of)
                 );
@@ -150,7 +151,7 @@ impl ConstrainedIntValidator {
         if let Some(le) = self.le {
             if int > le {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::IntLessThanEqual,
                     context = context!("le" => le)
                 );
@@ -159,7 +160,7 @@ impl ConstrainedIntValidator {
         if let Some(lt) = self.lt {
             if int >= lt {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::IntLessThan,
                     context = context!("lt" => lt)
                 );
@@ -168,7 +169,7 @@ impl ConstrainedIntValidator {
         if let Some(ge) = self.ge {
             if int < ge {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::IntGreaterThanEqual,
                     context = context!("ge" => ge)
                 );
@@ -177,7 +178,7 @@ impl ConstrainedIntValidator {
         if let Some(gt) = self.gt {
             if int <= gt {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::IntGreaterThan,
                     context = context!("gt" => gt)
                 );

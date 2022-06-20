@@ -1,10 +1,14 @@
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::{
+    prelude::*,
+    types::{PyDict, PyString},
+};
 use regex::Regex;
 
-use crate::build_tools::{is_strict, py_error, schema_or_config};
-use crate::errors::{context, err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::Input;
+use crate::{
+    build_tools::{is_strict, py_error, schema_or_config},
+    errors::{context, err_val_error, ErrorKind, ValResult},
+    input::Input,
+};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -47,7 +51,7 @@ impl BuildValidator for StrValidator {
 }
 
 impl Validator for StrValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -57,7 +61,7 @@ impl Validator for StrValidator {
         Ok(input.lax_str()?.into_py(py))
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -82,7 +86,7 @@ impl StrictStrValidator {
 }
 
 impl Validator for StrictStrValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -109,7 +113,7 @@ pub struct StrConstrainedValidator {
 }
 
 impl Validator for StrConstrainedValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -123,7 +127,7 @@ impl Validator for StrConstrainedValidator {
         self._validation_logic(py, input, str)
     }
 
-    fn validate_strict<'s, 'data, I: Input>(
+    fn validate_strict<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -165,10 +169,10 @@ impl StrConstrainedValidator {
         .into())
     }
 
-    fn _validation_logic<'s, 'data>(
+    fn _validation_logic<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
-        input: &'data impl Input,
+        input: &'data I,
         str: String,
     ) -> ValResult<'data, PyObject> {
         let mut str = str;
@@ -176,7 +180,7 @@ impl StrConstrainedValidator {
             if str.len() < min_length {
                 // return py_error!("{} is shorter than {}", str, min_length);
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::StrTooShort,
                     context = context!("min_length" => min_length)
                 );
@@ -185,7 +189,7 @@ impl StrConstrainedValidator {
         if let Some(max_length) = self.max_length {
             if str.len() > max_length {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::StrTooLong,
                     context = context!("max_length" => max_length)
                 );
@@ -194,7 +198,7 @@ impl StrConstrainedValidator {
         if let Some(pattern) = &self.pattern {
             if !pattern.is_match(&str) {
                 return err_val_error!(
-                    input_value = InputValue::InputRef(input),
+                    input_value = input.as_error_value(),
                     kind = ErrorKind::StrPatternMismatch,
                     context = context!("pattern" => pattern.to_string())
                 );

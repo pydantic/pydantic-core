@@ -1,9 +1,6 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::{prelude::*, types::PyDict};
 
-use crate::build_tools::SchemaDict;
-use crate::errors::ValResult;
-use crate::input::Input;
+use crate::{build_tools::SchemaDict, errors::ValResult, input::Input};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -28,7 +25,7 @@ impl BuildValidator for RecursiveValidator {
 }
 
 impl Validator for RecursiveValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
@@ -64,7 +61,7 @@ impl BuildValidator for RecursiveRefValidator {
 }
 
 impl Validator for RecursiveRefValidator {
-    fn validate<'s, 'data, I: Input>(
+    fn validate<'s, 'data, I: Input<'data>>(
         &'s self,
         py: Python<'data>,
         input: &'data I,
