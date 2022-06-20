@@ -81,8 +81,8 @@ impl TupleVarLenValidator {
             if length < min_length {
                 return err_val_error!(
                     input_value = input.as_error_value(),
-                    kind = ErrorKind::TupleTooShort,
-                    context = context!("min_length" => min_length)
+                    kind = ErrorKind::TooShort,
+                    context = context!("type" => "Tuple", "min_length" => min_length)
                 );
             }
         }
@@ -90,8 +90,8 @@ impl TupleVarLenValidator {
             if length > max_length {
                 return err_val_error!(
                     input_value = input.as_error_value(),
-                    kind = ErrorKind::TupleTooLong,
-                    context = context!("max_length" => max_length)
+                    kind = ErrorKind::TooLong,
+                    context = context!("type" => "Tuple", "max_length" => max_length)
                 );
             }
         }
