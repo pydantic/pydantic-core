@@ -254,5 +254,5 @@ def test_json_error():
 
 
 def test_missing_schema_key():
-    with pytest.raises(SchemaError, match='SchemaError: Missing schema key for field "x"'):
+    with pytest.raises(SchemaError, match='"schema" is required'):
         SchemaValidator({'type': 'model', 'fields': {'x': {'type': 'str'}}})
