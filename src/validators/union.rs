@@ -30,10 +30,10 @@ impl BuildValidator for UnionValidator {
 }
 
 impl Validator for UnionValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {

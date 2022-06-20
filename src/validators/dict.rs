@@ -45,10 +45,10 @@ impl BuildValidator for DictValidator {
 }
 
 impl Validator for DictValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -59,10 +59,10 @@ impl Validator for DictValidator {
         self._validation_logic(py, input, dict, extra, slots)
     }
 
-    fn validate_strict<'s, 'data, I: Input<'data>>(
+    fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -75,10 +75,10 @@ impl Validator for DictValidator {
 }
 
 impl DictValidator {
-    fn _validation_logic<'s, 'data, I: Input<'data>>(
+    fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         dict: GenericMapping<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],

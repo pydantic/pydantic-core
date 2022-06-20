@@ -34,20 +34,20 @@ impl BuildValidator for IntValidator {
 }
 
 impl Validator for IntValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         Ok(input.lax_int()?.into_py(py))
     }
 
-    fn validate_strict<'s, 'data, I: Input<'data>>(
+    fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -69,10 +69,10 @@ impl StrictIntValidator {
 }
 
 impl Validator for StrictIntValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -95,10 +95,10 @@ pub struct ConstrainedIntValidator {
 }
 
 impl Validator for ConstrainedIntValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -109,10 +109,10 @@ impl Validator for ConstrainedIntValidator {
         self._validation_logic(py, input, int)
     }
 
-    fn validate_strict<'s, 'data, I: Input<'data>>(
+    fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -137,7 +137,7 @@ impl ConstrainedIntValidator {
         .into())
     }
 
-    fn _validation_logic<'a, I: Input<'a>>(&self, py: Python<'a>, input: &'a I, int: i64) -> ValResult<'a, PyObject> {
+    fn _validation_logic<'a>(&self, py: Python<'a>, input: &'a impl Input<'a>, int: i64) -> ValResult<'a, PyObject> {
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
                 return err_val_error!(

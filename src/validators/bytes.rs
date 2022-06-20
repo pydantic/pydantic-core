@@ -30,10 +30,10 @@ impl BuildValidator for BytesValidator {
 }
 
 impl Validator for BytesValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -41,10 +41,10 @@ impl Validator for BytesValidator {
         Ok(either_bytes.into_py(py))
     }
 
-    fn validate_strict<'s, 'data, I: Input<'data>>(
+    fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -67,10 +67,10 @@ impl StrictBytesValidator {
 }
 
 impl Validator for StrictBytesValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -91,10 +91,10 @@ pub struct BytesConstrainedValidator {
 }
 
 impl Validator for BytesConstrainedValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -105,10 +105,10 @@ impl Validator for BytesConstrainedValidator {
         self._validation_logic(py, input, bytes)
     }
 
-    fn validate_strict<'s, 'data, I: Input<'data>>(
+    fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -130,10 +130,10 @@ impl BytesConstrainedValidator {
         .into())
     }
 
-    fn _validation_logic<'s, 'data, I: Input<'data>>(
+    fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         either_bytes: EitherBytes<'data>,
     ) -> ValResult<'data, PyObject> {
         let len = either_bytes.len().map_err(as_internal)?;

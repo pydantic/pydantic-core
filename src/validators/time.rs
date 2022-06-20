@@ -52,10 +52,10 @@ impl BuildValidator for TimeValidator {
 }
 
 impl Validator for TimeValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -66,10 +66,10 @@ impl Validator for TimeValidator {
         self.validation_comparison(py, input, time)
     }
 
-    fn validate_strict<'s, 'data, I: Input<'data>>(
+    fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -82,10 +82,10 @@ impl Validator for TimeValidator {
 }
 
 impl TimeValidator {
-    fn validation_comparison<'s, 'data, I: Input<'data>>(
+    fn validation_comparison<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         time: EitherTime<'data>,
     ) -> ValResult<'data, PyObject> {
         if let Some(constraints) = &self.constraints {

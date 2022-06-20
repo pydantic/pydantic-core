@@ -38,10 +38,10 @@ impl BuildValidator for SetValidator {
 }
 
 impl Validator for SetValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -52,10 +52,10 @@ impl Validator for SetValidator {
         self._validation_logic(py, input, set, extra, slots)
     }
 
-    fn validate_strict<'s, 'data, I: Input<'data>>(
+    fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -68,10 +68,10 @@ impl Validator for SetValidator {
 }
 
 impl SetValidator {
-    fn _validation_logic<'s, 'data, I: Input<'data>>(
+    fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         list: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],

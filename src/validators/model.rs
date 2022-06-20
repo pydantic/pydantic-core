@@ -87,10 +87,10 @@ impl BuildValidator for ModelValidator {
 }
 
 impl Validator for ModelValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -208,11 +208,11 @@ impl Validator for ModelValidator {
 }
 
 impl ModelValidator {
-    fn validate_assignment<'s, 'data, I: Input<'data>>(
+    fn validate_assignment<'s, 'data>(
         &'s self,
         py: Python<'data>,
         field: &str,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject>

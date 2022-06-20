@@ -38,10 +38,10 @@ impl BuildValidator for TupleVarLenValidator {
 }
 
 impl Validator for TupleVarLenValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -52,10 +52,10 @@ impl Validator for TupleVarLenValidator {
         self._validation_logic(py, input, tuple, extra, slots)
     }
 
-    fn validate_strict<'s, 'data, I: Input<'data>>(
+    fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -68,10 +68,10 @@ impl Validator for TupleVarLenValidator {
 }
 
 impl TupleVarLenValidator {
-    fn _validation_logic<'s, 'data, I: Input<'data>>(
+    fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         tuple: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
@@ -133,10 +133,10 @@ impl BuildValidator for TupleFixLenValidator {
 }
 
 impl Validator for TupleFixLenValidator {
-    fn validate<'s, 'data, I: Input<'data>>(
+    fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -147,10 +147,10 @@ impl Validator for TupleFixLenValidator {
         self._validation_logic(py, input, tuple, extra, slots)
     }
 
-    fn validate_strict<'s, 'data, I: Input<'data>>(
+    fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -163,10 +163,10 @@ impl Validator for TupleFixLenValidator {
 }
 
 impl TupleFixLenValidator {
-    fn _validation_logic<'s, 'data, I: Input<'data>>(
+    fn _validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data I,
+        input: &'data impl Input<'data>,
         tuple: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
