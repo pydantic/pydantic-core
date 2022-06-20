@@ -45,8 +45,12 @@ macro_rules! build_validate_to_vec {
                 match validator.validate(py, item, extra, slots) {
                     Ok(item) => output.push(item),
                     Err(ValError::LineErrors(line_errors)) => {
-                        let loc = vec![LocItem::I(index)];
-                        errors.extend(line_errors.into_iter().map(|err| err.with_prefix_location(&loc)));
+                        let loc_prefix = LocItem::I(index);
+                        errors.extend(
+                            line_errors
+                                .into_iter()
+                                .map(|err| err.with_prefix_location(loc_prefix.clone())),
+                        );
                     }
                     Err(err) => return Err(err),
                 }
