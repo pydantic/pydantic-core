@@ -218,10 +218,7 @@ impl<'a> Input<'a> for PyAny {
         if let Ok(set) = self.cast_as::<PyFrozenSet>() {
             Ok(set.into())
         } else {
-            err_val_error!(
-                input_value = InputValue::InputRef(self),
-                kind = ErrorKind::FrozenSetType
-            )
+            err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::FrozenSetType)
         }
     }
 
@@ -235,10 +232,7 @@ impl<'a> Input<'a> for PyAny {
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
         } else {
-            err_val_error!(
-                input_value = InputValue::InputRef(self),
-                kind = ErrorKind::FrozenSetType
-            )
+            err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::FrozenSetType)
         }
     }
 

@@ -50,6 +50,7 @@ def test_frozenset_no_validators_both(py_or_json, input_value, expected):
         ((), frozenset()),
         (frozenset([1, 2, 3, 2, 3]), {1, 2, 3}),
         ({'abc'}, Err('0\n  Value must be a valid integer')),
+        ({1, 2, 'wrong'}, Err('Value must be a valid integer')),
         ({1: 2}, Err('1 validation error for frozenset-int\n  Value must be a valid frozenset')),
         ('abc', Err('Value must be a valid frozenset')),
         # Technically correct, but does anyone actually need this? I think needs a new type in pyo3
@@ -95,17 +96,18 @@ def test_frozenset_multiple_errors():
     'kwargs,input_value,expected',
     [
         ({'strict': True}, frozenset(), frozenset()),
+        ({'strict': True}, frozenset([1, 2, 3]), {1, 2, 3}),
         ({'strict': True}, {1, 2, 3}, Err('Value must be a valid frozenset')),
         ({'strict': True}, [1, 2, 3, 2, 3], Err('Value must be a valid frozenset [kind=frozen_set_type,')),
         ({'strict': True}, [], Err('Value must be a valid frozenset [kind=frozen_set_type,')),
         ({'strict': True}, (), Err('Value must be a valid frozenset [kind=frozen_set_type,')),
         ({'strict': True}, (1, 2, 3), Err('Value must be a valid frozenset [kind=frozen_set_type,')),
-        ({'strict': True}, set([1, 2, 3]), Err('Value must be a valid frozenset [kind=frozen_set_type,')),
+        ({'strict': True}, {1, 2, 3}, Err('Value must be a valid frozenset [kind=frozen_set_type,')),
         ({'strict': True}, 'abc', Err('Value must be a valid frozenset [kind=frozen_set_type,')),
         ({'min_items': 3}, {1, 2, 3}, {1, 2, 3}),
-        ({'min_items': 3}, {1, 2}, Err('FrozenSet must have at least 3 items [kind=frozen_set_too_short,')),
+        ({'min_items': 3}, {1, 2}, Err('FrozenSet must have at least 3 items [kind=too_short,')),
         ({'max_items': 3}, {1, 2, 3}, {1, 2, 3}),
-        ({'max_items': 3}, {1, 2, 3, 4}, Err('FrozenSet must have at most 3 items [kind=frozen_set_too_long,')),
+        ({'max_items': 3}, {1, 2, 3, 4}, Err('FrozenSet must have at most 3 items [kind=too_long,')),
     ],
 )
 def test_frozenset_kwargs_python(kwargs, input_value, expected):
@@ -182,3 +184,21 @@ def test_frozenset_as_dict_keys(py_or_json):
     v = py_or_json({'type': 'dict', 'keys': {'type': 'frozenset'}, 'value': 'int'})
     with pytest.raises(ValidationError, match=re.escape('Value must be a valid frozenset')):
         v.validate_test({'foo': 'bar'})
+
+
+def test_repr():
+    v = SchemaValidator({'type': 'frozenset', 'strict': True, 'min_items': 42})
+    assert repr(v) == (
+        'SchemaValidator(name="frozenset-any", validator=FrozenSet(\n'
+        '    FrozenSetValidator {\n'
+        '        strict: true,\n'
+        '        item_validator: Any(\n'
+        '            AnyValidator,\n'
+        '        ),\n'
+        '        min_items: Some(\n'
+        '            42,\n'
+        '        ),\n'
+        '        max_items: None,\n'
+        '    },\n'
+        '))'
+    )

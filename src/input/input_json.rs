@@ -127,10 +127,7 @@ impl<'a> Input<'a> for JsonInput {
     fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         match self {
             JsonInput::Array(a) => Ok(a.into()),
-            _ => err_val_error!(
-                input_value = InputValue::InputRef(self),
-                kind = ErrorKind::FrozenSetType
-            ),
+            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::FrozenSetType),
         }
     }
 
@@ -271,10 +268,7 @@ impl<'a> Input<'a> for String {
 
     #[no_coverage]
     fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        err_val_error!(
-            input_value = InputValue::InputRef(self),
-            kind = ErrorKind::FrozenSetType
-        )
+        err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::FrozenSetType)
     }
 
     fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
