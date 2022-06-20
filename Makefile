@@ -20,6 +20,7 @@ build-dev:
 	@rm -f pydantic_core/*.so
 	cargo build
 	@rm -f target/debug/lib_pydantic_core.d
+	@rm -f target/debug/lib_pydantic_core.rlib
 	@mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: build-prod
@@ -27,6 +28,7 @@ build-prod:
 	@rm -f pydantic_core/*.so
 	cargo build --release
 	@rm -f target/release/lib_pydantic_core.d
+	@rm -f target/release/lib_pydantic_core.rlib
 	@mv target/release/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: build-coverage
@@ -37,11 +39,19 @@ build-coverage:
 	@rm -f target/debug/lib_pydantic_core.d
 	mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
+.PHONY: build-cov-windows
+build-cov-windows:
+	pip uninstall -y pydantic_core
+	rm -f pydantic_core/*.so
+	RUSTFLAGS='-C instrument-coverage -A incomplete_features' cargo build
+	@rm -f target/debug/lib_pydantic_core.d
+	@rm -f target/debug/lib_pydantic_core.rlib
+	mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
+
 .PHONY: format
 format:
 	$(isort)
 	$(black)
-	@echo 'max_width = 120' > .rustfmt.toml
 	cargo fmt
 
 .PHONY: lint-python
@@ -53,7 +63,6 @@ lint-python:
 .PHONY: lint-rust
 lint-rust:
 	cargo fmt --version
-	@echo 'max_width = 120' > .rustfmt.toml
 	cargo fmt --all -- --check
 	cargo clippy --version
 	cargo clippy -- -D warnings -A incomplete_features
@@ -69,9 +78,13 @@ pyright:
 test:
 	coverage run -m pytest
 
-.PHONY: benchmark
-benchmark:
+.PHONY: py-benchmark
+py-benchmark:
 	pytest tests/test_benchmarks.py --benchmark-enable --benchmark-autosave
+
+.PHONY: rust-benchmark
+rust-benchmark:
+	cargo rust-bench
 
 .PHONY: testcov
 testcov: build-coverage test
@@ -79,6 +92,14 @@ testcov: build-coverage test
 	@mkdir -p htmlcov
 	coverage html -d htmlcov/python
 	./tests/rust_coverage_html.sh
+
+.PHONY: testcov-windows
+testcov-windows: build-cov-windows test
+	@rm -rf htmlcov
+	@mkdir -p htmlcov
+	coverage html -d htmlcov/python
+	./tests/rust_coverage_html.sh
+
 
 .PHONY: all
 all: format build-dev lint pyright test

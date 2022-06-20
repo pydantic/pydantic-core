@@ -3,7 +3,7 @@ use std::fmt;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::input::ToPy;
+use crate::input::JsonInput;
 
 use super::kinds::ErrorKind;
 
@@ -59,7 +59,9 @@ impl<'a> ValLineError<'a> {
 #[derive(Debug)]
 pub enum InputValue<'a> {
     None,
-    InputRef(&'a dyn ToPy),
+    PyAny(&'a PyAny),
+    JsonInput(&'a JsonInput),
+    String(&'a str),
     PyObject(PyObject),
 }
 
@@ -69,11 +71,13 @@ impl Default for InputValue<'_> {
     }
 }
 
-impl<'a> InputValue<'a> {
-    pub fn to_py(&self, py: Python) -> PyObject {
+impl<'a> ToPyObject for InputValue<'a> {
+    fn to_object(&self, py: Python) -> PyObject {
         match self {
             Self::None => py.None(),
-            Self::InputRef(input) => input.to_py(py),
+            Self::PyAny(input) => input.into_py(py),
+            Self::JsonInput(input) => input.to_object(py),
+            Self::String(input) => input.into_py(py),
             Self::PyObject(py_obj) => py_obj.into_py(py),
         }
     }
@@ -83,8 +87,8 @@ impl<'a> InputValue<'a> {
 pub struct Context(Vec<(String, ContextValue)>);
 
 impl Context {
-    pub fn new<K: Into<String>, V: Into<ContextValue>, I: IntoIterator<Item = (K, V)>>(raw: I) -> Self {
-        Self(raw.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
+    pub fn new<I: IntoIterator<Item = (String, ContextValue)>>(raw: I) -> Self {
+        Self(raw.into_iter().collect())
     }
 
     pub fn is_empty(&self) -> bool {

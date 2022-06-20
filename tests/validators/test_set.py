@@ -9,11 +9,21 @@ from ..conftest import Err
 
 @pytest.mark.parametrize(
     'input_value,expected',
-    [([], set()), ([1, 2, 3], {1, 2, 3}), ([1, 2, '3'], {1, 2, 3}), ([1, 2, 3, 2, 3], {1, 2, 3})],
+    [
+        ([], set()),
+        ([1, 2, 3], {1, 2, 3}),
+        ([1, 2, '3'], {1, 2, 3}),
+        ([1, 2, 3, 2, 3], {1, 2, 3}),
+        (5, Err('Value must be a valid set [kind=set_type, input_value=5, input_type=int]')),
+    ],
 )
 def test_set_ints_both(py_or_json, input_value, expected):
     v = py_or_json({'type': 'set', 'items': {'type': 'int'}})
-    assert v.validate_test(input_value) == expected
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_test(input_value)
+    else:
+        assert v.validate_test(input_value) == expected
 
 
 @pytest.mark.parametrize('input_value,expected', [([1, 2.5, '3'], {1, 2.5, '3'})])
@@ -82,9 +92,9 @@ def test_set_multiple_errors():
         ({'strict': True}, frozenset([1, 2, 3]), Err('Value must be a valid set [kind=set_type,')),
         ({'strict': True}, 'abc', Err('Value must be a valid set [kind=set_type,')),
         ({'min_items': 3}, {1, 2, 3}, {1, 2, 3}),
-        ({'min_items': 3}, {1, 2}, Err('Set must have at least 3 items [kind=set_too_short,')),
+        ({'min_items': 3}, {1, 2}, Err('Set must have at least 3 items [kind=too_short,')),
         ({'max_items': 3}, {1, 2, 3}, {1, 2, 3}),
-        ({'max_items': 3}, {1, 2, 3, 4}, Err('Set must have at most 3 items [kind=set_too_long,')),
+        ({'max_items': 3}, {1, 2, 3, 4}, Err('Set must have at most 3 items [kind=too_long,')),
     ],
 )
 def test_set_kwargs(kwargs, input_value, expected):

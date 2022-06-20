@@ -1,15 +1,18 @@
 use std::fmt;
 
 use pyo3::types::PyType;
+use pyo3::ToPyObject;
 
-use crate::errors::ValResult;
+use crate::errors::{InputValue, ValResult};
 use crate::input::datetime::EitherTime;
 
 use super::return_enums::{EitherBytes, EitherString};
 use super::datetime::{EitherDate, EitherDateTime};
-use super::{GenericMapping, GenericSequence, ToLocItem, ToPy};
+use super::{GenericMapping, GenericSequence, ToLocItem};
 
-pub trait Input: fmt::Debug + ToPy + ToLocItem {
+pub trait Input<'a>: fmt::Debug + ToPyObject + ToLocItem {
+    fn as_error_value(&'a self) -> InputValue<'a>;
+
     fn is_none(&self) -> bool;
 
     fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>>;
@@ -72,5 +75,11 @@ pub trait Input: fmt::Debug + ToPy + ToLocItem {
 
     fn lax_datetime(&self) -> ValResult<EitherDateTime> {
         self.strict_datetime()
+    }
+
+    fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>>;
+
+    fn lax_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        self.strict_tuple()
     }
 }

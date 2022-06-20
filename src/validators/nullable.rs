@@ -7,12 +7,12 @@ use crate::input::Input;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
-pub struct OptionalValidator {
+pub struct NullableValidator {
     validator: Box<CombinedValidator>,
 }
 
-impl BuildValidator for OptionalValidator {
-    const EXPECTED_TYPE: &'static str = "optional";
+impl BuildValidator for NullableValidator {
+    const EXPECTED_TYPE: &'static str = "nullable";
 
     fn build(
         schema: &PyDict,
@@ -27,11 +27,11 @@ impl BuildValidator for OptionalValidator {
     }
 }
 
-impl Validator for OptionalValidator {
+impl Validator for NullableValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -44,7 +44,7 @@ impl Validator for OptionalValidator {
     fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
