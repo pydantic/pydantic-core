@@ -121,9 +121,8 @@ impl Validator for ModelValidator {
                         match field.validator.validate(py, value, &extra, slots) {
                             Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                             Err(ValError::LineErrors(line_errors)) => {
-                                let loc_prefix = field.name.to_loc();
                                 for err in line_errors {
-                                    errors.push(err.with_prefix_location(loc_prefix.clone()));
+                                    errors.push(err.with_prefix_location(field.name.to_loc()));
                                 }
                             }
                             Err(err) => return Err(err),
@@ -153,9 +152,8 @@ impl Validator for ModelValidator {
                         let key: String = match raw_key.lax_str() {
                             Ok(k) => k.as_raw().map_err(as_internal)?,
                             Err(ValError::LineErrors(line_errors)) => {
-                                let loc_prefix = raw_key.to_loc();
                                 for err in line_errors {
-                                    errors.push(err.with_prefix_location(loc_prefix.clone()));
+                                    errors.push(err.with_prefix_location(raw_key.to_loc()));
                                 }
                                 continue;
                             }
@@ -177,9 +175,8 @@ impl Validator for ModelValidator {
                             match validator.validate(py, value, &extra, slots) {
                                 Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                                 Err(ValError::LineErrors(line_errors)) => {
-                                    let loc_prefix = key.to_loc();
                                     for err in line_errors {
-                                        errors.push(err.with_prefix_location(loc_prefix.clone()));
+                                        errors.push(err.with_prefix_location(key.to_loc()));
                                     }
                                 }
                                 Err(err) => return Err(err),
