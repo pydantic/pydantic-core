@@ -143,7 +143,7 @@ impl BytesConstrainedValidator {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::BytesTooShort,
-                    context = context!("type" => "Bytes", "min_length" => min_length)
+                    context = context!("min_length" => min_length)
                 );
             }
         }
@@ -152,7 +152,7 @@ impl BytesConstrainedValidator {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::BytesTooLong,
-                    context = context!("type" => "Bytes", "max_length" => max_length)
+                    context = context!("max_length" => max_length)
                 );
             }
         }

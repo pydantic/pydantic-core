@@ -25,7 +25,7 @@ pub enum ErrorKind {
     #[strum(message = "Value must be a valid boolean")]
     Bool,
     // ---------------------
-    // comparison errors
+    // generic comparison errors - used for all inequality comparisons
     #[strum(message = "Value must be a multiple of {multiple_of}")]
     IntMultipleOf,
     #[strum(message = "Value must be greater than {gt}")]
@@ -36,27 +36,24 @@ pub enum ErrorKind {
     LessThan,
     #[strum(message = "Value must be less than or equal to {le}")]
     LessThanEqual,
-
+    // ---------------------
+    // generic length errors - used for everything with a length except strings and bytes which need custom messages
     #[strum(message = "{type} must have at least {min_length} items")]
     TooShort,
     #[strum(message = "{type} must have at most {max_length} items")]
     TooLong,
-
     // ---------------------
     // string errors
     #[strum(message = "Value must be a valid string")]
     StrType,
     #[strum(message = "Value must be a valid string, unable to parse raw data as a unicode string")]
     StrUnicode,
+    #[strum(message = "String must have at least {min_length} characters", serialize = "too_short")]
+    StrTooShort,
+    #[strum(message = "String must have at most {max_length} characters", serialize = "too_long")]
+    StrTooLong,
     #[strum(message = "String must match pattern '{pattern}'")]
     StrPatternMismatch,
-    #[strum(
-        message = "{type} must have at least {min_length} characters",
-        serialize = "too_short"
-    )]
-    StrTooShort,
-    #[strum(message = "{type} must have at most {max_length} characters", serialize = "too_long")]
-    StrTooLong,
     // ---------------------
     // dict errors
     #[strum(message = "Value must be a valid dictionary")]
@@ -109,12 +106,9 @@ pub enum ErrorKind {
     // bytes errors
     #[strum(message = "Value must be a valid bytes")]
     BytesType,
-    #[strum(
-        message = "{type} must have at least {min_length} characters",
-        serialize = "too_short"
-    )]
+    #[strum(message = "Data must have at least {min_length} bytes", serialize = "too_short")]
     BytesTooShort,
-    #[strum(message = "{type} must have at most {max_length} characters", serialize = "too_long")]
+    #[strum(message = "Data must have at most {max_length} bytes", serialize = "too_long")]
     BytesTooLong,
     // ---------------------
     // python errors from functions (the messages here will not be used as we sett message in these cases)

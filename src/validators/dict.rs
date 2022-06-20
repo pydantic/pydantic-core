@@ -88,7 +88,7 @@ impl DictValidator {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::TooShort,
-                    context = context!("type" => "Dict","min_length" => min_length)
+                    context = context!("type" => "Dict", "min_length" => min_length)
                 );
             }
         }
@@ -97,7 +97,7 @@ impl DictValidator {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::TooLong,
-                    context = context!("type" => "Dict","max_length" => max_length)
+                    context = context!("type" => "Dict", "max_length" => max_length)
                 );
             }
         }

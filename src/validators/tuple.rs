@@ -84,7 +84,7 @@ impl TupleVarLenValidator {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::TooShort,
-                    context = context!("type" => "Tuple","min_length" => min_length)
+                    context = context!("type" => "Tuple", "min_length" => min_length)
                 );
             }
         }

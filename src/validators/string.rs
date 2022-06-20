@@ -178,7 +178,7 @@ impl StrConstrainedValidator {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::StrTooShort,
-                    context = context!("type" => "String","min_length" => min_length)
+                    context = context!("min_length" => min_length)
                 );
             }
         }
@@ -187,7 +187,7 @@ impl StrConstrainedValidator {
                 return err_val_error!(
                     input_value = InputValue::InputRef(input),
                     kind = ErrorKind::StrTooLong,
-                    context = context!("type" => "String","max_length" => max_length)
+                    context = context!("max_length" => max_length)
                 );
             }
         }
