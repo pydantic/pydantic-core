@@ -1,6 +1,6 @@
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
 
 def test_simple():
@@ -251,3 +251,8 @@ def test_json_error():
             'input_value': 'wrong',
         }
     ]
+
+
+def test_missing_schema_key():
+    with pytest.raises(SchemaError, match='SchemaError: Missing schema key for field "x"'):
+        SchemaValidator({'type': 'model', 'fields': {'x': {'type': 'str'}}})
