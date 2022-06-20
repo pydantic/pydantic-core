@@ -48,7 +48,10 @@ pub enum ErrorKind {
     StrType,
     #[strum(message = "Value must be a valid string, unable to parse raw data as a unicode string")]
     StrUnicode,
-    #[strum(message = "String must have at least {min_length} characters", serialize = "too_short")]
+    #[strum(
+        message = "String must have at least {min_length} characters",
+        serialize = "too_short"
+    )]
     StrTooShort,
     #[strum(message = "String must have at most {max_length} characters", serialize = "too_long")]
     StrTooLong,
