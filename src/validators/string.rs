@@ -211,7 +211,7 @@ impl StrConstrainedValidator {
             str = str.to_uppercase()
         }
         let py_str = PyString::new(py, &str);
-        ValResult::Ok(py_str.into_py(py))
+        Ok(py_str.into_py(py))
     }
 }
 

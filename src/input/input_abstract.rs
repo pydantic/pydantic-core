@@ -6,8 +6,8 @@ use pyo3::ToPyObject;
 use crate::errors::{InputValue, ValResult};
 use crate::input::datetime::EitherTime;
 
-use super::return_enums::{EitherBytes, EitherString};
 use super::datetime::{EitherDate, EitherDateTime};
+use super::return_enums::{EitherBytes, EitherString};
 use super::{GenericMapping, GenericSequence, ToLocItem};
 
 pub trait Input<'a>: fmt::Debug + ToPyObject + ToLocItem {
