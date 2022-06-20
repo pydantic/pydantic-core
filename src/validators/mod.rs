@@ -8,7 +8,7 @@ use pyo3::types::{PyAny, PyDict};
 use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValResult};
+use crate::errors::{as_validation_err, val_line_error, ErrorKind, ValError, ValResult};
 use crate::input::{Input, JsonInput};
 use crate::SchemaError;
 
@@ -27,7 +27,7 @@ mod literal;
 mod model;
 mod model_class;
 mod none;
-mod optional;
+mod nullable;
 mod recursive;
 mod set;
 mod string;
@@ -47,7 +47,7 @@ pub struct SchemaValidator {
 impl SchemaValidator {
     #[new]
     pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
-        let mut build_context = BuildContext::new();
+        let mut build_context = BuildContext::default();
         let validator = match build_validator(schema, None, &mut build_context) {
             Ok((v, _)) => v,
             Err(err) => {
@@ -92,7 +92,7 @@ impl SchemaValidator {
             }
             Err(e) => {
                 let line_err = val_line_error!(
-                    input_value = InputValue::InputRef(&input),
+                    input_value = input.as_error_value(),
                     message = Some(e.to_string()),
                     kind = ErrorKind::InvalidJson
                 );
@@ -176,8 +176,8 @@ pub fn build_validator<'a>(
         model::ModelValidator,
         // unions
         union::UnionValidator,
-        // optional e.g. nullable
-        optional::OptionalValidator,
+        // nullables
+        nullable::NullableValidator,
         // model classes
         model_class::ModelClassValidator,
         // strings
@@ -239,8 +239,8 @@ pub enum CombinedValidator {
     Model(model::ModelValidator),
     // unions
     Union(union::UnionValidator),
-    // optional e.g. nullable
-    Optional(optional::OptionalValidator),
+    // nullables
+    Nullable(nullable::NullableValidator),
     // model classes
     ModelClass(model_class::ModelClassValidator),
     // strings
@@ -307,7 +307,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject>;
@@ -317,7 +317,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
     fn validate_strict<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        input: &'data dyn Input,
+        input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
@@ -336,12 +336,14 @@ pub struct BuildContext {
 
 const MAX_DEPTH: usize = 100;
 
-impl BuildContext {
-    pub fn new() -> Self {
+impl Default for BuildContext {
+    fn default() -> Self {
         let named_slots: Vec<(Option<String>, Option<CombinedValidator>)> = Vec::new();
         BuildContext { named_slots, depth: 0 }
     }
+}
 
+impl BuildContext {
     pub fn add_named_slot(&mut self, name: String, schema: &PyAny, config: Option<&PyDict>) -> PyResult<usize> {
         let id = self.named_slots.len();
         self.named_slots.push((Some(name), None));
