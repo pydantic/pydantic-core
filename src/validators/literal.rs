@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
+use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValResult};
 use crate::input::Input;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -284,7 +284,7 @@ impl Validator for LiteralGeneralValidator {
         }
 
         err_val_error!(
-            input_value = InputValue::PyObject(py_value),
+            input_value = input.as_error_value(),
             kind = ErrorKind::LiteralMultipleError,
             context = context!("expected" => self.repr.clone())
         )
