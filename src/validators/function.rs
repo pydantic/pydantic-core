@@ -6,7 +6,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug)]
 pub struct FunctionBuilder;
@@ -45,7 +45,7 @@ macro_rules! impl_build {
                 build_context: &mut BuildContext,
             ) -> PyResult<CombinedValidator> {
                 Ok(Self {
-                    validator: Box::new(build_validator(schema.get_as_req("schema")?, config, build_context)?.0),
+                    validator_id: build_context.add_unnamed_slot(schema.get_as_req("schema")?, config)?,
                     func: get_function(schema)?,
                     config: config.map(|c| c.into()),
                 }
@@ -57,7 +57,7 @@ macro_rules! impl_build {
 
 #[derive(Debug, Clone)]
 pub struct FunctionBeforeValidator {
-    validator: Box<CombinedValidator>,
+    validator_id: usize,
     func: PyObject,
     config: Option<Py<PyDict>>,
 }
@@ -79,7 +79,8 @@ impl Validator for FunctionBeforeValidator {
             .map_err(|e| convert_err(py, e, input))?;
         // maybe there's some way to get the PyAny here and explicitly tell rust it should have lifespan 'a?
         let new_input: &PyAny = value.as_ref(py);
-        match self.validator.validate(py, new_input, extra, slots) {
+        let validator = unsafe { slots.get_unchecked(self.validator_id) };
+        match validator.validate(py, new_input, extra, slots) {
             Ok(v) => Ok(v),
             Err(ValError::InternalErr(err)) => Err(ValError::InternalErr(err)),
             Err(ValError::LineErrors(line_errors)) => {
@@ -107,7 +108,7 @@ impl Validator for FunctionBeforeValidator {
 
 #[derive(Debug, Clone)]
 pub struct FunctionAfterValidator {
-    validator: Box<CombinedValidator>,
+    validator_id: usize,
     func: PyObject,
     config: Option<Py<PyDict>>,
 }
@@ -122,7 +123,8 @@ impl Validator for FunctionAfterValidator {
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        let v = self.validator.validate(py, input, extra, slots)?;
+        let validator = unsafe { slots.get_unchecked(self.validator_id) };
+        let v = validator.validate(py, input, extra, slots)?;
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
     }
@@ -169,7 +171,7 @@ impl Validator for FunctionPlainValidator {
 
 #[derive(Debug, Clone)]
 pub struct FunctionWrapValidator {
-    validator: Box<CombinedValidator>,
+    validator_id: usize,
     func: PyObject,
     config: Option<Py<PyDict>>,
 }
@@ -185,7 +187,7 @@ impl Validator for FunctionWrapValidator {
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         let validator_kwarg = ValidatorCallable {
-            validator: self.validator.clone(),
+            validator_id: self.validator_id,
             slots: slots.to_vec(),
             data: extra.data.map(|d| d.into_py(py)),
             field: extra.field.map(|f| f.to_string()),
@@ -209,7 +211,7 @@ impl Validator for FunctionWrapValidator {
 #[pyclass]
 #[derive(Debug, Clone)]
 struct ValidatorCallable {
-    validator: Box<CombinedValidator>,
+    validator_id: usize,
     slots: Vec<CombinedValidator>,
     data: Option<Py<PyDict>>,
     field: Option<String>,
@@ -222,13 +224,15 @@ impl ValidatorCallable {
             data: self.data.as_ref().map(|data| data.as_ref(py)),
             field: self.field.as_deref(),
         };
-        self.validator
+        let validator = unsafe { self.slots.get_unchecked(self.validator_id) };
+        validator
             .validate(py, arg, &extra, &self.slots)
             .map_err(|e| as_validation_err(py, "Model", e))
     }
 
     fn __repr__(&self) -> String {
-        format!("ValidatorCallable({:?})", self.validator)
+        let validator = unsafe { self.slots.get_unchecked(self.validator_id) };
+        format!("ValidatorCallable({:?})", validator)
     }
 
     fn __str__(&self) -> String {
