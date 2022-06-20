@@ -71,8 +71,8 @@ impl Default for InputValue<'_> {
     }
 }
 
-impl<'a> InputValue<'a> {
-    pub fn to_object(&self, py: Python) -> PyObject {
+impl<'a> ToPyObject for InputValue<'a> {
+    fn to_object(&self, py: Python) -> PyObject {
         match self {
             Self::None => py.None(),
             Self::PyAny(input) => input.into_py(py),

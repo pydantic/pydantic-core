@@ -1,6 +1,5 @@
 #![feature(no_coverage)]
 #![feature(trait_upcasting)]
-#![feature(type_alias_impl_trait)]
 #![allow(clippy::borrow_deref_ref)]
 
 extern crate core;
