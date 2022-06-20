@@ -68,8 +68,8 @@ impl BuildValidator for ModelValidator {
                 None => return py_error!("Missing schema key for field \"{}\"", key),
             };
 
-            let (validator, _field_dict) = match build_validator(schema, config, build_context) {
-                Ok(v) => v,
+            let validator = match build_validator(schema, config, build_context) {
+                Ok((v, _)) => v,
                 Err(err) => return py_error!("Key \"{}\":\n  {}", key, err),
             };
 
