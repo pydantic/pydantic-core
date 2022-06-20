@@ -76,7 +76,7 @@ impl SchemaValidator {
             field: None,
         };
         let r = self.validator.validate(py, input, &extra, &self.slots);
-        r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
+        r.map_err(|e| as_validation_err(py, &self.validator.get_name(py, &self.slots), e))
     }
 
     pub fn validate_json(&self, py: Python, input: String) -> PyResult<PyObject> {
@@ -87,7 +87,7 @@ impl SchemaValidator {
                     field: None,
                 };
                 let r = self.validator.validate(py, &input, &extra, &self.slots);
-                r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
+                r.map_err(|e| as_validation_err(py, &self.validator.get_name(py, &self.slots), e))
             }
             Err(e) => {
                 let line_err = val_line_error!(
@@ -96,7 +96,7 @@ impl SchemaValidator {
                     kind = ErrorKind::InvalidJson
                 );
                 let err = ValError::LineErrors(vec![line_err]);
-                Err(as_validation_err(py, &self.validator.get_name(py), err))
+                Err(as_validation_err(py, &self.validator.get_name(py, &self.slots), err))
             }
         }
     }
@@ -107,13 +107,13 @@ impl SchemaValidator {
             field: Some(field.as_str()),
         };
         let r = self.validator.validate(py, input, &extra, &self.slots);
-        r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
+        r.map_err(|e| as_validation_err(py, &self.validator.get_name(py, &self.slots), e))
     }
 
     pub fn __repr__(&self, py: Python) -> String {
         format!(
             "SchemaValidator(name={:?}, validator={:#?})",
-            self.validator.get_name(py),
+            self.validator.get_name(py, &self.slots),
             self.validator
         )
     }
@@ -321,11 +321,11 @@ pub trait Validator: Send + Sync + Clone + Debug {
 
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`
-    fn get_name(&self, py: Python) -> String;
+    fn get_name<'data>(&self, py: Python, _slots: &'data [CombinedValidator]) -> String;
 }
 
 pub struct BuildContext {
-    named_slots: Vec<(Option<String>, Option<CombinedValidator>)>,
+    slots: Vec<(Option<String>, Option<CombinedValidator>)>,
     depth: usize,
 }
 
@@ -333,18 +333,33 @@ const MAX_DEPTH: usize = 100;
 
 impl Default for BuildContext {
     fn default() -> Self {
-        let named_slots: Vec<(Option<String>, Option<CombinedValidator>)> = Vec::new();
-        BuildContext { named_slots, depth: 0 }
+        let slots: Vec<(Option<String>, Option<CombinedValidator>)> = vec![(None, Some(any::AnyValidator::create()))];
+        BuildContext { slots, depth: 0 }
     }
 }
 
 impl BuildContext {
+    pub fn any_validator_id(&self) -> usize {
+        0
+    }
+
     pub fn add_named_slot(&mut self, name: String, schema: &PyAny, config: Option<&PyDict>) -> PyResult<usize> {
-        let id = self.named_slots.len();
-        self.named_slots.push((Some(name), None));
+        let id = self.slots.len();
+        self.slots.push((Some(name), None));
         let validator = build_validator(schema, config, self)?.0;
-        self.named_slots[id] = (None, Some(validator));
+        self.slots[id] = (None, Some(validator));
         Ok(id)
+    }
+
+    pub fn add_unnamed_slot(&mut self, schema: &PyAny, config: Option<&PyDict>) -> PyResult<usize> {
+        let validator = build_validator(schema, config, self)?.0;
+        Ok(self.add_existing_validator(validator))
+    }
+
+    pub fn add_existing_validator(&mut self, validator: CombinedValidator) -> usize {
+        let id = self.slots.len();
+        self.slots.push((None, Some(validator)));
+        id
     }
 
     pub fn incr_check_depth(&mut self) -> PyResult<()> {
@@ -365,14 +380,14 @@ impl BuildContext {
             Some(n) => n == name,
             None => false,
         };
-        match self.named_slots.iter().position(is_match) {
+        match self.slots.iter().position(is_match) {
             Some(id) => Ok(id),
             None => py_error!("Recursive reference error: ref '{}' not found", name),
         }
     }
 
     pub fn into_slots(self) -> PyResult<Vec<CombinedValidator>> {
-        self.named_slots
+        self.slots
             .into_iter()
             .map(|(_, opt_validator)| match opt_validator {
                 Some(validator) => Ok(validator),

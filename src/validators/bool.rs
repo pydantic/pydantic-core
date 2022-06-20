@@ -49,7 +49,7 @@ impl Validator for BoolValidator {
         Ok(input.strict_bool()?.into_py(py))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 }
@@ -74,7 +74,7 @@ impl Validator for StrictBoolValidator {
         Ok(input.strict_bool()?.into_py(py))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         "strict-bool".to_string()
     }
 }

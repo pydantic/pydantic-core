@@ -62,8 +62,8 @@ impl Validator for SetValidator {
         self._validation_logic(py, input, input.strict_set()?, extra, slots)
     }
 
-    fn get_name(&self, py: Python) -> String {
-        format!("{}-{}", Self::EXPECTED_TYPE, self.item_validator.get_name(py))
+    fn get_name<'data>(&self, py: Python, slots: &'data [CombinedValidator]) -> String {
+        format!("{}-{}", Self::EXPECTED_TYPE, self.item_validator.get_name(py, slots))
     }
 }
 

@@ -56,14 +56,14 @@ impl Validator for UnionValidator {
                 otherwise => return otherwise,
             };
 
-            let loc = vec![LocItem::S(validator.get_name(py))];
+            let loc = vec![LocItem::S(validator.get_name(py, slots))];
             errors.extend(line_errors.into_iter().map(|err| err.with_prefix_location(&loc)));
         }
 
         Err(ValError::LineErrors(errors))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 }

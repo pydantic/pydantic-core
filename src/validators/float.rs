@@ -54,7 +54,7 @@ impl Validator for FloatValidator {
         Ok(input.strict_float()?.into_py(py))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 }
@@ -79,7 +79,7 @@ impl Validator for StrictFloatValidator {
         Ok(input.strict_float()?.into_py(py))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         "strict-float".to_string()
     }
 }
@@ -119,7 +119,7 @@ impl Validator for ConstrainedFloatValidator {
         self._validation_logic(py, input, input.strict_float()?)
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         "constrained-float".to_string()
     }
 }

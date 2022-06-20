@@ -39,7 +39,7 @@ impl Validator for RecursiveValidator {
         validator.validate(py, input, extra, slots)
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 }
@@ -75,7 +75,7 @@ impl Validator for RecursiveRefValidator {
         validator.validate(py, input, extra, slots)
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 }

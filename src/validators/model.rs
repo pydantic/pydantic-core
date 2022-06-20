@@ -13,13 +13,14 @@ struct ModelField {
     // alias: Option<String>,
     dict_key: Py<PyString>,
     default: Option<PyObject>,
-    validator: CombinedValidator,
+    validator_id: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct ModelValidator {
     name: String,
-    fields: Vec<ModelField>,
+    fields: [Option<ModelField>; 32],
+    // fields: Vec<Option<ModelField>>,
     extra_behavior: ExtraBehavior,
     extra_validator: Option<Box<CombinedValidator>>,
 }
@@ -44,6 +45,14 @@ impl BuildValidator for ModelValidator {
             _ => None,
         };
 
+        // let mut fields: [Option<ModelField>; 100] = unsafe {
+        //     let mut arr: [Option<ModelField>; 100] = std::mem::uninitialized();
+        //     for item in &mut arr[..] {
+        //         std::ptr::write(item, None);
+        //     }
+        //     arr
+        // };
+        let mut fields: [Option<ModelField>; 32]  = Default::default();
         let name: String = schema.get_as("name")?.unwrap_or_else(|| "Model".to_string());
         let fields_dict: &PyDict = match schema.get_as("fields")? {
             Some(fields) => fields,
@@ -51,28 +60,29 @@ impl BuildValidator for ModelValidator {
                 // allow an empty model, is this is a good idea?
                 return Ok(Self {
                     name,
-                    fields: vec![],
+                    fields,
                     extra_behavior,
                     extra_validator,
                 }
                 .into());
             }
         };
-        let mut fields: Vec<ModelField> = Vec::with_capacity(fields_dict.len());
+        // let mut fields: Vec<Option<ModelField>> = Vec::with_capacity(fields_dict.len());
 
         let py = schema.py();
-        for (key, value) in fields_dict.iter() {
+        for (index, (key, value)) in fields_dict.iter().enumerate() {
             let (validator, field_dict) = match build_validator(value, config, build_context) {
                 Ok(v) => v,
                 Err(err) => return py_error!("Key \"{}\":\n  {}", key, err),
             };
 
+            assert!(index < 32);
             let key_str = key.to_string();
-            fields.push(ModelField {
+            fields[index] = Some(ModelField {
                 name: key_str.clone(),
                 // alias: field_dict.get_as("alias"),
                 dict_key: PyString::intern(py, &key_str).into(),
-                validator,
+                validator_id: build_context.add_existing_validator(validator),
                 default: field_dict.get_as("default")?,
             });
         }
@@ -112,30 +122,36 @@ impl Validator for ModelValidator {
 
         macro_rules! process {
             ($dict:ident, $get_method:ident) => {{
-                for field in &self.fields {
-                    let py_key: &PyString = field.dict_key.as_ref(py);
-                    if let Some(value) = $dict.$get_method(&field.name) {
-                        match field.validator.validate(py, value, &extra, slots) {
-                            Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
-                            Err(ValError::LineErrors(line_errors)) => {
-                                let loc = vec![field.name.to_loc()];
-                                for err in line_errors {
-                                    errors.push(err.with_prefix_location(&loc));
+                for field_opt in &self.fields {
+                    match field_opt {
+                        Some(field) => {
+                            let py_key: &PyString = field.dict_key.as_ref(py);
+                            if let Some(value) = $dict.$get_method(&field.name) {
+                                let validator = unsafe {slots.get_unchecked(field.validator_id) };
+                                match validator.validate(py, value, &extra, slots) {
+                                    Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
+                                    Err(ValError::LineErrors(line_errors)) => {
+                                        let loc = vec![field.name.to_loc()];
+                                        for err in line_errors {
+                                            errors.push(err.with_prefix_location(&loc));
+                                        }
+                                    }
+                                    Err(err) => return Err(err),
                                 }
+                                fields_set.add(py_key).map_err(as_internal)?;
+                            } else if let Some(ref default) = field.default {
+                                output_dict
+                                    .set_item(py_key, default.as_ref(py))
+                                    .map_err(as_internal)?;
+                            } else {
+                                errors.push(val_line_error!(
+                                    input_value = input.as_error_value(),
+                                    kind = ErrorKind::Missing,
+                                    location = vec![field.name.to_loc()]
+                                ));
                             }
-                            Err(err) => return Err(err),
-                        }
-                        fields_set.add(py_key).map_err(as_internal)?;
-                    } else if let Some(ref default) = field.default {
-                        output_dict
-                            .set_item(py_key, default.as_ref(py))
-                            .map_err(as_internal)?;
-                    } else {
-                        errors.push(val_line_error!(
-                            input_value = input.as_error_value(),
-                            kind = ErrorKind::Missing,
-                            location = vec![field.name.to_loc()]
-                        ));
+                        },
+                        None => break,
                     }
                 }
 
@@ -193,7 +209,7 @@ impl Validator for ModelValidator {
         match dict {
             GenericMapping::PyDict(d) => process!(d, get_item),
             GenericMapping::JsonObject(d) => process!(d, get),
-        }
+        };
 
         if errors.is_empty() {
             Ok((output_dict, fields_set).to_object(py))
@@ -202,7 +218,7 @@ impl Validator for ModelValidator {
         }
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         self.name.clone()
     }
 }
@@ -241,8 +257,16 @@ impl ModelValidator {
             Err(err) => Err(err),
         };
 
-        if let Some(field) = self.fields.iter().find(|f| f.name == field) {
-            prepare_result(field.validator.validate(py, input, extra, slots))
+        let find_field = |op_f: &Option<ModelField>| {
+            match op_f {
+                Some(f) if f.name == field => Some(f.validator_id),
+                _ => None,
+            }
+        };
+
+        if let Some(validator_id) = self.fields.iter().find_map(find_field) {
+            let validator = unsafe {slots.get_unchecked(validator_id) };
+            prepare_result(validator.validate(py, input, extra, slots))
         } else {
             match self.extra_behavior {
                 // with allow we either want to set the value

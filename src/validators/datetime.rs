@@ -76,7 +76,7 @@ impl Validator for DateTimeValidator {
         self.validation_comparison(py, input, input.strict_datetime()?)
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 }

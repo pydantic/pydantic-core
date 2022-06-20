@@ -67,7 +67,7 @@ impl Validator for StrValidator {
         Ok(input.strict_str()?.into_py(py))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 }
@@ -92,7 +92,7 @@ impl Validator for StrictStrValidator {
         Ok(input.strict_str()?.into_py(py))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         "strict-str".to_string()
     }
 }
@@ -133,7 +133,7 @@ impl Validator for StrConstrainedValidator {
         self._validation_logic(py, input, input.strict_str()?)
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         "constrained-str".to_string()
     }
 }

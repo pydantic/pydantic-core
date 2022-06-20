@@ -10,6 +10,12 @@ use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 #[derive(Debug, Clone)]
 pub struct AnyValidator;
 
+impl AnyValidator {
+    pub fn create() -> CombinedValidator {
+        Self.into()
+    }
+}
+
 impl BuildValidator for AnyValidator {
     const EXPECTED_TYPE: &'static str = "any";
 
@@ -34,7 +40,7 @@ impl Validator for AnyValidator {
         Ok(input.to_object(py))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 }

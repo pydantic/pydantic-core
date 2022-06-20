@@ -52,7 +52,7 @@ impl Validator for BytesValidator {
         Ok(either_bytes.into_py(py))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 }
@@ -78,7 +78,7 @@ impl Validator for StrictBytesValidator {
         Ok(either_bytes.into_py(py))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         "strict-bytes".to_string()
     }
 }
@@ -115,7 +115,7 @@ impl Validator for BytesConstrainedValidator {
         self._validation_logic(py, input, input.strict_bytes()?)
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name<'data>(&self, _py: Python, _slots: &'data [CombinedValidator]) -> String {
         "constrained-bytes".to_string()
     }
 }
