@@ -51,7 +51,33 @@ pub fn benchmark_list(c: &mut Criterion) {
     let input_python = black_box(input_python.to_object(py));
     c.bench_function("validate_python List[int]", |b| {
         b.iter(|| {
-            validator.validate_python(py, black_box(input_python.as_ref(py))).unwrap()
+            validator
+                .validate_python(py, black_box(input_python.as_ref(py)))
+                .unwrap()
+        })
+    });
+}
+
+pub fn benchmark_list_long_copy(c: &mut Criterion) {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let validator = build_schema_validator(py, "{'type': 'list'}");
+    let code = "[1, 2, 3, 4, 5, 6, 7, 8, 9, 0]".to_string();
+
+    c.bench_function("validate_json List[Any]", |b| {
+        b.iter(|| {
+            let input_json = black_box(code.clone());
+            validator.validate_json(py, input_json).unwrap()
+        })
+    });
+
+    let input_python = py.eval(&code, None, None).unwrap();
+    let input_python = black_box(input_python.to_object(py));
+    c.bench_function("validate_python List[Any]", |b| {
+        b.iter(|| {
+            validator
+                .validate_python(py, black_box(input_python.as_ref(py)))
+                .unwrap()
         })
     });
 }
@@ -74,7 +100,9 @@ pub fn benchmark_dict(c: &mut Criterion) {
     let input_python = black_box(input_python.to_object(py));
     c.bench_function("validate_python Dict[str, int]", |b| {
         b.iter(|| {
-            validator.validate_python(py, black_box(input_python.as_ref(py))).unwrap()
+            validator
+                .validate_python(py, black_box(input_python.as_ref(py)))
+                .unwrap()
         })
     });
 }
@@ -115,7 +143,9 @@ pub fn benchmark_model(c: &mut Criterion) {
     let input_python = black_box(input_python.to_object(py));
     c.bench_function("validate_python model", |b| {
         b.iter(|| {
-            validator.validate_python(py, black_box(input_python.as_ref(py))).unwrap()
+            validator
+                .validate_python(py, black_box(input_python.as_ref(py)))
+                .unwrap()
         })
     });
 }
@@ -123,6 +153,6 @@ pub fn benchmark_model(c: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default().warm_up_time(Duration::from_secs(1)).measurement_time(Duration::from_secs(3));
-    targets =  benchmark_ints, benchmark_list, benchmark_dict, benchmark_model
+    targets =  benchmark_ints, benchmark_list, benchmark_list_long_copy, benchmark_dict, benchmark_model
 }
 criterion_main!(benches);

@@ -5,7 +5,6 @@ use crate::errors::{LocItem, ValError, ValLineError, ValResult};
 use crate::validators::{CombinedValidator, Extra, Validator};
 
 use super::parse_json::{JsonArray, JsonObject};
-use super::ToPy;
 
 pub enum GenericSequence<'a> {
     List(&'a PyList),
@@ -15,20 +14,20 @@ pub enum GenericSequence<'a> {
     JsonArray(&'a JsonArray),
 }
 
-macro_rules! sequence_derive_into {
-    ($type:ty, $key:ident) => {
-        impl<'a> From<&'a $type> for GenericSequence<'a> {
-            fn from(s: &'a $type) -> GenericSequence<'a> {
+macro_rules! derive_from {
+    ($enum:ident, $type:ty, $key:ident) => {
+        impl<'a> From<&'a $type> for $enum<'a> {
+            fn from(s: &'a $type) -> $enum<'a> {
                 Self::$key(s)
             }
         }
     };
 }
-sequence_derive_into!(PyList, List);
-sequence_derive_into!(PyTuple, Tuple);
-sequence_derive_into!(PySet, Set);
-sequence_derive_into!(PyFrozenSet, FrozenSet);
-sequence_derive_into!(JsonArray, JsonArray);
+derive_from!(GenericSequence, PyList, List);
+derive_from!(GenericSequence, PyTuple, Tuple);
+derive_from!(GenericSequence, PySet, Set);
+derive_from!(GenericSequence, PyFrozenSet, FrozenSet);
+derive_from!(GenericSequence, JsonArray, JsonArray);
 
 impl<'a> GenericSequence<'a> {
     pub fn generic_len(&self) -> usize {
@@ -51,6 +50,7 @@ impl<'a> GenericSequence<'a> {
     ) -> ValResult<'a, Vec<PyObject>> {
         let mut output: Vec<PyObject> = Vec::with_capacity(length);
         let mut errors: Vec<ValLineError> = Vec::new();
+
         macro_rules! iter {
             ($iterator:expr) => {
                 for (index, item) in $iterator.enumerate() {
@@ -79,21 +79,6 @@ impl<'a> GenericSequence<'a> {
             Err(ValError::LineErrors(errors))
         }
     }
-
-    pub fn copy_to_vec(&self, py: Python<'_>) -> Vec<PyObject> {
-        macro_rules! to_vec {
-            ($iterator:expr) => {
-                $iterator.map(|item| item.into_py(py)).collect()
-            };
-        }
-        match self {
-            Self::List(sequence) => to_vec!(sequence.iter()),
-            Self::Tuple(sequence) => to_vec!(sequence.iter()),
-            Self::Set(sequence) => to_vec!(sequence.iter()),
-            Self::FrozenSet(sequence) => to_vec!(sequence.iter()),
-            Self::JsonArray(sequence) => sequence.iter().map(|item| item.to_py(py)).collect(),
-        }
-    }
 }
 
 pub enum GenericMapping<'a> {
@@ -101,17 +86,8 @@ pub enum GenericMapping<'a> {
     JsonObject(&'a JsonObject),
 }
 
-impl<'a> From<&'a PyDict> for GenericMapping<'a> {
-    fn from(d: &'a PyDict) -> GenericMapping<'a> {
-        Self::PyDict(d)
-    }
-}
-
-impl<'a> From<&'a JsonObject> for GenericMapping<'a> {
-    fn from(d: &'a JsonObject) -> GenericMapping<'a> {
-        Self::JsonObject(d)
-    }
-}
+derive_from!(GenericMapping, PyDict, PyDict);
+derive_from!(GenericMapping, JsonObject, JsonObject);
 
 impl<'a> GenericMapping<'a> {
     pub fn generic_len(&self) -> usize {

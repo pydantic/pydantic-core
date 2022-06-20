@@ -5,12 +5,13 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue};
 use crate::input::{GenericSequence, Input};
 
+use super::any::AnyValidator;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct SetValidator {
     strict: bool,
-    item_validator: Option<Box<CombinedValidator>>,
+    item_validator: Box<CombinedValidator>,
     min_items: Option<usize>,
     max_items: Option<usize>,
 }
@@ -26,8 +27,8 @@ impl BuildValidator for SetValidator {
         Ok(Self {
             strict: is_strict(schema, config)?,
             item_validator: match schema.get_item("items") {
-                Some(d) => Some(Box::new(build_validator(d, config, build_context)?.0)),
-                None => None,
+                Some(d) => Box::new(build_validator(d, config, build_context)?.0),
+                None => Box::new(AnyValidator::build(schema, config, build_context)?),
             },
             min_items: schema.get_as("min_items")?,
             max_items: schema.get_as("max_items")?,
@@ -62,10 +63,7 @@ impl Validator for SetValidator {
     }
 
     fn get_name(&self, py: Python) -> String {
-        match &self.item_validator {
-            Some(v) => format!("{}-{}", Self::EXPECTED_TYPE, v.get_name(py)),
-            None => Self::EXPECTED_TYPE.to_string(),
-        }
+        format!("{}-{}", Self::EXPECTED_TYPE, self.item_validator.get_name(py))
     }
 }
 
@@ -98,15 +96,7 @@ impl SetValidator {
             }
         }
 
-        match self.item_validator {
-            Some(ref validator) => {
-                let output = list.validate_to_vec(py, length, validator, extra, slots)?;
-                Ok(PySet::new(py, &output).map_err(as_internal)?.into_py(py))
-            }
-            None => {
-                let output: Vec<PyObject> = list.copy_to_vec(py);
-                Ok(PySet::new(py, &output).map_err(as_internal)?.into_py(py))
-            }
-        }
+        let output = list.validate_to_vec(py, length, &self.item_validator, extra, slots)?;
+        Ok(PySet::new(py, &output).map_err(as_internal)?.into_py(py))
     }
 }
