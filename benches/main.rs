@@ -38,7 +38,10 @@ pub fn benchmark_list_int(c: &mut Criterion) {
     let gil = Python::acquire_gil();
     let py = gil.python();
     let validator = build_schema_validator(py, "{'type': 'list', 'items': 'int'}");
-    let code = format!("[{}]", (0..100).map(|x| x.to_string()).collect::<Vec<String>>().join(","));
+    let code = format!(
+        "[{}]",
+        (0..100).map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+    );
 
     c.bench_function("validate_json List[int]", |b| {
         b.iter(|| {
@@ -66,11 +69,10 @@ pub fn benchmark_list_error(c: &mut Criterion) {
     let mut code = format!("[{}", (0..90).map(|x| x.to_string()).collect::<Vec<String>>().join(","));
     code.push_str(r#","a","b","c","d","e","f","g","h","i","j"]"#);
 
-    println!("code: {}", &code);
     let input_json = black_box(code.clone());
     match validator.validate_json(py, input_json) {
         Ok(_) => panic!("unexpectedly valid"),
-        Err(e) => e
+        Err(e) => e,
     };
 
     c.bench_function("validate_json List[int] error", |b| {
@@ -78,7 +80,7 @@ pub fn benchmark_list_error(c: &mut Criterion) {
             let input_json = black_box(code.clone());
             match validator.validate_json(py, input_json) {
                 Ok(_) => panic!("unexpectedly valid"),
-                Err(e) => black_box(e)
+                Err(e) => black_box(e),
             }
         })
     });
@@ -87,12 +89,11 @@ pub fn benchmark_list_error(c: &mut Criterion) {
     let input_python = black_box(input_python.to_object(py));
     c.bench_function("validate_python List[int] error", |b| {
         b.iter(|| {
-            let result = validator
-                .validate_python(py, black_box(input_python.as_ref(py)));
+            let result = validator.validate_python(py, black_box(input_python.as_ref(py)));
 
             match result {
                 Ok(_) => panic!("unexpectedly valid"),
-                Err(e) => black_box(e)
+                Err(e) => black_box(e),
             }
         })
     });
@@ -102,7 +103,10 @@ pub fn benchmark_list_any(c: &mut Criterion) {
     let gil = Python::acquire_gil();
     let py = gil.python();
     let validator = build_schema_validator(py, "{'type': 'list'}");
-    let code = format!("[{}]", (0..100).map(|x| x.to_string()).collect::<Vec<String>>().join(","));
+    let code = format!(
+        "[{}]",
+        (0..100).map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+    );
 
     c.bench_function("validate_json List[Any]", |b| {
         b.iter(|| {
@@ -192,7 +196,7 @@ pub fn benchmark_model(c: &mut Criterion) {
     let input_python = black_box(input_python.to_object(py));
     c.bench_function("validate_python model", |b| {
         b.iter(|| {
-            let v= validator
+            let v = validator
                 .validate_python(py, black_box(input_python.as_ref(py)))
                 .unwrap();
             black_box(v)
