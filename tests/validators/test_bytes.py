@@ -67,3 +67,8 @@ def test_constrained_bytes(py_or_json, opts, input, expected):
             v.validate_test(input)
     else:
         assert v.validate_test(input) == expected
+
+def test_union():
+    v = SchemaValidator({'type': 'union', 'choices': ['str', 'bytes'], 'strict': True})
+    assert v.validate_python('oh, a string') == 'oh, a string'
+    assert v.validate_python(b'oh, bytes') == b'oh, bytes'
