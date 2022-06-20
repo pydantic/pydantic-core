@@ -2,19 +2,15 @@ use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
 
-use pyo3::{
-    exceptions::PyRecursionError,
-    prelude::*,
-    types::{PyAny, PyDict},
-};
+use pyo3::exceptions::PyRecursionError;
+use pyo3::prelude::*;
+use pyo3::types::{PyAny, PyDict};
 use serde_json::from_str as parse_json;
 
-use crate::{
-    build_tools::{py_error, SchemaDict},
-    errors::{as_validation_err, val_line_error, ErrorKind, ValError, ValResult},
-    input::{Input, JsonInput},
-    SchemaError,
-};
+use crate::build_tools::{py_error, SchemaDict};
+use crate::errors::{as_validation_err, val_line_error, ErrorKind, ValError, ValResult};
+use crate::input::{Input, JsonInput};
+use crate::SchemaError;
 
 mod any;
 mod bool;

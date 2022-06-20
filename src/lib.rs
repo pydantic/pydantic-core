@@ -12,7 +12,9 @@ extern crate serde;
 extern crate serde_json;
 extern crate strum;
 
-use pyo3::{create_exception, exceptions::PyException, prelude::*};
+use pyo3::create_exception;
+use pyo3::exceptions::PyException;
+use pyo3::prelude::*;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]

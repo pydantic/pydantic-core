@@ -1,9 +1,8 @@
-use pyo3::{prelude::*, types::PyDict};
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
-use crate::{
-    errors::{err_val_error, ErrorKind, ValResult},
-    input::Input,
-};
+use crate::errors::{err_val_error, ErrorKind, ValResult};
+use crate::input::Input;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 

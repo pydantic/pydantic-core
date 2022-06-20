@@ -1,14 +1,10 @@
-use pyo3::{
-    prelude::*,
-    types::{PyDateTime, PyDict},
-};
+use pyo3::prelude::*;
+use pyo3::types::{PyDateTime, PyDict};
 use speedate::DateTime;
 
-use crate::{
-    build_tools::{is_strict, SchemaDict},
-    errors::{as_internal, context, err_val_error, ErrorKind, ValResult},
-    input::{pydatetime_as_datetime, EitherDateTime, Input},
-};
+use crate::build_tools::{is_strict, SchemaDict};
+use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValResult};
+use crate::input::{pydatetime_as_datetime, EitherDateTime, Input};
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 

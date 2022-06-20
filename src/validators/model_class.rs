@@ -1,18 +1,15 @@
-use std::{os::raw::c_int, ptr::null_mut};
+use std::os::raw::c_int;
+use std::ptr::null_mut;
 
-use pyo3::{
-    conversion::AsPyPointer,
-    exceptions::PyTypeError,
-    ffi, intern,
-    prelude::*,
-    types::{PyDict, PyTuple, PyType},
-};
+use pyo3::conversion::AsPyPointer;
+use pyo3::exceptions::PyTypeError;
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyTuple, PyType};
+use pyo3::{ffi, intern};
 
-use crate::{
-    build_tools::{py_error, SchemaDict},
-    errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValResult},
-    input::Input,
-};
+use crate::build_tools::{py_error, SchemaDict};
+use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValResult};
+use crate::input::Input;
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 

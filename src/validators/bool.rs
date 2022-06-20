@@ -1,6 +1,9 @@
-use pyo3::{prelude::*, types::PyDict};
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
-use crate::{build_tools::is_strict, errors::ValResult, input::Input};
+use crate::build_tools::is_strict;
+use crate::errors::ValResult;
+use crate::input::Input;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 

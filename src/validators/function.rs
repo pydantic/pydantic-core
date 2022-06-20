@@ -1,14 +1,10 @@
-use pyo3::{
-    exceptions::{PyAssertionError, PyValueError},
-    prelude::*,
-    types::{PyAny, PyDict},
-};
+use pyo3::exceptions::{PyAssertionError, PyValueError};
+use pyo3::prelude::*;
+use pyo3::types::{PyAny, PyDict};
 
-use crate::{
-    build_tools::{py_error, SchemaDict},
-    errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult},
-    input::Input,
-};
+use crate::build_tools::{py_error, SchemaDict};
+use crate::errors::{as_validation_err, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult};
+use crate::input::Input;
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 

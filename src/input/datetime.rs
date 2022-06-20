@@ -1,8 +1,6 @@
-use pyo3::{
-    intern,
-    prelude::*,
-    types::{PyDate, PyDateTime, PyDelta, PyTime, PyTzInfo},
-};
+use pyo3::intern;
+use pyo3::prelude::*;
+use pyo3::types::{PyDate, PyDateTime, PyDelta, PyTime, PyTzInfo};
 use speedate::{Date, DateTime, Time};
 use strum::EnumMessage;
 

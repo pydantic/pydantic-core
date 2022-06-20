@@ -1,15 +1,11 @@
 use std::collections::HashSet;
 
-use pyo3::{
-    prelude::*,
-    types::{PyDict, PyList},
-};
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyList};
 
-use crate::{
-    build_tools::{py_error, SchemaDict},
-    errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult},
-    input::Input,
-};
+use crate::build_tools::{py_error, SchemaDict};
+use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
+use crate::input::Input;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 

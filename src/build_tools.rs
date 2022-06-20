@@ -1,4 +1,7 @@
-use pyo3::{exceptions::PyKeyError, prelude::*, types::PyDict, FromPyObject};
+use pyo3::exceptions::PyKeyError;
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
+use pyo3::FromPyObject;
 
 pub trait SchemaDict<'py> {
     fn get_as<T>(&'py self, key: &str) -> PyResult<Option<T>>

@@ -1,17 +1,12 @@
-use pyo3::{
-    prelude::*,
-    types::{PyDict, PySet},
-};
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PySet};
 
-use crate::{
-    build_tools::{is_strict, SchemaDict},
-    errors::{as_internal, context, err_val_error, ErrorKind},
-    input::{GenericSequence, Input},
-};
+use crate::build_tools::{is_strict, SchemaDict};
+use crate::errors::{as_internal, context, err_val_error, ErrorKind};
+use crate::input::{GenericSequence, Input};
 
-use super::{
-    any::AnyValidator, build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator,
-};
+use super::any::AnyValidator;
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct SetValidator {

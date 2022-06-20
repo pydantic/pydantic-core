@@ -1,13 +1,9 @@
-use pyo3::{
-    prelude::*,
-    types::{PyDict, PySet, PyString},
-};
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PySet, PyString};
 
-use crate::{
-    build_tools::{py_error, SchemaDict},
-    errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult},
-    input::{GenericMapping, Input, ToLocItem},
-};
+use crate::build_tools::{py_error, SchemaDict};
+use crate::errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult};
+use crate::input::{GenericMapping, Input, ToLocItem};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 

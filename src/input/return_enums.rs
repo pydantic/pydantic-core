@@ -1,4 +1,5 @@
-use pyo3::{prelude::*, types::PyBytes};
+use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 
 pub enum EitherBytes<'a> {
     Rust(Vec<u8>),

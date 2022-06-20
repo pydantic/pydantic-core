@@ -1,17 +1,12 @@
-use pyo3::{
-    prelude::*,
-    types::{PyDict, PyList, PyTuple},
-};
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyList, PyTuple};
 
-use crate::{
-    build_tools::{is_strict, py_error, SchemaDict},
-    errors::{context, err_val_error, ErrorKind, LocItem, ValError, ValLineError},
-    input::{GenericSequence, Input},
-};
+use crate::build_tools::{is_strict, py_error, SchemaDict};
+use crate::errors::{context, err_val_error, ErrorKind, LocItem, ValError, ValLineError};
+use crate::input::{GenericSequence, Input};
 
-use super::{
-    any::AnyValidator, build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator,
-};
+use super::any::AnyValidator;
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct TupleVarLenValidator {

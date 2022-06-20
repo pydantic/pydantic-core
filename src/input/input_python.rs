@@ -1,25 +1,21 @@
 use std::str::from_utf8;
 
-use pyo3::{
-    prelude::*,
-    types::{
-        PyBool, PyBytes, PyDate, PyDateTime, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet, PyString, PyTime,
-        PyTuple, PyType,
-    },
+use pyo3::prelude::*;
+use pyo3::types::{
+    PyBool, PyBytes, PyDate, PyDateTime, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySet, PyString, PyTime,
+    PyTuple, PyType,
 };
 
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
 
-use super::{
-    datetime::{
-        bytes_as_date, bytes_as_datetime, bytes_as_time, date_as_datetime, float_as_datetime, float_as_time,
-        int_as_datetime, int_as_time, EitherDate, EitherDateTime, EitherTime,
-    },
-    generics::{GenericMapping, GenericSequence},
-    input_abstract::Input,
-    return_enums::EitherBytes,
-    shared::{float_as_int, int_as_bool, str_as_bool, str_as_int},
+use super::datetime::{
+    bytes_as_date, bytes_as_datetime, bytes_as_time, date_as_datetime, float_as_datetime, float_as_time,
+    int_as_datetime, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
+use super::generics::{GenericMapping, GenericSequence};
+use super::input_abstract::Input;
+use super::return_enums::EitherBytes;
+use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 
 impl<'a> Input<'a> for PyAny {
     fn as_error_value(&'a self) -> InputValue<'a> {

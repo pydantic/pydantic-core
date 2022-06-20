@@ -3,12 +3,10 @@ mod line_error;
 mod val_error;
 mod validation_exception;
 
-pub use self::{
-    kinds::ErrorKind,
-    line_error::{Context, InputValue, LocItem, Location, ValLineError},
-    val_error::{as_internal, ValError, ValResult},
-    validation_exception::{as_validation_err, ValidationError},
-};
+pub use self::kinds::ErrorKind;
+pub use self::line_error::{Context, InputValue, LocItem, Location, ValLineError};
+pub use self::val_error::{as_internal, ValError, ValResult};
+pub use self::validation_exception::{as_validation_err, ValidationError};
 
 /// Utility for concisely creating a `ValLineError`
 /// can either take just `py` and a `value` (the given value) in which case kind `ErrorKind::ValueError` is used as kind

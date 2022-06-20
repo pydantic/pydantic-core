@@ -1,14 +1,10 @@
-use pyo3::{
-    prelude::*,
-    types::{PyDict, PyString},
-};
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyString};
 use regex::Regex;
 
-use crate::{
-    build_tools::{is_strict, py_error, schema_or_config},
-    errors::{context, err_val_error, ErrorKind, ValResult},
-    input::Input,
-};
+use crate::build_tools::{is_strict, py_error, schema_or_config};
+use crate::errors::{context, err_val_error, ErrorKind, ValResult};
+use crate::input::Input;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 

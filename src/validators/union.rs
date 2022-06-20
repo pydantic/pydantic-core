@@ -1,13 +1,9 @@
-use pyo3::{
-    prelude::*,
-    types::{PyDict, PyList},
-};
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyList};
 
-use crate::{
-    build_tools::SchemaDict,
-    errors::{LocItem, ValError, ValLineError},
-    input::Input,
-};
+use crate::build_tools::SchemaDict;
+use crate::errors::{LocItem, ValError, ValLineError};
+use crate::input::Input;
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
