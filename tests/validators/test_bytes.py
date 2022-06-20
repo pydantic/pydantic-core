@@ -34,6 +34,7 @@ def test_lax_bytes_validator():
         ({'max_length': 5}, b'foobar', Err('Data must have at most 5 bytes')),
         ({'min_length': 2}, b'foo', b'foo'),
         ({'min_length': 2}, b'f', Err('Data must have at least 2 bytes')),
+        ({'min_length': 1, 'max_length': 6, 'strict': True}, b'bytes?', b'bytes?'),
     ],
 )
 def test_constrained_bytes_python_bytes(opts, input, expected):
