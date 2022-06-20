@@ -46,7 +46,7 @@ pub struct SchemaValidator {
 impl SchemaValidator {
     #[new]
     pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
-        let mut build_context = BuildContext::new();
+        let mut build_context = BuildContext::default();
         let validator = match build_validator(schema, None, &mut build_context) {
             Ok((v, _)) => v,
             Err(err) => {
@@ -331,12 +331,14 @@ pub struct BuildContext {
 
 const MAX_DEPTH: usize = 100;
 
-impl BuildContext {
-    pub fn new() -> Self {
+impl Default for BuildContext {
+    fn default() -> Self {
         let named_slots: Vec<(Option<String>, Option<CombinedValidator>)> = Vec::new();
         BuildContext { named_slots, depth: 0 }
     }
+}
 
+impl BuildContext {
     pub fn add_named_slot(&mut self, name: String, schema: &PyAny, config: Option<&PyDict>) -> PyResult<usize> {
         let id = self.named_slots.len();
         self.named_slots.push((Some(name), None));

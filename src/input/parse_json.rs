@@ -31,20 +31,19 @@ pub enum JsonInput {
 pub type JsonArray = Vec<JsonInput>;
 pub type JsonObject = IndexMap<String, JsonInput>;
 
-// TODO currently not used...
-impl IntoPy<PyObject> for JsonInput {
-    fn into_py(self, py: Python<'_>) -> PyObject {
+impl ToPyObject for JsonInput {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
         match self {
             JsonInput::Null => py.None(),
             JsonInput::Bool(b) => b.into_py(py),
             JsonInput::Int(i) => i.into_py(py),
             JsonInput::Float(f) => f.into_py(py),
             JsonInput::String(s) => s.into_py(py),
-            JsonInput::Array(v) => v.into_iter().map(|v| v.into_py(py)).collect::<Vec<_>>().into_py(py),
+            JsonInput::Array(v) => v.iter().map(|v| v.to_object(py)).collect::<Vec<_>>().into_py(py),
             JsonInput::Object(o) => {
                 let dict = PyDict::new(py);
-                for (k, v) in o.into_iter() {
-                    dict.set_item(k, v.into_py(py)).unwrap();
+                for (k, v) in o.iter() {
+                    dict.set_item(k, v.to_object(py)).unwrap();
                 }
                 dict.into_py(py)
             }

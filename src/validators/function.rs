@@ -75,7 +75,7 @@ impl Validator for FunctionBeforeValidator {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         let value = self
             .func
-            .call(py, (input.to_py(py),), kwargs)
+            .call(py, (input.to_object(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))?;
         // maybe there's some way to get the PyAny here and explicitly tell rust it should have lifespan 'a?
         let new_input: &PyAny = value.as_ref(py);
@@ -91,7 +91,7 @@ impl Validator for FunctionBeforeValidator {
                             kind: line_error.kind,
                             location: line_error.location,
                             message: line_error.message,
-                            input_value: InputValue::PyObject(line_error.input_value.to_py(py)),
+                            input_value: InputValue::PyObject(line_error.input_value.to_object(py)),
                             context: line_error.context,
                         })
                         .collect(),
@@ -158,7 +158,7 @@ impl Validator for FunctionPlainValidator {
     ) -> ValResult<'data, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func
-            .call(py, (input.to_py(py),), kwargs)
+            .call(py, (input.to_object(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))
     }
 
@@ -197,7 +197,7 @@ impl Validator for FunctionWrapValidator {
             "config" => self.config.as_ref()
         );
         self.func
-            .call(py, (input.to_py(py),), kwargs)
+            .call(py, (input.to_object(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))
     }
 

@@ -31,7 +31,7 @@ impl Validator for AnyValidator {
         _slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
         // Ok(input.clone().into_py(py))
-        Ok(input.to_py(py))
+        Ok(input.to_object(py))
     }
 
     fn get_name(&self, _py: Python) -> String {

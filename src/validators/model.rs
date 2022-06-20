@@ -5,7 +5,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{
     as_internal, err_val_error, val_line_error, ErrorKind, InputValue, ValError, ValLineError, ValResult,
 };
-use crate::input::{GenericMapping, Input, ToLocItem, ToPy};
+use crate::input::{GenericMapping, Input, ToLocItem};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -184,7 +184,9 @@ impl Validator for ModelValidator {
                                 Err(err) => return Err(err),
                             }
                         } else {
-                            output_dict.set_item(&key, value.to_py(py)).map_err(as_internal)?;
+                            output_dict
+                                .set_item(&key, value.to_object(py))
+                                .map_err(as_internal)?;
                         }
                     }
                 }
@@ -248,7 +250,7 @@ impl ModelValidator {
                 // with allow we either want to set the value
                 ExtraBehavior::Allow => match self.extra_validator {
                     Some(ref validator) => prepare_result(validator.validate(py, input, extra, slots)),
-                    None => prepare_tuple(input.to_py(py)),
+                    None => prepare_tuple(input.to_object(py)),
                 },
                 // otherwise we raise an error:
                 // - with forbid this is obvious

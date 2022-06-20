@@ -1,9 +1,8 @@
 use std::fmt;
 
+use crate::input::Input;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-
-use crate::input::ToPy;
 
 use super::kinds::ErrorKind;
 
@@ -59,7 +58,7 @@ impl<'a> ValLineError<'a> {
 #[derive(Debug)]
 pub enum InputValue<'a> {
     None,
-    InputRef(&'a dyn ToPy),
+    InputRef(&'a dyn Input),
     PyObject(PyObject),
 }
 
@@ -70,10 +69,10 @@ impl Default for InputValue<'_> {
 }
 
 impl<'a> InputValue<'a> {
-    pub fn to_py(&self, py: Python) -> PyObject {
+    pub fn to_object(&self, py: Python) -> PyObject {
         match self {
             Self::None => py.None(),
-            Self::InputRef(input) => input.to_py(py),
+            Self::InputRef(input) => input.to_object(py),
             Self::PyObject(py_obj) => py_obj.into_py(py),
         }
     }
