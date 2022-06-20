@@ -22,7 +22,7 @@ pub struct ModelValidator {
     fields: [Option<ModelField>; 32],
     // fields: Vec<Option<ModelField>>,
     extra_behavior: ExtraBehavior,
-    extra_validator: Option<Box<CombinedValidator>>,
+    extra_validator_id: Option<usize>,
 }
 
 impl BuildValidator for ModelValidator {
@@ -37,9 +37,9 @@ impl BuildValidator for ModelValidator {
         let config: Option<&PyDict> = schema.get_as("config")?;
 
         let extra_behavior = ExtraBehavior::from_config(config)?;
-        let extra_validator = match extra_behavior {
+        let extra_validator_id = match extra_behavior {
             ExtraBehavior::Allow => match schema.get_item("extra_validator") {
-                Some(v) => Some(Box::new(build_validator(v, config, build_context)?.0)),
+                Some(v) => Some(build_context.add_unnamed_slot(v, config)?),
                 None => None,
             },
             _ => None,
@@ -52,7 +52,7 @@ impl BuildValidator for ModelValidator {
         //     }
         //     arr
         // };
-        let mut fields: [Option<ModelField>; 32]  = Default::default();
+        let mut fields: [Option<ModelField>; 32] = Default::default();
         let name: String = schema.get_as("name")?.unwrap_or_else(|| "Model".to_string());
         let fields_dict: &PyDict = match schema.get_as("fields")? {
             Some(fields) => fields,
@@ -62,7 +62,7 @@ impl BuildValidator for ModelValidator {
                     name,
                     fields,
                     extra_behavior,
-                    extra_validator,
+                    extra_validator_id,
                 }
                 .into());
             }
@@ -90,7 +90,7 @@ impl BuildValidator for ModelValidator {
             name,
             fields,
             extra_behavior,
-            extra_validator,
+            extra_validator_id,
         }
         .into())
     }
@@ -127,7 +127,7 @@ impl Validator for ModelValidator {
                         Some(field) => {
                             let py_key: &PyString = field.dict_key.as_ref(py);
                             if let Some(value) = $dict.$get_method(&field.name) {
-                                let validator = unsafe {slots.get_unchecked(field.validator_id) };
+                                let validator = unsafe { slots.get_unchecked(field.validator_id) };
                                 match validator.validate(py, value, &extra, slots) {
                                     Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                                     Err(ValError::LineErrors(line_errors)) => {
@@ -150,7 +150,7 @@ impl Validator for ModelValidator {
                                     location = vec![field.name.to_loc()]
                                 ));
                             }
-                        },
+                        }
                         None => break,
                     }
                 }
@@ -161,6 +161,10 @@ impl Validator for ModelValidator {
                     ExtraBehavior::Forbid => (true, true),
                 };
                 if check_extra {
+                    let extra_validator = match self.extra_validator_id {
+                        Some(validator_id) => Some(unsafe { slots.get_unchecked(validator_id) }),
+                        None => None,
+                    };
                     for (raw_key, value) in $dict.iter() {
                         // TODO use strict_str here if the model is strict
                         let key: String = match raw_key.lax_str() {
@@ -187,7 +191,7 @@ impl Validator for ModelValidator {
                                 kind = ErrorKind::ExtraForbidden,
                                 location = loc
                             ));
-                        } else if let Some(ref validator) = self.extra_validator {
+                        } else if let Some(validator) = extra_validator {
                             match validator.validate(py, value, &extra, slots) {
                                 Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                                 Err(ValError::LineErrors(line_errors)) => {
@@ -257,21 +261,22 @@ impl ModelValidator {
             Err(err) => Err(err),
         };
 
-        let find_field = |op_f: &Option<ModelField>| {
-            match op_f {
-                Some(f) if f.name == field => Some(f.validator_id),
-                _ => None,
-            }
+        let find_field = |op_f: &Option<ModelField>| match op_f {
+            Some(f) if f.name == field => Some(f.validator_id),
+            _ => None,
         };
 
         if let Some(validator_id) = self.fields.iter().find_map(find_field) {
-            let validator = unsafe {slots.get_unchecked(validator_id) };
+            let validator = unsafe { slots.get_unchecked(validator_id) };
             prepare_result(validator.validate(py, input, extra, slots))
         } else {
             match self.extra_behavior {
                 // with allow we either want to set the value
-                ExtraBehavior::Allow => match self.extra_validator {
-                    Some(ref validator) => prepare_result(validator.validate(py, input, extra, slots)),
+                ExtraBehavior::Allow => match self.extra_validator_id {
+                    Some(validator_id) => {
+                        let validator = unsafe { slots.get_unchecked(validator_id) };
+                        prepare_result(validator.validate(py, input, extra, slots))
+                    }
                     None => prepare_tuple(input.to_object(py)),
                 },
                 // otherwise we raise an error:

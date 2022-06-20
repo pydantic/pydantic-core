@@ -97,7 +97,7 @@ impl ListValidator {
         }
 
         let validator = unsafe { slots.get_unchecked(self.item_validator_id) };
-        let output = list.validate_to_vec(py, length, &validator, extra, slots)?;
+        let output = list.validate_to_vec(py, length, validator, extra, slots)?;
         Ok(output.into_py(py))
     }
 }

@@ -16,7 +16,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {
     strict: bool,
-    validator: Box<CombinedValidator>,
+    validator_id: usize,
     class: Py<PyType>,
 }
 
@@ -41,7 +41,7 @@ impl BuildValidator for ModelClassValidator {
             // we don't use is_strict here since we don't want validation to be strict in this case if
             // `config.strict` is set, only if this specific field is strict
             strict: schema.get_as("strict")?.unwrap_or(false),
-            validator: Box::new(validator),
+            validator_id: build_context.add_existing_validator(validator),
             class: class.into(),
         }
         .into())
@@ -66,7 +66,8 @@ impl Validator for ModelClassValidator {
                 context = context!("class_name" => self.get_name(py, slots))
             )
         } else {
-            let output = self.validator.validate(py, input, extra, slots)?;
+            let validator = unsafe { slots.get_unchecked(self.validator_id) };
+            let output = validator.validate(py, input, extra, slots)?;
             self.create_class(py, output).map_err(as_internal)
         }
     }

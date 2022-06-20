@@ -5,13 +5,12 @@ use crate::build_tools::{is_strict, py_error, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, LocItem, ValError, ValLineError};
 use crate::input::{GenericSequence, Input};
 
-use super::any::AnyValidator;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct TupleVarLenValidator {
     strict: bool,
-    item_validator: Box<CombinedValidator>,
+    item_validator_id: usize,
     min_items: Option<usize>,
     max_items: Option<usize>,
 }
@@ -26,9 +25,9 @@ impl BuildValidator for TupleVarLenValidator {
     ) -> PyResult<CombinedValidator> {
         Ok(Self {
             strict: is_strict(schema, config)?,
-            item_validator: match schema.get_item("items") {
-                Some(d) => Box::new(build_validator(d, config, build_context)?.0),
-                None => Box::new(AnyValidator::build(schema, config, build_context)?),
+            item_validator_id: match schema.get_item("items") {
+                Some(d) => build_context.add_unnamed_slot(d, config)?,
+                None => build_context.any_validator_id(),
             },
             min_items: schema.get_as("min_items")?,
             max_items: schema.get_as("max_items")?,
@@ -63,7 +62,8 @@ impl Validator for TupleVarLenValidator {
     }
 
     fn get_name<'data>(&self, py: Python, slots: &'data [CombinedValidator]) -> String {
-        format!("{}-{}", Self::EXPECTED_TYPE, self.item_validator.get_name(py, slots))
+        let validator = unsafe { slots.get_unchecked(self.item_validator_id) };
+        format!("{}-{}", Self::EXPECTED_TYPE, validator.get_name(py, slots))
     }
 }
 
@@ -96,7 +96,8 @@ impl TupleVarLenValidator {
             }
         }
 
-        let output = tuple.validate_to_vec(py, length, &self.item_validator, extra, slots)?;
+        let validator = unsafe { slots.get_unchecked(self.item_validator_id) };
+        let output = tuple.validate_to_vec(py, length, validator, extra, slots)?;
         Ok(PyTuple::new(py, &output).into_py(py))
     }
 }

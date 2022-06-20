@@ -4,11 +4,11 @@ use pyo3::types::PyDict;
 use crate::build_tools::SchemaDict;
 use crate::input::Input;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct NullableValidator {
-    validator: Box<CombinedValidator>,
+    validator_id: usize,
 }
 
 impl BuildValidator for NullableValidator {
@@ -20,10 +20,8 @@ impl BuildValidator for NullableValidator {
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
         let schema: &PyAny = schema.get_as_req("schema")?;
-        Ok(Self {
-            validator: Box::new(build_validator(schema, config, build_context)?.0),
-        }
-        .into())
+        let validator_id = build_context.add_unnamed_slot(schema, config)?;
+        Ok(Self { validator_id }.into())
     }
 }
 
@@ -37,7 +35,10 @@ impl Validator for NullableValidator {
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),
-            false => self.validator.validate(py, input, extra, slots),
+            false => {
+                let validator = unsafe { slots.get_unchecked(self.validator_id) };
+                validator.validate(py, input, extra, slots)
+            }
         }
     }
 
@@ -50,7 +51,10 @@ impl Validator for NullableValidator {
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),
-            false => self.validator.validate_strict(py, input, extra, slots),
+            false => {
+                let validator = unsafe { slots.get_unchecked(self.validator_id) };
+                validator.validate_strict(py, input, extra, slots)
+            }
         }
     }
 
