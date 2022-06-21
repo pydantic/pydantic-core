@@ -279,6 +279,7 @@ def test_alias_allow_pop(py_or_json):
     )
     assert v.validate_test({'FieldA': '123'}) == ({'field_a': 123}, {'field_a'})
     assert v.validate_test({'field_a': '123'}) == ({'field_a': 123}, {'field_a'})
+    assert v.validate_test({'FieldA': '1', 'field_a': '2'}) == ({'field_a': 1}, {'field_a'})
     with pytest.raises(ValidationError, match=r'field_a\n +Field required \[kind=missing,'):
         assert v.validate_test({'foobar': '123'})
 
@@ -313,6 +314,7 @@ def test_alias_path(py_or_json, input_value, expected):
         ({'spam': 5}, ({'field_a': 5}, {'field_a'})),
         ({'spam': 1, 'foo': {'bar': {'bat': 2}}}, ({'field_a': 2}, {'field_a'})),
         ({'x': '123'}, Err(r'field_a\n +Field required \[kind=missing,')),
+        ({'x': {2: 33}}, Err(r'field_a\n +Field required \[kind=missing,')),
         ({'foo': '01234'}, Err(r'field_a\n +Field required \[kind=missing,')),
         ({'foo': [1]}, Err(r'field_a\n +Field required \[kind=missing,')),
     ],
@@ -332,6 +334,35 @@ def test_alias_path_multiple(py_or_json, input_value, expected):
     else:
         output = v.validate_test(input_value)
         assert output == expected
+
+
+def get_int_key():
+    v = SchemaValidator({'type': 'model', 'fields': {'field_a': {'aliases': [['foo', 3], ['spam']], 'schema': 'int'}}})
+    assert v.validate_python({'foo': {3: 33}}) == ({'field_a': 33}, {'field_a'})
+
+
+class GetItemThing:
+    def __getitem__(self, v):
+        assert v == 'foo'
+        return 321
+
+
+def get_custom_getitem():
+    v = SchemaValidator({'type': 'model', 'fields': {'field_a': {'aliases': [['foo']], 'schema': 'int'}}})
+    assert v.validate_python(GetItemThing()) == ({'field_a': 321}, {'field_a'})
+    assert v.validate_python({'bar': GetItemThing()}) == ({'field_a': 321}, {'field_a'})
+
+
+@pytest.mark.parametrize('input_value', [{'foo': {'bar': 42}}, {'foo': 42}, {'field_a': 42}], ids=repr)
+def test_paths_allow_by_name(py_or_json, input_value):
+    v = py_or_json(
+        {
+            'type': 'model',
+            'fields': {'field_a': {'aliases': [['foo', 'bar'], ['foo']], 'schema': 'int'}},
+            'config': {'allow_population_by_field_name': True},
+        }
+    )
+    assert v.validate_test(input_value) == ({'field_a': 42}, {'field_a'})
 
 
 @pytest.mark.parametrize(

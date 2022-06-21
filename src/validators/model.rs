@@ -279,9 +279,9 @@ impl ExtraBehavior {
 
 #[derive(Debug, Clone)]
 pub enum FieldKeyLoc {
-    // string type key, used to get items from a dict
+    // string type key, used to get items from a dict or anything that implements __getitem__
     StrKey(String),
-    // integer key, used to get items from a list, tuple OR a dict with int keys
+    // integer key, used to get items from a list, tuple OR a dict with int keys (python only)
     IntKey(usize),
 }
 
@@ -325,15 +325,13 @@ impl FieldKeyLoc {
     }
 
     pub fn json_get<'a>(&self, any_json: &'a JsonInput) -> Option<&'a JsonInput> {
-        match self {
-            Self::StrKey(key) => match any_json {
-                JsonInput::Object(v_obj) => v_obj.get(key),
+        match any_json {
+            JsonInput::Object(v_obj) => self.json_obj_get(v_obj),
+            JsonInput::Array(v_array) => match self {
+                Self::IntKey(index) => v_array.get(*index),
                 _ => None,
             },
-            Self::IntKey(index) => match any_json {
-                JsonInput::Array(v_array) => v_array.get(*index),
-                _ => None,
-            },
+            _ => None,
         }
     }
 
@@ -367,7 +365,7 @@ impl FieldKey {
             }
             None => match field.get_as::<&PyList>("aliases")? {
                 Some(aliases) => {
-                    let locs = aliases
+                    let mut locs = aliases
                         .iter()
                         .map(Self::path_choice)
                         .collect::<PyResult<Vec<Vec<FieldKeyLoc>>>>()?;
@@ -375,6 +373,9 @@ impl FieldKey {
                     if locs.is_empty() {
                         py_error!("Aliases must have at least one element")
                     } else {
+                        if allow_by_name {
+                            locs.push(vec![FieldKeyLoc::StrKey(field_name.to_string())])
+                        }
                         Ok(FieldKey::PathChoices(locs))
                     }
                 }

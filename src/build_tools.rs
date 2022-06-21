@@ -53,7 +53,7 @@ impl<'py> SchemaDict<'py> for Option<&PyDict> {
     {
         match self {
             Some(d) => d.get_as_req(key),
-            None => py_error!(PyTypeError; r#""{}" is required, so its source cannot be None"#, key),
+            None => py_error!(PyTypeError; r#""{}" is required, so its source cannot be omitted"#, key),
         }
     }
 }
