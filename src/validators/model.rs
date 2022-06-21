@@ -1,5 +1,5 @@
-use pyo3::prelude::*;
 use pyo3::exceptions::PyTypeError;
+use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySet, PyString};
 
 use crate::build_tools::{py_error, SchemaDict};
@@ -376,7 +376,7 @@ impl FieldKey {
                         false => Ok(FieldKey::Simple(alias)),
                     }
                 }
-            },
+            }
             None => match field.get_as::<&PyList>("aliases")? {
                 Some(aliases) => {
                     let locs = aliases
@@ -422,9 +422,9 @@ fn pydict_get<'data, 's>(dict: &'data PyDict, field_key: &'s FieldKey) -> Option
             for path in path_choices {
                 // iterate over the path and plug each value into the py_any from the last step, starting with dict
                 // this could just be a loop but should be somewhat faster with a functional design
-                if let Some(v) = path.iter().try_fold(dict as &PyAny, |d, loc | loc.py_get(d)) {
+                if let Some(v) = path.iter().try_fold(dict as &PyAny, |d, loc| loc.py_get(d)) {
                     // Successfully found an item, return it
-                    return Some(v)
+                    return Some(v);
                 }
             }
             // got to the end of path_choices, without a match, return None
@@ -457,9 +457,9 @@ fn jsonobject_get<'data, 's>(dict: &'data JsonObject, field_key: &'s FieldKey) -
                 // similar to above
                 // iterate over the path and plug each value into the JsonInput from the last step, starting with v
                 // from the first step, this could just be a loop but should be somewhat faster with a functional design
-                if let Some(v) = path_iter.try_fold(v, |d, loc | loc.json_get(d)) {
+                if let Some(v) = path_iter.try_fold(v, |d, loc| loc.json_get(d)) {
                     // Successfully found an item, return it
-                    return Some(v)
+                    return Some(v);
                 }
             }
             // got to the end of path_choices, without a match, return None
