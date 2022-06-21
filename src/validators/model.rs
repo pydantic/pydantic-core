@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+use pyo3::exceptions::PyTypeError;
 use pyo3::types::{PyDict, PyList, PySet, PyString};
 
 use crate::build_tools::{py_error, SchemaDict};
@@ -306,13 +307,32 @@ impl ToPyObject for FieldKeyLoc {
 }
 
 impl FieldKeyLoc {
-    pub fn from_py(obj: &PyAny) -> PyResult<Self> {
+    pub fn from_py((index, obj): (usize, &PyAny)) -> PyResult<Self> {
         if let Ok(str_key) = obj.extract::<String>() {
             Ok(FieldKeyLoc::StrKey(str_key))
         } else if let Ok(int_key) = obj.extract::<usize>() {
-            Ok(FieldKeyLoc::IntKey(int_key))
+            if index == 0 {
+                py_error!(PyTypeError; "The first item in an alias path must be a string")
+            } else {
+                Ok(FieldKeyLoc::IntKey(int_key))
+            }
         } else {
-            py_error!("Alias path items must be with a string or int")
+            py_error!(PyTypeError; "Alias path items must be with a string or int")
+        }
+    }
+
+    pub fn py_get<'a>(&self, py_any: &'a PyAny) -> Option<&'a PyAny> {
+        // we definitely don't want to index strings, so explicitly omit this case
+        if py_any.cast_as::<PyString>().is_ok() {
+            None
+        } else {
+            // otherwise, blindly try getitem on v since no better logic is realistic
+            // TODO we could perhaps try getattr for StrKey depending on try_instance
+            match py_any.get_item(self) {
+                Ok(v_next) => Some(v_next),
+                // key/index not found, try next path
+                Err(_) => None,
+            }
         }
     }
 
@@ -347,9 +367,15 @@ pub enum FieldKey {
 impl FieldKey {
     pub fn from_py(field: &PyDict, field_name: &str, allow_by_name: bool) -> PyResult<Self> {
         match field.get_as::<String>("alias")? {
-            Some(alias) => match allow_by_name {
-                true => Ok(FieldKey::Choice((alias, field_name.to_string()))),
-                false => Ok(FieldKey::Simple(alias)),
+            Some(alias) => {
+                if field.contains("aliases")? {
+                    py_error!("'alias' and 'aliases' cannot be used together")
+                } else {
+                    match allow_by_name {
+                        true => Ok(FieldKey::Choice((alias, field_name.to_string()))),
+                        false => Ok(FieldKey::Simple(alias)),
+                    }
+                }
             },
             None => match field.get_as::<&PyList>("aliases")? {
                 Some(aliases) => {
@@ -373,6 +399,7 @@ impl FieldKey {
         let path = obj
             .extract::<&PyList>()?
             .iter()
+            .enumerate()
             .map(FieldKeyLoc::from_py)
             .collect::<PyResult<Vec<FieldKeyLoc>>>()?;
 
@@ -392,26 +419,13 @@ fn pydict_get<'data, 's>(dict: &'data PyDict, field_key: &'s FieldKey) -> Option
             None => dict.get_item(key2),
         },
         FieldKey::PathChoices(path_choices) => {
-            'paths_loop: for path in path_choices {
-                let mut v: &PyAny = dict;
-
-                for loc in path {
-                    // we definitely don't want to index strings, so explicitly omit this case
-                    if v.cast_as::<PyString>().is_ok() {
-                        continue 'paths_loop;
-                    } else {
-                        // otherwise, blindly try getitem on v since no better logic is realistic
-                        // TODO we could perhaps try getattr for StrKey depending on try_instance
-                        v = match v.get_item(loc) {
-                            Ok(v_next) => v_next,
-                            // key/index not found, try next path
-                            Err(_) => continue 'paths_loop,
-                        }
-                    }
+            for path in path_choices {
+                // iterate over the path and plug each value into the py_any from the last step, starting with dict
+                // this could just be a loop but should be somewhat faster with a functional design
+                if let Some(v) = path.iter().try_fold(dict as &PyAny, |d, loc | loc.py_get(d)) {
+                    // Successfully found an item, return it
+                    return Some(v)
                 }
-
-                // Successfully found an item, return it
-                return Some(v);
             }
             // got to the end of path_choices, without a match, return None
             None
@@ -427,31 +441,26 @@ fn jsonobject_get<'data, 's>(dict: &'data JsonObject, field_key: &'s FieldKey) -
             None => dict.get(key2),
         },
         FieldKey::PathChoices(path_choices) => {
-            'paths_loop: for path in path_choices {
+            for path in path_choices {
                 let mut path_iter = path.iter();
 
-                let mut v: &JsonInput;
-
                 // first step is different from the rest as we already know dict is JsonObject
-                if let Some(loc) = path_iter.next() {
-                    v = match loc.json_obj_get(dict) {
+                let v: &JsonInput = if let Some(loc) = path_iter.next() {
+                    match loc.json_obj_get(dict) {
                         Some(v) => v,
-                        None => continue 'paths_loop,
+                        None => continue,
                     }
                 } else {
-                    continue 'paths_loop;
-                }
+                    continue;
+                };
 
-                for loc in path_iter {
-                    if let Some(next_v) = loc.json_get(v) {
-                        v = next_v;
-                    } else {
-                        continue 'paths_loop;
-                    }
+                // similar to above
+                // iterate over the path and plug each value into the JsonInput from the last step, starting with v
+                // from the first step, this could just be a loop but should be somewhat faster with a functional design
+                if let Some(v) = path_iter.try_fold(v, |d, loc | loc.json_get(d)) {
+                    // Successfully found an item, return it
+                    return Some(v)
                 }
-
-                // Successfully found an item, return it
-                return Some(v);
             }
             // got to the end of path_choices, without a match, return None
             None

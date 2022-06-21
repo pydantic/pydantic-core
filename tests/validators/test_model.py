@@ -332,3 +332,25 @@ def test_alias_path_multiple(py_or_json, input_value, expected):
     else:
         output = v.validate_test(input_value)
         assert output == expected
+
+
+@pytest.mark.parametrize(
+    'alias_schema,error',
+    [
+        ({'alias': ['foo']}, "TypeError: 'list' object cannot be converted to 'PyString'"),
+        ({'alias': 'foo', 'aliases': []}, "'alias' and 'aliases' cannot be used together"),
+        ({'aliases': [[]]}, 'Each alias path must have at least one element'),
+        ({'aliases': [123]}, "TypeError: 'int' object cannot be converted to 'PyList'"),
+        ({'aliases': [[[]]]}, 'TypeError: Alias path items must be with a string or int'),
+        ({'aliases': [[1, 'foo']]}, "TypeError: The first item in an alias path must be a string"),
+    ],
+    ids=repr,
+)
+def test_alias_build_error(alias_schema, error):
+    with pytest.raises(SchemaError, match=error):
+        SchemaValidator(
+            {
+                'type': 'model',
+                'fields': {'field_a': {'schema': 'int', **alias_schema}},
+            }
+        )
