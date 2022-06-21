@@ -259,14 +259,14 @@ pub enum CombinedValidator {
     StrictFloat(float::StrictFloatValidator),
     ConstrainedFloat(float::ConstrainedFloatValidator),
     // lists
-    List(list::ListValidator),
+    List(Box<list::ListValidator>),
     // sets - unique lists
-    Set(set::SetValidator),
+    Set(Box<set::SetValidator>),
     // tuples
-    TupleVarLen(tuple::TupleVarLenValidator),
+    TupleVarLen(Box<tuple::TupleVarLenValidator>),
     TupleFixLen(tuple::TupleFixLenValidator),
     // dicts/objects (recursive)
-    Dict(dict::DictValidator),
+    Dict(Box<dict::DictValidator>),
     // None/null
     None(none::NoneValidator),
     // functions
@@ -295,8 +295,8 @@ pub enum CombinedValidator {
     Time(time::TimeValidator),
     // datetimes
     Datetime(datetime::DateTimeValidator),
-    // frozensets
-    FrozenSet(frozenset::FrozenSetValidator),
+    // frozen sets
+    FrozenSet(Box<frozenset::FrozenSetValidator>),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

@@ -12,7 +12,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 #[derive(Debug, Clone)]
 pub struct FrozenSetValidator {
     strict: bool,
-    item_validator: Box<CombinedValidator>,
+    item_validator: CombinedValidator,
     min_items: Option<usize>,
     max_items: Option<usize>,
 }
@@ -22,7 +22,7 @@ impl BuildValidator for FrozenSetValidator {
     sequence_build_function!();
 }
 
-impl Validator for FrozenSetValidator {
+impl Validator for Box<FrozenSetValidator> {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -48,7 +48,11 @@ impl Validator for FrozenSetValidator {
     }
 
     fn get_name(&self, py: Python) -> String {
-        format!("{}-{}", Self::EXPECTED_TYPE, self.item_validator.get_name(py))
+        format!(
+            "{}-{}",
+            FrozenSetValidator::EXPECTED_TYPE,
+            self.item_validator.get_name(py)
+        )
     }
 }
 

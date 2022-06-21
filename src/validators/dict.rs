@@ -11,8 +11,8 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 #[derive(Debug, Clone)]
 pub struct DictValidator {
     strict: bool,
-    key_validator: Box<CombinedValidator>,
-    value_validator: Box<CombinedValidator>,
+    key_validator: CombinedValidator,
+    value_validator: CombinedValidator,
     min_items: Option<usize>,
     max_items: Option<usize>,
     try_instance_as_dict: bool,
@@ -26,25 +26,25 @@ impl BuildValidator for DictValidator {
         config: Option<&PyDict>,
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
-        Ok(Self {
+        let validator = Self {
             strict: is_strict(schema, config)?,
             key_validator: match schema.get_item("keys") {
-                Some(schema) => Box::new(build_validator(schema, config, build_context)?.0),
-                None => Box::new(AnyValidator::build(schema, config, build_context)?),
+                Some(schema) => build_validator(schema, config, build_context)?.0,
+                None => AnyValidator::build(schema, config, build_context)?,
             },
             value_validator: match schema.get_item("values") {
-                Some(d) => Box::new(build_validator(d, config, build_context)?.0),
-                None => Box::new(AnyValidator::build(schema, config, build_context)?),
+                Some(d) => build_validator(d, config, build_context)?.0,
+                None => AnyValidator::build(schema, config, build_context)?,
             },
             min_items: schema.get_as("min_items")?,
             max_items: schema.get_as("max_items")?,
             try_instance_as_dict: schema.get_as("try_instance_as_dict")?.unwrap_or(false),
-        }
-        .into())
+        };
+        Ok(Box::new(validator).into())
     }
 }
 
-impl Validator for DictValidator {
+impl Validator for Box<DictValidator> {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -70,7 +70,7 @@ impl Validator for DictValidator {
     }
 
     fn get_name(&self, _py: Python) -> String {
-        Self::EXPECTED_TYPE.to_string()
+        DictValidator::EXPECTED_TYPE.to_string()
     }
 }
 
@@ -105,11 +105,8 @@ macro_rules! build_validate {
             let output = PyDict::new(py);
             let mut errors: Vec<ValLineError> = Vec::new();
 
-            let key_validator = self.key_validator.as_ref();
-            let value_validator = self.value_validator.as_ref();
-
             for (key, value) in dict.iter() {
-                let output_key = match key_validator.validate(py, key, extra, slots) {
+                let output_key = match self.key_validator.validate(py, key, extra, slots) {
                     Ok(value) => Some(value),
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {
@@ -122,7 +119,7 @@ macro_rules! build_validate {
                     }
                     Err(err) => return Err(err),
                 };
-                let output_value = match value_validator.validate(py, value, extra, slots) {
+                let output_value = match self.value_validator.validate(py, value, extra, slots) {
                     Ok(value) => Some(value),
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {

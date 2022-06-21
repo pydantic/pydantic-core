@@ -12,7 +12,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 #[derive(Debug, Clone)]
 pub struct TupleVarLenValidator {
     strict: bool,
-    item_validator: Box<CombinedValidator>,
+    item_validator: CombinedValidator,
     min_items: Option<usize>,
     max_items: Option<usize>,
 }
@@ -22,7 +22,7 @@ impl BuildValidator for TupleVarLenValidator {
     sequence_build_function!();
 }
 
-impl Validator for TupleVarLenValidator {
+impl Validator for Box<TupleVarLenValidator> {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -48,7 +48,11 @@ impl Validator for TupleVarLenValidator {
     }
 
     fn get_name(&self, py: Python) -> String {
-        format!("{}-{}", Self::EXPECTED_TYPE, self.item_validator.get_name(py))
+        format!(
+            "{}-{}",
+            TupleVarLenValidator::EXPECTED_TYPE,
+            self.item_validator.get_name(py)
+        )
     }
 }
 
