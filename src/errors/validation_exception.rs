@@ -32,6 +32,7 @@ pub fn as_validation_err(py: Python, model_name: &str, error: ValError) -> PyErr
 }
 
 impl fmt::Display for ValidationError {
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.display(None))
     }
@@ -63,6 +64,7 @@ impl ValidationError {
 }
 
 impl Error for ValidationError {
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         // we could in theory set self.source as `ValError::LineErrors(line_errors.clone())`, then return that here
         // source is not used, and I can't imagine why it would be

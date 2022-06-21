@@ -86,9 +86,14 @@ pub fn is_strict(schema: &PyDict, config: Option<&PyDict>) -> PyResult<bool> {
 // we could perhaps do clever things here to store each schema error, or have different types for the top
 // level error group, and other errors, we could perhaps also support error groups!?
 #[pyclass(extends=PyException, module="pydantic_core._pydantic_core")]
-#[derive(Debug)]
 pub struct SchemaError {
     message: String,
+}
+
+impl fmt::Debug for SchemaError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SchemaError({:?})", self.message)
+    }
 }
 
 impl fmt::Display for SchemaError {
@@ -98,6 +103,7 @@ impl fmt::Display for SchemaError {
 }
 
 impl Error for SchemaError {
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }
@@ -120,11 +126,11 @@ impl SchemaError {
     }
 
     fn __repr__(&self) -> String {
-        format!("SchemaError({:?})", self.message)
+        format!("{:?}", self)
     }
 
     fn __str__(&self) -> String {
-        self.message.clone()
+        self.to_string()
     }
 }
 
