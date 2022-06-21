@@ -37,10 +37,7 @@ impl BuildValidator for ModelValidator {
         // models ignore the parent config and always use the config from this model
         let config: Option<&PyDict> = schema.get_as("config")?;
 
-        let model_full = match config {
-            Some(config_dict) => config_dict.get_as("model_full")?.unwrap_or(true),
-            None => true,
-        };
+        let model_full = config.get_as("model_full")?.unwrap_or(true);
 
         let extra_behavior = ExtraBehavior::from_py(config)?;
         let extra_validator = match extra_behavior {
@@ -74,7 +71,7 @@ impl BuildValidator for ModelValidator {
                 required: match field_info.get_as::<bool>("required")? {
                     Some(required) => {
                         if required && default.is_some() {
-                            return py_error!("Key \"{}\":\n a required key cannot have a default value", key);
+                            return py_error!("Key \"{}\":\n a required field cannot have a default value", key);
                         }
                         required
                     }
