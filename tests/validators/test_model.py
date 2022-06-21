@@ -352,6 +352,8 @@ def test_alias_build_error(alias_schema, error):
         SchemaValidator({'type': 'model', 'fields': {'field_a': {'schema': 'int', **alias_schema}}})
 
 
-def test_no_fields():
-    with pytest.raises(SchemaError, match='Models must have at least on field'):
-        SchemaValidator({'type': 'model', 'fields': {}})
+def test_empty_model():
+    v = SchemaValidator({'type': 'model', 'fields': {}})
+    assert v.validate_python({}) == ({}, set())
+    with pytest.raises(ValidationError):
+        v.validate_python('x')

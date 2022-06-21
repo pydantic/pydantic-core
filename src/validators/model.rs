@@ -47,9 +47,6 @@ impl BuildValidator for ModelValidator {
 
         let name: String = schema.get_as("name")?.unwrap_or_else(|| "Model".to_string());
         let fields_dict: &PyDict = schema.get_as_req("fields")?;
-        if fields_dict.is_empty() {
-            return py_error!("Models must have at least on field");
-        }
         let mut fields: Vec<ModelField> = Vec::with_capacity(fields_dict.len());
         let allow_by_name: bool = config.get_as("allow_population_by_field_name")?.unwrap_or(false);
 
