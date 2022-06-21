@@ -11,7 +11,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 #[derive(Debug, Clone)]
 struct ModelField {
     name: String,
-    key: FieldKey,
+    lookup_key: LookupKey,
     dict_key: Py<PyString>,
     default: Option<PyObject>,
     validator: CombinedValidator,
@@ -58,7 +58,7 @@ impl BuildValidator for ModelValidator {
 
             fields.push(ModelField {
                 name: field_name.to_string(),
-                key: FieldKey::from_py(field_info, field_name, allow_by_name)?,
+                lookup_key: LookupKey::from_py(field_info, field_name, allow_by_name)?,
                 dict_key: PyString::intern(py, field_name).into(),
                 validator: match build_validator(schema, config, build_context) {
                     Ok((v, _)) => v,
@@ -105,7 +105,7 @@ impl Validator for ModelValidator {
             ($dict:ident, $get_method:ident) => {{
                 for field in &self.fields {
                     let py_key: &PyString = field.dict_key.as_ref(py);
-                    if let Some(value) = $get_method($dict, &field.key) {
+                    if let Some(value) = field.lookup_key.$get_method($dict) {
                         match field.validator.validate(py, value, &extra, slots) {
                             Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                             Err(ValError::LineErrors(line_errors)) => {
@@ -277,6 +277,122 @@ impl ExtraBehavior {
     }
 }
 
+/// Used got getting items from python or JSON objects, in different ways
+#[derive(Debug, Clone)]
+pub enum LookupKey {
+    // simply look up a key in a dict, equivalent to `d.get(key)`
+    Simple(String),
+    // look up a key by either string, equivalent to `d.get(choice1, d.get(choice2))`
+    Choice((String, String)),
+    // look up keys buy one or more "paths" a path might be `['foo', 'bar']` to get `d.?foo.?bar`
+    // ints are also supported to index arrays/lists/tuples and dicts with int keys
+    PathChoices(Vec<Vec<FieldKeyLoc>>),
+}
+
+impl LookupKey {
+    pub fn from_py(field: &PyDict, field_name: &str, allow_by_name: bool) -> PyResult<Self> {
+        match field.get_as::<String>("alias")? {
+            Some(alias) => {
+                if field.contains("aliases")? {
+                    py_error!("'alias' and 'aliases' cannot be used together")
+                } else {
+                    match allow_by_name {
+                        true => Ok(LookupKey::Choice((alias, field_name.to_string()))),
+                        false => Ok(LookupKey::Simple(alias)),
+                    }
+                }
+            }
+            None => match field.get_as::<&PyList>("aliases")? {
+                Some(aliases) => {
+                    let mut locs = aliases
+                        .iter()
+                        .map(Self::path_choice)
+                        .collect::<PyResult<Vec<Vec<FieldKeyLoc>>>>()?;
+
+                    if locs.is_empty() {
+                        py_error!("Aliases must have at least one element")
+                    } else {
+                        if allow_by_name {
+                            locs.push(vec![FieldKeyLoc::StrKey(field_name.to_string())])
+                        }
+                        Ok(LookupKey::PathChoices(locs))
+                    }
+                }
+                None => Ok(LookupKey::Simple(field_name.to_string())),
+            },
+        }
+    }
+
+    fn path_choice(obj: &PyAny) -> PyResult<Vec<FieldKeyLoc>> {
+        let path = obj
+            .extract::<&PyList>()?
+            .iter()
+            .enumerate()
+            .map(FieldKeyLoc::from_py)
+            .collect::<PyResult<Vec<FieldKeyLoc>>>()?;
+
+        if path.is_empty() {
+            py_error!("Each alias path must have at least one element")
+        } else {
+            Ok(path)
+        }
+    }
+
+    fn pydict_get<'data, 's>(&'s self, dict: &'data PyDict) -> Option<&'data PyAny> {
+        match self {
+            LookupKey::Simple(key) => dict.get_item(key),
+            LookupKey::Choice((key1, key2)) => match dict.get_item(key1) {
+                Some(v) => Some(v),
+                None => dict.get_item(key2),
+            },
+            LookupKey::PathChoices(path_choices) => {
+                for path in path_choices {
+                    // iterate over the path and plug each value into the py_any from the last step, starting with dict
+                    // this could just be a loop but should be somewhat faster with a functional design
+                    if let Some(v) = path.iter().try_fold(dict as &PyAny, |d, loc| loc.py_get(d)) {
+                        // Successfully found an item, return it
+                        return Some(v);
+                    }
+                }
+                // got to the end of path_choices, without a match, return None
+                None
+            }
+        }
+    }
+
+    fn jsonobject_get<'data, 's>(&'s self, dict: &'data JsonObject) -> Option<&'data JsonInput> {
+        match self {
+            LookupKey::Simple(key) => dict.get(key),
+            LookupKey::Choice((key1, key2)) => match dict.get(key1) {
+                Some(v) => Some(v),
+                None => dict.get(key2),
+            },
+            LookupKey::PathChoices(path_choices) => {
+                for path in path_choices {
+                    let mut path_iter = path.iter();
+
+                    // first step is different from the rest as we already know dict is JsonObject
+                    // because of above checks, we know that path must have at least one element, hence unwrap
+                    let v: &JsonInput = match path_iter.next().unwrap().json_obj_get(dict) {
+                        Some(v) => v,
+                        None => continue,
+                    };
+
+                    // similar to above
+                    // iterate over the path and plug each value into the JsonInput from the last step, starting with v
+                    // from the first step, this could just be a loop but should be somewhat faster with a functional design
+                    if let Some(v) = path_iter.try_fold(v, |d, loc| loc.json_get(d)) {
+                        // Successfully found an item, return it
+                        return Some(v);
+                    }
+                }
+                // got to the end of path_choices, without a match, return None
+                None
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum FieldKeyLoc {
     // string type key, used to get items from a dict or anything that implements __getitem__
@@ -339,117 +455,6 @@ impl FieldKeyLoc {
         match self {
             Self::StrKey(key) => json_obj.get(key),
             _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum FieldKey {
-    Simple(String),
-    Choice((String, String)),
-    PathChoices(Vec<Vec<FieldKeyLoc>>),
-}
-
-impl FieldKey {
-    pub fn from_py(field: &PyDict, field_name: &str, allow_by_name: bool) -> PyResult<Self> {
-        match field.get_as::<String>("alias")? {
-            Some(alias) => {
-                if field.contains("aliases")? {
-                    py_error!("'alias' and 'aliases' cannot be used together")
-                } else {
-                    match allow_by_name {
-                        true => Ok(FieldKey::Choice((alias, field_name.to_string()))),
-                        false => Ok(FieldKey::Simple(alias)),
-                    }
-                }
-            }
-            None => match field.get_as::<&PyList>("aliases")? {
-                Some(aliases) => {
-                    let mut locs = aliases
-                        .iter()
-                        .map(Self::path_choice)
-                        .collect::<PyResult<Vec<Vec<FieldKeyLoc>>>>()?;
-
-                    if locs.is_empty() {
-                        py_error!("Aliases must have at least one element")
-                    } else {
-                        if allow_by_name {
-                            locs.push(vec![FieldKeyLoc::StrKey(field_name.to_string())])
-                        }
-                        Ok(FieldKey::PathChoices(locs))
-                    }
-                }
-                None => Ok(FieldKey::Simple(field_name.to_string())),
-            },
-        }
-    }
-
-    fn path_choice(obj: &PyAny) -> PyResult<Vec<FieldKeyLoc>> {
-        let path = obj
-            .extract::<&PyList>()?
-            .iter()
-            .enumerate()
-            .map(FieldKeyLoc::from_py)
-            .collect::<PyResult<Vec<FieldKeyLoc>>>()?;
-
-        if path.is_empty() {
-            py_error!("Each alias path must have at least one element")
-        } else {
-            Ok(path)
-        }
-    }
-}
-
-fn pydict_get<'data, 's>(dict: &'data PyDict, field_key: &'s FieldKey) -> Option<&'data PyAny> {
-    match field_key {
-        FieldKey::Simple(key) => dict.get_item(key),
-        FieldKey::Choice((key1, key2)) => match dict.get_item(key1) {
-            Some(v) => Some(v),
-            None => dict.get_item(key2),
-        },
-        FieldKey::PathChoices(path_choices) => {
-            for path in path_choices {
-                // iterate over the path and plug each value into the py_any from the last step, starting with dict
-                // this could just be a loop but should be somewhat faster with a functional design
-                if let Some(v) = path.iter().try_fold(dict as &PyAny, |d, loc| loc.py_get(d)) {
-                    // Successfully found an item, return it
-                    return Some(v);
-                }
-            }
-            // got to the end of path_choices, without a match, return None
-            None
-        }
-    }
-}
-
-fn jsonobject_get<'data, 's>(dict: &'data JsonObject, field_key: &'s FieldKey) -> Option<&'data JsonInput> {
-    match field_key {
-        FieldKey::Simple(key) => dict.get(key),
-        FieldKey::Choice((key1, key2)) => match dict.get(key1) {
-            Some(v) => Some(v),
-            None => dict.get(key2),
-        },
-        FieldKey::PathChoices(path_choices) => {
-            for path in path_choices {
-                let mut path_iter = path.iter();
-
-                // first step is different from the rest as we already know dict is JsonObject
-                // because of above checks, we know that path must have at least one element, hence unwrap
-                let v: &JsonInput = match path_iter.next().unwrap().json_obj_get(dict) {
-                    Some(v) => v,
-                    None => continue,
-                };
-
-                // similar to above
-                // iterate over the path and plug each value into the JsonInput from the last step, starting with v
-                // from the first step, this could just be a loop but should be somewhat faster with a functional design
-                if let Some(v) = path_iter.try_fold(v, |d, loc| loc.json_get(d)) {
-                    // Successfully found an item, return it
-                    return Some(v);
-                }
-            }
-            // got to the end of path_choices, without a match, return None
-            None
         }
     }
 }
