@@ -86,6 +86,7 @@ jobs:
     - run: ./tests/rust_coverage_export.sh
 
     - uses: codecov/codecov-action@v2
+      if: matrix.rust-toolchain == 'nightly'
       with:
         env_vars: PYTHON
 
