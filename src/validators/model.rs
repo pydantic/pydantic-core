@@ -46,19 +46,10 @@ impl BuildValidator for ModelValidator {
         };
 
         let name: String = schema.get_as("name")?.unwrap_or_else(|| "Model".to_string());
-        let fields_dict: &PyDict = match schema.get_as("fields")? {
-            Some(fields) => fields,
-            None => {
-                // allow an empty model, is this is a good idea?
-                return Ok(Self {
-                    name,
-                    fields: vec![],
-                    extra_behavior,
-                    extra_validator,
-                }
-                .into());
-            }
-        };
+        let fields_dict: &PyDict = schema.get_as_req("fields")?;
+        if fields_dict.is_empty() {
+            return py_error!("Models must have at least on field");
+        }
         let mut fields: Vec<ModelField> = Vec::with_capacity(fields_dict.len());
         let allow_by_name: bool = config.get_as("allow_population_by_field_name")?.unwrap_or(false);
 
@@ -445,13 +436,10 @@ fn jsonobject_get<'data, 's>(dict: &'data JsonObject, field_key: &'s FieldKey) -
                 let mut path_iter = path.iter();
 
                 // first step is different from the rest as we already know dict is JsonObject
-                let v: &JsonInput = if let Some(loc) = path_iter.next() {
-                    match loc.json_obj_get(dict) {
-                        Some(v) => v,
-                        None => continue,
-                    }
-                } else {
-                    continue;
+                // because of above checks, we know that path must have at least one element, hence unwrap
+                let v: &JsonInput = match path_iter.next().unwrap().json_obj_get(dict) {
+                    Some(v) => v,
+                    None => continue,
                 };
 
                 // similar to above

@@ -339,6 +339,7 @@ def test_alias_path_multiple(py_or_json, input_value, expected):
     [
         ({'alias': ['foo']}, "TypeError: 'list' object cannot be converted to 'PyString'"),
         ({'alias': 'foo', 'aliases': []}, "'alias' and 'aliases' cannot be used together"),
+        ({'aliases': []}, 'Aliases must have at least one element'),
         ({'aliases': [[]]}, 'Each alias path must have at least one element'),
         ({'aliases': [123]}, "TypeError: 'int' object cannot be converted to 'PyList'"),
         ({'aliases': [[[]]]}, 'TypeError: Alias path items must be with a string or int'),
@@ -349,3 +350,8 @@ def test_alias_path_multiple(py_or_json, input_value, expected):
 def test_alias_build_error(alias_schema, error):
     with pytest.raises(SchemaError, match=error):
         SchemaValidator({'type': 'model', 'fields': {'field_a': {'schema': 'int', **alias_schema}}})
+
+
+def test_no_fields():
+    with pytest.raises(SchemaError, match='Models must have at least on field'):
+        SchemaValidator({'type': 'model', 'fields': {}})
