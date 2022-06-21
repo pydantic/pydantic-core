@@ -2,6 +2,8 @@ import pytest
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
+from ..conftest import Err
+
 
 def test_simple():
     v = SchemaValidator(
@@ -256,3 +258,77 @@ def test_json_error():
 def test_missing_schema_key():
     with pytest.raises(SchemaError, match='"schema" is required'):
         SchemaValidator({'type': 'model', 'fields': {'x': {'type': 'str'}}})
+
+
+def test_alias(py_or_json):
+    v = py_or_json({'type': 'model', 'fields': {'field_a': {'alias': 'FieldA', 'schema': 'int'}}})
+    assert v.validate_test({'FieldA': '123'}) == ({'field_a': 123}, {'field_a'})
+    with pytest.raises(ValidationError, match=r'field_a\n +Field required \[kind=missing,'):
+        assert v.validate_test({'foobar': '123'})
+    with pytest.raises(ValidationError, match=r'field_a\n +Field required \[kind=missing,'):
+        assert v.validate_test({'field_a': '123'})
+
+
+def test_alias_allow_pop(py_or_json):
+    v = py_or_json(
+        {
+            'type': 'model',
+            'config': {'allow_population_by_field_name': True},
+            'fields': {'field_a': {'alias': 'FieldA', 'schema': 'int'}},
+        }
+    )
+    assert v.validate_test({'FieldA': '123'}) == ({'field_a': 123}, {'field_a'})
+    assert v.validate_test({'field_a': '123'}) == ({'field_a': 123}, {'field_a'})
+    with pytest.raises(ValidationError, match=r'field_a\n +Field required \[kind=missing,'):
+        assert v.validate_test({'foobar': '123'})
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ({'foo': {'bar': '123'}}, ({'field_a': 123}, {'field_a'})),
+        ({'x': '123'}, Err(r'field_a\n +Field required \[kind=missing,')),
+        ({'foo': '123'}, Err(r'field_a\n +Field required \[kind=missing,')),
+        ({'foo': [1, 2, 3]}, Err(r'field_a\n +Field required \[kind=missing,')),
+        ({'foo': {'bat': '123'}}, Err(r'field_a\n +Field required \[kind=missing,')),
+    ],
+    ids=repr,
+)
+def test_alias_path(py_or_json, input_value, expected):
+    v = py_or_json({'type': 'model', 'fields': {'field_a': {'aliases': [['foo', 'bar']], 'schema': 'int'}}})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=expected.message):
+            v.validate_test(input_value)
+    else:
+        output = v.validate_test(input_value)
+        assert output == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ({'foo': {'bar': {'bat': '123'}}}, ({'field_a': 123}, {'field_a'})),
+        ({'foo': [1, 2, 3, 4]}, ({'field_a': 4}, {'field_a'})),
+        ({'foo': (1, 2, 3, 4)}, ({'field_a': 4}, {'field_a'})),
+        ({'spam': 5}, ({'field_a': 5}, {'field_a'})),
+        ({'spam': 1, 'foo': {'bar': {'bat': 2}}}, ({'field_a': 2}, {'field_a'})),
+        ({'x': '123'}, Err(r'field_a\n +Field required \[kind=missing,')),
+        ({'foo': '01234'}, Err(r'field_a\n +Field required \[kind=missing,')),
+        ({'foo': [1]}, Err(r'field_a\n +Field required \[kind=missing,')),
+    ],
+    ids=repr,
+)
+def test_alias_path_multiple(py_or_json, input_value, expected):
+    v = py_or_json(
+        {
+            'type': 'model',
+            'fields': {'field_a': {'aliases': [['foo', 'bar', 'bat'], ['foo', 3], ['spam']], 'schema': 'int'}},
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=expected.message):
+            val = v.validate_test(input_value)
+            print(f'UNEXPECTED OUTPUT: {val!r}')
+    else:
+        output = v.validate_test(input_value)
+        assert output == expected

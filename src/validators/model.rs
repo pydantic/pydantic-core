@@ -35,7 +35,7 @@ impl BuildValidator for ModelValidator {
         // models ignore the parent config and always use the config from this model
         let config: Option<&PyDict> = schema.get_as("config")?;
 
-        let extra_behavior = ExtraBehavior::from_config(config)?;
+        let extra_behavior = ExtraBehavior::from_py(config)?;
         let extra_validator = match extra_behavior {
             ExtraBehavior::Allow => match schema.get_item("extra_validator") {
                 Some(v) => Some(Box::new(build_validator(v, config, build_context)?.0)),
@@ -59,40 +59,23 @@ impl BuildValidator for ModelValidator {
             }
         };
         let mut fields: Vec<ModelField> = Vec::with_capacity(fields_dict.len());
+        let allow_by_name: bool = config.get_as("allow_population_by_field_name")?.unwrap_or(false);
 
         let py = schema.py();
         for (key, value) in fields_dict.iter() {
-            let field_infos: &PyDict = value.cast_as()?;
-            let schema: &PyAny = field_infos.get_as_req("schema")?;
+            let field_info: &PyDict = value.cast_as()?;
+            let schema: &PyAny = field_info.get_as_req("schema")?;
+            let field_name: &str = key.extract()?;
 
-            let validator = match build_validator(schema, config, build_context) {
-                Ok((v, _)) => v,
-                Err(err) => return py_error!("Key \"{}\":\n  {}", key, err),
-            };
-
-            let key_str = key.to_string();
-            let key = match field_infos.get_item("alias") {
-                Some(alias) => {
-                    if let Ok(string_alias) = alias.extract::<String>() {
-                        FieldKey::Choice((key_str.clone(), string_alias))
-                    } else if let Ok(list) = alias.cast_as::<PyList>() {
-                        let locs = list
-                            .iter()
-                            .map(|item| FieldKeyLoc::from_py(item))
-                            .collect::<PyResult<Vec<FieldKeyLoc>>>()?;
-                        FieldKey::PathChoices(vec![locs])
-                    } else {
-                        return py_error!(r#""alias" must be a string or list of strings & ints"#);
-                    }
-                }
-                None => FieldKey::Simple(key_str.clone()),
-            };
             fields.push(ModelField {
-                name: key_str.clone(),
-                key,
-                dict_key: PyString::intern(py, &key_str).into(),
-                validator,
-                default: field_infos.get_as("default")?,
+                name: field_name.to_string(),
+                key: FieldKey::from_py(field_info, field_name, allow_by_name)?,
+                dict_key: PyString::intern(py, field_name).into(),
+                validator: match build_validator(schema, config, build_context) {
+                    Ok((v, _)) => v,
+                    Err(err) => return py_error!("Key \"{}\":\n  {}", key, err),
+                },
+                default: field_info.get_as("default")?,
             });
         }
         Ok(Self {
@@ -292,20 +275,14 @@ enum ExtraBehavior {
 }
 
 impl ExtraBehavior {
-    pub fn from_config(config: Option<&PyDict>) -> PyResult<Self> {
-        match config {
-            Some(dict) => {
-                let b: Option<String> = dict.get_as("extra")?;
-                match b {
-                    Some(s) => match s.as_str() {
-                        "allow" => Ok(ExtraBehavior::Allow),
-                        "ignore" => Ok(ExtraBehavior::Ignore),
-                        "forbid" => Ok(ExtraBehavior::Forbid),
-                        _ => py_error!(r#"Invalid extra_behavior: "{}""#, s),
-                    },
-                    None => Ok(ExtraBehavior::Ignore),
-                }
-            }
+    pub fn from_py(config: Option<&PyDict>) -> PyResult<Self> {
+        match config.get_as::<&str>("extra")? {
+            Some(s) => match s {
+                "allow" => Ok(ExtraBehavior::Allow),
+                "ignore" => Ok(ExtraBehavior::Ignore),
+                "forbid" => Ok(ExtraBehavior::Forbid),
+                _ => py_error!(r#"Invalid extra_behavior: "{}""#, s),
+            },
             None => Ok(ExtraBehavior::Ignore),
         }
     }
@@ -335,7 +312,7 @@ impl FieldKeyLoc {
         } else if let Ok(int_key) = obj.extract::<usize>() {
             Ok(FieldKeyLoc::IntKey(int_key))
         } else {
-            py_error!("if alias is a list, it must contains only strings and int")
+            py_error!("Alias path items must be with a string or int")
         }
     }
 
@@ -367,26 +344,69 @@ pub enum FieldKey {
     PathChoices(Vec<Vec<FieldKeyLoc>>),
 }
 
+impl FieldKey {
+    pub fn from_py(field: &PyDict, field_name: &str, allow_by_name: bool) -> PyResult<Self> {
+        match field.get_as::<String>("alias")? {
+            Some(alias) => match allow_by_name {
+                true => Ok(FieldKey::Choice((alias, field_name.to_string()))),
+                false => Ok(FieldKey::Simple(alias)),
+            },
+            None => match field.get_as::<&PyList>("aliases")? {
+                Some(aliases) => {
+                    let locs = aliases
+                        .iter()
+                        .map(Self::path_choice)
+                        .collect::<PyResult<Vec<Vec<FieldKeyLoc>>>>()?;
+
+                    if locs.is_empty() {
+                        py_error!("Aliases must have at least one element")
+                    } else {
+                        Ok(FieldKey::PathChoices(locs))
+                    }
+                }
+                None => Ok(FieldKey::Simple(field_name.to_string())),
+            },
+        }
+    }
+
+    fn path_choice(obj: &PyAny) -> PyResult<Vec<FieldKeyLoc>> {
+        let path = obj
+            .extract::<&PyList>()?
+            .iter()
+            .map(FieldKeyLoc::from_py)
+            .collect::<PyResult<Vec<FieldKeyLoc>>>()?;
+
+        if path.is_empty() {
+            py_error!("Each alias path must have at least one element")
+        } else {
+            Ok(path)
+        }
+    }
+}
+
 fn pydict_get<'data, 's>(dict: &'data PyDict, field_key: &'s FieldKey) -> Option<&'data PyAny> {
     match field_key {
         FieldKey::Simple(key) => dict.get_item(key),
-        FieldKey::Choice((key1, key2)) => {
-            match dict.get_item(key1) {
-                Some(v) => Some(v),
-                None => dict.get_item(key2),
-            }
-        }
+        FieldKey::Choice((key1, key2)) => match dict.get_item(key1) {
+            Some(v) => Some(v),
+            None => dict.get_item(key2),
+        },
         FieldKey::PathChoices(path_choices) => {
             'paths_loop: for path in path_choices {
                 let mut v: &PyAny = dict;
 
                 for loc in path {
-                    // blindly try getitem on v since no better logic is realistic
-                    // TODO we could perhaps try getattr for StrKey depending on try_instance
-                    v = match v.get_item(loc) {
-                        Ok(v_next) => v_next,
-                        // key/index not found, try next path
-                        Err(_) => continue 'paths_loop,
+                    // we definitely don't want to index strings, so explicitly omit this case
+                    if v.cast_as::<PyString>().is_ok() {
+                        continue 'paths_loop;
+                    } else {
+                        // otherwise, blindly try getitem on v since no better logic is realistic
+                        // TODO we could perhaps try getattr for StrKey depending on try_instance
+                        v = match v.get_item(loc) {
+                            Ok(v_next) => v_next,
+                            // key/index not found, try next path
+                            Err(_) => continue 'paths_loop,
+                        }
                     }
                 }
 
@@ -402,12 +422,10 @@ fn pydict_get<'data, 's>(dict: &'data PyDict, field_key: &'s FieldKey) -> Option
 fn jsonobject_get<'data, 's>(dict: &'data JsonObject, field_key: &'s FieldKey) -> Option<&'data JsonInput> {
     match field_key {
         FieldKey::Simple(key) => dict.get(key),
-        FieldKey::Choice((key1, key2)) => {
-            match dict.get(key1) {
-                Some(v) => Some(v),
-                None => dict.get(key2),
-            }
-        }
+        FieldKey::Choice((key1, key2)) => match dict.get(key1) {
+            Some(v) => Some(v),
+            None => dict.get(key2),
+        },
         FieldKey::PathChoices(path_choices) => {
             'paths_loop: for path in path_choices {
                 let mut path_iter = path.iter();
@@ -416,7 +434,7 @@ fn jsonobject_get<'data, 's>(dict: &'data JsonObject, field_key: &'s FieldKey) -
 
                 // first step is different from the rest as we already know dict is JsonObject
                 if let Some(loc) = path_iter.next() {
-                    v = match loc.json_obj_get(&dict) {
+                    v = match loc.json_obj_get(dict) {
                         Some(v) => v,
                         None => continue 'paths_loop,
                     }

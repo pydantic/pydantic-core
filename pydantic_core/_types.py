@@ -84,10 +84,11 @@ class ModelClassSchema(TypedDict):
     model: ModelSchema
 
 
-class ModelField(TypedDict):
-    schema: Schema
-    default: NotRequired[Any]
-    # alias: str
+class ModelField(TypedDict, total=False):
+    schema: Required[Schema]
+    default: Any
+    alias: str
+    aliases: List[List[Union[str, int]]]
 
 
 class ModelSchema(TypedDict):
