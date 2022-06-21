@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PySet, PyString};
+use pyo3::types::{PyDict, PySet, PyString};
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult};
@@ -36,8 +36,8 @@ impl BuildValidator for ModelValidator {
         // models ignore the parent config and always use the config from this model
         let config: Option<&PyDict> = schema.get_as("config")?;
 
-        let field_default_required = match config {
-            Some(dict) => !matches!(dict.get_as("model_full")?, Some(false)),
+        let model_full = match config {
+            Some(config_dict) => config_dict.get_as("model_full")?.unwrap_or(true),
             None => true,
         };
 
@@ -79,15 +79,14 @@ impl BuildValidator for ModelValidator {
             let key_str = key.to_string();
 
             let default = field_infos.get_as("default")?;
-            let required = match field_infos.get_as::<&PyBool>("required")? {
-                Some(r) => {
-                    let required = r.extract()?;
+            let required = match field_infos.get_as::<bool>("required")? {
+                Some(required) => {
                     if required && default.is_some() {
                         return py_error!("Key \"{}\":\n a required key cannot have a default value", key);
                     }
                     required
                 }
-                None => field_default_required,
+                None => model_full,
             };
 
             fields.push(ModelField {

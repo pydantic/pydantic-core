@@ -345,7 +345,7 @@ def test_all_optional_fields_with_required_fields():
 
 def test_field_required_and_default():
     """A field cannot be required and have a default value"""
-    with pytest.raises(SchemaError, match='a required key cannot have a default value'):
+    with pytest.raises(SchemaError, match='Key "x":\n a required key cannot have a default value'):
         SchemaValidator(
             {'type': 'model', 'fields': {'x': {'schema': {'type': 'str'}, 'required': True, 'default': 'pika'}}}
         )
