@@ -1,16 +1,16 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySet, PyString};
+use pyo3::types::{PyDict, PyList, PySet, PyString};
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input, ToLocItem};
+use crate::input::{GenericMapping, Input, JsonInput, JsonObject, ToLocItem};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 struct ModelField {
     name: String,
-    // alias: Option<String>,
+    key: FieldKey,
     dict_key: Py<PyString>,
     default: Option<PyObject>,
     validator: CombinedValidator,
@@ -71,9 +71,25 @@ impl BuildValidator for ModelValidator {
             };
 
             let key_str = key.to_string();
+            let key = match field_infos.get_item("alias") {
+                Some(alias) => {
+                    if let Ok(string_alias) = alias.extract::<String>() {
+                        FieldKey::Choice((key_str.clone(), string_alias))
+                    } else if let Ok(list) = alias.cast_as::<PyList>() {
+                        let locs = list
+                            .iter()
+                            .map(|item| FieldKeyLoc::from_py(item))
+                            .collect::<PyResult<Vec<FieldKeyLoc>>>()?;
+                        FieldKey::PathChoices(vec![locs])
+                    } else {
+                        return py_error!(r#""alias" must be a string or list of strings & ints"#);
+                    }
+                }
+                None => FieldKey::Simple(key_str.clone()),
+            };
             fields.push(ModelField {
                 name: key_str.clone(),
-                // alias: field_infos.get_as("alias"),
+                key,
                 dict_key: PyString::intern(py, &key_str).into(),
                 validator,
                 default: field_infos.get_as("default")?,
@@ -117,7 +133,7 @@ impl Validator for ModelValidator {
             ($dict:ident, $get_method:ident) => {{
                 for field in &self.fields {
                     let py_key: &PyString = field.dict_key.as_ref(py);
-                    if let Some(value) = $dict.$get_method(&field.name) {
+                    if let Some(value) = $get_method($dict, &field.key) {
                         match field.validator.validate(py, value, &extra, slots) {
                             Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                             Err(ValError::LineErrors(line_errors)) => {
@@ -191,8 +207,8 @@ impl Validator for ModelValidator {
             }};
         }
         match dict {
-            GenericMapping::PyDict(d) => process!(d, get_item),
-            GenericMapping::JsonObject(d) => process!(d, get),
+            GenericMapping::PyDict(d) => process!(d, pydict_get),
+            GenericMapping::JsonObject(d) => process!(d, jsonobject_get),
         }
 
         if errors.is_empty() {
@@ -291,6 +307,136 @@ impl ExtraBehavior {
                 }
             }
             None => Ok(ExtraBehavior::Ignore),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FieldKeyLoc {
+    // string type key, used to get items from a dict
+    StrKey(String),
+    // integer key, used to get items from a list, tuple OR a dict with int keys
+    IntKey(usize),
+}
+
+impl ToPyObject for FieldKeyLoc {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        match self {
+            Self::StrKey(val) => val.to_object(py),
+            Self::IntKey(val) => val.to_object(py),
+        }
+    }
+}
+
+impl FieldKeyLoc {
+    pub fn from_py(obj: &PyAny) -> PyResult<Self> {
+        if let Ok(str_key) = obj.extract::<String>() {
+            Ok(FieldKeyLoc::StrKey(str_key))
+        } else if let Ok(int_key) = obj.extract::<usize>() {
+            Ok(FieldKeyLoc::IntKey(int_key))
+        } else {
+            py_error!("if alias is a list, it must contains only strings and int")
+        }
+    }
+
+    pub fn json_get<'a>(&self, any_json: &'a JsonInput) -> Option<&'a JsonInput> {
+        match self {
+            Self::StrKey(key) => match any_json {
+                JsonInput::Object(v_obj) => v_obj.get(key),
+                _ => None,
+            },
+            Self::IntKey(index) => match any_json {
+                JsonInput::Array(v_array) => v_array.get(*index),
+                _ => None,
+            },
+        }
+    }
+
+    pub fn json_obj_get<'a>(&self, json_obj: &'a JsonObject) -> Option<&'a JsonInput> {
+        match self {
+            Self::StrKey(key) => json_obj.get(key),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FieldKey {
+    Simple(String),
+    Choice((String, String)),
+    PathChoices(Vec<Vec<FieldKeyLoc>>),
+}
+
+fn pydict_get<'data, 's>(dict: &'data PyDict, field_key: &'s FieldKey) -> Option<&'data PyAny> {
+    match field_key {
+        FieldKey::Simple(key) => dict.get_item(key),
+        FieldKey::Choice((key1, key2)) => {
+            match dict.get_item(key1) {
+                Some(v) => Some(v),
+                None => dict.get_item(key2),
+            }
+        }
+        FieldKey::PathChoices(path_choices) => {
+            'paths_loop: for path in path_choices {
+                let mut v: &PyAny = dict;
+
+                for loc in path {
+                    // blindly try getitem on v since no better logic is realistic
+                    // TODO we could perhaps try getattr for StrKey depending on try_instance
+                    v = match v.get_item(loc) {
+                        Ok(v_next) => v_next,
+                        // key/index not found, try next path
+                        Err(_) => continue 'paths_loop,
+                    }
+                }
+
+                // Successfully found an item, return it
+                return Some(v);
+            }
+            // got to the end of path_choices, without a match, return None
+            None
+        }
+    }
+}
+
+fn jsonobject_get<'data, 's>(dict: &'data JsonObject, field_key: &'s FieldKey) -> Option<&'data JsonInput> {
+    match field_key {
+        FieldKey::Simple(key) => dict.get(key),
+        FieldKey::Choice((key1, key2)) => {
+            match dict.get(key1) {
+                Some(v) => Some(v),
+                None => dict.get(key2),
+            }
+        }
+        FieldKey::PathChoices(path_choices) => {
+            'paths_loop: for path in path_choices {
+                let mut path_iter = path.iter();
+
+                let mut v: &JsonInput;
+
+                // first step is different from the rest as we already know dict is JsonObject
+                if let Some(loc) = path_iter.next() {
+                    v = match loc.json_obj_get(&dict) {
+                        Some(v) => v,
+                        None => continue 'paths_loop,
+                    }
+                } else {
+                    continue 'paths_loop;
+                }
+
+                for loc in path_iter {
+                    if let Some(next_v) = loc.json_get(v) {
+                        v = next_v;
+                    } else {
+                        continue 'paths_loop;
+                    }
+                }
+
+                // Successfully found an item, return it
+                return Some(v);
+            }
+            // got to the end of path_choices, without a match, return None
+            None
         }
     }
 }
