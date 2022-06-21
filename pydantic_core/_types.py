@@ -28,6 +28,7 @@ class ConfigSchema(TypedDict, total=False):
     strict: bool
     extra: Literal['allow', 'forbid', 'ignore']
     model_full: bool  # default: True
+    allow_population_by_field_name: bool
 
 
 class DictSchema(TypedDict, total=False):
@@ -85,11 +86,12 @@ class ModelClassSchema(TypedDict):
     model: ModelSchema
 
 
-class ModelField(TypedDict):
-    schema: Schema
-    required: NotRequired[bool]
-    default: NotRequired[Any]
-    # alias: str
+class ModelField(TypedDict, total=False):
+    schema: Required[Schema]
+    required: bool
+    default: Any
+    alias: str
+    aliases: List[List[Union[str, int]]]
 
 
 class ModelSchema(TypedDict):
