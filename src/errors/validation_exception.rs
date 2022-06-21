@@ -14,7 +14,7 @@ use super::line_error::{Context, LocItem, Location, ValLineError};
 
 use super::ValError;
 
-#[pyclass(extends=PyValueError)]
+#[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
 #[derive(Debug)]
 pub struct ValidationError {
     line_errors: Vec<PyLineError>,
@@ -38,7 +38,6 @@ impl fmt::Display for ValidationError {
 }
 
 impl ValidationError {
-    #[inline]
     pub fn new_err<A>(args: A) -> PyErr
     where
         A: PyErrArguments + Send + Sync + 'static,
