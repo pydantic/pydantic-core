@@ -27,6 +27,7 @@ class BoolSchema(TypedDict):
 class ConfigSchema(TypedDict, total=False):
     strict: bool
     extra: Literal['allow', 'forbid', 'ignore']
+    allow_population_by_field_name: bool
 
 
 class DictSchema(TypedDict, total=False):
