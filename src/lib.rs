@@ -13,9 +13,9 @@ mod input;
 mod validators;
 
 // required for benchmarks
-pub use build_tools::SchemaError;
-pub use errors::ValidationError;
 pub use validators::SchemaValidator;
+pub use errors::ValidationError;
+pub use build_tools::SchemaError;
 
 pub fn get_version() -> String {
     let version = env!("CARGO_PKG_VERSION").to_string();
