@@ -7,13 +7,13 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::PyErrArguments;
 
-use crate::errors::location::PyLocItem;
 use strum::EnumMessage;
 
 use crate::input::repr_string;
 
 use super::kinds::ErrorKind;
 use super::line_error::{Context, ValLineError};
+use super::location::Location;
 use super::ValError;
 
 #[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
@@ -128,7 +128,7 @@ macro_rules! truncate_input_value {
 #[derive(Debug, Clone)]
 pub struct PyLineError {
     kind: ErrorKind,
-    location: Vec<PyLocItem>,
+    location: Location,
     message: Option<String>,
     input_value: PyObject,
     context: Context,
@@ -138,7 +138,7 @@ impl PyLineError {
     pub fn new(py: Python, raw_error: ValLineError) -> Self {
         Self {
             kind: raw_error.kind,
-            location: raw_error.location.into_iter().map(PyLocItem::from).collect(),
+            location: raw_error.location,
             message: raw_error.message,
             input_value: raw_error.input_value.to_object(py),
             context: raw_error.context,

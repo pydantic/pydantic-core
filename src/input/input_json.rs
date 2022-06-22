@@ -16,7 +16,7 @@ use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 impl<'a> Input<'a> for JsonInput {
     /// This is required by since JSON object keys are always strings, I don't think it can be called
     #[cfg_attr(has_no_coverage, no_coverage)]
-    fn as_loc_item(&'a self) -> LocItem<'a> {
+    fn as_loc_item(&'a self) -> LocItem {
         match self {
             JsonInput::Int(i) => LocItem::I(*i as usize),
             JsonInput::String(s) => s.as_str().into(),
@@ -202,7 +202,7 @@ impl<'a> Input<'a> for JsonInput {
 
 /// Required for Dict keys so the string can behave like an Input
 impl<'a> Input<'a> for String {
-    fn as_loc_item(&'a self) -> LocItem<'a> {
+    fn as_loc_item(&'a self) -> LocItem {
         self.to_string().into()
     }
 

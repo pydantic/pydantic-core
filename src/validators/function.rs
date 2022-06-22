@@ -88,7 +88,7 @@ impl Validator for FunctionBeforeValidator {
                 Err(ValError::LineErrors(
                     line_errors
                         .into_iter()
-                        .map(|line_error| line_error.clone_py(py))
+                        .map(|line_error| line_error.into_new(py))
                         .collect(),
                 ))
             }

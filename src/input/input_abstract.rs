@@ -12,7 +12,7 @@ use super::return_enums::{EitherBytes, EitherString};
 use super::{GenericMapping, GenericSequence};
 
 pub trait Input<'a>: fmt::Debug + ToPyObject {
-    fn as_loc_item(&'a self) -> LocItem<'a>;
+    fn as_loc_item(&'a self) -> LocItem;
 
     fn as_error_value(&'a self) -> InputValue<'a>;
 
