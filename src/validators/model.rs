@@ -388,7 +388,7 @@ impl LookupKey {
 
     fn jsonobject_get<'data, 's>(&'s self, dict: &'data JsonObject) -> Option<&'data JsonInput> {
         match self {
-            LookupKey::Simple((key,_ )) => dict.get(key),
+            LookupKey::Simple((key, _)) => dict.get(key),
             LookupKey::Choice((key1, _, key2, _)) => match dict.get(key1) {
                 Some(v) => Some(v),
                 None => dict.get(key2),
