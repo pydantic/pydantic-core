@@ -6,7 +6,7 @@ use pyo3::types::PyDict;
 use crate::input::JsonInput;
 
 use super::kinds::ErrorKind;
-use crate::location::{LocItem, Location};
+use super::location::{owned_location, LocItem, Location};
 
 /// A `ValLineError` is a single error that occurred during validation which is converted to a `PyLineError`
 /// to eventually form a `ValidationError`.
@@ -14,16 +14,26 @@ use crate::location::{LocItem, Location};
 #[derive(Debug, Default)]
 pub struct ValLineError<'a> {
     pub kind: ErrorKind,
-    pub location: Location,
+    pub location: Location<'a>,
     pub message: Option<String>,
     pub input_value: InputValue<'a>,
     pub context: Context,
 }
 
 impl<'a> ValLineError<'a> {
-    pub fn with_prefix_location(mut self, loc_item: LocItem) -> Self {
+    pub fn with_prefix_location(mut self, loc_item: LocItem<'a>) -> Self {
         self.location.insert(0, loc_item);
         self
+    }
+
+    pub fn clone_py<'b>(&'a self, py: Python) -> ValLineError<'b> {
+        ValLineError {
+            kind: self.kind.clone(),
+            location: owned_location(&self.location),
+            message: self.message.clone(),
+            input_value: InputValue::PyObject(self.input_value.to_object(py)),
+            context: self.context.clone(),
+        }
     }
 }
 

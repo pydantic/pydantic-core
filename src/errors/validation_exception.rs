@@ -4,7 +4,7 @@ use std::fmt::Write;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 use pyo3::PyErrArguments;
 
 use strum::EnumMessage;
@@ -14,7 +14,6 @@ use crate::input::repr_string;
 use super::kinds::ErrorKind;
 use super::line_error::{Context, ValLineError};
 use super::ValError;
-use crate::location::{LocItem, Location};
 
 #[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
 #[derive(Debug)]
@@ -128,7 +127,7 @@ macro_rules! truncate_input_value {
 #[derive(Debug, Clone)]
 pub struct PyLineError {
     kind: ErrorKind,
-    location: Location,
+    location: PyObject,
     message: Option<String>,
     input_value: PyObject,
     context: Context,
@@ -138,7 +137,7 @@ impl PyLineError {
     pub fn new(py: Python, raw_error: ValLineError) -> Self {
         Self {
             kind: raw_error.kind,
-            location: raw_error.location,
+            location: raw_error.location.to_object(py),
             message: raw_error.message,
             input_value: raw_error.input_value.to_object(py),
             context: raw_error.context,
@@ -148,7 +147,8 @@ impl PyLineError {
     pub fn as_dict(&self, py: Python) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
         dict.set_item("kind", self.kind())?;
-        dict.set_item("loc", self.location(py))?;
+        let location: &PyList = self.location.extract(py)?;
+        dict.set_item("loc", location)?;
         dict.set_item("message", self.message())?;
         dict.set_item("input_value", &self.input_value)?;
         if !self.context.is_empty() {
@@ -159,18 +159,6 @@ impl PyLineError {
 
     fn kind(&self) -> String {
         self.kind.to_string()
-    }
-
-    fn location(&self, py: Python) -> PyObject {
-        let mut loc: Vec<PyObject> = Vec::with_capacity(self.location.len());
-        for location in &self.location {
-            let item: PyObject = match location {
-                LocItem::S(key) => key.into_py(py),
-                LocItem::I(index) => index.into_py(py),
-            };
-            loc.push(item);
-        }
-        loc.into_py(py)
     }
 
     fn message(&self) -> String {
@@ -196,14 +184,16 @@ impl PyLineError {
 
     fn pretty(&self, py: Option<Python>) -> Result<String, fmt::Error> {
         let mut output = String::with_capacity(200);
-        if !self.location.is_empty() {
-            let loc = self
-                .location
-                .iter()
-                .map(|i| i.to_string())
-                .collect::<Vec<String>>()
-                .join(" -> ");
-            writeln!(output, "{}", &loc)?;
+        if let Some(py) = py {
+            let location: &PyList = self.location.extract(py).unwrap();
+            if !location.is_empty() {
+                let loc = location
+                    .iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" -> ");
+                writeln!(output, "{}", &loc)?;
+            }
         }
 
         write!(output, "  {} [kind={}", self.message(), self.kind())?;

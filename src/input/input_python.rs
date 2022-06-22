@@ -6,9 +6,9 @@ use pyo3::types::{
     PyTuple, PyType,
 };
 
+use crate::errors::location::LocItem;
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::return_enums::EitherString;
-use crate::location::LocItem;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, date_as_datetime, float_as_datetime, float_as_time,
@@ -23,13 +23,13 @@ use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 impl<'a> Input<'a> for PyAny {
     fn as_loc_item(&'a self) -> LocItem {
         if let Ok(key_str) = self.extract::<String>() {
-            LocItem::S(key_str)
+            key_str.into()
         } else if let Ok(key_int) = self.extract::<usize>() {
-            LocItem::I(key_int)
+            key_int.into()
         } else {
             match repr_string(self) {
-                Ok(s) => LocItem::S(s),
-                Err(_) => LocItem::S(format!("{:?}", self)),
+                Ok(s) => s.into(),
+                Err(_) => format!("{:?}", self).into(),
             }
         }
     }

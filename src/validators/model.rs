@@ -5,7 +5,6 @@ use pyo3::types::{PyDict, PyList, PySet, PyString};
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult};
 use crate::input::{GenericMapping, Input, JsonInput, JsonObject};
-use crate::location::LocItem;
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -170,14 +169,14 @@ impl Validator for ModelValidator {
                             errors.push(val_line_error!(
                                 input_value = input.as_error_value(),
                                 kind = ErrorKind::ExtraForbidden,
-                                location = vec![key.as_loc_item()]
+                                location = vec![raw_key.as_loc_item()]
                             ));
                         } else if let Some(ref validator) = self.extra_validator {
                             match validator.validate(py, value, &extra, slots) {
                                 Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                                 Err(ValError::LineErrors(line_errors)) => {
                                     for err in line_errors {
-                                        errors.push(err.with_prefix_location(key.as_loc_item()));
+                                        errors.push(err.with_prefix_location(raw_key.as_loc_item()));
                                     }
                                 }
                                 Err(err) => return Err(err),
@@ -237,7 +236,7 @@ impl ModelValidator {
             Err(ValError::LineErrors(line_errors)) => {
                 let errors = line_errors
                     .into_iter()
-                    .map(|e| e.with_prefix_location(field.into()))
+                    .map(|e| e.with_prefix_location(field.to_string().into()))
                     .collect();
                 Err(ValError::LineErrors(errors))
             }
@@ -257,10 +256,9 @@ impl ModelValidator {
                 // - with forbid this is obvious
                 // - with ignore the model should never be overloaded, so an error is the clearest option
                 _ => {
-                    let loc = vec![field.into()];
                     err_val_error!(
                         input_value = input.as_error_value(),
-                        location = loc,
+                        location = vec![field.to_string().into()],
                         kind = ErrorKind::ExtraForbidden
                     )
                 }
@@ -318,16 +316,13 @@ impl LookupKey {
             }
             None => match field.get_as::<&PyList>("aliases")? {
                 Some(aliases) => {
-                    let mut locs = aliases
-                        .iter()
-                        .map(Self::path_choice)
-                        .collect::<PyResult<Vec<Path>>>()?;
+                    let mut locs = aliases.iter().map(Self::path_choice).collect::<PyResult<Vec<Path>>>()?;
 
                     if locs.is_empty() {
                         py_error!("Aliases must have at least one element")
                     } else {
                         if allow_by_name {
-                            locs.push(vec![LocItem::S(field_name.to_string())])
+                            locs.push(vec![PathItem::S(field_name.to_string())])
                         }
                         Ok(LookupKey::PathChoices(locs))
                     }
@@ -342,7 +337,7 @@ impl LookupKey {
             .extract::<&PyList>()?
             .iter()
             .enumerate()
-            .map(LocItem::from_py)
+            .map(PathItem::from_py)
             .collect::<PyResult<Path>>()?;
 
         if path.is_empty() {
@@ -407,9 +402,26 @@ impl LookupKey {
     }
 }
 
-type Path = Vec<LocItem>;
+#[derive(Debug, Clone)]
+pub enum PathItem {
+    /// string type key, used to get or identify items from a dict or anything that implements `__getitem__`
+    S(String),
+    /// integer key, used to get items from a list, tuple OR a dict with int keys `Dict[int, ...]` (python only)
+    I(usize),
+}
 
-impl LocItem {
+impl ToPyObject for PathItem {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        match self {
+            Self::S(val) => val.to_object(py),
+            Self::I(val) => val.to_object(py),
+        }
+    }
+}
+
+type Path = Vec<PathItem>;
+
+impl PathItem {
     pub fn from_py((index, obj): (usize, &PyAny)) -> PyResult<Self> {
         if let Ok(str_key) = obj.extract::<String>() {
             Ok(Self::S(str_key))
