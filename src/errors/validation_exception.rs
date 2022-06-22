@@ -9,10 +9,12 @@ use pyo3::PyErrArguments;
 
 use strum::EnumMessage;
 
-use super::kinds::ErrorKind;
-use super::line_error::{Context, LocItem, Location, ValLineError};
+use crate::input::repr_string;
 
+use super::kinds::ErrorKind;
+use super::line_error::{Context, ValLineError};
 use super::ValError;
+use crate::location::{LocItem, Location};
 
 #[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
 #[derive(Debug)]
@@ -211,7 +213,7 @@ impl PyLineError {
         }
         if let Some(py) = py {
             let input_value = self.input_value.as_ref(py);
-            let input_str = match repr(input_value) {
+            let input_str = match repr_string(input_value) {
                 Ok(s) => s,
                 Err(_) => input_value.to_string(),
             };
@@ -226,8 +228,4 @@ impl PyLineError {
         output.push(']');
         Ok(output)
     }
-}
-
-fn repr(v: &PyAny) -> PyResult<String> {
-    v.repr()?.extract()
 }

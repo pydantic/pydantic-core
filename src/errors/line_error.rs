@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{Display, Formatter, Result};
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -6,30 +6,7 @@ use pyo3::types::PyDict;
 use crate::input::JsonInput;
 
 use super::kinds::ErrorKind;
-
-/// Used to store individual items of the error location, e.g. a string for key/field names
-/// or a number for array indices.
-/// Note: ints are also used for keys of `Dict[int, ...]`
-#[derive(Debug, Clone)]
-pub enum LocItem {
-    S(String),
-    I(usize),
-}
-// we could use the From trait to make creating Location's much easier, would it be worth it?
-
-impl fmt::Display for LocItem {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            LocItem::S(s) => write!(f, "{}", s),
-            LocItem::I(i) => write!(f, "{}", i),
-        }
-    }
-}
-
-/// Error locations are represented by a vector of `LocItem`s.
-/// e.g. if the error occurred in the third member of a list called `foo`,
-/// the location would be `["foo", 2]`.
-pub type Location = Vec<LocItem>;
+use crate::location::{LocItem, Location};
 
 /// A `ValLineError` is a single error that occurred during validation which is converted to a `PyLineError`
 /// to eventually form a `ValidationError`.
@@ -98,8 +75,8 @@ impl Context {
     }
 }
 
-impl fmt::Display for Context {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for Context {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let loc = self
             .0
             .iter()
@@ -110,7 +87,7 @@ impl fmt::Display for Context {
     }
 }
 
-// maybe this is overkill and we should just use fmt::Display an convert to string when creating Context?
+// maybe this is overkill and we should just use Display an convert to string when creating Context?
 #[derive(Debug, Clone)]
 pub enum ContextValue {
     S(String),
@@ -118,8 +95,8 @@ pub enum ContextValue {
     F(f64),
 }
 
-impl fmt::Display for ContextValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for ContextValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ContextValue::S(v) => write!(f, "{}", v),
             ContextValue::I(v) => write!(f, "{}", v),

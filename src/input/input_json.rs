@@ -1,6 +1,7 @@
 use pyo3::types::PyType;
 
 use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
+use crate::location::LocItem;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, float_as_datetime, float_as_time, int_as_datetime, int_as_time,
@@ -13,6 +14,16 @@ use super::return_enums::{EitherBytes, EitherString};
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 
 impl<'a> Input<'a> for JsonInput {
+    /// This is required by since JSON object keys are always strings, I don't think it can be called
+    #[cfg_attr(has_no_coverage, no_coverage)]
+    fn as_loc_item(&'a self) -> LocItem {
+        match self {
+            JsonInput::Int(i) => LocItem::I(*i as usize),
+            JsonInput::String(s) => LocItem::S(s.clone()),
+            v => LocItem::S(format!("{:?}", v)),
+        }
+    }
+
     fn as_error_value(&'a self) -> InputValue<'a> {
         InputValue::JsonInput(self)
     }
@@ -191,6 +202,10 @@ impl<'a> Input<'a> for JsonInput {
 
 /// Required for Dict keys so the string can behave like an Input
 impl<'a> Input<'a> for String {
+    fn as_loc_item(&'a self) -> LocItem {
+        LocItem::S(self.to_string())
+    }
+
     fn as_error_value(&'a self) -> InputValue<'a> {
         InputValue::String(self)
     }

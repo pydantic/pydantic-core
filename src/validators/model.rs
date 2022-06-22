@@ -4,7 +4,8 @@ use pyo3::types::{PyDict, PyList, PySet, PyString};
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input, JsonInput, JsonObject, ToLocItem};
+use crate::input::{GenericMapping, Input, JsonInput, JsonObject};
+use crate::location::LocItem;
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -120,7 +121,7 @@ impl Validator for ModelValidator {
                             Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
-                                    errors.push(err.with_prefix_location(field.name.to_loc()));
+                                    errors.push(err.with_prefix_location(field.name.clone().into()));
                                 }
                             }
                             Err(err) => return Err(err),
@@ -136,7 +137,7 @@ impl Validator for ModelValidator {
                         errors.push(val_line_error!(
                             input_value = input.as_error_value(),
                             kind = ErrorKind::Missing,
-                            location = vec![field.name.to_loc()]
+                            location = vec![field.name.clone().into()]
                         ));
                     }
                 }
@@ -153,7 +154,7 @@ impl Validator for ModelValidator {
                             Ok(k) => k.as_raw().map_err(as_internal)?,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
-                                    errors.push(err.with_prefix_location(raw_key.to_loc()));
+                                    errors.push(err.with_prefix_location(raw_key.as_loc_item()));
                                 }
                                 continue;
                             }
@@ -169,14 +170,14 @@ impl Validator for ModelValidator {
                             errors.push(val_line_error!(
                                 input_value = input.as_error_value(),
                                 kind = ErrorKind::ExtraForbidden,
-                                location = vec![key.to_loc()]
+                                location = vec![key.as_loc_item()]
                             ));
                         } else if let Some(ref validator) = self.extra_validator {
                             match validator.validate(py, value, &extra, slots) {
                                 Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                                 Err(ValError::LineErrors(line_errors)) => {
                                     for err in line_errors {
-                                        errors.push(err.with_prefix_location(key.to_loc()));
+                                        errors.push(err.with_prefix_location(key.as_loc_item()));
                                     }
                                 }
                                 Err(err) => return Err(err),
@@ -236,7 +237,7 @@ impl ModelValidator {
             Err(ValError::LineErrors(line_errors)) => {
                 let errors = line_errors
                     .into_iter()
-                    .map(|e| e.with_prefix_location(field.to_loc()))
+                    .map(|e| e.with_prefix_location(field.into()))
                     .collect();
                 Err(ValError::LineErrors(errors))
             }
@@ -256,7 +257,7 @@ impl ModelValidator {
                 // - with forbid this is obvious
                 // - with ignore the model should never be overloaded, so an error is the clearest option
                 _ => {
-                    let loc = vec![field.to_loc()];
+                    let loc = vec![field.into()];
                     err_val_error!(
                         input_value = input.as_error_value(),
                         location = loc,
@@ -298,7 +299,8 @@ pub enum LookupKey {
     Choice((String, String)),
     // look up keys buy one or more "paths" a path might be `['foo', 'bar']` to get `d.?foo.?bar`
     // ints are also supported to index arrays/lists/tuples and dicts with int keys
-    PathChoices(Vec<Vec<FieldKeyLoc>>),
+    // we reuse Location as the enum is the same, and the meaning is the same
+    PathChoices(Vec<Path>),
 }
 
 impl LookupKey {
@@ -319,13 +321,13 @@ impl LookupKey {
                     let mut locs = aliases
                         .iter()
                         .map(Self::path_choice)
-                        .collect::<PyResult<Vec<Vec<FieldKeyLoc>>>>()?;
+                        .collect::<PyResult<Vec<Path>>>()?;
 
                     if locs.is_empty() {
                         py_error!("Aliases must have at least one element")
                     } else {
                         if allow_by_name {
-                            locs.push(vec![FieldKeyLoc::StrKey(field_name.to_string())])
+                            locs.push(vec![LocItem::S(field_name.to_string())])
                         }
                         Ok(LookupKey::PathChoices(locs))
                     }
@@ -335,13 +337,13 @@ impl LookupKey {
         }
     }
 
-    fn path_choice(obj: &PyAny) -> PyResult<Vec<FieldKeyLoc>> {
+    fn path_choice(obj: &PyAny) -> PyResult<Path> {
         let path = obj
             .extract::<&PyList>()?
             .iter()
             .enumerate()
-            .map(FieldKeyLoc::from_py)
-            .collect::<PyResult<Vec<FieldKeyLoc>>>()?;
+            .map(LocItem::from_py)
+            .collect::<PyResult<Path>>()?;
 
         if path.is_empty() {
             py_error!("Each alias path must have at least one element")
@@ -405,32 +407,17 @@ impl LookupKey {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum FieldKeyLoc {
-    // string type key, used to get items from a dict or anything that implements __getitem__
-    StrKey(String),
-    // integer key, used to get items from a list, tuple OR a dict with int keys (python only)
-    IntKey(usize),
-}
+type Path = Vec<LocItem>;
 
-impl ToPyObject for FieldKeyLoc {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::StrKey(val) => val.to_object(py),
-            Self::IntKey(val) => val.to_object(py),
-        }
-    }
-}
-
-impl FieldKeyLoc {
+impl LocItem {
     pub fn from_py((index, obj): (usize, &PyAny)) -> PyResult<Self> {
         if let Ok(str_key) = obj.extract::<String>() {
-            Ok(FieldKeyLoc::StrKey(str_key))
+            Ok(Self::S(str_key))
         } else if let Ok(int_key) = obj.extract::<usize>() {
             if index == 0 {
                 py_error!(PyTypeError; "The first item in an alias path must be a string")
             } else {
-                Ok(FieldKeyLoc::IntKey(int_key))
+                Ok(Self::I(int_key))
             }
         } else {
             py_error!(PyTypeError; "Alias path items must be with a string or int")
@@ -456,7 +443,7 @@ impl FieldKeyLoc {
         match any_json {
             JsonInput::Object(v_obj) => self.json_obj_get(v_obj),
             JsonInput::Array(v_array) => match self {
-                Self::IntKey(index) => v_array.get(*index),
+                Self::I(index) => v_array.get(*index),
                 _ => None,
             },
             _ => None,
@@ -465,7 +452,7 @@ impl FieldKeyLoc {
 
     pub fn json_obj_get<'a>(&self, json_obj: &'a JsonObject) -> Option<&'a JsonInput> {
         match self {
-            Self::StrKey(key) => json_obj.get(key),
+            Self::S(key) => json_obj.get(key),
             _ => None,
         }
     }

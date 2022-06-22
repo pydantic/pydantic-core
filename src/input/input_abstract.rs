@@ -5,12 +5,15 @@ use pyo3::ToPyObject;
 
 use crate::errors::{InputValue, ValResult};
 use crate::input::datetime::EitherTime;
+use crate::location::LocItem;
 
 use super::datetime::{EitherDate, EitherDateTime};
 use super::return_enums::{EitherBytes, EitherString};
-use super::{GenericMapping, GenericSequence, ToLocItem};
+use super::{GenericMapping, GenericSequence};
 
-pub trait Input<'a>: fmt::Debug + ToPyObject + ToLocItem {
+pub trait Input<'a>: fmt::Debug + ToPyObject {
+    fn as_loc_item(&'a self) -> LocItem;
+
     fn as_error_value(&'a self) -> InputValue<'a>;
 
     fn is_none(&self) -> bool;

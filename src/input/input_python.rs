@@ -8,6 +8,7 @@ use pyo3::types::{
 
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::return_enums::EitherString;
+use crate::location::LocItem;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, date_as_datetime, float_as_datetime, float_as_time,
@@ -15,10 +16,24 @@ use super::datetime::{
 };
 use super::generics::{GenericMapping, GenericSequence};
 use super::input_abstract::Input;
+use super::repr_string;
 use super::return_enums::EitherBytes;
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 
 impl<'a> Input<'a> for PyAny {
+    fn as_loc_item(&'a self) -> LocItem {
+        if let Ok(key_str) = self.extract::<String>() {
+            LocItem::S(key_str)
+        } else if let Ok(key_int) = self.extract::<usize>() {
+            LocItem::I(key_int)
+        } else {
+            match repr_string(self) {
+                Ok(s) => LocItem::S(s),
+                Err(_) => LocItem::S(format!("{:?}", self)),
+            }
+        }
+    }
+
     fn as_error_value(&'a self) -> InputValue<'a> {
         InputValue::PyAny(self)
     }
@@ -165,7 +180,7 @@ impl<'a> Input<'a> for PyAny {
                     )
                 }
             };
-            inner_dict.lax_dict(false)
+            Ok(inner_dict.into())
         } else {
             err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::DictType)
         }

@@ -4,7 +4,7 @@ mod val_error;
 mod validation_exception;
 
 pub use self::kinds::ErrorKind;
-pub use self::line_error::{Context, InputValue, LocItem, Location, ValLineError};
+pub use self::line_error::{Context, InputValue, ValLineError};
 pub use self::val_error::{as_internal, ValError, ValResult};
 pub use self::validation_exception::{as_validation_err, ValidationError};
 

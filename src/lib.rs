@@ -11,6 +11,7 @@ mod build_tools;
 mod errors;
 mod input;
 mod validators;
+mod location;
 
 // required for benchmarks
 pub use build_tools::SchemaError;
