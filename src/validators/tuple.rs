@@ -187,7 +187,7 @@ impl TupleFixLenValidator {
                             errors.extend(
                                 line_errors
                                     .into_iter()
-                                    .map(|err| err.with_prefix_location(index.into())),
+                                    .map(|err| err.with_outer_location(index.into())),
                             );
                         }
                         Err(err) => return Err(err),

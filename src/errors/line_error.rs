@@ -14,22 +14,25 @@ use super::location::{LocItem, Location};
 #[derive(Debug, Default)]
 pub struct ValLineError<'a> {
     pub kind: ErrorKind,
-    pub location: Location,
+    // location is reversed so that adding an "outer" location item is pushing, it's reversed before showing to the user
+    pub reverse_location: Location,
     pub message: Option<String>,
     pub input_value: InputValue<'a>,
     pub context: Context,
 }
 
 impl<'a> ValLineError<'a> {
-    pub fn with_prefix_location(mut self, loc_item: LocItem) -> Self {
-        self.location.insert(0, loc_item);
+    /// location is stored reversed so it's quicker to add "outer" items as that's what we always do
+    /// hence `push` here instead of `insert`
+    pub fn with_outer_location(mut self, loc_item: LocItem) -> Self {
+        self.reverse_location.push(loc_item);
         self
     }
 
     pub fn into_new<'b>(self, py: Python) -> ValLineError<'b> {
         ValLineError {
             kind: self.kind,
-            location: self.location,
+            reverse_location: self.reverse_location,
             message: self.message,
             input_value: InputValue::PyObject(self.input_value.to_object(py)),
             context: self.context,

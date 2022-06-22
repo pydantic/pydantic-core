@@ -138,7 +138,10 @@ impl PyLineError {
     pub fn new(py: Python, raw_error: ValLineError) -> Self {
         Self {
             kind: raw_error.kind,
-            location: raw_error.location,
+            location: match raw_error.reverse_location.len() {
+                0..=1 => raw_error.reverse_location,
+                _ => raw_error.reverse_location.into_iter().rev().collect(),
+            },
             message: raw_error.message,
             input_value: raw_error.input_value.to_object(py),
             context: raw_error.context,

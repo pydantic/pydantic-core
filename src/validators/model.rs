@@ -120,7 +120,7 @@ impl Validator for ModelValidator {
                             Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
-                                    errors.push(err.with_prefix_location(field.name.clone().into()));
+                                    errors.push(err.with_outer_location(field.name.clone().into()));
                                 }
                             }
                             Err(err) => return Err(err),
@@ -136,7 +136,7 @@ impl Validator for ModelValidator {
                         errors.push(val_line_error!(
                             input_value = input.as_error_value(),
                             kind = ErrorKind::Missing,
-                            location = vec![field.name.clone().into()]
+                            reverse_location = vec![field.name.clone().into()]
                         ));
                     }
                 }
@@ -153,7 +153,7 @@ impl Validator for ModelValidator {
                             Ok(k) => k.as_raw().map_err(as_internal)?,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
-                                    errors.push(err.with_prefix_location(raw_key.as_loc_item()));
+                                    errors.push(err.with_outer_location(raw_key.as_loc_item()));
                                 }
                                 continue;
                             }
@@ -169,14 +169,14 @@ impl Validator for ModelValidator {
                             errors.push(val_line_error!(
                                 input_value = input.as_error_value(),
                                 kind = ErrorKind::ExtraForbidden,
-                                location = vec![raw_key.as_loc_item()]
+                                reverse_location = vec![raw_key.as_loc_item()]
                             ));
                         } else if let Some(ref validator) = self.extra_validator {
                             match validator.validate(py, value, &extra, slots) {
                                 Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                                 Err(ValError::LineErrors(line_errors)) => {
                                     for err in line_errors {
-                                        errors.push(err.with_prefix_location(raw_key.as_loc_item()));
+                                        errors.push(err.with_outer_location(raw_key.as_loc_item()));
                                     }
                                 }
                                 Err(err) => return Err(err),
@@ -236,7 +236,7 @@ impl ModelValidator {
             Err(ValError::LineErrors(line_errors)) => {
                 let errors = line_errors
                     .into_iter()
-                    .map(|e| e.with_prefix_location(field.to_string().into()))
+                    .map(|e| e.with_outer_location(field.to_string().into()))
                     .collect();
                 Err(ValError::LineErrors(errors))
             }
@@ -258,7 +258,7 @@ impl ModelValidator {
                 _ => {
                     err_val_error!(
                         input_value = input.as_error_value(),
-                        location = vec![field.to_string().into()],
+                        reverse_location = vec![field.to_string().into()],
                         kind = ErrorKind::ExtraForbidden
                     )
                 }
