@@ -293,10 +293,10 @@ impl ExtraBehavior {
 pub enum LookupKey {
     /// simply look up a key in a dict, equivalent to `d.get(key)`
     /// we save both the string and pystring to save creating the pystring for python
-    Simple((String, PyObject)),
+    Simple(String, PyObject),
     /// look up a key by either string, equivalent to `d.get(choice1, d.get(choice2))`
-    /// these are interpreted as 2 pairs of (string, pystring)
-    Choice((String, PyObject, String, PyObject)),
+    /// these are interpreted as (json_key1, json_key2, py_key1, py_key2)
+    Choice(String, String, PyObject, PyObject),
     /// look up keys buy one or more "paths" a path might be `['foo', 'bar']` to get `d.?foo.?bar`
     /// ints are also supported to index arrays/lists/tuples and dicts with int keys
     /// we reuse Location as the enum is the same, and the meaning is the same
@@ -318,13 +318,13 @@ impl LookupKey {
                 } else {
                     let alias_py = py_string!(py, &alias);
                     match allow_by_name {
-                        true => Ok(LookupKey::Choice((
+                        true => Ok(LookupKey::Choice(
                             alias,
-                            alias_py,
                             field_name.to_string(),
+                            alias_py,
                             py_string!(py, field_name),
-                        ))),
-                        false => Ok(LookupKey::Simple((alias, alias_py))),
+                        )),
+                        false => Ok(LookupKey::Simple(alias, alias_py)),
                     }
                 }
             }
@@ -339,12 +339,12 @@ impl LookupKey {
                         py_error!("Aliases must have at least one element")
                     } else {
                         if allow_by_name {
-                            locs.push(vec![PathItem::S((field_name.to_string(), py_string!(py, field_name)))])
+                            locs.push(vec![PathItem::S(field_name.to_string(), py_string!(py, field_name))])
                         }
                         Ok(LookupKey::PathChoices(locs))
                     }
                 }
-                None => Ok(LookupKey::Simple((field_name.to_string(), py_string!(py, field_name)))),
+                None => Ok(LookupKey::Simple(field_name.to_string(), py_string!(py, field_name))),
             },
         }
     }
@@ -366,8 +366,8 @@ impl LookupKey {
 
     fn pydict_get<'data, 's>(&'s self, dict: &'data PyDict) -> Option<&'data PyAny> {
         match self {
-            LookupKey::Simple((_, py_key)) => dict.get_item(py_key),
-            LookupKey::Choice((_, py_key1, _, py_key2)) => match dict.get_item(py_key1) {
+            LookupKey::Simple(_, py_key) => dict.get_item(py_key),
+            LookupKey::Choice(_, _, py_key1, py_key2) => match dict.get_item(py_key1) {
                 Some(v) => Some(v),
                 None => dict.get_item(py_key2),
             },
@@ -388,8 +388,8 @@ impl LookupKey {
 
     fn jsonobject_get<'data, 's>(&'s self, dict: &'data JsonObject) -> Option<&'data JsonInput> {
         match self {
-            LookupKey::Simple((key, _)) => dict.get(key),
-            LookupKey::Choice((key1, _, key2, _)) => match dict.get(key1) {
+            LookupKey::Simple(key, _) => dict.get(key),
+            LookupKey::Choice(key1, key2, _, _) => match dict.get(key1) {
                 Some(v) => Some(v),
                 None => dict.get(key2),
             },
@@ -423,7 +423,7 @@ impl LookupKey {
 pub enum PathItem {
     /// string type key, used to get or identify items from a dict or anything that implements `__getitem__`
     /// as above we store both the string and pystring to save creating the pystring for python
-    S((String, Py<PyString>)),
+    S(String, Py<PyString>),
     /// integer key, used to get items from a list, tuple OR a dict with int keys `Dict[int, ...]` (python only)
     I(usize),
 }
@@ -431,7 +431,7 @@ pub enum PathItem {
 impl ToPyObject for PathItem {
     fn to_object(&self, py: Python<'_>) -> PyObject {
         match self {
-            Self::S((_, val)) => val.to_object(py),
+            Self::S(_, val) => val.to_object(py),
             Self::I(val) => val.to_object(py),
         }
     }
@@ -443,7 +443,7 @@ impl PathItem {
     pub fn from_py(py: Python, index: usize, obj: &PyAny) -> PyResult<Self> {
         if let Ok(str_key) = obj.extract::<String>() {
             let py_str_key = py_string!(py, &str_key);
-            Ok(Self::S((str_key, py_str_key)))
+            Ok(Self::S(str_key, py_str_key))
         } else if let Ok(int_key) = obj.extract::<usize>() {
             if index == 0 {
                 py_error!(PyTypeError; "The first item in an alias path must be a string")
@@ -483,7 +483,7 @@ impl PathItem {
 
     pub fn json_obj_get<'a>(&self, json_obj: &'a JsonObject) -> Option<&'a JsonInput> {
         match self {
-            Self::S((key, _)) => json_obj.get(key),
+            Self::S(key, _) => json_obj.get(key),
             _ => None,
         }
     }
