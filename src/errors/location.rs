@@ -3,32 +3,14 @@ use std::fmt;
 
 use pyo3::prelude::*;
 
-/// Used to store individual items of the error location and also in lookup keys, e.g. a string for key/field names
+/// Used to store individual items of the error location, e.g. a string for key/field names
 /// or a number for array indices.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum LocItem<'a> {
-    /// string type key, used to get or identify items from a dict or anything that implements `__getitem__`
+    /// string type key, used to identify items from a dict or anything that implements `__getitem__`
     S(Cow<'a, str>),
     /// integer key, used to get items from a list, tuple OR a dict with int keys `Dict[int, ...]` (python only)
     I(usize),
-}
-
-impl fmt::Display for LocItem<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            LocItem::S(s) => write!(f, "{}", s),
-            LocItem::I(i) => write!(f, "{}", i),
-        }
-    }
-}
-
-impl ToPyObject for LocItem<'_> {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::S(val) => val.to_object(py),
-            Self::I(val) => val.to_object(py),
-        }
-    }
 }
 
 impl From<String> for LocItem<'_> {
@@ -61,4 +43,38 @@ pub fn owned_location<'a, 'b>(loc: &'a Location) -> Location<'b> {
             LocItem::I(i) => LocItem::I(*i),
         })
         .collect()
+}
+
+// Version of LocItem with no lifetime so it can be returned to python
+#[derive(Debug, Clone)]
+pub enum PyLocItem {
+    S(String),
+    I(usize),
+}
+
+impl From<LocItem<'_>> for PyLocItem {
+    fn from(item: LocItem<'_>) -> Self {
+        match item {
+            LocItem::S(val) => Self::S(val.to_string()),
+            LocItem::I(val) => Self::I(val),
+        }
+    }
+}
+
+impl ToPyObject for PyLocItem {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        match self {
+            Self::S(val) => val.to_object(py),
+            Self::I(val) => val.to_object(py),
+        }
+    }
+}
+
+impl fmt::Display for PyLocItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::S(s) => write!(f, "{}", s),
+            Self::I(i) => write!(f, "{}", i),
+        }
+    }
 }

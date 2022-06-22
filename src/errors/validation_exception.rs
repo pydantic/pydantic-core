@@ -4,9 +4,10 @@ use std::fmt::Write;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyDict;
 use pyo3::PyErrArguments;
 
+use crate::errors::location::PyLocItem;
 use strum::EnumMessage;
 
 use crate::input::repr_string;
@@ -127,7 +128,7 @@ macro_rules! truncate_input_value {
 #[derive(Debug, Clone)]
 pub struct PyLineError {
     kind: ErrorKind,
-    location: PyObject,
+    location: Vec<PyLocItem>,
     message: Option<String>,
     input_value: PyObject,
     context: Context,
@@ -137,7 +138,7 @@ impl PyLineError {
     pub fn new(py: Python, raw_error: ValLineError) -> Self {
         Self {
             kind: raw_error.kind,
-            location: raw_error.location.to_object(py),
+            location: raw_error.location.into_iter().map(PyLocItem::from).collect(),
             message: raw_error.message,
             input_value: raw_error.input_value.to_object(py),
             context: raw_error.context,
@@ -147,8 +148,7 @@ impl PyLineError {
     pub fn as_dict(&self, py: Python) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
         dict.set_item("kind", self.kind())?;
-        let location: &PyList = self.location.extract(py)?;
-        dict.set_item("loc", location)?;
+        dict.set_item("loc", self.location.to_object(py))?;
         dict.set_item("message", self.message())?;
         dict.set_item("input_value", &self.input_value)?;
         if !self.context.is_empty() {
@@ -184,16 +184,14 @@ impl PyLineError {
 
     fn pretty(&self, py: Option<Python>) -> Result<String, fmt::Error> {
         let mut output = String::with_capacity(200);
-        if let Some(py) = py {
-            let location: &PyList = self.location.extract(py).unwrap();
-            if !location.is_empty() {
-                let loc = location
-                    .iter()
-                    .map(|i| i.to_string())
-                    .collect::<Vec<String>>()
-                    .join(" -> ");
-                writeln!(output, "{}", &loc)?;
-            }
+        if !self.location.is_empty() {
+            let loc = self
+                .location
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join(" -> ");
+            writeln!(output, "{}", &loc)?;
         }
 
         write!(output, "  {} [kind={}", self.message(), self.kind())?;

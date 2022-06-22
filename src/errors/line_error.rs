@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter, Result};
+use std::fmt;
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -85,8 +85,8 @@ impl Context {
     }
 }
 
-impl Display for Context {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+impl fmt::Display for Context {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let loc = self
             .0
             .iter()
@@ -97,7 +97,7 @@ impl Display for Context {
     }
 }
 
-// maybe this is overkill and we should just use Display an convert to string when creating Context?
+// maybe this is overkill and we should just use fmt::Display an convert to string when creating Context?
 #[derive(Debug, Clone)]
 pub enum ContextValue {
     S(String),
@@ -105,8 +105,8 @@ pub enum ContextValue {
     F(f64),
 }
 
-impl Display for ContextValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+impl fmt::Display for ContextValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ContextValue::S(v) => write!(f, "{}", v),
             ContextValue::I(v) => write!(f, "{}", v),
