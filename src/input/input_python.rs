@@ -7,7 +7,7 @@ use pyo3::types::{
 };
 
 use crate::errors::location::LocItem;
-use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
+use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
 use crate::input::return_enums::EitherString;
 
 use super::datetime::{
@@ -161,8 +161,8 @@ impl<'a> Input<'a> for PyAny {
                 Err(err) => {
                     return err_val_error!(
                         input_value = self.as_error_value(),
-                        message = Some(err.to_string()),
-                        kind = ErrorKind::DictFromMapping
+                        kind = ErrorKind::DictFromMapping,
+                        context = context!("error" => err.to_string()),
                     )
                 }
             };
@@ -173,8 +173,8 @@ impl<'a> Input<'a> for PyAny {
                 Err(err) => {
                     return err_val_error!(
                         input_value = self.as_error_value(),
-                        message = Some(err.to_string()),
-                        kind = ErrorKind::DictFromObject
+                        kind = ErrorKind::DictFromObject,
+                        context = context!("error" => err.to_string()),
                     )
                 }
             };

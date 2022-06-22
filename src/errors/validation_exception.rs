@@ -129,7 +129,6 @@ macro_rules! truncate_input_value {
 pub struct PyLineError {
     kind: ErrorKind,
     location: Location,
-    message: Option<String>,
     input_value: PyObject,
     context: Context,
 }
@@ -142,7 +141,6 @@ impl PyLineError {
                 0..=1 => raw_error.reverse_location,
                 _ => raw_error.reverse_location.into_iter().rev().collect(),
             },
-            message: raw_error.message,
             input_value: raw_error.input_value.to_object(py),
             context: raw_error.context,
         }
@@ -152,7 +150,7 @@ impl PyLineError {
         let dict = PyDict::new(py);
         dict.set_item("kind", self.kind())?;
         dict.set_item("loc", self.location.to_object(py))?;
-        dict.set_item("message", self.message())?;
+        dict.set_item("message", self.get_message())?;
         dict.set_item("input_value", &self.input_value)?;
         if !self.context.is_empty() {
             dict.set_item("context", &self.context)?;
@@ -164,24 +162,15 @@ impl PyLineError {
         self.kind.to_string()
     }
 
-    fn message(&self) -> String {
-        let raw = self.raw_message();
+    fn get_message(&self) -> String {
+        let raw = match self.kind.get_message() {
+            Some(message) => message.to_string(),
+            None => self.kind(),
+        };
         if self.context.is_empty() {
             raw
         } else {
             self.context.render(raw)
-        }
-    }
-
-    fn raw_message(&self) -> String {
-        // TODO string substitution
-        if let Some(ref message) = self.message {
-            message.to_string()
-        } else {
-            match self.kind.get_message() {
-                Some(message) => message.to_string(),
-                None => self.kind(),
-            }
         }
     }
 
@@ -197,7 +186,7 @@ impl PyLineError {
             writeln!(output, "{}", &loc)?;
         }
 
-        write!(output, "  {} [kind={}", self.message(), self.kind())?;
+        write!(output, "  {} [kind={}", self.get_message(), self.kind())?;
 
         if !self.context.is_empty() {
             write!(output, ", context={}", self.context)?;

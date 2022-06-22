@@ -8,7 +8,7 @@ use pyo3::types::{PyAny, PyDict};
 use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict, SchemaError};
-use crate::errors::{as_validation_err, val_line_error, ErrorKind, ValError, ValResult};
+use crate::errors::{as_validation_err, context, val_line_error, ErrorKind, ValError, ValResult};
 use crate::input::{Input, JsonInput};
 
 mod any;
@@ -92,8 +92,8 @@ impl SchemaValidator {
             Err(e) => {
                 let line_err = val_line_error!(
                     input_value = input.as_error_value(),
-                    message = Some(e.to_string()),
-                    kind = ErrorKind::InvalidJson
+                    kind = ErrorKind::InvalidJson,
+                    context = context!("parser_error" => e.to_string())
                 );
                 let err = ValError::LineErrors(vec![line_err]);
                 Err(as_validation_err(py, &self.validator.get_name(py), err))
@@ -103,13 +103,11 @@ impl SchemaValidator {
 
     pub fn isinstance_json(&self, py: Python, input: String) -> PyResult<bool> {
         match parse_json::<JsonInput>(&input) {
-            Ok(input) => {
-                match self.validator.validate(py, &input, &Extra::default(), &self.slots) {
-                    Ok(_) => Ok(true),
-                    Err(ValError::InternalErr(err)) => Err(err),
-                    _ => Ok(false),
-                }
-            }
+            Ok(input) => match self.validator.validate(py, &input, &Extra::default(), &self.slots) {
+                Ok(_) => Ok(true),
+                Err(ValError::InternalErr(err)) => Err(err),
+                _ => Ok(false),
+            },
             Err(_) => Ok(false),
         }
     }

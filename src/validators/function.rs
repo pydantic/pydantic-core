@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_validation_err, val_line_error, ErrorKind, ValError, ValResult};
+use crate::errors::{as_validation_err, context, val_line_error, ErrorKind, ValError, ValResult};
 use crate::input::Input;
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -256,10 +256,14 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> Val
     };
 
     let message = match err.value(py).str() {
-        Ok(s) => Some(s.to_string()),
+        Ok(s) => s.to_string(),
         Err(err) => return ValError::InternalErr(err),
     };
     #[allow(clippy::redundant_field_names)]
-    let line_error = val_line_error!(input_value = input.as_error_value(), kind = kind, message = message);
+    let line_error = val_line_error!(
+        input_value = input.as_error_value(),
+        kind = kind,
+        context = context!("error" => message),
+    );
     ValError::LineErrors(vec![line_error])
 }

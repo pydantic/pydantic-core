@@ -38,4 +38,5 @@ def py_or_json(request):
                 return self.validator.isinstance_json(json.dumps(py_input))
             else:
                 return self.validator.isinstance_python(py_input)
+
     return CustomSchemaValidator

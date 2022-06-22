@@ -29,7 +29,13 @@ def test_function_before_raise():
         assert v.validate_python('input value') == 'input value Changed'
     # debug(str(exc_info.value))
     assert exc_info.value.errors() == [
-        {'kind': 'value_error', 'loc': [], 'message': 'foobar', 'input_value': 'input value'}
+        {
+            'kind': 'value_error',
+            'loc': [],
+            'message': 'Invalid value: foobar',
+            'input_value': 'input value',
+            'context': {'error': 'foobar'},
+        }
     ]
 
 
@@ -280,7 +286,13 @@ def test_raise_assertion_error():
         v.validate_python('input value')
 
     assert exc_info.value.errors() == [
-        {'kind': 'assertion_error', 'loc': [], 'message': 'foobar', 'input_value': 'input value'}
+        {
+            'kind': 'assertion_error',
+            'loc': [],
+            'message': 'Assertion failed: foobar',
+            'input_value': 'input value',
+            'context': {'error': 'foobar'},
+        }
     ]
 
 

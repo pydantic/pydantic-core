@@ -15,7 +15,7 @@ pub use self::validation_exception::{as_validation_err, ValidationError};
 /// or, `py`, `value` and a mapping of other attributes for `ValLineError`
 /// e.g. `val_line_error!(py, "the value provided", kind=ErrorKind::ExtraForbidden, message="the message")`
 macro_rules! val_line_error {
-    ($($key:ident = $val:expr),+) => {
+    ($($key:ident = $val:expr),+ $(,)?) => {
         crate::errors::ValLineError {
             $(
                 $key: $val,
