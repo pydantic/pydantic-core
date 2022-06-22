@@ -71,22 +71,22 @@ impl SchemaValidator {
     }
 
     pub fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
-        let extra = Extra {
-            data: None,
-            field: None,
-        };
-        let r = self.validator.validate(py, input, &extra, &self.slots);
+        let r = self.validator.validate(py, input, &Extra::default(), &self.slots);
         r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
+    }
+
+    pub fn isinstance_python(&self, py: Python, input: &PyAny) -> PyResult<bool> {
+        match self.validator.validate(py, input, &Extra::default(), &self.slots) {
+            Ok(_) => Ok(true),
+            Err(ValError::InternalErr(err)) => Err(err),
+            _ => Ok(false),
+        }
     }
 
     pub fn validate_json(&self, py: Python, input: String) -> PyResult<PyObject> {
         match parse_json::<JsonInput>(&input) {
             Ok(input) => {
-                let extra = Extra {
-                    data: None,
-                    field: None,
-                };
-                let r = self.validator.validate(py, &input, &extra, &self.slots);
+                let r = self.validator.validate(py, &input, &Extra::default(), &self.slots);
                 r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
             }
             Err(e) => {
@@ -98,6 +98,19 @@ impl SchemaValidator {
                 let err = ValError::LineErrors(vec![line_err]);
                 Err(as_validation_err(py, &self.validator.get_name(py), err))
             }
+        }
+    }
+
+    pub fn isinstance_json(&self, py: Python, input: String) -> PyResult<bool> {
+        match parse_json::<JsonInput>(&input) {
+            Ok(input) => {
+                match self.validator.validate(py, &input, &Extra::default(), &self.slots) {
+                    Ok(_) => Ok(true),
+                    Err(ValError::InternalErr(err)) => Err(err),
+                    _ => Ok(false),
+                }
+            }
+            Err(_) => Ok(false),
         }
     }
 
@@ -222,7 +235,7 @@ pub fn build_validator<'a>(
 
 /// More (mostly immutable) data to pass between validators, should probably be class `Context`,
 /// but that would confuse it with context as per samuelcolvin/pydantic#1549
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Extra<'a> {
     /// This is used as the `data` kwargs to validator functions, it also represents the current model
     /// data when validating assignment

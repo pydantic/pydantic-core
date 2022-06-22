@@ -4,7 +4,7 @@ use std::fmt::Write;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyString};
 use pyo3::PyErrArguments;
 
 use strum::EnumMessage;
@@ -27,7 +27,7 @@ pub fn as_validation_err(py: Python, model_name: &str, error: ValError) -> PyErr
     match error {
         ValError::LineErrors(raw_errors) => {
             let line_errors: Vec<PyLineError> = raw_errors.into_iter().map(|e| PyLineError::new(py, e)).collect();
-            ValidationError::new_err((line_errors, model_name.to_string()))
+            ValidationError::new_err((line_errors, PyString::new(py, model_name).to_object(py)))
         }
         ValError::InternalErr(err) => err,
     }
