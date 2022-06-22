@@ -238,6 +238,7 @@ pub enum CombinedValidator {
     Model(model::ModelValidator),
     // unions
     Union(union::UnionValidator),
+    StrictUnion(union::StrictUnionValidator),
     // nullables
     Nullable(nullable::NullableValidator),
     // model classes
