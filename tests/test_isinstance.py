@@ -44,3 +44,20 @@ def test_isinstance_json():
 
     # invalid json returns False, not an error!
     assert v.isinstance_json('x') is False
+
+
+def test_internal_error():
+    v = SchemaValidator(
+        {'type': 'model-class', 'class_type': int, 'model': {'type': 'model', 'fields': {'f': {'schema': 'int'}}}}
+    )
+    with pytest.raises(AttributeError, match="'int' object has no attribute '__dict__'"):
+        v.validate_python({'f': 123})
+
+    with pytest.raises(AttributeError, match="'int' object has no attribute '__dict__'"):
+        v.validate_json('{"f": 123}')
+
+    with pytest.raises(AttributeError, match="'int' object has no attribute '__dict__'"):
+        v.isinstance_python({'f': 123})
+
+    with pytest.raises(AttributeError, match="'int' object has no attribute '__dict__'"):
+        v.isinstance_json('{"f": 123}')

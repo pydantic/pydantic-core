@@ -296,6 +296,40 @@ def test_raise_assertion_error():
     ]
 
 
+def test_raise_assertion_error_plain():
+    def f(input_value, **kwargs):
+        raise AssertionError
+
+    v = SchemaValidator({'title': 'Test', 'type': 'function', 'mode': 'before', 'function': f, 'schema': 'str'})
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python('input value')
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'assertion_error',
+            'loc': [],
+            'message': 'Assertion failed: Unknown error occurred',
+            'input_value': 'input value',
+            'context': {'error': 'Unknown error occurred'},
+        }
+    ]
+
+
+def test_error_with_error():
+    class MyError(ValueError):
+        def __str__(self):
+            raise RuntimeError('internal error')
+
+    def f(input_value, **kwargs):
+        raise MyError()
+
+    v = SchemaValidator({'title': 'Test', 'type': 'function', 'mode': 'before', 'function': f, 'schema': 'str'})
+
+    with pytest.raises(RuntimeError, match='internal error'):
+        v.validate_python('input value')
+
+
 def test_raise_type_error():
     def f(input_value, **kwargs):
         raise TypeError('foobar')

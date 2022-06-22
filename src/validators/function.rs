@@ -256,8 +256,16 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> Val
     };
 
     let message = match err.value(py).str() {
-        Ok(s) => s.to_string(),
-        Err(err) => return ValError::InternalErr(err),
+        Ok(py_string) => {
+            match py_string.to_str() {
+                Ok(s) => match s.is_empty() {
+                    true => "Unknown error occurred",
+                    false => s,
+                },
+                Err(e) => return ValError::InternalErr(e),
+            }
+        },
+        Err(e) => return ValError::InternalErr(e),
     };
     #[allow(clippy::redundant_field_names)]
     let line_error = val_line_error!(
