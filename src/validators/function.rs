@@ -256,14 +256,12 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> Val
     };
 
     let message = match err.value(py).str() {
-        Ok(py_string) => {
-            match py_string.to_str() {
-                Ok(s) => match s.is_empty() {
-                    true => "Unknown error occurred",
-                    false => s,
-                },
-                Err(e) => return ValError::InternalErr(e),
-            }
+        Ok(py_string) => match py_string.to_str() {
+            Ok(s) => match s.is_empty() {
+                true => "Unknown error occurred",
+                false => s,
+            },
+            Err(e) => return ValError::InternalErr(e),
         },
         Err(e) => return ValError::InternalErr(e),
     };
