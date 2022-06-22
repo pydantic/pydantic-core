@@ -153,8 +153,8 @@ jobs:
 
     - run: make rust-benchmark
 
-  emscripten:
-    name: build on emscripten
+  build_wasm_emscripten:
+    name: build wasm emscripten
     # only run on push to main and on release
     if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main')"
     needs: [test, lint]
