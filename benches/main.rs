@@ -77,9 +77,7 @@ fn list_int_python(bench: &mut Bencher) {
     let (validator, input) = list_int_input(py);
     let input = black_box(input.as_ref(py));
     bench.iter(|| {
-        let v = validator
-            .validate_python(py, input)
-            .unwrap();
+        let v = validator.validate_python(py, input).unwrap();
         black_box(v)
     })
 }
@@ -98,7 +96,6 @@ fn list_int_python_isinstance(bench: &mut Bencher) {
         black_box(v)
     })
 }
-
 
 #[bench]
 fn list_error_json(bench: &mut Bencher) {
@@ -218,9 +215,7 @@ fn list_any_python(bench: &mut Bencher) {
     let input = py.eval(&code, None, None).unwrap();
     let input = black_box(input);
     bench.iter(|| {
-        let v = validator
-            .validate_python(py, input)
-            .unwrap();
+        let v = validator.validate_python(py, input).unwrap();
         black_box(v)
     })
 }
@@ -269,9 +264,7 @@ fn dict_python(bench: &mut Bencher) {
     let input = py.eval(&code, None, None).unwrap();
     let input = black_box(input);
     bench.iter(|| {
-        let v = validator
-            .validate_python(py, input)
-            .unwrap();
+        let v = validator.validate_python(py, input).unwrap();
         black_box(v)
     })
 }
@@ -384,9 +377,7 @@ fn model_python(bench: &mut Bencher) {
     let input = py.eval(&code, None, None).unwrap();
     let input = black_box(input);
     bench.iter(|| {
-        let v = validator
-            .validate_python(py, input)
-            .unwrap();
+        let v = validator.validate_python(py, input).unwrap();
         black_box(v)
     })
 }

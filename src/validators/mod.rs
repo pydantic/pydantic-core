@@ -8,7 +8,7 @@ use pyo3::types::{PyAny, PyDict};
 use serde_json::from_str as parse_json;
 
 use crate::build_tools::{py_error, SchemaDict, SchemaError};
-use crate::errors::{as_validation_err, context, val_line_error, ErrorKind, ValError, ValResult};
+use crate::errors::{context, val_line_error, ErrorKind, ValError, ValResult, ValidationError};
 use crate::input::{Input, JsonInput};
 
 mod any;
@@ -40,6 +40,7 @@ pub struct SchemaValidator {
     validator: CombinedValidator,
     slots: Vec<CombinedValidator>,
     schema: PyObject,
+    title: PyObject,
 }
 
 #[pymethods]
@@ -57,10 +58,12 @@ impl SchemaValidator {
             }
         };
         let slots = build_context.into_slots()?;
+        let title = validator.get_name(py).into_py(py);
         Ok(Self {
             validator,
             slots,
             schema: schema.into_py(py),
+            title,
         })
     }
 
@@ -72,7 +75,7 @@ impl SchemaValidator {
 
     pub fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
         let r = self.validator.validate(py, input, &Extra::default(), &self.slots);
-        r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
+        r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
     pub fn isinstance_python(&self, py: Python, input: &PyAny) -> PyResult<bool> {
@@ -87,7 +90,7 @@ impl SchemaValidator {
         match parse_json::<JsonInput>(&input) {
             Ok(input) => {
                 let r = self.validator.validate(py, &input, &Extra::default(), &self.slots);
-                r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
+                r.map_err(|e| self.prepare_validation_err(py, e))
             }
             Err(e) => {
                 let line_err = val_line_error!(
@@ -96,7 +99,7 @@ impl SchemaValidator {
                     context = context!("parser_error" => e.to_string())
                 );
                 let err = ValError::LineErrors(vec![line_err]);
-                Err(as_validation_err(py, &self.validator.get_name(py), err))
+                Err(self.prepare_validation_err(py, err))
             }
         }
     }
@@ -118,7 +121,7 @@ impl SchemaValidator {
             field: Some(field.as_str()),
         };
         let r = self.validator.validate(py, input, &extra, &self.slots);
-        r.map_err(|e| as_validation_err(py, &self.validator.get_name(py), e))
+        r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
     pub fn __repr__(&self, py: Python) -> String {
@@ -127,6 +130,12 @@ impl SchemaValidator {
             self.validator.get_name(py),
             self.validator
         )
+    }
+}
+
+impl SchemaValidator {
+    pub fn prepare_validation_err(&self, py: Python, error: ValError) -> PyErr {
+        ValidationError::from_val_error(py, self.title.clone_ref(py), error)
     }
 }
 

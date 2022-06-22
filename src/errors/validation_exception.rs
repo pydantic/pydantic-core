@@ -4,8 +4,7 @@ use std::fmt::Write;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
-use pyo3::PyErrArguments;
+use pyo3::types::PyDict;
 
 use strum::EnumMessage;
 
@@ -20,17 +19,7 @@ use super::ValError;
 #[derive(Debug)]
 pub struct ValidationError {
     line_errors: Vec<PyLineError>,
-    title: String,
-}
-
-pub fn as_validation_err(py: Python, model_name: &str, error: ValError) -> PyErr {
-    match error {
-        ValError::LineErrors(raw_errors) => {
-            let line_errors: Vec<PyLineError> = raw_errors.into_iter().map(|e| PyLineError::new(py, e)).collect();
-            ValidationError::new_err((line_errors, PyString::new(py, model_name).to_object(py)))
-        }
-        ValError::InternalErr(err) => err,
-    }
+    title: PyObject,
 }
 
 impl fmt::Display for ValidationError {
@@ -41,16 +30,23 @@ impl fmt::Display for ValidationError {
 }
 
 impl ValidationError {
-    pub fn new_err<A>(args: A) -> PyErr
-    where
-        A: PyErrArguments + Send + Sync + 'static,
-    {
-        PyErr::new::<ValidationError, A>(args)
+    pub fn from_val_error(py: Python, title: PyObject, error: ValError) -> PyErr {
+        match error {
+            ValError::LineErrors(raw_errors) => {
+                let line_errors: Vec<PyLineError> = raw_errors.into_iter().map(|e| PyLineError::new(py, e)).collect();
+                PyErr::new::<ValidationError, _>((line_errors, title))
+            }
+            ValError::InternalErr(err) => err,
+        }
     }
 
     fn display(&self, py: Option<Python>) -> String {
         let count = self.line_errors.len();
         let plural = if count == 1 { "" } else { "s" };
+        let title: &str = match py {
+            Some(py) => self.title.extract(py).unwrap(),
+            None => "Schema",
+        };
         let line_errors = self
             .line_errors
             .iter()
@@ -58,10 +54,7 @@ impl ValidationError {
             .collect::<Result<Vec<_>, _>>()
             .unwrap_or_else(|err| vec![format!("[error formatting line errors: {}]", err)])
             .join("\n");
-        format!(
-            "{} validation error{} for {}\n{}",
-            count, plural, self.title, line_errors
-        )
+        format!("{} validation error{} for {}\n{}", count, plural, title, line_errors)
     }
 }
 
@@ -77,13 +70,13 @@ impl Error for ValidationError {
 #[pymethods]
 impl ValidationError {
     #[new]
-    fn py_new(line_errors: Vec<PyLineError>, title: String) -> Self {
+    fn py_new(line_errors: Vec<PyLineError>, title: PyObject) -> Self {
         Self { line_errors, title }
     }
 
     #[getter]
-    fn title(&self) -> String {
-        self.title.clone()
+    fn title(&self, py: Python) -> PyObject {
+        self.title.clone_ref(py)
     }
 
     fn error_count(&self) -> usize {
