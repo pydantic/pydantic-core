@@ -9,10 +9,16 @@ pub enum EitherString<'a> {
 }
 
 impl<'a> EitherString<'a> {
-    pub fn as_raw(&self) -> PyResult<String> {
+    pub fn as_cow(&self) -> Cow<str> {
         match self {
-            Self::Raw(data) => Ok(data.to_string()),
-            Self::Py(py_str) => py_str.extract(),
+            Self::Raw(data) => data.clone(),
+            Self::Py(py_str) => py_str.to_string_lossy(),
+        }
+    }
+    pub fn as_py_string(&'a self, py: Python<'a>) -> &'a PyString {
+        match self {
+            Self::Raw(cow) => PyString::new(py, cow),
+            Self::Py(py_string) => py_string,
         }
     }
 }
@@ -38,7 +44,7 @@ impl<'a> From<&'a PyString> for EitherString<'a> {
 impl<'a> IntoPy<PyObject> for EitherString<'a> {
     fn into_py(self, py: Python<'_>) -> PyObject {
         match self {
-            EitherString::Raw(string) => PyString::new(py, &string).into_py(py),
+            EitherString::Raw(cow) => PyString::new(py, &cow).into_py(py),
             EitherString::Py(py_string) => py_string.into_py(py),
         }
     }

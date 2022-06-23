@@ -262,6 +262,8 @@ impl<'a> Input<'a> for PyAny {
         if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
             Ok(py_bytes.into())
         } else if let Ok(py_str) = self.cast_as::<PyString>() {
+            // let str = py_str.to_string_lossy().as_ref();
+            // Ok(str.as_bytes().into())
             let str: String = py_str.extract().map_err(as_internal)?;
             Ok(str.into_bytes().into())
         } else {
