@@ -1,7 +1,10 @@
 use std::str::from_utf8;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDate, PyDateTime, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySequence, PySet, PyString, PyTime, PyTuple, PyType};
+use pyo3::types::{
+    PyBool, PyBytes, PyDate, PyDateTime, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySequence, PySet, PyString,
+    PyTime, PyTuple, PyType,
+};
 
 use crate::errors::location::LocItem;
 use crate::errors::{as_internal, err_val_error, ErrorKind, InputValue, ValResult};
@@ -384,7 +387,6 @@ fn extract_mapping_seq(obj: &PyAny) -> Option<&PySequence> {
     }
 }
 
-
 // creating a temporary dict is slow, we could perhaps use an indexmap instead
 fn mapping_seq_as_dict(seq: &PySequence) -> PyResult<&PyDict> {
     let dict = PyDict::new(seq.py());
@@ -396,7 +398,6 @@ fn mapping_seq_as_dict(seq: &PySequence) -> PyResult<&PyDict> {
     }
     Ok(dict)
 }
-
 
 /// This is equivalent to `GetterDict` in pydantic v1
 fn instance_as_dict(instance: &PyAny) -> PyResult<&PyDict> {
