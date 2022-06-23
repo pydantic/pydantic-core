@@ -40,7 +40,7 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn strict_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>>;
 
-    fn lax_dict<'data>(&'data self, _try_instance: bool) -> ValResult<GenericMapping<'data>> {
+    fn lax_dict<'data>(&'data self, _from_attributes: bool) -> ValResult<GenericMapping<'data>> {
         self.strict_dict()
     }
 

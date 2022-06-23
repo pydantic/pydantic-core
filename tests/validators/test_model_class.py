@@ -145,7 +145,11 @@ def test_model_class_instance_subclass():
         {
             'type': 'model-class',
             'class_type': MyModel,
-            'model': {'type': 'model', 'fields': {'field_a': {'schema': {'type': 'str'}}}},
+            'model': {
+                'type': 'model',
+                'fields': {'field_a': {'schema': {'type': 'str'}}},
+                'config': {'from_attributes': True},
+            },
         }
     )
 

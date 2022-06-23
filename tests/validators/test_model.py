@@ -1,6 +1,7 @@
 import re
 
 import pytest
+from dirty_equals import HasRepr, IsStr
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
@@ -528,5 +529,57 @@ def test_model_deep():
             'loc': ['field_b', 'field_d', 'field_f'],
             'message': 'Value must be a valid integer, unable to parse string as an integer',
             'input_value': 'xx',
+        }
+    ]
+
+
+def test_from_attributes():
+    class ClassWithAttributes:
+        def __init__(self):
+            self.a = 1
+            self.b = 2
+            self.c = 'ham'
+
+        @property
+        def d(self):
+            return 'egg'
+
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'int'}, 'c': {'schema': 'str'}, 'd': {'schema': 'str'}},
+            'config': {'from_attributes': True},
+        }
+    )
+    assert v.validate_python(ClassWithAttributes()) == ({'a': 1, 'b': 2, 'c': 'ham', 'd': 'egg'}, {'d', 'b', 'a', 'c'})
+
+
+def test_from_attributes_error():
+    class ClassWithDict:
+        def __init__(self):
+            self.a = 1
+
+        @property
+        def b(self):
+            raise RuntimeError('intentional error')
+
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'int'}, 'c': {'schema': 'str'}, 'd': {'schema': 'str'}},
+            'config': {'from_attributes': True},
+        }
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(ClassWithDict())
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'dict_from_object',
+            'loc': [],
+            'message': 'Unable to extract dictionary from object, error: RuntimeError: intentional error',
+            'input_value': HasRepr(IsStr(regex='.+ClassWithDict object at.+')),
+            'context': {'error': 'RuntimeError: intentional error'},
         }
     ]

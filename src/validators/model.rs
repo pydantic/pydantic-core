@@ -23,6 +23,7 @@ pub struct ModelValidator {
     fields: Vec<ModelField>,
     extra_behavior: ExtraBehavior,
     extra_validator: Option<Box<CombinedValidator>>,
+    from_attributes: bool,
 }
 
 impl BuildValidator for ModelValidator {
@@ -37,6 +38,7 @@ impl BuildValidator for ModelValidator {
         let config: Option<&PyDict> = schema.get_as("config")?;
 
         let model_full = config.get_as("model_full")?.unwrap_or(true);
+        let from_attributes = config.get_as("from_attributes")?.unwrap_or(false);
 
         let extra_behavior = ExtraBehavior::from_py(config)?;
         let extra_validator = match extra_behavior {
@@ -82,6 +84,7 @@ impl BuildValidator for ModelValidator {
             fields,
             extra_behavior,
             extra_validator,
+            from_attributes,
         }
         .into())
     }
@@ -100,8 +103,7 @@ impl Validator for ModelValidator {
             return self.validate_assignment(py, field, input, extra, slots);
         }
 
-        // TODO allow _try_instance to be configurable
-        let dict = input.lax_dict(true)?;
+        let dict = input.lax_dict(self.from_attributes)?;
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let fields_set = PySet::empty(py).map_err(as_internal)?;

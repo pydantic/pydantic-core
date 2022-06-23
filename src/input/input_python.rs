@@ -154,7 +154,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_dict<'data>(&'data self, try_instance: bool) -> ValResult<GenericMapping<'data>> {
+    fn lax_dict<'data>(&'data self, from_attributes: bool) -> ValResult<GenericMapping<'data>> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
             Ok(dict.into())
         } else if let Some(result_dict) = mapping_as_dict(self) {
@@ -168,7 +168,7 @@ impl<'a> Input<'a> for PyAny {
                     )
                 }
             }
-        } else if try_instance && should_instance_as_dict(self) {
+        } else if from_attributes && should_instance_as_dict(self) {
             match instance_as_dict(self) {
                 Ok(dict) => Ok(dict.into()),
                 Err(err) => {
