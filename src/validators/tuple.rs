@@ -34,7 +34,7 @@ impl Validator for TupleVarLenValidator {
             true => input.strict_tuple()?,
             false => input.lax_tuple()?,
         };
-        self._validation_logic(py, input, tuple, extra, slots)
+        self.validation_logic(py, input, tuple, extra, slots)
     }
 
     fn validate_strict<'s, 'data>(
@@ -44,7 +44,7 @@ impl Validator for TupleVarLenValidator {
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_tuple()?, extra, slots)
+        self.validation_logic(py, input, input.strict_tuple()?, extra, slots)
     }
 
     fn get_name(&self, py: Python) -> String {
@@ -53,7 +53,7 @@ impl Validator for TupleVarLenValidator {
 }
 
 impl TupleVarLenValidator {
-    fn _validation_logic<'s, 'data>(
+    fn validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
@@ -129,7 +129,7 @@ impl Validator for TupleFixLenValidator {
             true => input.strict_tuple()?,
             false => input.lax_tuple()?,
         };
-        self._validation_logic(py, input, tuple, extra, slots)
+        self.validation_logic(py, input, tuple, extra, slots)
     }
 
     fn validate_strict<'s, 'data>(
@@ -139,7 +139,7 @@ impl Validator for TupleFixLenValidator {
         extra: &Extra,
         slots: &'data [CombinedValidator],
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_tuple()?, extra, slots)
+        self.validation_logic(py, input, input.strict_tuple()?, extra, slots)
     }
 
     fn get_name(&self, py: Python) -> String {
@@ -154,7 +154,7 @@ impl Validator for TupleFixLenValidator {
 }
 
 impl TupleFixLenValidator {
-    fn _validation_logic<'s, 'data>(
+    fn validation_logic<'s, 'data>(
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
@@ -176,32 +176,36 @@ impl TupleFixLenValidator {
                 )
             );
         }
+        match tuple {
+            GenericSequence::List(seq) => self.zip_validate(py, seq.iter(), expected_length, extra, slots),
+            GenericSequence::Tuple(seq) => self.zip_validate(py, seq.iter(), expected_length, extra, slots),
+            GenericSequence::Set(seq) => self.zip_validate(py, seq.iter(), expected_length, extra, slots),
+            GenericSequence::FrozenSet(seq) => self.zip_validate(py, seq.iter(), expected_length, extra, slots),
+            GenericSequence::JsonArray(seq) => self.zip_validate(py, seq.iter(), expected_length, extra, slots),
+        }
+    }
+
+    fn zip_validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        iter: impl Iterator<Item = &'data (impl Input<'data> + 'data)>,
+        expected_length: usize,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+    ) -> ValResult<'data, PyObject> {
         let mut output: Vec<PyObject> = Vec::with_capacity(expected_length);
         let mut errors: Vec<ValLineError> = Vec::new();
-        macro_rules! iter {
-            ($sequence:expr) => {
-                for (validator, (index, item)) in self.items_validators.iter().zip($sequence.iter().enumerate()) {
-                    match validator.validate(py, item, extra, slots) {
-                        Ok(item) => output.push(item),
-                        Err(ValError::LineErrors(line_errors)) => {
-                            errors.extend(
-                                line_errors
-                                    .into_iter()
-                                    .map(|err| err.with_outer_location(index.into())),
-                            );
-                        }
-                        Err(err) => return Err(err),
-                    }
+
+        for (validator, (index, item)) in self.items_validators.iter().zip(iter.enumerate()) {
+            match validator.validate(py, item, extra, slots) {
+                Ok(item) => output.push(item),
+                Err(ValError::LineErrors(line_errors)) => {
+                    errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
                 }
-            };
+                Err(err) => return Err(err),
+            }
         }
-        match tuple {
-            GenericSequence::List(sequence) => iter!(sequence),
-            GenericSequence::Tuple(sequence) => iter!(sequence),
-            GenericSequence::Set(sequence) => iter!(sequence),
-            GenericSequence::FrozenSet(sequence) => iter!(sequence),
-            GenericSequence::JsonArray(sequence) => iter!(sequence),
-        }
+
         if errors.is_empty() {
             Ok(PyTuple::new(py, &output).into_py(py))
         } else {

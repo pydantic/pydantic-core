@@ -97,108 +97,15 @@ impl Validator for ModelValidator {
     ) -> ValResult<'data, PyObject> {
         if let Some(field) = extra.field {
             // we're validating assignment, completely different logic
-            return self.validate_assignment(py, field, input, extra, slots);
-        }
-
-        // TODO allow _try_instance to be configurable
-        let dict = input.lax_dict(false)?;
-        let output_dict = PyDict::new(py);
-        let mut errors: Vec<ValLineError> = Vec::new();
-        let fields_set = PySet::empty(py).map_err(as_internal)?;
-
-        let extra = Extra {
-            data: Some(output_dict),
-            field: None,
-        };
-
-        macro_rules! process {
-            ($dict:ident, $get_method:ident) => {{
-                for field in &self.fields {
-                    let py_key: &PyString = field.dict_key.as_ref(py);
-                    if let Some(value) = field.lookup_key.$get_method($dict) {
-                        match field.validator.validate(py, value, &extra, slots) {
-                            Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    errors.push(err.with_outer_location(field.name.clone().into()));
-                                }
-                            }
-                            Err(err) => return Err(err),
-                        }
-                        fields_set.add(py_key).map_err(as_internal)?;
-                    } else if let Some(ref default) = field.default {
-                        output_dict
-                            .set_item(py_key, default.as_ref(py))
-                            .map_err(as_internal)?;
-                    } else if !field.required {
-                        continue;
-                    } else {
-                        errors.push(val_line_error!(
-                            input_value = input.as_error_value(),
-                            kind = ErrorKind::Missing,
-                            reverse_location = vec![field.name.clone().into()]
-                        ));
-                    }
-                }
-
-                let (check_extra, forbid) = match self.extra_behavior {
-                    ExtraBehavior::Ignore => (false, false),
-                    ExtraBehavior::Allow => (true, false),
-                    ExtraBehavior::Forbid => (true, true),
-                };
-                if check_extra {
-                    for (raw_key, value) in $dict.iter() {
-                        // TODO use strict_str here if the model is strict
-                        let key: String = match raw_key.lax_str() {
-                            Ok(k) => k.as_raw().map_err(as_internal)?,
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    errors.push(err.with_outer_location(raw_key.as_loc_item()));
-                                }
-                                continue;
-                            }
-                            Err(err) => return Err(err),
-                        };
-                        let py_key = PyString::new(py, &key);
-                        if fields_set.contains(py_key).map_err(as_internal)? {
-                            continue;
-                        }
-                        fields_set.add(py_key).map_err(as_internal)?;
-
-                        if forbid {
-                            errors.push(val_line_error!(
-                                input_value = input.as_error_value(),
-                                kind = ErrorKind::ExtraForbidden,
-                                reverse_location = vec![raw_key.as_loc_item()]
-                            ));
-                        } else if let Some(ref validator) = self.extra_validator {
-                            match validator.validate(py, value, &extra, slots) {
-                                Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
-                                Err(ValError::LineErrors(line_errors)) => {
-                                    for err in line_errors {
-                                        errors.push(err.with_outer_location(raw_key.as_loc_item()));
-                                    }
-                                }
-                                Err(err) => return Err(err),
-                            }
-                        } else {
-                            output_dict
-                                .set_item(&key, value.to_object(py))
-                                .map_err(as_internal)?;
-                        }
-                    }
-                }
-            }};
-        }
-        match dict {
-            GenericMapping::PyDict(d) => process!(d, pydict_get),
-            GenericMapping::JsonObject(d) => process!(d, jsonobject_get),
-        }
-
-        if errors.is_empty() {
-            Ok((output_dict, fields_set).to_object(py))
+            self.validate_assignment(py, field, input, extra, slots)
         } else {
-            Err(ValError::LineErrors(errors))
+            // TODO allow _try_instance to be configurable
+            let dict = input.lax_dict(false)?;
+
+            match dict {
+                GenericMapping::PyDict(d) => self.validate_generic(py, d, d.iter(), input, slots),
+                GenericMapping::JsonObject(d) => self.validate_generic(py, d, d.iter(), input, slots),
+            }
         }
     }
 
@@ -208,6 +115,102 @@ impl Validator for ModelValidator {
 }
 
 impl ModelValidator {
+    fn validate_generic<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        dict: &'data impl GenericGet<Return = (impl Input<'data> + 'data)>,
+        dict_iter: impl Iterator<Item = (&'data (impl Input<'data> + 'data), &'data (impl Input<'data> + 'data))>,
+        input: &'data impl Input<'data>,
+        slots: &'data [CombinedValidator],
+    ) -> ValResult<'data, PyObject> {
+        let output_dict = PyDict::new(py);
+        let mut errors: Vec<ValLineError> = Vec::new();
+        let fields_set = PySet::empty(py).map_err(as_internal)?;
+
+        let extra = Extra {
+            data: Some(output_dict),
+            field: None,
+        };
+
+        for field in &self.fields {
+            let py_key: &PyString = field.dict_key.as_ref(py);
+            if let Some(value) = dict.generic_get(&field.lookup_key) {
+                match field.validator.validate(py, value, &extra, slots) {
+                    Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
+                    Err(ValError::LineErrors(line_errors)) => {
+                        for err in line_errors {
+                            errors.push(err.with_outer_location(field.name.clone().into()));
+                        }
+                    }
+                    Err(err) => return Err(err),
+                }
+                fields_set.add(py_key).map_err(as_internal)?;
+            } else if let Some(ref default) = field.default {
+                output_dict.set_item(py_key, default.as_ref(py)).map_err(as_internal)?;
+            } else if !field.required {
+                continue;
+            } else {
+                errors.push(val_line_error!(
+                    input_value = input.as_error_value(),
+                    kind = ErrorKind::Missing,
+                    reverse_location = vec![field.name.clone().into()]
+                ));
+            }
+        }
+
+        let (check_extra, forbid) = match self.extra_behavior {
+            ExtraBehavior::Ignore => (false, false),
+            ExtraBehavior::Allow => (true, false),
+            ExtraBehavior::Forbid => (true, true),
+        };
+        if check_extra {
+            for (raw_key, value) in dict_iter {
+                // TODO use strict_str here if the model is strict
+                let key: String = match raw_key.lax_str() {
+                    Ok(k) => k.as_raw().map_err(as_internal)?,
+                    Err(ValError::LineErrors(line_errors)) => {
+                        for err in line_errors {
+                            errors.push(err.with_outer_location(raw_key.as_loc_item()));
+                        }
+                        continue;
+                    }
+                    Err(err) => return Err(err),
+                };
+                let py_key = PyString::new(py, &key);
+                if fields_set.contains(py_key).map_err(as_internal)? {
+                    continue;
+                }
+                fields_set.add(py_key).map_err(as_internal)?;
+
+                if forbid {
+                    errors.push(val_line_error!(
+                        input_value = input.as_error_value(),
+                        kind = ErrorKind::ExtraForbidden,
+                        reverse_location = vec![raw_key.as_loc_item()]
+                    ));
+                } else if let Some(ref validator) = self.extra_validator {
+                    match validator.validate(py, value, &extra, slots) {
+                        Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
+                        Err(ValError::LineErrors(line_errors)) => {
+                            for err in line_errors {
+                                errors.push(err.with_outer_location(raw_key.as_loc_item()));
+                            }
+                        }
+                        Err(err) => return Err(err),
+                    }
+                } else {
+                    output_dict.set_item(&key, value.to_object(py)).map_err(as_internal)?;
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok((output_dict, fields_set).to_object(py))
+        } else {
+            Err(ValError::LineErrors(errors))
+        }
+    }
+
     fn validate_assignment<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -262,6 +265,74 @@ impl ModelValidator {
                         kind = ErrorKind::ExtraForbidden
                     )
                 }
+            }
+        }
+    }
+}
+
+trait GenericGet {
+    type Return;
+
+    fn generic_get(&self, lookup_key: &LookupKey) -> Option<&Self::Return>;
+}
+
+impl GenericGet for PyDict {
+    type Return = PyAny;
+
+    fn generic_get(&self, lookup_key: &LookupKey) -> Option<&PyAny> {
+        match lookup_key {
+            LookupKey::Simple(_, py_key) => self.get_item(py_key),
+            LookupKey::Choice(_, _, py_key1, py_key2) => match self.get_item(py_key1) {
+                Some(v) => Some(v),
+                None => self.get_item(py_key2),
+            },
+            LookupKey::PathChoices(path_choices) => {
+                for path in path_choices {
+                    // iterate over the path and plug each value into the py_any from the last step, starting with self
+                    // this could just be a loop but should be somewhat faster with a functional design
+                    if let Some(v) = path.iter().try_fold(self as &PyAny, |d, loc| loc.py_get(d)) {
+                        // Successfully found an item, return it
+                        return Some(v);
+                    }
+                }
+                // got to the end of path_choices, without a match, return None
+                None
+            }
+        }
+    }
+}
+
+impl GenericGet for JsonObject {
+    type Return = JsonInput;
+
+    fn generic_get(&self, lookup_key: &LookupKey) -> Option<&JsonInput> {
+        match lookup_key {
+            LookupKey::Simple(key, _) => self.get(key),
+            LookupKey::Choice(key1, key2, _, _) => match self.get(key1) {
+                Some(v) => Some(v),
+                None => self.get(key2),
+            },
+            LookupKey::PathChoices(path_choices) => {
+                for path in path_choices {
+                    let mut path_iter = path.iter();
+
+                    // first step is different from the rest as we already know self is JsonObject
+                    // because of above checks, we know that path must have at least one element, hence unwrap
+                    let v: &JsonInput = match path_iter.next().unwrap().json_obj_get(self) {
+                        Some(v) => v,
+                        None => continue,
+                    };
+
+                    // similar to above
+                    // iterate over the path and plug each value into the JsonInput from the last step, starting with v
+                    // from the first step, this could just be a loop but should be somewhat faster with a functional design
+                    if let Some(v) = path_iter.try_fold(v, |d, loc| loc.json_get(d)) {
+                        // Successfully found an item, return it
+                        return Some(v);
+                    }
+                }
+                // got to the end of path_choices, without a match, return None
+                None
             }
         }
     }
@@ -361,60 +432,6 @@ impl LookupKey {
             py_error!("Each alias path must have at least one element")
         } else {
             Ok(path)
-        }
-    }
-
-    fn pydict_get<'data, 's>(&'s self, dict: &'data PyDict) -> Option<&'data PyAny> {
-        match self {
-            LookupKey::Simple(_, py_key) => dict.get_item(py_key),
-            LookupKey::Choice(_, _, py_key1, py_key2) => match dict.get_item(py_key1) {
-                Some(v) => Some(v),
-                None => dict.get_item(py_key2),
-            },
-            LookupKey::PathChoices(path_choices) => {
-                for path in path_choices {
-                    // iterate over the path and plug each value into the py_any from the last step, starting with dict
-                    // this could just be a loop but should be somewhat faster with a functional design
-                    if let Some(v) = path.iter().try_fold(dict as &PyAny, |d, loc| loc.py_get(d)) {
-                        // Successfully found an item, return it
-                        return Some(v);
-                    }
-                }
-                // got to the end of path_choices, without a match, return None
-                None
-            }
-        }
-    }
-
-    fn jsonobject_get<'data, 's>(&'s self, dict: &'data JsonObject) -> Option<&'data JsonInput> {
-        match self {
-            LookupKey::Simple(key, _) => dict.get(key),
-            LookupKey::Choice(key1, key2, _, _) => match dict.get(key1) {
-                Some(v) => Some(v),
-                None => dict.get(key2),
-            },
-            LookupKey::PathChoices(path_choices) => {
-                for path in path_choices {
-                    let mut path_iter = path.iter();
-
-                    // first step is different from the rest as we already know dict is JsonObject
-                    // because of above checks, we know that path must have at least one element, hence unwrap
-                    let v: &JsonInput = match path_iter.next().unwrap().json_obj_get(dict) {
-                        Some(v) => v,
-                        None => continue,
-                    };
-
-                    // similar to above
-                    // iterate over the path and plug each value into the JsonInput from the last step, starting with v
-                    // from the first step, this could just be a loop but should be somewhat faster with a functional design
-                    if let Some(v) = path_iter.try_fold(v, |d, loc| loc.json_get(d)) {
-                        // Successfully found an item, return it
-                        return Some(v);
-                    }
-                }
-                // got to the end of path_choices, without a match, return None
-                None
-            }
         }
     }
 }
