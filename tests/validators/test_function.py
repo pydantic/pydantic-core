@@ -309,7 +309,7 @@ def test_raise_assertion_error_plain():
         {
             'kind': 'assertion_error',
             'loc': [],
-            'message': 'Assertion failed: Unknown error occurred',
+            'message': 'Assertion failed: Unknown error',
             'input_value': 'input value',
             'context': {'error': 'Unknown error occurred'},
         }
