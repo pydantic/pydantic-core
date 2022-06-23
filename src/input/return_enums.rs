@@ -15,6 +15,7 @@ impl<'a> EitherString<'a> {
             Self::Py(py_str) => py_str.to_string_lossy(),
         }
     }
+
     pub fn as_py_string(&'a self, py: Python<'a>) -> &'a PyString {
         match self {
             Self::Cow(cow) => PyString::new(py, cow),
@@ -43,10 +44,7 @@ impl<'a> From<&'a PyString> for EitherString<'a> {
 
 impl<'a> IntoPy<PyObject> for EitherString<'a> {
     fn into_py(self, py: Python<'_>) -> PyObject {
-        match self {
-            EitherString::Cow(cow) => PyString::new(py, &cow).into_py(py),
-            EitherString::Py(py_string) => py_string.into_py(py),
-        }
+        self.as_py_string(py).into_py(py)
     }
 }
 

@@ -206,13 +206,17 @@ impl StrConstrainedValidator {
             str = str.trim();
         }
 
-        if self.to_lower {
-            Ok(PyString::new(py, &str.to_lowercase()).into_py(py))
+        let py_string = if self.to_lower {
+            PyString::new(py, &str.to_lowercase())
         } else if self.to_upper {
-            Ok(PyString::new(py, &str.to_uppercase()).into_py(py))
+            PyString::new(py, &str.to_uppercase())
+        } else if self.strip_whitespace {
+            PyString::new(py, str)
         } else {
-            Ok(PyString::new(py, str).into_py(py))
-        }
+            // we haven't modified the string, return the original as it might be a PyString
+            either_str.as_py_string(py)
+        };
+        Ok(py_string.into_py(py))
     }
 }
 
