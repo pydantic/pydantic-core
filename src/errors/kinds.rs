@@ -63,7 +63,7 @@ pub enum ErrorKind {
     DictType,
     #[strum(message = "Unable to convert mapping to a dictionary, error: {error}")]
     DictFromMapping,
-    #[strum(message = "Unable extract dict from object, error: {error}")]
+    #[strum(message = "Unable to extract dictionary from object, error: {error}")]
     DictFromObject,
     // ---------------------
     // list errors

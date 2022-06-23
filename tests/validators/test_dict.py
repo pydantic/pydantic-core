@@ -189,7 +189,7 @@ def test_dict_try_instance_error():
         {
             'kind': 'dict_from_object',
             'loc': [],
-            'message': 'Unable extract dict from object, error: RuntimeError: intentional error',
+            'message': 'Unable to extract dictionary from object, error: RuntimeError: intentional error',
             'input_value': HasRepr(IsStr(regex='.+ClassWithDict object at.+')),
             'context': {'error': 'RuntimeError: intentional error'},
         }
