@@ -115,9 +115,10 @@ impl Validator for ModelValidator {
             ($dict:ident, $get_method:ident) => {{
                 for field in &self.fields {
                     if let Some(value) = field.lookup_key.$get_method($dict) {
-                        let py_key: &PyString = field.dict_key.as_ref(py);
                         match field.validator.validate(py, value, &extra, slots) {
-                            Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
+                            Ok(value) => output_dict
+                                .set_item(&field.dict_key, value)
+                                .map_err(as_internal)?,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
                                     errors.push(err.with_outer_location(field.name.clone().into()));
@@ -125,10 +126,10 @@ impl Validator for ModelValidator {
                             }
                             Err(err) => return Err(err),
                         }
-                        fields_set.add(py_key).map_err(as_internal)?;
+                        fields_set.add(&field.dict_key).map_err(as_internal)?;
                     } else if let Some(ref default) = field.default {
                         output_dict
-                            .set_item(field.dict_key.as_ref(py), default.as_ref(py))
+                            .set_item(&field.dict_key, default.as_ref(py))
                             .map_err(as_internal)?;
                     } else if !field.required {
                         continue;
@@ -183,7 +184,7 @@ impl Validator for ModelValidator {
                             }
                         } else {
                             output_dict
-                                .set_item(&either_str.as_cow(), value.to_object(py))
+                                .set_item(py_key, value.to_object(py))
                                 .map_err(as_internal)?;
                         }
                     }
