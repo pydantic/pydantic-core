@@ -162,7 +162,7 @@ impl<'a> Input<'a> for PyAny {
                     return err_val_error!(
                         input_value = self.as_error_value(),
                         kind = ErrorKind::DictFromMapping,
-                        context = context!("error" => err.to_string()),
+                        context = context!("error" => err_string(self.py(), err)),
                     )
                 }
             };
@@ -174,7 +174,7 @@ impl<'a> Input<'a> for PyAny {
                     return err_val_error!(
                         input_value = self.as_error_value(),
                         kind = ErrorKind::DictFromObject,
-                        context = context!("error" => err.to_string()),
+                        context = context!("error" => err_string(self.py(), err)),
                     )
                 }
             };
@@ -424,5 +424,24 @@ fn _maybe_as_string(v: &PyAny, unicode_error: ErrorKind) -> ValResult<Option<Str
         Ok(Some(str))
     } else {
         Ok(None)
+    }
+}
+
+fn err_string(py: Python, err: PyErr) -> String {
+    let value = err.value(py);
+    match value.get_type().name() {
+        Ok(type_name) => match value.str() {
+            Ok(py_str) => {
+                let str_cow = py_str.to_string_lossy();
+                let str = str_cow.as_ref();
+                if !str.is_empty() {
+                    format!("{}: {}", type_name, str)
+                } else {
+                    type_name.to_string()
+                }
+            }
+            Err(_) => format!("{}: <exception str() failed>", type_name),
+        },
+        Err(_) => "Unknown Error".to_string(),
     }
 }
