@@ -114,8 +114,8 @@ impl Validator for ModelValidator {
         macro_rules! process {
             ($dict:ident, $get_method:ident) => {{
                 for field in &self.fields {
-                    let py_key: &PyString = field.dict_key.as_ref(py);
                     if let Some(value) = field.lookup_key.$get_method($dict) {
+                        let py_key: &PyString = field.dict_key.as_ref(py);
                         match field.validator.validate(py, value, &extra, slots) {
                             Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
                             Err(ValError::LineErrors(line_errors)) => {
@@ -128,7 +128,7 @@ impl Validator for ModelValidator {
                         fields_set.add(py_key).map_err(as_internal)?;
                     } else if let Some(ref default) = field.default {
                         output_dict
-                            .set_item(py_key, default.as_ref(py))
+                            .set_item(field.dict_key.as_ref(py), default.as_ref(py))
                             .map_err(as_internal)?;
                     } else if !field.required {
                         continue;
