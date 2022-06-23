@@ -101,7 +101,7 @@ impl Validator for ModelValidator {
         }
 
         // TODO allow _try_instance to be configurable
-        let dict = input.lax_dict(false)?;
+        let dict = input.lax_dict(true)?;
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let fields_set = PySet::empty(py).map_err(as_internal)?;

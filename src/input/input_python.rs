@@ -1,4 +1,5 @@
 use pyo3::exceptions::PyAttributeError;
+use pyo3::intern;
 use std::str::from_utf8;
 
 use pyo3::prelude::*;
@@ -167,18 +168,17 @@ impl<'a> Input<'a> for PyAny {
                     )
                 }
             }
-        } else if try_instance {
-            let inner_dict = match instance_as_dict(self) {
-                Ok(dict) => dict,
+        } else if try_instance && should_instance_as_dict(self) {
+            match instance_as_dict(self) {
+                Ok(dict) => Ok(dict.into()),
                 Err(err) => {
-                    return err_val_error!(
+                    err_val_error!(
                         input_value = self.as_error_value(),
                         kind = ErrorKind::DictFromObject,
                         context = context!("error" => err_string(self.py(), err)),
                     )
                 }
-            };
-            Ok(inner_dict.into())
+            }
         } else {
             err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::DictType)
         }
@@ -408,16 +408,44 @@ fn mapping_seq_as_dict(seq: &PySequence) -> PyResult<&PyDict> {
 }
 
 /// This is equivalent to `GetterDict` in pydantic v1
-fn instance_as_dict(instance: &PyAny) -> PyResult<&PyDict> {
-    let dict = PyDict::new(instance.py());
-    for k_any in instance.dir() {
+fn instance_as_dict(obj: &PyAny) -> PyResult<&PyDict> {
+    let dict = PyDict::new(obj.py());
+    for k_any in obj.dir() {
         let k_str: &str = k_any.extract()?;
         if !k_str.starts_with('_') {
-            let v = instance.getattr(k_any)?;
+            let v = obj.getattr(k_any)?;
             dict.set_item(k_any, v)?;
         }
     }
     Ok(dict)
+}
+
+/// Best effort check of whether it's likely to make sense to extract a dict from `obj.dir()`
+fn should_instance_as_dict(obj: &PyAny) -> bool {
+    let module_name = match obj.get_type().getattr(intern!(obj.py(), "__module__")) {
+        Ok(module) => match module.extract::<&str>() {
+            Ok(s) => s,
+            Err(_) => return false,
+        },
+        Err(_) => return false,
+    };
+    // I don't think it's a very good list at all! But it doesn't have to be at perfect, it just needs to avoid
+    // the most egregious foot guns, it's mostly just to catch "builtins"
+    // still happy to add more or do something completely different if anyone has a better idea???
+    !matches!(
+        module_name,
+        "builtins"
+            | "datetime"
+            | "sys"
+            | "os"
+            | "warnings"
+            | "test"
+            | "collections"
+            | "io"
+            | "math"
+            | "functools"
+            | "threading"
+    )
 }
 
 /// Utility for extracting a string from a PyAny, if possible.
