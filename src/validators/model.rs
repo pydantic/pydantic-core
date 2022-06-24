@@ -589,14 +589,17 @@ impl<'a> Iterator for IterAttributes<'a> {
                     .expect("dir didn't return a PyString")
                     .to_string_lossy();
                 if !name_cow.as_ref().starts_with('_') {
-                    let attr = self.object.getattr(name).expect("getattr failed");
-                    // we don't want bound methods to be included, is there a better way to check?
-                    // ref https://stackoverflow.com/a/18955425/949890
-                    let is_bound = attr
-                        .hasattr(intern!(attr.py(), "__self__"))
-                        .expect("bound method check failed");
-                    if !is_bound && !matches!(attr.is_instance_of::<PyFunction>(), Ok(true)) {
-                        return Some((name, attr));
+                    // getattr is most likely to fail due to an exception in a @property, skip
+                    if let Ok(attr) = self.object.getattr(name) {
+                        // we don't want bound methods to be included, is there a better way to check?
+                        // ref https://stackoverflow.com/a/18955425/949890
+                        let is_bound = matches!(attr.hasattr(intern!(attr.py(), "__self__")), Ok(true));
+                        // the is_instance_of::<PyFunction> catches `staticmethod`, but also any other function,
+                        // I think that's better than including static methods in the yielded attributes,
+                        // if someone really wants fields, they can use an explicit field, or a function to modify input
+                        if !is_bound && !matches!(attr.is_instance_of::<PyFunction>(), Ok(true)) {
+                            return Some((name, attr));
+                        }
                     }
                 }
             } else {

@@ -1,4 +1,5 @@
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -664,6 +665,10 @@ def test_from_attributes_extra():
         def _private_property(self):
             return 'wrong'
 
+        @property
+        def property_error(self):
+            raise RuntimeError('xxx')
+
         def bound_method(self):
             return f'wrong {self.a}'
 
@@ -695,6 +700,71 @@ def test_from_attributes_extra():
     assert v.validate_python(Cls(a=1, b=2, c='ham')) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
     assert v.validate_python(Cls(a=1, b=datetime(2000, 1, 1))) == ({'a': 1, 'b': datetime(2000, 1, 1)}, {'a', 'b'})
     assert v.validate_python(Cls(a=1, b=datetime.now, c=lambda: 42)) == ({'a': 1}, {'a'})
+
+
+def foobar():
+    pass
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        (Cls(a=1), {'a': 1}),
+        (Cls(a=datetime.now), {'a': datetime.now}),
+        (Cls(a=lambda: 42), {'a': HasRepr(IsStr(regex='.+<lambda>.+'))}),
+        (Cls(a=sys.path), {'a': sys.path}),
+        (Cls(a=foobar), {'a': foobar}),
+    ],
+    ids=repr,
+)
+def test_from_attributes_function(input_value, expected):
+    v = SchemaValidator({'type': 'model', 'fields': {'a': {'schema': 'any'}}, 'config': {'from_attributes': True}})
+
+    assert v.validate_python(input_value) == (expected, {'a'})
+
+
+def test_from_attributes_error_error():
+    class BadError(Exception):
+        def __str__(self):
+            raise RuntimeError('intentional error inside error')
+
+    class Foobar:
+        @property
+        def x(self):
+            raise BadError('intentional error')
+
+    v = SchemaValidator({'type': 'model', 'fields': {'x': {'schema': 'int'}}, 'config': {'from_attributes': True}})
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(Foobar())
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'model_attribute_error',
+            'loc': ['x'],
+            'message': IsStr(regex=r'Error extracting attribute: \S+\.<locals>\.BadError: <exception str\(\) failed>'),
+            'input_value': HasRepr(IsStr(regex='.+Foobar object at.+')),
+            'context': {'error': IsStr(regex=r'\S+\.<locals>\.BadError: <exception str\(\) failed>')},
+        }
+    ]
+
+    class UnInitError:
+        @property
+        def x(self):
+            raise RuntimeError
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(UnInitError())
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'model_attribute_error',
+            'loc': ['x'],
+            'message': 'Error extracting attribute: RuntimeError',
+            'input_value': HasRepr(IsStr(regex='.+UnInitError object at.+')),
+            'context': {'error': 'RuntimeError'},
+        }
+    ]
 
 
 @pytest.mark.parametrize(
