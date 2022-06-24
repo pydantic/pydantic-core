@@ -138,6 +138,11 @@ def test_allow_extra_invalid():
         )
 
 
+def test_allow_extra_wrong():
+    with pytest.raises(SchemaError, match='Invalid extra_behavior: "wrong"'):
+        SchemaValidator({'type': 'model', 'fields': {}, 'config': {'extra_behavior': 'wrong'}})
+
+
 def test_str_config():
     v = SchemaValidator(
         {'type': 'model', 'fields': {'field_a': {'schema': {'type': 'str'}}}, 'config': {'str_max_length': 5}}
@@ -419,6 +424,7 @@ def test_alias_path(py_or_json, input_value, expected):
         ({'foo': (1, 2, 3, 4)}, ({'field_a': 4}, {'field_a'})),
         ({'spam': 5}, ({'field_a': 5}, {'field_a'})),
         ({'spam': 1, 'foo': {'bar': {'bat': 2}}}, ({'field_a': 2}, {'field_a'})),
+        ({'foo': {'x': 2}}, Err(r'field_a\n +Field required \[kind=missing,')),
         ({'x': '123'}, Err(r'field_a\n +Field required \[kind=missing,')),
         ({'x': {2: 33}}, Err(r'field_a\n +Field required \[kind=missing,')),
         ({'foo': '01234'}, Err(r'field_a\n +Field required \[kind=missing,')),
@@ -781,6 +787,7 @@ def test_from_attributes_error_error():
         (Cls(x={2: 33}), Err(r'my_field\n +Field required \[kind=missing,')),
         (Cls(foo='01234'), Err(r'my_field\n +Field required \[kind=missing,')),
         (Cls(foo=[1]), Err(r'my_field\n +Field required \[kind=missing,')),
+        (Cls, Err(r'Value must be a valid dictionary')),
     ],
     ids=repr,
 )
@@ -799,3 +806,30 @@ def test_from_attributes_path(input_value, expected):
     else:
         output = v.validate_python(input_value)
         assert output == expected
+
+
+def test_from_attributes_path_error():
+    class PropertyError:
+        @property
+        def foo(self):
+            raise RuntimeError('intentional error')
+
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'fields': {'my_field': {'aliases': [['foo', 'bar', 'bat'], ['foo', 3], ['spam']], 'schema': 'int'}},
+            'config': {'from_attributes': True},
+        }
+    )
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(PropertyError())
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'model_attribute_error',
+            'loc': ['my_field'],
+            'message': 'Error extracting attribute: RuntimeError: intentional error',
+            'input_value': HasRepr(IsStr(regex='.+PropertyError object at.+')),
+            'context': {'error': 'RuntimeError: intentional error'},
+        }
+    ]
