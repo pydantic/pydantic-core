@@ -1,7 +1,7 @@
-use pyo3::exceptions::PyAttributeError;
-use pyo3::intern;
 use std::str::from_utf8;
 
+use pyo3::exceptions::{PyAttributeError, PyTypeError};
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{
     PyBool, PyBytes, PyDate, PyDateTime, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySequence, PySet, PyString,
@@ -10,17 +10,13 @@ use pyo3::types::{
 
 use crate::errors::location::LocItem;
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
-use crate::input::return_enums::EitherString;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, date_as_datetime, float_as_datetime, float_as_time,
     int_as_datetime, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
-use super::generics::{GenericMapping, GenericSequence};
-use super::input_abstract::Input;
-use super::repr_string;
-use super::return_enums::EitherBytes;
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
+use super::{repr_string, EitherBytes, EitherString, GenericMapping, GenericSequence, Input};
 
 impl<'a> Input<'a> for PyAny {
     fn as_loc_item(&'a self) -> LocItem {
@@ -154,7 +150,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_dict<'data>(&'data self, from_attributes: bool) -> ValResult<GenericMapping<'data>> {
+    fn lax_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
             Ok(dict.into())
         } else if let Some(result_dict) = mapping_as_dict(self) {
@@ -168,19 +164,16 @@ impl<'a> Input<'a> for PyAny {
                     )
                 }
             }
-        } else if from_attributes && should_instance_as_dict(self) {
-            match instance_as_dict(self) {
-                Ok(dict) => Ok(dict.into()),
-                Err(err) => {
-                    err_val_error!(
-                        input_value = self.as_error_value(),
-                        kind = ErrorKind::DictFromObject,
-                        context = context!("error" => err_string(self.py(), err)),
-                    )
-                }
-            }
         } else {
             err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::DictType)
+        }
+    }
+
+    fn typed_dict<'data>(&'data self, from_attributes: bool) -> ValResult<GenericMapping<'data>> {
+        if from_attributes && try_from_attributes(self) {
+            Ok(self.into())
+        } else {
+            self.lax_dict()
         }
     }
 
@@ -400,28 +393,19 @@ fn mapping_seq_as_dict(seq: &PySequence) -> PyResult<&PyDict> {
     let dict = PyDict::new(seq.py());
     for r in seq.iter()? {
         let t: &PyTuple = r?.extract()?;
-        let k = t.get_item(0)?;
-        let v = t.get_item(1)?;
+        if t.len() != 2 {
+            return Err(PyTypeError::new_err("mapping items must be a tuple with 2 elements"));
+        }
+        let k = unsafe { t.get_item_unchecked(0) };
+        let v = unsafe { t.get_item_unchecked(1) };
         dict.set_item(k, v)?;
     }
     Ok(dict)
 }
 
-/// This is equivalent to `GetterDict` in pydantic v1
-fn instance_as_dict(obj: &PyAny) -> PyResult<&PyDict> {
-    let dict = PyDict::new(obj.py());
-    for k_any in obj.dir() {
-        let k_str: &str = k_any.extract()?;
-        if !k_str.starts_with('_') {
-            let v = obj.getattr(k_any)?;
-            dict.set_item(k_any, v)?;
-        }
-    }
-    Ok(dict)
-}
-
 /// Best effort check of whether it's likely to make sense to extract a dict from `obj.dir()`
-fn should_instance_as_dict(obj: &PyAny) -> bool {
+/// used both here and in model.rs
+pub fn try_from_attributes(obj: &PyAny) -> bool {
     let module_name = match obj.get_type().getattr(intern!(obj.py(), "__module__")) {
         Ok(module) => match module.extract::<&str>() {
             Ok(s) => s,

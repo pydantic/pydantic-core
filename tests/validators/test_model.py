@@ -554,8 +554,36 @@ def test_from_attributes():
     assert v.validate_python(ClassWithAttributes()) == ({'a': 1, 'b': 2, 'c': 'ham', 'd': 'egg'}, {'d', 'b', 'a', 'c'})
 
 
+def test_from_attributes_missing():
+    class Foobar:
+        def __init__(self):
+            self.a = 1
+            self.b = 2
+
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'int'}, 'c': {'schema': 'str'}},
+            'config': {'from_attributes': True},
+        }
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(Foobar())
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'missing',
+            'loc': ['c'],
+            'message': 'Field required',
+            'input_value': HasRepr(IsStr(regex='.+Foobar object at.+')),
+        }
+    ]
+
+
+@pytest.mark.xfail(reason='Not implemented')
 def test_from_attributes_error():
-    class ClassWithDict:
+    class Foobar:
         def __init__(self):
             self.a = 1
 
@@ -566,20 +594,20 @@ def test_from_attributes_error():
     v = SchemaValidator(
         {
             'type': 'model',
-            'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'int'}, 'c': {'schema': 'str'}, 'd': {'schema': 'str'}},
+            'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'int'}},
             'config': {'from_attributes': True},
         }
     )
 
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_python(ClassWithDict())
+        v.validate_python(Foobar())
 
     assert exc_info.value.errors() == [
         {
             'kind': 'dict_from_object',
-            'loc': [],
+            'loc': ['b'],
             'message': 'Unable to extract dictionary from object, error: RuntimeError: intentional error',
-            'input_value': HasRepr(IsStr(regex='.+ClassWithDict object at.+')),
+            'input_value': HasRepr(IsStr(regex='.+Foobar object at.+')),
             'context': {'error': 'RuntimeError: intentional error'},
         }
     ]

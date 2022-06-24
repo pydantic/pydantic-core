@@ -17,6 +17,8 @@ pub enum ErrorKind {
     InvalidKey,
     #[strum(message = "Value must be an instance of {class_name}")]
     ModelType,
+    #[strum(message = "Error extracting attribute: {error}")]
+    ModelAttributeError,
     // ---------------------
     // None errors
     #[strum(message = "Value must be None/null")]
@@ -63,8 +65,6 @@ pub enum ErrorKind {
     DictType,
     #[strum(message = "Unable to convert mapping to a dictionary, error: {error}")]
     DictFromMapping,
-    #[strum(message = "Unable to extract dictionary from object, error: {error}")]
-    DictFromObject,
     // ---------------------
     // list errors
     #[strum(message = "Value must be a valid list/array")]

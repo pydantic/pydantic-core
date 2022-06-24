@@ -4,7 +4,7 @@ use pyo3::types::{PyDict, PyList, PySet, PyString};
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input, JsonInput, JsonObject};
+use crate::input::{try_from_attributes, GenericMapping, Input, JsonInput, JsonObject};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -103,7 +103,7 @@ impl Validator for ModelValidator {
             return self.validate_assignment(py, field, input, extra, slots);
         }
 
-        let dict = input.lax_dict(self.from_attributes)?;
+        let dict = input.typed_dict(self.from_attributes)?;
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let fields_set = PySet::empty(py).map_err(as_internal)?;
@@ -114,7 +114,7 @@ impl Validator for ModelValidator {
         };
 
         macro_rules! process {
-            ($dict:ident, $get_method:ident) => {{
+            ($dict:ident, $get_method:ident, $iter:block) => {{
                 for field in &self.fields {
                     if let Some(value) = field.lookup_key.$get_method($dict) {
                         match field.validator.validate(py, value, &extra, slots) {
@@ -150,7 +150,7 @@ impl Validator for ModelValidator {
                     ExtraBehavior::Forbid => (true, true),
                 };
                 if check_extra {
-                    for (raw_key, value) in $dict.iter() {
+                    for (raw_key, value) in $iter {
                         // TODO use strict_str here if the model is strict
                         let either_str = match raw_key.lax_str() {
                             Ok(k) => k,
@@ -194,8 +194,17 @@ impl Validator for ModelValidator {
             }};
         }
         match dict {
-            GenericMapping::PyDict(d) => process!(d, pydict_get),
-            GenericMapping::JsonObject(d) => process!(d, jsonobject_get),
+            GenericMapping::PyDict(d) => process!(d, py_get_item, { d.iter() }),
+            GenericMapping::PyGetAttr(d) => {
+                process!(d, py_get_attr, {
+                    GetAttrsIterator {
+                        attributes: d.dir(),
+                        object: d,
+                        index: 0,
+                    }
+                })
+            }
+            GenericMapping::JsonObject(d) => process!(d, json_get, { d.iter() }),
         }
 
         if errors.is_empty() {
@@ -367,7 +376,7 @@ impl LookupKey {
         }
     }
 
-    fn pydict_get<'data, 's>(&'s self, dict: &'data PyDict) -> Option<&'data PyAny> {
+    fn py_get_item<'data, 's>(&'s self, dict: &'data PyDict) -> Option<&'data PyAny> {
         match self {
             LookupKey::Simple(_, py_key) => dict.get_item(py_key),
             LookupKey::Choice(_, _, py_key1, py_key2) => match dict.get_item(py_key1) {
@@ -378,7 +387,7 @@ impl LookupKey {
                 for path in path_choices {
                     // iterate over the path and plug each value into the py_any from the last step, starting with dict
                     // this could just be a loop but should be somewhat faster with a functional design
-                    if let Some(v) = path.iter().try_fold(dict as &PyAny, |d, loc| loc.py_get(d)) {
+                    if let Some(v) = path.iter().try_fold(dict as &PyAny, |d, loc| loc.py_get_item(d)) {
                         // Successfully found an item, return it
                         return Some(v);
                     }
@@ -389,7 +398,28 @@ impl LookupKey {
         }
     }
 
-    fn jsonobject_get<'data, 's>(&'s self, dict: &'data JsonObject) -> Option<&'data JsonInput> {
+    fn py_get_attr<'data, 's>(&'s self, obj: &'data PyAny) -> Option<&'data PyAny> {
+        match self {
+            LookupKey::Simple(_, py_key) => obj.getattr(&py_key).ok(),
+            LookupKey::Choice(_, _, py_key1, py_key2) => match obj.getattr(&py_key1) {
+                Ok(v) => Some(v),
+                Err(_) => obj.getattr(py_key2).ok(),
+            },
+            LookupKey::PathChoices(path_choices) => {
+                for path in path_choices {
+                    // similar to above, but using py_get_attrs
+                    if let Some(v) = path.iter().try_fold(obj, |d, loc| loc.py_get_attrs(d)) {
+                        // Successfully found an item, return it
+                        return Some(v);
+                    }
+                }
+                // got to the end of path_choices, without a match, return None
+                None
+            }
+        }
+    }
+
+    fn json_get<'data, 's>(&'s self, dict: &'data JsonObject) -> Option<&'data JsonInput> {
         match self {
             LookupKey::Simple(key, _) => dict.get(key),
             LookupKey::Choice(key1, key2, _, _) => match dict.get(key1) {
@@ -458,18 +488,21 @@ impl PathItem {
         }
     }
 
-    pub fn py_get<'a>(&self, py_any: &'a PyAny) -> Option<&'a PyAny> {
+    pub fn py_get_item<'a>(&self, py_any: &'a PyAny) -> Option<&'a PyAny> {
         // we definitely don't want to index strings, so explicitly omit this case
         if py_any.cast_as::<PyString>().is_ok() {
             None
         } else {
             // otherwise, blindly try getitem on v since no better logic is realistic
-            // TODO we could perhaps try getattr for StrKey depending on try_instance
-            match py_any.get_item(self) {
-                Ok(v_next) => Some(v_next),
-                // key/index not found, try next path
-                Err(_) => None,
-            }
+            py_any.get_item(self).ok()
+        }
+    }
+
+    pub fn py_get_attrs<'a>(&self, py_any: &'a PyAny) -> Option<&'a PyAny> {
+        if try_from_attributes(py_any) {
+            py_any.getattr(self).ok()
+        } else {
+            None
         }
     }
 
@@ -489,5 +522,43 @@ impl PathItem {
             Self::S(key, _) => json_obj.get(key),
             _ => None,
         }
+    }
+}
+
+pub struct GetAttrsIterator<'a> {
+    attributes: &'a PyList,
+    object: &'a PyAny,
+    index: usize,
+}
+
+impl<'a> Iterator for GetAttrsIterator<'a> {
+    type Item = (&'a PyAny, &'a PyAny);
+
+    fn next(&mut self) -> Option<(&'a PyAny, &'a PyAny)> {
+        // loop until we find an attribute who's name does not start with underscore,
+        // or we get to the end of the list of attributes
+        loop {
+            if self.index < self.attributes.len() {
+                let name: &PyAny = unsafe { self.attributes.get_item_unchecked(self.index) };
+                self.index += 1;
+                // from benchmarks this is 14x faster than using the python `starts_with` method
+                let name_cow = name
+                    .cast_as::<PyString>()
+                    .expect("dir didn't return a PyString")
+                    .to_string_lossy();
+                if !name_cow.as_ref().starts_with('_') {
+                    let value = self.object.getattr(name).expect("getattr failed");
+                    return Some((name, value));
+                }
+            } else {
+                return None;
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.attributes.len();
+
+        (len.saturating_sub(self.index), Some(len.saturating_sub(self.index)))
     }
 }
