@@ -153,27 +153,40 @@ impl<'a> Input<'a> for PyAny {
     fn lax_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
             Ok(dict.into())
-        } else if let Some(result_dict) = mapping_as_dict(self) {
-            match result_dict {
-                Ok(dict) => Ok(dict.into()),
-                Err(err) => {
-                    err_val_error!(
-                        input_value = self.as_error_value(),
-                        kind = ErrorKind::DictFromMapping,
-                        context = context!("error" => py_err_string(self.py(), err)),
-                    )
-                }
-            }
+        } else if let Some(generic_mapping) = mapping_as_dict(self) {
+            generic_mapping
         } else {
             err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::DictType)
         }
     }
 
-    fn typed_dict<'data>(&'data self, from_attributes: bool) -> ValResult<GenericMapping<'data>> {
-        if from_attributes && from_attributes_applicable(self) {
-            Ok(self.into())
-        } else {
+    fn typed_dict<'data>(&'data self, from_attributes: bool, from_mapping: bool) -> ValResult<GenericMapping<'data>> {
+        if from_attributes {
+            // if from_attributes, first try a dict, then mapping then from_attributes
+            if let Ok(dict) = self.cast_as::<PyDict>() {
+                return Ok(dict.into());
+            } else if from_mapping {
+                // we can't do this in one set of if/else because we need to check from_mapping before doing this
+                if let Some(generic_mapping) = mapping_as_dict(self) {
+                    return generic_mapping;
+                }
+            }
+
+            if from_attributes_applicable(self) {
+                Ok(self.into())
+            } else {
+                // note the error here gives a hint about from_attributes
+                err_val_error!(
+                    input_value = self.as_error_value(),
+                    kind = ErrorKind::DictAttributesType
+                )
+            }
+        } else if from_mapping {
+            // otherwise we just call back to lax_dict if from_mapping is allowed, not there error in this
+            // case (correctly) won't hint about from_attributes
             self.lax_dict()
+        } else {
+            self.strict_dict()
         }
     }
 
@@ -368,7 +381,7 @@ impl<'a> Input<'a> for PyAny {
 
 /// return None if obj is not a mapping (cast_as::<PyMapping> fails or mapping.items returns an AttributeError)
 /// otherwise try to covert the mapping to a dict and return an Some(error) if it fails
-fn mapping_as_dict(obj: &PyAny) -> Option<PyResult<&PyDict>> {
+fn mapping_as_dict(obj: &PyAny) -> Option<ValResult<GenericMapping>> {
     let mapping: &PyMapping = match obj.cast_as() {
         Ok(mapping) => mapping,
         Err(_) => return None,
@@ -376,15 +389,23 @@ fn mapping_as_dict(obj: &PyAny) -> Option<PyResult<&PyDict>> {
     // see https://github.com/PyO3/pyo3/issues/2072 - the cast_as::<PyMapping> is not entirely accurate
     // and returns some things which are definitely not mappings (e.g. str) as mapping,
     // hence we also require that the object as `items` to consider it a mapping
-    match mapping.items() {
-        Ok(seq) => Some(mapping_seq_as_dict(seq)),
+    let result_dict = match mapping.items() {
+        Ok(seq) => mapping_seq_as_dict(seq),
         Err(err) => {
             if matches!(err.get_type(obj.py()).is_subclass_of::<PyAttributeError>(), Ok(true)) {
-                None
+                return None;
             } else {
-                Some(Err(err))
+                Err(err)
             }
         }
+    };
+    match result_dict {
+        Ok(dict) => Some(Ok(dict.into())),
+        Err(err) => Some(err_val_error!(
+            input_value = obj.as_error_value(),
+            kind = ErrorKind::DictFromMapping,
+            context = context!("error" => py_err_string(obj.py(), err)),
+        )),
     }
 }
 

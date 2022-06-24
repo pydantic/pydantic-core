@@ -26,6 +26,7 @@ pub struct ModelValidator {
     fields: Vec<ModelField>,
     extra_behavior: ExtraBehavior,
     extra_validator: Option<Box<CombinedValidator>>,
+    strict: bool,
     from_attributes: bool,
 }
 
@@ -41,6 +42,7 @@ impl BuildValidator for ModelValidator {
         let config: Option<&PyDict> = schema.get_as("config")?;
 
         let model_full = config.get_as("model_full")?.unwrap_or(true);
+        let strict = config.get_as("strict")?.unwrap_or(false);
         let from_attributes = config.get_as("from_attributes")?.unwrap_or(false);
 
         let extra_behavior = match config.get_as::<&str>("extra_behavior")? {
@@ -60,9 +62,9 @@ impl BuildValidator for ModelValidator {
             None => None,
         };
 
+        let populate_by_name: bool = config.get_as("populate_by_name")?.unwrap_or(false);
         let fields_dict: &PyDict = schema.get_as_req("fields")?;
         let mut fields: Vec<ModelField> = Vec::with_capacity(fields_dict.len());
-        let populate_by_name: bool = config.get_as("populate_by_name")?.unwrap_or(false);
 
         let py = schema.py();
         for (key, value) in fields_dict.iter() {
@@ -95,6 +97,7 @@ impl BuildValidator for ModelValidator {
             fields,
             extra_behavior,
             extra_validator,
+            strict,
             from_attributes,
         }
         .into())
@@ -114,7 +117,7 @@ impl Validator for ModelValidator {
             return self.validate_assignment(py, field, input, extra, slots);
         }
 
-        let dict = input.typed_dict(self.from_attributes)?;
+        let dict = input.typed_dict(self.from_attributes, !self.strict)?;
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let fields_set = PySet::empty(py).map_err(as_internal)?;
@@ -176,11 +179,11 @@ impl Validator for ModelValidator {
                 if check_extra {
                     for (raw_key, value) in $iter {
                         // TODO use strict_str here if the model is strict
-                        let either_str = match raw_key.lax_str() {
+                        let either_str = match raw_key.strict_str() {
                             Ok(k) => k,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
-                                    errors.push(err.with_outer_location(raw_key.as_loc_item()));
+                                    errors.push(err.with_outer_location(raw_key.as_loc_item()).with_kind(ErrorKind::InvalidKey));
                                 }
                                 continue;
                             }

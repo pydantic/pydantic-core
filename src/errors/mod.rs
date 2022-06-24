@@ -3,12 +3,10 @@ use pyo3::prelude::*;
 mod kinds;
 mod line_error;
 pub mod location;
-mod val_error;
 mod validation_exception;
 
 pub use self::kinds::ErrorKind;
-pub use self::line_error::{Context, InputValue, ValLineError};
-pub use self::val_error::{as_internal, ValError, ValResult};
+pub use self::line_error::{as_internal, Context, InputValue, ValError, ValLineError, ValResult};
 pub use self::validation_exception::ValidationError;
 
 /// Utility for concisely creating a `ValLineError`

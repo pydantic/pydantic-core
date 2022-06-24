@@ -189,7 +189,7 @@ def test_model_class_strict():
         v.validate_python({'field_a': 'test', 'field_b': 12})
     assert exc_info.value.errors() == [
         {
-            'kind': 'model_type',
+            'kind': 'model_class_type',
             'loc': [],
             'message': 'Value must be an instance of MyModel',
             'input_value': {'field_a': 'test', 'field_b': 12},

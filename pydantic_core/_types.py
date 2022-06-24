@@ -100,7 +100,6 @@ class ModelField(TypedDict, total=False):
 class ModelSchema(TypedDict):
     type: Literal['model']
     fields: Dict[str, ModelField]
-    name: NotRequired[str]
     extra_validator: NotRequired[Schema]
     config: NotRequired[ConfigSchema]
 

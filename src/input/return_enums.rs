@@ -8,6 +8,7 @@ use crate::validators::{CombinedValidator, Extra, Validator};
 
 use super::parse_json::{JsonArray, JsonObject};
 
+#[derive(Debug)]
 pub enum GenericSequence<'a> {
     List(&'a PyList),
     Tuple(&'a PyTuple),
@@ -100,6 +101,7 @@ impl<'a> GenericSequence<'a> {
     }
 }
 
+#[derive(Debug)]
 pub enum GenericMapping<'a> {
     PyDict(&'a PyDict),
     PyGetAttr(&'a PyAny),

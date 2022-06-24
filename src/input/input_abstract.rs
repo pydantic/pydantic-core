@@ -44,7 +44,7 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         self.strict_dict()
     }
 
-    fn typed_dict<'data>(&'data self, _from_attributes: bool) -> ValResult<GenericMapping<'data>> {
+    fn typed_dict<'data>(&'data self, _from_attributes: bool, _from_mapping: bool) -> ValResult<GenericMapping<'data>> {
         self.strict_dict()
     }
 

@@ -2,6 +2,7 @@ import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Mapping
 
 import pytest
 from dirty_equals import HasRepr, IsStr
@@ -9,6 +10,32 @@ from dirty_equals import HasRepr, IsStr
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
 from ..conftest import Err
+
+
+class Cls:
+    def __init__(self, **attributes):
+        for k, v in attributes.items():
+            setattr(self, k, v)
+
+    def __repr__(self):
+        return 'Cls({})'.format(', '.join(f'{k}={v!r}' for k, v in self.__dict__.items()))
+
+
+class Map(Mapping):
+    def __init__(self, **kwargs):
+        self._d = kwargs
+
+    def __iter__(self):
+        return iter(self._d)
+
+    def __len__(self) -> int:
+        return len(self._d)
+
+    def __getitem__(self, __k):
+        return self._d[__k]
+
+    def __repr__(self):
+        return 'Map({})'.format(', '.join(f'{k}={v!r}' for k, v in self._d.items()))
 
 
 def test_simple():
@@ -71,6 +98,36 @@ def test_missing_error():
 field_b
   Field required [kind=missing, input_value={'field_a': 123}, input_type=dict]"""
     )
+
+
+@pytest.mark.parametrize(
+    'config,input_value,expected',
+    [
+        ({}, {'a': '123'}, {'a': 123}),
+        ({}, Map(a=123), {'a': 123}),
+        ({}, {b'a': '123'}, Err('Field required [kind=missing,')),
+        ({}, {'a': '123', 'c': 4}, {'a': 123}),
+        ({'extra_behavior': 'allow'}, {'a': '123', 'c': 4}, {'a': 123, 'c': 4}),
+        ({'extra_behavior': 'allow'}, {'a': '123', b'c': 4}, Err('Model keys must be strings [kind=invalid_key,')),
+        ({'strict': True}, Map(a=123), Err('Value must be a valid dictionary [kind=dict_type,')),
+    ],
+    ids=repr,
+)
+def test_config(config, input_value, expected):
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'int', 'required': False}},
+            'config': config,
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            val = v.validate_python(input_value)
+            print(f'UNEXPECTED OUTPUT: {val!r}')
+    else:
+        output_dict, _ = v.validate_python(input_value)
+        assert output_dict == expected
 
 
 def test_ignore_extra():
@@ -557,31 +614,38 @@ def test_model_deep():
     ]
 
 
-class Cls:
-    def __init__(self, **attributes):
-        for k, v in attributes.items():
-            setattr(self, k, v)
+class ClassWithAttributes:
+    def __init__(self):
+        self.a = 1
+        self.b = 2
 
-    def __repr__(self):
-        return 'Cls({})'.format(', '.join(f'{k}={v!r}' for k, v in self.__dict__.items()))
+    @property
+    def c(self):
+        return 'ham'
 
 
-def test_from_attributes():
-    class ClassWithAttributes:
-        def __init__(self):
-            self.a = 1
-            self.b = 2
+@dataclass
+class MyDataclass:
+    a: int = 1
+    b: int = 2
+    c: str = 'ham'
 
-        @property
-        def c(self):
-            return 'ham'
 
-    @dataclass
-    class MyDataclass:
-        a: int = 1
-        b: int = 2
-        c: str = 'ham'
-
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        (ClassWithAttributes(), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
+        (MyDataclass(), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
+        (Cls(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
+        (dict(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
+        (Map(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
+        ('123', Err('Value must be a valid dictionary or instance to extract fields from [kind=dict_attributes_type,')),
+        ([(1, 2)], Err('kind=dict_attributes_type,')),
+        (((1, 2),), Err('kind=dict_attributes_type,')),
+    ],
+    ids=repr,
+)
+def test_from_attributes(input_value, expected):
     v = SchemaValidator(
         {
             'type': 'model',
@@ -589,9 +653,34 @@ def test_from_attributes():
             'config': {'from_attributes': True},
         }
     )
-    assert v.validate_python(ClassWithAttributes()) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
-    assert v.validate_python(MyDataclass()) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
-    assert v.validate_python(Cls(a=1, b=2, c='ham')) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            val = v.validate_python(input_value)
+            print(f'UNEXPECTED OUTPUT: {val!r}')
+    else:
+        output = v.validate_python(input_value)
+        assert output == expected
+
+
+def test_from_attributes_type_error():
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'int'}, 'c': {'schema': 'str'}},
+            'config': {'from_attributes': True},
+        }
+    )
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python('123')
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'dict_attributes_type',
+            'loc': [],
+            'message': 'Value must be a valid dictionary or instance to extract fields from',
+            'input_value': '123',
+        }
+    ]
 
 
 def test_from_attributes_by_name():

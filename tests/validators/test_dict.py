@@ -131,7 +131,7 @@ def test_key_error():
 
 
 def test_mapping_error():
-    class MyMapping(Mapping):
+    class BadMapping(Mapping):
         def __getitem__(self, key):
             raise None
 
@@ -143,14 +143,47 @@ def test_mapping_error():
 
     v = SchemaValidator({'type': 'dict', 'keys': {'type': 'int'}, 'values': {'type': 'int'}})
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_python(MyMapping())
+        v.validate_python(BadMapping())
+
     assert exc_info.value.errors() == [
         {
             'kind': 'dict_from_mapping',
             'loc': [],
             'message': 'Unable to convert mapping to a dictionary, error: RuntimeError: intentional error',
-            'input_value': HasRepr(IsStr(regex='.+MyMapping object at.+')),
+            'input_value': HasRepr(IsStr(regex='.+BadMapping object at.+')),
             'context': {'error': 'RuntimeError: intentional error'},
+        }
+    ]
+
+
+def test_mapping_error_yield_1():
+    class BadMapping(Mapping):
+        def items(self):
+            return [(1,)]
+
+        def __iter__(self):
+            return iter({1: 2})
+
+        def __getitem__(self, key):
+            raise None
+
+        def __len__(self):
+            return 1
+
+    v = SchemaValidator({'type': 'dict', 'keys': {'type': 'int'}, 'values': {'type': 'int'}})
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(BadMapping())
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'dict_from_mapping',
+            'loc': [],
+            'message': (
+                'Unable to convert mapping to a dictionary, error: '
+                'TypeError: mapping items must be a tuple with 2 elements'
+            ),
+            'input_value': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+            'context': {'error': 'TypeError: mapping items must be a tuple with 2 elements'},
         }
     ]
 
