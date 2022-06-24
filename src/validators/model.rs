@@ -384,10 +384,7 @@ impl LookupKey {
     fn py_get_item<'data, 's>(&'s self, dict: &'data PyDict) -> PyResult<Option<&'data PyAny>> {
         match self {
             LookupKey::Simple(_, py_key) => Ok(dict.get_item(py_key)),
-            LookupKey::Choice(_, _, py_key1, py_key2) => match dict.get_item(py_key1) {
-                Some(v) => Ok(Some(v)),
-                None => Ok(dict.get_item(py_key2)),
-            },
+            LookupKey::Choice(_, _, py_key1, py_key2) => Ok(dict.get_item(py_key1).or_else(|| dict.get_item(py_key2))),
             LookupKey::PathChoices(path_choices) => {
                 for path in path_choices {
                     // iterate over the path and plug each value into the py_any from the last step, starting with dict
@@ -412,7 +409,8 @@ impl LookupKey {
             },
             LookupKey::PathChoices(path_choices) => {
                 'outer: for path in path_choices {
-                    // similar to above, but using `py_get_attrs`
+                    // similar to above, but using `py_get_attrs`, we can't use try_fold because of the extra Err
+                    // so we have to loop manually
                     let mut v = obj;
                     for loc in path {
                         v = match loc.py_get_attrs(v) {
