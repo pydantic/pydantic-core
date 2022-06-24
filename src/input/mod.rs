@@ -12,7 +12,6 @@ pub(crate) use datetime::{
     pydate_as_date, pydatetime_as_datetime, pytime_as_time, EitherDate, EitherDateTime, EitherTime,
 };
 pub use input_abstract::Input;
-pub use input_python::try_from_attributes;
 pub use parse_json::{JsonInput, JsonObject};
 pub use return_enums::{EitherBytes, EitherString, GenericMapping, GenericSequence};
 

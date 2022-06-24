@@ -9,7 +9,7 @@ use pyo3::types::{
 };
 
 use crate::errors::location::LocItem;
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, InputValue, ValResult};
+use crate::errors::{as_internal, context, err_val_error, py_err_string, ErrorKind, InputValue, ValResult};
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, date_as_datetime, float_as_datetime, float_as_time,
@@ -160,7 +160,7 @@ impl<'a> Input<'a> for PyAny {
                     err_val_error!(
                         input_value = self.as_error_value(),
                         kind = ErrorKind::DictFromMapping,
-                        context = context!("error" => err_string(self.py(), err)),
+                        context = context!("error" => py_err_string(self.py(), err)),
                     )
                 }
             }
@@ -170,7 +170,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn typed_dict<'data>(&'data self, from_attributes: bool) -> ValResult<GenericMapping<'data>> {
-        if from_attributes && try_from_attributes(self) {
+        if from_attributes && from_attributes_applicable(self) {
             Ok(self.into())
         } else {
             self.lax_dict()
@@ -403,9 +403,9 @@ fn mapping_seq_as_dict(seq: &PySequence) -> PyResult<&PyDict> {
     Ok(dict)
 }
 
-/// Best effort check of whether it's likely to make sense to extract a dict from `obj.dir()`
-/// used both here and in model.rs
-pub fn try_from_attributes(obj: &PyAny) -> bool {
+/// Best effort check of whether it's likely to make sense to inspect obj for attributes and iterate over it
+/// with `obj.dir()`
+fn from_attributes_applicable(obj: &PyAny) -> bool {
     let module_name = match obj.get_type().getattr(intern!(obj.py(), "__module__")) {
         Ok(module) => match module.extract::<&str>() {
             Ok(s) => s,
@@ -416,20 +416,8 @@ pub fn try_from_attributes(obj: &PyAny) -> bool {
     // I don't think it's a very good list at all! But it doesn't have to be at perfect, it just needs to avoid
     // the most egregious foot guns, it's mostly just to catch "builtins"
     // still happy to add more or do something completely different if anyone has a better idea???
-    !matches!(
-        module_name,
-        "builtins"
-            | "datetime"
-            | "sys"
-            | "os"
-            | "warnings"
-            | "test"
-            | "collections"
-            | "io"
-            | "math"
-            | "functools"
-            | "threading"
-    )
+    // dbg!(obj, module_name);
+    !matches!(module_name, "builtins" | "datetime" | "collections")
 }
 
 /// Utility for extracting a string from a PyAny, if possible.
@@ -443,24 +431,5 @@ fn maybe_as_string(v: &PyAny, unicode_error: ErrorKind) -> ValResult<Option<Eith
         }
     } else {
         Ok(None)
-    }
-}
-
-fn err_string(py: Python, err: PyErr) -> String {
-    let value = err.value(py);
-    match value.get_type().name() {
-        Ok(type_name) => match value.str() {
-            Ok(py_str) => {
-                let str_cow = py_str.to_string_lossy();
-                let str = str_cow.as_ref();
-                if !str.is_empty() {
-                    format!("{}: {}", type_name, str)
-                } else {
-                    type_name.to_string()
-                }
-            }
-            Err(_) => format!("{}: <exception str() failed>", type_name),
-        },
-        Err(_) => "Unknown Error".to_string(),
     }
 }

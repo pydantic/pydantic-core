@@ -1,3 +1,5 @@
+use pyo3::prelude::*;
+
 mod kinds;
 mod line_error;
 pub mod location;
@@ -41,3 +43,22 @@ macro_rules! context {
     }};
 }
 pub(crate) use context;
+
+pub fn py_err_string(py: Python, err: PyErr) -> String {
+    let value = err.value(py);
+    match value.get_type().name() {
+        Ok(type_name) => match value.str() {
+            Ok(py_str) => {
+                let str_cow = py_str.to_string_lossy();
+                let str = str_cow.as_ref();
+                if !str.is_empty() {
+                    format!("{}: {}", type_name, str)
+                } else {
+                    type_name.to_string()
+                }
+            }
+            Err(_) => format!("{}: <exception str() failed>", type_name),
+        },
+        Err(_) => "Unknown Error".to_string(),
+    }
+}

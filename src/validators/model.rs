@@ -1,10 +1,13 @@
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyAttributeError, PyTypeError};
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySet, PyString};
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_internal, err_val_error, val_line_error, ErrorKind, ValError, ValLineError, ValResult};
-use crate::input::{try_from_attributes, GenericMapping, Input, JsonInput, JsonObject};
+use crate::errors::{
+    as_internal, context, err_val_error, py_err_string, val_line_error, ErrorKind, ValError, ValLineError, ValResult,
+};
+use crate::input::{GenericMapping, Input, JsonInput, JsonObject};
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -116,7 +119,20 @@ impl Validator for ModelValidator {
         macro_rules! process {
             ($dict:ident, $get_method:ident, $iter:block) => {{
                 for field in &self.fields {
-                    if let Some(value) = field.lookup_key.$get_method($dict) {
+                    let op_value = match field.lookup_key.$get_method($dict) {
+                        Ok(v) => v,
+                        Err(err) => {
+                            // we're setting every member on ValLineError, so clippy complains if we use val_line_error!
+                            errors.push(ValLineError {
+                                input_value: input.as_error_value(),
+                                kind: ErrorKind::ModelAttributeError,
+                                reverse_location: vec![field.name.clone().into()],
+                                context: context!("error" => py_err_string(py, err)),
+                            });
+                            continue;
+                        },
+                    };
+                    if let Some(value) = op_value {
                         match field.validator.validate(py, value, &extra, slots) {
                             Ok(value) => output_dict
                                 .set_item(&field.dict_key, value)
@@ -376,12 +392,12 @@ impl LookupKey {
         }
     }
 
-    fn py_get_item<'data, 's>(&'s self, dict: &'data PyDict) -> Option<&'data PyAny> {
+    fn py_get_item<'data, 's>(&'s self, dict: &'data PyDict) -> PyResult<Option<&'data PyAny>> {
         match self {
-            LookupKey::Simple(_, py_key) => dict.get_item(py_key),
+            LookupKey::Simple(_, py_key) => Ok(dict.get_item(py_key)),
             LookupKey::Choice(_, _, py_key1, py_key2) => match dict.get_item(py_key1) {
-                Some(v) => Some(v),
-                None => dict.get_item(py_key2),
+                Some(v) => Ok(Some(v)),
+                None => Ok(dict.get_item(py_key2)),
             },
             LookupKey::PathChoices(path_choices) => {
                 for path in path_choices {
@@ -389,43 +405,48 @@ impl LookupKey {
                     // this could just be a loop but should be somewhat faster with a functional design
                     if let Some(v) = path.iter().try_fold(dict as &PyAny, |d, loc| loc.py_get_item(d)) {
                         // Successfully found an item, return it
-                        return Some(v);
+                        return Ok(Some(v));
                     }
                 }
                 // got to the end of path_choices, without a match, return None
-                None
+                Ok(None)
             }
         }
     }
 
-    fn py_get_attr<'data, 's>(&'s self, obj: &'data PyAny) -> Option<&'data PyAny> {
+    fn py_get_attr<'data, 's>(&'s self, obj: &'data PyAny) -> PyResult<Option<&'data PyAny>> {
         match self {
-            LookupKey::Simple(_, py_key) => obj.getattr(&py_key).ok(),
-            LookupKey::Choice(_, _, py_key1, py_key2) => match obj.getattr(&py_key1) {
-                Ok(v) => Some(v),
-                Err(_) => obj.getattr(py_key2).ok(),
+            LookupKey::Simple(_, py_key) => py_get_attrs(obj, &py_key),
+            LookupKey::Choice(_, _, py_key1, py_key2) => match py_get_attrs(obj, &py_key1)? {
+                Some(v) => Ok(Some(v)),
+                None => py_get_attrs(obj, &py_key2),
             },
             LookupKey::PathChoices(path_choices) => {
-                for path in path_choices {
-                    // similar to above, but using py_get_attrs
-                    if let Some(v) = path.iter().try_fold(obj, |d, loc| loc.py_get_attrs(d)) {
-                        // Successfully found an item, return it
-                        return Some(v);
+                'outer: for path in path_choices {
+                    // similar to above, but using `py_get_attrs`
+                    let mut v = obj;
+                    for loc in path {
+                        v = match loc.py_get_attrs(v) {
+                            Ok(Some(v)) => v,
+                            Ok(None) => {
+                                continue 'outer;
+                            }
+                            Err(e) => return Err(e),
+                        }
                     }
+                    // Successfully found an item, return it
+                    return Ok(Some(v));
                 }
                 // got to the end of path_choices, without a match, return None
-                None
+                Ok(None)
             }
         }
     }
 
-    fn json_get<'data, 's>(&'s self, dict: &'data JsonObject) -> Option<&'data JsonInput> {
+    fn json_get<'data, 's>(&'s self, dict: &'data JsonObject) -> PyResult<Option<&'data JsonInput>> {
         match self {
-            LookupKey::Simple(key, _) => dict.get(key),
-            LookupKey::Choice(key1, key2, _, _) => match dict.get(key1) {
-                Some(v) => Some(v),
-                None => dict.get(key2),
-            },
+            LookupKey::Simple(key, _) => Ok(dict.get(key)),
+            LookupKey::Choice(key1, key2, _, _) => Ok(dict.get(key1).or_else(|| dict.get(key2))),
             LookupKey::PathChoices(path_choices) => {
                 for path in path_choices {
                     let mut path_iter = path.iter();
@@ -442,11 +463,11 @@ impl LookupKey {
                     // from the first step, this could just be a loop but should be somewhat faster with a functional design
                     if let Some(v) = path_iter.try_fold(v, |d, loc| loc.json_get(d)) {
                         // Successfully found an item, return it
-                        return Some(v);
+                        return Ok(Some(v));
                     }
                 }
                 // got to the end of path_choices, without a match, return None
-                None
+                Ok(None)
             }
         }
     }
@@ -498,11 +519,18 @@ impl PathItem {
         }
     }
 
-    pub fn py_get_attrs<'a>(&self, py_any: &'a PyAny) -> Option<&'a PyAny> {
-        if try_from_attributes(py_any) {
-            py_any.getattr(self).ok()
-        } else {
-            None
+    pub fn py_get_attrs<'a>(&self, obj: &'a PyAny) -> PyResult<Option<&'a PyAny>> {
+        match self {
+            Self::S(_, py_key) => {
+                // if obj is a dict, we want to use get_item, not getattr
+                if obj.cast_as::<PyDict>().is_ok() {
+                    Ok(self.py_get_item(obj))
+                } else {
+                    py_get_attrs(obj, py_key)
+                }
+            }
+            // int, we fall back to py_get_item - e.g. we want to use get_item for a list, tuple, dict, etc.
+            Self::I(_) => Ok(self.py_get_item(obj)),
         }
     }
 
@@ -521,6 +549,24 @@ impl PathItem {
         match self {
             Self::S(key, _) => json_obj.get(key),
             _ => None,
+        }
+    }
+}
+
+/// wrapper around `getattr` that returns `Ok(None)` for attribute errors, but returns other errors
+/// We dont check `try_from_attributes` because that check was performed on the top level object before we got here
+fn py_get_attrs<N>(obj: &PyAny, attr_name: N) -> PyResult<Option<&PyAny>>
+where
+    N: ToPyObject,
+{
+    match obj.getattr(attr_name) {
+        Ok(attr) => Ok(Some(attr)),
+        Err(err) => {
+            if err.get_type(obj.py()).is_subclass_of::<PyAttributeError>()? {
+                Ok(None)
+            } else {
+                Err(err)
+            }
         }
     }
 }
@@ -547,8 +593,15 @@ impl<'a> Iterator for GetAttrsIterator<'a> {
                     .expect("dir didn't return a PyString")
                     .to_string_lossy();
                 if !name_cow.as_ref().starts_with('_') {
-                    let value = self.object.getattr(name).expect("getattr failed");
-                    return Some((name, value));
+                    let attr = self.object.getattr(name).expect("getattr failed");
+                    // we don't want bound methods to be included, is there a better way to check?
+                    // ref https://stackoverflow.com/a/18955425/949890
+                    let is_bound = attr
+                        .hasattr(intern!(attr.py(), "__self__"))
+                        .expect("bound method check failed");
+                    if !is_bound {
+                        return Some((name, attr));
+                    }
                 }
             } else {
                 return None;

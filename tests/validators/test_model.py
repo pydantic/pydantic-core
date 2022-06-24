@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 
 import pytest
 from dirty_equals import HasRepr, IsStr
@@ -416,7 +417,7 @@ def test_alias_path(py_or_json, input_value, expected):
     ],
     ids=repr,
 )
-def test_alias_path_multiple(py_or_json, input_value, expected):
+def test_aliases_path_multiple(py_or_json, input_value, expected):
     v = py_or_json(
         {
             'type': 'model',
@@ -533,25 +534,41 @@ def test_model_deep():
     ]
 
 
+class Cls:
+    def __init__(self, **attributes):
+        for k, v in attributes.items():
+            setattr(self, k, v)
+
+    def __repr__(self):
+        return 'Cls({})'.format(', '.join(f'{k}={v!r}' for k, v in self.__dict__.items()))
+
+
 def test_from_attributes():
     class ClassWithAttributes:
         def __init__(self):
             self.a = 1
             self.b = 2
-            self.c = 'ham'
 
         @property
-        def d(self):
-            return 'egg'
+        def c(self):
+            return 'ham'
+
+    @dataclass
+    class MyDataclass:
+        a: int = 1
+        b: int = 2
+        c: str = 'ham'
 
     v = SchemaValidator(
         {
             'type': 'model',
-            'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'int'}, 'c': {'schema': 'str'}, 'd': {'schema': 'str'}},
+            'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'int'}, 'c': {'schema': 'str'}},
             'config': {'from_attributes': True},
         }
     )
-    assert v.validate_python(ClassWithAttributes()) == ({'a': 1, 'b': 2, 'c': 'ham', 'd': 'egg'}, {'d', 'b', 'a', 'c'})
+    assert v.validate_python(ClassWithAttributes()) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
+    assert v.validate_python(MyDataclass()) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
+    assert v.validate_python(Cls(a=1, b=2, c='ham')) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
 
 
 def test_from_attributes_missing():
@@ -581,7 +598,6 @@ def test_from_attributes_missing():
     ]
 
 
-@pytest.mark.xfail(reason='Not implemented')
 def test_from_attributes_error():
     class Foobar:
         def __init__(self):
@@ -604,10 +620,77 @@ def test_from_attributes_error():
 
     assert exc_info.value.errors() == [
         {
-            'kind': 'dict_from_object',
+            'kind': 'model_attribute_error',
             'loc': ['b'],
-            'message': 'Unable to extract dictionary from object, error: RuntimeError: intentional error',
+            'message': 'Error extracting attribute: RuntimeError: intentional error',
             'input_value': HasRepr(IsStr(regex='.+Foobar object at.+')),
             'context': {'error': 'RuntimeError: intentional error'},
         }
     ]
+
+
+def test_from_attributes_extra():
+    class Foobar:
+        def __init__(self):
+            self.a = 1
+            self.b = 2
+            self._d = 4
+
+        @property
+        def c(self):
+            return 'ham'
+
+        @property
+        def _e(self):
+            return 'wrong'
+
+        def f(self):
+            return 'wrong'
+
+    @dataclass
+    class MyDataclass:
+        a: int = 1
+        b: int = 2
+        c: str = 'ham'
+        _d: int = 4
+
+    v = SchemaValidator(
+        {'type': 'model', 'fields': {'a': {'schema': 'int'}}, 'config': {'from_attributes': True, 'extra': 'allow'}}
+    )
+
+    assert v.validate_python(Foobar()) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
+    assert v.validate_python(MyDataclass()) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ({'foo': {'bar': {'bat': '123'}}}, ({'my_field': 123}, {'my_field'})),
+        (Cls(foo=Cls(bar=Cls(bat='123'))), ({'my_field': 123}, {'my_field'})),
+        (Cls(foo={'bar': {'bat': '123'}}), ({'my_field': 123}, {'my_field'})),
+        (Cls(foo=[1, 2, 3, 4]), ({'my_field': 4}, {'my_field'})),
+        (Cls(foo=(1, 2, 3, 4)), ({'my_field': 4}, {'my_field'})),
+        (Cls(spam=5), ({'my_field': 5}, {'my_field'})),
+        (Cls(spam=1, foo=Cls(bar=Cls(bat=2))), ({'my_field': 2}, {'my_field'})),
+        (Cls(x='123'), Err(r'my_field\n +Field required \[kind=missing,')),
+        (Cls(x={2: 33}), Err(r'my_field\n +Field required \[kind=missing,')),
+        (Cls(foo='01234'), Err(r'my_field\n +Field required \[kind=missing,')),
+        (Cls(foo=[1]), Err(r'my_field\n +Field required \[kind=missing,')),
+    ],
+    ids=repr,
+)
+def test_from_attributes_path(input_value, expected):
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'fields': {'my_field': {'aliases': [['foo', 'bar', 'bat'], ['foo', 3], ['spam']], 'schema': 'int'}},
+            'config': {'from_attributes': True},
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=expected.message):
+            val = v.validate_python(input_value)
+            print(f'UNEXPECTED OUTPUT: {val!r}')
+    else:
+        output = v.validate_python(input_value)
+        assert output == expected
