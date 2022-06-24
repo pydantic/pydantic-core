@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from datetime import datetime
 
 import pytest
 from dirty_equals import HasRepr, IsStr
@@ -132,12 +133,7 @@ def test_allow_extra_validate():
 def test_allow_extra_invalid():
     with pytest.raises(SchemaError, match='extra_validator can only be used if extra_behavior=allow'):
         SchemaValidator(
-            {
-                'type': 'model',
-                'fields': {'field_a': {'schema': {'type': 'str'}}},
-                'extra_validator': {'type': 'int'},
-                'config': {'extra_behavior': 'ignore'},
-            }
+            {'type': 'model', 'fields': {}, 'extra_validator': {'type': 'int'}, 'config': {'extra_behavior': 'ignore'}}
         )
 
 
@@ -583,6 +579,18 @@ def test_from_attributes():
     assert v.validate_python(Cls(a=1, b=2, c='ham')) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
 
 
+def test_from_attributes_by_name():
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'fields': {'a': {'schema': 'int', 'alias': 'a_alias'}},
+            'config': {'from_attributes': True, 'populate_by_name': True},
+        }
+    )
+    assert v.validate_python(Cls(a_alias=1)) == ({'a': 1}, {'a'})
+    assert v.validate_python(Cls(a=1)) == ({'a': 1}, {'a'})
+
+
 def test_from_attributes_missing():
     class Foobar:
         def __init__(self):
@@ -646,17 +654,25 @@ def test_from_attributes_extra():
         def __init__(self):
             self.a = 1
             self.b = 2
-            self._d = 4
+            self._private_attribute = 4
 
         @property
         def c(self):
             return 'ham'
 
         @property
-        def _e(self):
+        def _private_property(self):
             return 'wrong'
 
-        def f(self):
+        def bound_method(self):
+            return f'wrong {self.a}'
+
+        @staticmethod
+        def static_method():
+            return 'wrong'
+
+        @classmethod
+        def class_method(cls):
             return 'wrong'
 
     @dataclass
@@ -676,6 +692,9 @@ def test_from_attributes_extra():
 
     assert v.validate_python(Foobar()) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
     assert v.validate_python(MyDataclass()) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
+    assert v.validate_python(Cls(a=1, b=2, c='ham')) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})
+    assert v.validate_python(Cls(a=1, b=datetime(2000, 1, 1))) == ({'a': 1, 'b': datetime(2000, 1, 1)}, {'a', 'b'})
+    assert v.validate_python(Cls(a=1, b=datetime.now, c=lambda: 42)) == ({'a': 1}, {'a'})
 
 
 @pytest.mark.parametrize(

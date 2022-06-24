@@ -1,7 +1,7 @@
 use pyo3::exceptions::{PyAttributeError, PyTypeError};
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PySet, PyString};
+use pyo3::types::{PyDict, PyFunction, PyList, PySet, PyString};
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{
@@ -219,15 +219,7 @@ impl Validator for ModelValidator {
         }
         match dict {
             GenericMapping::PyDict(d) => process!(d, py_get_item, { d.iter() }),
-            GenericMapping::PyGetAttr(d) => {
-                process!(d, py_get_attr, {
-                    GetAttrsIterator {
-                        attributes: d.dir(),
-                        object: d,
-                        index: 0,
-                    }
-                })
-            }
+            GenericMapping::PyGetAttr(d) => process!(d, py_get_attr, { IterAttributes::new(d) }),
             GenericMapping::JsonObject(d) => process!(d, json_get, { d.iter() }),
         }
 
@@ -258,7 +250,7 @@ impl ModelValidator {
         // TODO probably we should set location on errors here
         let data = match extra.data {
             Some(data) => data,
-            None => panic!("data is required when validating assignment"),
+            None => unreachable!(),
         };
 
         let prepare_tuple = |output: PyObject| {
@@ -565,13 +557,23 @@ where
     }
 }
 
-pub struct GetAttrsIterator<'a> {
-    attributes: &'a PyList,
+pub struct IterAttributes<'a> {
     object: &'a PyAny,
+    attributes: &'a PyList,
     index: usize,
 }
 
-impl<'a> Iterator for GetAttrsIterator<'a> {
+impl<'a> IterAttributes<'a> {
+    pub fn new(object: &'a PyAny) -> Self {
+        Self {
+            object,
+            attributes: object.dir(),
+            index: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for IterAttributes<'a> {
     type Item = (&'a PyAny, &'a PyAny);
 
     fn next(&mut self) -> Option<(&'a PyAny, &'a PyAny)> {
@@ -581,7 +583,7 @@ impl<'a> Iterator for GetAttrsIterator<'a> {
             if self.index < self.attributes.len() {
                 let name: &PyAny = unsafe { self.attributes.get_item_unchecked(self.index) };
                 self.index += 1;
-                // from benchmarks this is 14x faster than using the python `starts_with` method
+                // from benchmarks this is 14x faster than using the python `startswith` method
                 let name_cow = name
                     .cast_as::<PyString>()
                     .expect("dir didn't return a PyString")
@@ -593,7 +595,7 @@ impl<'a> Iterator for GetAttrsIterator<'a> {
                     let is_bound = attr
                         .hasattr(intern!(attr.py(), "__self__"))
                         .expect("bound method check failed");
-                    if !is_bound {
+                    if !is_bound && !matches!(attr.is_instance_of::<PyFunction>(), Ok(true)) {
                         return Some((name, attr));
                     }
                 }
@@ -602,10 +604,5 @@ impl<'a> Iterator for GetAttrsIterator<'a> {
             }
         }
     }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.attributes.len();
-
-        (len.saturating_sub(self.index), Some(len.saturating_sub(self.index)))
-    }
+    // size_hint is omitted as it isn't needed
 }
