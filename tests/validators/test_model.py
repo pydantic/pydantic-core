@@ -84,7 +84,7 @@ def test_ignore_extra():
 
 def test_forbid_extra():
     v = SchemaValidator(
-        {'type': 'model', 'fields': {'field_a': {'schema': {'type': 'str'}}}, 'config': {'extra': 'forbid'}}
+        {'type': 'model', 'fields': {'field_a': {'schema': {'type': 'str'}}}, 'config': {'extra_behavior': 'forbid'}}
     )
 
     with pytest.raises(ValidationError, match='field_b | Extra values are not permitted'):
@@ -93,7 +93,7 @@ def test_forbid_extra():
 
 def test_allow_extra():
     v = SchemaValidator(
-        {'type': 'model', 'fields': {'field_a': {'schema': {'type': 'str'}}}, 'config': {'extra': 'allow'}}
+        {'type': 'model', 'fields': {'field_a': {'schema': {'type': 'str'}}}, 'config': {'extra_behavior': 'allow'}}
     )
 
     assert v.validate_python({'field_a': 123, 'field_b': (1, 2)}) == (
@@ -108,7 +108,7 @@ def test_allow_extra_validate():
             'type': 'model',
             'fields': {'field_a': {'schema': {'type': 'str'}}},
             'extra_validator': {'type': 'int'},
-            'config': {'extra': 'allow'},
+            'config': {'extra_behavior': 'allow'},
         }
     )
 
@@ -127,6 +127,18 @@ def test_allow_extra_validate():
             'input_value': 12.5,
         }
     ]
+
+
+def test_allow_extra_invalid():
+    with pytest.raises(SchemaError, match='extra_validator can only be used if extra_behavior=allow'):
+        SchemaValidator(
+            {
+                'type': 'model',
+                'fields': {'field_a': {'schema': {'type': 'str'}}},
+                'extra_validator': {'type': 'int'},
+                'config': {'extra_behavior': 'ignore'},
+            }
+        )
 
 
 def test_str_config():
@@ -207,7 +219,7 @@ def test_validate_assignment_ignore_extra():
 
 def test_validate_assignment_allow_extra():
     v = SchemaValidator(
-        {'type': 'model', 'fields': {'field_a': {'schema': {'type': 'str'}}}, 'config': {'extra': 'allow'}}
+        {'type': 'model', 'fields': {'field_a': {'schema': {'type': 'str'}}}, 'config': {'extra_behavior': 'allow'}}
     )
 
     assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
@@ -224,7 +236,7 @@ def test_validate_assignment_allow_extra_validate():
             'type': 'model',
             'fields': {'field_a': {'schema': {'type': 'str'}}},
             'extra_validator': {'type': 'int'},
-            'config': {'extra': 'allow'},
+            'config': {'extra_behavior': 'allow'},
         }
     )
 
@@ -370,7 +382,7 @@ def test_alias_allow_pop(py_or_json):
     v = py_or_json(
         {
             'type': 'model',
-            'config': {'allow_population_by_field_name': True},
+            'config': {'populate_by_name': True},
             'fields': {'field_a': {'alias': 'FieldA', 'schema': 'int'}},
         }
     )
@@ -456,7 +468,7 @@ def test_paths_allow_by_name(py_or_json, input_value):
         {
             'type': 'model',
             'fields': {'field_a': {'aliases': [['foo', 'bar'], ['foo']], 'schema': 'int'}},
-            'config': {'allow_population_by_field_name': True},
+            'config': {'populate_by_name': True},
         }
     )
     assert v.validate_test(input_value) == ({'field_a': 42}, {'field_a'})
@@ -655,7 +667,11 @@ def test_from_attributes_extra():
         _d: int = 4
 
     v = SchemaValidator(
-        {'type': 'model', 'fields': {'a': {'schema': 'int'}}, 'config': {'from_attributes': True, 'extra': 'allow'}}
+        {
+            'type': 'model',
+            'fields': {'a': {'schema': 'int'}},
+            'config': {'from_attributes': True, 'extra_behavior': 'allow'},
+        }
     )
 
     assert v.validate_python(Foobar()) == ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})

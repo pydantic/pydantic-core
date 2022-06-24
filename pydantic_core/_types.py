@@ -26,9 +26,9 @@ class BoolSchema(TypedDict):
 
 class ConfigSchema(TypedDict, total=False):
     strict: bool
-    extra: Literal['allow', 'forbid', 'ignore']
+    extra_behavior: Literal['allow', 'forbid', 'ignore']
     model_full: bool  # default: True
-    allow_population_by_field_name: bool
+    populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
     from_attributes: bool
 
 

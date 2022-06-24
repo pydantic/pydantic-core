@@ -43,18 +43,26 @@ impl BuildValidator for ModelValidator {
         let model_full = config.get_as("model_full")?.unwrap_or(true);
         let from_attributes = config.get_as("from_attributes")?.unwrap_or(false);
 
-        let extra_behavior = ExtraBehavior::from_py(config)?;
-        let extra_validator = match extra_behavior {
-            ExtraBehavior::Allow => match schema.get_item("extra_validator") {
-                Some(v) => Some(Box::new(build_validator(v, config, build_context)?.0)),
-                None => None,
+        let extra_behavior = match config.get_as::<&str>("extra_behavior")? {
+            Some(s) => match s {
+                "allow" => ExtraBehavior::Allow,
+                "ignore" => ExtraBehavior::Ignore,
+                "forbid" => ExtraBehavior::Forbid,
+                _ => return py_error!(r#"Invalid extra_behavior: "{}""#, s),
             },
-            _ => None,
+            None => ExtraBehavior::Ignore,
+        };
+        let extra_validator = match schema.get_item("extra_validator") {
+            Some(v) => match extra_behavior {
+                ExtraBehavior::Allow => Some(Box::new(build_validator(v, config, build_context)?.0)),
+                _ => return py_error!("extra_validator can only be used if extra_behavior=allow"),
+            },
+            None => None,
         };
 
         let fields_dict: &PyDict = schema.get_as_req("fields")?;
         let mut fields: Vec<ModelField> = Vec::with_capacity(fields_dict.len());
-        let allow_by_name: bool = config.get_as("allow_population_by_field_name")?.unwrap_or(false);
+        let populate_by_name: bool = config.get_as("populate_by_name")?.unwrap_or(false);
 
         let py = schema.py();
         for (key, value) in fields_dict.iter() {
@@ -65,7 +73,7 @@ impl BuildValidator for ModelValidator {
 
             fields.push(ModelField {
                 name: field_name.to_string(),
-                lookup_key: LookupKey::from_py(py, field_info, field_name, allow_by_name)?,
+                lookup_key: LookupKey::from_py(py, field_info, field_name, populate_by_name)?,
                 dict_key: PyString::intern(py, field_name).into(),
                 validator: match build_validator(schema, config, build_context) {
                     Ok((v, _)) => v,
@@ -302,20 +310,6 @@ enum ExtraBehavior {
     Forbid,
 }
 
-impl ExtraBehavior {
-    pub fn from_py(config: Option<&PyDict>) -> PyResult<Self> {
-        match config.get_as::<&str>("extra")? {
-            Some(s) => match s {
-                "allow" => Ok(ExtraBehavior::Allow),
-                "ignore" => Ok(ExtraBehavior::Ignore),
-                "forbid" => Ok(ExtraBehavior::Forbid),
-                _ => py_error!(r#"Invalid extra_behavior: "{}""#, s),
-            },
-            None => Ok(ExtraBehavior::Ignore),
-        }
-    }
-}
-
 /// Used got getting items from python or JSON objects, in different ways
 #[derive(Debug, Clone)]
 pub enum LookupKey {
@@ -338,14 +332,14 @@ macro_rules! py_string {
 }
 
 impl LookupKey {
-    pub fn from_py(py: Python, field: &PyDict, field_name: &str, allow_by_name: bool) -> PyResult<Self> {
+    pub fn from_py(py: Python, field: &PyDict, field_name: &str, populate_by_name: bool) -> PyResult<Self> {
         match field.get_as::<String>("alias")? {
             Some(alias) => {
                 if field.contains("aliases")? {
                     py_error!("'alias' and 'aliases' cannot be used together")
                 } else {
                     let alias_py = py_string!(py, &alias);
-                    match allow_by_name {
+                    match populate_by_name {
                         true => Ok(LookupKey::Choice(
                             alias,
                             field_name.to_string(),
@@ -366,7 +360,7 @@ impl LookupKey {
                     if locs.is_empty() {
                         py_error!("Aliases must have at least one element")
                     } else {
-                        if allow_by_name {
+                        if populate_by_name {
                             locs.push(vec![PathItem::S(field_name.to_string(), py_string!(py, field_name))])
                         }
                         Ok(LookupKey::PathChoices(locs))
