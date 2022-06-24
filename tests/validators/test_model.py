@@ -448,6 +448,14 @@ def test_aliases_path_multiple(py_or_json, input_value, expected):
         assert output == expected
 
 
+def test_aliases_debug():
+    v = SchemaValidator(
+        {'type': 'model', 'fields': {'field_a': {'aliases': [['foo', 'bar', 'bat'], ['foo', 3]], 'schema': 'int'}}}
+    )
+    assert repr(v).startswith('SchemaValidator(name="model", validator=Model(')
+    assert 'PathChoices(' in repr(v)
+
+
 def get_int_key():
     v = SchemaValidator({'type': 'model', 'fields': {'field_a': {'aliases': [['foo', 3], ['spam']], 'schema': 'int'}}})
     assert v.validate_python({'foo': {3: 33}}) == ({'field_a': 33}, {'field_a'})
