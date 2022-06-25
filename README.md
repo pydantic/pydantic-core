@@ -77,7 +77,7 @@ except ValidationError as e:
 ```
 
 Pydantic-core is currently around 17x faster than pydantic standard.
-See [`tests/test_benchmarks.py`](./tests/test_benchmarks.py) for details.
+See [`tests/benchmarks/`](./tests/benchmarks/) for details.
 
 Benchmarks overtime can be seen [here](https://samuelcolvin.github.io/pydantic-core/dev/bench/).
 

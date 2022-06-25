@@ -1,3 +1,6 @@
+"""
+Numerous benchmarks of specific functionality.
+"""
 import json
 import os
 from datetime import date, datetime, timedelta, timezone
