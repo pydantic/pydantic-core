@@ -26,7 +26,8 @@ struct ModelField {
 #[derive(Debug, Clone)]
 pub struct ModelValidator {
     fields: Vec<ModelField>,
-    extra_behavior: ExtraBehavior,
+    check_extra: bool,
+    forbid_extra: bool,
     extra_validator: Option<Box<CombinedValidator>>,
     strict: bool,
     from_attributes: bool,
@@ -49,20 +50,24 @@ impl BuildValidator for ModelValidator {
         let from_attributes = config.get_as("from_attributes")?.unwrap_or(false);
         let return_fields_set = schema.get_as("return_fields_set")?.unwrap_or(false);
 
-        let extra_behavior = match config.get_as::<&str>("extra_behavior")? {
+        let (check_extra, forbid_extra) = match config.get_as::<&str>("extra_behavior")? {
             Some(s) => match s {
-                "allow" => ExtraBehavior::Allow,
-                "ignore" => ExtraBehavior::Ignore,
-                "forbid" => ExtraBehavior::Forbid,
+                "allow" => (true, false),
+                "ignore" => (false, false),
+                "forbid" => (true, true),
                 _ => return py_error!(r#"Invalid extra_behavior: "{}""#, s),
             },
-            None => ExtraBehavior::Ignore,
+            None => (false, false),
         };
+
         let extra_validator = match schema.get_item("extra_validator") {
-            Some(v) => match extra_behavior {
-                ExtraBehavior::Allow => Some(Box::new(build_validator(v, config, build_context)?.0)),
-                _ => return py_error!("extra_validator can only be used if extra_behavior=allow"),
-            },
+            Some(v) => {
+                if check_extra && !forbid_extra {
+                    Some(Box::new(build_validator(v, config, build_context)?.0))
+                } else {
+                    return py_error!("extra_validator can only be used if extra_behavior=allow");
+                }
+            }
             None => None,
         };
 
@@ -103,7 +108,8 @@ impl BuildValidator for ModelValidator {
         }
         Ok(Self {
             fields,
-            extra_behavior,
+            check_extra,
+            forbid_extra,
             extra_validator,
             strict,
             from_attributes,
@@ -134,15 +140,10 @@ impl Validator for ModelValidator {
             true => Some(Vec::with_capacity(self.fields.len())),
             false => None,
         };
-        let (check_extra, forbid_extra) = match self.extra_behavior {
-            ExtraBehavior::Ignore => (false, false),
-            ExtraBehavior::Allow => (true, false),
-            ExtraBehavior::Forbid => (true, true),
-        };
 
         // we only care about which keys have been used if we're iterating over the object for extra after
         // the first pass
-        let mut used_keys: Option<HashSet<&str>> = match check_extra {
+        let mut used_keys: Option<HashSet<&str>> = match self.check_extra {
             true => Some(HashSet::with_capacity(self.fields.len())),
             false => None,
         };
@@ -206,7 +207,7 @@ impl Validator for ModelValidator {
                     }
                 }
 
-                if check_extra {
+                if self.check_extra {
                     let used_keys = match used_keys {
                         Some(v) => v,
                         None => unreachable!(),
@@ -226,7 +227,7 @@ impl Validator for ModelValidator {
                             continue;
                         }
 
-                        if forbid_extra {
+                        if self.forbid_extra {
                             errors.push(val_line_error!(
                                 input_value = input.as_error_value(),
                                 kind = ErrorKind::ExtraForbidden,
@@ -330,33 +331,23 @@ impl ModelValidator {
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field) {
             prepare_result(field.validator.validate(py, input, extra, slots))
-        } else {
-            match self.extra_behavior {
-                // with allow we either want to set the value
-                ExtraBehavior::Allow => match self.extra_validator {
-                    Some(ref validator) => prepare_result(validator.validate(py, input, extra, slots)),
-                    None => prepare_tuple(input.to_object(py)),
-                },
-                // otherwise we raise an error:
-                // - with forbid this is obvious
-                // - with ignore the model should never be overloaded, so an error is the clearest option
-                _ => {
-                    err_val_error!(
-                        input_value = input.as_error_value(),
-                        reverse_location = vec![field.to_string().into()],
-                        kind = ErrorKind::ExtraForbidden
-                    )
-                }
+        } else if self.check_extra && !self.forbid_extra {
+            // this is the "allow" case of extra_behavior
+            match self.extra_validator {
+                Some(ref validator) => prepare_result(validator.validate(py, input, extra, slots)),
+                None => prepare_tuple(input.to_object(py)),
             }
+        } else {
+            // otherwise we raise an error:
+            // - with forbid this is obvious
+            // - with ignore the model should never be overloaded, so an error is the clearest option
+            err_val_error!(
+                input_value = input.as_error_value(),
+                reverse_location = vec![field.to_string().into()],
+                kind = ErrorKind::ExtraForbidden
+            )
         }
     }
-}
-
-#[derive(Debug, Clone)]
-enum ExtraBehavior {
-    Allow,
-    Ignore,
-    Forbid,
 }
 
 /// Used got getting items from python or JSON objects, in different ways
