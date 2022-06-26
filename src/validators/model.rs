@@ -134,7 +134,18 @@ impl Validator for ModelValidator {
             true => Some(Vec::with_capacity(self.fields.len())),
             false => None,
         };
-        let mut used_keys: HashSet<&str> = HashSet::with_capacity(self.fields.len());
+        let (check_extra, forbid_extra) = match self.extra_behavior {
+            ExtraBehavior::Ignore => (false, false),
+            ExtraBehavior::Allow => (true, false),
+            ExtraBehavior::Forbid => (true, true),
+        };
+
+        // we only care about which keys have been used if we're iterating over the object for extra after
+        // the first pass
+        let mut used_keys: Option<HashSet<&str>> = match check_extra {
+            true => Some(HashSet::with_capacity(self.fields.len())),
+            false => None,
+        };
 
         let extra = Extra {
             data: Some(output_dict),
@@ -158,9 +169,11 @@ impl Validator for ModelValidator {
                         },
                     };
                     if let Some((used_key, value)) = op_key_value {
-                        // key is "used" whether or not validation passes, since we want to skip this key in
-                        // extra logic either way
-                        used_keys.insert(used_key);
+                        if let Some(ref mut used_keys) = used_keys {
+                            // key is "used" whether or not validation passes, since we want to skip this key in
+                            // extra logic either way
+                            used_keys.insert(used_key);
+                        }
                         match field.validator.validate(py, value, &extra, slots) {
                             Ok(value) => {
                                 output_dict
@@ -193,12 +206,11 @@ impl Validator for ModelValidator {
                     }
                 }
 
-                let (check_extra, forbid) = match self.extra_behavior {
-                    ExtraBehavior::Ignore => (false, false),
-                    ExtraBehavior::Allow => (true, false),
-                    ExtraBehavior::Forbid => (true, true),
-                };
                 if check_extra {
+                    let used_keys = match used_keys {
+                        Some(v) => v,
+                        None => unreachable!(),
+                    };
                     for (raw_key, value) in $iter {
                         let either_str = match raw_key.strict_str() {
                             Ok(k) => k,
@@ -213,20 +225,29 @@ impl Validator for ModelValidator {
                         if used_keys.contains(either_str.as_cow().as_ref()) {
                             continue;
                         }
-                        let py_key = either_str.as_py_string(py);
-                        if let Some(ref mut fs) = fields_set_vec {
-                            fs.push(py_key.into_py(py));
-                        }
 
-                        if forbid {
+                        if forbid_extra {
                             errors.push(val_line_error!(
                                 input_value = input.as_error_value(),
                                 kind = ErrorKind::ExtraForbidden,
                                 reverse_location = vec![raw_key.as_loc_item()]
                             ));
-                        } else if let Some(ref validator) = self.extra_validator {
+                            continue;
+                        }
+
+                        let py_key = either_str.as_py_string(py);
+                        if let Some(ref mut fs) = fields_set_vec {
+                            fs.push(py_key.into_py(py));
+                        }
+
+                        if let Some(ref validator) = self.extra_validator {
                             match validator.validate(py, value, &extra, slots) {
-                                Ok(value) => output_dict.set_item(py_key, value).map_err(as_internal)?,
+                                Ok(value) => {
+                                    output_dict.set_item(py_key, value).map_err(as_internal)?;
+                                    if let Some(ref mut fs) = fields_set_vec {
+                                        fs.push(py_key.into_py(py));
+                                    }
+                                },
                                 Err(ValError::LineErrors(line_errors)) => {
                                     for err in line_errors {
                                         errors.push(err.with_outer_location(raw_key.as_loc_item()));
@@ -238,6 +259,9 @@ impl Validator for ModelValidator {
                             output_dict
                                 .set_item(py_key, value.to_object(py))
                                 .map_err(as_internal)?;
+                            if let Some(ref mut fs) = fields_set_vec {
+                                fs.push(py_key.into_py(py));
+                            }
                         }
                     }
                 }

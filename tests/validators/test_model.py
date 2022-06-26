@@ -966,6 +966,19 @@ def test_alias_extra(py_or_json):
     assert v.validate_test({'FieldA': 1}) == {'field_a': 1}
     assert v.validate_test({'foo': [1, 2, 3]}) == {'field_a': 3}
 
+    # used_keys should be populated either though validation fails so "FieldA" is skipped in extra
+    with pytest.raises(ValidationError) as exc_info:
+        assert v.validate_test({'FieldA': '...'}) == {'field_a': 1}
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'int_parsing',
+            'loc': ['field_a'],
+            'message': 'Value must be a valid integer, unable to parse string as an integer',
+            'input_value': '...',
+        }
+    ]
+
 
 def test_alias_extra_from_attributes():
     v = SchemaValidator(
