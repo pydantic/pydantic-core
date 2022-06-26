@@ -1,14 +1,18 @@
+"""
+General benchmarks that attempt to cover all field types, through by no means all uses of all field types.
+"""
+import json
 from datetime import date, datetime, time
 
 import pytest
 
-from pydantic_core import SchemaValidator
+from pydantic_core import SchemaValidator, ValidationError
 
-from .complete_schema import input_data_lax, input_data_strict, pydantic_model, schema
+from .complete_schema import input_data_lax, input_data_strict, input_data_wrong, pydantic_model, schema
 from .test_micro_benchmarks import skip_pydantic
 
 
-def test_complete_core_test():
+def test_complete_valid():
     lax_schema = schema()
     class_type = lax_schema['class_type']
     lax_validator = SchemaValidator(lax_schema)
@@ -32,21 +36,21 @@ def test_complete_core_test():
         'field_time_con': time(12, 0),
         'field_datetime': datetime(2020, 1, 1, 12, 13, 14),
         'field_datetime_con': datetime(2020, 1, 1),
-        'field_list_any': ['a', b'b', True, 1.0, None],
-        'field_list_str': ['a', 'b', 'c'],
-        'field_list_str_con': ['a', 'b', 'c'],
-        'field_set_any': {b'b', True, 'a', None},
-        'field_set_int': {1, 2, 3},
-        'field_set_int_con': {1, 2, 3},
-        'field_frozenset_any': frozenset({b'b', True, 'a', None}),
-        'field_frozenset_bytes': frozenset({b'b', b'a', b'c'}),
-        'field_frozenset_bytes_con': frozenset({b'b', b'a', b'c'}),
+        'field_list_any': ['a', b'b', True, 1.0, None] * 10,
+        'field_list_str': ['a', 'b', 'c'] * 10,
+        'field_list_str_con': ['a', 'b', 'c'] * 10,
+        'field_set_any': {'a', b'b', True, 1.0, None},
+        'field_set_int': set(range(100)),
+        'field_set_int_con': set(range(42)),
+        'field_frozenset_any': frozenset({'a', b'b', True, 1.0, None}),
+        'field_frozenset_bytes': frozenset([f'{i}'.encode() for i in range(100)]),
+        'field_frozenset_bytes_con': frozenset([f'{i}'.encode() for i in range(42)]),
         'field_tuple_var_len_any': ('a', b'b', True, 1.0, None),
-        'field_tuple_var_len_float': (1.0, 2.0, 3.0),
-        'field_tuple_var_len_float_con': (1.0, 2.0, 3.0),
+        'field_tuple_var_len_float': tuple((i + 0.5 for i in range(100))),
+        'field_tuple_var_len_float_con': tuple((i + 0.5 for i in range(42))),
         'field_tuple_fix_len': ('a', 1, 1.0, True),
-        'field_dict_any': {'a': 'b', 1: 1.0},
-        'field_dict_str_float': {'a': 1.0, 'b': 2.0, 'c': 3.0},
+        'field_dict_any': {'a': 'b', 1: True, 1.0: 1.0},
+        'field_dict_str_float': {f'{i}': i + 0.5 for i in range(100)},
         'field_literal_1_int': 1,
         'field_literal_1_str': 'foobar',
         'field_literal_mult_int': 3,
@@ -79,6 +83,25 @@ def test_complete_core_test():
     assert output_pydantic.dict() == output_dict
 
 
+def test_complete_invalid():
+    lax_schema = schema()
+    lax_validator = SchemaValidator(lax_schema)
+    with pytest.raises(ValidationError) as exc_info:
+        lax_validator.validate_python(input_data_wrong())
+    assert len(exc_info.value.errors()) == 636
+
+    model = pydantic_model()
+    if model is None:
+        print('pydantic is not installed, skipping pydantic tests')
+        return
+
+    from pydantic import ValidationError as PydanticValidationError
+
+    with pytest.raises(PydanticValidationError) as exc_info:
+        model.parse_obj(input_data_wrong())
+    assert len(exc_info.value.errors()) == 530
+
+
 @pytest.mark.benchmark(group='complete')
 def test_complete_core_lax(benchmark):
     v = SchemaValidator(schema())
@@ -97,3 +120,63 @@ def test_complete_pyd(benchmark):
     model = pydantic_model()
     assert model is not None
     benchmark(model.parse_obj, input_data_lax())
+
+
+@pytest.mark.benchmark(group='complete-wrong')
+def test_complete_core_error(benchmark):
+    v = SchemaValidator(schema())
+    data = input_data_wrong()
+
+    @benchmark
+    def f():
+        try:
+            v.validate_python(data)
+        except ValueError:
+            pass
+        else:
+            raise RuntimeError('expected ValueError')
+
+
+@skip_pydantic
+@pytest.mark.benchmark(group='complete-wrong')
+def test_complete_pyd_error(benchmark):
+    model = pydantic_model()
+    assert model is not None
+    data = input_data_wrong()
+
+    @benchmark
+    def f():
+        try:
+            model.parse_obj(data)
+        except ValueError:
+            pass
+        else:
+            raise RuntimeError('expected ValueError')
+
+
+def default_json_encoder(obj):
+    if isinstance(obj, bytes):
+        return obj.decode('utf-8')
+    if isinstance(obj, (set, frozenset)):
+        return list(obj)
+    else:
+        raise TypeError(f'Object of type {type(obj)} is not JSON serializable')
+
+
+@pytest.mark.benchmark(group='complete-json')
+def test_complete_core_json(benchmark):
+    v = SchemaValidator(schema())
+    json_data = json.dumps(input_data_lax(), default=default_json_encoder)
+    benchmark(v.validate_json, json_data)
+
+
+@skip_pydantic
+@pytest.mark.benchmark(group='complete-json')
+def test_complete_pyd_json(benchmark):
+    model = pydantic_model()
+    assert model is not None
+    json_data = json.dumps(input_data_lax(), default=default_json_encoder)
+
+    @benchmark
+    def t():
+        model.parse_raw(json_data, content_type='application/json')
