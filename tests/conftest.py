@@ -90,3 +90,12 @@ if sys.platform == 'emscripten':
             return func(*args, **kwargs)
 
         return result
+
+    def pytest_configure(config):
+        config.addinivalue_line('markers', 'benchmark: pytest-benchmark stub, ignored')
+
+    def pytest_addoption(parser):
+        parser.addoption('--benchmark-columns', action='store', default='-', help='pytest-benchmark stub, ignored')
+        parser.addoption('--benchmark-group-by', action='store', default='-', help='pytest-benchmark stub, ignored')
+        parser.addoption('--benchmark-warmup', action='store', default='-', help='pytest-benchmark stub, ignored')
+        parser.addoption('--benchmark-disable', action='store_true', default='-', help='pytest-benchmark stub, ignored')
