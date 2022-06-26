@@ -1,3 +1,6 @@
+"""
+Logic required for running tests with webassembly/emscripten
+"""
 import json
 import os
 from pathlib import Path

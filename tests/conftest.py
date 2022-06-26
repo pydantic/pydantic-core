@@ -83,6 +83,7 @@ def import_execute(request, tmp_work_path: Path):
 
 
 if sys.platform == 'emscripten':
+    # we have to stub pytest-benchmark since it can't currently be used with webassembly/emscripten
 
     @pytest.fixture
     def benchmark():
