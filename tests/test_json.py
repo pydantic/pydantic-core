@@ -34,7 +34,10 @@ def test_float(input_value, output_value):
 
 def test_model():
     v = SchemaValidator(
-        {'type': 'model', 'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}}}
+        {
+            'type': 'typed-dict',
+            'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
+        }
     )
 
     # language=json
@@ -50,7 +53,7 @@ def test_float_no_remainder():
 def test_error_loc():
     v = SchemaValidator(
         {
-            'type': 'model',
+            'type': 'typed-dict',
             'return_fields_set': True,
             'fields': {'field_a': {'schema': {'type': 'list', 'items': {'type': 'int'}}}},
             'extra_validator': {'type': 'int'},

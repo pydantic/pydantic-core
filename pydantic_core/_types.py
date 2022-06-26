@@ -52,12 +52,17 @@ class FloatSchema(TypedDict, total=False):
     default: float
 
 
-# TODO: function could be typed based on mode
 class FunctionSchema(TypedDict):
     type: Literal['function']
-    mode: Literal['before', 'after', 'plain', 'wrap']
+    mode: Literal['before', 'after', 'wrap']
     function: Callable[..., Any]
-    schema: NotRequired[Schema]
+    schema: Schema
+
+
+class FunctionPlainSchema(TypedDict):
+    type: Literal['function']
+    mode: Literal['plain']
+    function: Callable[..., Any]
 
 
 class IntSchema(TypedDict, total=False):
@@ -86,10 +91,10 @@ class LiteralSchema(TypedDict):
 class ModelClassSchema(TypedDict):
     type: Literal['model-class']
     class_type: type
-    model: ModelSchema
+    model: TypedDictSchema
 
 
-class ModelField(TypedDict, total=False):
+class TypedDictField(TypedDict, total=False):
     schema: Required[Schema]
     required: bool
     default: Any
@@ -97,9 +102,9 @@ class ModelField(TypedDict, total=False):
     aliases: List[List[Union[str, int]]]
 
 
-class ModelSchema(TypedDict):
-    type: Literal['model']
-    fields: Dict[str, ModelField]
+class TypedDictSchema(TypedDict):
+    type: Literal['typed-dict']
+    fields: Dict[str, TypedDictField]
     extra_validator: NotRequired[Schema]
     config: NotRequired[ConfigSchema]
     return_fields_set: NotRequired[bool]
@@ -243,10 +248,11 @@ Schema = Union[
     DictSchema,
     FloatSchema,
     FunctionSchema,
+    FunctionPlainSchema,
     IntSchema,
     ListSchema,
     LiteralSchema,
-    ModelSchema,
+    TypedDictSchema,
     ModelClassSchema,
     NoneSchema,
     NullableSchema,

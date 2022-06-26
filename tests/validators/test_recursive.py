@@ -11,7 +11,7 @@ def test_branch_nullable():
             'type': 'recursive-container',
             'name': 'Branch',
             'schema': {
-                'type': 'model',
+                'type': 'typed-dict',
                 'fields': {
                     'name': {'schema': {'type': 'str'}},
                     'sub_branch': {
@@ -42,7 +42,7 @@ def test_nullable_error():
             'type': 'recursive-container',
             'name': 'Branch',
             'schema': {
-                'type': 'model',
+                'type': 'typed-dict',
                 'fields': {
                     'width': {'schema': 'int'},
                     'sub_branch': {
@@ -83,7 +83,7 @@ def test_list():
             'type': 'recursive-container',
             'name': 'BranchList',
             'schema': {
-                'type': 'model',
+                'type': 'typed-dict',
                 'fields': {
                     'width': {'schema': 'int'},
                     'branches': {
@@ -120,7 +120,7 @@ def test_multiple_intertwined():
             'type': 'recursive-container',
             'name': 'Foo',
             'schema': {
-                'type': 'model',
+                'type': 'typed-dict',
                 'fields': {
                     'height': {'schema': 'int'},
                     'bar': {
@@ -128,7 +128,7 @@ def test_multiple_intertwined():
                             'type': 'recursive-container',
                             'name': 'Bar',
                             'schema': {
-                                'type': 'model',
+                                'type': 'typed-dict',
                                 'fields': {
                                     'width': {'schema': 'int'},
                                     'bars': {
@@ -178,7 +178,7 @@ def test_model_class():
                 'type': 'model-class',
                 'class_type': Branch,
                 'model': {
-                    'type': 'model',
+                    'type': 'typed-dict',
                     'return_fields_set': True,
                     'fields': {
                         'width': {'schema': 'int'},
@@ -216,7 +216,7 @@ def test_invalid_schema():
             {
                 'type': 'list',
                 'items': {
-                    'type': 'model',
+                    'type': 'typed-dict',
                     'fields': {
                         'width': {'schema': {'type': 'int'}},
                         'branch': {

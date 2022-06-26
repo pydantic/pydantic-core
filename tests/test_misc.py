@@ -44,7 +44,7 @@ def test_validation_error_multiple():
             'type': 'model-class',
             'class_type': MyModel,
             'model': {
-                'type': 'model',
+                'type': 'typed-dict',
                 'return_fields_set': True,
                 'fields': {'x': {'schema': {'type': 'float'}}, 'y': {'schema': {'type': 'int'}}},
             },

@@ -33,12 +33,12 @@ impl BuildValidator for ModelClassValidator {
         let model_schema_raw: &PyAny = schema.get_as_req("model")?;
         let (validator, model_schema) = build_validator(model_schema_raw, config, build_context)?;
         let model_type: String = model_schema.get_as_req("type")?;
-        if &model_type != "model" {
-            return py_error!("model-class expected a 'model' schema, got '{}'", model_type);
+        if &model_type != "typed-dict" {
+            return py_error!("model-class expected a 'typed-dict' schema, got '{}'", model_type);
         }
         let return_fields_set = model_schema.get_as("return_fields_set")?.unwrap_or(false);
         if !return_fields_set {
-            return py_error!(r#"model-class inner model must have "return_fields_set" set to True"#);
+            return py_error!(r#"model-class inner schema must have "return_fields_set" set to True"#);
         }
 
         Ok(Self {

@@ -13,7 +13,7 @@ def schema(*, strict: bool = False) -> dict:
         'type': 'model-class',
         'class_type': MyModel,
         'model': {
-            'type': 'model',
+            'type': 'typed-dict',
             'config': {'strict': strict},
             'return_fields_set': True,
             'fields': {
@@ -65,7 +65,7 @@ def schema(*, strict: bool = False) -> dict:
                         'choices': [
                             'str',
                             {
-                                'type': 'model',
+                                'type': 'typed-dict',
                                 'fields': {
                                     'field_str': {'schema': 'str'},
                                     'field_int': {'schema': 'int'},
@@ -73,7 +73,7 @@ def schema(*, strict: bool = False) -> dict:
                                 },
                             },
                             {
-                                'type': 'model',
+                                'type': 'typed-dict',
                                 'fields': {
                                     'field_float': {'schema': 'float'},
                                     'field_bytes': {'schema': 'bytes'},
@@ -85,7 +85,7 @@ def schema(*, strict: bool = False) -> dict:
                 },
                 'field_functions_model': {
                     'schema': {
-                        'type': 'model',
+                        'type': 'typed-dict',
                         'fields': {
                             'field_before': {
                                 'schema': {
@@ -120,7 +120,7 @@ def schema(*, strict: bool = False) -> dict:
                         'type': 'recursive-container',
                         'name': 'Branch',
                         'schema': {
-                            'type': 'model',
+                            'type': 'typed-dict',
                             'fields': {
                                 'name': {'schema': 'str'},
                                 'sub_branch': {
