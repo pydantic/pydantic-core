@@ -4,16 +4,15 @@ import pytest
 
 from pydantic_core import SchemaValidator
 
-from .complete_schema import complete_input_data, complete_schema, complete_pydantic_model
+from .complete_schema import input_data_lax, input_data_strict, pydantic_model, schema
 from .test_micro_benchmarks import skip_pydantic
 
 
 def test_complete_core_test():
-    schema = complete_schema()
-    class_type = schema['class_type']
-    v = SchemaValidator(schema)
-    input_data = complete_input_data()
-    output = v.validate_python(input_data)
+    lax_schema = schema()
+    class_type = lax_schema['class_type']
+    lax_validator = SchemaValidator(lax_schema)
+    output = lax_validator.validate_python(input_data_lax())
     assert isinstance(output, class_type)
     assert len(output.__fields_set__) == 39
     output_dict = output.__dict__
@@ -27,12 +26,12 @@ def test_complete_core_test():
         'field_bool': True,
         'field_bytes': b'foobar',
         'field_bytes_con': b'foobar',
-        'field_date': date(2020, 1, 1),
+        'field_date': date(2010, 2, 3),
         'field_date_con': date(2020, 1, 1),
         'field_time': time(12, 0),
         'field_time_con': time(12, 0),
-        'field_datetime': datetime(2020, 1, 1, 0, 0),
-        'field_datetime_con': datetime(2020, 1, 1, 0, 0),
+        'field_datetime': datetime(2020, 1, 1, 12, 13, 14),
+        'field_datetime_con': datetime(2020, 1, 1),
         'field_list_any': ['a', b'b', True, 1.0, None],
         'field_list_str': ['a', 'b', 'c'],
         'field_list_str_con': ['a', 'b', 'c'],
@@ -66,25 +65,35 @@ def test_complete_core_test():
             'sub_branch': {'name': 'bar', 'sub_branch': {'name': 'baz', 'sub_branch': None}},
         },
     }
-    pydantic_model = complete_pydantic_model()
-    if pydantic_model is None:
+
+    strict_validator = SchemaValidator(schema(strict=True))
+    output2 = strict_validator.validate_python(input_data_strict())
+    assert output_dict == output2.__dict__
+
+    model = pydantic_model()
+    if model is None:
+        print('pydantic is not installed, skipping pydantic tests')
         return
 
-    output_pydantic = pydantic_model.parse_obj(input_data)
+    output_pydantic = model.parse_obj(input_data_lax())
     assert output_pydantic.dict() == output_dict
 
 
 @pytest.mark.benchmark(group='complete')
-def test_complete_core(benchmark):
-    v = SchemaValidator(complete_schema())
-    input_data = complete_input_data()
-    benchmark(v.validate_python, input_data)
+def test_complete_core_lax(benchmark):
+    v = SchemaValidator(schema())
+    benchmark(v.validate_python, input_data_lax())
+
+
+@pytest.mark.benchmark(group='complete')
+def test_complete_core_strict(benchmark):
+    v = SchemaValidator(schema(strict=True))
+    benchmark(v.validate_python, input_data_strict())
 
 
 @skip_pydantic
 @pytest.mark.benchmark(group='complete')
 def test_complete_pyd(benchmark):
-    pydantic_model = complete_pydantic_model()
-    assert pydantic_model is not None
-    input_data = complete_input_data()
-    benchmark(pydantic_model.parse_obj, input_data)
+    model = pydantic_model()
+    assert model is not None
+    benchmark(model.parse_obj, input_data_lax())

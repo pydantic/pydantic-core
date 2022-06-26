@@ -102,7 +102,7 @@ class ModelSchema(TypedDict):
     fields: Dict[str, ModelField]
     extra_validator: NotRequired[Schema]
     config: NotRequired[ConfigSchema]
-    return_fields_set: bool
+    return_fields_set: NotRequired[bool]
 
 
 class NoneSchema(TypedDict):

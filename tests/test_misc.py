@@ -42,6 +42,7 @@ def test_validation_error_multiple():
             'class_type': MyModel,
             'model': {
                 'type': 'model',
+                'return_fields_set': True,
                 'fields': {'x': {'schema': {'type': 'float'}}, 'y': {'schema': {'type': 'int'}}},
             },
         }

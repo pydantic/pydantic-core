@@ -1,4 +1,4 @@
-def complete_schema():
+def schema(*, strict: bool = False) -> dict:
     class MyModel:
         # __slots__ is not required, but it avoids __fields_set__ falling into __dict__
         __slots__ = '__dict__', '__fields_set__'
@@ -14,6 +14,7 @@ def complete_schema():
         'class_type': MyModel,
         'model': {
             'type': 'model',
+            'config': {'strict': strict},
             'return_fields_set': True,
             'fields': {
                 'field_str': {'schema': 'str'},
@@ -30,7 +31,9 @@ def complete_schema():
                 'field_time': {'schema': 'time'},
                 'field_time_con': {'schema': {'type': 'time', 'ge': '06:00:00', 'lt': '12:13:14'}},
                 'field_datetime': {'schema': 'datetime'},
-                'field_datetime_con': {'schema': {'type': 'datetime', 'ge': '2000-01-01T06:00:00', 'lt': '2020-01-02T12:13:14'}},
+                'field_datetime_con': {
+                    'schema': {'type': 'datetime', 'ge': '2000-01-01T06:00:00', 'lt': '2020-01-02T12:13:14'}
+                },
                 'field_list_any': {'schema': 'list'},
                 'field_list_str': {'schema': {'type': 'list', 'items': 'str'}},
                 'field_list_str_con': {'schema': {'type': 'list', 'items': 'str', 'min_items': 3, 'max_items': 42}},
@@ -39,10 +42,14 @@ def complete_schema():
                 'field_set_int_con': {'schema': {'type': 'set', 'items': 'int', 'min_items': 3, 'max_items': 42}},
                 'field_frozenset_any': {'schema': 'frozenset'},
                 'field_frozenset_bytes': {'schema': {'type': 'frozenset', 'items': 'bytes'}},
-                'field_frozenset_bytes_con': {'schema': {'type': 'frozenset', 'items': 'bytes', 'min_items': 3, 'max_items': 42}},
+                'field_frozenset_bytes_con': {
+                    'schema': {'type': 'frozenset', 'items': 'bytes', 'min_items': 3, 'max_items': 42}
+                },
                 'field_tuple_var_len_any': {'schema': 'tuple-var-len'},
                 'field_tuple_var_len_float': {'schema': {'type': 'tuple-var-len', 'items': 'float'}},
-                'field_tuple_var_len_float_con': {'schema': {'type': 'tuple-var-len', 'items': 'float', 'min_items': 3, 'max_items': 42}},
+                'field_tuple_var_len_float_con': {
+                    'schema': {'type': 'tuple-var-len', 'items': 'float', 'min_items': 3, 'max_items': 42}
+                },
                 'field_tuple_fix_len': {'schema': {'type': 'tuple-fix-len', 'items': ['str', 'int', 'float', 'bool']}},
                 'field_dict_any': {'schema': 'dict'},
                 'field_dict_str_float': {'schema': {'type': 'dict', 'key': 'str', 'values': 'float'}},
@@ -132,12 +139,12 @@ def complete_schema():
     }
 
 
-def complete_pydantic_model():
-    from typing import Literal, Any, Union
-    from datetime import date, time, datetime
+def pydantic_model():
+    from datetime import date, datetime, time
+    from typing import Any, Literal, Union
 
     try:
-        from pydantic import BaseModel, validator, constr, conint, confloat, conbytes, conlist, conset, confrozenset
+        from pydantic import BaseModel, conbytes, confloat, confrozenset, conint, conlist, conset, constr, validator
     except ImportError:
         return None
 
@@ -175,7 +182,7 @@ def complete_pydantic_model():
 
     class Model(BaseModel):
         field_str: str
-        field_str_con: constr(min_length=3, max_length=5, regex='^[a-z]+$')
+        field_str_con: constr(min_length=3, max_length=5, regex='^[a-z]+$')  # noqa F722
         field_int: int
         field_int_con: conint(gt=1, lt=10, multiple_of=2)
         field_float: float
@@ -217,7 +224,7 @@ def complete_pydantic_model():
     return Model
 
 
-def complete_input_data():
+def input_data_lax():
     return {
         'field_str': 'fo',
         'field_str_con': 'fooba',
@@ -228,11 +235,11 @@ def complete_input_data():
         'field_bool': True,
         'field_bytes': b'foobar',
         'field_bytes_con': b'foobar',
-        'field_date': '2020-01-01',
+        'field_date': '2010-02-03',
         'field_date_con': '2020-01-01',
         'field_time': '12:00:00',
         'field_time_con': '12:00:00',
-        'field_datetime': '2020-01-01T00:00:00',
+        'field_datetime': '2020-01-01T12:13:14',
         'field_datetime_con': '2020-01-01T00:00:00',
         'field_list_any': ['a', b'b', True, 1.0, None],
         'field_list_str': ['a', 'b', 'c'],
@@ -267,3 +274,18 @@ def complete_input_data():
             'sub_branch': {'name': 'bar', 'sub_branch': {'name': 'baz', 'sub_branch': None}},
         },
     }
+
+
+def input_data_strict():
+    from datetime import date, datetime, time
+
+    input_data = input_data_lax()
+    input_data.update(
+        field_date=date(2010, 2, 3),
+        field_date_con=date(2020, 1, 1),
+        field_time=time(12, 0, 0),
+        field_time_con=time(12, 0, 0),
+        field_datetime=datetime(2020, 1, 1, 12, 13, 14),
+        field_datetime_con=datetime(2020, 1, 1),
+    )
+    return input_data

@@ -86,7 +86,7 @@ impl BuildValidator for ModelValidator {
                 dict_key: PyString::intern(py, field_name).into(),
                 validator: match build_validator(schema, config, build_context) {
                     Ok((v, _)) => v,
-                    Err(err) => return py_error!("Field \"{}\":\n{}", field_name, err),
+                    Err(err) => return py_error!("Field \"{}\":\n  {}", field_name, err),
                 },
                 required: match field_info.get_as::<bool>("required")? {
                     Some(required) => {
@@ -188,7 +188,6 @@ impl Validator for ModelValidator {
                 };
                 if check_extra {
                     for (raw_key, value) in $iter {
-                        // TODO use strict_str here if the model is strict
                         let either_str = match raw_key.strict_str() {
                             Ok(k) => k,
                             Err(ValError::LineErrors(line_errors)) => {
@@ -205,6 +204,12 @@ impl Validator for ModelValidator {
                                 continue;
                             }
                             fields_set.add(py_key).map_err(as_internal)?;
+                        } else {
+                            // fields_set has not been populated, so we have to use the output dict to check
+                            // if this key has already been processed
+                            if output_dict.contains(py_key).map_err(as_internal)? {
+                                continue;
+                            }
                         }
 
                         if forbid {
@@ -272,8 +277,12 @@ impl ModelValidator {
 
         let prepare_tuple = |output: PyObject| {
             data.set_item(field, output).map_err(as_internal)?;
-            let fields_set = PySet::new(py, &[field]).map_err(as_internal)?;
-            Ok((data, fields_set).to_object(py))
+            if self.return_fields_set {
+                let fields_set = PySet::new(py, &[field]).map_err(as_internal)?;
+                Ok((data, fields_set).to_object(py))
+            } else {
+                Ok(data.to_object(py))
+            }
         };
 
         let prepare_result = |result: ValResult<'data, PyObject>| match result {
