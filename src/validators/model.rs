@@ -2,6 +2,7 @@ use pyo3::exceptions::{PyAttributeError, PyTypeError};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyList, PySet, PyString};
+use std::collections::HashSet;
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{
@@ -16,7 +17,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 struct ModelField {
     name: String,
     lookup_key: LookupKey,
-    dict_key: Py<PyString>,
+    name_pystring: Py<PyString>,
     required: bool,
     default: Option<PyObject>,
     validator: CombinedValidator,
@@ -83,7 +84,7 @@ impl BuildValidator for ModelValidator {
             fields.push(ModelField {
                 name: field_name.to_string(),
                 lookup_key: LookupKey::from_py(py, field_info, field_name, populate_by_name)?,
-                dict_key: PyString::intern(py, field_name).into(),
+                name_pystring: PyString::intern(py, field_name).into(),
                 validator: match build_validator(schema, config, build_context) {
                     Ok((v, _)) => v,
                     Err(err) => return py_error!("Field \"{}\":\n  {}", field_name, err),
@@ -129,6 +130,7 @@ impl Validator for ModelValidator {
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let fields_set = PySet::empty(py).map_err(as_internal)?;
+        let mut used_keys: HashSet<&str> = HashSet::with_capacity(self.fields.len());
 
         let extra = Extra {
             data: Some(output_dict),
@@ -138,7 +140,7 @@ impl Validator for ModelValidator {
         macro_rules! process {
             ($dict:ident, $get_method:ident, $iter:block) => {{
                 for field in &self.fields {
-                    let op_value = match field.lookup_key.$get_method($dict) {
+                    let op_key_value = match field.lookup_key.$get_method(py, $dict) {
                         Ok(v) => v,
                         Err(err) => {
                             // we're setting every member on ValLineError, so clippy complains if we use val_line_error!
@@ -151,11 +153,17 @@ impl Validator for ModelValidator {
                             continue;
                         },
                     };
-                    if let Some(value) = op_value {
+                    if let Some((used_key, value)) = op_key_value {
+                        used_keys.insert(used_key);
                         match field.validator.validate(py, value, &extra, slots) {
-                            Ok(value) => output_dict
-                                .set_item(&field.dict_key, value)
-                                .map_err(as_internal)?,
+                            Ok(value) => {
+                                output_dict
+                                    .set_item(&field.name_pystring, value)
+                                    .map_err(as_internal)?;
+                                if self.return_fields_set {
+                                    fields_set.add(&field.name_pystring).map_err(as_internal)?;
+                                }
+                            },
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
                                     errors.push(err.with_outer_location(field.name.clone().into()));
@@ -163,12 +171,10 @@ impl Validator for ModelValidator {
                             }
                             Err(err) => return Err(err),
                         }
-                        if self.return_fields_set {
-                            fields_set.add(&field.dict_key).map_err(as_internal)?;
-                        }
                     } else if let Some(ref default) = field.default {
+                        // TODO default needs to be copied here
                         output_dict
-                            .set_item(&field.dict_key, default.as_ref(py))
+                            .set_item(&field.name_pystring, default.as_ref(py))
                             .map_err(as_internal)?;
                     } else if !field.required {
                         continue;
@@ -198,18 +204,13 @@ impl Validator for ModelValidator {
                             }
                             Err(err) => return Err(err),
                         };
+                        let key_cow = either_str.as_cow();
+                        if used_keys.contains(key_cow.as_ref()) {
+                            continue;
+                        }
                         let py_key = either_str.as_py_string(py);
                         if self.return_fields_set {
-                            if fields_set.contains(py_key).map_err(as_internal)? {
-                                continue;
-                            }
                             fields_set.add(py_key).map_err(as_internal)?;
-                        } else {
-                            // fields_set has not been populated, so we have to use the output dict to check
-                            // if this key has already been processed
-                            if output_dict.contains(py_key).map_err(as_internal)? {
-                                continue;
-                            }
                         }
 
                         if forbid {
@@ -333,10 +334,10 @@ enum ExtraBehavior {
 pub enum LookupKey {
     /// simply look up a key in a dict, equivalent to `d.get(key)`
     /// we save both the string and pystring to save creating the pystring for python
-    Simple(String, PyObject),
+    Simple(String, Py<PyString>),
     /// look up a key by either string, equivalent to `d.get(choice1, d.get(choice2))`
     /// these are interpreted as (json_key1, json_key2, py_key1, py_key2)
-    Choice(String, String, PyObject, PyObject),
+    Choice(String, String, Py<PyString>, Py<PyString>),
     /// look up keys buy one or more "paths" a path might be `['foo', 'bar']` to get `d.?foo.?bar`
     /// ints are also supported to index arrays/lists/tuples and dicts with int keys
     /// we reuse Location as the enum is the same, and the meaning is the same
@@ -404,17 +405,31 @@ impl LookupKey {
         }
     }
 
-    fn py_get_item<'data, 's>(&'s self, dict: &'data PyDict) -> PyResult<Option<&'data PyAny>> {
+    fn py_get_item<'data, 's>(
+        &'s self,
+        _py: Python<'s>,
+        dict: &'data PyDict,
+    ) -> PyResult<Option<(&'s str, &'data PyAny)>> {
         match self {
-            LookupKey::Simple(_, py_key) => Ok(dict.get_item(py_key)),
-            LookupKey::Choice(_, _, py_key1, py_key2) => Ok(dict.get_item(py_key1).or_else(|| dict.get_item(py_key2))),
+            LookupKey::Simple(key, py_key) => match dict.get_item(py_key) {
+                Some(value) => Ok(Some((key, value))),
+                None => Ok(None),
+            },
+            LookupKey::Choice(key1, key2, py_key1, py_key2) => match dict.get_item(py_key1) {
+                Some(value) => Ok(Some((key1, value))),
+                None => match dict.get_item(py_key2) {
+                    Some(value) => Ok(Some((key2, value))),
+                    None => Ok(None),
+                },
+            },
             LookupKey::PathChoices(path_choices) => {
                 for path in path_choices {
                     // iterate over the path and plug each value into the py_any from the last step, starting with dict
                     // this could just be a loop but should be somewhat faster with a functional design
                     if let Some(v) = path.iter().try_fold(dict as &PyAny, |d, loc| loc.py_get_item(d)) {
                         // Successfully found an item, return it
-                        return Ok(Some(v));
+                        let key = path.first().unwrap().get_key();
+                        return Ok(Some((key, v)));
                     }
                 }
                 // got to the end of path_choices, without a match, return None
@@ -423,12 +438,22 @@ impl LookupKey {
         }
     }
 
-    fn py_get_attr<'data, 's>(&'s self, obj: &'data PyAny) -> PyResult<Option<&'data PyAny>> {
+    fn py_get_attr<'data, 's>(
+        &'s self,
+        _py: Python<'s>,
+        obj: &'data PyAny,
+    ) -> PyResult<Option<(&'s str, &'data PyAny)>> {
         match self {
-            LookupKey::Simple(_, py_key) => py_get_attrs(obj, &py_key),
-            LookupKey::Choice(_, _, py_key1, py_key2) => match py_get_attrs(obj, &py_key1)? {
-                Some(v) => Ok(Some(v)),
-                None => py_get_attrs(obj, &py_key2),
+            LookupKey::Simple(key, py_key) => match py_get_attrs(obj, &py_key)? {
+                Some(value) => Ok(Some((key, value))),
+                None => Ok(None),
+            },
+            LookupKey::Choice(key1, key2, py_key1, py_key2) => match py_get_attrs(obj, &py_key1)? {
+                Some(value) => Ok(Some((key1, value))),
+                None => match py_get_attrs(obj, &py_key2)? {
+                    Some(value) => Ok(Some((key2, value))),
+                    None => Ok(None),
+                },
             },
             LookupKey::PathChoices(path_choices) => {
                 'outer: for path in path_choices {
@@ -445,7 +470,8 @@ impl LookupKey {
                         }
                     }
                     // Successfully found an item, return it
-                    return Ok(Some(v));
+                    let key = path.first().unwrap().get_key();
+                    return Ok(Some((key, v)));
                 }
                 // got to the end of path_choices, without a match, return None
                 Ok(None)
@@ -453,10 +479,23 @@ impl LookupKey {
         }
     }
 
-    fn json_get<'data, 's>(&'s self, dict: &'data JsonObject) -> PyResult<Option<&'data JsonInput>> {
+    fn json_get<'data, 's>(
+        &'s self,
+        _py: Python<'s>,
+        dict: &'data JsonObject,
+    ) -> PyResult<Option<(&'s str, &'data JsonInput)>> {
         match self {
-            LookupKey::Simple(key, _) => Ok(dict.get(key)),
-            LookupKey::Choice(key1, key2, _, _) => Ok(dict.get(key1).or_else(|| dict.get(key2))),
+            LookupKey::Simple(key, _) => match dict.get(key) {
+                Some(value) => Ok(Some((key, value))),
+                None => Ok(None),
+            },
+            LookupKey::Choice(key1, key2, _, _) => match dict.get(key1) {
+                Some(value) => Ok(Some((key1, value))),
+                None => match dict.get(key2) {
+                    Some(value) => Ok(Some((key2, value))),
+                    None => Ok(None),
+                },
+            },
             LookupKey::PathChoices(path_choices) => {
                 for path in path_choices {
                     let mut path_iter = path.iter();
@@ -473,7 +512,8 @@ impl LookupKey {
                     // from the first step, this could just be a loop but should be somewhat faster with a functional design
                     if let Some(v) = path_iter.try_fold(v, |d, loc| loc.json_get(d)) {
                         // Successfully found an item, return it
-                        return Ok(Some(v));
+                        let key = path.first().unwrap().get_key();
+                        return Ok(Some((key, v)));
                     }
                 }
                 // got to the end of path_choices, without a match, return None
@@ -526,6 +566,13 @@ impl PathItem {
         } else {
             // otherwise, blindly try getitem on v since no better logic is realistic
             py_any.get_item(self).ok()
+        }
+    }
+
+    pub fn get_key(&self) -> &str {
+        match self {
+            Self::S(key, _) => key.as_str(),
+            Self::I(_) => unreachable!(),
         }
     }
 
