@@ -38,7 +38,7 @@ impl BuildValidator for ModelClassValidator {
         }
         let return_fields_set = model_schema.get_as("return_fields_set")?.unwrap_or(false);
         if !return_fields_set {
-            return py_error!(r#"model-class inner model must have "return_fields_set" set to true"#);
+            return py_error!(r#"model-class inner model must have "return_fields_set" set to True"#);
         }
 
         Ok(Self {

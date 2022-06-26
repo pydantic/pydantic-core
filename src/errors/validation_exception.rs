@@ -172,7 +172,7 @@ impl PyLineError {
         }
     }
 
-    pub fn pretty(&self, py: Option<Python>) -> Result<String, fmt::Error> {
+    fn pretty(&self, py: Option<Python>) -> Result<String, fmt::Error> {
         let mut output = String::with_capacity(200);
         if !self.location.is_empty() {
             let loc = self

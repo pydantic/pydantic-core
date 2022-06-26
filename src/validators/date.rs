@@ -171,7 +171,7 @@ fn date_from_datetime<'data>(
 fn convert_pydate(schema: &PyDict, field: &str) -> PyResult<Option<Date>> {
     match schema.get_as::<&PyAny>(field)? {
         Some(obj) => {
-            let prefix = format!(r#"Invalid "{}" constraint"#, field);
+            let prefix = format!(r#"Invalid "{}" constraint for date"#, field);
             let date = obj
                 .lax_date()
                 .map_err(|e| SchemaError::from_val_error(obj.py(), &prefix, e))?;

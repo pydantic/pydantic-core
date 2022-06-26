@@ -128,7 +128,7 @@ impl DateTimeValidator {
 fn py_datetime_as_datetime(schema: &PyDict, field: &str) -> PyResult<Option<DateTime>> {
     match schema.get_as::<&PyAny>(field)? {
         Some(obj) => {
-            let prefix = format!(r#"Invalid "{}" constraint"#, field);
+            let prefix = format!(r#"Invalid "{}" constraint for datetime"#, field);
             let date = obj
                 .lax_datetime()
                 .map_err(|e| SchemaError::from_val_error(obj.py(), &prefix, e))?;

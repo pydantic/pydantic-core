@@ -117,7 +117,7 @@ impl TimeValidator {
 fn convert_pytime(schema: &PyDict, field: &str) -> PyResult<Option<Time>> {
     match schema.get_as::<&PyAny>(field)? {
         Some(obj) => {
-            let prefix = format!(r#"Invalid "{}" constraint"#, field);
+            let prefix = format!(r#"Invalid "{}" constraint for time"#, field);
             let date = obj
                 .lax_time()
                 .map_err(|e| SchemaError::from_val_error(obj.py(), &prefix, e))?;

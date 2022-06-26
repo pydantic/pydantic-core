@@ -1,3 +1,6 @@
+import re
+from pathlib import Path
+
 import pytest
 
 from pydantic_core._pydantic_core import SchemaError, SchemaValidator, ValidationError, __version__
@@ -75,3 +78,10 @@ def test_validation_error_multiple():
         "  Value must be a valid integer, unable to parse string as an integer [kind=int_parsing, input_value='y', "
         'input_type=str]'
     )
+
+
+def test_readme(import_execute):
+    this_dir = Path(__file__).parent
+    readme = (this_dir / '..' / 'README.md').read_text()
+    example_code = re.search(r'\n```py\n(.*?)\n```\n', readme, re.M | re.S).group(1)
+    import_execute(example_code)
