@@ -127,9 +127,13 @@ impl Validator for ModelValidator {
         }
 
         let dict = input.typed_dict(self.from_attributes, !self.strict)?;
+
         let output_dict = PyDict::new(py);
-        let mut errors: Vec<ValLineError> = Vec::new();
-        let mut fields_set_vec: Vec<Py<PyString>> = Vec::with_capacity(self.fields.len());
+        let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
+        let mut fields_set_vec: Option<Vec<Py<PyString>>> = match self.return_fields_set {
+            true => Some(Vec::with_capacity(self.fields.len())),
+            false => None,
+        };
         let mut used_keys: HashSet<&str> = HashSet::with_capacity(self.fields.len());
 
         let extra = Extra {
@@ -155,15 +159,15 @@ impl Validator for ModelValidator {
                     };
                     if let Some((used_key, value)) = op_key_value {
                         // key is "used" whether or not validation passes, since we want to skip this key in
-                        // extra either way
+                        // extra logic either way
                         used_keys.insert(used_key);
                         match field.validator.validate(py, value, &extra, slots) {
                             Ok(value) => {
                                 output_dict
                                     .set_item(&field.name_pystring, value)
                                     .map_err(as_internal)?;
-                                if self.return_fields_set {
-                                    fields_set_vec.push(field.name_pystring.clone_ref(py));
+                                if let Some(ref mut fs) = fields_set_vec {
+                                    fs.push(field.name_pystring.clone_ref(py));
                                 }
                             },
                             Err(ValError::LineErrors(line_errors)) => {
@@ -206,13 +210,12 @@ impl Validator for ModelValidator {
                             }
                             Err(err) => return Err(err),
                         };
-                        let key_cow = either_str.as_cow();
-                        if used_keys.contains(key_cow.as_ref()) {
+                        if used_keys.contains(either_str.as_cow().as_ref()) {
                             continue;
                         }
                         let py_key = either_str.as_py_string(py);
-                        if self.return_fields_set {
-                            fields_set_vec.push(py_key.into_py(py));
+                        if let Some(ref mut fs) = fields_set_vec {
+                            fs.push(py_key.into_py(py));
                         }
 
                         if forbid {
@@ -248,8 +251,8 @@ impl Validator for ModelValidator {
 
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
-        } else if self.return_fields_set {
-            let fields_set = PySet::new(py, &fields_set_vec).map_err(as_internal)?;
+        } else if let Some(fs) = fields_set_vec {
+            let fields_set = PySet::new(py, &fs).map_err(as_internal)?;
             Ok((output_dict, fields_set).to_object(py))
         } else {
             Ok(output_dict.to_object(py))
