@@ -1,7 +1,5 @@
 from datetime import date, datetime, time
 
-import pytest
-
 from pydantic_core import Schema, SchemaError, SchemaValidator
 
 
@@ -92,9 +90,7 @@ def test_schema_typing() -> None:
 
 
 def test_schema_typing_error() -> None:
-    schema: Schema = {'type': 'wrong'}  # type: ignore
-    with pytest.raises(SchemaError, match='Unknown schema type: "wrong"'):
-        SchemaValidator(schema)
+    _: Schema = {'type': 'wrong'}  # type: ignore
 
 
 def test_schema_validator() -> None:
