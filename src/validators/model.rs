@@ -129,7 +129,7 @@ impl Validator for ModelValidator {
         let dict = input.typed_dict(self.from_attributes, !self.strict)?;
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
-        let fields_set = PySet::empty(py).map_err(as_internal)?;
+        let mut fields_set_vec: Vec<Py<PyString>> = Vec::with_capacity(self.fields.len());
         let mut used_keys: HashSet<&str> = HashSet::with_capacity(self.fields.len());
 
         let extra = Extra {
@@ -140,7 +140,7 @@ impl Validator for ModelValidator {
         macro_rules! process {
             ($dict:ident, $get_method:ident, $iter:block) => {{
                 for field in &self.fields {
-                    let op_key_value = match field.lookup_key.$get_method(py, $dict) {
+                    let op_key_value = match field.lookup_key.$get_method($dict) {
                         Ok(v) => v,
                         Err(err) => {
                             // we're setting every member on ValLineError, so clippy complains if we use val_line_error!
@@ -154,6 +154,8 @@ impl Validator for ModelValidator {
                         },
                     };
                     if let Some((used_key, value)) = op_key_value {
+                        // key is "used" whether or not validation passes, since we want to skip this key in
+                        // extra either way
                         used_keys.insert(used_key);
                         match field.validator.validate(py, value, &extra, slots) {
                             Ok(value) => {
@@ -161,7 +163,7 @@ impl Validator for ModelValidator {
                                     .set_item(&field.name_pystring, value)
                                     .map_err(as_internal)?;
                                 if self.return_fields_set {
-                                    fields_set.add(&field.name_pystring).map_err(as_internal)?;
+                                    fields_set_vec.push(field.name_pystring.clone_ref(py));
                                 }
                             },
                             Err(ValError::LineErrors(line_errors)) => {
@@ -210,7 +212,7 @@ impl Validator for ModelValidator {
                         }
                         let py_key = either_str.as_py_string(py);
                         if self.return_fields_set {
-                            fields_set.add(py_key).map_err(as_internal)?;
+                            fields_set_vec.push(py_key.into_py(py));
                         }
 
                         if forbid {
@@ -247,6 +249,7 @@ impl Validator for ModelValidator {
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
         } else if self.return_fields_set {
+            let fields_set = PySet::new(py, &fields_set_vec).map_err(as_internal)?;
             Ok((output_dict, fields_set).to_object(py))
         } else {
             Ok(output_dict.to_object(py))
@@ -405,11 +408,7 @@ impl LookupKey {
         }
     }
 
-    fn py_get_item<'data, 's>(
-        &'s self,
-        _py: Python<'s>,
-        dict: &'data PyDict,
-    ) -> PyResult<Option<(&'s str, &'data PyAny)>> {
+    fn py_get_item<'data, 's>(&'s self, dict: &'data PyDict) -> PyResult<Option<(&'s str, &'data PyAny)>> {
         match self {
             LookupKey::Simple(key, py_key) => match dict.get_item(py_key) {
                 Some(value) => Ok(Some((key, value))),
@@ -438,11 +437,7 @@ impl LookupKey {
         }
     }
 
-    fn py_get_attr<'data, 's>(
-        &'s self,
-        _py: Python<'s>,
-        obj: &'data PyAny,
-    ) -> PyResult<Option<(&'s str, &'data PyAny)>> {
+    fn py_get_attr<'data, 's>(&'s self, obj: &'data PyAny) -> PyResult<Option<(&'s str, &'data PyAny)>> {
         match self {
             LookupKey::Simple(key, py_key) => match py_get_attrs(obj, &py_key)? {
                 Some(value) => Ok(Some((key, value))),
@@ -479,11 +474,7 @@ impl LookupKey {
         }
     }
 
-    fn json_get<'data, 's>(
-        &'s self,
-        _py: Python<'s>,
-        dict: &'data JsonObject,
-    ) -> PyResult<Option<(&'s str, &'data JsonInput)>> {
+    fn json_get<'data, 's>(&'s self, dict: &'data JsonObject) -> PyResult<Option<(&'s str, &'data JsonInput)>> {
         match self {
             LookupKey::Simple(key, _) => match dict.get(key) {
                 Some(value) => Ok(Some((key, value))),
