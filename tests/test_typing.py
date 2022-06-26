@@ -33,15 +33,15 @@ def test_schema_typing() -> None:
     SchemaValidator(schema)
     schema: Schema = {'type': 'bytes'}
     SchemaValidator(schema)
-    schema: Schema = {'type': 'list', 'items': {'type': 'str'}, 'min_items': 3}
+    schema: Schema = {'type': 'list', 'items_schema': {'type': 'str'}, 'min_items': 3}
     SchemaValidator(schema)
-    schema: Schema = {'type': 'set', 'items': {'type': 'str'}, 'max_items': 3}
+    schema: Schema = {'type': 'set', 'items_schema': {'type': 'str'}, 'max_items': 3}
     SchemaValidator(schema)
-    schema: Schema = {'type': 'tuple-var-len', 'items': {'type': 'str'}, 'max_items': 3}
+    schema: Schema = {'type': 'tuple-var-len', 'items_schema': {'type': 'str'}, 'max_items': 3}
     SchemaValidator(schema)
-    schema: Schema = {'type': 'tuple-fix-len', 'items': [{'type': 'str'}, {'type': 'int'}]}
+    schema: Schema = {'type': 'tuple-fix-len', 'items_schema': [{'type': 'str'}, {'type': 'int'}]}
     SchemaValidator(schema)
-    schema: Schema = {'type': 'frozenset', 'items': {'type': 'str'}, 'max_items': 3}
+    schema: Schema = {'type': 'frozenset', 'items_schema': {'type': 'str'}, 'max_items': 3}
     SchemaValidator(schema)
     schema: Schema = {'type': 'dict', 'keys': {'type': 'str'}, 'values': {'type': 'any'}}
     SchemaValidator(schema)

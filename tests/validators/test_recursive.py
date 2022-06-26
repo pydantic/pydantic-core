@@ -87,7 +87,7 @@ def test_list():
                 'fields': {
                     'width': {'schema': 'int'},
                     'branches': {
-                        'schema': {'type': 'list', 'items': {'type': 'recursive-ref', 'name': 'BranchList'}},
+                        'schema': {'type': 'list', 'items_schema': {'type': 'recursive-ref', 'name': 'BranchList'}},
                         'default': None,
                     },
                 },
@@ -132,7 +132,10 @@ def test_multiple_intertwined():
                                 'fields': {
                                     'width': {'schema': 'int'},
                                     'bars': {
-                                        'schema': {'type': 'list', 'items': {'type': 'recursive-ref', 'name': 'Bar'}},
+                                        'schema': {
+                                            'type': 'list',
+                                            'items_schema': {'type': 'recursive-ref', 'name': 'Bar'},
+                                        },
                                         'default': None,
                                     },
                                     'foo': {
@@ -215,7 +218,7 @@ def test_invalid_schema():
         SchemaValidator(
             {
                 'type': 'list',
-                'items': {
+                'items_schema': {
                     'type': 'typed-dict',
                     'fields': {
                         'width': {'schema': {'type': 'int'}},

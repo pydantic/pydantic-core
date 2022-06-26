@@ -77,7 +77,7 @@ class IntSchema(TypedDict, total=False):
 
 class ListSchema(TypedDict, total=False):
     type: Required[Literal['list']]
-    items: Schema  # default: AnySchema
+    items_schema: Schema  # default: AnySchema
     min_items: int
     max_items: int
     strict: bool
@@ -133,7 +133,7 @@ class RecursiveContainerSchema(TypedDict):
 
 class SetSchema(TypedDict, total=False):
     type: Required[Literal['set']]
-    items: Schema
+    items_schema: Schema  # default: AnySchema
     min_items: int
     max_items: int
     strict: bool
@@ -141,7 +141,7 @@ class SetSchema(TypedDict, total=False):
 
 class FrozenSetSchema(TypedDict, total=False):
     type: Required[Literal['frozenset']]
-    items: Schema
+    items_schema: Schema  # default: AnySchema
     min_items: int
     max_items: int
     strict: bool
@@ -202,15 +202,15 @@ class DatetimeSchema(TypedDict, total=False):
     default: datetime
 
 
-class TupleFixLenSchema(TypedDict, total=False):
-    type: Required[Literal['tuple-fix-len']]
-    items: List[Schema]
-    strict: bool
+class TupleFixLenSchema(TypedDict):
+    type: Literal['tuple-fix-len']
+    items_schema: List[Schema]
+    strict: NotRequired[bool]
 
 
 class TupleVarLenSchema(TypedDict, total=False):
     type: Required[Literal['tuple-var-len']]
-    items: Required[Schema]
+    items_schema: Schema  # default: AnySchema
     min_items: int
     max_items: int
     strict: bool

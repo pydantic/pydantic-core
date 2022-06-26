@@ -194,7 +194,10 @@ def test_union_list_bool_int():
     v = SchemaValidator(
         {
             'type': 'union',
-            'choices': [{'type': 'list', 'items': {'type': 'bool'}}, {'type': 'list', 'items': {'type': 'int'}}],
+            'choices': [
+                {'type': 'list', 'items_schema': {'type': 'bool'}},
+                {'type': 'list', 'items_schema': {'type': 'int'}},
+            ],
         }
     )
     assert v.validate_python(['true', True, 'no']) == [True, True, False]

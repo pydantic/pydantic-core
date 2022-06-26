@@ -55,7 +55,7 @@ def test_error_loc():
         {
             'type': 'typed-dict',
             'return_fields_set': True,
-            'fields': {'field_a': {'schema': {'type': 'list', 'items': {'type': 'int'}}}},
+            'fields': {'field_a': {'schema': {'type': 'list', 'items_schema': {'type': 'int'}}}},
             'extra_validator': {'type': 'int'},
             'config': {'extra_behavior': 'allow'},
         }

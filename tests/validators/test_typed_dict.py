@@ -342,7 +342,9 @@ def test_validate_assignment_allow_extra_validate():
 
 
 def test_json_error():
-    v = SchemaValidator({'type': 'typed-dict', 'fields': {'field_a': {'schema': {'type': 'list', 'items': 'int'}}}})
+    v = SchemaValidator(
+        {'type': 'typed-dict', 'fields': {'field_a': {'schema': {'type': 'list', 'items_schema': 'int'}}}}
+    )
     with pytest.raises(ValidationError) as exc_info:
         v.validate_json('{"field_a": [123, "wrong"]}')
 
