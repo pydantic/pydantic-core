@@ -91,7 +91,7 @@ class LiteralSchema(TypedDict):
 class ModelClassSchema(TypedDict):
     type: Literal['model-class']
     class_type: type
-    model: TypedDictSchema
+    schema: TypedDictSchema
 
 
 class TypedDictField(TypedDict, total=False):

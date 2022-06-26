@@ -41,7 +41,7 @@ class TestBenchmarkSimpleModel:
             {
                 'type': 'model-class',
                 'class_type': CoreModel,
-                'model': {
+                'schema': {
                     'type': 'typed-dict',
                     'return_fields_set': True,
                     'fields': {
@@ -142,7 +142,7 @@ def test_small_class_core_model(benchmark):
         {
             'type': 'model-class',
             'class_type': MyCoreModel,
-            'model': {
+            'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
                 'fields': {'name': {'schema': {'type': 'str'}}, 'age': {'schema': {'type': 'int'}}},
@@ -194,7 +194,7 @@ def test_recursive_model_core(recursive_model_data, benchmark):
             'schema': {
                 'type': 'model-class',
                 'class_type': CoreBranch,
-                'model': {
+                'schema': {
                     'type': 'typed-dict',
                     'return_fields_set': True,
                     'fields': {
@@ -463,7 +463,7 @@ def test_many_models_core_model(benchmark):
             'items': {
                 'type': 'model-class',
                 'class_type': MyCoreModel,
-                'model': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'age': {'schema': 'int'}}},
+                'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'age': {'schema': 'int'}}},
             },
         }
     )
@@ -525,7 +525,7 @@ class TestBenchmarkDateTime:
             {
                 'type': 'model-class',
                 'class_type': CoreModel,
-                'model': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'dt': {'schema': 'datetime'}}},
+                'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'dt': {'schema': 'datetime'}}},
             }
         )
 

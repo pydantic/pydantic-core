@@ -180,7 +180,7 @@ def test_model_class():
             'schema': {
                 'type': 'model-class',
                 'class_type': Branch,
-                'model': {
+                'schema': {
                     'type': 'typed-dict',
                     'return_fields_set': True,
                     'fields': {

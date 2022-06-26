@@ -16,7 +16,7 @@ def test_model_class():
         {
             'type': 'model-class',
             'class_type': MyModel,
-            'model': {
+            'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
                 'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
@@ -52,7 +52,7 @@ def test_model_class_setattr():
         {
             'type': 'model-class',
             'class_type': MyModel,
-            'model': {
+            'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
                 'fields': {'field_a': {'schema': {'type': 'str'}}},
@@ -83,7 +83,7 @@ def test_model_class_root_validator():
             'schema': {
                 'type': 'model-class',
                 'class_type': MyModel,
-                'model': {
+                'schema': {
                     'type': 'typed-dict',
                     'return_fields_set': True,
                     'fields': {'field_a': {'schema': {'type': 'str'}}},
@@ -101,7 +101,7 @@ def test_model_class_bad_model():
         pass
 
     with pytest.raises(SchemaError, match=re.escape("model-class expected a 'typed-dict' schema, got 'str'")):
-        SchemaValidator({'type': 'model-class', 'class_type': MyModel, 'model': {'type': 'str'}})
+        SchemaValidator({'type': 'model-class', 'class_type': MyModel, 'schema': {'type': 'str'}})
 
 
 def test_model_class_not_type():
@@ -121,7 +121,7 @@ def test_model_class_instance_direct():
         {
             'type': 'model-class',
             'class_type': MyModel,
-            'model': {
+            'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
                 'fields': {'field_a': {'schema': {'type': 'str'}}},
@@ -158,7 +158,7 @@ def test_model_class_instance_subclass():
         {
             'type': 'model-class',
             'class_type': MyModel,
-            'model': {
+            'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
                 'fields': {'field_a': {'schema': {'type': 'str'}}},
@@ -186,7 +186,7 @@ def test_model_class_strict():
             'type': 'model-class',
             'strict': True,
             'class_type': MyModel,
-            'model': {
+            'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
                 'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
@@ -219,7 +219,7 @@ def test_internal_error():
         {
             'type': 'model-class',
             'class_type': int,
-            'model': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': 'int'}}},
+            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': 'int'}}},
         }
     )
     with pytest.raises(AttributeError, match=re.escape("'int' object has no attribute '__dict__'")):

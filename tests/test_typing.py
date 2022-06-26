@@ -48,7 +48,7 @@ def test_schema_typing() -> None:
     schema: Schema = {
         'type': 'model-class',
         'class_type': Foo,
-        'model': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'bar': {'schema': {'type': 'str'}}}},
+        'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'bar': {'schema': {'type': 'str'}}}},
     }
     SchemaValidator(schema)
     schema: Schema = {
