@@ -34,8 +34,8 @@ class ConfigSchema(TypedDict, total=False):
 
 class DictSchema(TypedDict, total=False):
     type: Required[Literal['dict']]
-    keys: Schema  # default: AnySchema
-    values: Schema  # default: AnySchema
+    keys_schema: Schema  # default: AnySchema
+    values_schema: Schema  # default: AnySchema
     min_items: int
     max_items: int
     strict: bool

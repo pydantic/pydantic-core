@@ -76,12 +76,12 @@ def test_error_loc():
 
 
 def test_dict():
-    v = SchemaValidator({'type': 'dict', 'keys': {'type': 'int'}, 'values': {'type': 'int'}})
+    v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
     assert v.validate_json('{"1": 2, "3": 4}') == {1: 2, 3: 4}
 
 
 def test_dict_any_value():
-    v = SchemaValidator({'type': 'dict', 'keys': {'type': 'str'}})
+    v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'str'}})
     assert v.validate_json('{"1": 1, "2": "a", "3": null}') == {'1': 1, '2': 'a', '3': None}
 
 

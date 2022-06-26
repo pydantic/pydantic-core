@@ -43,7 +43,7 @@ def test_schema_typing() -> None:
     SchemaValidator(schema)
     schema: Schema = {'type': 'frozenset', 'items_schema': {'type': 'str'}, 'max_items': 3}
     SchemaValidator(schema)
-    schema: Schema = {'type': 'dict', 'keys': {'type': 'str'}, 'values': {'type': 'any'}}
+    schema: Schema = {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'any'}}
     SchemaValidator(schema)
     schema: Schema = {
         'type': 'model-class',

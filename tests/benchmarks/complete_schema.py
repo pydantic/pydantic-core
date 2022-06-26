@@ -58,7 +58,7 @@ def schema(*, strict: bool = False) -> dict:
                     'schema': {'type': 'tuple-fix-len', 'items_schema': ['str', 'int', 'float', 'bool']}
                 },
                 'field_dict_any': {'schema': 'dict'},
-                'field_dict_str_float': {'schema': {'type': 'dict', 'key': 'str', 'values': 'float'}},
+                'field_dict_str_float': {'schema': {'type': 'dict', 'keys_schema': 'str', 'values_schema': 'float'}},
                 'field_literal_1_int': {'schema': {'type': 'literal', 'expected': [1]}},
                 'field_literal_1_str': {'schema': {'type': 'literal', 'expected': ['foobar']}},
                 'field_literal_mult_int': {'schema': {'type': 'literal', 'expected': [1, 2, 3]}},
