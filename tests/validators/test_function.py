@@ -213,6 +213,11 @@ def test_function_plain():
     assert v.validate_python('x') == 'xx'
 
 
+def test_plain_schema():
+    with pytest.raises(SchemaError, match='Plain functions should not include a sub-schema'):
+        SchemaValidator({'type': 'function', 'mode': 'plain', 'function': lambda x: x, 'schema': 'str'})
+
+
 def test_validate_assignment():
     def f(input_value, **kwargs):
         input_value['more'] = 'foobar'
