@@ -76,7 +76,6 @@ function setupStreams(FS, TTY){
   var stdin = FS.open('/dev/stdin', 0);
   var stdout = FS.open('/dev/stdout', 1);
   var stderr = FS.open('/dev/stderr', 1);
-  console.log(stdin.fd, stdout.fd, stderr.fd);
 }
 
 
@@ -97,7 +96,7 @@ async function main() {
     await micropip.install(wheelURL);
     const pytest = pyodide.pyimport('pytest');
     FS.chdir("/test_dir");
-    errcode = pytest.main(pyodide.toPy(['/test_dir']));
+    errcode = pytest.main();
   } catch (e) {
     console.error(e);
     process.exit(1);
