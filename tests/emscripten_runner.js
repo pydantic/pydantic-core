@@ -96,6 +96,7 @@ async function main() {
     await micropip.install('dirty-equals');
     await micropip.install(wheelURL);
     const pytest = pyodide.pyimport('pytest');
+    FS.chdir("/test_dir");
     errcode = pytest.main(pyodide.toPy(['/test_dir']));
   } catch (e) {
     console.error(e);
