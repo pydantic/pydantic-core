@@ -4,7 +4,7 @@ use pyo3::types::PyDict;
 use crate::errors::ValResult;
 use crate::input::Input;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
 
 /// This might seem useless, but it's useful in DictValidator to avoid Option<Validator> a lot
 #[derive(Debug, Clone)]
@@ -29,6 +29,7 @@ impl Validator for AnyValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         // Ok(input.clone().into_py(py))
         Ok(input.to_object(py))

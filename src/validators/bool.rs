@@ -5,7 +5,7 @@ use crate::build_tools::is_strict;
 use crate::errors::ValResult;
 use crate::input::Input;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
 
 #[derive(Debug, Clone)]
 pub struct BoolValidator;
@@ -33,6 +33,7 @@ impl Validator for BoolValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool
         // and back again, might be worth profiling?
@@ -45,6 +46,7 @@ impl Validator for BoolValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_bool()?.into_py(py))
     }
@@ -70,6 +72,7 @@ impl Validator for StrictBoolValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_bool()?.into_py(py))
     }

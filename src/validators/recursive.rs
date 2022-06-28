@@ -5,7 +5,7 @@ use crate::build_tools::SchemaDict;
 use crate::errors::ValResult;
 use crate::input::Input;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
 
 #[derive(Debug, Clone)]
 pub struct RecursiveContainerValidator {
@@ -25,9 +25,10 @@ impl Validator for RecursiveContainerValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let validator = unsafe { slots.get_unchecked(self.validator_id) };
-        validator.validate(py, input, extra, slots)
+        validator.validate(py, input, extra, slots, recursion_guard)
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -61,9 +62,10 @@ impl Validator for RecursiveRefValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let validator = unsafe { slots.get_unchecked(self.validator_id) };
-        validator.validate(py, input, extra, slots)
+        validator.validate(py, input, extra, slots, recursion_guard)
     }
 
     fn get_name(&self, _py: Python) -> String {

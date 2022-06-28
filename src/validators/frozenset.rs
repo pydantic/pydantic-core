@@ -7,7 +7,9 @@ use crate::input::{GenericSequence, Input};
 
 use super::any::AnyValidator;
 use super::list::sequence_build_function;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
+use super::{
+    build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, ValResult, Validator,
+};
 
 #[derive(Debug, Clone)]
 pub struct FrozenSetValidator {
@@ -29,12 +31,13 @@ impl Validator for FrozenSetValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let frozenset = match self.strict {
             true => input.strict_frozenset()?,
             false => input.lax_frozenset()?,
         };
-        self._validation_logic(py, input, frozenset, extra, slots)
+        self._validation_logic(py, input, frozenset, extra, slots, recursion_guard)
     }
 
     fn validate_strict<'s, 'data>(
@@ -43,8 +46,9 @@ impl Validator for FrozenSetValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_frozenset()?, extra, slots)
+        self._validation_logic(py, input, input.strict_frozenset()?, extra, slots, recursion_guard)
     }
 
     fn get_name(&self, py: Python) -> String {
@@ -60,6 +64,7 @@ impl FrozenSetValidator {
         list: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let length = list.generic_len();
         if let Some(min_length) = self.min_items {
@@ -81,7 +86,7 @@ impl FrozenSetValidator {
             }
         }
 
-        let output = list.validate_to_vec(py, length, &self.item_validator, extra, slots)?;
+        let output = list.validate_to_vec(py, length, &self.item_validator, extra, slots, recursion_guard)?;
         Ok(PyFrozenSet::new(py, &output).map_err(as_internal)?.into_py(py))
     }
 }

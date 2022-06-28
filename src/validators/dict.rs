@@ -6,7 +6,7 @@ use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValError, Va
 use crate::input::{GenericMapping, Input, JsonObject};
 
 use super::any::AnyValidator;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
@@ -49,12 +49,13 @@ impl Validator for DictValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let dict = match self.strict {
             true => input.strict_dict()?,
             false => input.lax_dict()?,
         };
-        self._validation_logic(py, input, dict, extra, slots)
+        self._validation_logic(py, input, dict, extra, slots, recursion_guard)
     }
 
     fn validate_strict<'s, 'data>(
@@ -63,8 +64,9 @@ impl Validator for DictValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_dict()?, extra, slots)
+        self._validation_logic(py, input, input.strict_dict()?, extra, slots, recursion_guard)
     }
 
     fn get_name(&self, py: Python) -> String {
@@ -86,6 +88,7 @@ macro_rules! build_validate {
             dict: &'data $dict_type,
             extra: &Extra,
             slots: &'data [CombinedValidator],
+            recursion_guard: &'s mut RecursionGuard,
         ) -> ValResult<'data, PyObject> {
             if let Some(min_length) = self.min_items {
                 if dict.len() < min_length {
@@ -112,7 +115,7 @@ macro_rules! build_validate {
             let value_validator = self.value_validator.as_ref();
 
             for (key, value) in dict.iter() {
-                let output_key = match key_validator.validate(py, key, extra, slots) {
+                let output_key = match key_validator.validate(py, key, extra, slots, recursion_guard) {
                     Ok(value) => Some(value),
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {
@@ -125,7 +128,7 @@ macro_rules! build_validate {
                     }
                     Err(err) => return Err(err),
                 };
-                let output_value = match value_validator.validate(py, value, extra, slots) {
+                let output_value = match value_validator.validate(py, value, extra, slots, recursion_guard) {
                     Ok(value) => Some(value),
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {
@@ -160,11 +163,14 @@ impl DictValidator {
         dict: GenericMapping<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         match dict {
-            GenericMapping::PyDict(py_dict) => self.validate_dict(py, input, py_dict, extra, slots),
+            GenericMapping::PyDict(py_dict) => self.validate_dict(py, input, py_dict, extra, slots, recursion_guard),
             GenericMapping::PyGetAttr(_) => unreachable!(),
-            GenericMapping::JsonObject(json_object) => self.validate_json_object(py, input, json_object, extra, slots),
+            GenericMapping::JsonObject(json_object) => {
+                self.validate_json_object(py, input, json_object, extra, slots, recursion_guard)
+            }
         }
     }
 }

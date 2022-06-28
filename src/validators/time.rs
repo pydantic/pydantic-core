@@ -6,7 +6,7 @@ use crate::build_tools::{is_strict, SchemaDict, SchemaError};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValResult};
 use crate::input::{EitherTime, Input};
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
 
 #[derive(Debug, Clone)]
 pub struct TimeValidator {
@@ -58,6 +58,7 @@ impl Validator for TimeValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let time = match self.strict {
             true => input.strict_time()?,
@@ -72,6 +73,7 @@ impl Validator for TimeValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         self.validation_comparison(py, input, input.strict_time()?)
     }

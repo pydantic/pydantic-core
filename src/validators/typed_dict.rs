@@ -12,7 +12,7 @@ use crate::errors::{
 use crate::input::{GenericMapping, Input, JsonInput, JsonObject};
 use crate::SchemaError;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
 
 #[derive(Debug, Clone)]
 struct TypedDictField {
@@ -127,10 +127,11 @@ impl Validator for TypedDictValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(field) = extra.field {
             // we're validating assignment, completely different logic
-            return self.validate_assignment(py, field, input, extra, slots);
+            return self.validate_assignment(py, field, input, extra, slots, recursion_guard);
         }
 
         let dict = input.typed_dict(self.from_attributes, !self.strict)?;
@@ -176,7 +177,7 @@ impl Validator for TypedDictValidator {
                             // extra logic either way
                             used_keys.insert(used_key);
                         }
-                        match field.validator.validate(py, value, &extra, slots) {
+                        match field.validator.validate(py, value, &extra, slots, recursion_guard) {
                             Ok(value) => {
                                 output_dict
                                     .set_item(&field.name_pystring, value)
@@ -243,7 +244,7 @@ impl Validator for TypedDictValidator {
                         }
 
                         if let Some(ref validator) = self.extra_validator {
-                            match validator.validate(py, value, &extra, slots) {
+                            match validator.validate(py, value, &extra, slots, recursion_guard) {
                                 Ok(value) => {
                                     output_dict.set_item(py_key, value).map_err(as_internal)?;
                                     if let Some(ref mut fs) = fields_set_vec {
@@ -298,6 +299,7 @@ impl TypedDictValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject>
     where
         'data: 's,
@@ -331,11 +333,11 @@ impl TypedDictValidator {
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field) {
-            prepare_result(field.validator.validate(py, input, extra, slots))
+            prepare_result(field.validator.validate(py, input, extra, slots, recursion_guard))
         } else if self.check_extra && !self.forbid_extra {
             // this is the "allow" case of extra_behavior
             match self.extra_validator {
-                Some(ref validator) => prepare_result(validator.validate(py, input, extra, slots)),
+                Some(ref validator) => prepare_result(validator.validate(py, input, extra, slots, recursion_guard)),
                 None => prepare_tuple(input.to_object(py)),
             }
         } else {

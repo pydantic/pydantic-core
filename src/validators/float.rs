@@ -5,7 +5,7 @@ use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind, ValResult};
 use crate::input::Input;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
 
 #[derive(Debug, Clone)]
 pub struct FloatValidator;
@@ -40,6 +40,7 @@ impl Validator for FloatValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         Ok(input.lax_float()?.into_py(py))
     }
@@ -50,6 +51,7 @@ impl Validator for FloatValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_float()?.into_py(py))
     }
@@ -75,6 +77,7 @@ impl Validator for StrictFloatValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_float()?.into_py(py))
     }
@@ -101,6 +104,7 @@ impl Validator for ConstrainedFloatValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let float = match self.strict {
             true => input.strict_float()?,
@@ -115,6 +119,7 @@ impl Validator for ConstrainedFloatValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_float()?)
     }

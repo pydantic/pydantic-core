@@ -11,7 +11,7 @@ use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValResult};
 use crate::input::Input;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {
@@ -59,6 +59,7 @@ impl Validator for ModelClassValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let class = self.class.as_ref(py);
         if input.strict_model_check(class)? {
@@ -70,7 +71,7 @@ impl Validator for ModelClassValidator {
                 context = context!("class_name" => self.get_name(py))
             )
         } else {
-            let output = self.validator.validate(py, input, extra, slots)?;
+            let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
             self.create_class(py, output).map_err(as_internal)
         }
     }
@@ -81,6 +82,7 @@ impl Validator for ModelClassValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if input.strict_model_check(self.class.as_ref(py))? {
             Ok(input.to_object(py))
