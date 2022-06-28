@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use enum_dispatch::enum_dispatch;
 
 use pyo3::exceptions::{PyRecursionError, PyTypeError};
+use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyByteArray, PyBytes, PyDict, PyString};
 
@@ -47,6 +48,14 @@ pub struct SchemaValidator {
 impl SchemaValidator {
     #[new]
     pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
+        let self_schema = Self::get_self_schema(py);
+
+        let schema_obj = self_schema
+            .validator
+            .validate(py, schema, &Extra::default(), &self_schema.slots)
+            .map_err(|e| SchemaError::from_val_error(py, "Invalid Schema", e))?;
+        let schema = schema_obj.as_ref(py);
+
         let mut build_context = BuildContext::default();
         let mut validator = match build_validator(schema, None, &mut build_context) {
             Ok((v, _)) => v,
@@ -159,8 +168,36 @@ impl SchemaValidator {
     }
 }
 
+static SCHEMA_DEFINITION: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+
 impl SchemaValidator {
-    pub fn prepare_validation_err(&self, py: Python, error: ValError) -> PyErr {
+    fn get_self_schema(py: Python) -> &Self {
+        SCHEMA_DEFINITION.get_or_init(py, || Self::build_self_schema(py).unwrap())
+    }
+
+    fn build_self_schema(py: Python) -> PyResult<Self> {
+        let code = include_str!("../schema_definition.py");
+        let self_schema: &PyDict = py.eval(code, None, None)?.extract()?;
+
+        let mut build_context = BuildContext::default();
+        let validator = match build_validator(self_schema, None, &mut build_context) {
+            Ok((v, _)) => v,
+            Err(err) => {
+                return Err(match err.is_instance_of::<SchemaError>(py) {
+                    true => err,
+                    false => SchemaError::new_err(format!("Schema build error:\n  {}", err)),
+                });
+            }
+        };
+        Ok(Self {
+            validator,
+            slots: build_context.into_slots()?,
+            schema: py.None(),
+            title: "Self Schema".into_py(py),
+        })
+    }
+
+    fn prepare_validation_err(&self, py: Python, error: ValError) -> PyErr {
         ValidationError::from_val_error(py, self.title.clone_ref(py), error)
     }
 }

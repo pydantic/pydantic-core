@@ -28,3 +28,4 @@ tests/package.json
 tests/package-lock.json
 tests/node_modules
 /.hypothesis/
+/src/schema_definition.py

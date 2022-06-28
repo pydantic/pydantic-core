@@ -228,28 +228,8 @@ class TupleVarLenSchema(TypedDict, total=False):
 
 
 # pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
-# 'int' is equivalent to {'type': 'int'}
-BareType = Literal[
-    'any',
-    'bool',
-    'bytes',
-    'dict',
-    'float',
-    'function',
-    'int',
-    'list',
-    'model',
-    'model-class',
-    'none',
-    'nullable',
-    'recursive-container',
-    'recursive-reference',
-    'set',
-    'str',
-    # tuple-fix-len cannot be created without more typing information
-    'tuple-var-len',
-    'union',
-]
+# 'int' is equivalent to {'type': 'int'}, this only applies to schema types which do not have other required fields
+BareType = Literal['any', 'bool', 'bytes', 'dict', 'float', 'int', 'list', 'none', 'set', 'str', 'tuple-var-len']
 
 Schema = Union[
     BareType,
