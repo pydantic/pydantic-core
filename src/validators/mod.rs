@@ -1,3 +1,4 @@
+use ahash::AHashSet;
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
@@ -74,12 +75,19 @@ impl SchemaValidator {
     }
 
     pub fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
-        let r = self.validator.validate(py, input, &Extra::default(), &self.slots);
+        let mut recursion_guard = RecursionGuard::new();
+        let r = self
+            .validator
+            .validate(py, input, &Extra::default(), &self.slots, &mut recursion_guard);
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
     pub fn isinstance_python(&self, py: Python, input: &PyAny) -> PyResult<bool> {
-        match self.validator.validate(py, input, &Extra::default(), &self.slots) {
+        let mut recursion_guard = RecursionGuard::new();
+        match self
+            .validator
+            .validate(py, input, &Extra::default(), &self.slots, &mut recursion_guard)
+        {
             Ok(_) => Ok(true),
             Err(ValError::InternalErr(err)) => Err(err),
             _ => Ok(false),
@@ -89,7 +97,10 @@ impl SchemaValidator {
     pub fn validate_json(&self, py: Python, input: String) -> PyResult<PyObject> {
         match parse_json::<JsonInput>(&input) {
             Ok(input) => {
-                let r = self.validator.validate(py, &input, &Extra::default(), &self.slots);
+                let mut recursion_guard = RecursionGuard::new();
+                let r = self
+                    .validator
+                    .validate(py, &input, &Extra::default(), &self.slots, &mut recursion_guard);
                 r.map_err(|e| self.prepare_validation_err(py, e))
             }
             Err(e) => {
@@ -106,11 +117,17 @@ impl SchemaValidator {
 
     pub fn isinstance_json(&self, py: Python, input: String) -> PyResult<bool> {
         match parse_json::<JsonInput>(&input) {
-            Ok(input) => match self.validator.validate(py, &input, &Extra::default(), &self.slots) {
-                Ok(_) => Ok(true),
-                Err(ValError::InternalErr(err)) => Err(err),
-                _ => Ok(false),
-            },
+            Ok(input) => {
+                let mut recursion_guard = RecursionGuard::new();
+                match self
+                    .validator
+                    .validate(py, &input, &Extra::default(), &self.slots, &mut recursion_guard)
+                {
+                    Ok(_) => Ok(true),
+                    Err(ValError::InternalErr(err)) => Err(err),
+                    _ => Ok(false),
+                }
+            }
             Err(_) => Ok(false),
         }
     }
@@ -120,7 +137,10 @@ impl SchemaValidator {
             data: Some(data),
             field: Some(field.as_str()),
         };
-        let r = self.validator.validate(py, input, &extra, &self.slots);
+        let mut recursion_guard = RecursionGuard::new();
+        let r = self
+            .validator
+            .validate(py, input, &extra, &self.slots, &mut recursion_guard);
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
@@ -333,6 +353,8 @@ pub enum CombinedValidator {
     FrozenSet(frozenset::FrozenSetValidator),
 }
 
+pub type RecursionGuard = AHashSet<isize>;
+
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
 /// validators defined in `build_validator` also need `EXPECTED_TYPE` as a const, but that can't be part of the trait
 #[enum_dispatch(CombinedValidator)]
@@ -344,6 +366,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject>;
 
     /// This is used in unions for the first pass to see if we have an "exact match",
@@ -354,8 +377,9 @@ pub trait Validator: Send + Sync + Clone + Debug {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self.validate(py, input, extra, slots)
+        self.validate(py, input, extra, slots, recursion_guard)
     }
 
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator

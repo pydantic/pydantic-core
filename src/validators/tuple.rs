@@ -7,7 +7,9 @@ use crate::input::{GenericSequence, Input};
 
 use super::any::AnyValidator;
 use super::list::sequence_build_function;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
+use super::{
+    build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, ValResult, Validator,
+};
 
 #[derive(Debug, Clone)]
 pub struct TupleVarLenValidator {
@@ -29,12 +31,13 @@ impl Validator for TupleVarLenValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let tuple = match self.strict {
             true => input.strict_tuple()?,
             false => input.lax_tuple()?,
         };
-        self._validation_logic(py, input, tuple, extra, slots)
+        self._validation_logic(py, input, tuple, extra, slots, recursion_guard)
     }
 
     fn validate_strict<'s, 'data>(
@@ -43,8 +46,9 @@ impl Validator for TupleVarLenValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_tuple()?, extra, slots)
+        self._validation_logic(py, input, input.strict_tuple()?, extra, slots, recursion_guard)
     }
 
     fn get_name(&self, py: Python) -> String {
@@ -60,6 +64,7 @@ impl TupleVarLenValidator {
         tuple: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let length = tuple.generic_len();
         if let Some(min_length) = self.min_items {
@@ -81,7 +86,7 @@ impl TupleVarLenValidator {
             }
         }
 
-        let output = tuple.validate_to_vec(py, length, &self.item_validator, extra, slots)?;
+        let output = tuple.validate_to_vec(py, length, &self.item_validator, extra, slots, recursion_guard)?;
         Ok(PyTuple::new(py, &output).into_py(py))
     }
 }
@@ -124,12 +129,13 @@ impl Validator for TupleFixLenValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let tuple = match self.strict {
             true => input.strict_tuple()?,
             false => input.lax_tuple()?,
         };
-        self._validation_logic(py, input, tuple, extra, slots)
+        self._validation_logic(py, input, tuple, extra, slots, recursion_guard)
     }
 
     fn validate_strict<'s, 'data>(
@@ -138,8 +144,9 @@ impl Validator for TupleFixLenValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_tuple()?, extra, slots)
+        self._validation_logic(py, input, input.strict_tuple()?, extra, slots, recursion_guard)
     }
 
     fn get_name(&self, py: Python) -> String {
@@ -161,6 +168,7 @@ impl TupleFixLenValidator {
         tuple: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let expected_length = self.items_validators.len();
 
@@ -181,7 +189,7 @@ impl TupleFixLenValidator {
         macro_rules! iter {
             ($sequence:expr) => {
                 for (validator, (index, item)) in self.items_validators.iter().zip($sequence.iter().enumerate()) {
-                    match validator.validate(py, item, extra, slots) {
+                    match validator.validate(py, item, extra, slots, recursion_guard) {
                         Ok(item) => output.push(item),
                         Err(ValError::LineErrors(line_errors)) => {
                             errors.extend(
