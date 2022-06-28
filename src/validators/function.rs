@@ -156,7 +156,7 @@ impl Validator for FunctionPlainValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         _slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func
