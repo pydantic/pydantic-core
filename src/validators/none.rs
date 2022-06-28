@@ -28,7 +28,7 @@ impl Validator for NoneValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),

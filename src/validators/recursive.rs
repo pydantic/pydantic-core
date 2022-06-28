@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::SchemaDict;
-use crate::errors::ValResult;
+use crate::errors::{err_val_error, ErrorKind, ValResult};
 use crate::input::Input;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
@@ -64,6 +64,14 @@ impl Validator for RecursiveRefValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
+        if let Some(id) = input.identity() {
+            eprintln!("---------------");
+            dbg!(&recursion_guard, &input, &id);
+            if recursion_guard.contains(&id) {
+                return err_val_error!(kind = ErrorKind::RecursionLoop, input_value = input.as_error_value(),);
+            }
+            recursion_guard.insert(id);
+        }
         let validator = unsafe { slots.get_unchecked(self.validator_id) };
         validator.validate(py, input, extra, slots, recursion_guard)
     }
