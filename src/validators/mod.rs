@@ -353,7 +353,7 @@ pub enum CombinedValidator {
     FrozenSet(frozenset::FrozenSetValidator),
 }
 
-pub type RecursionGuard = AHashSet<isize>;
+pub type RecursionGuard = AHashSet<usize>;
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
 /// validators defined in `build_validator` also need `EXPECTED_TYPE` as a const, but that can't be part of the trait

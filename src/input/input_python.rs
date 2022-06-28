@@ -36,8 +36,8 @@ impl<'a> Input<'a> for PyAny {
         InputValue::PyAny(self)
     }
 
-    fn identity(&'a self) -> Option<isize> {
-        Some(self.as_ptr() as isize)
+    fn identity(&'a self) -> Option<usize> {
+        Some(self.as_ptr() as usize)
     }
 
     fn is_none(&self) -> bool {
