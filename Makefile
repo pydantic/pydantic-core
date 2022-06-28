@@ -1,12 +1,13 @@
 .DEFAULT_GOAL := all
-isort = isort pydantic_core tests
-black = black pydantic_core tests
+isort = isort pydantic_core tests generate_self_schema.py
+black = black pydantic_core tests generate_self_schema.py
 
 .PHONY: install
 install:
 	pip install -U pip wheel pre-commit
 	pip install -r tests/requirements.txt
 	pip install -r tests/requirements-linting.txt
+	make self-schema
 	pip install -e .
 	pre-commit install
 
@@ -15,8 +16,12 @@ install-rust-coverage:
 	cargo install rustfilt cargo-binutils
 	rustup component add llvm-tools-preview
 
+.PHONY: self-schema
+self-schema:
+	python generate_self_schema.py
+
 .PHONY: build-dev
-build-dev:
+build-dev: self-schema
 	@rm -f pydantic_core/*.so
 	cargo build
 	@rm -f target/debug/lib_pydantic_core.d
@@ -24,7 +29,7 @@ build-dev:
 	@mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: build-prod
-build-prod:
+build-prod: self-schema
 	@rm -f pydantic_core/*.so
 	cargo build --release
 	@rm -f target/release/lib_pydantic_core.d
@@ -32,7 +37,7 @@ build-prod:
 	@mv target/release/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: build-coverage
-build-coverage:
+build-coverage: self-schema
 	pip uninstall -y pydantic_core
 	rm -f pydantic_core/*.so
 	RUSTFLAGS='-C instrument-coverage -A incomplete_features -C link-arg=-undefined -C link-arg=dynamic_lookup' cargo build
@@ -41,7 +46,7 @@ build-coverage:
 	mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: build-cov-windows
-build-cov-windows:
+build-cov-windows: self-schema
 	pip uninstall -y pydantic_core
 	rm -f pydantic_core/*.so
 	RUSTFLAGS='-C instrument-coverage -A incomplete_features' cargo build

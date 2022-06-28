@@ -24,8 +24,8 @@ docs/_build/
 /*.profraw
 /flame/
 /.benchmarks/
-tests/package.json
-tests/package-lock.json
-tests/node_modules
+/tests/package.json
+/tests/package-lock.json
+/tests/node_modules
 /.hypothesis/
-/src/schema_definition.py
+/src/self_schema.py
