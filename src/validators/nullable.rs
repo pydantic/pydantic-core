@@ -36,7 +36,7 @@ impl Validator for NullableValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),
@@ -50,7 +50,7 @@ impl Validator for NullableValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),

@@ -40,7 +40,7 @@ impl Validator for FloatValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
+        _recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         Ok(input.lax_float()?.into_py(py))
     }
@@ -51,7 +51,7 @@ impl Validator for FloatValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
+        _recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_float()?.into_py(py))
     }
@@ -77,7 +77,7 @@ impl Validator for StrictFloatValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
+        _recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         Ok(input.strict_float()?.into_py(py))
     }
@@ -104,7 +104,7 @@ impl Validator for ConstrainedFloatValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
+        _recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let float = match self.strict {
             true => input.strict_float()?,
@@ -119,7 +119,7 @@ impl Validator for ConstrainedFloatValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
+        _recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_float()?)
     }

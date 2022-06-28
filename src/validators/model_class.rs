@@ -59,7 +59,7 @@ impl Validator for ModelClassValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let class = self.class.as_ref(py);
         if input.strict_model_check(class)? {
@@ -82,7 +82,7 @@ impl Validator for ModelClassValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
+        _recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         if input.strict_model_check(self.class.as_ref(py))? {
             Ok(input.to_object(py))

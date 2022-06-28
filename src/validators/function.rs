@@ -71,7 +71,7 @@ impl Validator for FunctionBeforeValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         let value = self
@@ -117,7 +117,7 @@ impl Validator for FunctionAfterValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let v = self.validator.validate(py, input, extra, slots, recursion_guard)?;
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
@@ -156,7 +156,7 @@ impl Validator for FunctionPlainValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
+        _recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
         self.func
@@ -185,14 +185,14 @@ impl Validator for FunctionWrapValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let validator_kwarg = ValidatorCallable {
             validator: self.validator.clone(),
             slots: slots.to_vec(),
             data: extra.data.map(|d| d.into_py(py)),
             field: extra.field.map(|f| f.to_string()),
-            recursion_guard: recursion_guard.clone(),
+            recursion_guard: recursion_guard.as_mut().map(|guard| guard.clone()),
         };
         let kwargs = kwargs!(
             py,
@@ -217,7 +217,7 @@ struct ValidatorCallable {
     slots: Vec<CombinedValidator>,
     data: Option<Py<PyDict>>,
     field: Option<String>,
-    recursion_guard: RecursionGuard,
+    recursion_guard: Option<RecursionGuard>,
 }
 
 #[pymethods]
@@ -227,9 +227,16 @@ impl ValidatorCallable {
             data: self.data.as_ref().map(|data| data.as_ref(py)),
             field: self.field.as_deref(),
         };
-        self.validator
-            .validate(py, arg, &extra, &self.slots, &mut self.recursion_guard)
-            .map_err(|e| ValidationError::from_val_error(py, "Model".to_object(py), e))
+        match &mut self.recursion_guard {
+            Some(guard) => self
+                .validator
+                .validate(py, arg, &extra, &self.slots, &mut Some(guard))
+                .map_err(|e| ValidationError::from_val_error(py, "Model".to_object(py), e)),
+            None => self
+                .validator
+                .validate(py, arg, &extra, &self.slots, &mut None)
+                .map_err(|e| ValidationError::from_val_error(py, "Model".to_object(py), e)),
+        }
     }
 
     fn __repr__(&self) -> String {

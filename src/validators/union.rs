@@ -40,7 +40,7 @@ impl Validator for UnionValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         if self.strict {
             let mut errors: Vec<ValLineError> = Vec::with_capacity(self.choices.len());

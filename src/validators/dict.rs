@@ -49,7 +49,7 @@ impl Validator for DictValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let dict = match self.strict {
             true => input.strict_dict()?,
@@ -64,7 +64,7 @@ impl Validator for DictValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_dict()?, extra, slots, recursion_guard)
     }
@@ -88,7 +88,7 @@ macro_rules! build_validate {
             dict: &'data $dict_type,
             extra: &Extra,
             slots: &'data [CombinedValidator],
-            recursion_guard: &'s mut RecursionGuard,
+            recursion_guard: &'s mut Option<& mut RecursionGuard>,
         ) -> ValResult<'data, PyObject> {
             if let Some(min_length) = self.min_items {
                 if dict.len() < min_length {
@@ -163,7 +163,7 @@ impl DictValidator {
         dict: GenericMapping<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         match dict {
             GenericMapping::PyDict(py_dict) => self.validate_dict(py, input, py_dict, extra, slots, recursion_guard),

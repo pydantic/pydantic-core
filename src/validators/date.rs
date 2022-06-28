@@ -58,7 +58,7 @@ impl Validator for DateValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
+        _recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let date = match self.strict {
             true => input.strict_date()?,
@@ -81,7 +81,7 @@ impl Validator for DateValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
+        _recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         self.validation_comparison(py, input, input.strict_date()?)
     }

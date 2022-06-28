@@ -52,7 +52,7 @@ impl Validator for ListValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let list = match self.strict {
             true => input.strict_list()?,
@@ -67,7 +67,7 @@ impl Validator for ListValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_list()?, extra, slots, recursion_guard)
     }
@@ -85,7 +85,7 @@ impl ListValidator {
         list: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let length = list.generic_len();
         if let Some(min_length) = self.min_items {

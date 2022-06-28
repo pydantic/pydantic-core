@@ -75,18 +75,16 @@ impl SchemaValidator {
     }
 
     pub fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
-        let mut recursion_guard = RecursionGuard::new();
         let r = self
             .validator
-            .validate(py, input, &Extra::default(), &self.slots, &mut recursion_guard);
+            .validate(py, input, &Extra::default(), &self.slots, &mut None);
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
     pub fn isinstance_python(&self, py: Python, input: &PyAny) -> PyResult<bool> {
-        let mut recursion_guard = RecursionGuard::new();
         match self
             .validator
-            .validate(py, input, &Extra::default(), &self.slots, &mut recursion_guard)
+            .validate(py, input, &Extra::default(), &self.slots, &mut None)
         {
             Ok(_) => Ok(true),
             Err(ValError::InternalErr(err)) => Err(err),
@@ -97,10 +95,9 @@ impl SchemaValidator {
     pub fn validate_json(&self, py: Python, input: String) -> PyResult<PyObject> {
         match parse_json::<JsonInput>(&input) {
             Ok(input) => {
-                let mut recursion_guard = RecursionGuard::new();
                 let r = self
                     .validator
-                    .validate(py, &input, &Extra::default(), &self.slots, &mut recursion_guard);
+                    .validate(py, &input, &Extra::default(), &self.slots, &mut None);
                 r.map_err(|e| self.prepare_validation_err(py, e))
             }
             Err(e) => {
@@ -118,10 +115,9 @@ impl SchemaValidator {
     pub fn isinstance_json(&self, py: Python, input: String) -> PyResult<bool> {
         match parse_json::<JsonInput>(&input) {
             Ok(input) => {
-                let mut recursion_guard = RecursionGuard::new();
                 match self
                     .validator
-                    .validate(py, &input, &Extra::default(), &self.slots, &mut recursion_guard)
+                    .validate(py, &input, &Extra::default(), &self.slots, &mut None)
                 {
                     Ok(_) => Ok(true),
                     Err(ValError::InternalErr(err)) => Err(err),
@@ -137,10 +133,7 @@ impl SchemaValidator {
             data: Some(data),
             field: Some(field.as_str()),
         };
-        let mut recursion_guard = RecursionGuard::new();
-        let r = self
-            .validator
-            .validate(py, input, &extra, &self.slots, &mut recursion_guard);
+        let r = self.validator.validate(py, input, &extra, &self.slots, &mut None);
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
@@ -366,7 +359,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject>;
 
     /// This is used in unions for the first pass to see if we have an "exact match",
@@ -377,7 +370,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         self.validate(py, input, extra, slots, recursion_guard)
     }

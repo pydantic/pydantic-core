@@ -1,5 +1,5 @@
 #![cfg_attr(has_no_coverage, feature(no_coverage))]
-#![allow(clippy::borrow_deref_ref)]
+#![allow(clippy::borrow_as_ptr)]
 
 use pyo3::prelude::*;
 

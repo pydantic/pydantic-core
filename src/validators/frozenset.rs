@@ -31,7 +31,7 @@ impl Validator for FrozenSetValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let frozenset = match self.strict {
             true => input.strict_frozenset()?,
@@ -46,7 +46,7 @@ impl Validator for FrozenSetValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_frozenset()?, extra, slots, recursion_guard)
     }
@@ -64,7 +64,7 @@ impl FrozenSetValidator {
         list: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let length = list.generic_len();
         if let Some(min_length) = self.min_items {

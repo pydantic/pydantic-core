@@ -25,7 +25,7 @@ impl Validator for RecursiveContainerValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         validate(self.validator_id, py, input, extra, slots, recursion_guard)
     }
@@ -61,7 +61,7 @@ impl Validator for RecursiveRefValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         validate(self.validator_id, py, input, extra, slots, recursion_guard)
     }
@@ -77,19 +77,24 @@ fn validate<'s, 'data>(
     input: &'data impl Input<'data>,
     extra: &Extra,
     slots: &'data [CombinedValidator],
-    recursion_guard: &'s mut RecursionGuard,
+    recursion_guard: &'s mut Option<&mut RecursionGuard>,
 ) -> ValResult<'data, PyObject> {
+    let new_guard = &mut RecursionGuard::new();
+    let guard = match recursion_guard {
+        Some(guard) => guard,
+        None => new_guard,
+    };
     if let Some(id) = input.identity() {
-        if recursion_guard.contains(&id) {
+        if guard.contains(&id) {
             return err_val_error!(kind = ErrorKind::RecursionLoop, input_value = input.as_error_value());
         }
-        recursion_guard.insert(id);
+        guard.insert(id);
         let validator = unsafe { slots.get_unchecked(validator_id) };
-        let output = validator.validate(py, input, extra, slots, recursion_guard);
-        recursion_guard.remove(&id);
+        let output = validator.validate(py, input, extra, slots, &mut Some(guard));
+        guard.remove(&id);
         output
     } else {
         let validator = unsafe { slots.get_unchecked(validator_id) };
-        validator.validate(py, input, extra, slots, recursion_guard)
+        validator.validate(py, input, extra, slots, &mut Some(guard))
     }
 }

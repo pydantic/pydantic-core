@@ -41,7 +41,7 @@ macro_rules! build_validate_to_vec {
             validator: &'s CombinedValidator,
             extra: &Extra,
             slots: &'a [CombinedValidator],
-            recursion_guard: &'s mut RecursionGuard,
+            recursion_guard: &'s mut Option<&mut RecursionGuard>,
         ) -> ValResult<'a, Vec<PyObject>> {
             let mut output: Vec<PyObject> = Vec::with_capacity(length);
             let mut errors: Vec<ValLineError> = Vec::new();
@@ -91,7 +91,7 @@ impl<'a> GenericSequence<'a> {
         validator: &'s CombinedValidator,
         extra: &Extra,
         slots: &'a [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'a, Vec<PyObject>> {
         match self {
             Self::List(sequence) => {

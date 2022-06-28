@@ -31,7 +31,7 @@ impl Validator for TupleVarLenValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let tuple = match self.strict {
             true => input.strict_tuple()?,
@@ -46,7 +46,7 @@ impl Validator for TupleVarLenValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_tuple()?, extra, slots, recursion_guard)
     }
@@ -64,7 +64,7 @@ impl TupleVarLenValidator {
         tuple: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let length = tuple.generic_len();
         if let Some(min_length) = self.min_items {
@@ -129,7 +129,7 @@ impl Validator for TupleFixLenValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let tuple = match self.strict {
             true => input.strict_tuple()?,
@@ -144,7 +144,7 @@ impl Validator for TupleFixLenValidator {
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         self._validation_logic(py, input, input.strict_tuple()?, extra, slots, recursion_guard)
     }
@@ -168,7 +168,7 @@ impl TupleFixLenValidator {
         tuple: GenericSequence<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'s mut Option<&mut RecursionGuard>,
     ) -> ValResult<'data, PyObject> {
         let expected_length = self.items_validators.len();
 
