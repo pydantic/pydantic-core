@@ -1,6 +1,7 @@
 from typing import Optional
 
 import pytest
+from dirty_equals import IsPartialDict
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
@@ -231,3 +232,37 @@ def test_outside_parent():
         'tuple1': (1, 1, 'frog'),
         'tuple2': (2, 2, 'toad'),
     }
+
+
+def test_recursion():
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'ref': 'Branch',
+            'fields': {
+                'name': {'schema': {'type': 'str'}},
+                'branch': {
+                    'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                    'default': None,
+                },
+            },
+        }
+    )
+    assert v.validate_python({'name': 'root'}) == {'name': 'root', 'branch': None}
+    assert v.validate_python({'name': 'root', 'branch': {'name': 'b1', 'branch': None}}) == {
+        'name': 'root',
+        'branch': {'name': 'b1', 'branch': None},
+    }
+
+    b = {'name': 'recursive'}
+    b['branch'] = b
+    with pytest.raises(ValidationError) as exc_info:
+        assert v.validate_python(b)
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'recursion_loop',
+            'loc': ['branch'],
+            'message': 'Recursion error - cyclic reference detected',
+            'input_value': {'name': 'recursive', 'branch': IsPartialDict(name='recursive')},
+        }
+    ]

@@ -16,7 +16,7 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn as_error_value(&'a self) -> InputValue<'a>;
 
-    fn identity(&'a self) -> Option<isize> {
+    fn identity(&'a self) -> Option<usize> {
         None
     }
 
