@@ -4,8 +4,8 @@ use crate::errors::location::LocItem;
 use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
 
 use super::datetime::{
-    bytes_as_date, bytes_as_datetime, bytes_as_time, float_as_datetime, float_as_time, int_as_datetime, int_as_time,
-    EitherDate, EitherDateTime, EitherTime,
+    bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_time,
+    int_as_datetime, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 use super::{EitherBytes, EitherString, GenericMapping, GenericSequence, Input, JsonInput};
@@ -195,6 +195,13 @@ impl<'a> Input<'a> for JsonInput {
             _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::TupleType),
         }
     }
+
+    fn strict_timedelta(&self) -> ValResult<super::EitherTimedelta> {
+        match self {
+            JsonInput::String(v) => bytes_as_timedelta(self, v.as_bytes()),
+            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::TimedeltaType),
+        }
+    }
 }
 
 /// Required for Dict keys so the string can behave like an Input
@@ -295,5 +302,9 @@ impl<'a> Input<'a> for String {
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::TupleType)
+    }
+
+    fn strict_timedelta(&self) -> ValResult<super::EitherTimedelta> {
+        bytes_as_timedelta(self, self.as_bytes())
     }
 }

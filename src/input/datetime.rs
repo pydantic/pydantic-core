@@ -1,7 +1,7 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDate, PyDateTime, PyDelta, PyTime, PyTzInfo};
-use speedate::{Date, DateTime, Time};
+use speedate::{Date, DateTime, Duration, Time};
 use strum::EnumMessage;
 
 use super::Input;
@@ -66,6 +66,53 @@ impl<'a> From<Time> for EitherTime<'a> {
 impl<'a> From<&'a PyTime> for EitherTime<'a> {
     fn from(time: &'a PyTime) -> Self {
         Self::Py(time)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum EitherTimedelta<'a> {
+    Raw(Duration),
+    Py(&'a PyDelta),
+}
+
+impl<'a> From<Duration> for EitherTimedelta<'a> {
+    fn from(timedelta: Duration) -> Self {
+        Self::Raw(timedelta)
+    }
+}
+
+impl<'a> From<&'a PyDelta> for EitherTimedelta<'a> {
+    fn from(timedelta: &'a PyDelta) -> Self {
+        Self::Py(timedelta)
+    }
+}
+
+impl<'a> EitherTimedelta<'a> {
+    pub fn as_raw(&self) -> PyResult<Duration> {
+        match self {
+            Self::Raw(timedelta) => Ok(timedelta.clone()),
+            Self::Py(py_timedelta) => {
+                let total_seconds = py_timedelta
+                    .getattr(pyo3::intern!(py_timedelta.py(), "total_seconds"))?
+                    .call0()?
+                    .extract()?;
+                Ok(float_as_duration(total_seconds))
+            }
+        }
+    }
+
+    pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
+        let timedelta = match self {
+            Self::Py(timedelta) => Ok(timedelta),
+            Self::Raw(duration) => PyDelta::new(
+                py,
+                0,
+                duration.signed_total_seconds() as i32,
+                duration.signed_microseconds(),
+                true,
+            ),
+        }?;
+        Ok(timedelta.into_py(py))
     }
 }
 
@@ -291,6 +338,30 @@ pub fn float_as_time<'a>(input: &'a impl Input<'a>, timestamp: f64) -> ValResult
     int_as_time(input, timestamp.floor() as i64, microseconds.round() as u32)
 }
 
+pub fn bytes_as_timedelta<'a, 'b>(input: &'a impl Input<'a>, bytes: &'b [u8]) -> ValResult<'a, EitherTimedelta<'a>> {
+    match Duration::parse_bytes(bytes) {
+        Ok(dt) => Ok(dt.into()),
+        Err(err) => {
+            err_val_error!(
+                input_value = input.as_error_value(),
+                kind = ErrorKind::TimedeltaParsing,
+                context = context!("parsing_error" => err.get_documentation().unwrap_or_default())
+            )
+        }
+    }
+}
+pub fn float_as_duration(total_seconds: f64) -> Duration {
+    let positive = total_seconds >= 0_f64;
+    let total_seconds = total_seconds.abs();
+    let microsecond = total_seconds.fract() * 1_000_000.0;
+    let days = total_seconds as u64 / 86400;
+    let seconds = total_seconds as u64 - days * 86400;
+    Duration::new(positive, days, seconds as u32, microsecond.round() as u32)
+}
+
+pub fn float_as_timedelta<'a>(total_seconds: f64) -> ValResult<'a, EitherTimedelta<'a>> {
+    Ok(float_as_duration(total_seconds).into())
+}
 #[pyclass(module = "pydantic_core._pydantic_core", extends = PyTzInfo)]
 #[derive(Debug, Clone)]
 struct TzInfo {

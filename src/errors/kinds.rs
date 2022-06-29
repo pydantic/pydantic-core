@@ -168,6 +168,14 @@ pub enum ErrorKind {
     FrozenSetTooShort,
     #[strum(message = "FrozenSet must have at most {max_length} items")]
     FrozenSetTooLong,
+    // timedelta errors
+    #[strum(serialize = "timedelta_type", message = "Value must be a valid timedelta")]
+    TimedeltaType,
+    #[strum(
+        serialize = "timedelta_parsing",
+        message = "Value must be a valid timedelta, {parsing_error}"
+    )]
+    TimedeltaParsing,
 }
 
 impl Default for ErrorKind {

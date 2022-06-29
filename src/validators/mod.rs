@@ -30,10 +30,10 @@ mod recursive;
 mod set;
 mod string;
 mod time;
+mod timedelta;
 mod tuple;
 mod typed_dict;
 mod union;
-
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {
@@ -252,6 +252,8 @@ pub fn build_validator<'a>(
         datetime::DateTimeValidator,
         // frozensets
         frozenset::FrozenSetValidator,
+        // timedelta
+        timedelta::TimedeltaValidator,
     )
 }
 
@@ -331,6 +333,8 @@ pub enum CombinedValidator {
     Datetime(datetime::DateTimeValidator),
     // frozensets
     FrozenSet(frozenset::FrozenSetValidator),
+    // timedelta
+    Timedelta(timedelta::TimedeltaValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
