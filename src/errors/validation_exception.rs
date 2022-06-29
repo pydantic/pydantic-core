@@ -11,8 +11,9 @@ use strum::EnumMessage;
 use crate::input::repr_string;
 
 use super::kinds::ErrorKind;
-use super::line_error::{Context, ValLineError};
+use super::line_error::ValLineError;
 use super::location::Location;
+use super::msg_context::{context_as_py, render_message, Context};
 use super::ValError;
 
 #[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
@@ -180,7 +181,7 @@ impl PyLineError {
         dict.set_item("message", self.get_message())?;
         dict.set_item("input_value", &self.input_value)?;
         if self.context.is_some() {
-            dict.set_item("context", &self.context)?;
+            dict.set_item("context", context_as_py(&self.context, py)?)?;
         }
         Ok(dict.into_py(py))
     }
@@ -195,7 +196,7 @@ impl PyLineError {
             None => self.kind(),
         };
         if self.context.is_some() {
-            self.context.render(raw)
+            render_message(&self.context, raw)
         } else {
             raw
         }
@@ -215,9 +216,6 @@ impl PyLineError {
 
         write!(output, "  {} [kind={}", self.get_message(), self.kind())?;
 
-        if self.context.is_some() {
-            write!(output, ", context={}", self.context)?;
-        }
         if let Some(py) = py {
             let input_value = self.input_value.as_ref(py);
             let input_str = match repr_string(input_value) {

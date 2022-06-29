@@ -119,8 +119,7 @@ def test_int_strict(py_or_json, input_value, expected):
             {'ge': 0},
             -1,
             Err(
-                'Value must be greater than or equal to 0 '
-                '[kind=greater_than_equal, context={ge: 0}, input_value=-1, input_type=int]'
+                'Value must be greater than or equal to 0 ' '[kind=greater_than_equal, input_value=-1, input_type=int]'
             ),
             id='ge-0',
         ),
@@ -128,7 +127,7 @@ def test_int_strict(py_or_json, input_value, expected):
         pytest.param(
             {'gt': 0},
             0,
-            Err('Value must be greater than 0 [kind=greater_than, context={gt: 0}, input_value=0, input_type=int]'),
+            Err('Value must be greater than 0 [kind=greater_than, input_value=0, input_type=int]'),
             id='gt-0',
         ),
         pytest.param({'le': 0}, 0, 0),
@@ -213,7 +212,7 @@ def test_long_int(py_or_json):
     assert repr(exc_info.value) == (
         '1 validation error for int\n'
         '  Value must be a valid integer, got infinity '
-        '[kind=int_nan, context={nan_value: infinity}, '
+        '[kind=int_nan, '
         "input_value='111111111111111111111111...11111111111111111111111', input_type=str]"
     )
 
