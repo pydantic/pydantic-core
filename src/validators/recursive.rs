@@ -82,7 +82,7 @@ fn validate<'s, 'data>(
 ) -> ValResult<'data, PyObject> {
     if let Some(id) = input.identity() {
         if recursion_guard.contains_or_insert(id) {
-            // remove ID in we use recursion_guard again
+            // remove ID in case we use recursion_guard again
             recursion_guard.remove(&id);
             return err_val_error!(kind = ErrorKind::RecursionLoop, input_value = input.as_error_value());
         }

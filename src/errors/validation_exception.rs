@@ -68,7 +68,7 @@ impl<'a> From<ValidationError> for ValError<'a> {
             .line_errors
             .into_iter()
             .map(|e| e.into())
-            .collect::<Vec<ValLineError>>()
+            .collect::<Vec<_>>()
             .into()
     }
 }
@@ -157,7 +157,7 @@ impl<'a> IntoPy<PyLineError> for ValLineError<'a> {
     }
 }
 
-/// opposite of above, used extract line errors from a validation error for wrap functions
+/// opposite of above, used to extract line errors from a validation error for wrap functions
 impl<'a> From<PyLineError> for ValLineError<'a> {
     fn from(py_line_error: PyLineError) -> Self {
         Self {
