@@ -64,6 +64,7 @@ pub fn reverse_location(location: Location) -> Location {
 }
 
 pub fn new_location(item: LocItem) -> Location {
+    // 3 is plucked out of the air, should it just be 1?
     let mut loc = Vec::with_capacity(3);
     loc.push(item);
     Some(loc)

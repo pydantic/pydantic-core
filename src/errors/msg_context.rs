@@ -31,23 +31,9 @@ pub fn context_as_py(context: &Context, py: Python) -> PyResult<PyObject> {
             }
             Ok(dict.into_py(py))
         }
-        None => Ok(py.None().into_py(py)),
+        None => unreachable!(),
     }
 }
-
-// fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//     match self.0 {
-//         Some(ref ctx) => {
-//             let loc = ctx
-//                 .iter()
-//                 .map(|(k, v)| format!("{}: {}", k, v))
-//                 .collect::<Vec<_>>()
-//                 .join(", ");
-//             write!(f, "{{{}}}", loc)
-//         }
-//         None => write!(f, "{{}}"),
-//     }
-// }
 
 // maybe this is overkill and we should just use fmt::Display an convert to string when creating Context?
 #[derive(Debug, Clone)]
