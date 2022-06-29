@@ -76,3 +76,11 @@ class BranchModel(TypedDict):
 @given(strategies.from_type(BranchModel))
 def test_recursive_hyp(recursive_schema, data):
     assert recursive_schema.validate_python(data) == data
+
+
+@pytest.mark.skip(reason='recursion not yet detected, see #134, python/pytest currently crash with Segmentation fault')
+def test_recursive_broken(recursive_schema):
+    data = {'name': 'x'}
+    data['sub_branch'] = data
+    with pytest.raises(ValidationError):
+        recursive_schema.validate_python(data)
