@@ -1,9 +1,10 @@
 import os
 from datetime import datetime, timezone
-from typing import Optional, TypedDict
+from typing import Optional
 
 import pytest
 from hypothesis import given, settings, strategies
+from typing_extensions import TypedDict
 
 from pydantic_core import SchemaValidator, ValidationError
 
