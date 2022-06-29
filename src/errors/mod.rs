@@ -35,7 +35,7 @@ pub fn val_line_error_loc<'d>(
         kind,
         input_value: input.as_error_value(),
         context,
-        reverse_location: vec![loc.into()],
+        reverse_location: Some(vec![loc.into()]),
     }
 }
 

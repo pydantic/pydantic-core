@@ -55,7 +55,10 @@ impl<'a> ValLineError<'a> {
     /// location is stored reversed so it's quicker to add "outer" items as that's what we always do
     /// hence `push` here instead of `insert`
     pub fn with_outer_location(mut self, loc_item: LocItem) -> Self {
-        self.reverse_location.push(loc_item);
+        match self.reverse_location {
+            Some(ref mut rev_loc) => rev_loc.push(loc_item),
+            None => self.reverse_location = Some(vec![loc_item]),
+        };
         self
     }
 

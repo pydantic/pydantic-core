@@ -51,4 +51,14 @@ impl ToPyObject for LocItem {
 /// Error locations are represented by a vector of `LocItem`s.
 /// e.g. if the error occurred in the third member of a list called `foo`,
 /// the location would be `["foo", 2]`.
-pub type Location = Vec<LocItem>;
+pub type Location = Option<Vec<LocItem>>;
+
+pub fn reverse_location(location: Location) -> Location {
+    match location {
+        Some(loc) => match loc.len() {
+            0..=1 => Some(loc),
+            _ => Some(loc.into_iter().rev().collect()),
+        },
+        None => None,
+    }
+}
