@@ -8,7 +8,8 @@ from hypothesis import given, settings, strategies
 from pydantic_core import SchemaValidator, ValidationError
 
 settings_dict = {}
-if hyp_max_examples := os.getenv('HYPOTHESIS_MAX_EXAMPLES'):
+hyp_max_examples = os.getenv('HYPOTHESIS_MAX_EXAMPLES')
+if hyp_max_examples:
     settings_dict['max_examples'] = int(hyp_max_examples)
     print(f'hypothesis settings: {settings_dict}')
 
