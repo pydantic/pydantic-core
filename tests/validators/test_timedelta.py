@@ -31,7 +31,7 @@ from ..conftest import Err
         pytest.param(Decimal('3601.1234562'), timedelta(hours=1, seconds=1, microseconds=123456), id='decimal-7dig-up'),
         pytest.param(
             Decimal('3601.1234568'), timedelta(hours=1, seconds=1, microseconds=123457), id='decimal-7dig-down'
-        )
+        ),
         pytest.param(-3601, timedelta(hours=-2, seconds=3599), id='negative-int'),
         pytest.param(
             Decimal('-3601.222222'), timedelta(hours=-2, seconds=3598, microseconds=777778), id='negative-decimal'
