@@ -66,11 +66,11 @@ impl Validator for ModelClassValidator {
         if input.strict_model_check(class)? {
             Ok(input.to_object(py))
         } else if self.strict {
-            err_val_error!(
-                input_value = input.as_error_value(),
-                kind = ErrorKind::ModelClassType,
-                context = context!("class_name" => self.get_name(py))
-            )
+            Err(err_val_error(
+                ErrorKind::ModelClassType,
+                input,
+                context!("class_name" => self.get_name(py)),
+            ))
         } else {
             let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
             self.create_class(py, output).map_err(as_internal)

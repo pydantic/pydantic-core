@@ -111,35 +111,44 @@ impl<'a> ToPyObject for InputValue<'a> {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Context(Vec<(String, ContextValue)>);
+pub struct Context(Option<Vec<(String, ContextValue)>>);
 
 impl Context {
     pub fn new<I: IntoIterator<Item = (String, ContextValue)>>(raw: I) -> Self {
-        Self(raw.into_iter().collect())
+        Self(Some(raw.into_iter().collect()))
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+    pub fn is_some(&self) -> bool {
+        self.0.is_some()
     }
 
     pub fn render(&self, template: String) -> String {
-        let mut rendered = template;
-        for (key, value) in &self.0 {
-            rendered = rendered.replace(&format!("{{{}}}", key), &value.to_string());
+        match self.0 {
+            Some(ref ctx) => {
+                let mut rendered = template;
+                for (key, value) in ctx {
+                    rendered = rendered.replace(&format!("{{{}}}", key), &value.to_string());
+                }
+                rendered
+            }
+            None => template,
         }
-        rendered
     }
 }
 
 impl fmt::Display for Context {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let loc = self
-            .0
-            .iter()
-            .map(|(k, v)| format!("{}: {}", k, v))
-            .collect::<Vec<String>>()
-            .join(", ");
-        write!(f, "{{{}}}", loc)
+        match self.0 {
+            Some(ref ctx) => {
+                let loc = ctx
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "{{{}}}", loc)
+            }
+            None => write!(f, "{{}}"),
+        }
     }
 }
 
@@ -203,10 +212,15 @@ impl ToPyObject for ContextValue {
 
 impl ToPyObject for Context {
     fn to_object(&self, py: Python) -> PyObject {
-        let dict = PyDict::new(py);
-        for (key, value) in &self.0 {
-            dict.set_item(key, value).unwrap();
+        match self.0 {
+            Some(ref ctx) => {
+                let dict = PyDict::new(py);
+                for (key, value) in ctx {
+                    dict.set_item(key, value).unwrap();
+                }
+                dict.into_py(py)
+            }
+            None => PyDict::new(py).into(),
         }
-        dict.into_py(py)
     }
 }

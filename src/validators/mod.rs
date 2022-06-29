@@ -112,10 +112,10 @@ impl SchemaValidator {
                 r.map_err(|e| self.prepare_validation_err(py, e))
             }
             Err(e) => {
-                let line_err = val_line_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::InvalidJson,
-                    context = context!("parser_error" => e.to_string())
+                let line_err = val_line_error(
+                    ErrorKind::InvalidJson,
+                    &input,
+                    context!("parser_error" => e.to_string()),
                 );
                 let err = ValError::LineErrors(vec![line_err]);
                 Err(self.prepare_validation_err(py, err))

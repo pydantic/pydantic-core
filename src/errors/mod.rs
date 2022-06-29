@@ -5,39 +5,60 @@ mod line_error;
 pub mod location;
 mod validation_exception;
 
+use crate::input::Input;
+
+use self::location::{LocItem, Location};
+
 pub use self::kinds::ErrorKind;
 pub use self::line_error::{as_internal, pretty_line_errors, Context, InputValue, ValError, ValLineError, ValResult};
 pub use self::validation_exception::ValidationError;
 
 /// Utility for concisely creating a `ValLineError`
-/// can either take just `py` and a `value` (the given value) in which case kind `ErrorKind::ValueError` is used as kind
-/// e.g. `val_line_error!(py, "the value provided")`
-/// or, `py`, `value` and a mapping of other attributes for `ValLineError`
-/// e.g. `val_line_error!(py, "the value provided", kind=ErrorKind::ExtraForbidden, message="the message")`
-macro_rules! val_line_error {
-    ($($key:ident = $val:expr),+ $(,)?) => {
-        crate::errors::ValLineError {
-            $(
-                $key: $val,
-            )+
-            ..Default::default()
-        }
-    };
+pub fn val_line_error<'d>(kind: ErrorKind, input: &'d impl Input<'d>, context: Option<Context>) -> ValLineError<'d> {
+    ValLineError {
+        kind,
+        input_value: input.as_error_value(),
+        context: match context {
+            Some(context) => context,
+            None => Context::default(),
+        },
+        reverse_location: Location::default(),
+    }
 }
-pub(crate) use val_line_error;
 
-/// Utility for concisely creating a `Err(ValError::LineErrors([?]))` containing a single `ValLineError`
-/// Usage matches `val_line_error`
-macro_rules! err_val_error {
-    ($($key:ident = $val:expr),+ $(,)?) => {
-        Err(crate::errors::ValError::LineErrors(vec![crate::errors::val_line_error!($($key = $val),+)]))
-    };
+pub fn val_line_error_loc<'d>(
+    kind: ErrorKind,
+    input: &'d impl Input<'d>,
+    context: Option<Context>,
+    loc: impl Into<LocItem>,
+) -> ValLineError<'d> {
+    ValLineError {
+        kind,
+        input_value: input.as_error_value(),
+        context: match context {
+            Some(context) => context,
+            None => Context::default(),
+        },
+        reverse_location: vec![loc.into()],
+    }
 }
-pub(crate) use err_val_error;
+
+pub fn err_val_error<'d>(kind: ErrorKind, input: &'d impl Input<'d>, context: Option<Context>) -> ValError<'d> {
+    ValError::LineErrors(vec![val_line_error(kind, input, context)])
+}
+
+pub fn err_val_error_loc<'d>(
+    kind: ErrorKind,
+    input: &'d impl Input<'d>,
+    context: Option<Context>,
+    loc: impl Into<LocItem>,
+) -> ValError<'d> {
+    ValError::LineErrors(vec![val_line_error_loc(kind, input, context, loc)])
+}
 
 macro_rules! context {
     ($($k:expr => $v:expr),* $(,)?) => {{
-        crate::errors::Context::new([$(($k.into(), $v.into()),)*])
+        Some(crate::errors::Context::new([$(($k.into(), $v.into()),)*]))
     }};
 }
 pub(crate) use context;

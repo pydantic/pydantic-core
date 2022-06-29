@@ -146,47 +146,31 @@ impl ConstrainedIntValidator {
     fn _validation_logic<'a>(&self, py: Python<'a>, input: &'a impl Input<'a>, int: i64) -> ValResult<'a, PyObject> {
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::IntMultiple,
-                    context = context!("multiple_of" => multiple_of)
-                );
+                return Err(err_val_error(
+                    ErrorKind::IntMultiple,
+                    input,
+                    context!("multiple_of" => multiple_of),
+                ));
             }
         }
         if let Some(le) = self.le {
             if int > le {
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::LessThanEqual,
-                    context = context!("le" => le)
-                );
+                return Err(err_val_error(ErrorKind::LessThanEqual, input, context!("le" => le)));
             }
         }
         if let Some(lt) = self.lt {
             if int >= lt {
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::LessThan,
-                    context = context!("lt" => lt)
-                );
+                return Err(err_val_error(ErrorKind::LessThan, input, context!("lt" => lt)));
             }
         }
         if let Some(ge) = self.ge {
             if int < ge {
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::GreaterThanEqual,
-                    context = context!("ge" => ge)
-                );
+                return Err(err_val_error(ErrorKind::GreaterThanEqual, input, context!("ge" => ge)));
             }
         }
         if let Some(gt) = self.gt {
             if int <= gt {
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::GreaterThan,
-                    context = context!("gt" => gt)
-                );
+                return Err(err_val_error(ErrorKind::GreaterThan, input, context!("gt" => gt)));
             }
         }
         Ok(int.into_py(py))

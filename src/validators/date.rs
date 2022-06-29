@@ -106,11 +106,7 @@ impl DateValidator {
                 ($constraint:ident, $error:path, $key:literal) => {
                     if let Some(constraint) = &constraints.$constraint {
                         if !raw_date.$constraint(constraint) {
-                            return err_val_error!(
-                                input_value = input.as_error_value(),
-                                kind = $error,
-                                context = context!($key => constraint.to_string())
-                            );
+                            return Err(err_val_error($error, input, context!($key => constraint.to_string())));
                         }
                     }
                 };
@@ -164,10 +160,7 @@ fn date_from_datetime<'data>(
     if dt.time == zero_time && dt.offset.is_none() {
         Ok(EitherDate::Raw(dt.date))
     } else {
-        err_val_error!(
-            input_value = input.as_error_value(),
-            kind = ErrorKind::DateFromDatetimeInexact
-        )
+        Err(err_val_error(ErrorKind::DateFromDatetimeInexact, input, None))
     }
 }
 

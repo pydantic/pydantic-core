@@ -84,7 +84,7 @@ fn validate<'s, 'data>(
         if recursion_guard.contains_or_insert(id) {
             // remove ID in case we use recursion_guard again
             recursion_guard.remove(&id);
-            return err_val_error!(kind = ErrorKind::RecursionLoop, input_value = input.as_error_value());
+            return Err(err_val_error(ErrorKind::RecursionLoop, input, None));
         }
         let validator = unsafe { slots.get_unchecked(validator_id) };
         let output = validator.validate(py, input, extra, slots, recursion_guard);

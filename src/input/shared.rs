@@ -21,7 +21,7 @@ pub fn str_as_bool<'a>(input: &'a impl Input<'a>, str: &str) -> ValResult<'a, bo
     {
         Ok(true)
     } else {
-        err_val_error!(input_value = input.as_error_value(), kind = ErrorKind::BoolParsing)
+        Err(err_val_error(ErrorKind::BoolParsing, input, None))
     }
 }
 
@@ -32,7 +32,7 @@ pub fn int_as_bool<'a>(input: &'a impl Input<'a>, int: i64) -> ValResult<'a, boo
     } else if int == 1 {
         Ok(true)
     } else {
-        err_val_error!(input_value = input.as_error_value(), kind = ErrorKind::BoolParsing)
+        Err(err_val_error(ErrorKind::BoolParsing, input, None))
     }
 }
 
@@ -43,31 +43,27 @@ pub fn str_as_int<'s, 'l>(input: &'s impl Input<'s>, str: &'l str) -> ValResult<
     } else if let Ok(f) = str.parse::<f64>() {
         float_as_int(input, f)
     } else {
-        err_val_error!(input_value = input.as_error_value(), kind = ErrorKind::IntParsing)
+        Err(err_val_error(ErrorKind::IntParsing, input, None))
     }
 }
 
 pub fn float_as_int<'a>(input: &'a impl Input<'a>, float: f64) -> ValResult<'a, i64> {
     if float == f64::INFINITY {
-        err_val_error!(
-            input_value = input.as_error_value(),
-            kind = ErrorKind::IntNan,
-            context = context!("nan_value" => "infinity")
-        )
+        Err(err_val_error(
+            ErrorKind::IntNan,
+            input,
+            context!("nan_value" => "infinity"),
+        ))
     } else if float == f64::NEG_INFINITY {
-        err_val_error!(
-            input_value = input.as_error_value(),
-            kind = ErrorKind::IntNan,
-            context = context!("nan_value" => "negative infinity")
-        )
+        Err(err_val_error(
+            ErrorKind::IntNan,
+            input,
+            context!("nan_value" => "negative infinity"),
+        ))
     } else if float.is_nan() {
-        err_val_error!(
-            input_value = input.as_error_value(),
-            kind = ErrorKind::IntNan,
-            context = context!("nan_value" => "NaN")
-        )
+        Err(err_val_error(ErrorKind::IntNan, input, context!("nan_value" => "NaN")))
     } else if float % 1.0 != 0.0 {
-        err_val_error!(input_value = input.as_error_value(), kind = ErrorKind::IntFromFloat)
+        Err(err_val_error(ErrorKind::IntFromFloat, input, None))
     } else {
         Ok(float as i64)
     }

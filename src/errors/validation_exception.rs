@@ -179,7 +179,7 @@ impl PyLineError {
         dict.set_item("loc", self.location.to_object(py))?;
         dict.set_item("message", self.get_message())?;
         dict.set_item("input_value", &self.input_value)?;
-        if !self.context.is_empty() {
+        if self.context.is_some() {
             dict.set_item("context", &self.context)?;
         }
         Ok(dict.into_py(py))
@@ -194,10 +194,10 @@ impl PyLineError {
             Some(message) => message.to_string(),
             None => self.kind(),
         };
-        if self.context.is_empty() {
-            raw
-        } else {
+        if self.context.is_some() {
             self.context.render(raw)
+        } else {
+            raw
         }
     }
 
@@ -215,7 +215,7 @@ impl PyLineError {
 
         write!(output, "  {} [kind={}", self.get_message(), self.kind())?;
 
-        if !self.context.is_empty() {
+        if self.context.is_some() {
             write!(output, ", context={}", self.context)?;
         }
         if let Some(py) = py {

@@ -98,22 +98,18 @@ impl DateTimeValidator {
                 Ok(dt) => dt,
                 Err(err) => {
                     let error_name = err.get_type(py).name().map_err(as_internal)?;
-                    return err_val_error!(
-                        input_value = input.as_error_value(),
-                        kind = ErrorKind::DateTimeObjectInvalid,
-                        context = context!("processing_error" => error_name)
-                    );
+                    return Err(err_val_error(
+                        ErrorKind::DateTimeObjectInvalid,
+                        input,
+                        context!("processing_error" => error_name),
+                    ));
                 }
             };
             macro_rules! check_constraint {
                 ($constraint:ident, $error:path, $key:literal) => {
                     if let Some(constraint) = &constraints.$constraint {
                         if !speedate_dt.$constraint(constraint) {
-                            return err_val_error!(
-                                input_value = input.as_error_value(),
-                                kind = $error,
-                                context = context!($key => constraint.to_string())
-                            );
+                            return Err(err_val_error($error, input, context!($key => constraint.to_string())));
                         }
                     }
                 };

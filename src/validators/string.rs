@@ -182,29 +182,29 @@ impl StrConstrainedValidator {
         if let Some(min_length) = self.min_length {
             if str.len() < min_length {
                 // return py_error!("{} is shorter than {}", str, min_length);
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::StrTooShort,
-                    context = context!("min_length" => min_length)
-                );
+                return Err(err_val_error(
+                    ErrorKind::StrTooShort,
+                    input,
+                    context!("min_length" => min_length),
+                ));
             }
         }
         if let Some(max_length) = self.max_length {
             if str.len() > max_length {
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::StrTooLong,
-                    context = context!("max_length" => max_length)
-                );
+                return Err(err_val_error(
+                    ErrorKind::StrTooLong,
+                    input,
+                    context!("max_length" => max_length),
+                ));
             }
         }
         if let Some(pattern) = &self.pattern {
             if !pattern.is_match(str) {
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::StrPatternMismatch,
-                    context = context!("pattern" => pattern.to_string())
-                );
+                return Err(err_val_error(
+                    ErrorKind::StrPatternMismatch,
+                    input,
+                    context!("pattern" => pattern.to_string()),
+                ));
             }
         }
 

@@ -70,11 +70,11 @@ impl Validator for LiteralSingleStringValidator {
         if either_str.as_cow().as_ref() == self.expected.as_str() {
             Ok(input.to_object(py))
         } else {
-            err_val_error!(
-                input_value = input.as_error_value(),
-                kind = ErrorKind::LiteralSingleError,
-                context = context!("expected" => self.repr.clone()),
-            )
+            Err(err_val_error(
+                ErrorKind::LiteralSingleError,
+                input,
+                context!("expected" => self.repr.clone()),
+            ))
         }
     }
 
@@ -107,11 +107,11 @@ impl Validator for LiteralSingleIntValidator {
         if str == self.expected {
             Ok(input.to_object(py))
         } else {
-            err_val_error!(
-                input_value = input.as_error_value(),
-                kind = ErrorKind::LiteralSingleError,
-                context = context!("expected" => self.expected)
-            )
+            Err(err_val_error(
+                ErrorKind::LiteralSingleError,
+                input,
+                context!("expected" => self.expected),
+            ))
         }
     }
 
@@ -159,11 +159,11 @@ impl Validator for LiteralMultipleStringsValidator {
         if self.expected.contains(either_str.as_cow().as_ref()) {
             Ok(input.to_object(py))
         } else {
-            err_val_error!(
-                input_value = input.as_error_value(),
-                kind = ErrorKind::LiteralMultipleError,
-                context = context!("expected" => self.repr.clone()),
-            )
+            Err(err_val_error(
+                ErrorKind::LiteralMultipleError,
+                input,
+                context!("expected" => self.repr.clone()),
+            ))
         }
     }
 
@@ -211,11 +211,11 @@ impl Validator for LiteralMultipleIntsValidator {
         if self.expected.contains(&int) {
             Ok(input.to_object(py))
         } else {
-            err_val_error!(
-                input_value = input.as_error_value(),
-                kind = ErrorKind::LiteralMultipleError,
-                context = context!("expected" => self.repr.clone())
-            )
+            Err(err_val_error(
+                ErrorKind::LiteralMultipleError,
+                input,
+                context!("expected" => self.repr.clone()),
+            ))
         }
     }
 
@@ -289,11 +289,11 @@ impl Validator for LiteralGeneralValidator {
             return Ok(py_value);
         }
 
-        err_val_error!(
-            input_value = input.as_error_value(),
-            kind = ErrorKind::LiteralMultipleError,
-            context = context!("expected" => self.repr.clone())
-        )
+        Err(err_val_error(
+            ErrorKind::LiteralMultipleError,
+            input,
+            context!("expected" => self.repr.clone()),
+        ))
     }
 
     fn get_name(&self, _py: Python) -> String {

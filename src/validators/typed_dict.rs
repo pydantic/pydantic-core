@@ -7,7 +7,8 @@ use ahash::AHashSet;
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{
-    as_internal, context, err_val_error, py_err_string, val_line_error, ErrorKind, ValError, ValLineError, ValResult,
+    as_internal, context, err_val_error_loc, py_err_string, val_line_error_loc, ErrorKind, ValError, ValLineError,
+    ValResult,
 };
 use crate::input::{GenericMapping, Input, JsonInput, JsonObject};
 use crate::recursion_guard::RecursionGuard;
@@ -162,13 +163,12 @@ impl Validator for TypedDictValidator {
                     let op_key_value = match field.lookup_key.$get_method($dict) {
                         Ok(v) => v,
                         Err(err) => {
-                            // we're setting every member on ValLineError, so clippy complains if we use val_line_error!
-                            errors.push(ValLineError {
-                                input_value: input.as_error_value(),
-                                kind: ErrorKind::GetAttributeError,
-                                reverse_location: vec![field.name.clone().into()],
-                                context: context!("error" => py_err_string(py, err)),
-                            });
+                            errors.push(val_line_error_loc(
+                                ErrorKind::GetAttributeError,
+                                input,
+                                context!("error" => py_err_string(py, err)),
+                                field.name.clone(),
+                            ));
                             continue;
                         },
                     };
@@ -202,10 +202,11 @@ impl Validator for TypedDictValidator {
                     } else if !field.required {
                         continue;
                     } else {
-                        errors.push(val_line_error!(
-                            input_value = input.as_error_value(),
-                            kind = ErrorKind::Missing,
-                            reverse_location = vec![field.name.clone().into()]
+                        errors.push(val_line_error_loc(
+                            ErrorKind::Missing,
+                            input,
+                            None,
+                            field.name.clone(),
                         ));
                     }
                 }
@@ -231,10 +232,11 @@ impl Validator for TypedDictValidator {
                         }
 
                         if self.forbid_extra {
-                            errors.push(val_line_error!(
-                                input_value = input.as_error_value(),
-                                kind = ErrorKind::ExtraForbidden,
-                                reverse_location = vec![raw_key.as_loc_item()]
+                            errors.push(val_line_error_loc(
+                                ErrorKind::ExtraForbidden,
+                                input,
+                                None,
+                                raw_key.as_loc_item(),
                             ));
                             continue;
                         }
@@ -345,11 +347,12 @@ impl TypedDictValidator {
             // otherwise we raise an error:
             // - with forbid this is obvious
             // - with ignore the model should never be overloaded, so an error is the clearest option
-            err_val_error!(
-                input_value = input.as_error_value(),
-                reverse_location = vec![field.to_string().into()],
-                kind = ErrorKind::ExtraForbidden
-            )
+            Err(err_val_error_loc(
+                ErrorKind::ExtraForbidden,
+                input,
+                None,
+                field.to_string(),
+            ))
         }
     }
 }

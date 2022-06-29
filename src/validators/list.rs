@@ -89,20 +89,20 @@ impl ListValidator {
         let length = list.generic_len();
         if let Some(min_length) = self.min_items {
             if length < min_length {
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::TooShort,
-                    context = context!("type" => "List", "min_length" => min_length)
-                );
+                return Err(err_val_error(
+                    ErrorKind::TooShort,
+                    input,
+                    context!("type" => "List", "min_length" => min_length),
+                ));
             }
         }
         if let Some(max_length) = self.max_items {
             if length > max_length {
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::TooLong,
-                    context = context!("type" => "List", "max_length" => max_length)
-                );
+                return Err(err_val_error(
+                    ErrorKind::TooLong,
+                    input,
+                    context!("type" => "List", "max_length" => max_length),
+                ));
             }
         }
 

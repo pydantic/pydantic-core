@@ -68,20 +68,20 @@ impl TupleVarLenValidator {
         let length = tuple.generic_len();
         if let Some(min_length) = self.min_items {
             if length < min_length {
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::TooShort,
-                    context = context!("type" => "Tuple", "min_length" => min_length)
-                );
+                return Err(err_val_error(
+                    ErrorKind::TooShort,
+                    input,
+                    context!("type" => "Tuple", "min_length" => min_length),
+                ));
             }
         }
         if let Some(max_length) = self.max_items {
             if length > max_length {
-                return err_val_error!(
-                    input_value = input.as_error_value(),
-                    kind = ErrorKind::TooLong,
-                    context = context!("type" => "Tuple", "max_length" => max_length)
-                );
+                return Err(err_val_error(
+                    ErrorKind::TooLong,
+                    input,
+                    context!("type" => "Tuple", "max_length" => max_length),
+                ));
             }
         }
 
@@ -173,15 +173,14 @@ impl TupleFixLenValidator {
 
         if expected_length != tuple.generic_len() {
             let plural = if expected_length == 1 { "" } else { "s" };
-            return err_val_error!(
-                input_value = input.as_error_value(),
-                kind = ErrorKind::TupleLengthMismatch,
-                // TODO fix Context::new so context! accepts different value types
-                context = context!(
+            return Err(err_val_error(
+                ErrorKind::TupleLengthMismatch,
+                input,
+                context!(
                     "expected_length" => expected_length,
                     "plural" => plural.to_string(),
-                )
-            );
+                ),
+            ));
         }
         let mut output: Vec<PyObject> = Vec::with_capacity(expected_length);
         let mut errors: Vec<ValLineError> = Vec::new();

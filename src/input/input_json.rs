@@ -32,7 +32,7 @@ impl<'a> Input<'a> for JsonInput {
     fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
         match self {
             JsonInput::String(s) => Ok(s.as_str().into()),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::StrType),
+            _ => Err(err_val_error(ErrorKind::StrType, self, None)),
         }
     }
 
@@ -41,14 +41,14 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::String(s) => Ok(s.as_str().into()),
             JsonInput::Int(int) => Ok(int.to_string().into()),
             JsonInput::Float(float) => Ok(float.to_string().into()),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::StrType),
+            _ => Err(err_val_error(ErrorKind::StrType, self, None)),
         }
     }
 
     fn strict_bool(&self) -> ValResult<bool> {
         match self {
             JsonInput::Bool(b) => Ok(*b),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::BoolType),
+            _ => Err(err_val_error(ErrorKind::BoolType, self, None)),
         }
     }
 
@@ -58,14 +58,14 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::String(s) => str_as_bool(self, s),
             JsonInput::Int(int) => int_as_bool(self, *int),
             // TODO float??
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::BoolType),
+            _ => Err(err_val_error(ErrorKind::BoolType, self, None)),
         }
     }
 
     fn strict_int(&self) -> ValResult<i64> {
         match self {
             JsonInput::Int(i) => Ok(*i),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::IntType),
+            _ => Err(err_val_error(ErrorKind::IntType, self, None)),
         }
     }
 
@@ -78,7 +78,7 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::Int(i) => Ok(*i),
             JsonInput::Float(f) => float_as_int(self, *f),
             JsonInput::String(str) => str_as_int(self, str),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::IntType),
+            _ => Err(err_val_error(ErrorKind::IntType, self, None)),
         }
     }
 
@@ -86,7 +86,7 @@ impl<'a> Input<'a> for JsonInput {
         match self {
             JsonInput::Float(f) => Ok(*f),
             JsonInput::Int(i) => Ok(*i as f64),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::FloatType),
+            _ => Err(err_val_error(ErrorKind::FloatType, self, None)),
         }
     }
 
@@ -100,9 +100,9 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::Int(i) => Ok(*i as f64),
             JsonInput::String(str) => match str.parse() {
                 Ok(i) => Ok(i),
-                Err(_) => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::FloatParsing),
+                Err(_) => Err(err_val_error(ErrorKind::FloatParsing, self, None)),
             },
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::FloatType),
+            _ => Err(err_val_error(ErrorKind::FloatType, self, None)),
         }
     }
 
@@ -113,14 +113,14 @@ impl<'a> Input<'a> for JsonInput {
     fn strict_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
         match self {
             JsonInput::Object(dict) => Ok(dict.into()),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::DictType),
+            _ => Err(err_val_error(ErrorKind::DictType, self, None)),
         }
     }
 
     fn strict_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         match self {
             JsonInput::Array(a) => Ok(a.into()),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::ListType),
+            _ => Err(err_val_error(ErrorKind::ListType, self, None)),
         }
     }
 
@@ -128,35 +128,35 @@ impl<'a> Input<'a> for JsonInput {
         // we allow a list here since otherwise it would be impossible to create a set from JSON
         match self {
             JsonInput::Array(a) => Ok(a.into()),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::SetType),
+            _ => Err(err_val_error(ErrorKind::SetType, self, None)),
         }
     }
 
     fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         match self {
             JsonInput::Array(a) => Ok(a.into()),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::FrozenSetType),
+            _ => Err(err_val_error(ErrorKind::FrozenSetType, self, None)),
         }
     }
 
     fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
         match self {
             JsonInput::String(s) => Ok(s.as_bytes().into()),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::BytesType),
+            _ => Err(err_val_error(ErrorKind::BytesType, self, None)),
         }
     }
 
     fn strict_date(&self) -> ValResult<EitherDate> {
         match self {
             JsonInput::String(v) => bytes_as_date(self, v.as_bytes()),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::DateType),
+            _ => Err(err_val_error(ErrorKind::DateType, self, None)),
         }
     }
 
     fn strict_time(&self) -> ValResult<EitherTime> {
         match self {
             JsonInput::String(v) => bytes_as_time(self, v.as_bytes()),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::TimeType),
+            _ => Err(err_val_error(ErrorKind::TimeType, self, None)),
         }
     }
 
@@ -168,14 +168,14 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::String(v) => bytes_as_time(self, v.as_bytes()),
             JsonInput::Int(v) => int_as_time(self, *v, 0),
             JsonInput::Float(v) => float_as_time(self, *v),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::TimeType),
+            _ => Err(err_val_error(ErrorKind::TimeType, self, None)),
         }
     }
 
     fn strict_datetime(&self) -> ValResult<EitherDateTime> {
         match self {
             JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes()),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::DateTimeType),
+            _ => Err(err_val_error(ErrorKind::DateTimeType, self, None)),
         }
     }
 
@@ -184,7 +184,7 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes()),
             JsonInput::Int(v) => int_as_datetime(self, *v, 0),
             JsonInput::Float(v) => float_as_datetime(self, *v),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::DateTimeType),
+            _ => Err(err_val_error(ErrorKind::DateTimeType, self, None)),
         }
     }
 
@@ -192,7 +192,7 @@ impl<'a> Input<'a> for JsonInput {
         // just as in set's case, List has to be allowed
         match self {
             JsonInput::Array(a) => Ok(a.into()),
-            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::TupleType),
+            _ => Err(err_val_error(ErrorKind::TupleType, self, None)),
         }
     }
 }
@@ -218,7 +218,7 @@ impl<'a> Input<'a> for String {
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_bool(&self) -> ValResult<bool> {
-        err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::BoolType)
+        Err(err_val_error(ErrorKind::BoolType, self, None))
     }
 
     fn lax_bool(&self) -> ValResult<bool> {
@@ -227,27 +227,27 @@ impl<'a> Input<'a> for String {
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_int(&self) -> ValResult<i64> {
-        err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::IntType)
+        Err(err_val_error(ErrorKind::IntType, self, None))
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_int(&self) -> ValResult<i64> {
         match self.parse() {
             Ok(i) => Ok(i),
-            Err(_) => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::IntParsing),
+            Err(_) => Err(err_val_error(ErrorKind::IntParsing, self, None)),
         }
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_float(&self) -> ValResult<f64> {
-        err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::FloatType)
+        Err(err_val_error(ErrorKind::FloatType, self, None))
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_float(&self) -> ValResult<f64> {
         match self.parse() {
             Ok(i) => Ok(i),
-            Err(_) => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::FloatParsing),
+            Err(_) => Err(err_val_error(ErrorKind::FloatParsing, self, None)),
         }
     }
 
@@ -258,22 +258,22 @@ impl<'a> Input<'a> for String {
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
-        err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::DictType)
+        Err(err_val_error(ErrorKind::DictType, self, None))
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::ListType)
+        Err(err_val_error(ErrorKind::ListType, self, None))
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::SetType)
+        Err(err_val_error(ErrorKind::SetType, self, None))
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::FrozenSetType)
+        Err(err_val_error(ErrorKind::FrozenSetType, self, None))
     }
 
     fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
@@ -294,6 +294,6 @@ impl<'a> Input<'a> for String {
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::TupleType)
+        Err(err_val_error(ErrorKind::TupleType, self, None))
     }
 }
