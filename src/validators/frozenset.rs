@@ -4,12 +4,11 @@ use pyo3::types::{PyDict, PyFrozenSet};
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind};
 use crate::input::{GenericSequence, Input};
+use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
 use super::list::sequence_build_function;
-use super::{
-    build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, ValResult, Validator,
-};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct FrozenSetValidator {

@@ -4,11 +4,10 @@ use pyo3::types::PyDict;
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{context, err_val_error, ErrorKind};
 use crate::input::{GenericSequence, Input};
+use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
-use super::{
-    build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, ValResult, Validator,
-};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ListValidator {

@@ -4,7 +4,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTuple};
 
 use crate::errors::{ValError, ValLineError, ValResult};
-use crate::validators::{CombinedValidator, Extra, RecursionGuard, Validator};
+use crate::recursion_guard::RecursionGuard;
+use crate::validators::{CombinedValidator, Extra, Validator};
 
 use super::parse_json::{JsonArray, JsonObject};
 

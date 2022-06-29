@@ -361,3 +361,25 @@ def test_multiple_tuple_recursion(multiple_tuple_schema):
             'input_value': [1, IsList(length=2)],
         },
     ]
+
+
+def test_multiple_tuple_recursion_once(multiple_tuple_schema):
+    data = [1]
+    data.append(data)
+    with pytest.raises(ValidationError) as exc_info:
+        multiple_tuple_schema.validate_python({'f1': data, 'f2': data})
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'recursion_loop',
+            'loc': ['f1', 1],
+            'message': 'Recursion error - cyclic reference detected',
+            'input_value': [1, IsList(length=2)],
+        },
+        {
+            'kind': 'recursion_loop',
+            'loc': ['f2', 1],
+            'message': 'Recursion error - cyclic reference detected',
+            'input_value': [1, IsList(length=2)],
+        },
+    ]

@@ -5,8 +5,9 @@ use pyo3::types::{PyAny, PyDict};
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{context, val_line_error, ErrorKind, ValError, ValResult, ValidationError};
 use crate::input::Input;
+use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug)]
 pub struct FunctionBuilder;

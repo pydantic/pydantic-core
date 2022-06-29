@@ -3,8 +3,9 @@ use pyo3::types::PyDict;
 
 use crate::errors::{err_val_error, ErrorKind, ValResult};
 use crate::input::Input;
+use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct NoneValidator;

@@ -4,9 +4,10 @@ use pyo3::types::PyDict;
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValLineError, ValResult};
 use crate::input::{GenericMapping, Input, JsonObject};
+use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {

@@ -4,8 +4,9 @@ use pyo3::types::PyDict;
 use crate::build_tools::is_strict;
 use crate::errors::ValResult;
 use crate::input::Input;
+use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct BoolValidator;

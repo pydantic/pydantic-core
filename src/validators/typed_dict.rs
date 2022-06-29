@@ -10,9 +10,10 @@ use crate::errors::{
     as_internal, context, err_val_error, py_err_string, val_line_error, ErrorKind, ValError, ValLineError, ValResult,
 };
 use crate::input::{GenericMapping, Input, JsonInput, JsonObject};
+use crate::recursion_guard::RecursionGuard;
 use crate::SchemaError;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 struct TypedDictField {

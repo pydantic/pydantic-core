@@ -3,10 +3,9 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::SchemaDict;
 use crate::input::Input;
+use crate::recursion_guard::RecursionGuard;
 
-use super::{
-    build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, ValResult, Validator,
-};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct NullableValidator {

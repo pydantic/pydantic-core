@@ -1,9 +1,6 @@
-use std::collections::HashSet;
 use std::fmt::Debug;
-use std::hash::BuildHasherDefault;
 
 use enum_dispatch::enum_dispatch;
-use nohash_hasher::NoHashHasher;
 
 use pyo3::exceptions::PyRecursionError;
 use pyo3::prelude::*;
@@ -13,6 +10,7 @@ use serde_json::from_str as parse_json;
 use crate::build_tools::{py_error, SchemaDict, SchemaError};
 use crate::errors::{context, val_line_error, ErrorKind, ValError, ValResult, ValidationError};
 use crate::input::{Input, JsonInput};
+use crate::recursion_guard::RecursionGuard;
 
 mod any;
 mod bool;
@@ -362,41 +360,6 @@ pub enum CombinedValidator {
     Datetime(datetime::DateTimeValidator),
     // frozensets
     FrozenSet(frozenset::FrozenSetValidator),
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct RecursionGuard(Option<HashSet<usize, BuildHasherDefault<NoHashHasher<usize>>>>);
-
-impl RecursionGuard {
-    pub fn insert(&mut self, id: usize) {
-        match self.0 {
-            Some(ref mut set) => {
-                set.insert(id);
-            }
-            None => {
-                let mut set: HashSet<usize, BuildHasherDefault<NoHashHasher<usize>>> =
-                    HashSet::with_capacity_and_hasher(10, BuildHasherDefault::default());
-                set.insert(id);
-                self.0 = Some(set);
-            }
-        };
-    }
-
-    pub fn remove(&mut self, id: &usize) {
-        match self.0 {
-            Some(ref mut set) => {
-                set.remove(id);
-            }
-            None => unreachable!(),
-        };
-    }
-
-    pub fn contains(&self, id: &usize) -> bool {
-        match self.0 {
-            Some(ref set) => set.contains(id),
-            None => false,
-        }
-    }
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

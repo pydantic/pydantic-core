@@ -5,8 +5,9 @@ use regex::Regex;
 use crate::build_tools::{is_strict, py_error, schema_or_config};
 use crate::errors::{context, err_val_error, ErrorKind, ValResult};
 use crate::input::{EitherString, Input};
+use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct StrValidator;

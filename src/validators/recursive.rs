@@ -4,8 +4,9 @@ use pyo3::types::PyDict;
 use crate::build_tools::SchemaDict;
 use crate::errors::{err_val_error, ErrorKind, ValResult};
 use crate::input::Input;
+use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct RecursiveContainerValidator {
@@ -80,10 +81,11 @@ fn validate<'s, 'data>(
     recursion_guard: &'s mut RecursionGuard,
 ) -> ValResult<'data, PyObject> {
     if let Some(id) = input.identity() {
-        if recursion_guard.contains(&id) {
+        if recursion_guard.contains_or_insert(id) {
+            // remove ID in we use recursion_guard again
+            recursion_guard.remove(&id);
             return err_val_error!(kind = ErrorKind::RecursionLoop, input_value = input.as_error_value());
         }
-        recursion_guard.insert(id);
         let validator = unsafe { slots.get_unchecked(validator_id) };
         let output = validator.validate(py, input, extra, slots, recursion_guard);
         recursion_guard.remove(&id);

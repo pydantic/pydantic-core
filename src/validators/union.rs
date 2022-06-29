@@ -4,10 +4,9 @@ use pyo3::types::{PyDict, PyList};
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ValError, ValLineError};
 use crate::input::Input;
+use crate::recursion_guard::RecursionGuard;
 
-use super::{
-    build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, ValResult, Validator,
-};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
 
 #[derive(Debug, Clone)]
 pub struct UnionValidator {

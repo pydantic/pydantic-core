@@ -5,8 +5,9 @@ use speedate::DateTime;
 use crate::build_tools::{is_strict, SchemaDict, SchemaError};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValResult};
 use crate::input::{EitherDateTime, Input};
+use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, RecursionGuard, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DateTimeValidator {
