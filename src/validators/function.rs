@@ -259,6 +259,9 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> Val
     // Only ValueError and AssertionError are considered as validation errors,
     // TypeError is now considered as a runtime error to catch errors in function signatures
     let kind = if err.is_instance_of::<PyValueError>(py) {
+        if let Ok(validation_error) = err.value(py).extract::<ValidationError>() {
+            return validation_error.into();
+        }
         ErrorKind::ValueError
     } else if err.is_instance_of::<PyAssertionError>(py) {
         ErrorKind::AssertionError

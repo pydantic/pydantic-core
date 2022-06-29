@@ -1,11 +1,12 @@
 from typing import Optional
 
 import pytest
-from dirty_equals import IsList, IsPartialDict
+from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
 from ..conftest import Err
+from .test_typed_dict import Cls
 
 
 def test_branch_nullable():
@@ -241,6 +242,7 @@ def test_recursion_branch():
         {
             'type': 'typed-dict',
             'ref': 'Branch',
+            'config': {'from_attributes': True},
             'fields': {
                 'name': {'schema': {'type': 'str'}},
                 'branch': {
@@ -256,16 +258,34 @@ def test_recursion_branch():
         'branch': {'name': 'b1', 'branch': None},
     }
 
+    data = Cls(name='root')
+    data.branch = Cls(name='b1', branch=None)
+    assert v.validate_python(data) == {'name': 'root', 'branch': {'name': 'b1', 'branch': None}}
+
     b = {'name': 'recursive'}
     b['branch'] = b
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python(b)
+    assert exc_info.value.title == 'recursive-container'
     assert exc_info.value.errors() == [
         {
             'kind': 'recursion_loop',
             'loc': ['branch'],
             'message': 'Recursion error - cyclic reference detected',
             'input_value': {'name': 'recursive', 'branch': IsPartialDict(name='recursive')},
+        }
+    ]
+
+    data = Cls(name='root')
+    data.branch = data
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(data)
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'recursion_loop',
+            'loc': ['branch'],
+            'message': 'Recursion error - cyclic reference detected',
+            'input_value': HasAttributes(name='root', branch=AnyThing()),
         }
     ]
 
@@ -382,4 +402,39 @@ def test_multiple_tuple_recursion_once(multiple_tuple_schema):
             'message': 'Recursion error - cyclic reference detected',
             'input_value': [1, IsList(length=2)],
         },
+    ]
+
+
+def test_recursive_wrap():
+    def wrap_func(input_value, *, validator, **kwargs):
+        return validator(input_value) + (42,)
+
+    v = SchemaValidator(
+        {
+            'type': 'function',
+            'ref': 'wrapper',
+            'mode': 'wrap',
+            'function': wrap_func,
+            'schema': {
+                'type': 'tuple-fix-len',
+                'items_schema': [
+                    {'type': 'int'},
+                    {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'wrapper'}},
+                ],
+            },
+        }
+    )
+    assert v.validate_python((1, None)) == (1, None, 42)
+    assert v.validate_python((1, (2, (3, None)))) == (1, (2, (3, None, 42), 42), 42)
+    t = [1]
+    t.append(t)
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(t)
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'recursion_loop',
+            'loc': [1],
+            'message': 'Recursion error - cyclic reference detected',
+            'input_value': IsList(positions={0: 1}, length=2),
+        }
     ]
