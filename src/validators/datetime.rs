@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 use speedate::DateTime;
 
 use crate::build_tools::{is_strict, SchemaDict, SchemaError};
-use crate::errors::{as_internal, context, ErrorKind, ValError, ValResult};
+use crate::errors::{as_internal, ErrorKind, ValError, ValResult};
 use crate::input::{EitherDateTime, Input};
 use crate::recursion_guard::RecursionGuard;
 
@@ -99,26 +99,32 @@ impl DateTimeValidator {
                 Err(err) => {
                     let error_name = err.get_type(py).name().map_err(as_internal)?;
                     return Err(ValError::new(
-                        ErrorKind::DateTimeObjectInvalid,
+                        ErrorKind::DateTimeObjectInvalid {
+                            processing_error: error_name.to_string(),
+                        },
                         input,
-                        context!("processing_error": error_name),
                     ));
                 }
             };
             macro_rules! check_constraint {
-                ($constraint:ident, $error:path, $key:literal) => {
+                ($constraint:ident, $error:ident) => {
                     if let Some(constraint) = &constraints.$constraint {
                         if !speedate_dt.$constraint(constraint) {
-                            return Err(ValError::new($error, input, context!($key: constraint.to_string())));
+                            return Err(ValError::new(
+                                ErrorKind::$error {
+                                    $constraint: constraint.to_string(),
+                                },
+                                input,
+                            ));
                         }
                     }
                 };
             }
 
-            check_constraint!(le, ErrorKind::LessThanEqual, "le");
-            check_constraint!(lt, ErrorKind::LessThan, "lt");
-            check_constraint!(ge, ErrorKind::GreaterThanEqual, "ge");
-            check_constraint!(gt, ErrorKind::GreaterThan, "gt");
+            check_constraint!(le, LessThanEqual);
+            check_constraint!(lt, LessThan);
+            check_constraint!(ge, GreaterThanEqual);
+            check_constraint!(gt, GreaterThan);
         }
         datetime.try_into_py(py).map_err(as_internal)
     }

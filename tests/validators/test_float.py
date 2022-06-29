@@ -112,7 +112,7 @@ def test_union_float(py_or_json):
     assert exc_info.value.errors() == [
         {'kind': 'float_type', 'loc': ['strict-float'], 'message': 'Value must be a valid number', 'input_value': '5'},
         {
-            'kind': 'float_multiple',
+            'kind': 'multiple_of',
             'loc': ['constrained-float'],
             'message': 'Value must be a multiple of 7',
             'input_value': '5',

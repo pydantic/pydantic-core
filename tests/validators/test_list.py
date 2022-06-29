@@ -79,9 +79,9 @@ def test_list_error(input_value, index):
     [
         ({}, [1, 2, 3, 4], [1, 2, 3, 4]),
         ({'min_items': 3}, [1, 2, 3, 4], [1, 2, 3, 4]),
-        ({'min_items': 3}, [1, 2], Err('List must have at least 3 items [kind=too_short')),
+        ({'min_items': 3}, [1, 2], Err('Input must have at least 3 items [kind=too_short')),
         ({'max_items': 4}, [1, 2, 3, 4], [1, 2, 3, 4]),
-        ({'max_items': 3}, [1, 2, 3, 4], Err('List must have at most 3 items [kind=too_long')),
+        ({'max_items': 3}, [1, 2, 3, 4], Err('Input must have at most 3 items [kind=too_long')),
     ],
 )
 def test_list_length_constraints(kwargs, input_value, expected):

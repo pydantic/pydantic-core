@@ -7,14 +7,12 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use crate::errors::location::reverse_location;
-use strum::EnumMessage;
 
 use crate::input::repr_string;
 
 use super::kinds::ErrorKind;
 use super::line_error::ValLineError;
 use super::location::Location;
-use super::msg_context::{context_as_py, render_message, Context};
 use super::ValError;
 
 #[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
@@ -142,7 +140,6 @@ pub struct PyLineError {
     kind: ErrorKind,
     location: Location,
     input_value: PyObject,
-    context: Context,
 }
 
 impl<'a> IntoPy<PyLineError> for ValLineError<'a> {
@@ -151,7 +148,6 @@ impl<'a> IntoPy<PyLineError> for ValLineError<'a> {
             kind: self.kind,
             location: reverse_location(self.reverse_location),
             input_value: self.input_value.to_object(py),
-            context: self.context,
         }
     }
 }
@@ -163,7 +159,6 @@ impl<'a> From<PyLineError> for ValLineError<'a> {
             kind: py_line_error.kind,
             reverse_location: reverse_location(py_line_error.location),
             input_value: py_line_error.input_value.into(),
-            context: py_line_error.context,
         }
     }
 }
@@ -179,8 +174,8 @@ impl PyLineError {
         }
         dict.set_item("message", self.get_message())?;
         dict.set_item("input_value", &self.input_value)?;
-        if self.context.is_some() {
-            dict.set_item("context", context_as_py(&self.context, py)?)?;
+        if let Some(context) = self.kind.py_dict(py)? {
+            dict.set_item("context", context)?;
         }
         Ok(dict.into_py(py))
     }
@@ -190,15 +185,7 @@ impl PyLineError {
     }
 
     fn get_message(&self) -> String {
-        let raw = match self.kind.get_message() {
-            Some(message) => message.to_string(),
-            None => self.kind(),
-        };
-        if self.context.is_some() {
-            render_message(&self.context, raw)
-        } else {
-            raw
-        }
+        self.kind.render()
     }
 
     fn pretty(&self, py: Option<Python>) -> Result<String, fmt::Error> {

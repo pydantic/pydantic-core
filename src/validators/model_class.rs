@@ -8,7 +8,7 @@ use pyo3::types::{PyDict, PyTuple, PyType};
 use pyo3::{ffi, intern};
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_internal, context, ErrorKind, ValError, ValResult};
+use crate::errors::{as_internal, ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
@@ -67,9 +67,10 @@ impl Validator for ModelClassValidator {
             Ok(input.to_object(py))
         } else if self.strict {
             Err(ValError::new(
-                ErrorKind::ModelClassType,
+                ErrorKind::ModelClassType {
+                    class_name: self.get_name(py),
+                },
                 input,
-                context!("class_name": self.get_name(py)),
             ))
         } else {
             let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;

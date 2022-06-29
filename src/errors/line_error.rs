@@ -4,7 +4,6 @@ use crate::input::{Input, JsonInput};
 
 use super::kinds::ErrorKind;
 use super::location::{new_location, LocItem, Location};
-use super::msg_context::Context;
 use super::validation_exception::{pretty_py_line_errors, PyLineError};
 
 pub type ValResult<'a, T> = Result<T, ValError<'a>>;
@@ -28,16 +27,11 @@ impl<'a> From<Vec<ValLineError<'a>>> for ValError<'a> {
 }
 
 impl<'a> ValError<'a> {
-    pub fn new(kind: ErrorKind, input: &'a impl Input<'a>, context: Context) -> ValError<'a> {
-        Self::LineErrors(vec![ValLineError::new(kind, input, context)])
+    pub fn new(kind: ErrorKind, input: &'a impl Input<'a>) -> ValError<'a> {
+        Self::LineErrors(vec![ValLineError::new(kind, input)])
     }
-    pub fn new_with_loc(
-        kind: ErrorKind,
-        input: &'a impl Input<'a>,
-        context: Context,
-        loc: impl Into<LocItem>,
-    ) -> ValError<'a> {
-        Self::LineErrors(vec![ValLineError::new_with_loc(kind, input, context, loc)])
+    pub fn new_with_loc(kind: ErrorKind, input: &'a impl Input<'a>, loc: impl Into<LocItem>) -> ValError<'a> {
+        Self::LineErrors(vec![ValLineError::new_with_loc(kind, input, loc)])
     }
 }
 
@@ -62,29 +56,21 @@ pub struct ValLineError<'a> {
     // location is reversed so that adding an "outer" location item is pushing, it's reversed before showing to the user
     pub reverse_location: Location,
     pub input_value: InputValue<'a>,
-    pub context: Context,
 }
 
 impl<'a> ValLineError<'a> {
-    pub fn new(kind: ErrorKind, input: &'a impl Input<'a>, context: Context) -> ValLineError<'a> {
+    pub fn new(kind: ErrorKind, input: &'a impl Input<'a>) -> ValLineError<'a> {
         Self {
             kind,
             input_value: input.as_error_value(),
-            context,
-            reverse_location: Location::default(),
+            reverse_location: None,
         }
     }
 
-    pub fn new_with_loc(
-        kind: ErrorKind,
-        input: &'a impl Input<'a>,
-        context: Context,
-        loc: impl Into<LocItem>,
-    ) -> ValLineError<'a> {
+    pub fn new_with_loc(kind: ErrorKind, input: &'a impl Input<'a>, loc: impl Into<LocItem>) -> ValLineError<'a> {
         Self {
             kind,
             input_value: input.as_error_value(),
-            context,
             reverse_location: Some(vec![loc.into()]),
         }
     }
@@ -110,7 +96,6 @@ impl<'a> ValLineError<'a> {
             kind: self.kind,
             reverse_location: self.reverse_location,
             input_value: self.input_value.to_object(py).into(),
-            context: self.context,
         }
     }
 }
