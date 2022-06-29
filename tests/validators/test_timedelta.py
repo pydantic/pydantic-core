@@ -27,22 +27,22 @@ from ..conftest import Err
         ),
         pytest.param((-1,), Err('Value must be a valid timedelta [kind=timedelta_type'), id='tuple'),
         pytest.param(3601, timedelta(hours=1, seconds=1), id='int'),
-        pytest.param(Decimal("3601.123456"), timedelta(hours=1, seconds=1, microseconds=123456), id='decimal'),
-        pytest.param(Decimal("3601.1234562"), timedelta(hours=1, seconds=1, microseconds=123456), id='decimal-7dig-up'),
+        pytest.param(Decimal('3601.123456'), timedelta(hours=1, seconds=1, microseconds=123456), id='decimal'),
+        pytest.param(Decimal('3601.1234562'), timedelta(hours=1, seconds=1, microseconds=123456), id='decimal-7dig-up'),
         pytest.param(
-            Decimal("3601.1234568"), timedelta(hours=1, seconds=1, microseconds=123457), id='decimal-7dig-down'
-        ),
+            Decimal('3601.1234568'), timedelta(hours=1, seconds=1, microseconds=123457), id='decimal-7dig-down'
+        )
         pytest.param(-3601, timedelta(hours=-2, seconds=3599), id='negative-int'),
         pytest.param(
-            Decimal("-3601.222222"), timedelta(hours=-2, seconds=3598, microseconds=777778), id='negative-decimal'
+            Decimal('-3601.222222'), timedelta(hours=-2, seconds=3598, microseconds=777778), id='negative-decimal'
         ),
         pytest.param(
-            Decimal("-3601.2222222"),
+            Decimal('-3601.2222222'),
             timedelta(hours=-2, seconds=3598, microseconds=777778),
             id='negative-decimal-7dig-up',
         ),
         pytest.param(
-            Decimal("-3601.2222227"),
+            Decimal('-3601.2222227'),
             timedelta(hours=-2, seconds=3598, microseconds=777777),
             id='negative-decimal-7dig-down',
         ),
