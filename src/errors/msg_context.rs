@@ -5,8 +5,8 @@ use pyo3::types::PyDict;
 
 pub type Context = Option<Vec<(String, ContextValue)>>;
 
-pub fn new_context<I: IntoIterator<Item = (String, ContextValue)>>(raw: I) -> Context {
-    Some(raw.into_iter().collect())
+pub fn new_context(context: Vec<(String, ContextValue)>) -> Context {
+    Some(context)
 }
 
 pub fn render_message(context: &Context, template: String) -> String {
@@ -46,9 +46,9 @@ pub enum ContextValue {
 impl fmt::Display for ContextValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ContextValue::S(v) => write!(f, "{}", v),
-            ContextValue::I(v) => write!(f, "{}", v),
-            ContextValue::F(v) => write!(f, "{}", v),
+            Self::S(v) => write!(f, "{}", v),
+            Self::I(v) => write!(f, "{}", v),
+            Self::F(v) => write!(f, "{}", v),
         }
     }
 }
@@ -86,9 +86,9 @@ impl From<f64> for ContextValue {
 impl ToPyObject for ContextValue {
     fn to_object(&self, py: Python) -> PyObject {
         match self {
-            ContextValue::S(v) => v.into_py(py),
-            ContextValue::I(v) => v.into_py(py),
-            ContextValue::F(v) => v.into_py(py),
+            Self::S(v) => v.into_py(py),
+            Self::I(v) => v.into_py(py),
+            Self::F(v) => v.into_py(py),
         }
     }
 }

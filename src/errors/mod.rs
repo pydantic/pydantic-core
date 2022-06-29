@@ -14,7 +14,7 @@ pub use self::validation_exception::ValidationError;
 
 macro_rules! context {
     ($($k:literal: $v:expr),* $(,)?) => {{
-        crate::errors::new_context([$(($k.into(), $v.into()),)*])
+        crate::errors::new_context(vec![$(($k.into(), $v.into()),)*])
     }};
 }
 pub(crate) use context;
