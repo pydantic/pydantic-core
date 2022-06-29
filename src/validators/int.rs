@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{context, err_val_error, ErrorKind, ValResult};
+use crate::errors::{context, ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
@@ -146,7 +146,7 @@ impl ConstrainedIntValidator {
     fn _validation_logic<'a>(&self, py: Python<'a>, input: &'a impl Input<'a>, int: i64) -> ValResult<'a, PyObject> {
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
-                return Err(err_val_error(
+                return Err(ValError::new(
                     ErrorKind::IntMultiple,
                     input,
                     context!("multiple_of" => multiple_of),
@@ -155,22 +155,22 @@ impl ConstrainedIntValidator {
         }
         if let Some(le) = self.le {
             if int > le {
-                return Err(err_val_error(ErrorKind::LessThanEqual, input, context!("le" => le)));
+                return Err(ValError::new(ErrorKind::LessThanEqual, input, context!("le" => le)));
             }
         }
         if let Some(lt) = self.lt {
             if int >= lt {
-                return Err(err_val_error(ErrorKind::LessThan, input, context!("lt" => lt)));
+                return Err(ValError::new(ErrorKind::LessThan, input, context!("lt" => lt)));
             }
         }
         if let Some(ge) = self.ge {
             if int < ge {
-                return Err(err_val_error(ErrorKind::GreaterThanEqual, input, context!("ge" => ge)));
+                return Err(ValError::new(ErrorKind::GreaterThanEqual, input, context!("ge" => ge)));
             }
         }
         if let Some(gt) = self.gt {
             if int <= gt {
-                return Err(err_val_error(ErrorKind::GreaterThan, input, context!("gt" => gt)));
+                return Err(ValError::new(ErrorKind::GreaterThan, input, context!("gt" => gt)));
             }
         }
         Ok(int.into_py(py))

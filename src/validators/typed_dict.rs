@@ -6,10 +6,7 @@ use pyo3::types::{PyDict, PyFunction, PyList, PySet, PyString};
 use ahash::AHashSet;
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{
-    as_internal, context, err_val_error_loc, py_err_string, val_line_error_loc, ErrorKind, ValError, ValLineError,
-    ValResult,
-};
+use crate::errors::{as_internal, context, py_err_string, ErrorKind, ValError, ValLineError, ValResult};
 use crate::input::{GenericMapping, Input, JsonInput, JsonObject};
 use crate::recursion_guard::RecursionGuard;
 use crate::SchemaError;
@@ -163,7 +160,7 @@ impl Validator for TypedDictValidator {
                     let op_key_value = match field.lookup_key.$get_method($dict) {
                         Ok(v) => v,
                         Err(err) => {
-                            errors.push(val_line_error_loc(
+                            errors.push(ValLineError::new_with_loc(
                                 ErrorKind::GetAttributeError,
                                 input,
                                 context!("error" => py_err_string(py, err)),
@@ -202,7 +199,7 @@ impl Validator for TypedDictValidator {
                     } else if !field.required {
                         continue;
                     } else {
-                        errors.push(val_line_error_loc(
+                        errors.push(ValLineError::new_with_loc(
                             ErrorKind::Missing,
                             input,
                             None,
@@ -232,7 +229,7 @@ impl Validator for TypedDictValidator {
                         }
 
                         if self.forbid_extra {
-                            errors.push(val_line_error_loc(
+                            errors.push(ValLineError::new_with_loc(
                                 ErrorKind::ExtraForbidden,
                                 input,
                                 None,
@@ -347,7 +344,7 @@ impl TypedDictValidator {
             // otherwise we raise an error:
             // - with forbid this is obvious
             // - with ignore the model should never be overloaded, so an error is the clearest option
-            Err(err_val_error_loc(
+            Err(ValError::new_with_loc(
                 ErrorKind::ExtraForbidden,
                 input,
                 None,

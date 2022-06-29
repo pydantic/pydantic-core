@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 use speedate::{Date, Time};
 
 use crate::build_tools::{is_strict, SchemaDict, SchemaError};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValError, ValResult};
+use crate::errors::{as_internal, context, ErrorKind, ValError, ValResult};
 use crate::input::{EitherDate, Input};
 use crate::recursion_guard::RecursionGuard;
 
@@ -106,7 +106,7 @@ impl DateValidator {
                 ($constraint:ident, $error:path, $key:literal) => {
                     if let Some(constraint) = &constraints.$constraint {
                         if !raw_date.$constraint(constraint) {
-                            return Err(err_val_error($error, input, context!($key => constraint.to_string())));
+                            return Err(ValError::new($error, input, context!($key => constraint.to_string())));
                         }
                     }
                 };
@@ -160,7 +160,7 @@ fn date_from_datetime<'data>(
     if dt.time == zero_time && dt.offset.is_none() {
         Ok(EitherDate::Raw(dt.date))
     } else {
-        Err(err_val_error(ErrorKind::DateFromDatetimeInexact, input, None))
+        Err(ValError::new(ErrorKind::DateFromDatetimeInexact, input, None))
     }
 }
 

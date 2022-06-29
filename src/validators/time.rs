@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 use speedate::Time;
 
 use crate::build_tools::{is_strict, SchemaDict, SchemaError};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValResult};
+use crate::errors::{as_internal, context, ErrorKind, ValError, ValResult};
 use crate::input::{EitherTime, Input};
 use crate::recursion_guard::RecursionGuard;
 
@@ -98,7 +98,7 @@ impl TimeValidator {
                 ($constraint:ident, $error:path, $key:literal) => {
                     if let Some(constraint) = &constraints.$constraint {
                         if !raw_time.$constraint(constraint) {
-                            return Err(err_val_error($error, input, context!($key => constraint.to_string())));
+                            return Err(ValError::new($error, input, context!($key => constraint.to_string())));
                         }
                     }
                 };

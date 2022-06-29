@@ -1,9 +1,9 @@
 use pyo3::prelude::*;
 
-use crate::input::JsonInput;
+use crate::input::{Input, JsonInput};
 
 use super::kinds::ErrorKind;
-use super::location::{LocItem, Location};
+use super::location::{new_location, LocItem, Location};
 use super::msg_context::Context;
 use super::validation_exception::{pretty_py_line_errors, PyLineError};
 
@@ -24,6 +24,20 @@ impl<'a> From<PyErr> for ValError<'a> {
 impl<'a> From<Vec<ValLineError<'a>>> for ValError<'a> {
     fn from(line_errors: Vec<ValLineError<'a>>) -> Self {
         Self::LineErrors(line_errors)
+    }
+}
+
+impl<'a> ValError<'a> {
+    pub fn new(kind: ErrorKind, input: &'a impl Input<'a>, context: Context) -> ValError<'a> {
+        Self::LineErrors(vec![ValLineError::new(kind, input, context)])
+    }
+    pub fn new_with_loc(
+        kind: ErrorKind,
+        input: &'a impl Input<'a>,
+        context: Context,
+        loc: impl Into<LocItem>,
+    ) -> ValError<'a> {
+        Self::LineErrors(vec![ValLineError::new_with_loc(kind, input, context, loc)])
     }
 }
 
@@ -52,12 +66,35 @@ pub struct ValLineError<'a> {
 }
 
 impl<'a> ValLineError<'a> {
+    pub fn new(kind: ErrorKind, input: &'a impl Input<'a>, context: Context) -> ValLineError<'a> {
+        Self {
+            kind,
+            input_value: input.as_error_value(),
+            context,
+            reverse_location: Location::default(),
+        }
+    }
+
+    pub fn new_with_loc(
+        kind: ErrorKind,
+        input: &'a impl Input<'a>,
+        context: Context,
+        loc: impl Into<LocItem>,
+    ) -> ValLineError<'a> {
+        Self {
+            kind,
+            input_value: input.as_error_value(),
+            context,
+            reverse_location: Some(vec![loc.into()]),
+        }
+    }
+
     /// location is stored reversed so it's quicker to add "outer" items as that's what we always do
     /// hence `push` here instead of `insert`
     pub fn with_outer_location(mut self, loc_item: LocItem) -> Self {
         match self.reverse_location {
             Some(ref mut rev_loc) => rev_loc.push(loc_item),
-            None => self.reverse_location = Some(vec![loc_item]),
+            None => self.reverse_location = new_location(loc_item),
         };
         self
     }

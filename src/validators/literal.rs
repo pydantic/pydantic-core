@@ -4,7 +4,7 @@ use pyo3::types::{PyDict, PyList};
 use ahash::AHashSet;
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValResult};
+use crate::errors::{as_internal, context, ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
@@ -70,7 +70,7 @@ impl Validator for LiteralSingleStringValidator {
         if either_str.as_cow().as_ref() == self.expected.as_str() {
             Ok(input.to_object(py))
         } else {
-            Err(err_val_error(
+            Err(ValError::new(
                 ErrorKind::LiteralSingleError,
                 input,
                 context!("expected" => self.repr.clone()),
@@ -107,7 +107,7 @@ impl Validator for LiteralSingleIntValidator {
         if str == self.expected {
             Ok(input.to_object(py))
         } else {
-            Err(err_val_error(
+            Err(ValError::new(
                 ErrorKind::LiteralSingleError,
                 input,
                 context!("expected" => self.expected),
@@ -159,7 +159,7 @@ impl Validator for LiteralMultipleStringsValidator {
         if self.expected.contains(either_str.as_cow().as_ref()) {
             Ok(input.to_object(py))
         } else {
-            Err(err_val_error(
+            Err(ValError::new(
                 ErrorKind::LiteralMultipleError,
                 input,
                 context!("expected" => self.repr.clone()),
@@ -211,7 +211,7 @@ impl Validator for LiteralMultipleIntsValidator {
         if self.expected.contains(&int) {
             Ok(input.to_object(py))
         } else {
-            Err(err_val_error(
+            Err(ValError::new(
                 ErrorKind::LiteralMultipleError,
                 input,
                 context!("expected" => self.repr.clone()),
@@ -289,7 +289,7 @@ impl Validator for LiteralGeneralValidator {
             return Ok(py_value);
         }
 
-        Err(err_val_error(
+        Err(ValError::new(
             ErrorKind::LiteralMultipleError,
             input,
             context!("expected" => self.repr.clone()),

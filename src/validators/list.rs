@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{context, err_val_error, ErrorKind};
+use crate::errors::{context, ErrorKind, ValError};
 use crate::input::{GenericSequence, Input};
 use crate::recursion_guard::RecursionGuard;
 
@@ -89,7 +89,7 @@ impl ListValidator {
         let length = list.generic_len();
         if let Some(min_length) = self.min_items {
             if length < min_length {
-                return Err(err_val_error(
+                return Err(ValError::new(
                     ErrorKind::TooShort,
                     input,
                     context!("type" => "List", "min_length" => min_length),
@@ -98,7 +98,7 @@ impl ListValidator {
         }
         if let Some(max_length) = self.max_items {
             if length > max_length {
-                return Err(err_val_error(
+                return Err(ValError::new(
                     ErrorKind::TooLong,
                     input,
                     context!("type" => "List", "max_length" => max_length),

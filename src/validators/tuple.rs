@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::{is_strict, py_error, SchemaDict};
-use crate::errors::{context, err_val_error, ErrorKind, ValError, ValLineError};
+use crate::errors::{context, ErrorKind, ValError, ValLineError};
 use crate::input::{GenericSequence, Input};
 use crate::recursion_guard::RecursionGuard;
 
@@ -68,7 +68,7 @@ impl TupleVarLenValidator {
         let length = tuple.generic_len();
         if let Some(min_length) = self.min_items {
             if length < min_length {
-                return Err(err_val_error(
+                return Err(ValError::new(
                     ErrorKind::TooShort,
                     input,
                     context!("type" => "Tuple", "min_length" => min_length),
@@ -77,7 +77,7 @@ impl TupleVarLenValidator {
         }
         if let Some(max_length) = self.max_items {
             if length > max_length {
-                return Err(err_val_error(
+                return Err(ValError::new(
                     ErrorKind::TooLong,
                     input,
                     context!("type" => "Tuple", "max_length" => max_length),
@@ -173,7 +173,7 @@ impl TupleFixLenValidator {
 
         if expected_length != tuple.generic_len() {
             let plural = if expected_length == 1 { "" } else { "s" };
-            return Err(err_val_error(
+            return Err(ValError::new(
                 ErrorKind::TupleLengthMismatch,
                 input,
                 context!(

@@ -1,4 +1,4 @@
-use crate::errors::{context, err_val_error, ErrorKind, ValResult};
+use crate::errors::{context, ErrorKind, ValError, ValResult};
 
 use super::Input;
 
@@ -21,7 +21,7 @@ pub fn str_as_bool<'a>(input: &'a impl Input<'a>, str: &str) -> ValResult<'a, bo
     {
         Ok(true)
     } else {
-        Err(err_val_error(ErrorKind::BoolParsing, input, None))
+        Err(ValError::new(ErrorKind::BoolParsing, input, None))
     }
 }
 
@@ -32,7 +32,7 @@ pub fn int_as_bool<'a>(input: &'a impl Input<'a>, int: i64) -> ValResult<'a, boo
     } else if int == 1 {
         Ok(true)
     } else {
-        Err(err_val_error(ErrorKind::BoolParsing, input, None))
+        Err(ValError::new(ErrorKind::BoolParsing, input, None))
     }
 }
 
@@ -43,27 +43,27 @@ pub fn str_as_int<'s, 'l>(input: &'s impl Input<'s>, str: &'l str) -> ValResult<
     } else if let Ok(f) = str.parse::<f64>() {
         float_as_int(input, f)
     } else {
-        Err(err_val_error(ErrorKind::IntParsing, input, None))
+        Err(ValError::new(ErrorKind::IntParsing, input, None))
     }
 }
 
 pub fn float_as_int<'a>(input: &'a impl Input<'a>, float: f64) -> ValResult<'a, i64> {
     if float == f64::INFINITY {
-        Err(err_val_error(
+        Err(ValError::new(
             ErrorKind::IntNan,
             input,
             context!("nan_value" => "infinity"),
         ))
     } else if float == f64::NEG_INFINITY {
-        Err(err_val_error(
+        Err(ValError::new(
             ErrorKind::IntNan,
             input,
             context!("nan_value" => "negative infinity"),
         ))
     } else if float.is_nan() {
-        Err(err_val_error(ErrorKind::IntNan, input, context!("nan_value" => "NaN")))
+        Err(ValError::new(ErrorKind::IntNan, input, context!("nan_value" => "NaN")))
     } else if float % 1.0 != 0.0 {
-        Err(err_val_error(ErrorKind::IntFromFloat, input, None))
+        Err(ValError::new(ErrorKind::IntFromFloat, input, None))
     } else {
         Ok(float as i64)
     }

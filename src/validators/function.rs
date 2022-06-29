@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{context, val_line_error, ErrorKind, ValError, ValResult, ValidationError};
+use crate::errors::{context, ErrorKind, ValError, ValLineError, ValResult, ValidationError};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
@@ -280,6 +280,6 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> Val
         Err(e) => return ValError::InternalErr(e),
     };
     #[allow(clippy::redundant_field_names)]
-    let line_error = val_line_error(kind, input, context!("error" => message));
+    let line_error = ValLineError::new(kind, input, context!("error" => message));
     ValError::LineErrors(vec![line_error])
 }

@@ -62,3 +62,9 @@ pub fn reverse_location(location: Location) -> Location {
         None => None,
     }
 }
+
+pub fn new_location(item: LocItem) -> Location {
+    let mut loc = Vec::with_capacity(3);
+    loc.push(item);
+    Some(loc)
+}
