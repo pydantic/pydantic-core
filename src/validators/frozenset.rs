@@ -71,7 +71,7 @@ impl FrozenSetValidator {
                 return Err(ValError::new(
                     ErrorKind::TooShort,
                     input,
-                    context!("type" => "FrozenSet", "min_length" => min_length),
+                    context!("type": "FrozenSet", "min_length": min_length),
                 ));
             }
         }
@@ -80,7 +80,7 @@ impl FrozenSetValidator {
                 return Err(ValError::new(
                     ErrorKind::TooLong,
                     input,
-                    context!("type" => "FrozenSet", "max_length" => max_length),
+                    context!("type": "FrozenSet", "max_length": max_length),
                 ));
             }
         }

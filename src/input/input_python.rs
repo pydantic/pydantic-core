@@ -404,7 +404,7 @@ fn mapping_as_dict(obj: &PyAny) -> Option<ValResult<GenericMapping>> {
         Err(err) => Some(Err(ValError::new(
             ErrorKind::DictFromMapping,
             obj,
-            context!("error" => py_err_string(obj.py(), err)),
+            context!("error": py_err_string(obj.py(), err)),
         ))),
     }
 }

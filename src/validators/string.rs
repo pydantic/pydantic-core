@@ -185,7 +185,7 @@ impl StrConstrainedValidator {
                 return Err(ValError::new(
                     ErrorKind::StrTooShort,
                     input,
-                    context!("min_length" => min_length),
+                    context!("min_length": min_length),
                 ));
             }
         }
@@ -194,7 +194,7 @@ impl StrConstrainedValidator {
                 return Err(ValError::new(
                     ErrorKind::StrTooLong,
                     input,
-                    context!("max_length" => max_length),
+                    context!("max_length": max_length),
                 ));
             }
         }
@@ -203,7 +203,7 @@ impl StrConstrainedValidator {
                 return Err(ValError::new(
                     ErrorKind::StrPatternMismatch,
                     input,
-                    context!("pattern" => pattern.to_string()),
+                    context!("pattern": pattern.to_string()),
                 ));
             }
         }

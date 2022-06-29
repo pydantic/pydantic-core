@@ -101,7 +101,7 @@ impl DateTimeValidator {
                     return Err(ValError::new(
                         ErrorKind::DateTimeObjectInvalid,
                         input,
-                        context!("processing_error" => error_name),
+                        context!("processing_error": error_name),
                     ));
                 }
             };
@@ -109,7 +109,7 @@ impl DateTimeValidator {
                 ($constraint:ident, $error:path, $key:literal) => {
                     if let Some(constraint) = &constraints.$constraint {
                         if !speedate_dt.$constraint(constraint) {
-                            return Err(ValError::new($error, input, context!($key => constraint.to_string())));
+                            return Err(ValError::new($error, input, context!($key: constraint.to_string())));
                         }
                     }
                 };

@@ -92,7 +92,7 @@ impl ListValidator {
                 return Err(ValError::new(
                     ErrorKind::TooShort,
                     input,
-                    context!("type" => "List", "min_length" => min_length),
+                    context!("type": "List", "min_length": min_length),
                 ));
             }
         }
@@ -101,7 +101,7 @@ impl ListValidator {
                 return Err(ValError::new(
                     ErrorKind::TooLong,
                     input,
-                    context!("type" => "List", "max_length" => max_length),
+                    context!("type": "List", "max_length": max_length),
                 ));
             }
         }

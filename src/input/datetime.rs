@@ -180,7 +180,7 @@ pub fn bytes_as_date<'a>(input: &'a impl Input<'a>, bytes: &[u8]) -> ValResult<'
         Err(err) => Err(ValError::new(
             ErrorKind::DateParsing,
             input,
-            context!("parsing_error" => err.get_documentation().unwrap_or_default()),
+            context!("parsing_error": err.get_documentation().unwrap_or_default()),
         )),
     }
 }
@@ -191,7 +191,7 @@ pub fn bytes_as_time<'a>(input: &'a impl Input<'a>, bytes: &[u8]) -> ValResult<'
         Err(err) => Err(ValError::new(
             ErrorKind::TimeParsing,
             input,
-            context!("parsing_error" => err.get_documentation().unwrap_or_default()),
+            context!("parsing_error": err.get_documentation().unwrap_or_default()),
         )),
     }
 }
@@ -202,7 +202,7 @@ pub fn bytes_as_datetime<'a, 'b>(input: &'a impl Input<'a>, bytes: &'b [u8]) -> 
         Err(err) => Err(ValError::new(
             ErrorKind::DateTimeParsing,
             input,
-            context!("parsing_error" => err.get_documentation().unwrap_or_default()),
+            context!("parsing_error": err.get_documentation().unwrap_or_default()),
         )),
     }
 }
@@ -217,7 +217,7 @@ pub fn int_as_datetime<'a>(
         Err(err) => Err(ValError::new(
             ErrorKind::DateTimeParsing,
             input,
-            context!("parsing_error" => err.get_documentation().unwrap_or_default()),
+            context!("parsing_error": err.get_documentation().unwrap_or_default()),
         )),
     }
 }
@@ -257,7 +257,7 @@ pub fn int_as_time<'a>(
             return Err(ValError::new(
                 ErrorKind::TimeParsing,
                 input,
-                context!("parsing_error" => "time in seconds must be positive"),
+                context!("parsing_error": "time in seconds must be positive"),
             ));
         }
         // continue and use the speedate error for >86400
@@ -270,7 +270,7 @@ pub fn int_as_time<'a>(
         Err(err) => Err(ValError::new(
             ErrorKind::TimeParsing,
             input,
-            context!("parsing_error" => err.get_documentation().unwrap_or_default()),
+            context!("parsing_error": err.get_documentation().unwrap_or_default()),
         )),
     }
 }

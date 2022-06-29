@@ -98,7 +98,7 @@ impl TimeValidator {
                 ($constraint:ident, $error:path, $key:literal) => {
                     if let Some(constraint) = &constraints.$constraint {
                         if !raw_time.$constraint(constraint) {
-                            return Err(ValError::new($error, input, context!($key => constraint.to_string())));
+                            return Err(ValError::new($error, input, context!($key: constraint.to_string())));
                         }
                     }
                 };

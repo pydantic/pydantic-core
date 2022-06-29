@@ -52,16 +52,16 @@ pub fn float_as_int<'a>(input: &'a impl Input<'a>, float: f64) -> ValResult<'a, 
         Err(ValError::new(
             ErrorKind::IntNan,
             input,
-            context!("nan_value" => "infinity"),
+            context!("nan_value": "infinity"),
         ))
     } else if float == f64::NEG_INFINITY {
         Err(ValError::new(
             ErrorKind::IntNan,
             input,
-            context!("nan_value" => "negative infinity"),
+            context!("nan_value": "negative infinity"),
         ))
     } else if float.is_nan() {
-        Err(ValError::new(ErrorKind::IntNan, input, context!("nan_value" => "NaN")))
+        Err(ValError::new(ErrorKind::IntNan, input, context!("nan_value": "NaN")))
     } else if float % 1.0 != 0.0 {
         Err(ValError::new(ErrorKind::IntFromFloat, input, None))
     } else {

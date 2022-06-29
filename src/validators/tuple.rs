@@ -71,7 +71,7 @@ impl TupleVarLenValidator {
                 return Err(ValError::new(
                     ErrorKind::TooShort,
                     input,
-                    context!("type" => "Tuple", "min_length" => min_length),
+                    context!("type": "Tuple", "min_length": min_length),
                 ));
             }
         }
@@ -80,7 +80,7 @@ impl TupleVarLenValidator {
                 return Err(ValError::new(
                     ErrorKind::TooLong,
                     input,
-                    context!("type" => "Tuple", "max_length" => max_length),
+                    context!("type": "Tuple", "max_length": max_length),
                 ));
             }
         }
@@ -176,10 +176,7 @@ impl TupleFixLenValidator {
             return Err(ValError::new(
                 ErrorKind::TupleLengthMismatch,
                 input,
-                context!(
-                    "expected_length" => expected_length,
-                    "plural" => plural.to_string(),
-                ),
+                context!("expected_length": expected_length, "plural": plural.to_string()),
             ));
         }
         let mut output: Vec<PyObject> = Vec::with_capacity(expected_length);

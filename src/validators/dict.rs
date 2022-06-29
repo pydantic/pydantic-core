@@ -93,12 +93,12 @@ macro_rules! build_validate {
         ) -> ValResult<'data, PyObject> {
             if let Some(min_length) = self.min_items {
                 if dict.len() < min_length {
-                    return Err(ValError::new(ErrorKind::TooShort, input, context!("type" => "Dict", "min_length" => min_length)));
+                    return Err(ValError::new(ErrorKind::TooShort, input, context!("type": "Dict", "min_length": min_length)));
                 }
             }
             if let Some(max_length) = self.max_items {
                 if dict.len() > max_length {
-                    return Err(ValError::new(ErrorKind::TooLong, input, context!("type" => "Dict", "max_length" => max_length)));
+                    return Err(ValError::new(ErrorKind::TooLong, input, context!("type": "Dict", "max_length": max_length)));
                 }
             }
             let output = PyDict::new(py);

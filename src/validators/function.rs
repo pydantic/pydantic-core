@@ -280,6 +280,6 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> Val
         Err(e) => return ValError::InternalErr(e),
     };
     #[allow(clippy::redundant_field_names)]
-    let line_error = ValLineError::new(kind, input, context!("error" => message));
+    let line_error = ValLineError::new(kind, input, context!("error": message));
     ValError::LineErrors(vec![line_error])
 }

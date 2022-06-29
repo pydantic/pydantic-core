@@ -149,7 +149,7 @@ impl BytesConstrainedValidator {
                 return Err(ValError::new(
                     ErrorKind::BytesTooShort,
                     input,
-                    context!("min_length" => min_length),
+                    context!("min_length": min_length),
                 ));
             }
         }
@@ -158,7 +158,7 @@ impl BytesConstrainedValidator {
                 return Err(ValError::new(
                     ErrorKind::BytesTooLong,
                     input,
-                    context!("max_length" => max_length),
+                    context!("max_length": max_length),
                 ));
             }
         }

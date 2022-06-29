@@ -13,7 +13,7 @@ pub use self::msg_context::new_context;
 pub use self::validation_exception::ValidationError;
 
 macro_rules! context {
-    ($($k:expr => $v:expr),* $(,)?) => {{
+    ($($k:literal: $v:expr),* $(,)?) => {{
         crate::errors::new_context([$(($k.into(), $v.into()),)*])
     }};
 }

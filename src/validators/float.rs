@@ -154,28 +154,28 @@ impl ConstrainedFloatValidator {
                 return Err(ValError::new(
                     ErrorKind::FloatMultiple,
                     input,
-                    context!("multiple_of" => multiple_of),
+                    context!("multiple_of": multiple_of),
                 ));
             }
         }
         if let Some(le) = self.le {
             if float > le {
-                return Err(ValError::new(ErrorKind::LessThanEqual, input, context!("le" => le)));
+                return Err(ValError::new(ErrorKind::LessThanEqual, input, context!("le": le)));
             }
         }
         if let Some(lt) = self.lt {
             if float >= lt {
-                return Err(ValError::new(ErrorKind::LessThan, input, context!("lt" => lt)));
+                return Err(ValError::new(ErrorKind::LessThan, input, context!("lt": lt)));
             }
         }
         if let Some(ge) = self.ge {
             if float < ge {
-                return Err(ValError::new(ErrorKind::GreaterThanEqual, input, context!("ge" => ge)));
+                return Err(ValError::new(ErrorKind::GreaterThanEqual, input, context!("ge": ge)));
             }
         }
         if let Some(gt) = self.gt {
             if float <= gt {
-                return Err(ValError::new(ErrorKind::GreaterThan, input, context!("gt" => gt)));
+                return Err(ValError::new(ErrorKind::GreaterThan, input, context!("gt": gt)));
             }
         }
         Ok(float.into_py(py))

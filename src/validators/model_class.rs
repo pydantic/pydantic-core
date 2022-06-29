@@ -69,7 +69,7 @@ impl Validator for ModelClassValidator {
             Err(ValError::new(
                 ErrorKind::ModelClassType,
                 input,
-                context!("class_name" => self.get_name(py)),
+                context!("class_name": self.get_name(py)),
             ))
         } else {
             let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;

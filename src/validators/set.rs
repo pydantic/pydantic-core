@@ -71,7 +71,7 @@ impl SetValidator {
                 return Err(ValError::new(
                     ErrorKind::TooShort,
                     input,
-                    context!("type" => "Set", "min_length" => min_length),
+                    context!("type": "Set", "min_length": min_length),
                 ));
             }
         }
@@ -80,7 +80,7 @@ impl SetValidator {
                 return Err(ValError::new(
                     ErrorKind::TooLong,
                     input,
-                    context!("type" => "Set", "max_length" => max_length),
+                    context!("type": "Set", "max_length": max_length),
                 ));
             }
         }

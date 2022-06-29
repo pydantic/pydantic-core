@@ -73,7 +73,7 @@ impl Validator for LiteralSingleStringValidator {
             Err(ValError::new(
                 ErrorKind::LiteralSingleError,
                 input,
-                context!("expected" => self.repr.clone()),
+                context!("expected": self.repr.clone()),
             ))
         }
     }
@@ -110,7 +110,7 @@ impl Validator for LiteralSingleIntValidator {
             Err(ValError::new(
                 ErrorKind::LiteralSingleError,
                 input,
-                context!("expected" => self.expected),
+                context!("expected": self.expected),
             ))
         }
     }
@@ -162,7 +162,7 @@ impl Validator for LiteralMultipleStringsValidator {
             Err(ValError::new(
                 ErrorKind::LiteralMultipleError,
                 input,
-                context!("expected" => self.repr.clone()),
+                context!("expected": self.repr.clone()),
             ))
         }
     }
@@ -214,7 +214,7 @@ impl Validator for LiteralMultipleIntsValidator {
             Err(ValError::new(
                 ErrorKind::LiteralMultipleError,
                 input,
-                context!("expected" => self.repr.clone()),
+                context!("expected": self.repr.clone()),
             ))
         }
     }
@@ -292,7 +292,7 @@ impl Validator for LiteralGeneralValidator {
         Err(ValError::new(
             ErrorKind::LiteralMultipleError,
             input,
-            context!("expected" => self.repr.clone()),
+            context!("expected": self.repr.clone()),
         ))
     }
 
