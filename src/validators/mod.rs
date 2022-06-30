@@ -21,6 +21,7 @@ mod float;
 mod frozenset;
 mod function;
 mod int;
+mod is_instance;
 mod list;
 mod literal;
 mod model_class;
@@ -290,6 +291,8 @@ pub fn build_validator<'a>(
         datetime::DateTimeValidator,
         // frozensets
         frozenset::FrozenSetValidator,
+        // is_instance
+        is_instance::IsInstanceValidator,
     )
 }
 
@@ -369,6 +372,8 @@ pub enum CombinedValidator {
     Datetime(datetime::DateTimeValidator),
     // frozensets
     FrozenSet(frozenset::FrozenSetValidator),
+    // is_instance
+    IsInstance(is_instance::IsInstanceValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

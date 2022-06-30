@@ -193,6 +193,10 @@ pub enum ErrorKind {
     // frozenset errors
     #[strum(message = "Value must be a valid frozenset")]
     FrozenSetType,
+    // ---------------------
+    // introspection types - e.g. isinstance
+    #[strum(message = "Input must be an instance of {class}")]
+    IsInstanceOf { class: String },
 }
 
 macro_rules! render {
@@ -269,6 +273,7 @@ impl ErrorKind {
             Self::TimeParsing { error } => render!(template, error),
             Self::DateTimeParsing { error } => render!(template, error),
             Self::DateTimeObjectInvalid { error } => render!(template, error),
+            Self::IsInstanceOf { class } => render!(template, class),
             _ => template.to_string(),
         }
     }
