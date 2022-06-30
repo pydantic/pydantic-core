@@ -5,6 +5,7 @@ use speedate::Duration;
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValResult};
 use crate::input::{EitherTimedelta, Input};
+use crate::recursion_guard::RecursionGuard;
 use crate::SchemaError;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -58,6 +59,7 @@ impl Validator for TimedeltaValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let timedelta = match self.strict {
             true => input.strict_timedelta()?,
@@ -72,6 +74,7 @@ impl Validator for TimedeltaValidator {
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
+        _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         self.validation_comparison(py, input, input.strict_timedelta()?)
     }
