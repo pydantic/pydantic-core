@@ -41,8 +41,11 @@ def test_is_instance():
     'schema_class,input_val,value',
     [
         (Foo, Foo(), True),
+        (Foo, Foo, False),
         (Foo, Bar(), True),
+        (Foo, Bar, False),
         (Bar, Foo(), False),
+        (Bar, Foo, False),
         (dict, {1: 2}, True),
         (dict, {1, 2}, False),
         (type, Foo, True),
@@ -81,3 +84,13 @@ def test_instancecheck():
 
     with pytest.raises(TypeError, match='intentional error'):
         v.validate_python('error')
+
+
+def test_repr():
+    v = SchemaValidator({'type': 'union', 'choices': ['int', {'type': 'is-instance', 'class_': Foo}]})
+    assert v.isinstance_python(4) is True
+    assert v.isinstance_python(Bar()) is True
+    assert v.isinstance_python('foo') is False
+
+    with pytest.raises(ValidationError, match=r'is-instance\[Foo\]\s+Input must be an instance of Foo'):
+        v.validate_python('foo')

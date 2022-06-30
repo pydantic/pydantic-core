@@ -50,3 +50,13 @@ def test_callable():
 def test_callable_cases(input_value, expected):
     v = SchemaValidator({'type': 'callable'})
     assert v.isinstance_python(input_value) == expected
+
+
+def test_repr():
+    v = SchemaValidator({'type': 'union', 'choices': ['int', 'callable']})
+    assert v.isinstance_python(4) is True
+    assert v.isinstance_python(func) is True
+    assert v.isinstance_python('foo') is False
+
+    with pytest.raises(ValidationError, match=r'callable\s+Input must be callable'):
+        v.validate_python('foo')

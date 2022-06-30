@@ -23,10 +23,9 @@ impl BuildValidator for IsInstanceValidator {
         _build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
         let class: &PyType = schema.get_as_req("class_")?;
-        let class_repr = class.name()?.to_string();
         Ok(Self {
             class: class.into(),
-            class_repr,
+            class_repr: class.name()?.to_string(),
         }
         .into())
     }
@@ -52,8 +51,7 @@ impl Validator for IsInstanceValidator {
         }
     }
 
-    fn get_name(&self, py: Python) -> String {
-        let cls = self.class.as_ref(py);
-        format!("{}[{}]", Self::EXPECTED_TYPE, cls)
+    fn get_name(&self, _py: Python) -> String {
+        format!("{}[{}]", Self::EXPECTED_TYPE, self.class_repr)
     }
 }
