@@ -38,7 +38,8 @@ pub enum ErrorKind {
     #[strum(message = "Value must be a valid boolean")]
     Bool,
     // ---------------------
-    // generic comparison errors - used for all inequality comparisons
+    // generic comparison errors - used for all inequality comparisons except int and float which have their
+    // own type, bounds arguments are Strings so they can be created from any type
     #[strum(message = "Value must be greater than {gt}")]
     GreaterThan { gt: String },
     #[strum(message = "Value must be greater than or equal to {ge}")]
@@ -161,7 +162,7 @@ pub enum ErrorKind {
     #[strum(message = "Value must be a valid date")]
     DateType,
     #[strum(message = "Value must be a valid date in the format YYYY-MM-DD, {error}")]
-    DateParsing { error: String },
+    DateParsing { error: &'static str },
     #[strum(message = "Value must be a valid date or datetime, {error}")]
     DateFromDatetimeParsing { error: String },
     #[strum(message = "Datetimes provided to dates must have zero time - e.g. be exact dates")]
@@ -171,13 +172,13 @@ pub enum ErrorKind {
     #[strum(message = "Value must be a valid time")]
     TimeType,
     #[strum(message = "Value must be in a valid time format, {error}")]
-    TimeParsing { error: String },
+    TimeParsing { error: &'static str },
     // ---------------------
     // datetime errors
     #[strum(serialize = "datetime_type", message = "Value must be a valid datetime")]
     DateTimeType,
     #[strum(serialize = "datetime_parsing", message = "Value must be a valid datetime, {error}")]
-    DateTimeParsing { error: String },
+    DateTimeParsing { error: &'static str },
     #[strum(
         serialize = "datetime_object_invalid",
         message = "Invalid datetime object, got {error}"

@@ -142,7 +142,9 @@ fn date_from_datetime<'data>(
                     for line_error in line_errors.iter_mut() {
                         match line_error.kind {
                             ErrorKind::DateTimeParsing { ref error } => {
-                                line_error.kind = ErrorKind::DateFromDatetimeParsing { error: error.clone() };
+                                line_error.kind = ErrorKind::DateFromDatetimeParsing {
+                                    error: error.to_string(),
+                                };
                             }
                             _ => {
                                 return Err(date_err);
