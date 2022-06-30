@@ -30,6 +30,7 @@ impl<'a> ValError<'a> {
     pub fn new(kind: ErrorKind, input: &'a impl Input<'a>) -> ValError<'a> {
         Self::LineErrors(vec![ValLineError::new(kind, input)])
     }
+
     pub fn new_with_loc(kind: ErrorKind, input: &'a impl Input<'a>, loc: impl Into<LocItem>) -> ValError<'a> {
         Self::LineErrors(vec![ValLineError::new_with_loc(kind, input, loc)])
     }
