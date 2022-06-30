@@ -4,7 +4,7 @@ use pyo3::types::{PyDict, PyList};
 use ahash::AHashSet;
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_internal, context, ErrorKind, ValError, ValResult};
+use crate::errors::{as_internal, ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
@@ -71,9 +71,10 @@ impl Validator for LiteralSingleStringValidator {
             Ok(input.to_object(py))
         } else {
             Err(ValError::new(
-                ErrorKind::LiteralSingleError,
+                ErrorKind::LiteralSingleError {
+                    expected: self.repr.clone(),
+                },
                 input,
-                context!("expected": self.repr.clone()),
             ))
         }
     }
@@ -108,9 +109,10 @@ impl Validator for LiteralSingleIntValidator {
             Ok(input.to_object(py))
         } else {
             Err(ValError::new(
-                ErrorKind::LiteralSingleError,
+                ErrorKind::LiteralSingleError {
+                    expected: self.expected.to_string(),
+                },
                 input,
-                context!("expected": self.expected),
             ))
         }
     }
@@ -160,9 +162,10 @@ impl Validator for LiteralMultipleStringsValidator {
             Ok(input.to_object(py))
         } else {
             Err(ValError::new(
-                ErrorKind::LiteralMultipleError,
+                ErrorKind::LiteralMultipleError {
+                    expected: self.repr.clone(),
+                },
                 input,
-                context!("expected": self.repr.clone()),
             ))
         }
     }
@@ -212,9 +215,10 @@ impl Validator for LiteralMultipleIntsValidator {
             Ok(input.to_object(py))
         } else {
             Err(ValError::new(
-                ErrorKind::LiteralMultipleError,
+                ErrorKind::LiteralMultipleError {
+                    expected: self.repr.clone(),
+                },
                 input,
-                context!("expected": self.repr.clone()),
             ))
         }
     }
@@ -290,9 +294,10 @@ impl Validator for LiteralGeneralValidator {
         }
 
         Err(ValError::new(
-            ErrorKind::LiteralMultipleError,
+            ErrorKind::LiteralMultipleError {
+                expected: self.repr.clone(),
+            },
             input,
-            context!("expected": self.repr.clone()),
         ))
     }
 

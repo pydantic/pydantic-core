@@ -5,7 +5,7 @@ use speedate::{Date, DateTime, Time};
 use strum::EnumMessage;
 
 use super::Input;
-use crate::errors::{context, ErrorKind, ValError, ValResult};
+use crate::errors::{ErrorKind, ValError, ValResult};
 
 pub enum EitherDate<'a> {
     Raw(Date),
@@ -178,9 +178,10 @@ pub fn bytes_as_date<'a>(input: &'a impl Input<'a>, bytes: &[u8]) -> ValResult<'
     match Date::parse_bytes(bytes) {
         Ok(date) => Ok(date.into()),
         Err(err) => Err(ValError::new(
-            ErrorKind::DateParsing,
+            ErrorKind::DateParsing {
+                error: err.get_documentation().unwrap_or_default(),
+            },
             input,
-            context!("parsing_error": err.get_documentation().unwrap_or_default()),
         )),
     }
 }
@@ -189,9 +190,10 @@ pub fn bytes_as_time<'a>(input: &'a impl Input<'a>, bytes: &[u8]) -> ValResult<'
     match Time::parse_bytes(bytes) {
         Ok(date) => Ok(date.into()),
         Err(err) => Err(ValError::new(
-            ErrorKind::TimeParsing,
+            ErrorKind::TimeParsing {
+                error: err.get_documentation().unwrap_or_default(),
+            },
             input,
-            context!("parsing_error": err.get_documentation().unwrap_or_default()),
         )),
     }
 }
@@ -200,9 +202,10 @@ pub fn bytes_as_datetime<'a, 'b>(input: &'a impl Input<'a>, bytes: &'b [u8]) -> 
     match DateTime::parse_bytes(bytes) {
         Ok(dt) => Ok(dt.into()),
         Err(err) => Err(ValError::new(
-            ErrorKind::DateTimeParsing,
+            ErrorKind::DateTimeParsing {
+                error: err.get_documentation().unwrap_or_default(),
+            },
             input,
-            context!("parsing_error": err.get_documentation().unwrap_or_default()),
         )),
     }
 }
@@ -215,9 +218,10 @@ pub fn int_as_datetime<'a>(
     match DateTime::from_timestamp(timestamp, timestamp_microseconds) {
         Ok(dt) => Ok(dt.into()),
         Err(err) => Err(ValError::new(
-            ErrorKind::DateTimeParsing,
+            ErrorKind::DateTimeParsing {
+                error: err.get_documentation().unwrap_or_default(),
+            },
             input,
-            context!("parsing_error": err.get_documentation().unwrap_or_default()),
         )),
     }
 }
@@ -255,9 +259,10 @@ pub fn int_as_time<'a>(
     let time_timestamp: u32 = match timestamp {
         t if t < 0_i64 => {
             return Err(ValError::new(
-                ErrorKind::TimeParsing,
+                ErrorKind::TimeParsing {
+                    error: "time in seconds must be positive",
+                },
                 input,
-                context!("parsing_error": "time in seconds must be positive"),
             ));
         }
         // continue and use the speedate error for >86400
@@ -268,9 +273,10 @@ pub fn int_as_time<'a>(
     match Time::from_timestamp(time_timestamp, timestamp_microseconds) {
         Ok(dt) => Ok(dt.into()),
         Err(err) => Err(ValError::new(
-            ErrorKind::TimeParsing,
+            ErrorKind::TimeParsing {
+                error: err.get_documentation().unwrap_or_default(),
+            },
             input,
-            context!("parsing_error": err.get_documentation().unwrap_or_default()),
         )),
     }
 }

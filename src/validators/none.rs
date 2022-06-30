@@ -33,7 +33,7 @@ impl Validator for NoneValidator {
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {
             true => Ok(py.None()),
-            false => Err(ValError::new(ErrorKind::NoneRequired, input, None)),
+            false => Err(ValError::new(ErrorKind::NoneRequired, input)),
         }
     }
 

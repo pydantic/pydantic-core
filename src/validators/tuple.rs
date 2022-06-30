@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::{is_strict, py_error, SchemaDict};
-use crate::errors::{context, ErrorKind, ValError, ValLineError};
+use crate::errors::{ErrorKind, ValError, ValLineError};
 use crate::input::{GenericSequence, Input};
 use crate::recursion_guard::RecursionGuard;
 
@@ -68,20 +68,12 @@ impl TupleVarLenValidator {
         let length = tuple.generic_len();
         if let Some(min_length) = self.min_items {
             if length < min_length {
-                return Err(ValError::new(
-                    ErrorKind::TooShort,
-                    input,
-                    context!("type": "Tuple", "min_length": min_length),
-                ));
+                return Err(ValError::new(ErrorKind::TooShort { min_length }, input));
             }
         }
         if let Some(max_length) = self.max_items {
             if length > max_length {
-                return Err(ValError::new(
-                    ErrorKind::TooLong,
-                    input,
-                    context!("type": "Tuple", "max_length": max_length),
-                ));
+                return Err(ValError::new(ErrorKind::TooLong { max_length }, input));
             }
         }
 
@@ -172,11 +164,12 @@ impl TupleFixLenValidator {
         let expected_length = self.items_validators.len();
 
         if expected_length != tuple.generic_len() {
-            let plural = if expected_length == 1 { "" } else { "s" };
             return Err(ValError::new(
-                ErrorKind::TupleLengthMismatch,
+                ErrorKind::TupleLengthMismatch {
+                    expected_length,
+                    plural: expected_length != 1,
+                },
                 input,
-                context!("expected_length": expected_length, "plural": plural.to_string()),
             ));
         }
         let mut output: Vec<PyObject> = Vec::with_capacity(expected_length);

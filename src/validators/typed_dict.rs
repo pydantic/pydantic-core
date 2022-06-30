@@ -6,7 +6,7 @@ use pyo3::types::{PyDict, PyFunction, PyList, PySet, PyString};
 use ahash::AHashSet;
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_internal, context, py_err_string, ErrorKind, ValError, ValLineError, ValResult};
+use crate::errors::{as_internal, py_err_string, ErrorKind, ValError, ValLineError, ValResult};
 use crate::input::{GenericMapping, Input, JsonInput, JsonObject};
 use crate::recursion_guard::RecursionGuard;
 use crate::SchemaError;
@@ -161,9 +161,10 @@ impl Validator for TypedDictValidator {
                         Ok(v) => v,
                         Err(err) => {
                             errors.push(ValLineError::new_with_loc(
-                                ErrorKind::GetAttributeError,
+                                ErrorKind::GetAttributeError {
+                                    error: py_err_string(py, err),
+                                },
                                 input,
-                                context!("error": py_err_string(py, err)),
                                 field.name.clone(),
                             ));
                             continue;
@@ -205,7 +206,6 @@ impl Validator for TypedDictValidator {
                         errors.push(ValLineError::new_with_loc(
                             ErrorKind::Missing,
                             input,
-                            None,
                             field.name.clone(),
                         ));
                     }
@@ -238,7 +238,6 @@ impl Validator for TypedDictValidator {
                             errors.push(ValLineError::new_with_loc(
                                 ErrorKind::ExtraForbidden,
                                 input,
-                                None,
                                 raw_key.as_loc_item(),
                             ));
                             continue;
@@ -353,7 +352,6 @@ impl TypedDictValidator {
             Err(ValError::new_with_loc(
                 ErrorKind::ExtraForbidden,
                 input,
-                None,
                 field.to_string(),
             ))
         }
