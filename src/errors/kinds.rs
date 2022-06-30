@@ -194,9 +194,11 @@ pub enum ErrorKind {
     #[strum(message = "Value must be a valid frozenset")]
     FrozenSetType,
     // ---------------------
-    // introspection types - e.g. isinstance
+    // introspection types - e.g. isinstance, callable
     #[strum(message = "Input must be an instance of {class}")]
     IsInstanceOf { class: String },
+    #[strum(message = "Input must be callable")]
+    CallableType,
 }
 
 macro_rules! render {
@@ -229,7 +231,7 @@ macro_rules! py_dict {
 
 impl ErrorKind {
     pub fn render(&self) -> String {
-        let template: &'static str = self.get_message().unwrap();
+        let template: &'static str = self.get_message().expect("ErrorKind with no strum message");
         match self {
             Self::InvalidJson { error } => render!(template, error),
             Self::GetAttributeError { error } => render!(template, error),

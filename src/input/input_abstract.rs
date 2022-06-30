@@ -102,4 +102,8 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
     fn is_instance(&self, _class: &PyType) -> PyResult<bool> {
         Ok(false)
     }
+
+    fn callable(&self) -> bool {
+        false
+    }
 }

@@ -389,6 +389,10 @@ impl<'a> Input<'a> for PyAny {
     fn is_instance(&self, class: &PyType) -> PyResult<bool> {
         self.is_instance(class)
     }
+
+    fn callable(&self) -> bool {
+        self.is_callable()
+    }
 }
 
 /// return None if obj is not a mapping (cast_as::<PyMapping> fails or mapping.items returns an AttributeError)

@@ -2,11 +2,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 
 use crate::build_tools::SchemaDict;
-use crate::errors::{as_internal, ErrorKind};
+use crate::errors::{as_internal, ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, ValError, ValResult, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct IsInstanceValidator {

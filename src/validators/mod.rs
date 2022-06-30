@@ -14,6 +14,7 @@ use crate::recursion_guard::RecursionGuard;
 mod any;
 mod bool;
 mod bytes;
+mod callable;
 mod date;
 mod datetime;
 mod dict;
@@ -291,8 +292,9 @@ pub fn build_validator<'a>(
         datetime::DateTimeValidator,
         // frozensets
         frozenset::FrozenSetValidator,
-        // is_instance
+        // introspection types
         is_instance::IsInstanceValidator,
+        callable::CallableValidator,
     )
 }
 
@@ -372,8 +374,9 @@ pub enum CombinedValidator {
     Datetime(datetime::DateTimeValidator),
     // frozensets
     FrozenSet(frozenset::FrozenSetValidator),
-    // is_instance
+    // introspection types
     IsInstance(is_instance::IsInstanceValidator),
+    Callable(callable::CallableValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
