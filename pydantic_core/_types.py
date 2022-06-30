@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import Any, Callable, Dict, List, Union
 
 if sys.version_info < (3, 11):
@@ -227,6 +227,16 @@ class TupleVarLenSchema(TypedDict, total=False):
     ref: str
 
 
+class TimedeltaSchema(TypedDict, total=False):
+    type: Required[Literal['timedelta']]
+    strict: bool
+    le: timedelta
+    ge: timedelta
+    lt: timedelta
+    gt: timedelta
+    ref: str
+
+
 # pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
 # 'int' is equivalent to {'type': 'int'}
 BareType = Literal[
@@ -277,4 +287,5 @@ Schema = Union[
     DateSchema,
     TimeSchema,
     DatetimeSchema,
+    TimedeltaSchema,
 ]

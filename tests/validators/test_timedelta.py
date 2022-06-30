@@ -12,41 +12,24 @@ from ..conftest import Err
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        pytest.param(
+        (
             timedelta(days=3, weeks=2, hours=1, minutes=2, seconds=3, milliseconds=500),
             timedelta(days=3, weeks=2, hours=1, minutes=2, seconds=3, milliseconds=500),
-            id='timedelta',
         ),
-        pytest.param(
-            'P0Y0M3D2WT1H2M3.5S', timedelta(days=3, weeks=2, hours=1, minutes=2, seconds=3, milliseconds=500), id='str'
-        ),
-        pytest.param(
-            b'P0Y0M3D2WT1H2M3.5S',
-            timedelta(days=3, weeks=2, hours=1, minutes=2, seconds=3, milliseconds=500),
-            id='bytes',
-        ),
-        pytest.param((-1,), Err('Value must be a valid timedelta [kind=timedelta_type'), id='tuple'),
-        pytest.param(3601, timedelta(hours=1, seconds=1), id='int'),
-        pytest.param(Decimal('3601.123456'), timedelta(hours=1, seconds=1, microseconds=123456), id='decimal'),
-        pytest.param(Decimal('3601.1234562'), timedelta(hours=1, seconds=1, microseconds=123456), id='decimal-7dig-up'),
-        pytest.param(
-            Decimal('3601.1234568'), timedelta(hours=1, seconds=1, microseconds=123457), id='decimal-7dig-down'
-        ),
-        pytest.param(-3601, timedelta(hours=-2, seconds=3599), id='negative-int'),
-        pytest.param(
-            Decimal('-3601.222222'), timedelta(hours=-2, seconds=3598, microseconds=777778), id='negative-decimal'
-        ),
-        pytest.param(
-            Decimal('-3601.2222222'),
-            timedelta(hours=-2, seconds=3598, microseconds=777778),
-            id='negative-decimal-7dig-up',
-        ),
-        pytest.param(
-            Decimal('-3601.2222227'),
-            timedelta(hours=-2, seconds=3598, microseconds=777777),
-            id='negative-decimal-7dig-down',
-        ),
+        ('P0Y0M3D2WT1H2M3.5S', timedelta(days=3, weeks=2, hours=1, minutes=2, seconds=3, milliseconds=500)),
+        (b'P0Y0M3D2WT1H2M3.5S', timedelta(days=3, weeks=2, hours=1, minutes=2, seconds=3, milliseconds=500)),
+        ((-1,), Err('Value must be a valid timedelta [kind=timedelta_type')),
+        (3601, timedelta(hours=1, seconds=1)),
+        (Decimal('3601.123456'), timedelta(hours=1, seconds=1, microseconds=123456)),
+        (Decimal('3601.1234562'), timedelta(hours=1, seconds=1, microseconds=123456)),
+        (Decimal('3601.1234568'), timedelta(hours=1, seconds=1, microseconds=123457)),
+        (-3601, timedelta(hours=-2, seconds=3599)),
+        (Decimal('-3601.222222'), timedelta(hours=-2, seconds=3598, microseconds=777778)),
+        (Decimal('-3601.2222222'), timedelta(hours=-2, seconds=3598, microseconds=777778)),
+        (Decimal('-3601.2222227'), timedelta(hours=-2, seconds=3598, microseconds=777777)),
+        (2**32 + 1, timedelta(seconds=2**32 + 1)),
     ],
+    ids=repr,
 )
 def test_timedelta(input_value, expected):
     v = SchemaValidator({'type': 'timedelta'})
@@ -61,19 +44,23 @@ def test_timedelta(input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        pytest.param(
-            'P0Y0M3D2WT1H2M3.5S', timedelta(days=3, weeks=2, hours=1, minutes=2, seconds=3, milliseconds=500), id='str'
-        ),
-        pytest.param((-1,), Err('Value must be a valid timedelta [kind=timedelta_type'), id='tuple'),
+        ('"P0Y0M3D2WT1H2M3.5S"', timedelta(days=3, weeks=2, hours=1, minutes=2, seconds=3, milliseconds=500)),
+        ('"errordata"', Err('Value must be a valid timedelta, invalid digit in duration [kind=timedelta_parsing')),
+        ('3601', timedelta(hours=1, seconds=1)),
+        ('3601.123456', timedelta(hours=1, seconds=1, microseconds=123456)),
+        ('-3601', timedelta(hours=-2, seconds=3599)),
+        ('-3601.222222', timedelta(hours=-2, seconds=3598, microseconds=777778)),
+        ('-3601.2222222', timedelta(hours=-2, seconds=3598, microseconds=777778)),
     ],
+    ids=repr,
 )
-def test_timedelta_json(py_or_json, input_value, expected):
-    v = py_or_json({'type': 'timedelta'})
+def test_timedelta_json(input_value, expected):
+    v = SchemaValidator({'type': 'timedelta'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
-            v.validate_test(input_value)
+            v.validate_json(input_value)
     else:
-        output = v.validate_test(input_value)
+        output = v.validate_json(input_value)
         assert output == expected
 
 
@@ -169,9 +156,26 @@ def test_dict_py():
     }
 
 
-def test_dict(py_or_json):
+def test_dict_key(py_or_json):
     v = py_or_json({'type': 'dict', 'keys_schema': 'timedelta', 'values_schema': 'int'})
     assert v.validate_test({'P2DT1H': 2, 'P2DT2H': 4}) == {timedelta(days=2, hours=1): 2, timedelta(days=2, hours=2): 4}
+
+    with pytest.raises(
+        ValidationError,
+        match=re.escape('Value must be a valid timedelta, invalid digit in duration [kind=timedelta_parsing'),
+    ):
+        v.validate_test({'errordata': 2})
+
+
+def test_dict_value(py_or_json):
+    v = py_or_json({'type': 'dict', 'keys_schema': 'int', 'values_schema': 'timedelta'})
+    assert v.validate_test({2: 'P2DT1H', 4: 'P2DT2H'}) == {2: timedelta(days=2, hours=1), 4: timedelta(days=2, hours=2)}
+
+    with pytest.raises(
+        ValidationError,
+        match=re.escape('Value must be a valid timedelta, invalid digit in duration [kind=timedelta_parsing'),
+    ):
+        v.validate_test({4: 'errordata'})
 
 
 def test_union():

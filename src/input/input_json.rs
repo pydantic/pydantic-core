@@ -5,7 +5,7 @@ use crate::errors::{err_val_error, ErrorKind, InputValue, ValResult};
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_time,
-    int_as_datetime, int_as_time, EitherDate, EitherDateTime, EitherTime,
+    float_as_timedelta, int_as_datetime, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 use super::{EitherBytes, EitherString, GenericMapping, GenericSequence, Input, JsonInput};
@@ -199,6 +199,15 @@ impl<'a> Input<'a> for JsonInput {
     fn strict_timedelta(&self) -> ValResult<super::EitherTimedelta> {
         match self {
             JsonInput::String(v) => bytes_as_timedelta(self, v.as_bytes()),
+            _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::TimedeltaType),
+        }
+    }
+
+    fn lax_timedelta(&self) -> ValResult<super::EitherTimedelta> {
+        match self {
+            JsonInput::String(v) => bytes_as_timedelta(self, v.as_bytes()),
+            JsonInput::Int(v) => float_as_timedelta(*v as f64),
+            JsonInput::Float(v) => float_as_timedelta(*v),
             _ => err_val_error!(input_value = self.as_error_value(), kind = ErrorKind::TimedeltaType),
         }
     }

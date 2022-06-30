@@ -91,26 +91,34 @@ impl<'a> EitherTimedelta<'a> {
     pub fn as_raw(&self) -> PyResult<Duration> {
         match self {
             Self::Raw(timedelta) => Ok(timedelta.clone()),
-            Self::Py(py_timedelta) => {
-                let total_seconds = py_timedelta
-                    .getattr(pyo3::intern!(py_timedelta.py(), "total_seconds"))?
-                    .call0()?
-                    .extract()?;
-                Ok(float_as_duration(total_seconds))
-            }
+            Self::Py(py_timedelta) => Ok(Duration::new(
+                true,
+                py_timedelta
+                    .getattr(pyo3::intern!(py_timedelta.py(), "days"))?
+                    .extract()?,
+                py_timedelta
+                    .getattr(pyo3::intern!(py_timedelta.py(), "seconds"))?
+                    .extract()?,
+                py_timedelta
+                    .getattr(pyo3::intern!(py_timedelta.py(), "microseconds"))?
+                    .extract()?,
+            )),
         }
     }
 
     pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
         let timedelta = match self {
             Self::Py(timedelta) => Ok(timedelta),
-            Self::Raw(duration) => PyDelta::new(
-                py,
-                0,
-                duration.signed_total_seconds() as i32,
-                duration.signed_microseconds(),
-                true,
-            ),
+            Self::Raw(duration) => {
+                let sign = if duration.positive { 1 } else { -1 };
+                PyDelta::new(
+                    py,
+                    sign * duration.day as i32,
+                    sign * duration.second as i32,
+                    sign * duration.microsecond as i32,
+                    true,
+                )
+            }
         }?;
         Ok(timedelta.into_py(py))
     }
