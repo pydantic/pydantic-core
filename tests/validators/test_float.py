@@ -93,8 +93,12 @@ def test_float_strict(py_or_json, input_value, expected):
 def test_float_kwargs(py_or_json, kwargs, input_value, expected):
     v = py_or_json({'type': 'float', **kwargs})
     if isinstance(expected, Err):
-        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
+        errors = exc_info.value.errors()
+        assert len(errors) == 1
+        if 'context' in errors[0]:
+            assert errors[0]['context'] == kwargs
     else:
         output = v.validate_test(input_value)
         assert output == expected

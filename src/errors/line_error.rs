@@ -51,7 +51,7 @@ pub fn pretty_line_errors(py: Python, line_errors: Vec<ValLineError>) -> String 
 /// A `ValLineError` is a single error that occurred during validation which is converted to a `PyLineError`
 /// to eventually form a `ValidationError`.
 /// I don't like the name `ValLineError`, but it's the best I could come up with (for now).
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ValLineError<'a> {
     pub kind: ErrorKind,
     // location is reversed so that adding an "outer" location item is pushing, it's reversed before showing to the user

@@ -190,12 +190,6 @@ pub enum ErrorKind {
     FrozenSetType,
 }
 
-impl Default for ErrorKind {
-    fn default() -> Self {
-        ErrorKind::InvalidInput
-    }
-}
-
 macro_rules! render {
     ($template:ident, $($value:ident),* $(,)?) => {
         $template
