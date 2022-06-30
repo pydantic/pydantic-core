@@ -200,6 +200,15 @@ macro_rules! render {
     ($template:ident, $($value:ident),* $(,)?) => {
         $template
         $(
+            .replace(concat!("{", stringify!($value), "}"), $value)
+        )*
+    };
+}
+
+macro_rules! to_string_render {
+    ($template:ident, $($value:ident),* $(,)?) => {
+        $template
+        $(
             .replace(concat!("{", stringify!($value), "}"), $value.to_string().as_str())
         )*
     };
@@ -226,10 +235,10 @@ impl ErrorKind {
             Self::GreaterThanEqual { ge } => render!(template, ge),
             Self::LessThan { lt } => render!(template, lt),
             Self::LessThanEqual { le } => render!(template, le),
-            Self::TooShort { min_length } => render!(template, min_length),
-            Self::TooLong { max_length } => render!(template, max_length),
-            Self::StrTooShort { min_length } => render!(template, min_length),
-            Self::StrTooLong { max_length } => render!(template, max_length),
+            Self::TooShort { min_length } => to_string_render!(template, min_length),
+            Self::TooLong { max_length } => to_string_render!(template, max_length),
+            Self::StrTooShort { min_length } => to_string_render!(template, min_length),
+            Self::StrTooLong { max_length } => to_string_render!(template, max_length),
             Self::StrPatternMismatch { pattern } => render!(template, pattern),
             Self::DictFromMapping { error } => render!(template, error),
             Self::TupleLengthMismatch {
@@ -237,21 +246,21 @@ impl ErrorKind {
                 plural,
             } => {
                 let plural = if *plural { "s" } else { "" };
-                render!(template, expected_length, plural)
+                to_string_render!(template, expected_length, plural)
             }
             Self::IntNan { nan_value } => render!(template, nan_value),
-            Self::IntMultipleOf { multiple_of } => render!(template, multiple_of),
-            Self::IntGreaterThan { gt } => render!(template, gt),
-            Self::IntGreaterThanEqual { ge } => render!(template, ge),
-            Self::IntLessThan { lt } => render!(template, lt),
-            Self::IntLessThanEqual { le } => render!(template, le),
-            Self::FloatMultipleOf { multiple_of } => render!(template, multiple_of),
-            Self::FloatGreaterThan { gt } => render!(template, gt),
-            Self::FloatGreaterThanEqual { ge } => render!(template, ge),
-            Self::FloatLessThan { lt } => render!(template, lt),
-            Self::FloatLessThanEqual { le } => render!(template, le),
-            Self::BytesTooShort { min_length } => render!(template, min_length),
-            Self::BytesTooLong { max_length } => render!(template, max_length),
+            Self::IntMultipleOf { multiple_of } => to_string_render!(template, multiple_of),
+            Self::IntGreaterThan { gt } => to_string_render!(template, gt),
+            Self::IntGreaterThanEqual { ge } => to_string_render!(template, ge),
+            Self::IntLessThan { lt } => to_string_render!(template, lt),
+            Self::IntLessThanEqual { le } => to_string_render!(template, le),
+            Self::FloatMultipleOf { multiple_of } => to_string_render!(template, multiple_of),
+            Self::FloatGreaterThan { gt } => to_string_render!(template, gt),
+            Self::FloatGreaterThanEqual { ge } => to_string_render!(template, ge),
+            Self::FloatLessThan { lt } => to_string_render!(template, lt),
+            Self::FloatLessThanEqual { le } => to_string_render!(template, le),
+            Self::BytesTooShort { min_length } => to_string_render!(template, min_length),
+            Self::BytesTooLong { max_length } => to_string_render!(template, max_length),
             Self::ValueError { error } => render!(template, error),
             Self::AssertionError { error } => render!(template, error),
             Self::LiteralSingleError { expected } => render!(template, expected),
