@@ -100,7 +100,7 @@ impl DateTimeValidator {
                     let error_name = err.get_type(py).name().map_err(as_internal)?;
                     return Err(ValError::new(
                         ErrorKind::DateTimeObjectInvalid {
-                            processing_error: error_name.to_string(),
+                            error: error_name.to_string(),
                         },
                         input,
                     ));

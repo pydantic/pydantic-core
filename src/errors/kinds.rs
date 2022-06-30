@@ -8,8 +8,8 @@ use strum::{Display, EnumMessage};
 pub enum ErrorKind {
     #[strum(message = "Invalid input")]
     InvalidInput,
-    #[strum(message = "Invalid JSON: {parser_error}")]
-    InvalidJson { parser_error: String },
+    #[strum(message = "Invalid JSON: {error}")]
+    InvalidJson { error: String },
     // ---------------------
     // recursion error
     #[strum(message = "Recursion error - cyclic reference detected")]
@@ -160,32 +160,29 @@ pub enum ErrorKind {
     // date errors
     #[strum(message = "Value must be a valid date")]
     DateType,
-    #[strum(message = "Value must be a valid date in the format YYYY-MM-DD, {parsing_error}")]
-    DateParsing { parsing_error: String },
-    #[strum(message = "Value must be a valid date or datetime, {parsing_error}")]
-    DateFromDatetimeParsing { parsing_error: String },
+    #[strum(message = "Value must be a valid date in the format YYYY-MM-DD, {error}")]
+    DateParsing { error: String },
+    #[strum(message = "Value must be a valid date or datetime, {error}")]
+    DateFromDatetimeParsing { error: String },
     #[strum(message = "Datetimes provided to dates must have zero time - e.g. be exact dates")]
     DateFromDatetimeInexact,
     // ---------------------
     // date errors
     #[strum(message = "Value must be a valid time")]
     TimeType,
-    #[strum(message = "Value must be in a valid time format, {parsing_error}")]
-    TimeParsing { parsing_error: String },
+    #[strum(message = "Value must be in a valid time format, {error}")]
+    TimeParsing { error: String },
     // ---------------------
     // datetime errors
     #[strum(serialize = "datetime_type", message = "Value must be a valid datetime")]
     DateTimeType,
-    #[strum(
-        serialize = "datetime_parsing",
-        message = "Value must be a valid datetime, {parsing_error}"
-    )]
-    DateTimeParsing { parsing_error: String },
+    #[strum(serialize = "datetime_parsing", message = "Value must be a valid datetime, {error}")]
+    DateTimeParsing { error: String },
     #[strum(
         serialize = "datetime_object_invalid",
-        message = "Invalid datetime object, got {processing_error}"
+        message = "Invalid datetime object, got {error}"
     )]
-    DateTimeObjectInvalid { processing_error: String },
+    DateTimeObjectInvalid { error: String },
     // ---------------------
     // frozenset errors
     #[strum(message = "Value must be a valid frozenset")]
@@ -198,77 +195,78 @@ impl Default for ErrorKind {
     }
 }
 
-fn create_py_dict<'a, I: IntoIterator<Item = (&'a str, PyObject)>>(
-    py: Python<'a>,
-    members: I,
-) -> PyResult<Option<PyObject>> {
-    let dict = PyDict::new(py);
-    for (key, value) in members {
-        dict.set_item(key, value)?;
-    }
-    Ok(Some(dict.into_py(py)))
+macro_rules! render {
+    ($template:ident, $($value:ident),* $(,)?) => {
+        $template
+        $(
+            .replace(concat!("{", stringify!($value), "}"), $value.to_string().as_str())
+        )*
+    };
 }
 
 macro_rules! py_dict {
     ($py:ident, $($value:expr),* $(,)?) => {{
-        create_py_dict($py, [$((stringify!($value), $value.into_py($py)),)*])
+        let dict = PyDict::new($py);
+        $(
+        dict.set_item(stringify!($value), $value.into_py($py))?;
+        )*
+        Ok(Some(dict.into_py($py)))
     }};
 }
 
 impl ErrorKind {
     pub fn render(&self) -> String {
-        let template = self.get_message().unwrap().to_string();
+        let template: &'static str = self.get_message().unwrap();
         match self {
-            Self::InvalidJson { parser_error } => template.replace("{parser_error}", parser_error),
-            Self::GetAttributeError { error } => template.replace("{error}", error),
-            Self::ModelClassType { class_name } => template.replace("{class_name}", class_name),
-            Self::GreaterThan { gt } => template.replace("{gt}", gt),
-            Self::GreaterThanEqual { ge } => template.replace("{ge}", ge),
-            Self::LessThan { lt } => template.replace("{lt}", lt),
-            Self::LessThanEqual { le } => template.replace("{le}", le),
-            Self::TooShort { min_length } => template.replace("{min_length}", &min_length.to_string()),
-            Self::TooLong { max_length } => template.replace("{max_length}", &max_length.to_string()),
-            Self::StrTooShort { min_length } => template.replace("{min_length}", &min_length.to_string()),
-            Self::StrTooLong { max_length } => template.replace("{max_length}", &max_length.to_string()),
-            Self::StrPatternMismatch { pattern } => template.replace("{pattern}", pattern),
-            Self::DictFromMapping { error } => template.replace("{error}", error),
+            Self::InvalidJson { error } => render!(template, error),
+            Self::GetAttributeError { error } => render!(template, error),
+            Self::ModelClassType { class_name } => render!(template, class_name),
+            Self::GreaterThan { gt } => render!(template, gt),
+            Self::GreaterThanEqual { ge } => render!(template, ge),
+            Self::LessThan { lt } => render!(template, lt),
+            Self::LessThanEqual { le } => render!(template, le),
+            Self::TooShort { min_length } => render!(template, min_length),
+            Self::TooLong { max_length } => render!(template, max_length),
+            Self::StrTooShort { min_length } => render!(template, min_length),
+            Self::StrTooLong { max_length } => render!(template, max_length),
+            Self::StrPatternMismatch { pattern } => render!(template, pattern),
+            Self::DictFromMapping { error } => render!(template, error),
             Self::TupleLengthMismatch {
                 expected_length,
                 plural,
-            } => template
-                .replace("{expected_length}", &expected_length.to_string())
-                .replace("{plural}", if *plural { "s" } else { "" }),
-            Self::IntNan { nan_value } => template.replace("{nan_value}", nan_value),
-            Self::IntMultipleOf { multiple_of } => template.replace("{multiple_of}", &multiple_of.to_string()),
-            Self::IntGreaterThan { gt } => template.replace("{gt}", &gt.to_string()),
-            Self::IntGreaterThanEqual { ge } => template.replace("{ge}", &ge.to_string()),
-            Self::IntLessThan { lt } => template.replace("{lt}", &lt.to_string()),
-            Self::IntLessThanEqual { le } => template.replace("{le}", &le.to_string()),
-            Self::FloatMultipleOf { multiple_of } => template.replace("{multiple_of}", &multiple_of.to_string()),
-            Self::FloatGreaterThan { gt } => template.replace("{gt}", &gt.to_string()),
-            Self::FloatGreaterThanEqual { ge } => template.replace("{ge}", &ge.to_string()),
-            Self::FloatLessThan { lt } => template.replace("{lt}", &lt.to_string()),
-            Self::FloatLessThanEqual { le } => template.replace("{le}", &le.to_string()),
-            Self::BytesTooShort { min_length } => template.replace("{min_length}", &min_length.to_string()),
-            Self::BytesTooLong { max_length } => template.replace("{max_length}", &max_length.to_string()),
-            Self::ValueError { error } => template.replace("{error}", error),
-            Self::AssertionError { error } => template.replace("{error}", error),
-            Self::LiteralSingleError { expected } => template.replace("{expected}", expected),
-            Self::LiteralMultipleError { expected } => template.replace("{expected}", expected),
-            Self::DateParsing { parsing_error } => template.replace("{parsing_error}", parsing_error),
-            Self::DateFromDatetimeParsing { parsing_error } => template.replace("{parsing_error}", parsing_error),
-            Self::TimeParsing { parsing_error } => template.replace("{parsing_error}", parsing_error),
-            Self::DateTimeParsing { parsing_error } => template.replace("{parsing_error}", parsing_error),
-            Self::DateTimeObjectInvalid { processing_error } => {
-                template.replace("{processing_error}", processing_error)
+            } => {
+                let plural = if *plural { "s" } else { "" };
+                render!(template, expected_length, plural)
             }
-            _ => template,
+            Self::IntNan { nan_value } => render!(template, nan_value),
+            Self::IntMultipleOf { multiple_of } => render!(template, multiple_of),
+            Self::IntGreaterThan { gt } => render!(template, gt),
+            Self::IntGreaterThanEqual { ge } => render!(template, ge),
+            Self::IntLessThan { lt } => render!(template, lt),
+            Self::IntLessThanEqual { le } => render!(template, le),
+            Self::FloatMultipleOf { multiple_of } => render!(template, multiple_of),
+            Self::FloatGreaterThan { gt } => render!(template, gt),
+            Self::FloatGreaterThanEqual { ge } => render!(template, ge),
+            Self::FloatLessThan { lt } => render!(template, lt),
+            Self::FloatLessThanEqual { le } => render!(template, le),
+            Self::BytesTooShort { min_length } => render!(template, min_length),
+            Self::BytesTooLong { max_length } => render!(template, max_length),
+            Self::ValueError { error } => render!(template, error),
+            Self::AssertionError { error } => render!(template, error),
+            Self::LiteralSingleError { expected } => render!(template, expected),
+            Self::LiteralMultipleError { expected } => render!(template, expected),
+            Self::DateParsing { error } => render!(template, error),
+            Self::DateFromDatetimeParsing { error } => render!(template, error),
+            Self::TimeParsing { error } => render!(template, error),
+            Self::DateTimeParsing { error } => render!(template, error),
+            Self::DateTimeObjectInvalid { error } => render!(template, error),
+            _ => template.to_string(),
         }
     }
 
     pub fn py_dict(&self, py: Python) -> PyResult<Option<PyObject>> {
         match self {
-            Self::InvalidJson { parser_error } => py_dict!(py, parser_error),
+            Self::InvalidJson { error } => py_dict!(py, error),
             Self::GetAttributeError { error } => py_dict!(py, error),
             Self::ModelClassType { class_name } => py_dict!(py, class_name),
             Self::GreaterThan { gt } => py_dict!(py, gt),
@@ -302,11 +300,11 @@ impl ErrorKind {
             Self::AssertionError { error } => py_dict!(py, error),
             Self::LiteralSingleError { expected } => py_dict!(py, expected),
             Self::LiteralMultipleError { expected } => py_dict!(py, expected),
-            Self::DateParsing { parsing_error } => py_dict!(py, parsing_error),
-            Self::DateFromDatetimeParsing { parsing_error } => py_dict!(py, parsing_error),
-            Self::TimeParsing { parsing_error } => py_dict!(py, parsing_error),
-            Self::DateTimeParsing { parsing_error } => py_dict!(py, parsing_error),
-            Self::DateTimeObjectInvalid { processing_error } => py_dict!(py, processing_error),
+            Self::DateParsing { error } => py_dict!(py, error),
+            Self::DateFromDatetimeParsing { error } => py_dict!(py, error),
+            Self::TimeParsing { error } => py_dict!(py, error),
+            Self::DateTimeParsing { error } => py_dict!(py, error),
+            Self::DateTimeObjectInvalid { error } => py_dict!(py, error),
             _ => Ok(None),
         }
     }

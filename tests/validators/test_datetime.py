@@ -217,7 +217,7 @@ def test_custom_invalid_tz():
             'loc': [],
             'message': 'Invalid datetime object, got NotImplementedError',
             'input_value': dt,
-            'context': {'processing_error': 'NotImplementedError'},
+            'context': {'error': 'NotImplementedError'},
         }
     ]
 
