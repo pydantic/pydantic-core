@@ -36,7 +36,7 @@ impl Validator for AnyValidator {
         Ok(input.to_object(py))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name(&self, _py: Python, _slots: &[CombinedValidator]) -> String {
         Self::EXPECTED_TYPE.to_string()
     }
 }

@@ -68,7 +68,7 @@ impl Validator for ModelClassValidator {
         } else if self.strict {
             Err(ValError::new(
                 ErrorKind::ModelClassType {
-                    class_name: self.get_name(py),
+                    class_name: self.get_name(py, slots),
                 },
                 input,
             ))
@@ -94,7 +94,8 @@ impl Validator for ModelClassValidator {
         }
     }
 
-    fn get_name(&self, py: Python) -> String {
+    fn get_name(&self, py: Python, _slots: &[CombinedValidator]) -> String {
+        // TODO we should probably store this on the struct
         // Get the class's `__name__`, not using `class.name()` since it uses `__qualname__`
         // which is not what we want here
         let class = self.class.as_ref(py);

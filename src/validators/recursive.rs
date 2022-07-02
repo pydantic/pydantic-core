@@ -42,8 +42,10 @@ impl Validator for RecursiveContainerValidator {
         guard_validate(self.validator_id, py, true, input, extra, slots, recursion_guard)
     }
 
-    fn get_name(&self, _py: Python) -> String {
-        "recursive-container".to_string()
+    fn get_name(&self, py: Python, slots: &[CombinedValidator]) -> String {
+        // we just return the inner validator to make the recursive-container invisible in output messages
+        let validator = unsafe { slots.get_unchecked(self.validator_id) };
+        validator.get_name(py, slots)
     }
 }
 
@@ -89,7 +91,9 @@ impl Validator for RecursiveRefValidator {
         guard_validate(self.validator_id, py, true, input, extra, slots, recursion_guard)
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name(&self, _py: Python, _slots: &[CombinedValidator]) -> String {
+        // we can't use the same logic as above because it can cause recursion,
+        // this is a bodge until we improve names
         Self::EXPECTED_TYPE.to_string()
     }
 }

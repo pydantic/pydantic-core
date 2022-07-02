@@ -53,7 +53,7 @@ impl Validator for UnionValidator {
                 errors.extend(
                     line_errors
                         .into_iter()
-                        .map(|err| err.with_outer_location(validator.get_name(py).into())),
+                        .map(|err| err.with_outer_location(validator.get_name(py, slots).into())),
                 );
             }
 
@@ -81,7 +81,7 @@ impl Validator for UnionValidator {
                 errors.extend(
                     line_errors
                         .into_iter()
-                        .map(|err| err.with_outer_location(validator.get_name(py).into())),
+                        .map(|err| err.with_outer_location(validator.get_name(py, slots).into())),
                 );
             }
 
@@ -89,11 +89,11 @@ impl Validator for UnionValidator {
         }
     }
 
-    fn get_name(&self, py: Python) -> String {
+    fn get_name(&self, py: Python, slots: &[CombinedValidator]) -> String {
         let descr = self
             .choices
             .iter()
-            .map(|v| v.get_name(py))
+            .map(|v| v.get_name(py, slots))
             .collect::<Vec<_>>()
             .join(", ");
         format!("{}[{}]", Self::EXPECTED_TYPE, descr)

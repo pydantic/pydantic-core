@@ -71,8 +71,8 @@ impl Validator for ListValidator {
         self._validation_logic(py, input, input.strict_list()?, extra, slots, recursion_guard)
     }
 
-    fn get_name(&self, py: Python) -> String {
-        format!("{}[{}]", Self::EXPECTED_TYPE, self.item_validator.get_name(py))
+    fn get_name(&self, py: Python, slots: &[CombinedValidator]) -> String {
+        format!("{}[{}]", Self::EXPECTED_TYPE, self.item_validator.get_name(py, slots))
     }
 }
 

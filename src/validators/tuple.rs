@@ -50,8 +50,8 @@ impl Validator for TupleVarLenValidator {
         self._validation_logic(py, input, input.strict_tuple()?, extra, slots, recursion_guard)
     }
 
-    fn get_name(&self, py: Python) -> String {
-        format!("{}[{}]", Self::EXPECTED_TYPE, self.item_validator.get_name(py))
+    fn get_name(&self, py: Python, slots: &[CombinedValidator]) -> String {
+        format!("{}[{}]", Self::EXPECTED_TYPE, self.item_validator.get_name(py, slots))
     }
 }
 
@@ -140,11 +140,11 @@ impl Validator for TupleFixLenValidator {
         self._validation_logic(py, input, input.strict_tuple()?, extra, slots, recursion_guard)
     }
 
-    fn get_name(&self, py: Python) -> String {
+    fn get_name(&self, py: Python, slots: &[CombinedValidator]) -> String {
         let descr = self
             .items_validators
             .iter()
-            .map(|v| v.get_name(py))
+            .map(|v| v.get_name(py, slots))
             .collect::<Vec<_>>()
             .join(", ");
         format!("{}[{}]", Self::EXPECTED_TYPE, descr)

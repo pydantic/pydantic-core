@@ -266,7 +266,7 @@ def test_recursion_branch():
     b['branch'] = b
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python(b)
-    assert exc_info.value.title == 'recursive-container'
+    assert exc_info.value.title == 'typed-dict'
     assert exc_info.value.errors() == [
         {
             'kind': 'recursion_loop',
@@ -299,8 +299,17 @@ def test_recursive_list():
 
     data = list()
     data.append(data)
-    with pytest.raises(ValidationError, match='Recursion error - cyclic reference detected'):
+    with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python(data)
+    assert exc_info.value.title == 'list[recursive-ref]'
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'recursion_loop',
+            'loc': [0],
+            'message': 'Recursion error - cyclic reference detected',
+            'input_value': [IsList(length=1)],
+        }
+    ]
 
 
 @pytest.fixture(scope='module')
@@ -440,7 +449,7 @@ def test_recursive_wrap():
     ]
 
 
-def test_union_strictness():
+def test_union_ref_strictness():
     v = SchemaValidator(
         {
             'fields': {
@@ -456,6 +465,42 @@ def test_union_strictness():
         }
     )
     assert v.validate_python({'a': 1, 'b': '2'}) == {'a': 1, 'b': '2'}
+    assert v.validate_python({'a': 1, 'b': 2}) == {'a': 1, 'b': 2}
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python({'a': 1, 'b': []})
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'int_type',
+            'loc': ['b', 'recursive-ref'],
+            'message': 'Value must be a valid integer',
+            'input_value': [],
+        },
+        {'kind': 'str_type', 'loc': ['b', 'str'], 'message': 'Value must be a valid string', 'input_value': []},
+    ]
+
+
+def test_union_container_strictness():
+    v = SchemaValidator(
+        {
+            'fields': {
+                'b': {'schema': {'type': 'union', 'choices': [{'type': 'int', 'ref': 'int-type'}, {'type': 'str'}]}},
+                'a': {'schema': {'type': 'recursive-ref', 'schema_ref': 'int-type'}},
+            },
+            'type': 'typed-dict',
+        }
+    )
+    assert v.validate_python({'a': 1, 'b': '2'}) == {'a': 1, 'b': '2'}
+    assert v.validate_python({'a': 1, 'b': 2}) == {'a': 1, 'b': 2}
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python({'a': 1, 'b': []})
+
+    assert exc_info.value.errors() == [
+        {'kind': 'int_type', 'loc': ['b', 'int'], 'message': 'Value must be a valid integer', 'input_value': []},
+        {'kind': 'str_type', 'loc': ['b', 'str'], 'message': 'Value must be a valid string', 'input_value': []},
+    ]
 
 
 @pytest.mark.parametrize('strict', [True, False], ids=lambda s: f'strict={s}')

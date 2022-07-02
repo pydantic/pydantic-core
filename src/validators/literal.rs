@@ -79,7 +79,7 @@ impl Validator for LiteralSingleStringValidator {
         }
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name(&self, _py: Python, _slots: &[CombinedValidator]) -> String {
         format!("literal[{}]", self.repr)
     }
 }
@@ -117,7 +117,7 @@ impl Validator for LiteralSingleIntValidator {
         }
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name(&self, _py: Python, _slots: &[CombinedValidator]) -> String {
         format!("literal[{}]", self.expected)
     }
 }
@@ -170,7 +170,7 @@ impl Validator for LiteralMultipleStringsValidator {
         }
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name(&self, _py: Python, _slots: &[CombinedValidator]) -> String {
         format!("literal[{}]", self.repr)
     }
 }
@@ -223,7 +223,7 @@ impl Validator for LiteralMultipleIntsValidator {
         }
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name(&self, _py: Python, _slots: &[CombinedValidator]) -> String {
         format!("literal[{}]", self.repr)
     }
 }
@@ -301,7 +301,7 @@ impl Validator for LiteralGeneralValidator {
         ))
     }
 
-    fn get_name(&self, _py: Python) -> String {
+    fn get_name(&self, _py: Python, _slots: &[CombinedValidator]) -> String {
         format!("literal[{}]", self.repr)
     }
 }
