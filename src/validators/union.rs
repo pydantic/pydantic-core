@@ -59,7 +59,7 @@ impl Validator for UnionValidator {
 
             Err(ValError::LineErrors(errors))
         } else {
-            // 1st pass: check if the value is an exact instance of one of the Union types
+            // 1st pass: check if the value is an exact instance of one of the Union types, e.g. use validate_strict
             if let Some(res) = self
                 .choices
                 .iter()
@@ -71,11 +71,11 @@ impl Validator for UnionValidator {
 
             let mut errors: Vec<ValLineError> = Vec::with_capacity(self.choices.len());
 
-            // 2nd pass: check if the value can be coerced into one of the Union types
+            // 2nd pass: check if the value can be coerced into one of the Union types, e.g. use validate
             for validator in &self.choices {
                 let line_errors = match validator.validate(py, input, extra, slots, recursion_guard) {
                     Err(ValError::LineErrors(line_errors)) => line_errors,
-                    otherwise => return otherwise,
+                    success => return success,
                 };
 
                 errors.extend(

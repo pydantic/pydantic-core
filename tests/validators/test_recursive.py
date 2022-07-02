@@ -438,3 +438,59 @@ def test_recursive_wrap():
             'input_value': IsList(positions={0: 1}, length=2),
         }
     ]
+
+
+def test_union_strictness():
+    v = SchemaValidator(
+        {
+            'fields': {
+                'a': {'schema': {'type': 'int', 'ref': 'int-type'}},
+                'b': {
+                    'schema': {
+                        'type': 'union',
+                        'choices': [{'type': 'recursive-ref', 'schema_ref': 'int-type'}, {'type': 'str'}],
+                    }
+                },
+            },
+            'type': 'typed-dict',
+        }
+    )
+    assert v.validate_python({'a': 1, 'b': '2'}) == {'a': 1, 'b': '2'}
+
+
+@pytest.mark.parametrize('strict', [True, False], ids=lambda s: f'strict={s}')
+def test_union_cycle(strict):
+    s = SchemaValidator(
+        {
+            'choices': [
+                {
+                    'fields': {
+                        'foobar': {
+                            'schema': {
+                                'items_schema': {'schema_ref': 'root-schema', 'type': 'recursive-ref'},
+                                'type': 'list',
+                            }
+                        }
+                    },
+                    'type': 'typed-dict',
+                }
+            ],
+            'strict': strict,
+            'ref': 'root-schema',
+            'type': 'union',
+        }
+    )
+
+    data = {'foobar': []}
+    data['foobar'].append(data)
+
+    with pytest.raises(ValidationError) as exc_info:
+        s.validate_python(data)
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'recursion_loop',
+            'loc': ['typed-dict', 'foobar', 0],
+            'message': 'Recursion error - cyclic reference detected',
+            'input_value': {'foobar': [{'foobar': IsList(length=1)}]},
+        }
+    ]

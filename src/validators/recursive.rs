@@ -28,7 +28,18 @@ impl Validator for RecursiveContainerValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        validate(self.validator_id, py, input, extra, slots, recursion_guard)
+        guard_validate(self.validator_id, py, false, input, extra, slots, recursion_guard)
+    }
+
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        guard_validate(self.validator_id, py, true, input, extra, slots, recursion_guard)
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -64,7 +75,18 @@ impl Validator for RecursiveRefValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        validate(self.validator_id, py, input, extra, slots, recursion_guard)
+        guard_validate(self.validator_id, py, false, input, extra, slots, recursion_guard)
+    }
+
+    fn validate_strict<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        guard_validate(self.validator_id, py, true, input, extra, slots, recursion_guard)
     }
 
     fn get_name(&self, _py: Python) -> String {
@@ -72,9 +94,10 @@ impl Validator for RecursiveRefValidator {
     }
 }
 
-fn validate<'s, 'data>(
+fn guard_validate<'s, 'data>(
     validator_id: usize,
     py: Python<'data>,
+    strict: bool,
     input: &'data impl Input<'data>,
     extra: &Extra,
     slots: &'data [CombinedValidator],
@@ -82,16 +105,31 @@ fn validate<'s, 'data>(
 ) -> ValResult<'data, PyObject> {
     if let Some(id) = input.identity() {
         if recursion_guard.contains_or_insert(id) {
-            // remove ID in case we use recursion_guard again
+            // we don't remove id here, we leave that to the validator which originally added id to `recursion_guard`
+            Err(ValError::new(ErrorKind::RecursionLoop, input))
+        } else {
+            let output = validate(validator_id, py, strict, input, extra, slots, recursion_guard);
             recursion_guard.remove(&id);
-            return Err(ValError::new(ErrorKind::RecursionLoop, input));
+            output
         }
-        let validator = unsafe { slots.get_unchecked(validator_id) };
-        let output = validator.validate(py, input, extra, slots, recursion_guard);
-        recursion_guard.remove(&id);
-        output
     } else {
-        let validator = unsafe { slots.get_unchecked(validator_id) };
+        validate(validator_id, py, strict, input, extra, slots, recursion_guard)
+    }
+}
+
+fn validate<'s, 'data>(
+    validator_id: usize,
+    py: Python<'data>,
+    strict: bool,
+    input: &'data impl Input<'data>,
+    extra: &Extra,
+    slots: &'data [CombinedValidator],
+    recursion_guard: &'s mut RecursionGuard,
+) -> ValResult<'data, PyObject> {
+    let validator = unsafe { slots.get_unchecked(validator_id) };
+    if strict {
+        validator.validate_strict(py, input, extra, slots, recursion_guard)
+    } else {
         validator.validate(py, input, extra, slots, recursion_guard)
     }
 }
