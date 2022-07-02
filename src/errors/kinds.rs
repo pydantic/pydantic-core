@@ -7,7 +7,7 @@ use strum::{Display, EnumMessage};
 /// NOTE: if an error has parameters:
 /// * the variables in the message need to match the enum struct
 /// * you need to add an entry to the `render` enum to render the error message as a template
-/// * you need to ad an entry to the `py_dict` enum to generate `ctx` for error messages
+/// * you need to add an entry to the `py_dict` enum to generate `ctx` for error messages
 #[derive(Debug, Display, EnumMessage, Clone)]
 #[strum(serialize_all = "snake_case")]
 pub enum ErrorKind {

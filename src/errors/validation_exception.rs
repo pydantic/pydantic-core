@@ -4,9 +4,7 @@ use std::fmt::Write;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
-
-use crate::errors::location::reverse_location;
+use pyo3::types::PyDict;
 
 use crate::input::repr_string;
 
@@ -146,7 +144,7 @@ impl<'a> IntoPy<PyLineError> for ValLineError<'a> {
     fn into_py(self, py: Python<'_>) -> PyLineError {
         PyLineError {
             kind: self.kind,
-            location: reverse_location(self.reverse_location),
+            location: self.location,
             input_value: self.input_value.to_object(py),
         }
     }
@@ -157,7 +155,7 @@ impl<'a> From<PyLineError> for ValLineError<'a> {
     fn from(py_line_error: PyLineError) -> Self {
         Self {
             kind: py_line_error.kind,
-            reverse_location: reverse_location(py_line_error.location),
+            location: py_line_error.location,
             input_value: py_line_error.input_value.into(),
         }
     }
@@ -167,11 +165,7 @@ impl PyLineError {
     pub fn as_dict(&self, py: Python) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
         dict.set_item("kind", self.kind.to_string())?;
-        if let Some(ref location) = self.location {
-            dict.set_item("loc", location.to_object(py))?;
-        } else {
-            dict.set_item("loc", PyList::empty(py).to_object(py))?;
-        }
+        dict.set_item("loc", self.location.to_object(py))?;
         dict.set_item("message", self.kind.render())?;
         dict.set_item("input_value", &self.input_value)?;
         if let Some(context) = self.kind.py_dict(py)? {
@@ -182,14 +176,7 @@ impl PyLineError {
 
     fn pretty(&self, py: Option<Python>) -> Result<String, fmt::Error> {
         let mut output = String::with_capacity(200);
-        if let Some(ref location) = self.location {
-            let loc = location
-                .iter()
-                .map(|i| i.to_string())
-                .collect::<Vec<String>>()
-                .join(" -> ");
-            writeln!(output, "{}", &loc)?;
-        }
+        write!(output, "{}", self.location)?;
 
         write!(output, "  {} [kind={}", self.kind.render(), self.kind)?;
 

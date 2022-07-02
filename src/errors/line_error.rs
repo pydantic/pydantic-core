@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use crate::input::{Input, JsonInput};
 
 use super::kinds::ErrorKind;
-use super::location::{new_location, LocItem, Location};
+use super::location::{LocItem, Location};
 use super::validation_exception::{pretty_py_line_errors, PyLineError};
 
 pub type ValResult<'a, T> = Result<T, ValError<'a>>;
@@ -55,7 +55,7 @@ pub fn pretty_line_errors(py: Python, line_errors: Vec<ValLineError>) -> String 
 pub struct ValLineError<'a> {
     pub kind: ErrorKind,
     // location is reversed so that adding an "outer" location item is pushing, it's reversed before showing to the user
-    pub reverse_location: Location,
+    pub location: Location,
     pub input_value: InputValue<'a>,
 }
 
@@ -64,7 +64,7 @@ impl<'a> ValLineError<'a> {
         Self {
             kind,
             input_value: input.as_error_value(),
-            reverse_location: None,
+            location: Location::default(),
         }
     }
 
@@ -72,17 +72,14 @@ impl<'a> ValLineError<'a> {
         Self {
             kind,
             input_value: input.as_error_value(),
-            reverse_location: Some(vec![loc.into()]),
+            location: Location::new_some(loc.into()),
         }
     }
 
     /// location is stored reversed so it's quicker to add "outer" items as that's what we always do
     /// hence `push` here instead of `insert`
     pub fn with_outer_location(mut self, loc_item: LocItem) -> Self {
-        match self.reverse_location {
-            Some(ref mut rev_loc) => rev_loc.push(loc_item),
-            None => self.reverse_location = new_location(loc_item),
-        };
+        self.location.with_outer(loc_item);
         self
     }
 
@@ -95,7 +92,7 @@ impl<'a> ValLineError<'a> {
     pub fn into_new<'b>(self, py: Python) -> ValLineError<'b> {
         ValLineError {
             kind: self.kind,
-            reverse_location: self.reverse_location,
+            location: self.location,
             input_value: self.input_value.to_object(py).into(),
         }
     }
