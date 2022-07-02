@@ -13,7 +13,6 @@ from pprint import pformat
 from typing import Any, Dict, ForwardRef, List, Union
 
 import black
-from pydantic.typing import all_literal_values, literal_values
 from typing_extensions import get_args, is_typeddict
 
 try:
