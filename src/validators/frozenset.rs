@@ -2,13 +2,13 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFrozenSet};
 
 use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{as_internal, ErrorKind, ValError};
+use crate::errors::{as_internal, ErrorKind, ValError, ValResult};
 use crate::input::{GenericSequence, Input};
 use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
 use super::list::sequence_build_function;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct FrozenSetValidator {

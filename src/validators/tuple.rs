@@ -2,13 +2,13 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::{is_strict, py_error, SchemaDict};
-use crate::errors::{ErrorKind, ValError, ValLineError};
+use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
 use crate::input::{GenericSequence, Input};
 use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
 use super::list::sequence_build_function;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValResult, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct TupleVarLenValidator {
