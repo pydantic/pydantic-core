@@ -1,18 +1,11 @@
-import os
 from datetime import datetime, timezone
 from typing import Optional
 
 import pytest
-from hypothesis import given, settings, strategies
+from hypothesis import given, strategies
 from typing_extensions import TypedDict
 
 from pydantic_core import SchemaValidator, ValidationError
-
-settings_dict = {}
-hyp_max_examples = os.getenv('HYPOTHESIS_MAX_EXAMPLES')
-if hyp_max_examples:
-    settings_dict['max_examples'] = int(hyp_max_examples)
-    print(f'hypothesis settings: {settings_dict}')
 
 
 @pytest.fixture(scope='module')
@@ -20,13 +13,11 @@ def datetime_schema():
     return SchemaValidator({'type': 'datetime'})
 
 
-@settings(**settings_dict)
 @given(strategies.datetimes())
 def test_datetime_datetime(datetime_schema, data):
     assert datetime_schema.validate_python(data) == data
 
 
-@settings(**settings_dict)
 @given(strategies.integers(min_value=-11_676_096_000, max_value=253_402_300_799_000))
 def test_datetime_int(datetime_schema, data):
     if abs(data) > 20_000_000_000:
@@ -38,7 +29,6 @@ def test_datetime_int(datetime_schema, data):
     assert datetime_schema.validate_python(data) == expected, data
 
 
-@settings(**settings_dict)
 @given(strategies.binary())
 def test_datetime_binary(datetime_schema, data):
     try:
@@ -74,7 +64,6 @@ class BranchModel(TypedDict):
     sub_branch: Optional['BranchModel']
 
 
-@settings(**settings_dict)
 @given(strategies.from_type(BranchModel))
 def test_recursive_hyp(recursive_schema, data):
     assert recursive_schema.validate_python(data) == data
