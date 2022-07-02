@@ -52,7 +52,13 @@ impl SchemaValidator {
 
         let schema_obj = self_schema
             .validator
-            .validate(py, schema, &Extra::default(), &self_schema.slots)
+            .validate(
+                py,
+                schema,
+                &Extra::default(),
+                &self_schema.slots,
+                &mut RecursionGuard::default(),
+            )
             .map_err(|e| SchemaError::from_val_error(py, "Invalid Schema", e))?;
         let schema = schema_obj.as_ref(py);
 
