@@ -65,7 +65,22 @@ class BranchModel(TypedDict):
 
 
 @given(strategies.from_type(BranchModel))
-def test_recursive_hyp(recursive_schema, data):
+def test_recursive(recursive_schema, data):
+    assert recursive_schema.validate_python(data) == data
+
+
+@strategies.composite
+def branch_models_with_cycles(draw, existing: list[BranchModel] = strategies.from_type(list[BranchModel])):
+    # debug(existing)
+    name = draw(strategies.text())
+    sub_branch = draw(strategies.from_type(BranchModel) | strategies.sampled_from(existing))
+    branch = BranchModel(name=name, sub_branch=sub_branch)
+    existing.append(branch)
+    return branch
+
+
+@given(branch_models_with_cycles())
+def test_recursive_cycles(recursive_schema, data):
     assert recursive_schema.validate_python(data) == data
 
 
