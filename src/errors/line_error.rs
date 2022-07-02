@@ -103,17 +103,10 @@ impl<'a> ValLineError<'a> {
 
 #[derive(Debug)]
 pub enum InputValue<'a> {
-    None,
     PyAny(&'a PyAny),
     JsonInput(&'a JsonInput),
     String(&'a str),
     PyObject(PyObject),
-}
-
-impl Default for InputValue<'_> {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl<'a> From<PyObject> for InputValue<'a> {
@@ -125,7 +118,6 @@ impl<'a> From<PyObject> for InputValue<'a> {
 impl<'a> ToPyObject for InputValue<'a> {
     fn to_object(&self, py: Python) -> PyObject {
         match self {
-            Self::None => py.None(),
             Self::PyAny(input) => input.into_py(py),
             Self::JsonInput(input) => input.to_object(py),
             Self::String(input) => input.into_py(py),
