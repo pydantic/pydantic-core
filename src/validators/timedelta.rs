@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 use speedate::Duration;
 
 use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{as_internal, context, err_val_error, ErrorKind, ValResult};
+use crate::errors::{as_internal, ErrorKind, ValError, ValResult};
 use crate::input::{EitherTimedelta, Input};
 use crate::recursion_guard::RecursionGuard;
 use crate::SchemaError;
@@ -95,23 +95,24 @@ impl TimedeltaValidator {
             let raw_timedelta = timedelta.as_raw().map_err(as_internal)?;
 
             macro_rules! check_constraint {
-                ($constraint:ident, $error:path, $key:literal) => {
+                ($constraint:ident, $error:ident) => {
                     if let Some(constraint) = &constraints.$constraint {
                         if !raw_timedelta.$constraint(constraint) {
-                            return err_val_error!(
-                                input_value = input.as_error_value(),
-                                kind = $error,
-                                context = context!($key => constraint.to_string())
-                            );
+                            return Err(ValError::new(
+                                ErrorKind::$error {
+                                    $constraint: constraint.to_string(),
+                                },
+                                input,
+                            ));
                         }
                     }
                 };
             }
 
-            check_constraint!(le, ErrorKind::LessThanEqual, "le");
-            check_constraint!(lt, ErrorKind::LessThan, "lt");
-            check_constraint!(ge, ErrorKind::GreaterThanEqual, "ge");
-            check_constraint!(gt, ErrorKind::GreaterThan, "gt");
+            check_constraint!(le, LessThanEqual);
+            check_constraint!(lt, LessThan);
+            check_constraint!(ge, GreaterThanEqual);
+            check_constraint!(gt, GreaterThan);
         }
         timedelta.try_into_py(py).map_err(as_internal)
     }
