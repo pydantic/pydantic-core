@@ -167,11 +167,13 @@ fn parse_json(input: &PyAny) -> PyResult<serde_json::Result<JsonInput>> {
     if let Ok(py_bytes) = input.cast_as::<PyBytes>() {
         Ok(serde_json::from_slice(py_bytes.as_bytes()))
     } else if let Ok(py_str) = input.cast_as::<PyString>() {
-        Ok(serde_json::from_str(&py_str.to_string_lossy()))
+        let str = py_str.to_str()?;
+        Ok(serde_json::from_str(str))
     } else if let Ok(py_byte_array) = input.cast_as::<PyByteArray>() {
         Ok(serde_json::from_slice(unsafe { py_byte_array.as_bytes() }))
     } else {
-        Err(PyTypeError::new_err("JSON input must be str, bytes or bytearray"))
+        let input_type = input.get_type().name().unwrap_or("unknown");
+        py_error!(PyTypeError; "JSON input must be str, bytes or bytearray, not {}", input_type)
     }
 }
 
