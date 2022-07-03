@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
 import pytest
 from hypothesis import given, strategies
@@ -70,10 +70,15 @@ def test_recursive(recursive_schema, data):
 
 
 @strategies.composite
-def branch_models_with_cycles(draw, existing: list[BranchModel] = strategies.from_type(list[BranchModel])):
-    # debug(existing)
+def branch_models_with_cycles(draw, existing: List[BranchModel] | None = None):
+    if existing is None:
+        existing = []
     name = draw(strategies.text())
-    sub_branch = draw(strategies.from_type(BranchModel) | strategies.sampled_from(existing))
+    sub_branch = draw(
+        strategies.none()
+        | (strategies.sampled_from(existing) if existing else strategies.nothing())
+        | branch_models_with_cycles(existing)
+    )
     branch = BranchModel(name=name, sub_branch=sub_branch)
     existing.append(branch)
     return branch
