@@ -295,12 +295,10 @@ impl Validator for TypedDictValidator {
         Self::EXPECTED_TYPE
     }
 
-    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
-        eprintln!("complete typed dict");
+    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
         self.fields
-            .iter()
-            .map(|f| f.validator.complete(build_context))
-            .collect::<PyResult<_>>()
+            .iter_mut()
+            .try_for_each(|f| f.validator.complete(build_context))
     }
 }
 

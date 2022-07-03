@@ -79,7 +79,7 @@ impl Validator for ListValidator {
         &self.name
     }
 
-    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
+    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
         self.item_validator.complete(build_context)
     }
 }

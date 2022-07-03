@@ -84,7 +84,7 @@ impl Validator for DictValidator {
         &self.name
     }
 
-    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
+    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
         self.key_validator.complete(build_context)?;
         self.value_validator.complete(build_context)
     }

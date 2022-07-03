@@ -102,10 +102,7 @@ impl Validator for UnionValidator {
         &self.name
     }
 
-    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
-        self.choices
-            .iter()
-            .map(|v| v.complete(build_context))
-            .collect::<PyResult<_>>()
+    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
+        self.choices.iter_mut().try_for_each(|v| v.complete(build_context))
     }
 }

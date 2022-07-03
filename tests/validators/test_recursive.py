@@ -54,7 +54,6 @@ def test_nullable_error():
             },
         }
     )
-    debug(v)
     assert v.validate_python({'width': 123, 'sub_branch': {'width': 321}}) == (
         {'width': 123, 'sub_branch': {'width': 321, 'sub_branch': None}}
     )
@@ -69,7 +68,7 @@ def test_nullable_error():
         },
         {
             'kind': 'int_parsing',
-            'loc': ['sub_branch', 'recursive-ref', 'width'],
+            'loc': ['sub_branch', 'typed-dict', 'width'],
             'message': 'Value must be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         },
@@ -302,7 +301,7 @@ def test_recursive_list():
     data.append(data)
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python(data)
-    assert exc_info.value.title == 'list[recursive-ref]'
+    assert exc_info.value.title == 'list[...]'
     assert exc_info.value.errors() == [
         {
             'kind': 'recursion_loop',
@@ -472,12 +471,7 @@ def test_union_ref_strictness():
         v.validate_python({'a': 1, 'b': []})
 
     assert exc_info.value.errors() == [
-        {
-            'kind': 'int_type',
-            'loc': ['b', 'recursive-ref'],
-            'message': 'Value must be a valid integer',
-            'input_value': [],
-        },
+        {'kind': 'int_type', 'loc': ['b', 'int'], 'message': 'Value must be a valid integer', 'input_value': []},
         {'kind': 'str_type', 'loc': ['b', 'str'], 'message': 'Value must be a valid string', 'input_value': []},
     ]
 
