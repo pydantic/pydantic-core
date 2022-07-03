@@ -36,7 +36,7 @@ impl BuildValidator for DictValidator {
             None => Box::new(AnyValidator::build(schema, config, build_context)?),
         };
         let name = format!(
-            "{}[{}, {}]",
+            "{}[{},{}]",
             Self::EXPECTED_TYPE,
             key_validator.get_name(),
             value_validator.get_name()
