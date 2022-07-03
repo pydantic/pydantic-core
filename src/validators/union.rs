@@ -101,4 +101,11 @@ impl Validator for UnionValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
+
+    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
+        self.choices
+            .iter()
+            .map(|v| v.complete(build_context))
+            .collect::<PyResult<_>>()
+    }
 }

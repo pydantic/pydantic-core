@@ -54,6 +54,7 @@ def test_nullable_error():
             },
         }
     )
+    debug(v)
     assert v.validate_python({'width': 123, 'sub_branch': {'width': 321}}) == (
         {'width': 123, 'sub_branch': {'width': 321, 'sub_branch': None}}
     )

@@ -54,6 +54,10 @@ impl Validator for TupleVarLenValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
+
+    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
+        self.item_validator.complete(build_context)
+    }
 }
 
 impl TupleVarLenValidator {
@@ -146,6 +150,13 @@ impl Validator for TupleFixLenValidator {
 
     fn get_name(&self) -> &str {
         &self.name
+    }
+
+    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
+        self.items_validators
+            .iter()
+            .map(|v| v.complete(build_context))
+            .collect::<PyResult<_>>()
     }
 }
 

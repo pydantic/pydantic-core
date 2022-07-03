@@ -54,6 +54,10 @@ impl Validator for SetValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
+
+    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
+        self.item_validator.complete(build_context)
+    }
 }
 
 impl SetValidator {

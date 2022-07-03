@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::hash::BuildHasherDefault;
 
+use ahash::AHashSet;
 use nohash_hasher::NoHashHasher;
 
 /// This is used to avoid cyclic references in input data causing recursive validation and a nasty segmentation fault.
@@ -29,6 +30,33 @@ impl RecursionGuard {
         match self.0 {
             Some(ref mut set) => {
                 set.remove(id);
+            }
+            None => unreachable!(),
+        };
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct NameRecursionGuard(Option<AHashSet<String>>);
+
+impl NameRecursionGuard {
+    // insert a new id into the set, return whether the set already had the id in it
+    pub fn contains_or_insert(&mut self, validator_ref: String) -> bool {
+        match self.0 {
+            Some(ref mut set) => !set.insert(validator_ref),
+            None => {
+                let mut set: AHashSet<String> = AHashSet::with_capacity(10);
+                set.insert(validator_ref);
+                self.0 = Some(set);
+                false
+            }
+        }
+    }
+
+    pub fn remove(&mut self, validator_ref: &str) {
+        match self.0 {
+            Some(ref mut set) => {
+                set.remove(validator_ref);
             }
             None => unreachable!(),
         };

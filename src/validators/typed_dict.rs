@@ -294,6 +294,14 @@ impl Validator for TypedDictValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
+
+    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
+        eprintln!("complete typed dict");
+        self.fields
+            .iter()
+            .map(|f| f.validator.complete(build_context))
+            .collect::<PyResult<_>>()
+    }
 }
 
 impl TypedDictValidator {

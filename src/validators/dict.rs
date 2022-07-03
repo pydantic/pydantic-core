@@ -83,6 +83,11 @@ impl Validator for DictValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
+
+    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
+        self.key_validator.complete(build_context)?;
+        self.value_validator.complete(build_context)
+    }
 }
 
 macro_rules! build_validate {

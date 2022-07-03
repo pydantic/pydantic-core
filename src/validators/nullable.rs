@@ -61,4 +61,8 @@ impl Validator for NullableValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
+
+    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
+        self.validator.complete(build_context)
+    }
 }

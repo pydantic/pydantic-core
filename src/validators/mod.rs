@@ -10,7 +10,7 @@ use serde_json::from_str as parse_json;
 use crate::build_tools::{py_error, SchemaDict, SchemaError};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult, ValidationError};
 use crate::input::{Input, JsonInput};
-use crate::recursion_guard::RecursionGuard;
+use crate::recursion_guard::{NameRecursionGuard, RecursionGuard};
 
 mod any;
 mod bool;
@@ -58,6 +58,7 @@ impl SchemaValidator {
                 });
             }
         };
+        validator.complete(&build_context)?;
         let slots = build_context.into_slots()?;
         let title = validator.get_name().into_py(py);
         Ok(Self {
@@ -169,11 +170,8 @@ pub trait BuildValidator: Sized {
 
     /// Build a new validator from the schema, the return type is a trait to provide a way for validators
     /// to return other validators, see `string.rs`, `int.rs`, `float.rs` and `function.rs` for examples
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        _build_context: &mut BuildContext,
-    ) -> PyResult<CombinedValidator>;
+    fn build(schema: &PyDict, config: Option<&PyDict>, build_context: &mut BuildContext)
+        -> PyResult<CombinedValidator>;
 }
 
 fn build_single_validator<'a, T: BuildValidator>(
@@ -189,7 +187,7 @@ fn build_single_validator<'a, T: BuildValidator>(
         let inner_val = T::build(schema_dict, config, build_context)
             .map_err(|err| SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", val_type, err)))?;
         let name = inner_val.get_name().to_string();
-        build_context.complete_slot(slot_id, inner_val);
+        build_context.complete_slot(slot_id, inner_val)?;
         recursive::RecursiveContainerValidator::create(slot_id, name)
     } else {
         T::build(schema_dict, config, build_context)
@@ -389,12 +387,19 @@ pub trait Validator: Send + Sync + Clone + Debug {
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`
     fn get_name(&self) -> &str;
+
+    /// Use by recursive validators to set their name
+    fn complete(&self, _build_context: &BuildContext) -> PyResult<()> {
+        eprintln!("default complete {}", self.get_name());
+        Ok(())
+    }
 }
 
 #[derive(Default)]
 pub struct BuildContext {
     slots: Vec<(String, Option<CombinedValidator>)>,
     depth: usize,
+    name_rec_guard: NameRecursionGuard,
 }
 
 const MAX_DEPTH: usize = 100;
@@ -406,9 +411,13 @@ impl BuildContext {
         Ok(id)
     }
 
-    pub fn complete_slot(&mut self, slot_id: usize, validator: CombinedValidator) {
-        let (name, _) = self.slots.get(slot_id).unwrap();
-        self.slots[slot_id] = (name.clone(), Some(validator));
+    pub fn complete_slot(&mut self, slot_id: usize, validator: CombinedValidator) -> PyResult<()> {
+        let (val_ref, _) = self.slots.get(slot_id).ok_or(SchemaError::new_err(format!(
+            "Recursive reference error: slot {} not found",
+            slot_id
+        )))?;
+        self.slots[slot_id] = (val_ref.clone(), Some(validator));
+        Ok(())
     }
 
     pub fn incr_check_depth(&mut self) -> PyResult<()> {
@@ -424,11 +433,45 @@ impl BuildContext {
         self.depth -= 1;
     }
 
-    pub fn find_slot_id(&self, slot_ref: &str) -> PyResult<usize> {
-        let is_match = |(n, _): &(String, Option<CombinedValidator>)| n == slot_ref;
+    pub fn find_slot_id(&self, val_ref: &str) -> PyResult<usize> {
+        let is_match = |(slot_ref, _): &(String, Option<CombinedValidator>)| slot_ref == val_ref;
         match self.slots.iter().position(is_match) {
             Some(id) => Ok(id),
-            None => py_error!("Recursive reference error: ref '{}' not found", slot_ref),
+            None => py_error!("Recursive reference error: ref '{}' not found", val_ref),
+        }
+    }
+
+    pub fn get_name(&self, slot_id: usize) -> PyResult<String> {
+        let (_, op_validator) = self.slots.get(slot_id).ok_or(SchemaError::new_err(format!(
+            "Recursive reference error: slot {} not found",
+            slot_id
+        )))?;
+        match op_validator {
+            Some(ref validator) => Ok(validator.get_name().to_string()),
+            None => py_error!("Recursive reference error: slot {} not yet filled", slot_id),
+        }
+    }
+
+    // pub fn complete_validator(&mut self, slot_id: usize) -> PyResult<()> {
+    //     match self.slots.get_mut(slot_id) {
+    //         Some((_, op_validator)) =>  match op_validator {
+    //             Some(ref mut validator) => {
+    //                 // validator.complete(self);
+    //                 Ok(())
+    //             },
+    //             None => py_error!("Recursive reference error: slot {} not yet filled", slot_id),
+    //         },
+    //         None => py_error!("Recursive reference error: slot {} not found", slot_id)
+    //     }
+    // }
+
+    pub fn get_validator(&self, slot_id: usize) -> PyResult<&CombinedValidator> {
+        match self.slots.get(slot_id) {
+            Some((_, op_validator)) => match op_validator {
+                Some(ref validator) => Ok(validator),
+                None => py_error!("Recursive reference error: slot {} not yet filled", slot_id),
+            },
+            None => py_error!("Recursive reference error: slot {} not found", slot_id),
         }
     }
 

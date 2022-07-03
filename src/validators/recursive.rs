@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
+
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -51,11 +54,19 @@ impl Validator for RecursiveContainerValidator {
         // we just return the inner validator to make the recursive-container invisible in output messages
         &self.inner_name
     }
+
+    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
+        eprintln!("complete recursive container");
+        let validator = build_context.get_validator(self.validator_id)?;
+        validator.complete(build_context)
+        // build_context.complete_validator(self.validator_id)
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct RecursiveRefValidator {
     validator_id: usize,
+    name: Arc<Mutex<RefCell<String>>>,
 }
 
 impl BuildValidator for RecursiveRefValidator {
@@ -68,7 +79,11 @@ impl BuildValidator for RecursiveRefValidator {
     ) -> PyResult<CombinedValidator> {
         let name: String = schema.get_as_req("schema_ref")?;
         let validator_id = build_context.find_slot_id(&name)?;
-        Ok(Self { validator_id }.into())
+        Ok(Self {
+            validator_id,
+            name: Arc::new(Mutex::new(RefCell::new("...".to_string()))),
+        }
+        .into())
     }
 }
 
@@ -96,9 +111,16 @@ impl Validator for RecursiveRefValidator {
     }
 
     fn get_name(&self) -> &str {
-        // let validator = unsafe { slots.get_unchecked(self.validator_id) };
-        // validator.get_name(py, slots)
-        Self::EXPECTED_TYPE
+        // self.name.borrow().into_inner()
+        let name_ref = self.name.lock().unwrap();
+        name_ref.borrow().as_str()
+    }
+
+    fn complete(&self, build_context: &BuildContext) -> PyResult<()> {
+        let validator = build_context.get_validator(self.validator_id)?;
+        let name_ref = self.name.lock().unwrap();
+        name_ref.replace(validator.get_name().to_string());
+        Ok(())
     }
 }
 
