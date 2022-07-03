@@ -12,6 +12,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 pub struct UnionValidator {
     choices: Vec<CombinedValidator>,
     strict: bool,
+    name: String,
 }
 
 impl BuildValidator for UnionValidator {
@@ -28,7 +29,15 @@ impl BuildValidator for UnionValidator {
             .map(|choice| build_validator(choice, config, build_context).map(|result| result.0))
             .collect::<PyResult<Vec<CombinedValidator>>>()?;
         let strict = is_strict(schema, config)?;
-        Ok(Self { choices, strict }.into())
+
+        let descr = choices.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
+
+        Ok(Self {
+            choices,
+            strict,
+            name: format!("{}[{}]", Self::EXPECTED_TYPE, descr),
+        }
+        .into())
     }
 }
 
@@ -53,7 +62,7 @@ impl Validator for UnionValidator {
                 errors.extend(
                     line_errors
                         .into_iter()
-                        .map(|err| err.with_outer_location(validator.get_name(py, slots).into())),
+                        .map(|err| err.with_outer_location(validator.get_name().into())),
                 );
             }
 
@@ -81,7 +90,7 @@ impl Validator for UnionValidator {
                 errors.extend(
                     line_errors
                         .into_iter()
-                        .map(|err| err.with_outer_location(validator.get_name(py, slots).into())),
+                        .map(|err| err.with_outer_location(validator.get_name().into())),
                 );
             }
 
@@ -89,13 +98,7 @@ impl Validator for UnionValidator {
         }
     }
 
-    fn get_name(&self, py: Python, slots: &[CombinedValidator]) -> String {
-        let descr = self
-            .choices
-            .iter()
-            .map(|v| v.get_name(py, slots))
-            .collect::<Vec<_>>()
-            .join(", ");
-        format!("{}[{}]", Self::EXPECTED_TYPE, descr)
+    fn get_name(&self) -> &str {
+        &self.name
     }
 }

@@ -59,7 +59,7 @@ impl SchemaValidator {
             }
         };
         let slots = build_context.into_slots()?;
-        let title = validator.get_name(py, &slots).into_py(py);
+        let title = validator.get_name().into_py(py);
         Ok(Self {
             validator,
             slots,
@@ -149,10 +149,10 @@ impl SchemaValidator {
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
-    pub fn __repr__(&self, py: Python) -> String {
+    pub fn __repr__(&self) -> String {
         format!(
             "SchemaValidator(name={:?}, validator={:#?})",
-            self.validator.get_name(py, &self.slots),
+            self.validator.get_name(),
             self.validator
         )
     }
@@ -387,7 +387,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
 
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`
-    fn get_name(&self, py: Python, _slots: &[CombinedValidator]) -> String;
+    fn get_name(&self) -> &str;
 }
 
 #[derive(Default)]

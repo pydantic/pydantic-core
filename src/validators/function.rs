@@ -97,8 +97,8 @@ impl Validator for FunctionBeforeValidator {
         }
     }
 
-    fn get_name(&self, _py: Python, _slots: &[CombinedValidator]) -> String {
-        "function-before".to_string()
+    fn get_name(&self) -> &str {
+        "function-before"
     }
 }
 
@@ -125,8 +125,8 @@ impl Validator for FunctionAfterValidator {
         self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
     }
 
-    fn get_name(&self, _py: Python, _slots: &[CombinedValidator]) -> String {
-        "function-after".to_string()
+    fn get_name(&self) -> &str {
+        "function-after"
     }
 }
 
@@ -165,8 +165,8 @@ impl Validator for FunctionPlainValidator {
             .map_err(|e| convert_err(py, e, input))
     }
 
-    fn get_name(&self, _py: Python, _slots: &[CombinedValidator]) -> String {
-        "function-plain".to_string()
+    fn get_name(&self) -> &str {
+        "function-plain"
     }
 }
 
@@ -206,8 +206,8 @@ impl Validator for FunctionWrapValidator {
             .map_err(|e| convert_err(py, e, input))
     }
 
-    fn get_name(&self, _py: Python, _slots: &[CombinedValidator]) -> String {
-        "function-wrap".to_string()
+    fn get_name(&self) -> &str {
+        "function-wrap"
     }
 }
 

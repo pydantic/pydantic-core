@@ -16,6 +16,7 @@ pub struct TupleVarLenValidator {
     item_validator: Box<CombinedValidator>,
     min_items: Option<usize>,
     max_items: Option<usize>,
+    name: String,
 }
 
 impl BuildValidator for TupleVarLenValidator {
@@ -50,8 +51,8 @@ impl Validator for TupleVarLenValidator {
         self._validation_logic(py, input, input.strict_tuple()?, extra, slots, recursion_guard)
     }
 
-    fn get_name(&self, py: Python, slots: &[CombinedValidator]) -> String {
-        format!("{}[{}]", Self::EXPECTED_TYPE, self.item_validator.get_name(py, slots))
+    fn get_name(&self) -> &str {
+        &self.name
     }
 }
 
@@ -86,6 +87,7 @@ impl TupleVarLenValidator {
 pub struct TupleFixLenValidator {
     strict: bool,
     items_validators: Vec<CombinedValidator>,
+    name: String,
 }
 
 impl BuildValidator for TupleFixLenValidator {
@@ -105,9 +107,11 @@ impl BuildValidator for TupleFixLenValidator {
             .map(|item| build_validator(item, config, build_context).map(|result| result.0))
             .collect::<PyResult<Vec<CombinedValidator>>>()?;
 
+        let descr = validators.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
         Ok(Self {
             strict: is_strict(schema, config)?,
             items_validators: validators,
+            name: format!("{}[{}]", Self::EXPECTED_TYPE, descr),
         }
         .into())
     }
@@ -140,14 +144,8 @@ impl Validator for TupleFixLenValidator {
         self._validation_logic(py, input, input.strict_tuple()?, extra, slots, recursion_guard)
     }
 
-    fn get_name(&self, py: Python, slots: &[CombinedValidator]) -> String {
-        let descr = self
-            .items_validators
-            .iter()
-            .map(|v| v.get_name(py, slots))
-            .collect::<Vec<_>>()
-            .join(", ");
-        format!("{}[{}]", Self::EXPECTED_TYPE, descr)
+    fn get_name(&self) -> &str {
+        &self.name
     }
 }
 

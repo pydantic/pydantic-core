@@ -16,6 +16,7 @@ pub struct FrozenSetValidator {
     item_validator: Box<CombinedValidator>,
     min_items: Option<usize>,
     max_items: Option<usize>,
+    name: String,
 }
 
 impl BuildValidator for FrozenSetValidator {
@@ -50,8 +51,8 @@ impl Validator for FrozenSetValidator {
         self._validation_logic(py, input, input.strict_frozenset()?, extra, slots, recursion_guard)
     }
 
-    fn get_name(&self, py: Python, slots: &[CombinedValidator]) -> String {
-        format!("{}[{}]", Self::EXPECTED_TYPE, self.item_validator.get_name(py, slots))
+    fn get_name(&self) -> &str {
+        &self.name
     }
 }
 
