@@ -11,11 +11,16 @@ use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 #[derive(Debug, Clone)]
 pub struct RecursiveContainerValidator {
     validator_id: usize,
+    inner_name: String,
 }
 
 impl RecursiveContainerValidator {
-    pub fn create(validator_id: usize) -> CombinedValidator {
-        Self { validator_id }.into()
+    pub fn create(validator_id: usize, inner_name: String) -> CombinedValidator {
+        Self {
+            validator_id,
+            inner_name,
+        }
+        .into()
     }
 }
 
@@ -44,9 +49,7 @@ impl Validator for RecursiveContainerValidator {
 
     fn get_name(&self) -> &str {
         // we just return the inner validator to make the recursive-container invisible in output messages
-        // let validator = unsafe { slots.get_unchecked(self.validator_id) };
-        // validator.get_name(py, slots)
-        "TODO"
+        &self.inner_name
     }
 }
 
@@ -93,8 +96,8 @@ impl Validator for RecursiveRefValidator {
     }
 
     fn get_name(&self) -> &str {
-        // we can't use the same logic as above because it can cause recursion,
-        // this is a bodge until we improve names
+        // let validator = unsafe { slots.get_unchecked(self.validator_id) };
+        // validator.get_name(py, slots)
         Self::EXPECTED_TYPE
     }
 }

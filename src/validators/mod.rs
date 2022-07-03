@@ -188,8 +188,9 @@ fn build_single_validator<'a, T: BuildValidator>(
         let slot_id = build_context.prepare_slot(schema_ref)?;
         let inner_val = T::build(schema_dict, config, build_context)
             .map_err(|err| SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", val_type, err)))?;
+        let name = inner_val.get_name().to_string();
         build_context.complete_slot(slot_id, inner_val);
-        recursive::RecursiveContainerValidator::create(slot_id)
+        recursive::RecursiveContainerValidator::create(slot_id, name)
     } else {
         T::build(schema_dict, config, build_context)
             .map_err(|err| SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", val_type, err)))?
@@ -392,7 +393,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
 
 #[derive(Default)]
 pub struct BuildContext {
-    named_slots: Vec<(Option<String>, Option<CombinedValidator>)>,
+    slots: Vec<(String, Option<CombinedValidator>)>,
     depth: usize,
 }
 
@@ -400,14 +401,14 @@ const MAX_DEPTH: usize = 100;
 
 impl BuildContext {
     pub fn prepare_slot(&mut self, slot_ref: String) -> PyResult<usize> {
-        let id = self.named_slots.len();
-        self.named_slots.push((Some(slot_ref), None));
+        let id = self.slots.len();
+        self.slots.push((slot_ref, None));
         Ok(id)
     }
 
     pub fn complete_slot(&mut self, slot_id: usize, validator: CombinedValidator) {
-        let (name, _) = self.named_slots.get(slot_id).unwrap();
-        self.named_slots[slot_id] = (name.clone(), Some(validator));
+        let (name, _) = self.slots.get(slot_id).unwrap();
+        self.slots[slot_id] = (name.clone(), Some(validator));
     }
 
     pub fn incr_check_depth(&mut self) -> PyResult<()> {
@@ -424,18 +425,15 @@ impl BuildContext {
     }
 
     pub fn find_slot_id(&self, slot_ref: &str) -> PyResult<usize> {
-        let is_match = |(n, _): &(Option<String>, Option<CombinedValidator>)| match n {
-            Some(n) => n == slot_ref,
-            None => false,
-        };
-        match self.named_slots.iter().position(is_match) {
+        let is_match = |(n, _): &(String, Option<CombinedValidator>)| n == slot_ref;
+        match self.slots.iter().position(is_match) {
             Some(id) => Ok(id),
             None => py_error!("Recursive reference error: ref '{}' not found", slot_ref),
         }
     }
 
     pub fn into_slots(self) -> PyResult<Vec<CombinedValidator>> {
-        self.named_slots
+        self.slots
             .into_iter()
             .map(|(_, opt_validator)| match opt_validator {
                 Some(validator) => Ok(validator),
