@@ -52,18 +52,14 @@ impl Validator for RecursiveContainerValidator {
         &self.inner_name
     }
 
-    // fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
-    //     eprintln!("complete recursive container");
-    //     let validator = build_context.get_validator(self.validator_id)?;
-    //     validator.complete(build_context)
-    //     // build_context.complete_validator(self.validator_id)
-    // }
+    // complete is not implemented here, instead complete_validators in mod.rs calls complete()
+    // on all validators in slots
 }
 
 #[derive(Debug, Clone)]
 pub struct RecursiveRefValidator {
     validator_id: usize,
-    name: String,
+    inner_name: String,
 }
 
 impl BuildValidator for RecursiveRefValidator {
@@ -78,7 +74,7 @@ impl BuildValidator for RecursiveRefValidator {
         let validator_id = build_context.find_slot_id(&name)?;
         Ok(Self {
             validator_id,
-            name: "...".to_string(),
+            inner_name: "...".to_string(),
         }
         .into())
     }
@@ -108,12 +104,13 @@ impl Validator for RecursiveRefValidator {
     }
 
     fn get_name(&self) -> &str {
-        &self.name
+        &self.inner_name
     }
 
+    /// don't need to call complete on the inner validator here, complete_validators takes care of that.
     fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
         let validator = build_context.get_validator(self.validator_id)?;
-        self.name = validator.get_name().to_string();
+        self.inner_name = validator.get_name().to_string();
         Ok(())
     }
 }

@@ -469,7 +469,7 @@ impl BuildContext {
             .into_iter()
             .map(|(_, opt_validator)| match opt_validator {
                 Some(validator) => Ok(validator),
-                None => py_error!("Schema build error: missing named slot"),
+                None => py_error!("Recursive schema build error: slot not yet filled"),
             })
             .collect()
     }
