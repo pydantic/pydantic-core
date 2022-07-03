@@ -534,3 +534,71 @@ def test_union_cycle(strict):
             'input_value': {'foobar': [{'foobar': IsList(length=1)}]},
         }
     ]
+
+
+def test_function_name():
+    def f(input_value, **kwargs):
+        return input_value + ' Changed'
+
+    v = SchemaValidator(
+        {
+            'choices': [
+                {
+                    'type': 'function',
+                    'mode': 'after',
+                    'function': f,
+                    'schema': {'schema_ref': 'root-schema', 'type': 'recursive-ref'},
+                },
+                'int',
+            ],
+            'ref': 'root-schema',
+            'type': 'union',
+        }
+    )
+
+    assert v.validate_python(123) == 123
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python('input value')
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'recursion_loop',
+            'loc': ['function-after[...]'],
+            'message': 'Recursion error - cyclic reference detected',
+            'input_value': 'input value',
+        },
+        {
+            'kind': 'int_parsing',
+            'loc': ['int'],
+            'message': 'Value must be a valid integer, unable to parse string as an integer',
+            'input_value': 'input value',
+        },
+    ]
+
+
+@pytest.mark.skip(reason='This case causes a seg-fault since the recursion checker cannot detect the cycle')
+def test_function_change_id():
+    def f(input_value, **kwargs):
+        return input_value + ' Changed'
+
+    v = SchemaValidator(
+        {
+            'choices': [
+                {
+                    'type': 'function',
+                    'mode': 'before',
+                    'function': f,
+                    'schema': {'schema_ref': 'root-schema', 'type': 'recursive-ref'},
+                },
+                'int',
+            ],
+            'ref': 'root-schema',
+            'type': 'union',
+        }
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        assert v.validate_python('input value') == 'input value Changed'
+
+    print(str(exc_info.value))

@@ -30,7 +30,7 @@ impl BuildValidator for UnionValidator {
             .collect::<PyResult<Vec<CombinedValidator>>>()?;
         let strict = is_strict(schema, config)?;
 
-        let descr = choices.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
+        let descr = choices.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(",");
 
         Ok(Self {
             choices,
