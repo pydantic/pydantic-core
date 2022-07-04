@@ -1,7 +1,7 @@
 use std::fmt;
 
+use pyo3::prelude::*;
 use pyo3::types::PyType;
-use pyo3::ToPyObject;
 
 use crate::errors::{InputValue, LocItem, ValResult};
 use crate::input::datetime::EitherTime;
@@ -103,5 +103,13 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn lax_timedelta(&self) -> ValResult<EitherTimedelta> {
         self.strict_timedelta()
+    }
+
+    fn is_instance(&self, _class: &PyType) -> PyResult<bool> {
+        Ok(false)
+    }
+
+    fn callable(&self) -> bool {
+        false
     }
 }

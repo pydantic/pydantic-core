@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from datetime import date, datetime, time, timedelta
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, Dict, List, Type, Union
 
 if sys.version_info < (3, 11):
     from typing_extensions import NotRequired, Required
@@ -211,6 +211,16 @@ class DatetimeSchema(TypedDict, total=False):
     ref: str
 
 
+class TimedeltaSchema(TypedDict, total=False):
+    type: Required[Literal['timedelta']]
+    strict: bool
+    le: timedelta
+    ge: timedelta
+    lt: timedelta
+    gt: timedelta
+    ref: str
+
+
 class TupleFixLenSchema(TypedDict, total=False):
     type: Required[Literal['tuple-fix-len']]
     items_schema: Required[List[Schema]]
@@ -227,14 +237,13 @@ class TupleVarLenSchema(TypedDict, total=False):
     ref: str
 
 
-class TimedeltaSchema(TypedDict, total=False):
-    type: Required[Literal['timedelta']]
-    strict: bool
-    le: timedelta
-    ge: timedelta
-    lt: timedelta
-    gt: timedelta
-    ref: str
+class IsInstanceSchema(TypedDict):
+    type: Literal['is-instance']
+    class_: Type[Any]
+
+
+class CallableSchema(TypedDict):
+    type: Literal['callable']
 
 
 # pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
@@ -259,6 +268,7 @@ BareType = Literal[
     # tuple-fix-len cannot be created without more typing information
     'tuple-var-len',
     'union',
+    'callable',
 ]
 
 Schema = Union[
@@ -288,4 +298,6 @@ Schema = Union[
     TimeSchema,
     DatetimeSchema,
     TimedeltaSchema,
+    IsInstanceSchema,
+    CallableSchema,
 ]

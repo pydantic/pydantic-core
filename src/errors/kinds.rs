@@ -199,6 +199,12 @@ pub enum ErrorKind {
     // frozenset errors
     #[strum(message = "Value must be a valid frozenset")]
     FrozenSetType,
+    // ---------------------
+    // introspection types - e.g. isinstance, callable
+    #[strum(message = "Input must be an instance of {class}")]
+    IsInstanceOf { class: String },
+    #[strum(message = "Input must be callable")]
+    CallableType,
 }
 
 macro_rules! render {
@@ -231,7 +237,7 @@ macro_rules! py_dict {
 
 impl ErrorKind {
     pub fn render(&self) -> String {
-        let template: &'static str = self.get_message().unwrap();
+        let template: &'static str = self.get_message().expect("ErrorKind with no strum message");
         match self {
             Self::InvalidJson { error } => render!(template, error),
             Self::GetAttributeError { error } => render!(template, error),
@@ -276,6 +282,7 @@ impl ErrorKind {
             Self::DateTimeParsing { error } => render!(template, error),
             Self::DateTimeObjectInvalid { error } => render!(template, error),
             Self::TimeDeltaParsing { error } => render!(template, error),
+            Self::IsInstanceOf { class } => render!(template, class),
             _ => template.to_string(),
         }
     }
@@ -322,6 +329,7 @@ impl ErrorKind {
             Self::DateTimeParsing { error } => py_dict!(py, error),
             Self::DateTimeObjectInvalid { error } => py_dict!(py, error),
             Self::TimeDeltaParsing { error } => py_dict!(py, error),
+            Self::IsInstanceOf { class } => py_dict!(py, class),
             _ => Ok(None),
         }
     }
