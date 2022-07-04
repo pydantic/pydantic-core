@@ -12,6 +12,7 @@ use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 pub struct IsInstanceValidator {
     class: Py<PyType>,
     class_repr: String,
+    name: String,
 }
 
 impl BuildValidator for IsInstanceValidator {
@@ -23,9 +24,12 @@ impl BuildValidator for IsInstanceValidator {
         _build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
         let class: &PyType = schema.get_as_req("class_")?;
+        let class_repr = class.name()?.to_string();
+        let name = format!("{}[{}]", Self::EXPECTED_TYPE, class_repr);
         Ok(Self {
             class: class.into(),
-            class_repr: class.name()?.to_string(),
+            class_repr,
+            name,
         }
         .into())
     }
@@ -51,7 +55,7 @@ impl Validator for IsInstanceValidator {
         }
     }
 
-    fn get_name(&self, _py: Python) -> String {
-        format!("{}[{}]", Self::EXPECTED_TYPE, self.class_repr)
+    fn get_name(&self) -> &str {
+        &self.name
     }
 }
