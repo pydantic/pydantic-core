@@ -92,7 +92,7 @@ impl TimeDeltaValidator {
         timedelta: EitherTimedelta<'data>,
     ) -> ValResult<'data, PyObject> {
         if let Some(constraints) = &self.constraints {
-            let raw_timedelta = timedelta.as_raw().map_err(as_internal)?;
+            let raw_timedelta = timedelta.as_raw();
 
             macro_rules! check_constraint {
                 ($constraint:ident, $error:ident) => {
@@ -125,7 +125,7 @@ fn py_timedelta_as_timedelta(schema: &PyDict, field: &str) -> PyResult<Option<Du
             let timedelta = obj
                 .lax_timedelta()
                 .map_err(|e| SchemaError::from_val_error(obj.py(), &prefix, e))?;
-            Ok(Some(timedelta.as_raw()?))
+            Ok(Some(timedelta.as_raw()))
         }
         None => Ok(None),
     }

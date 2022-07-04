@@ -123,21 +123,17 @@ def test_timedelta_strict_json(input_value, expected):
         ({'ge': timedelta(days=3)}, 'P2DT1H', Err('Value must be greater than or equal to P3D')),
         ({'gt': timedelta(days=3)}, 'P3DT1H', timedelta(days=3, hours=1)),
         ({'gt': 'P3D'}, 'P2DT1H', Err('Value must be greater than P3D')),
-        ({'le': timedelta(seconds=-86400 - 0.123)}, '-PT86400.123S', timedelta(seconds=-86400 - 0.123)),
-        ({'le': timedelta(seconds=-86400 - 0.123)}, '-PT86400.124S', timedelta(seconds=-86400 - 0.124)),
+        ({'le': timedelta(seconds=-86400.123)}, '-PT86400.123S', timedelta(seconds=-86400.123)),
+        ({'le': timedelta(seconds=-86400.123)}, '-PT86400.124S', timedelta(seconds=-86400.124)),
         (
-            {'le': timedelta(seconds=-86400 - 0.123)},
+            {'le': timedelta(seconds=-86400.123)},
             '-PT86400.122S',
             Err('Value must be less than or equal to -P1DT0.123S [kind=less_than_equal'),
         ),
+        ({'gt': timedelta(seconds=-86400.123)}, timedelta(seconds=-86400.122), timedelta(seconds=-86400.122)),
+        ({'gt': timedelta(seconds=-86400.123)}, '-PT86400.122S', timedelta(seconds=-86400.122)),
         (
-            {'gt': timedelta(seconds=-86400 - 0.123)},
-            timedelta(seconds=-86400 - 0.122),
-            timedelta(seconds=-86400 - 0.122),
-        ),
-        ({'gt': timedelta(seconds=-86400 - 0.123)}, '-PT86400.122S', timedelta(seconds=-86400 - 0.122)),
-        (
-            {'gt': timedelta(seconds=-86400 - 0.123)},
+            {'gt': timedelta(seconds=-86400.123)},
             '-PT86400.124S',
             Err('Value must be greater than -P1DT0.123S [kind=greater_than'),
         ),
@@ -212,3 +208,34 @@ def test_union():
     v = SchemaValidator({'type': 'union', 'choices': ['timedelta', 'str']})
     assert v.validate_python('P2DT1H') == 'P2DT1H'
     assert v.validate_python(timedelta(days=2, hours=1)) == timedelta(days=2, hours=1)
+
+
+@pytest.mark.parametrize(
+    'constraint,expected_duration',
+    [
+        (timedelta(days=3), {'positive': True, 'day': 3, 'second': 0, 'microsecond': 0}),
+        (timedelta(days=2, seconds=42.123), {'positive': True, 'day': 2, 'second': 42, 'microsecond': 123_000}),
+        (timedelta(days=-1), {'positive': False, 'day': 1, 'second': 0, 'microsecond': 0}),
+        (timedelta(seconds=86410), {'positive': True, 'day': 1, 'second': 10, 'microsecond': 0}),
+        (timedelta(seconds=86410.123), {'positive': True, 'day': 1, 'second': 10, 'microsecond': 123_000}),
+        (timedelta(seconds=-86410), {'positive': False, 'day': 1, 'second': 10, 'microsecond': 0}),
+        (timedelta(seconds=-86410.123), {'positive': False, 'day': 1, 'second': 10, 'microsecond': 123_000}),
+        (timedelta(days=-4, hours=12), {'positive': False, 'day': 3, 'second': 43200, 'microsecond': 0}),
+        (timedelta(days=-4, microseconds=456), {'positive': False, 'day': 3, 'second': 86399, 'microsecond': 999544}),
+        (timedelta(days=-1, seconds=20_000), {'positive': False, 'day': 0, 'second': 66_400, 'microsecond': 0}),
+        (
+            timedelta(days=-1, seconds=86_399, microseconds=1),
+            {'positive': False, 'day': 0, 'second': 0, 'microsecond': 999_999},
+        ),
+        (timedelta.max, {'positive': True, 'day': 999999999, 'second': 86399, 'microsecond': 999999}),
+        (timedelta.min, {'positive': False, 'day': 999999999, 'second': 0, 'microsecond': 0}),
+    ],
+    ids=repr,
+)
+def test_pytimedelta_as_timedelta(constraint, expected_duration):
+    v = SchemaValidator({'type': 'timedelta', 'gt': constraint})
+    # simplest way to check `pytimedelta_as_timedelta` is correct is to extract duration from repr of the validator
+    m = re.search(r'Duration ?\{\s+positive: ?(\w+),\s+day: ?(\d+),\s+second: ?(\d+),\s+microsecond: ?(\d+)', repr(v))
+    pos, day, sec, micro = m.groups()
+    duration = {'positive': pos == 'true', 'day': int(day), 'second': int(sec), 'microsecond': int(micro)}
+    assert duration == expected_duration, constraint

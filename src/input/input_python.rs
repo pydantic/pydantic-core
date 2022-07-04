@@ -399,7 +399,7 @@ impl<'a> Input<'a> for PyAny {
         if let Ok(dt) = self.cast_as::<PyDelta>() {
             Ok(dt.into())
         } else if let Ok(py_str) = self.cast_as::<PyString>() {
-            bytes_as_timedelta(self, py_str.to_string_lossy().to_string().as_ref())
+            bytes_as_timedelta(self, py_str.to_string_lossy().as_bytes())
         } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
             bytes_as_timedelta(self, py_bytes.as_bytes())
         } else if let Ok(int) = self.extract::<i64>() {
