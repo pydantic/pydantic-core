@@ -85,12 +85,15 @@ def branch_models_with_cycles(draw, existing=None):
 
 @given(branch_models_with_cycles())
 def test_recursive_cycles(recursive_schema, data):
-    with pytest.raises(ValidationError):
+    try:
         assert recursive_schema.validate_python(data) == data
+    except ValidationError:
+        # that's fine
+        pass
 
 
 def test_recursive_broken(recursive_schema):
     data = {'name': 'x'}
     data['sub_branch'] = data
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match='Recursion error - cyclic reference detected'):
         recursive_schema.validate_python(data)
