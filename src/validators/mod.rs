@@ -2,10 +2,9 @@ use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
 
-use pyo3::exceptions::PyRecursionError;
+use pyo3::exceptions::{PyRecursionError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
-use serde_json::from_str as parse_json;
+use pyo3::types::{PyAny, PyByteArray, PyBytes, PyDict, PyString};
 
 use crate::build_tools::{py_error, SchemaDict, SchemaError};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult, ValidationError};
@@ -49,7 +48,7 @@ impl SchemaValidator {
     #[new]
     pub fn py_new(py: Python, schema: &PyAny) -> PyResult<Self> {
         let mut build_context = BuildContext::default();
-        let validator = match build_validator(schema, None, &mut build_context) {
+        let mut validator = match build_validator(schema, None, &mut build_context) {
             Ok((v, _)) => v,
             Err(err) => {
                 return Err(match err.is_instance_of::<SchemaError>(py) {
@@ -58,8 +57,10 @@ impl SchemaValidator {
                 });
             }
         };
+        build_context.complete_validators()?;
+        validator.complete(&build_context)?;
         let slots = build_context.into_slots()?;
-        let title = validator.get_name(py).into_py(py);
+        let title = validator.get_name().into_py(py);
         Ok(Self {
             validator,
             slots,
@@ -99,8 +100,8 @@ impl SchemaValidator {
         }
     }
 
-    pub fn validate_json(&self, py: Python, input: String) -> PyResult<PyObject> {
-        match parse_json::<JsonInput>(&input) {
+    pub fn validate_json(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
+        match parse_json(input)? {
             Ok(input) => {
                 let r = self.validator.validate(
                     py,
@@ -112,15 +113,15 @@ impl SchemaValidator {
                 r.map_err(|e| self.prepare_validation_err(py, e))
             }
             Err(e) => {
-                let line_err = ValLineError::new(ErrorKind::InvalidJson { error: e.to_string() }, &input);
+                let line_err = ValLineError::new(ErrorKind::InvalidJson { error: e.to_string() }, input);
                 let err = ValError::LineErrors(vec![line_err]);
                 Err(self.prepare_validation_err(py, err))
             }
         }
     }
 
-    pub fn isinstance_json(&self, py: Python, input: String) -> PyResult<bool> {
-        match parse_json::<JsonInput>(&input) {
+    pub fn isinstance_json(&self, py: Python, input: &PyAny) -> PyResult<bool> {
+        match parse_json(input)? {
             Ok(input) => {
                 match self.validator.validate(
                     py,
@@ -149,10 +150,10 @@ impl SchemaValidator {
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
-    pub fn __repr__(&self, py: Python) -> String {
+    pub fn __repr__(&self) -> String {
         format!(
             "SchemaValidator(name={:?}, validator={:#?})",
-            self.validator.get_name(py),
+            self.validator.get_name(),
             self.validator
         )
     }
@@ -164,16 +165,27 @@ impl SchemaValidator {
     }
 }
 
+fn parse_json(input: &PyAny) -> PyResult<serde_json::Result<JsonInput>> {
+    if let Ok(py_bytes) = input.cast_as::<PyBytes>() {
+        Ok(serde_json::from_slice(py_bytes.as_bytes()))
+    } else if let Ok(py_str) = input.cast_as::<PyString>() {
+        let str = py_str.to_str()?;
+        Ok(serde_json::from_str(str))
+    } else if let Ok(py_byte_array) = input.cast_as::<PyByteArray>() {
+        Ok(serde_json::from_slice(unsafe { py_byte_array.as_bytes() }))
+    } else {
+        let input_type = input.get_type().name().unwrap_or("unknown");
+        py_error!(PyTypeError; "JSON input must be str, bytes or bytearray, not {}", input_type)
+    }
+}
+
 pub trait BuildValidator: Sized {
     const EXPECTED_TYPE: &'static str;
 
     /// Build a new validator from the schema, the return type is a trait to provide a way for validators
     /// to return other validators, see `string.rs`, `int.rs`, `float.rs` and `function.rs` for examples
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        _build_context: &mut BuildContext,
-    ) -> PyResult<CombinedValidator>;
+    fn build(schema: &PyDict, config: Option<&PyDict>, build_context: &mut BuildContext)
+        -> PyResult<CombinedValidator>;
 }
 
 fn build_single_validator<'a, T: BuildValidator>(
@@ -188,8 +200,9 @@ fn build_single_validator<'a, T: BuildValidator>(
         let slot_id = build_context.prepare_slot(schema_ref)?;
         let inner_val = T::build(schema_dict, config, build_context)
             .map_err(|err| SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", val_type, err)))?;
-        build_context.complete_slot(slot_id, inner_val);
-        recursive::RecursiveContainerValidator::create(slot_id)
+        let name = inner_val.get_name().to_string();
+        build_context.complete_slot(slot_id, inner_val)?;
+        recursive::RecursiveContainerValidator::create(slot_id, name)
     } else {
         T::build(schema_dict, config, build_context)
             .map_err(|err| SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", val_type, err)))?
@@ -391,12 +404,18 @@ pub trait Validator: Send + Sync + Clone + Debug {
 
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`
-    fn get_name(&self, py: Python) -> String;
+    fn get_name(&self) -> &str;
+
+    /// this method must be implemented for any validator which holds references to other validators,
+    /// it is used by `RecursiveRefValidator` to set its name
+    fn complete(&mut self, _build_context: &BuildContext) -> PyResult<()> {
+        Ok(())
+    }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct BuildContext {
-    named_slots: Vec<(Option<String>, Option<CombinedValidator>)>,
+    slots: Vec<(String, Option<CombinedValidator>)>,
     depth: usize,
 }
 
@@ -404,14 +423,19 @@ const MAX_DEPTH: usize = 100;
 
 impl BuildContext {
     pub fn prepare_slot(&mut self, slot_ref: String) -> PyResult<usize> {
-        let id = self.named_slots.len();
-        self.named_slots.push((Some(slot_ref), None));
+        let id = self.slots.len();
+        self.slots.push((slot_ref, None));
         Ok(id)
     }
 
-    pub fn complete_slot(&mut self, slot_id: usize, validator: CombinedValidator) {
-        let (name, _) = self.named_slots.get(slot_id).unwrap();
-        self.named_slots[slot_id] = (name.clone(), Some(validator));
+    pub fn complete_slot(&mut self, slot_id: usize, validator: CombinedValidator) -> PyResult<()> {
+        match self.slots.get(slot_id) {
+            Some((val_ref, _)) => {
+                self.slots[slot_id] = (val_ref.clone(), Some(validator));
+                Ok(())
+            }
+            None => py_error!("Recursive reference error: slot {} not found", slot_id),
+        }
     }
 
     pub fn incr_check_depth(&mut self) -> PyResult<()> {
@@ -427,23 +451,43 @@ impl BuildContext {
         self.depth -= 1;
     }
 
-    pub fn find_slot_id(&self, slot_ref: &str) -> PyResult<usize> {
-        let is_match = |(n, _): &(Option<String>, Option<CombinedValidator>)| match n {
-            Some(n) => n == slot_ref,
-            None => false,
-        };
-        match self.named_slots.iter().position(is_match) {
+    pub fn find_slot_id(&self, val_ref: &str) -> PyResult<usize> {
+        let is_match = |(slot_ref, _): &(String, Option<CombinedValidator>)| slot_ref == val_ref;
+        match self.slots.iter().position(is_match) {
             Some(id) => Ok(id),
-            None => py_error!("Recursive reference error: ref '{}' not found", slot_ref),
+            None => py_error!("Recursive reference error: ref '{}' not found", val_ref),
         }
     }
 
+    pub fn get_validator(&self, slot_id: usize) -> PyResult<&CombinedValidator> {
+        match self.slots.get(slot_id) {
+            Some((_, op_validator)) => match op_validator {
+                Some(ref validator) => Ok(validator),
+                None => py_error!("Recursive reference error: slot {} not yet filled", slot_id),
+            },
+            None => py_error!("Recursive reference error: slot {} not found", slot_id),
+        }
+    }
+
+    pub fn complete_validators(&mut self) -> PyResult<()> {
+        let self_clone = self.clone();
+        for (_, op_validator) in self.slots.iter_mut() {
+            match op_validator {
+                Some(ref mut validator) => {
+                    validator.complete(&self_clone)?;
+                }
+                None => return py_error!("Recursive reference error: slot not yet filled"),
+            }
+        }
+        Ok(())
+    }
+
     pub fn into_slots(self) -> PyResult<Vec<CombinedValidator>> {
-        self.named_slots
+        self.slots
             .into_iter()
             .map(|(_, opt_validator)| match opt_validator {
                 Some(validator) => Ok(validator),
-                None => py_error!("Schema build error: missing named slot"),
+                None => py_error!("Recursive schema build error: slot not yet filled"),
             })
             .collect()
     }
