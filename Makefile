@@ -7,7 +7,6 @@ install:
 	pip install -U pip wheel pre-commit
 	pip install -r tests/requirements.txt
 	pip install -r tests/requirements-linting.txt
-	make self-schema
 	pip install -e .
 	pre-commit install
 
