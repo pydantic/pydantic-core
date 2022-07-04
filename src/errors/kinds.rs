@@ -321,6 +321,7 @@ impl ErrorKind {
             Self::TimeParsing { error } => py_dict!(py, error),
             Self::DateTimeParsing { error } => py_dict!(py, error),
             Self::DateTimeObjectInvalid { error } => py_dict!(py, error),
+            Self::IsInstanceOf { class } => py_dict!(py, class),
             _ => Ok(None),
         }
     }

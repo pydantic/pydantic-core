@@ -23,13 +23,19 @@ def test_is_instance():
     bar = Bar()
     assert v.validate_python(bar) == bar
     s = Spam()
+    assert v.isinstance_python(s) is False
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(s)
 
     assert exc_info.value.errors() == [
-        {'kind': 'is_instance_of', 'loc': [], 'message': 'Input must be an instance of Foo', 'input_value': s}
+        {
+            'kind': 'is_instance_of',
+            'loc': [],
+            'message': 'Input must be an instance of Foo',
+            'input_value': s,
+            'context': {'class': 'Foo'},
+        }
     ]
-    assert v.isinstance_python(s) is False
     with pytest.raises(ValidationError, match='kind=is_instance_of'):
         v.validate_python(Foo)
 
