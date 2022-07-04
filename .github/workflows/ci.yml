@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         rust-toolchain:
-          - nightly
+          - nightly-2022-07-01
         python-version:
           - '3.7'
           - '3.8'
@@ -86,7 +86,7 @@ jobs:
     - run: ./tests/rust_coverage_export.sh
 
     - uses: codecov/codecov-action@v2
-      if: matrix.rust-toolchain == 'nightly'
+      if: matrix.rust-toolchain == 'nightly-2022-07-01'
       with:
         env_vars: PYTHON
 
@@ -179,10 +179,8 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
           components: rust-src
           target: wasm32-unknown-emscripten
-          override: true
 
       - name: cache rust
         uses: Swatinem/rust-cache@v1
