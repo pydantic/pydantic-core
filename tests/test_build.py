@@ -61,10 +61,8 @@ def test_pickle(pickle_protocol: int) -> None:
 
 def test_schema_recursive_error():
     schema = {'type': 'union', 'choices': []}
-    schema['choices'].append(schema)
-    with pytest.raises(
-        SchemaError, match='RecursionError: Recursive detected, depth exceeded max allowed value of 100'
-    ):
+    schema['choices'].append({'type': 'nullable', 'schema': schema})
+    with pytest.raises(SchemaError, match='Recursion error - cyclic reference detected'):
         SchemaValidator(schema)
 
 

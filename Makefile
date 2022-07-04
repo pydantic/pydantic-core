@@ -68,6 +68,7 @@ lint-python:
 
 .PHONY: lint-rust
 lint-rust:
+	@touch src/self_schema.py
 	cargo fmt --version
 	cargo fmt --all -- --check
 	cargo clippy --version
