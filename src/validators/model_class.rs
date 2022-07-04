@@ -172,14 +172,25 @@ fn build_config<'a>(
         (None, Some(child)) => Ok(Some(child)),
         (None, None) => Ok(None),
         (Some(parent), Some(child)) => {
-            let parent_priority: i64 = parent.get_as("priority")?.unwrap_or_default();
-            let child_priority: i64 = child.get_as("priority")?.unwrap_or_default();
-            match parent_priority.cmp(&child_priority) {
+            let parent_choose: i32 = parent.get_as("config_choose_priority")?.unwrap_or_default();
+            let child_choose: i32 = child.get_as("config_choose_priority")?.unwrap_or_default();
+            match parent_choose.cmp(&child_choose) {
                 Ordering::Greater => Ok(Some(parent)),
                 Ordering::Less => Ok(Some(child)),
                 Ordering::Equal => {
-                    parent.getattr(intern!(py, "update"))?.call1((child,))?;
-                    Ok(Some(parent))
+                    let parent_merge: i32 = parent.get_as("config_merge_priority")?.unwrap_or_default();
+                    let child_merge: i32 = child.get_as("config_merge_priority")?.unwrap_or_default();
+                    match parent_merge.cmp(&child_merge) {
+                        Ordering::Greater => {
+                            child.getattr(intern!(py, "update"))?.call1((parent,))?;
+                            Ok(Some(child))
+                        }
+                        // otherwise child is the winner
+                        _ => {
+                            parent.getattr(intern!(py, "update"))?.call1((child,))?;
+                            Ok(Some(parent))
+                        }
+                    }
                 }
             }
         }

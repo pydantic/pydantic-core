@@ -28,7 +28,9 @@ class BoolSchema(TypedDict, total=False):
 class Config(TypedDict, total=False):
     strict: bool
     # higher priority configs take precedence of over lower, if priority matches the two configs are merged, default 0
-    priority: int
+    config_choose_priority: int
+    # if configs are merged, which should take precedence, default 0, default means child takes precedence
+    config_merge_priority: int
     # settings related to typed_dicts only
     typed_dict_extra_behavior: Literal['allow', 'forbid', 'ignore']
     typed_dict_full: bool  # default: True
@@ -109,6 +111,7 @@ class ModelClassSchema(TypedDict):
     class_type: type
     schema: TypedDictSchema
     ref: NotRequired[str]
+    config: NotRequired[Config]
 
 
 class TypedDictField(TypedDict, total=False):
@@ -124,7 +127,6 @@ class TypedDictSchema(TypedDict, total=False):
     fields: Required[Dict[str, TypedDictField]]
     strict: bool
     extra_validator: Schema
-    config: Config
     return_fields_set: bool
     ref: str
     # all these values can be set via config, equivalent fields have `typed_dict_` prefix
