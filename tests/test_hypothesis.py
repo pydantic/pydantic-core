@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import pytest
+from dirty_equals import AnyThing, IsBytes, IsList, IsStr
 from hypothesis import given, strategies
 from typing_extensions import TypedDict
 
@@ -33,9 +34,16 @@ def test_datetime_int(datetime_schema, data):
 def test_datetime_binary(datetime_schema, data):
     try:
         datetime_schema.validate_python(data)
-    except ValidationError:
-        # that's fine
-        pass
+    except ValidationError as exc:
+        assert exc.errors() == [
+            {
+                'kind': 'datetime_parsing',
+                'loc': [],
+                'message': IsStr(regex='Value must be a valid datetime, .+'),
+                'input_value': IsBytes(),
+                'context': {'error': IsStr()},
+            }
+        ]
 
 
 @pytest.fixture(scope='module')
@@ -87,9 +95,15 @@ def branch_models_with_cycles(draw, existing=None):
 def test_recursive_cycles(recursive_schema, data):
     try:
         assert recursive_schema.validate_python(data) == data
-    except ValidationError:
-        # that's fine
-        pass
+    except ValidationError as exc:
+        assert exc.errors() == [
+            {
+                'kind': 'recursion_loop',
+                'loc': IsList(length=(1, None)),
+                'message': 'Recursion error - cyclic reference detected',
+                'input_value': AnyThing(),
+            }
+        ]
 
 
 def test_recursive_broken(recursive_schema):
