@@ -122,4 +122,4 @@ def test_pytimedelta_as_timedelta(dt):
     pos, day, sec, micro = m.groups()
     total_seconds = (1 if pos == 'true' else -1) * (int(day) * 86_400 + int(sec) + int(micro) / 1_000_000)
 
-    assert total_seconds == dt.total_seconds()
+    assert total_seconds == pytest.approx(dt.total_seconds())

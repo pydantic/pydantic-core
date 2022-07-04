@@ -238,4 +238,4 @@ def test_pytimedelta_as_timedelta(constraint, expected_duration):
     m = re.search(r'Duration ?\{\s+positive: ?(\w+),\s+day: ?(\d+),\s+second: ?(\d+),\s+microsecond: ?(\d+)', repr(v))
     pos, day, sec, micro = m.groups()
     duration = {'positive': pos == 'true', 'day': int(day), 'second': int(sec), 'microsecond': int(micro)}
-    assert duration == expected_duration, constraint
+    assert duration == pytest.approx(expected_duration), constraint
