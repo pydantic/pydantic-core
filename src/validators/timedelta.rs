@@ -11,7 +11,7 @@ use crate::SchemaError;
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
-pub struct TimedeltaValidator {
+pub struct TimeDeltaValidator {
     strict: bool,
     constraints: Option<TimedeltaConstraints>,
 }
@@ -23,7 +23,7 @@ struct TimedeltaConstraints {
     ge: Option<Duration>,
     gt: Option<Duration>,
 }
-impl BuildValidator for TimedeltaValidator {
+impl BuildValidator for TimeDeltaValidator {
     const EXPECTED_TYPE: &'static str = "timedelta";
 
     fn build(
@@ -52,7 +52,7 @@ impl BuildValidator for TimedeltaValidator {
     }
 }
 
-impl Validator for TimedeltaValidator {
+impl Validator for TimeDeltaValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -84,7 +84,7 @@ impl Validator for TimedeltaValidator {
     }
 }
 
-impl TimedeltaValidator {
+impl TimeDeltaValidator {
     fn validation_comparison<'s, 'data>(
         &'s self,
         py: Python<'data>,

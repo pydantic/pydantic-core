@@ -192,9 +192,9 @@ pub enum ErrorKind {
     // ---------------------
     // timedelta errors
     #[strum(message = "Value must be a valid timedelta")]
-    TimedeltaType,
+    TimeDeltaType,
     #[strum(message = "Value must be a valid timedelta, {error}")]
-    TimedeltaParsing { error: &'static str },
+    TimeDeltaParsing { error: &'static str },
     // ---------------------
     // frozenset errors
     #[strum(message = "Value must be a valid frozenset")]
@@ -275,7 +275,7 @@ impl ErrorKind {
             Self::TimeParsing { error } => render!(template, error),
             Self::DateTimeParsing { error } => render!(template, error),
             Self::DateTimeObjectInvalid { error } => render!(template, error),
-            Self::TimedeltaParsing { error } => render!(template, error),
+            Self::TimeDeltaParsing { error } => render!(template, error),
             _ => template.to_string(),
         }
     }
@@ -321,7 +321,7 @@ impl ErrorKind {
             Self::TimeParsing { error } => py_dict!(py, error),
             Self::DateTimeParsing { error } => py_dict!(py, error),
             Self::DateTimeObjectInvalid { error } => py_dict!(py, error),
-            Self::TimedeltaParsing { error } => py_dict!(py, error),
+            Self::TimeDeltaParsing { error } => py_dict!(py, error),
             _ => Ok(None),
         }
     }

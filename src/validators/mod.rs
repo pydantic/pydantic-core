@@ -278,7 +278,7 @@ pub fn build_validator<'a>(
         // frozensets
         frozenset::FrozenSetValidator,
         // timedelta
-        timedelta::TimedeltaValidator,
+        timedelta::TimeDeltaValidator,
     )
 }
 
@@ -359,7 +359,7 @@ pub enum CombinedValidator {
     // frozensets
     FrozenSet(frozenset::FrozenSetValidator),
     // timedelta
-    Timedelta(timedelta::TimedeltaValidator),
+    Timedelta(timedelta::TimeDeltaValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

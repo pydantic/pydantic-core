@@ -12,7 +12,8 @@ use crate::errors::{as_internal, py_err_string, ErrorKind, InputValue, LocItem, 
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, date_as_datetime, float_as_datetime,
-    float_as_time, float_as_timedelta, int_as_datetime, int_as_time, EitherDate, EitherDateTime, EitherTime,
+    float_as_duration, float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime,
+    EitherTime,
 };
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 use super::{repr_string, EitherBytes, EitherString, EitherTimedelta, GenericMapping, GenericSequence, Input};
@@ -382,21 +383,23 @@ impl<'a> Input<'a> for PyAny {
         if let Ok(dt) = self.cast_as::<PyDelta>() {
             Ok(dt.into())
         } else {
-            Err(ValError::new(ErrorKind::TimedeltaType, self))
+            Err(ValError::new(ErrorKind::TimeDeltaType, self))
         }
     }
 
     fn lax_timedelta(&self) -> ValResult<EitherTimedelta> {
         if let Ok(dt) = self.cast_as::<PyDelta>() {
             Ok(dt.into())
-        } else if let Ok(str) = self.extract::<String>() {
-            bytes_as_timedelta(self, str.as_bytes())
+        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+            bytes_as_timedelta(self, py_str.to_string_lossy().to_string().as_ref())
         } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
             bytes_as_timedelta(self, py_bytes.as_bytes())
+        } else if let Ok(int) = self.extract::<i64>() {
+            Ok(int_as_duration(int).into())
         } else if let Ok(float) = self.extract::<f64>() {
-            float_as_timedelta(float)
+            Ok(float_as_duration(float).into())
         } else {
-            Err(ValError::new(ErrorKind::TimedeltaType, self))
+            Err(ValError::new(ErrorKind::TimeDeltaType, self))
         }
     }
 }
