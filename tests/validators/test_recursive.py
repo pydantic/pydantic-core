@@ -1,7 +1,7 @@
 from typing import Optional
 
 import pytest
-from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict
+from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict, IsStr
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
@@ -577,10 +577,11 @@ def test_function_name():
     ]
 
 
-@pytest.mark.skip(reason='This case causes a seg-fault since the recursion checker cannot detect the cycle')
-def test_function_change_id():
+@pytest.mark.parametrize('strict', [True, False], ids=lambda s: f'strict={s}')
+def test_function_change_id(strict):
     def f(input_value, **kwargs):
-        return input_value + ' Changed'
+        _, count = input_value.split('-')
+        return f'f-{int(count) + 1}'
 
     v = SchemaValidator(
         {
@@ -590,15 +591,52 @@ def test_function_change_id():
                     'mode': 'before',
                     'function': f,
                     'schema': {'schema_ref': 'root-schema', 'type': 'recursive-ref'},
-                },
-                'int',
+                }
             ],
+            'strict': strict,
             'ref': 'root-schema',
             'type': 'union',
         }
     )
 
     with pytest.raises(ValidationError) as exc_info:
-        assert v.validate_python('input value') == 'input value Changed'
+        v.validate_python('start-0')
 
-    print(str(exc_info.value))
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'recursion_loop',
+            'loc': IsList(length=(1, 255)),
+            'message': 'Recursion error - cyclic reference detected',
+            'input_value': IsStr(regex=r'f-\d+'),
+        }
+    ]
+
+
+def test_many_uses_of_ref():
+    # check we can safely exceed BACKUP_GUARD_LIMIT without upsetting the backup recursion guard
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'ref': 'Branch',
+            'fields': {
+                'name': {'schema': {'type': 'str', 'max_length': 8, 'ref': 'limited-string'}},
+                'other_names': {
+                    'schema': {
+                        'type': 'list',
+                        'items_schema': {'type': 'recursive-ref', 'schema_ref': 'limited-string'},
+                    }
+                },
+            },
+        }
+    )
+
+    assert v.validate_python({'name': 'Anne', 'other_names': ['Bob', 'Charlie']}) == {
+        'name': 'Anne',
+        'other_names': ['Bob', 'Charlie'],
+    }
+
+    with pytest.raises(ValidationError, match=r'other_names -> 2\s+String must have at most 8 characters'):
+        v.validate_python({'name': 'Anne', 'other_names': ['Bob', 'Charlie', 'Daveeeeee']})
+
+    long_input = {'name': 'Anne', 'other_names': [f'p-{i}' for i in range(300)]}
+    assert v.validate_python(long_input) == long_input

@@ -115,6 +115,11 @@ impl Validator for RecursiveRefValidator {
     }
 }
 
+// see #143 this is a backup in case the identity check recursion guard fails
+// if a single validator "depth" (how many times it's called inside itself) exceeds the limit,
+// we raise a recursion error.
+const BACKUP_GUARD_LIMIT: u16 = 255;
+
 fn guard_validate<'s, 'data>(
     validator_id: usize,
     py: Python<'data>,
@@ -129,8 +134,12 @@ fn guard_validate<'s, 'data>(
             // we don't remove id here, we leave that to the validator which originally added id to `recursion_guard`
             Err(ValError::new(ErrorKind::RecursionLoop, input))
         } else {
+            if recursion_guard.incr_depth() > BACKUP_GUARD_LIMIT {
+                return Err(ValError::new(ErrorKind::RecursionLoop, input));
+            }
             let output = validate(validator_id, py, strict, input, extra, slots, recursion_guard);
             recursion_guard.remove(&id);
+            recursion_guard.decr_depth();
             output
         }
     } else {
