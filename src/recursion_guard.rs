@@ -18,15 +18,15 @@ pub struct RecursionGuard {
 
 impl RecursionGuard {
     // insert a new id into the set, return whether the set already had the id in it
-    pub fn contains_or_insert(&mut self, identity: usize) -> bool {
+    pub fn contains_or_insert(&mut self, id: usize) -> bool {
         match self.ids {
             // https://doc.rust-lang.org/std/collections/struct.HashSet.html#method.insert
             // "If the set did not have this value present, `true` is returned."
-            Some(ref mut set) => !set.insert(identity),
+            Some(ref mut set) => !set.insert(id),
             None => {
                 let mut set: HashSet<usize, BuildNoHashHasher> =
                     HashSet::with_capacity_and_hasher(10, BuildHasherDefault::default());
-                set.insert(identity);
+                set.insert(id);
                 self.ids = Some(set);
                 false
             }
