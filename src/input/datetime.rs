@@ -95,7 +95,6 @@ pub fn pytimedelta_as_timedelta(py_timedelta: &PyDelta) -> Duration {
     let mut seconds = py_timedelta.get_seconds(); // 0 through 86399
     let mut microseconds = py_timedelta.get_microseconds(); // 0 through 999999
     let positive = days >= 0;
-    dbg!(days, seconds, microseconds, positive);
     if !positive {
         // negative timedelta, we need to adjust values to match duration logic
         if microseconds != 0 {
