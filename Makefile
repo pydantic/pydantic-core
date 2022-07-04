@@ -16,12 +16,8 @@ install-rust-coverage:
 	cargo install rustfilt cargo-binutils
 	rustup component add llvm-tools-preview
 
-.PHONY: self-schema
-self-schema:
-	python generate_self_schema.py
-
 .PHONY: build-dev
-build-dev: self-schema
+build-dev:
 	@rm -f pydantic_core/*.so
 	cargo build
 	@rm -f target/debug/lib_pydantic_core.d
@@ -29,7 +25,7 @@ build-dev: self-schema
 	@mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: build-prod
-build-prod: self-schema
+build-prod:
 	@rm -f pydantic_core/*.so
 	cargo build --release
 	@rm -f target/release/lib_pydantic_core.d
@@ -37,7 +33,7 @@ build-prod: self-schema
 	@mv target/release/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: build-coverage
-build-coverage: self-schema
+build-coverage:
 	pip uninstall -y pydantic_core
 	rm -f pydantic_core/*.so
 	RUSTFLAGS='-C instrument-coverage -A incomplete_features -C link-arg=-undefined -C link-arg=dynamic_lookup' cargo build
@@ -46,7 +42,7 @@ build-coverage: self-schema
 	mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: build-cov-windows
-build-cov-windows: self-schema
+build-cov-windows:
 	pip uninstall -y pydantic_core
 	rm -f pydantic_core/*.so
 	RUSTFLAGS='-C instrument-coverage -A incomplete_features' cargo build
@@ -68,7 +64,6 @@ lint-python:
 
 .PHONY: lint-rust
 lint-rust:
-	@touch src/self_schema.py
 	cargo fmt --version
 	cargo fmt --all -- --check
 	cargo clippy --version
@@ -134,6 +129,7 @@ clean:
 	rm -f `find . -type f -name '*.py[co]' `
 	rm -f `find . -type f -name '*~' `
 	rm -f `find . -type f -name '.*~' `
+	rm -rf src/self_schema.py
 	rm -rf .cache
 	rm -rf flame
 	rm -rf htmlcov

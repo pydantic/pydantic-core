@@ -183,7 +183,9 @@ impl SchemaValidator {
 
     fn build_self_schema(py: Python) -> PyResult<Self> {
         let code = include_str!("../self_schema.py");
-        let self_schema: &PyDict = py.eval(code, None, None)?.extract()?;
+        let locals = PyDict::new(py);
+        py.run(code, None, Some(locals))?;
+        let self_schema: &PyDict = locals.get_as_req("self_schema")?;
 
         let mut build_context = BuildContext::default();
         let validator = match build_validator(self_schema, None, &mut build_context) {
