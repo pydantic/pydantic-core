@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Optional
 
 import pytest
 from hypothesis import given, strategies
@@ -70,26 +70,25 @@ def test_recursive(recursive_schema, data):
 
 
 @strategies.composite
-def branch_models_with_cycles(draw, existing: List[BranchModel] | None = None):
+def branch_models_with_cycles(draw, existing=None):
     if existing is None:
         existing = []
-    name = draw(strategies.text())
-    sub_branch = draw(
+    model = BranchModel(name=draw(strategies.text()), sub_branch=None)
+    existing.append(model)
+    model['sub_branch'] = draw(
         strategies.none()
-        | (strategies.sampled_from(existing) if existing else strategies.nothing())
-        | branch_models_with_cycles(existing)
+        | strategies.builds(BranchModel, name=strategies.text(), sub_branch=branch_models_with_cycles(existing))
+        | strategies.sampled_from(existing)
     )
-    branch = BranchModel(name=name, sub_branch=sub_branch)
-    existing.append(branch)
-    return branch
+    return model
 
 
 @given(branch_models_with_cycles())
 def test_recursive_cycles(recursive_schema, data):
-    assert recursive_schema.validate_python(data) == data
+    with pytest.raises(ValidationError):
+        assert recursive_schema.validate_python(data) == data
 
 
-@pytest.mark.skip(reason='recursion not yet detected, see #134, python/pytest currently crash with Segmentation fault')
 def test_recursive_broken(recursive_schema):
     data = {'name': 'x'}
     data['sub_branch'] = data
