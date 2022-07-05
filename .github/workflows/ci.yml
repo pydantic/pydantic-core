@@ -221,7 +221,7 @@ jobs:
           node-version: '18'
 
       - name: run tests
-        run: nox -f tests/noxfile.py -s test-emscripten
+        run: npm run test
 
       - uses: actions/upload-artifact@v3
         with:
