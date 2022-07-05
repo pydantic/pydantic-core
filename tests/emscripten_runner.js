@@ -94,8 +94,11 @@ import micropip
 
 await micropip.install('dirty-equals')
 await micropip.install('hypothesis')
-# await micropip.install('pytest-speed')
+await micropip.install('pytest-speed')
 await micropip.install('${wheel_url}')
+
+# prompt pytest_speed to be detected as a plugin by pytest
+import pytest_speed
 
 print(micropip.list())
 

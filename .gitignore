@@ -24,8 +24,6 @@ docs/_build/
 /*.profraw
 /flame/
 /.benchmarks/
-tests/package.json
-tests/package-lock.json
-node_modules/
 .hypothesis/
-/package-lock.json
+node_modules/
+package-lock.json
