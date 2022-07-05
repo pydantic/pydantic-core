@@ -118,6 +118,11 @@ jobs:
       with:
         python-version: '3.10'
 
+    # used to lint js code
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
     - uses: actions/cache@v2
       id: cache-py
       name: cache python
@@ -139,6 +144,9 @@ jobs:
 
     - run: make lint
     - run: make pyright
+
+    - run: npm install
+    - run: npm run lint
 
   bench:
     # run the rust benchmarks
@@ -189,15 +197,14 @@ jobs:
           version: '3.1.14'
           actions-cache-folder: emsdk-cache
 
-      # setup-emsdk action adds an old version of node in PATH, install node afterwards to override it
       - uses: actions/setup-node@v3
         with:
           node-version: '18'
 
       - run: npm install
 
-      - name: setup pyodide
-        run: python tests/setup_pyodide.py
+#      - name: setup pyodide
+#        run: python tests/setup_pyodide.py
 
       - name: set package version
         run: python .github/set_version.py
