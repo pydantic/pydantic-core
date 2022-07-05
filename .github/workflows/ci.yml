@@ -59,7 +59,7 @@ jobs:
     - run: rustup component add llvm-tools-preview
 
     - name: set up python
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -114,7 +114,7 @@ jobs:
     - name: cache rust
       uses: Swatinem/rust-cache@v1
 
-    - uses: actions/setup-python@v3
+    - uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
@@ -155,7 +155,7 @@ jobs:
     - name: cache rust
       uses: Swatinem/rust-cache@v1
 
-    - uses: actions/setup-python@v3
+    - uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
@@ -173,7 +173,7 @@ jobs:
         id: setup-python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.10.2
+          python-version: '3.10.2'
 
       - name: set up node
         uses: actions/setup-node@v3
@@ -190,6 +190,9 @@ jobs:
         uses: Swatinem/rust-cache@v1
 
       - run: pip install nox requests
+
+      - name: setup pyodide
+        run: npm init
 
       - name: setup pyodide
         run: nox -f tests/noxfile.py -s setup-pyodide
@@ -280,7 +283,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: set up python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
           architecture: ${{ matrix.python-architecture || 'x64' }}
@@ -336,7 +339,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: set up python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 

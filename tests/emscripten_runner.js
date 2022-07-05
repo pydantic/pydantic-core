@@ -2,11 +2,11 @@ const {opendir} = require('node:fs/promises')
 const {loadPyodide} = require('pyodide')
 const path = require('path')
 
-async function findWheel(distDir) {
-  const dir = await opendir(distDir)
+async function find_wheel(dist_dir) {
+  const dir = await opendir(dist_dir)
   for await (const dirent of dir) {
     if (dirent.name.endsWith('whl')) {
-      return dirent.name
+      return path.join(dist_dir, dirent.name)
     }
   }
 }
@@ -77,10 +77,8 @@ function setupStreams(FS, TTY) {
 
 async function main() {
   const root_dir = path.resolve(__dirname, '..')
-  const dist_dir = path.join(root_dir, 'dist')
-  const test_dir = path.join(root_dir, 'tests')
-  const wheel_name = await findWheel(dist_dir)
-  const wheel_url = `file:${path.join(root_dir, wheel_name)}`
+  const wheel_path = await find_wheel(path.join(root_dir, 'dist'))
+  const wheel_url = `file:${wheel_path}`
   let errcode = 0
   try {
     const pyodide = await loadPyodide()
@@ -88,7 +86,7 @@ async function main() {
     setupStreams(FS, pyodide._module.TTY)
     const NODEFS = FS.filesystems.NODEFS
     FS.mkdir('/test_dir')
-    FS.mount(NODEFS, {root: test_dir}, '/test_dir')
+    FS.mount(NODEFS, {root: path.join(root_dir, 'tests')}, '/test_dir')
     await pyodide.loadPackage(['micropip', 'pytest', 'pytz'])
     const micropip = pyodide.pyimport('micropip')
     await micropip.install('dirty-equals')
