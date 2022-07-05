@@ -92,7 +92,7 @@ def import_execute(request, tmp_work_path: Path):
 
 
 if sys.platform == 'emscripten':
-    # we have to stub pytest-benchmark as pytest is not detecting it
+    # we have to stub pytest-speed/pytest-benchmark as pytest is not detecting the plugin, can perhaps remove in future
 
     @pytest.fixture
     def benchmark():

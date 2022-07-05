@@ -5,7 +5,7 @@ const path = require('path')
 async function find_wheel(dist_dir) {
   const dir = await opendir(dist_dir)
   for await (const dirent of dir) {
-    if (dirent.name.endsWith('whl')) {
+    if (dirent.name.endsWith('.whl')) {
       return path.join(dist_dir, dirent.name)
     }
   }
@@ -84,9 +84,8 @@ async function main() {
     const pyodide = await loadPyodide()
     const FS = pyodide.FS
     setupStreams(FS, pyodide._module.TTY)
-    const NODEFS = FS.filesystems.NODEFS
     FS.mkdir('/test_dir')
-    FS.mount(NODEFS, {root: path.join(root_dir, 'tests')}, '/test_dir')
+    FS.mount(FS.filesystems.NODEFS, {root: path.join(root_dir, 'tests')}, '/test_dir')
     FS.chdir('/test_dir')
     await pyodide.loadPackage(['micropip', 'pytest', 'pytz'])
     // language=python
@@ -95,7 +94,7 @@ import micropip
 
 await micropip.install('dirty-equals')
 await micropip.install('hypothesis')
-await micropip.install('pytest-speed')
+# await micropip.install('pytest-speed')
 await micropip.install('${wheel_url}')
 
 print(micropip.list())
