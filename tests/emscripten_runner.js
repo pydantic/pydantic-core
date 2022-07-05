@@ -91,7 +91,7 @@ async function main() {
     const micropip = pyodide.pyimport('micropip')
     await micropip.install('dirty-equals')
     await micropip.install('hypothesis')
-    await micropip.install('pytest-speed')
+    // await micropip.install('pytest-speed')
     await micropip.install(wheel_url)
     console.log('Installed packages:', micropip.list())
     const pytest = pyodide.pyimport('pytest')
