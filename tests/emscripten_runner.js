@@ -93,6 +93,7 @@ async function main() {
     await micropip.install('hypothesis')
     await micropip.install('pytest-speed')
     await micropip.install(wheel_url)
+    console.log('Installed packages:', micropip.list())
     const pytest = pyodide.pyimport('pytest')
     FS.chdir('/test_dir')
     errcode = pytest.main()
