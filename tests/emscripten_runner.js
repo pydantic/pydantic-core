@@ -82,7 +82,7 @@ function setupStreams(FS, TTY){
 async function main() {
   const wheelName = await findWheel(distDir);
   const wheelURL = `file:${distDir}/${wheelName}`;
-
+  let errcode = 0;
   try {
     pyodide = await loadPyodide();
     const FS = pyodide.FS;
@@ -93,16 +93,17 @@ async function main() {
     await pyodide.loadPackage(['micropip', 'pytest', 'pytz']);
     const micropip = pyodide.pyimport('micropip');
     await micropip.install('dirty-equals');
+    await micropip.install('hypothesis');
     await micropip.install('pytest-speed');
     await micropip.install(wheelURL);
     const pytest = pyodide.pyimport('pytest');
     FS.chdir("/test_dir");
     errcode = pytest.main();
-    process.exit(errcode);
   } catch (e) {
     console.error(e);
     process.exit(1);
   }
+  process.exit(errcode);
 }
 
 main();
