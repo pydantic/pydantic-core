@@ -93,6 +93,7 @@ async function main() {
     await pyodide.loadPackage(['micropip', 'pytest', 'pytz']);
     const micropip = pyodide.pyimport('micropip');
     await micropip.install('dirty-equals');
+    await micropip.install('pytest-speed');
     await micropip.install(wheelURL);
     const pytest = pyodide.pyimport('pytest');
     FS.chdir("/test_dir");
