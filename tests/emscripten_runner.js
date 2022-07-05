@@ -98,6 +98,7 @@ async function main() {
     const pytest = pyodide.pyimport('pytest');
     FS.chdir("/test_dir");
     errcode = pytest.main();
+    process.exit(errcode);
   } catch (e) {
     console.error(e);
     process.exit(1);
