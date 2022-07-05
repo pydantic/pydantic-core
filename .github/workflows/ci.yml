@@ -175,11 +175,6 @@ jobs:
         with:
           python-version: '3.10.2'
 
-      - name: set up node
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -191,16 +186,20 @@ jobs:
 
       - run: pip install nox requests
 
-      - name: setup pyodide
-        run: npm init
-
-      - name: setup pyodide
-        run: nox -f tests/noxfile.py -s setup-pyodide
-
       - uses: mymindstorm/setup-emsdk@v11
         with:
           version: '3.1.14'
           actions-cache-folder: emsdk-cache
+
+      # setup-emsdk action adds an old version of node in PATH, install node afterwards to override it
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - run: npm install
+
+      - name: setup pyodide
+        run: nox -f tests/noxfile.py -s setup-pyodide
 
       - name: set package version
         run: python .github/set_version.py
@@ -216,12 +215,6 @@ jobs:
         run: maturin build --release --target wasm32-unknown-emscripten --out dist -i 3.10
 
       - run: ls -lh dist
-
-      # setup-emsdk action adds an old version of node in PATH
-      # override it by setup node again
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '18'
 
       - name: run tests
         run: npm run test
