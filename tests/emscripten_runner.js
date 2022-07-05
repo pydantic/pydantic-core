@@ -87,16 +87,22 @@ async function main() {
     const NODEFS = FS.filesystems.NODEFS
     FS.mkdir('/test_dir')
     FS.mount(NODEFS, {root: path.join(root_dir, 'tests')}, '/test_dir')
-    await pyodide.loadPackage(['micropip', 'pytest', 'pytz'])
-    const micropip = pyodide.pyimport('micropip')
-    await micropip.install('dirty-equals')
-    await micropip.install('hypothesis')
-    // await micropip.install('pytest-speed')
-    await micropip.install(wheel_url)
-    console.log('Installed packages:', micropip.list())
-    const pytest = pyodide.pyimport('pytest')
     FS.chdir('/test_dir')
-    errcode = pytest.main()
+    await pyodide.loadPackage(['micropip', 'pytest', 'pytz'])
+    // language=python
+    errcode = await pyodide.runPythonAsync(`
+import micropip
+
+await micropip.install('dirty-equals')
+await micropip.install('hypothesis')
+await micropip.install('pytest-speed')
+await micropip.install('${wheel_url}')
+
+print(micropip.list())
+
+import pytest
+pytest.main()
+`)
   } catch (e) {
     console.error(e)
     process.exit(1)
