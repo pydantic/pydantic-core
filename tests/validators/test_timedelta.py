@@ -239,3 +239,11 @@ def test_pytimedelta_as_timedelta(constraint, expected_duration):
     pos, day, sec, micro = m.groups()
     duration = {'positive': pos == 'true', 'day': int(day), 'second': int(sec), 'microsecond': int(micro)}
     assert duration == pytest.approx(expected_duration), constraint
+
+
+def test_large_value():
+    v = SchemaValidator({'type': 'timedelta'})
+    assert v.validate_python('123days, 12:34') == timedelta(days=123, hours=12, minutes=34)
+    assert v.validate_python(f'{999_999_999}days, 12:34') == timedelta(days=999_999_999, hours=12, minutes=34)
+    with pytest.raises(ValidationError, match='must be a valid timedelta, durations may not exceed 999,999,999 days'):
+        v.validate_python(f'{999_999_999 + 1}days, 12:34')

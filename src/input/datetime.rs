@@ -108,7 +108,7 @@ pub fn pytimedelta_as_timedelta(py_timedelta: &PyDelta) -> Duration {
         days = days.abs();
     }
     // we can safely "unwrap" since the methods above guarantee values are in the correct ranges.
-    Duration::new(positive, days as u64, seconds as u32, microseconds as u32).unwrap()
+    Duration::new(positive, days as u32, seconds as u32, microseconds as u32).unwrap()
 }
 
 impl<'a> EitherTimedelta<'a> {
@@ -371,14 +371,16 @@ pub fn int_as_duration(total_seconds: i64) -> Duration {
     let positive = total_seconds >= 0;
     let total_seconds = total_seconds.unsigned_abs();
     // we can safely unwrap here since we've guaranteed seconds and microseconds can't cause overflow
-    Duration::new(positive, total_seconds / 86400, (total_seconds % 86400) as u32, 0).unwrap()
+    let days = (total_seconds / 86400) as u32;
+    let seconds = (total_seconds % 86400) as u32;
+    Duration::new(positive, days, seconds, 0).unwrap()
 }
 
 pub fn float_as_duration(total_seconds: f64) -> Duration {
     let positive = total_seconds >= 0_f64;
     let total_seconds = total_seconds.abs();
     let microsecond = total_seconds.fract() * 1_000_000.0;
-    let days = total_seconds as u64 / 86400;
+    let days = (total_seconds / 86400f64) as u32;
     let seconds = total_seconds as u64 % 86400;
     Duration::new(positive, days, seconds as u32, microsecond.round() as u32).unwrap()
 }
