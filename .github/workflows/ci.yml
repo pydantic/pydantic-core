@@ -166,11 +166,6 @@ jobs:
     # if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main')"
     # needs: [test, lint]
     runs-on: ubuntu-latest
-    env:
-      PYODIDE_VERSION: '0.21.0-alpha.2'
-      PYTHON_VERSION: '3.10.2'
-      EMSCRIPTEN_VERSION: '3.1.14'
-      NODE_VERSION: 18
     steps:
       - uses: actions/checkout@v3
 
@@ -178,12 +173,12 @@ jobs:
         id: setup-python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: 3.10.2
 
       - name: set up node
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: '18'
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -201,7 +196,7 @@ jobs:
 
       - uses: mymindstorm/setup-emsdk@v11
         with:
-          version: ${{ env.EMSCRIPTEN_VERSION }}
+          version: '3.1.14'
           actions-cache-folder: emsdk-cache
 
       - name: set package version
@@ -223,7 +218,7 @@ jobs:
       # override it by setup node again
       - uses: actions/setup-node@v3
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: '18'
 
       - name: run tests
         run: nox -f tests/noxfile.py -s test-emscripten

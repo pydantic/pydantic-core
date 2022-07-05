@@ -26,5 +26,6 @@ docs/_build/
 /.benchmarks/
 tests/package.json
 tests/package-lock.json
-tests/node_modules
+node_modules/
 .hypothesis/
+/package-lock.json
