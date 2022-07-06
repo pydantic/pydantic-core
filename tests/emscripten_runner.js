@@ -92,7 +92,8 @@ async function main() {
 import micropip
 import importlib
 
-# ugly hack to get tests to work on arm64 (m1 mac)
+# ugly hack to get tests to work on arm64 (my m1 mac)
+# see https://github.com/pyodide/pyodide/issues/2840
 # import sys; sys.setrecursionlimit(200)
 
 await micropip.install([
