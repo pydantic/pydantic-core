@@ -19,10 +19,10 @@ function make_tty_ops(stream) {
     // c.) null to signal an EOF
     get_char(tty) {
       if (!tty.input.length) {
-        var result = null
-        var BUFSIZE = 256
-        var buf = Buffer.alloc(BUFSIZE)
-        var bytesRead = fs.readSync(process.stdin.fd, buf, 0, BUFSIZE, -1)
+        let result = null
+        const BUFSIZE = 256
+        const buf = Buffer.alloc(BUFSIZE)
+        const bytesRead = fs.readSync(process.stdin.fd, buf, 0, BUFSIZE, -1)
         if (bytesRead === 0) {
           return null
         }
@@ -78,7 +78,6 @@ function setupStreams(FS, TTY) {
 async function main() {
   const root_dir = path.resolve(__dirname, '..')
   const wheel_path = await find_wheel(path.join(root_dir, 'dist'))
-  const wheel_url = `file:${wheel_path}`
   let errcode = 0
   try {
     const pyodide = await loadPyodide()
@@ -91,16 +90,20 @@ async function main() {
     // language=python
     errcode = await pyodide.runPythonAsync(`
 import micropip
+import importlib
 
-await micropip.install('dirty-equals')
-await micropip.install('hypothesis')
-await micropip.install('pytest-speed')
-await micropip.install('${wheel_url}')
+# ugly hack to get tests to work on arm64 (m1 mac)
+# import sys; sys.setrecursionlimit(200)
 
-# prompt pytest_speed to be detected as a plugin by pytest
-import pytest_speed
+await micropip.install([
+    'dirty-equals',
+    'hypothesis',
+    'pytest-speed',
+    'file:${wheel_path}',
+])
+importlib.invalidate_caches()
 
-print(micropip.list())
+print('installed packages:', micropip.list())
 
 import pytest
 pytest.main()
