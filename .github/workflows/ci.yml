@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    name: test py${{ matrix.python-version }} rust ${{ matrix.rust-toolchain }}
+    name: test ${{ matrix.python-version }} rust ${{ matrix.rust-toolchain }}
     strategy:
       fail-fast: false
       matrix:
