@@ -326,6 +326,7 @@ jobs:
           path: dist
 
       - run: ls -lh dist/
+      - run: echo "`ls src | wc -l` files"
 
   release:
     needs: [build, build-wasm-emscripten]

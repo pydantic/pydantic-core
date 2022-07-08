@@ -677,7 +677,11 @@ impl<'a> Iterator for IterAttributes<'a> {
         // or we get to the end of the list of attributes
         loop {
             if self.index < self.attributes.len() {
-                let name: &PyAny = unsafe { self.attributes.get_item_unchecked(self.index) };
+                let name: &PyAny = if cfg!(PyPy) {
+                    self.attributes.get_item(self.index).unwrap()
+                } else {
+                    unsafe { self.attributes.get_item_unchecked(self.index) }
+                };
                 self.index += 1;
                 // from benchmarks this is 14x faster than using the python `startswith` method
                 let name_cow = name
