@@ -151,10 +151,10 @@ impl BuildValidator for TaggedUnionValidator {
             let validator = build_validator(value, config, build_context)?.0;
             if first {
                 first = false;
-                tags_repr.push_str(&tag);
+                write!(tags_repr, r#""{}""#, tag).unwrap();
                 descr.push_str(validator.get_name());
             } else {
-                write!(tags_repr, ", {}", tag).unwrap();
+                write!(tags_repr, r#", "{}""#, tag).unwrap();
                 // no spaces in get_name() output to make loc easy to read
                 write!(descr, ",{}", validator.get_name()).unwrap();
             }
@@ -198,7 +198,7 @@ impl Validator for TaggedUnionValidator {
                         } else {
                             value.lax_str()?
                         };
-                        self.choices.get(tag.as_cow().as_ref())
+                        self.choices.get_key_value(tag.as_cow().as_ref())
                     }
                     None => None,
                 }
@@ -207,13 +207,16 @@ impl Validator for TaggedUnionValidator {
 
         // note all these methods return PyResult<Option<(data, data)>>, the outer Err is just for
         // errors when getting attributes which should be "raised"
-        let op_validator: Option<&CombinedValidator> = match dict {
+        let tag_validator: Option<(&String, &CombinedValidator)> = match dict {
             GenericMapping::PyDict(d) => find_validator!(d, py_get_item),
             GenericMapping::PyGetAttr(d) => find_validator!(d, py_get_attr),
             GenericMapping::JsonObject(d) => find_validator!(d, json_get),
         };
-        if let Some(validator) = op_validator {
-            validator.validate(py, input, extra, slots, recursion_guard)
+        if let Some((tag, validator)) = tag_validator {
+            match validator.validate(py, input, extra, slots, recursion_guard) {
+                Ok(res) => Ok(res),
+                Err(err) => Err(err.with_outer_location(tag.as_str().into())),
+            }
         } else {
             Err(ValError::new(
                 ErrorKind::UnionTagNotFound {

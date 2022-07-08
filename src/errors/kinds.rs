@@ -207,7 +207,7 @@ pub enum ErrorKind {
     CallableType,
     // ---------------------
     // union errors
-    #[strum(message = "Input value {key} must match one of the allowed tags {tags}")]
+    #[strum(message = "Input key \"{key}\" must match one of the allowed tags {tags}")]
     UnionTagNotFound { key: String, tags: String },
 }
 
