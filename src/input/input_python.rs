@@ -462,15 +462,15 @@ fn mapping_seq_as_dict(seq: &PySequence) -> PyResult<&PyDict> {
     for r in seq.iter()? {
         let t: &PyTuple = r?.extract()?;
 
+        if t.len() != 2 {
+            return Err(PyTypeError::new_err("mapping items must be a tuple with 2 elements"));
+        }
+
         #[cfg(PyPy)]
         let k = t.get_item(0)?;
         #[cfg(PyPy)]
         let v = t.get_item(1)?;
 
-        #[cfg(not(PyPy))]
-        if t.len() != 2 {
-            return Err(PyTypeError::new_err("mapping items must be a tuple with 2 elements"));
-        }
         #[cfg(not(PyPy))]
         let k = unsafe { t.get_item_unchecked(0) };
         #[cfg(not(PyPy))]
