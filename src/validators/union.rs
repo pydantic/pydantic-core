@@ -1,7 +1,10 @@
-use std::fmt;
+use std::fmt::Write;
 
+use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+
+use ahash::AHashMap;
 
 use crate::build_tools::{is_strict, py_error, schema_or_config, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
@@ -113,41 +116,14 @@ impl Validator for UnionValidator {
 }
 
 #[derive(Debug, Clone)]
-struct TaggedUnionChoice {
-    lookup_key: LookupKey,
-    tag: String,
-    validator: CombinedValidator,
-}
-
-impl fmt::Display for TaggedUnionChoice {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({})={}", self.lookup_key, self.tag)
-    }
-}
-
-impl TaggedUnionChoice {
-    fn from_py(tagged_union: &PyAny, config: Option<&PyDict>, build_context: &mut BuildContext) -> PyResult<Self> {
-        let tagged_union: &PyDict = tagged_union.extract()?;
-        let py = tagged_union.py();
-        let lookup_key = match LookupKey::from_py(py, tagged_union, None, "tag_key", "tag_keys")? {
-            Some(lookup_key) => lookup_key,
-            None => return py_error!("'tag_key' or 'tag_keys' must be set on tagged union choices"),
-        };
-        Ok(Self {
-            lookup_key,
-            tag: tagged_union.get_as_req("tag")?,
-            validator: build_validator(tagged_union.get_as_req("schema")?, config, build_context)?.0,
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct TaggedUnionValidator {
-    choices: Vec<TaggedUnionChoice>,
+    choices: AHashMap<String, CombinedValidator>,
+    lookup_key: LookupKey,
     from_attributes: bool,
     strict: bool,
-    name: String,
     tags_repr: String,
+    key_repr: String,
+    name: String,
 }
 
 impl BuildValidator for TaggedUnionValidator {
@@ -158,27 +134,45 @@ impl BuildValidator for TaggedUnionValidator {
         config: Option<&PyDict>,
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
-        let choices = schema
-            .get_as_req::<&PyList>("choices")?
-            .iter()
-            .map(|choice| TaggedUnionChoice::from_py(choice, config, build_context))
-            .collect::<PyResult<Vec<TaggedUnionChoice>>>()?;
+        let py = schema.py();
+        let lookup_key = match LookupKey::from_py(py, schema, None, "tag_key", "tag_keys")? {
+            Some(lookup_key) => lookup_key,
+            None => return py_error!(PyKeyError; "'tag_key' or 'tag_keys' must be set on a tagged union"),
+        };
 
-        let tags_repr = choices.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(", ");
-        let descr = choices
-            .iter()
-            .map(|c| c.validator.get_name())
-            .collect::<Vec<_>>()
-            .join(",");
+        let mut choices = AHashMap::new();
+        let mut first = true;
+        let mut tags_repr = String::with_capacity(50);
+        let mut descr = String::with_capacity(50);
+
+        for item in schema.get_as_req::<&PyDict>("choices")?.items().iter() {
+            let tag: String = item.get_item(0)?.extract()?;
+            let value = item.get_item(1)?;
+            let validator = build_validator(value, config, build_context)?.0;
+            if first {
+                first = false;
+                tags_repr.push_str(&tag);
+                descr.push_str(validator.get_name());
+            } else {
+                write!(tags_repr, ", {}", tag).unwrap();
+                // no spaces in get_name() output to make loc easy to read
+                write!(descr, ",{}", validator.get_name()).unwrap();
+            }
+            choices.insert(tag, validator);
+        }
+
         let from_attributes =
             schema_or_config(schema, config, "from_attributes", "typed_dict_from_attributes")?.unwrap_or(false);
+        let key_repr = lookup_key.to_string();
 
         Ok(Self {
             choices,
+            lookup_key,
             from_attributes,
             strict: is_strict(schema, config)?,
-            name: format!("{}[{}]", Self::EXPECTED_TYPE, descr),
             tags_repr,
+            key_repr,
+            name: format!("{}[{}]", Self::EXPECTED_TYPE, descr),
         }
         .into())
     }
@@ -195,30 +189,40 @@ impl Validator for TaggedUnionValidator {
     ) -> ValResult<'data, PyObject> {
         let dict = input.typed_dict(self.from_attributes, !self.strict)?;
 
-        for choice in &self.choices {
-            // note all these methods return PyResult<Option<(data, data)>>, the outer Err is just for
-            // errors when getting attributes which should be returned straight away,
-            let d = match dict {
-                GenericMapping::PyDict(d) => choice.lookup_key.py_get_item(d)?,
-                GenericMapping::PyGetAttr(d) => choice.lookup_key.py_get_attr(d)?,
-                GenericMapping::JsonObject(d) => choice.lookup_key.json_get(d)?,
-            };
-
-            if let Some((_, value)) = d {
-                // if value is not a string, we don't raise an error, but continue to the next
-                if let Ok(value_string) = value.extract::<String>() {
-                    if value_string == choice.tag {
-                        return choice.validator.validate(py, input, extra, slots, recursion_guard);
+        macro_rules! find_validator {
+            ($dict:ident, $get_method:ident) => {{
+                match self.lookup_key.$get_method($dict)? {
+                    Some((_, value)) => {
+                        let tag = if self.strict {
+                            value.strict_str()?
+                        } else {
+                            value.lax_str()?
+                        };
+                        self.choices.get(tag.as_cow().as_ref())
                     }
+                    None => None,
                 }
-            }
+            }};
         }
-        Err(ValError::new(
-            ErrorKind::UnionTagNotFound {
-                tags: self.tags_repr.clone(),
-            },
-            input,
-        ))
+
+        // note all these methods return PyResult<Option<(data, data)>>, the outer Err is just for
+        // errors when getting attributes which should be "raised"
+        let op_validator: Option<&CombinedValidator> = match dict {
+            GenericMapping::PyDict(d) => find_validator!(d, py_get_item),
+            GenericMapping::PyGetAttr(d) => find_validator!(d, py_get_attr),
+            GenericMapping::JsonObject(d) => find_validator!(d, json_get),
+        };
+        if let Some(validator) = op_validator {
+            validator.validate(py, input, extra, slots, recursion_guard)
+        } else {
+            Err(ValError::new(
+                ErrorKind::UnionTagNotFound {
+                    key: self.key_repr.clone(),
+                    tags: self.tags_repr.clone(),
+                },
+                input,
+            ))
+        }
     }
 
     fn get_name(&self) -> &str {
@@ -228,6 +232,6 @@ impl Validator for TaggedUnionValidator {
     fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
         self.choices
             .iter_mut()
-            .try_for_each(|c| c.validator.complete(build_context))
+            .try_for_each(|(_, validator)| validator.complete(build_context))
     }
 }

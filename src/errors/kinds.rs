@@ -207,8 +207,8 @@ pub enum ErrorKind {
     CallableType,
     // ---------------------
     // union errors
-    #[strum(message = "Input must match one of the allowed tags {tags}")]
-    UnionTagNotFound { tags: String },
+    #[strum(message = "Input value {key} must match one of the allowed tags {tags}")]
+    UnionTagNotFound { key: String, tags: String },
 }
 
 macro_rules! render {
@@ -287,7 +287,7 @@ impl ErrorKind {
             Self::DateTimeObjectInvalid { error } => render!(template, error),
             Self::TimeDeltaParsing { error } => render!(template, error),
             Self::IsInstanceOf { class } => render!(template, class),
-            Self::UnionTagNotFound { tags } => render!(template, tags),
+            Self::UnionTagNotFound { key, tags } => render!(template, key, tags),
             _ => template.to_string(),
         }
     }
@@ -335,7 +335,7 @@ impl ErrorKind {
             Self::DateTimeObjectInvalid { error } => py_dict!(py, error),
             Self::TimeDeltaParsing { error } => py_dict!(py, error),
             Self::IsInstanceOf { class } => py_dict!(py, class),
-            Self::UnionTagNotFound { tags } => py_dict!(py, tags),
+            Self::UnionTagNotFound { key, tags } => py_dict!(py, key, tags),
             _ => Ok(None),
         }
     }
