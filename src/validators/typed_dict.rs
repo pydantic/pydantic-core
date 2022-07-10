@@ -1,5 +1,5 @@
 use pyo3::exceptions::{PyAttributeError, PyTypeError};
-use pyo3::intern;
+use pyo3::{intern, PyTypeInfo};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyList, PySet, PyString};
 
@@ -696,7 +696,7 @@ impl<'a> Iterator for IterAttributes<'a> {
                         // the is_instance_of::<PyFunction> catches `staticmethod`, but also any other function,
                         // I think that's better than including static methods in the yielded attributes,
                         // if someone really wants fields, they can use an explicit field, or a function to modify input
-                        if !is_bound && !matches!(attr.is_instance_of::<PyFunction>(), Ok(true)) {
+                        if !is_bound && !PyFunction::is_type_of(attr) {
                             return Some((name, attr));
                         }
                     }
