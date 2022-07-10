@@ -213,7 +213,7 @@ def test_custom_invalid_tz():
     with pytest.raises(ValidationError) as excinfo:
         schema.validate_python(dt)
 
-    # exception messages are different between python and pypy
+    # exception messages differ between python and pypy
     if platform.python_implementation() == 'PyPy':
         error_message = 'NotImplementedError: tzinfo subclass must override utcoffset()'
     else:

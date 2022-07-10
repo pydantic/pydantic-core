@@ -261,7 +261,7 @@ def test_function_wrong_sig():
 
     v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'str'}})
 
-    # exception messages are different between python and pypy
+    # exception messages differ between python and pypy
     if platform.python_implementation() == 'PyPy':
         error_message = 'f() got 2 unexpected keyword arguments'
     else:
