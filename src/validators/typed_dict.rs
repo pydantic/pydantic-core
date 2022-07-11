@@ -20,6 +20,7 @@ struct TypedDictField {
     name_pystring: Py<PyString>,
     required: bool,
     default: Option<PyObject>,
+    default_factory: Option<PyObject>,
     validator: CombinedValidator,
 }
 
@@ -84,9 +85,14 @@ impl BuildValidator for TypedDictValidator {
             let schema: &PyAny = field_info
                 .get_as_req("schema")
                 .map_err(|err| SchemaError::new_err(format!("Field \"{}\":\n  {}", field_name, err)))?;
-            let default = field_info
-                .get_as("default")
-                .map_err(|err| PyTypeError::new_err(format!("Field \"{}\":\n  {}", field_name, err)))?;
+
+            let (default, default_factory) =
+                match (field_info.get_as("default")?, field_info.get_as("default_factory")?) {
+                    (Some(_default), Some(_default_factory)) => {
+                        return py_error!("'default' and 'default_factory' cannot be used together")
+                    }
+                    (default, default_factory) => (default, default_factory),
+                };
 
             fields.push(TypedDictField {
                 name: field_name.to_string(),
@@ -98,7 +104,7 @@ impl BuildValidator for TypedDictValidator {
                 },
                 required: match field_info.get_as::<bool>("required")? {
                     Some(required) => {
-                        if required && default.is_some() {
+                        if required && (default.is_some() || default_factory.is_some()) {
                             return py_error!("Field \"{}\": a required field cannot have a default value", field_name);
                         }
                         required
@@ -106,6 +112,7 @@ impl BuildValidator for TypedDictValidator {
                     None => full,
                 },
                 default,
+                default_factory,
             });
         }
         Ok(Self {
@@ -201,6 +208,10 @@ impl Validator for TypedDictValidator {
                         // TODO default needs to be copied here
                         output_dict
                             .set_item(&field.name_pystring, default.as_ref(py))
+                            .map_err(as_internal)?;
+                    } else if let Some(ref default_factory) = field.default_factory {
+                        output_dict
+                            .set_item(&field.name_pystring, default_factory.as_ref(py).call0()?)
                             .map_err(as_internal)?;
                     } else if !field.required {
                         continue;
