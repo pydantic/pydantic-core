@@ -21,11 +21,27 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn is_none(&self) -> bool;
 
-    fn validate_str<'data>(&'data self, strict: bool) -> ValResult<EitherString<'data>>;
+    fn validate_str<'data>(&'data self, strict: bool) -> ValResult<EitherString<'data>> {
+        if strict {
+            self.strict_str()
+        } else {
+            self.lax_str()
+        }
+    }
+    fn lax_str<'data>(&'data self) -> ValResult<EitherString<'data>>;
+    fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>>;
 
     fn validate_bool(&self, strict: bool) -> ValResult<bool>;
 
-    fn validate_int(&self, strict: bool) -> ValResult<i64>;
+    fn validate_int(&self, strict: bool) -> ValResult<i64> {
+        if strict {
+            self.strict_int()
+        } else {
+            self.lax_int()
+        }
+    }
+    fn strict_int(&self) -> ValResult<i64>;
+    fn lax_int(&self) -> ValResult<i64>;
 
     fn validate_float(&self, strict: bool) -> ValResult<f64>;
 

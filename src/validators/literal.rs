@@ -68,7 +68,7 @@ impl Validator for LiteralSingleStringValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_str = input.validate_str(true)?;
+        let either_str = input.strict_str()?;
         if either_str.as_cow().as_ref() == self.expected.as_str() {
             Ok(input.to_object(py))
         } else {
@@ -110,7 +110,7 @@ impl Validator for LiteralSingleIntValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let str = input.validate_int(true)?;
+        let str = input.strict_int()?;
         if str == self.expected {
             Ok(input.to_object(py))
         } else {
@@ -162,7 +162,7 @@ impl Validator for LiteralMultipleStringsValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_str = input.validate_str(true)?;
+        let either_str = input.strict_str()?;
         if self.expected.contains(either_str.as_cow().as_ref()) {
             Ok(input.to_object(py))
         } else {
@@ -214,7 +214,7 @@ impl Validator for LiteralMultipleIntsValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let int = input.validate_int(true)?;
+        let int = input.strict_int()?;
         if self.expected.contains(&int) {
             Ok(input.to_object(py))
         } else {
@@ -280,14 +280,14 @@ impl Validator for LiteralGeneralValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if !self.expected_int.is_empty() {
-            if let Ok(int) = input.validate_int(true) {
+            if let Ok(int) = input.strict_int() {
                 if self.expected_int.contains(&int) {
                     return Ok(input.to_object(py));
                 }
             }
         }
         if !self.expected_str.is_empty() {
-            if let Ok(either_str) = input.validate_str(true) {
+            if let Ok(either_str) = input.strict_str() {
                 if self.expected_str.contains(either_str.as_cow().as_ref()) {
                     return Ok(input.to_object(py));
                 }

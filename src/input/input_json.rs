@@ -26,19 +26,19 @@ impl<'a> Input<'a> for JsonInput {
         matches!(self, JsonInput::Null)
     }
 
-    fn validate_str<'data>(&'data self, strict: bool) -> ValResult<EitherString<'data>> {
-        if strict {
-            match self {
-                JsonInput::String(s) => Ok(s.as_str().into()),
-                _ => Err(ValError::new(ErrorKind::StrType, self)),
-            }
-        } else {
-            match self {
-                JsonInput::String(s) => Ok(s.as_str().into()),
-                JsonInput::Int(int) => Ok(int.to_string().into()),
-                JsonInput::Float(float) => Ok(float.to_string().into()),
-                _ => Err(ValError::new(ErrorKind::StrType, self)),
-            }
+    fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
+        match self {
+            JsonInput::String(s) => Ok(s.as_str().into()),
+            _ => Err(ValError::new(ErrorKind::StrType, self)),
+        }
+    }
+
+    fn lax_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
+        match self {
+            JsonInput::String(s) => Ok(s.as_str().into()),
+            JsonInput::Int(int) => Ok(int.to_string().into()),
+            JsonInput::Float(float) => Ok(float.to_string().into()),
+            _ => Err(ValError::new(ErrorKind::StrType, self)),
         }
     }
 
@@ -62,23 +62,23 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
-    fn validate_int(&self, strict: bool) -> ValResult<i64> {
-        if strict {
-            match self {
-                JsonInput::Int(i) => Ok(*i),
-                _ => Err(ValError::new(ErrorKind::IntType, self)),
-            }
-        } else {
-            match self {
-                JsonInput::Bool(b) => match *b {
-                    true => Ok(1),
-                    false => Ok(0),
-                },
-                JsonInput::Int(i) => Ok(*i),
-                JsonInput::Float(f) => float_as_int(self, *f),
-                JsonInput::String(str) => str_as_int(self, str),
-                _ => Err(ValError::new(ErrorKind::IntType, self)),
-            }
+    fn strict_int(&self) -> ValResult<i64> {
+        match self {
+            JsonInput::Int(i) => Ok(*i),
+            _ => Err(ValError::new(ErrorKind::IntType, self)),
+        }
+    }
+
+    fn lax_int(&self) -> ValResult<i64> {
+        match self {
+            JsonInput::Bool(b) => match *b {
+                true => Ok(1),
+                false => Ok(0),
+            },
+            JsonInput::Int(i) => Ok(*i),
+            JsonInput::Float(f) => float_as_int(self, *f),
+            JsonInput::String(str) => str_as_int(self, str),
+            _ => Err(ValError::new(ErrorKind::IntType, self)),
         }
     }
 
@@ -226,6 +226,12 @@ impl<'a> Input<'a> for String {
     fn validate_str<'data>(&'data self, _strict: bool) -> ValResult<EitherString<'data>> {
         Ok(self.as_str().into())
     }
+    fn lax_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
+        Ok(self.as_str().into())
+    }
+    fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
+        Ok(self.as_str().into())
+    }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn validate_bool(&self, strict: bool) -> ValResult<bool> {
@@ -237,14 +243,15 @@ impl<'a> Input<'a> for String {
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validate_int(&self, strict: bool) -> ValResult<i64> {
-        if strict {
-            Err(ValError::new(ErrorKind::IntType, self))
-        } else {
-            match self.parse() {
-                Ok(i) => Ok(i),
-                Err(_) => Err(ValError::new(ErrorKind::IntParsing, self)),
-            }
+    fn strict_int(&self) -> ValResult<i64> {
+        Err(ValError::new(ErrorKind::IntType, self))
+    }
+
+    #[cfg_attr(has_no_coverage, no_coverage)]
+    fn lax_int(&self) -> ValResult<i64> {
+        match self.parse() {
+            Ok(i) => Ok(i),
+            Err(_) => Err(ValError::new(ErrorKind::IntParsing, self)),
         }
     }
 

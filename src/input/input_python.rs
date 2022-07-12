@@ -44,11 +44,17 @@ impl<'a> Input<'a> for PyAny {
         self.is_none()
     }
 
-    fn validate_str<'data>(&'data self, strict: bool) -> ValResult<EitherString<'data>> {
+    fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
         if let Ok(py_str) = self.cast_as::<PyString>() {
             Ok(py_str.into())
-        } else if strict {
+        } else {
             Err(ValError::new(ErrorKind::StrType, self))
+        }
+    }
+
+    fn lax_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
+        if let Ok(py_str) = self.cast_as::<PyString>() {
+            Ok(py_str.into())
         } else if let Ok(bytes) = self.cast_as::<PyBytes>() {
             let str = match from_utf8(bytes.as_bytes()) {
                 Ok(s) => s,
@@ -95,14 +101,20 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn validate_int(&self, strict: bool) -> ValResult<i64> {
-        if strict && self.extract::<bool>().is_ok() {
+    fn strict_int(&self) -> ValResult<i64> {
+        if self.extract::<bool>().is_ok() {
             // bool check has to come before int check as bools would be cast to ints below
             Err(ValError::new(ErrorKind::IntType, self))
         } else if let Ok(int) = self.extract::<i64>() {
             Ok(int)
-        } else if strict {
+        } else {
             Err(ValError::new(ErrorKind::IntType, self))
+        }
+    }
+
+    fn lax_int(&self) -> ValResult<i64> {
+        if let Ok(int) = self.extract::<i64>() {
+            Ok(int)
         } else if let Ok(int) = self.extract::<i64>() {
             Ok(int)
         } else if let Some(either_str) = maybe_as_string(self, ErrorKind::IntParsing)? {
