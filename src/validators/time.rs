@@ -4,7 +4,7 @@ use speedate::Time;
 
 use crate::build_tools::{is_strict, SchemaDict, SchemaError};
 use crate::errors::{as_internal, ErrorKind, ValError, ValResult};
-use crate::input::{EitherTime, Input};
+use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -57,37 +57,11 @@ impl Validator for TimeValidator {
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        _extra: &Extra,
+        extra: &Extra,
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let time = input.validate_time(self.strict)?;
-        self.validation_comparison(py, input, time)
-    }
-
-    fn validate_strict<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        _extra: &Extra,
-        _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        self.validation_comparison(py, input, input.validate_time(true)?)
-    }
-
-    fn get_name(&self) -> &str {
-        Self::EXPECTED_TYPE
-    }
-}
-
-impl TimeValidator {
-    fn validation_comparison<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        time: EitherTime<'data>,
-    ) -> ValResult<'data, PyObject> {
+        let time = input.validate_time(self.strict || extra.strict)?;
         if let Some(constraints) = &self.constraints {
             let raw_time = time.as_raw().map_err(as_internal)?;
 
@@ -112,6 +86,10 @@ impl TimeValidator {
             check_constraint!(gt, GreaterThan);
         }
         time.try_into_py(py).map_err(as_internal)
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
     }
 }
 

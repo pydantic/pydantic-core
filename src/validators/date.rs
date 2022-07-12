@@ -57,11 +57,11 @@ impl Validator for DateValidator {
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        _extra: &Extra,
+        extra: &Extra,
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let date = match input.validate_date(self.strict) {
+        let date = match input.validate_date(self.strict || extra.strict) {
             Ok(date) => date,
             // if the date error was an internal error, return that immediately
             Err(ValError::InternalErr(internal_err)) => return Err(ValError::InternalErr(internal_err)),
@@ -72,32 +72,6 @@ impl Validator for DateValidator {
                 false => date_from_datetime(input, date_err),
             }?,
         };
-        self.validation_comparison(py, input, date)
-    }
-
-    fn validate_strict<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        _extra: &Extra,
-        _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        self.validation_comparison(py, input, input.validate_date(true)?)
-    }
-
-    fn get_name(&self) -> &str {
-        Self::EXPECTED_TYPE
-    }
-}
-
-impl DateValidator {
-    fn validation_comparison<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        date: EitherDate<'data>,
-    ) -> ValResult<'data, PyObject> {
         if let Some(constraints) = &self.constraints {
             let raw_date = date.as_raw().map_err(as_internal)?;
 
@@ -122,6 +96,10 @@ impl DateValidator {
             check_constraint!(gt, GreaterThan);
         }
         date.try_into_py(py).map_err(as_internal)
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
     }
 }
 

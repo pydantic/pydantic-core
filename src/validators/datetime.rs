@@ -4,7 +4,7 @@ use speedate::DateTime;
 
 use crate::build_tools::{is_strict, SchemaDict, SchemaError};
 use crate::errors::{as_internal, py_err_string, ErrorKind, ValError, ValResult};
-use crate::input::{EitherDateTime, Input};
+use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -57,37 +57,11 @@ impl Validator for DateTimeValidator {
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        _extra: &Extra,
+        extra: &Extra,
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let date = input.validate_datetime(self.strict)?;
-        self.validation_comparison(py, input, date)
-    }
-
-    fn validate_strict<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        _extra: &Extra,
-        _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        self.validation_comparison(py, input, input.validate_datetime(true)?)
-    }
-
-    fn get_name(&self) -> &str {
-        Self::EXPECTED_TYPE
-    }
-}
-
-impl DateTimeValidator {
-    fn validation_comparison<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        datetime: EitherDateTime,
-    ) -> ValResult<'data, PyObject> {
+        let datetime = input.validate_datetime(self.strict || extra.strict)?;
         if let Some(constraints) = &self.constraints {
             // if we get an error from as_speedate, it's probably because the input datetime was invalid
             // specifically had an invalid tzinfo, hence here we return a validation error
@@ -119,6 +93,10 @@ impl DateTimeValidator {
             check_constraint!(gt, GreaterThan);
         }
         datetime.try_into_py(py).map_err(as_internal)
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
     }
 }
 

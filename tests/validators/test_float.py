@@ -7,7 +7,7 @@ import pytest
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err, PyAndJson
+from ..conftest import Err, PyAndJson, plain_repr
 
 
 @pytest.mark.parametrize(
@@ -112,7 +112,7 @@ def test_union_float(py_and_json: PyAndJson):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test('5')
     assert exc_info.value.errors() == [
-        {'kind': 'float_type', 'loc': ['strict-float'], 'message': 'Value must be a valid number', 'input_value': '5'},
+        {'kind': 'float_type', 'loc': ['float'], 'message': 'Value must be a valid number', 'input_value': '5'},
         {
             'kind': 'multiple_of',
             'loc': ['constrained-float'],
@@ -141,11 +141,11 @@ def test_union_float_simple(py_and_json: PyAndJson):
 
 def test_float_repr():
     v = SchemaValidator({'type': 'float'})
-    assert repr(v) == 'SchemaValidator(name="float", validator=Float(\n    FloatValidator,\n))'
+    assert plain_repr(v) == 'SchemaValidator(name="float",validator=Float(FloatValidator{strict:false}))'
     v = SchemaValidator({'type': 'float', 'strict': True})
-    assert repr(v) == 'SchemaValidator(name="strict-float", validator=StrictFloat(\n    StrictFloatValidator,\n))'
+    assert plain_repr(v) == 'SchemaValidator(name="float",validator=Float(FloatValidator{strict:true}))'
     v = SchemaValidator({'type': 'float', 'multiple_of': 7})
-    assert repr(v).startswith('SchemaValidator(name="constrained-float", validator=ConstrainedFloat(\n')
+    assert plain_repr(v).startswith('SchemaValidator(name="constrained-float",validator=ConstrainedFloat(')
 
 
 @pytest.mark.parametrize('input_value,expected', [(Decimal('1.23'), 1.23), (Decimal('1'), 1.0)])

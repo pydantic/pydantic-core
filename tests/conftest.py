@@ -2,6 +2,7 @@ import functools
 import importlib.util
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Type
@@ -12,12 +13,19 @@ from typing_extensions import Literal
 
 from pydantic_core import SchemaValidator
 
-__all__ = ('Err', 'PyAndJson')
+__all__ = 'Err', 'PyAndJson', 'plain_repr'
 
 hyp_max_examples = os.getenv('HYPOTHESIS_MAX_EXAMPLES')
 if hyp_max_examples:
     settings.register_profile('custom', max_examples=int(hyp_max_examples))
     settings.load_profile('custom')
+
+
+def plain_repr(obj):
+    r = repr(obj)
+    r = re.sub(r',$', '', r, flags=re.M)
+    r = re.sub(r'\s+', '', r)
+    return r
 
 
 @dataclass

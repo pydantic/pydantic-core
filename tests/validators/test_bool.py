@@ -4,7 +4,7 @@ import pytest
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err, PyAndJson
+from ..conftest import Err, PyAndJson, plain_repr
 
 
 @pytest.mark.parametrize(
@@ -76,6 +76,6 @@ def test_bool_error():
 
 def test_bool_repr():
     v = SchemaValidator({'type': 'bool'})
-    assert repr(v) == 'SchemaValidator(name="bool", validator=Bool(\n    BoolValidator,\n))'
+    assert plain_repr(v) == 'SchemaValidator(name="bool",validator=Bool(BoolValidator{strict:false}))'
     v = SchemaValidator({'type': 'bool', 'strict': True})
-    assert repr(v) == 'SchemaValidator(name="strict-bool", validator=StrictBool(\n    StrictBoolValidator,\n))'
+    assert plain_repr(v) == 'SchemaValidator(name="bool",validator=Bool(BoolValidator{strict:true}))'

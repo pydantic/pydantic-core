@@ -4,7 +4,7 @@ use speedate::Duration;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{as_internal, ErrorKind, ValError, ValResult};
-use crate::input::{EitherTimedelta, Input};
+use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::SchemaError;
 
@@ -57,37 +57,11 @@ impl Validator for TimeDeltaValidator {
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        _extra: &Extra,
+        extra: &Extra,
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let timedelta = input.validate_timedelta(self.strict)?;
-        self.validation_comparison(py, input, timedelta)
-    }
-
-    fn validate_strict<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        _extra: &Extra,
-        _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        self.validation_comparison(py, input, input.validate_timedelta(true)?)
-    }
-
-    fn get_name(&self) -> &str {
-        Self::EXPECTED_TYPE
-    }
-}
-
-impl TimeDeltaValidator {
-    fn validation_comparison<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        timedelta: EitherTimedelta<'data>,
-    ) -> ValResult<'data, PyObject> {
+        let timedelta = input.validate_timedelta(self.strict || extra.strict)?;
         if let Some(constraints) = &self.constraints {
             let raw_timedelta = timedelta.as_raw();
 
@@ -112,6 +86,10 @@ impl TimeDeltaValidator {
             check_constraint!(gt, GreaterThan);
         }
         timedelta.try_into_py(py).map_err(as_internal)
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
     }
 }
 
