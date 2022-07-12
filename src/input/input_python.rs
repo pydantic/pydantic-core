@@ -44,6 +44,18 @@ impl<'a> Input<'a> for PyAny {
         self.is_none()
     }
 
+    fn is_type(&self, class: &PyType) -> ValResult<bool> {
+        self.get_type().eq(class).map_err(as_internal)
+    }
+
+    fn is_instance(&self, class: &PyType) -> PyResult<bool> {
+        self.is_instance(class)
+    }
+
+    fn callable(&self) -> bool {
+        self.is_callable()
+    }
+
     fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
         if let Ok(py_str) = self.cast_as::<PyString>() {
             Ok(py_str.into())
@@ -82,11 +94,38 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn validate_bool(&self, strict: bool) -> ValResult<bool> {
+    fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
+        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            Ok(py_bytes.into())
+        } else {
+            Err(ValError::new(ErrorKind::BytesType, self))
+        }
+    }
+
+    fn lax_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
+        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            Ok(py_bytes.into())
+        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+            let string = py_str.to_string_lossy().to_string();
+            Ok(string.into_bytes().into())
+        } else if let Ok(py_byte_array) = self.cast_as::<PyByteArray>() {
+            Ok(py_byte_array.to_vec().into())
+        } else {
+            Err(ValError::new(ErrorKind::BytesType, self))
+        }
+    }
+
+    fn strict_bool(&self) -> ValResult<bool> {
         if let Ok(bool) = self.extract::<bool>() {
             Ok(bool)
-        } else if strict {
+        } else {
             Err(ValError::new(ErrorKind::BoolType, self))
+        }
+    }
+
+    fn lax_bool(&self) -> ValResult<bool> {
+        if let Ok(bool) = self.extract::<bool>() {
+            Ok(bool)
         } else if let Some(either_str) = maybe_as_string(self, ErrorKind::BoolParsing)? {
             str_as_bool(self, &either_str.as_cow())
         } else if let Ok(int) = self.extract::<i64>() {
@@ -102,8 +141,8 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_int(&self) -> ValResult<i64> {
+        // bool check has to come before int check as bools would be cast to ints below
         if self.extract::<bool>().is_ok() {
-            // bool check has to come before int check as bools would be cast to ints below
             Err(ValError::new(ErrorKind::IntType, self))
         } else if let Ok(int) = self.extract::<i64>() {
             Ok(int)
@@ -115,26 +154,27 @@ impl<'a> Input<'a> for PyAny {
     fn lax_int(&self) -> ValResult<i64> {
         if let Ok(int) = self.extract::<i64>() {
             Ok(int)
-        } else if let Ok(int) = self.extract::<i64>() {
-            Ok(int)
         } else if let Some(either_str) = maybe_as_string(self, ErrorKind::IntParsing)? {
             str_as_int(self, &either_str.as_cow())
-        } else if let Ok(float) = self.validate_float(false) {
+        } else if let Ok(float) = self.lax_float() {
             float_as_int(self, float)
         } else {
             Err(ValError::new(ErrorKind::IntType, self))
         }
     }
 
-    fn validate_float(&self, strict: bool) -> ValResult<f64> {
-        if strict && self.extract::<bool>().is_ok() {
-            // bool check has to come before float check as bools would be cast to floats below
+    fn strict_float(&self) -> ValResult<f64> {
+        if self.extract::<bool>().is_ok() {
             Err(ValError::new(ErrorKind::FloatType, self))
         } else if let Ok(float) = self.extract::<f64>() {
             Ok(float)
-        } else if strict {
+        } else {
             Err(ValError::new(ErrorKind::FloatType, self))
-        } else if let Ok(float) = self.extract::<f64>() {
+        }
+    }
+
+    fn lax_float(&self) -> ValResult<f64> {
+        if let Ok(float) = self.extract::<f64>() {
             Ok(float)
         } else if let Some(either_str) = maybe_as_string(self, ErrorKind::FloatParsing)? {
             match either_str.as_cow().as_ref().parse() {
@@ -146,15 +186,17 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn is_type(&self, class: &PyType) -> ValResult<bool> {
-        self.get_type().eq(class).map_err(as_internal)
-    }
-
-    fn validate_dict<'data>(&'data self, strict: bool) -> ValResult<GenericMapping<'data>> {
+    fn strict_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
             Ok(dict.into())
-        } else if strict {
+        } else {
             Err(ValError::new(ErrorKind::DictType, self))
+        }
+    }
+
+    fn lax_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
+        if let Ok(dict) = self.cast_as::<PyDict>() {
+            Ok(dict.into())
         } else if let Some(generic_mapping) = mapping_as_dict(self) {
             generic_mapping
         } else {
@@ -162,12 +204,16 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn typed_dict<'data>(&'data self, from_attributes: bool, from_mapping: bool) -> ValResult<GenericMapping<'data>> {
+    fn validate_typed_dict<'data>(
+        &'data self,
+        strict: bool,
+        from_attributes: bool,
+    ) -> ValResult<GenericMapping<'data>> {
         if from_attributes {
             // if from_attributes, first try a dict, then mapping then from_attributes
             if let Ok(dict) = self.cast_as::<PyDict>() {
                 return Ok(dict.into());
-            } else if from_mapping {
+            } else if !strict {
                 // we can't do this in one set of if/else because we need to check from_mapping before doing this
                 if let Some(generic_mapping) = mapping_as_dict(self) {
                     return generic_mapping;
@@ -180,20 +226,24 @@ impl<'a> Input<'a> for PyAny {
                 // note the error here gives a hint about from_attributes
                 Err(ValError::new(ErrorKind::DictAttributesType, self))
             }
-        } else if from_mapping {
+        } else {
             // otherwise we just call back to lax_dict if from_mapping is allowed, not there error in this
             // case (correctly) won't hint about from_attributes
-            self.validate_dict(false)
-        } else {
-            self.validate_dict(true)
+            self.validate_dict(strict)
         }
     }
 
-    fn validate_list<'data>(&'data self, strict: bool) -> ValResult<GenericSequence<'data>> {
+    fn strict_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
-        } else if strict {
+        } else {
             Err(ValError::new(ErrorKind::ListType, self))
+        }
+    }
+
+    fn lax_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        if let Ok(list) = self.cast_as::<PyList>() {
+            Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
         } else if let Ok(set) = self.cast_as::<PySet>() {
@@ -205,11 +255,39 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn validate_set<'data>(&'data self, strict: bool) -> ValResult<GenericSequence<'data>> {
+    fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else {
+            Err(ValError::new(ErrorKind::TupleType, self))
+        }
+    }
+
+    fn lax_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else if let Ok(list) = self.cast_as::<PyList>() {
+            Ok(list.into())
+        } else if let Ok(set) = self.cast_as::<PySet>() {
+            Ok(set.into())
+        } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
+            Ok(frozen_set.into())
+        } else {
+            Err(ValError::new(ErrorKind::TupleType, self))
+        }
+    }
+
+    fn strict_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         if let Ok(set) = self.cast_as::<PySet>() {
             Ok(set.into())
-        } else if strict {
+        } else {
             Err(ValError::new(ErrorKind::SetType, self))
+        }
+    }
+
+    fn lax_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        if let Ok(set) = self.cast_as::<PySet>() {
+            Ok(set.into())
         } else if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
@@ -221,11 +299,17 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn validate_frozenset<'data>(&'data self, strict: bool) -> ValResult<GenericSequence<'data>> {
+    fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         if let Ok(set) = self.cast_as::<PyFrozenSet>() {
             Ok(set.into())
-        } else if strict {
+        } else {
             Err(ValError::new(ErrorKind::FrozenSetType, self))
+        }
+    }
+
+    fn lax_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
+            Ok(frozen_set.into())
         } else if let Ok(set) = self.cast_as::<PySet>() {
             Ok(set.into())
         } else if let Ok(list) = self.cast_as::<PyList>() {
@@ -237,30 +321,24 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn validate_bytes<'data>(&'data self, strict: bool) -> ValResult<EitherBytes<'data>> {
-        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
-            Ok(py_bytes.into())
-        } else if strict {
-            Err(ValError::new(ErrorKind::BytesType, self))
-        } else if let Ok(py_str) = self.cast_as::<PyString>() {
-            let string = py_str.to_string_lossy().to_string();
-            Ok(string.into_bytes().into())
-        } else if let Ok(py_byte_array) = self.cast_as::<PyByteArray>() {
-            Ok(py_byte_array.to_vec().into())
-        } else {
-            Err(ValError::new(ErrorKind::BytesType, self))
-        }
-    }
-
-    fn validate_date(&self, strict: bool) -> ValResult<EitherDate> {
+    fn strict_date(&self) -> ValResult<EitherDate> {
         if self.cast_as::<PyDateTime>().is_ok() {
             // have to check if it's a datetime first, otherwise the line below converts to a date
-            // even if (in lax mode) we later try coercion from a datetime, we don't want to return a datetime now
             Err(ValError::new(ErrorKind::DateType, self))
         } else if let Ok(date) = self.cast_as::<PyDate>() {
             Ok(date.into())
-        } else if strict {
+        } else {
             Err(ValError::new(ErrorKind::DateType, self))
+        }
+    }
+
+    fn lax_date(&self) -> ValResult<EitherDate> {
+        if self.cast_as::<PyDateTime>().is_ok() {
+            // have to check if it's a datetime first, otherwise the line below converts to a date
+            // even if we later try coercion from a datetime, we don't want to return a datetime now
+            Err(ValError::new(ErrorKind::DateType, self))
+        } else if let Ok(date) = self.cast_as::<PyDate>() {
+            Ok(date.into())
         } else if let Ok(str) = self.extract::<String>() {
             bytes_as_date(self, str.as_bytes())
         } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
@@ -270,11 +348,17 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn validate_time(&self, strict: bool) -> ValResult<EitherTime> {
+    fn strict_time(&self) -> ValResult<EitherTime> {
         if let Ok(time) = self.cast_as::<PyTime>() {
             Ok(time.into())
-        } else if strict {
+        } else {
             Err(ValError::new(ErrorKind::TimeType, self))
+        }
+    }
+
+    fn lax_time(&self) -> ValResult<EitherTime> {
+        if let Ok(time) = self.cast_as::<PyTime>() {
+            Ok(time.into())
         } else if let Ok(str) = self.extract::<String>() {
             bytes_as_time(self, str.as_bytes())
         } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
@@ -290,11 +374,17 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn validate_datetime(&self, strict: bool) -> ValResult<EitherDateTime> {
+    fn strict_datetime(&self) -> ValResult<EitherDateTime> {
         if let Ok(dt) = self.cast_as::<PyDateTime>() {
             Ok(dt.into())
-        } else if strict {
+        } else {
             Err(ValError::new(ErrorKind::DateTimeType, self))
+        }
+    }
+
+    fn lax_datetime(&self) -> ValResult<EitherDateTime> {
+        if let Ok(dt) = self.cast_as::<PyDateTime>() {
+            Ok(dt.into())
         } else if let Ok(str) = self.extract::<String>() {
             bytes_as_datetime(self, str.as_bytes())
         } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
@@ -312,27 +402,17 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn validate_tuple<'data>(&'data self, strict: bool) -> ValResult<GenericSequence<'data>> {
-        if let Ok(tuple) = self.cast_as::<PyTuple>() {
-            Ok(tuple.into())
-        } else if strict {
-            Err(ValError::new(ErrorKind::TupleType, self))
-        } else if let Ok(list) = self.cast_as::<PyList>() {
-            Ok(list.into())
-        } else if let Ok(set) = self.cast_as::<PySet>() {
-            Ok(set.into())
-        } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
-            Ok(frozen_set.into())
+    fn strict_timedelta(&self) -> ValResult<EitherTimedelta> {
+        if let Ok(dt) = self.cast_as::<PyDelta>() {
+            Ok(dt.into())
         } else {
-            Err(ValError::new(ErrorKind::TupleType, self))
+            Err(ValError::new(ErrorKind::TimeDeltaType, self))
         }
     }
 
-    fn validate_timedelta(&self, strict: bool) -> ValResult<EitherTimedelta> {
+    fn lax_timedelta(&self) -> ValResult<EitherTimedelta> {
         if let Ok(dt) = self.cast_as::<PyDelta>() {
             Ok(dt.into())
-        } else if strict {
-            Err(ValError::new(ErrorKind::TimeDeltaType, self))
         } else if let Ok(py_str) = self.cast_as::<PyString>() {
             bytes_as_timedelta(self, py_str.to_string_lossy().as_bytes())
         } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
@@ -344,14 +424,6 @@ impl<'a> Input<'a> for PyAny {
         } else {
             Err(ValError::new(ErrorKind::TimeDeltaType, self))
         }
-    }
-
-    fn is_instance(&self, class: &PyType) -> PyResult<bool> {
-        self.is_instance(class)
-    }
-
-    fn callable(&self) -> bool {
-        self.is_callable()
     }
 }
 

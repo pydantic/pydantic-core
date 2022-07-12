@@ -135,7 +135,7 @@ impl Validator for TypedDictValidator {
             return self.validate_assignment(py, field, input, extra, slots, recursion_guard);
         }
         let strict = self.strict || extra.strict;
-        let dict = input.typed_dict(self.from_attributes, !strict)?;
+        let dict = input.validate_typed_dict(strict, self.from_attributes)?;
 
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());

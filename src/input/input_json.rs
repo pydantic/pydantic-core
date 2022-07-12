@@ -32,7 +32,6 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorKind::StrType, self)),
         }
     }
-
     fn lax_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
         match self {
             JsonInput::String(s) => Ok(s.as_str().into()),
@@ -42,23 +41,32 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
-    fn validate_bool(&self, strict: bool) -> ValResult<bool> {
-        if strict {
-            match self {
-                JsonInput::Bool(b) => Ok(*b),
+    fn validate_bytes<'data>(&'data self, _strict: bool) -> ValResult<EitherBytes<'data>> {
+        match self {
+            JsonInput::String(s) => Ok(s.as_bytes().into()),
+            _ => Err(ValError::new(ErrorKind::BytesType, self)),
+        }
+    }
+    fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
+        self.validate_bytes(false)
+    }
+
+    fn strict_bool(&self) -> ValResult<bool> {
+        match self {
+            JsonInput::Bool(b) => Ok(*b),
+            _ => Err(ValError::new(ErrorKind::BoolType, self)),
+        }
+    }
+    fn lax_bool(&self) -> ValResult<bool> {
+        match self {
+            JsonInput::Bool(b) => Ok(*b),
+            JsonInput::String(s) => str_as_bool(self, s),
+            JsonInput::Int(int) => int_as_bool(self, *int),
+            JsonInput::Float(float) => match float_as_int(self, *float) {
+                Ok(int) => int_as_bool(self, int),
                 _ => Err(ValError::new(ErrorKind::BoolType, self)),
-            }
-        } else {
-            match self {
-                JsonInput::Bool(b) => Ok(*b),
-                JsonInput::String(s) => str_as_bool(self, s),
-                JsonInput::Int(int) => int_as_bool(self, *int),
-                JsonInput::Float(float) => match float_as_int(self, *float) {
-                    Ok(int) => int_as_bool(self, int),
-                    _ => Err(ValError::new(ErrorKind::BoolType, self)),
-                },
-                _ => Err(ValError::new(ErrorKind::BoolType, self)),
-            }
+            },
+            _ => Err(ValError::new(ErrorKind::BoolType, self)),
         }
     }
 
@@ -68,7 +76,6 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorKind::IntType, self)),
         }
     }
-
     fn lax_int(&self) -> ValResult<i64> {
         match self {
             JsonInput::Bool(b) => match *b {
@@ -82,27 +89,26 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
-    fn validate_float(&self, strict: bool) -> ValResult<f64> {
-        if strict {
-            match self {
-                JsonInput::Float(f) => Ok(*f),
-                JsonInput::Int(i) => Ok(*i as f64),
-                _ => Err(ValError::new(ErrorKind::FloatType, self)),
-            }
-        } else {
-            match self {
-                JsonInput::Bool(b) => match *b {
-                    true => Ok(1.0),
-                    false => Ok(0.0),
-                },
-                JsonInput::Float(f) => Ok(*f),
-                JsonInput::Int(i) => Ok(*i as f64),
-                JsonInput::String(str) => match str.parse() {
-                    Ok(i) => Ok(i),
-                    Err(_) => Err(ValError::new(ErrorKind::FloatParsing, self)),
-                },
-                _ => Err(ValError::new(ErrorKind::FloatType, self)),
-            }
+    fn strict_float(&self) -> ValResult<f64> {
+        match self {
+            JsonInput::Float(f) => Ok(*f),
+            JsonInput::Int(i) => Ok(*i as f64),
+            _ => Err(ValError::new(ErrorKind::FloatType, self)),
+        }
+    }
+    fn lax_float(&self) -> ValResult<f64> {
+        match self {
+            JsonInput::Bool(b) => match *b {
+                true => Ok(1.0),
+                false => Ok(0.0),
+            },
+            JsonInput::Float(f) => Ok(*f),
+            JsonInput::Int(i) => Ok(*i as f64),
+            JsonInput::String(str) => match str.parse() {
+                Ok(i) => Ok(i),
+                Err(_) => Err(ValError::new(ErrorKind::FloatParsing, self)),
+            },
+            _ => Err(ValError::new(ErrorKind::FloatType, self)),
         }
     }
 
@@ -112,6 +118,9 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorKind::DictType, self)),
         }
     }
+    fn strict_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
+        self.validate_dict(false)
+    }
 
     fn validate_list<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
         match self {
@@ -119,68 +128,8 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorKind::ListType, self)),
         }
     }
-
-    fn validate_set<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
-        // we allow a list here since otherwise it would be impossible to create a set from JSON
-        match self {
-            JsonInput::Array(a) => Ok(a.into()),
-            _ => Err(ValError::new(ErrorKind::SetType, self)),
-        }
-    }
-
-    fn validate_frozenset<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
-        match self {
-            JsonInput::Array(a) => Ok(a.into()),
-            _ => Err(ValError::new(ErrorKind::FrozenSetType, self)),
-        }
-    }
-
-    fn validate_bytes<'data>(&'data self, _strict: bool) -> ValResult<EitherBytes<'data>> {
-        match self {
-            JsonInput::String(s) => Ok(s.as_bytes().into()),
-            _ => Err(ValError::new(ErrorKind::BytesType, self)),
-        }
-    }
-
-    fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
-        match self {
-            JsonInput::String(v) => bytes_as_date(self, v.as_bytes()),
-            _ => Err(ValError::new(ErrorKind::DateType, self)),
-        }
-        // NO custom `lax_date` implementation, if strict_date fails, the validator will fallback to lax_datetime
-        // then check there's no remainder
-    }
-
-    fn validate_time(&self, strict: bool) -> ValResult<EitherTime> {
-        if strict {
-            match self {
-                JsonInput::String(v) => bytes_as_time(self, v.as_bytes()),
-                _ => Err(ValError::new(ErrorKind::TimeType, self)),
-            }
-        } else {
-            match self {
-                JsonInput::String(v) => bytes_as_time(self, v.as_bytes()),
-                JsonInput::Int(v) => int_as_time(self, *v, 0),
-                JsonInput::Float(v) => float_as_time(self, *v),
-                _ => Err(ValError::new(ErrorKind::TimeType, self)),
-            }
-        }
-    }
-
-    fn validate_datetime(&self, strict: bool) -> ValResult<EitherDateTime> {
-        if strict {
-            match self {
-                JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes()),
-                _ => Err(ValError::new(ErrorKind::DateTimeType, self)),
-            }
-        } else {
-            match self {
-                JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes()),
-                JsonInput::Int(v) => int_as_datetime(self, *v, 0),
-                JsonInput::Float(v) => float_as_datetime(self, *v),
-                _ => Err(ValError::new(ErrorKind::DateTimeType, self)),
-            }
-        }
+    fn strict_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        self.validate_list(false)
     }
 
     fn validate_tuple<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
@@ -190,20 +139,86 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorKind::TupleType, self)),
         }
     }
+    fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        self.validate_tuple(false)
+    }
 
-    fn validate_timedelta(&self, strict: bool) -> ValResult<EitherTimedelta> {
-        if strict {
-            match self {
-                JsonInput::String(v) => bytes_as_timedelta(self, v.as_bytes()),
-                _ => Err(ValError::new(ErrorKind::TimeDeltaType, self)),
-            }
-        } else {
-            match self {
-                JsonInput::String(v) => bytes_as_timedelta(self, v.as_bytes()),
-                JsonInput::Int(v) => Ok(int_as_duration(*v).into()),
-                JsonInput::Float(v) => Ok(float_as_duration(*v).into()),
-                _ => Err(ValError::new(ErrorKind::TimeDeltaType, self)),
-            }
+    fn validate_set<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
+        // we allow a list here since otherwise it would be impossible to create a set from JSON
+        match self {
+            JsonInput::Array(a) => Ok(a.into()),
+            _ => Err(ValError::new(ErrorKind::SetType, self)),
+        }
+    }
+    fn strict_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        self.validate_set(false)
+    }
+
+    fn validate_frozenset<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
+        // we allow a list here since otherwise it would be impossible to create a frozenset from JSON
+        match self {
+            JsonInput::Array(a) => Ok(a.into()),
+            _ => Err(ValError::new(ErrorKind::FrozenSetType, self)),
+        }
+    }
+    fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        self.validate_frozenset(false)
+    }
+
+    fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
+        match self {
+            JsonInput::String(v) => bytes_as_date(self, v.as_bytes()),
+            _ => Err(ValError::new(ErrorKind::DateType, self)),
+        }
+    }
+    // NO custom `lax_date` implementation, if strict_date fails, the validator will fallback to lax_datetime
+    // then check there's no remainder
+    fn strict_date(&self) -> ValResult<EitherDate> {
+        self.validate_date(false)
+    }
+
+    fn strict_time(&self) -> ValResult<EitherTime> {
+        match self {
+            JsonInput::String(v) => bytes_as_time(self, v.as_bytes()),
+            _ => Err(ValError::new(ErrorKind::TimeType, self)),
+        }
+    }
+    fn lax_time(&self) -> ValResult<EitherTime> {
+        match self {
+            JsonInput::String(v) => bytes_as_time(self, v.as_bytes()),
+            JsonInput::Int(v) => int_as_time(self, *v, 0),
+            JsonInput::Float(v) => float_as_time(self, *v),
+            _ => Err(ValError::new(ErrorKind::TimeType, self)),
+        }
+    }
+
+    fn strict_datetime(&self) -> ValResult<EitherDateTime> {
+        match self {
+            JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes()),
+            _ => Err(ValError::new(ErrorKind::DateTimeType, self)),
+        }
+    }
+    fn lax_datetime(&self) -> ValResult<EitherDateTime> {
+        match self {
+            JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes()),
+            JsonInput::Int(v) => int_as_datetime(self, *v, 0),
+            JsonInput::Float(v) => float_as_datetime(self, *v),
+            _ => Err(ValError::new(ErrorKind::DateTimeType, self)),
+        }
+    }
+
+    fn strict_timedelta(&self) -> ValResult<EitherTimedelta> {
+        match self {
+            JsonInput::String(v) => bytes_as_timedelta(self, v.as_bytes()),
+            _ => Err(ValError::new(ErrorKind::TimeDeltaType, self)),
+        }
+    }
+    fn lax_timedelta(&self) -> ValResult<EitherTimedelta> {
+        match self {
+            JsonInput::String(v) => bytes_as_timedelta(self, v.as_bytes()),
+            JsonInput::Int(v) => Ok(int_as_duration(*v).into()),
+            JsonInput::Float(v) => Ok(float_as_duration(*v).into()),
+            _ => Err(ValError::new(ErrorKind::TimeDeltaType, self)),
         }
     }
 }
@@ -226,28 +241,29 @@ impl<'a> Input<'a> for String {
     fn validate_str<'data>(&'data self, _strict: bool) -> ValResult<EitherString<'data>> {
         Ok(self.as_str().into())
     }
-    fn lax_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
-        Ok(self.as_str().into())
-    }
     fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
-        Ok(self.as_str().into())
+        self.validate_str(false)
+    }
+
+    fn validate_bytes<'data>(&'data self, _strict: bool) -> ValResult<EitherBytes<'data>> {
+        Ok(self.as_bytes().into())
+    }
+    fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
+        self.validate_bytes(false)
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validate_bool(&self, strict: bool) -> ValResult<bool> {
-        if strict {
-            Err(ValError::new(ErrorKind::BoolType, self))
-        } else {
-            str_as_bool(self, self)
-        }
+    fn strict_bool(&self) -> ValResult<bool> {
+        Err(ValError::new(ErrorKind::BoolType, self))
+    }
+    fn lax_bool(&self) -> ValResult<bool> {
+        str_as_bool(self, self)
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_int(&self) -> ValResult<i64> {
         Err(ValError::new(ErrorKind::IntType, self))
     }
-
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_int(&self) -> ValResult<i64> {
         match self.parse() {
             Ok(i) => Ok(i),
@@ -256,14 +272,13 @@ impl<'a> Input<'a> for String {
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validate_float(&self, strict: bool) -> ValResult<f64> {
-        if strict {
-            Err(ValError::new(ErrorKind::FloatType, self))
-        } else {
-            match self.parse() {
-                Ok(i) => Ok(i),
-                Err(_) => Err(ValError::new(ErrorKind::FloatParsing, self)),
-            }
+    fn strict_float(&self) -> ValResult<f64> {
+        Err(ValError::new(ErrorKind::FloatType, self))
+    }
+    fn lax_float(&self) -> ValResult<f64> {
+        match self.parse() {
+            Ok(i) => Ok(i),
+            Err(_) => Err(ValError::new(ErrorKind::FloatParsing, self)),
         }
     }
 
@@ -271,44 +286,67 @@ impl<'a> Input<'a> for String {
     fn validate_dict<'data>(&'data self, _strict: bool) -> ValResult<GenericMapping<'data>> {
         Err(ValError::new(ErrorKind::DictType, self))
     }
+    fn strict_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
+        self.validate_dict(false)
+    }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn validate_list<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
         Err(ValError::new(ErrorKind::ListType, self))
     }
-
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validate_set<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
-        Err(ValError::new(ErrorKind::SetType, self))
-    }
-
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validate_frozenset<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
-        Err(ValError::new(ErrorKind::FrozenSetType, self))
-    }
-
-    fn validate_bytes<'data>(&'data self, _strict: bool) -> ValResult<EitherBytes<'data>> {
-        Ok(self.as_bytes().into())
-    }
-
-    fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
-        bytes_as_date(self, self.as_bytes())
-    }
-
-    fn validate_time(&self, _strict: bool) -> ValResult<EitherTime> {
-        bytes_as_time(self, self.as_bytes())
-    }
-
-    fn validate_datetime(&self, _strict: bool) -> ValResult<EitherDateTime> {
-        bytes_as_datetime(self, self.as_bytes())
+    fn strict_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        self.validate_list(false)
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn validate_tuple<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
         Err(ValError::new(ErrorKind::TupleType, self))
     }
+    fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        self.validate_tuple(false)
+    }
+
+    #[cfg_attr(has_no_coverage, no_coverage)]
+    fn validate_set<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
+        Err(ValError::new(ErrorKind::SetType, self))
+    }
+    fn strict_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        self.validate_set(false)
+    }
+
+    #[cfg_attr(has_no_coverage, no_coverage)]
+    fn validate_frozenset<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
+        Err(ValError::new(ErrorKind::FrozenSetType, self))
+    }
+    fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        self.validate_frozenset(false)
+    }
+
+    fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
+        bytes_as_date(self, self.as_bytes())
+    }
+    fn strict_date(&self) -> ValResult<EitherDate> {
+        self.validate_date(false)
+    }
+
+    fn validate_time(&self, _strict: bool) -> ValResult<EitherTime> {
+        bytes_as_time(self, self.as_bytes())
+    }
+    fn strict_time(&self) -> ValResult<EitherTime> {
+        self.validate_time(false)
+    }
+
+    fn validate_datetime(&self, _strict: bool) -> ValResult<EitherDateTime> {
+        bytes_as_datetime(self, self.as_bytes())
+    }
+    fn strict_datetime(&self) -> ValResult<EitherDateTime> {
+        self.validate_datetime(false)
+    }
 
     fn validate_timedelta(&self, _strict: bool) -> ValResult<EitherTimedelta> {
         bytes_as_timedelta(self, self.as_bytes())
+    }
+    fn strict_timedelta(&self) -> ValResult<EitherTimedelta> {
+        self.validate_timedelta(false)
     }
 }
