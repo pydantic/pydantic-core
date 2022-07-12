@@ -38,7 +38,7 @@ impl Validator for BoolValidator {
     ) -> ValResult<'data, PyObject> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool
         // and back again, might be worth profiling?
-        Ok(input.lax_bool()?.into_py(py))
+        Ok(input.validate_bool(false)?.into_py(py))
     }
 
     fn validate_strict<'s, 'data>(
@@ -49,7 +49,7 @@ impl Validator for BoolValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.strict_bool()?.into_py(py))
+        Ok(input.validate_bool(true)?.into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -75,7 +75,7 @@ impl Validator for StrictBoolValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.strict_bool()?.into_py(py))
+        Ok(input.validate_bool(true)?.into_py(py))
     }
 
     fn get_name(&self) -> &str {

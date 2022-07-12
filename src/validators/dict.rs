@@ -62,10 +62,7 @@ impl Validator for DictValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let dict = match self.strict {
-            true => input.strict_dict()?,
-            false => input.lax_dict()?,
-        };
+        let dict = input.validate_dict(self.strict)?;
         self._validation_logic(py, input, dict, extra, slots, recursion_guard)
     }
 
@@ -77,7 +74,7 @@ impl Validator for DictValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_dict()?, extra, slots, recursion_guard)
+        self._validation_logic(py, input, input.validate_dict(true)?, extra, slots, recursion_guard)
     }
 
     fn get_name(&self) -> &str {

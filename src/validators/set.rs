@@ -33,10 +33,7 @@ impl Validator for SetValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let set = match self.strict {
-            true => input.strict_set()?,
-            false => input.lax_set()?,
-        };
+        let set = input.validate_set(self.strict)?;
         self._validation_logic(py, input, set, extra, slots, recursion_guard)
     }
 
@@ -48,7 +45,7 @@ impl Validator for SetValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_set()?, extra, slots, recursion_guard)
+        self._validation_logic(py, input, input.validate_set(true)?, extra, slots, recursion_guard)
     }
 
     fn get_name(&self) -> &str {

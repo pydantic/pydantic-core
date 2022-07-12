@@ -70,7 +70,7 @@ impl Validator for ModelClassValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let class = self.class.as_ref(py);
-        if input.strict_model_check(class)? {
+        if input.is_type(class)? {
             Ok(input.to_object(py))
         } else if self.strict {
             Err(ValError::new(
@@ -93,7 +93,7 @@ impl Validator for ModelClassValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        if input.strict_model_check(self.class.as_ref(py))? {
+        if input.is_type(self.class.as_ref(py))? {
             Ok(input.to_object(py))
         } else {
             // errors from `validate_strict` are never used used, so we can keep this simple

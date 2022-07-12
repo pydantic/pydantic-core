@@ -56,7 +56,7 @@ impl Validator for StrValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.lax_str()?.into_py(py))
+        Ok(input.validate_str(false)?.into_py(py))
     }
 
     fn validate_strict<'s, 'data>(
@@ -67,7 +67,7 @@ impl Validator for StrValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.strict_str()?.into_py(py))
+        Ok(input.validate_str(true)?.into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -93,7 +93,7 @@ impl Validator for StrictStrValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.strict_str()?.into_py(py))
+        Ok(input.validate_str(true)?.into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -121,10 +121,7 @@ impl Validator for StrConstrainedValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let str = match self.strict {
-            true => input.strict_str()?,
-            false => input.lax_str()?,
-        };
+        let str = input.validate_str(self.strict)?;
         self._validation_logic(py, input, str)
     }
 
@@ -136,7 +133,7 @@ impl Validator for StrConstrainedValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_str()?)
+        self._validation_logic(py, input, input.validate_str(true)?)
     }
 
     fn get_name(&self) -> &str {

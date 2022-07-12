@@ -61,10 +61,7 @@ impl Validator for DateTimeValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let date = match self.strict {
-            true => input.strict_datetime()?,
-            false => input.lax_datetime()?,
-        };
+        let date = input.validate_datetime(self.strict)?;
         self.validation_comparison(py, input, date)
     }
 
@@ -76,7 +73,7 @@ impl Validator for DateTimeValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self.validation_comparison(py, input, input.strict_datetime()?)
+        self.validation_comparison(py, input, input.validate_datetime(true)?)
     }
 
     fn get_name(&self) -> &str {
@@ -130,7 +127,7 @@ fn py_datetime_as_datetime(schema: &PyDict, field: &str) -> PyResult<Option<Date
         Some(obj) => {
             let prefix = format!(r#"Invalid "{}" constraint for datetime"#, field);
             let date = obj
-                .lax_datetime()
+                .validate_datetime(false)
                 .map_err(|e| SchemaError::from_val_error(obj.py(), &prefix, e))?;
             Ok(Some(date.as_raw()?))
         }

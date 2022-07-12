@@ -33,10 +33,7 @@ impl Validator for FrozenSetValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let frozenset = match self.strict {
-            true => input.strict_frozenset()?,
-            false => input.lax_frozenset()?,
-        };
+        let frozenset = input.validate_frozenset(self.strict)?;
         self._validation_logic(py, input, frozenset, extra, slots, recursion_guard)
     }
 
@@ -48,7 +45,14 @@ impl Validator for FrozenSetValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_frozenset()?, extra, slots, recursion_guard)
+        self._validation_logic(
+            py,
+            input,
+            input.validate_frozenset(true)?,
+            extra,
+            slots,
+            recursion_guard,
+        )
     }
 
     fn get_name(&self) -> &str {

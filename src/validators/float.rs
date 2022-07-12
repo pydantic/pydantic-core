@@ -43,7 +43,7 @@ impl Validator for FloatValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.lax_float()?.into_py(py))
+        Ok(input.validate_float(false)?.into_py(py))
     }
 
     fn validate_strict<'s, 'data>(
@@ -54,7 +54,7 @@ impl Validator for FloatValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.strict_float()?.into_py(py))
+        Ok(input.validate_float(true)?.into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -80,7 +80,7 @@ impl Validator for StrictFloatValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.strict_float()?.into_py(py))
+        Ok(input.validate_float(true)?.into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -108,8 +108,8 @@ impl Validator for ConstrainedFloatValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let float = match self.strict {
-            true => input.strict_float()?,
-            false => input.lax_float()?,
+            true => input.validate_float(true)?,
+            false => input.validate_float(false)?,
         };
         self._validation_logic(py, input, float)
     }
@@ -122,7 +122,7 @@ impl Validator for ConstrainedFloatValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_float()?)
+        self._validation_logic(py, input, input.validate_float(true)?)
     }
 
     fn get_name(&self) -> &str {

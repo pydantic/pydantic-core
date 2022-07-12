@@ -43,7 +43,7 @@ impl Validator for IntValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.lax_int()?.into_py(py))
+        Ok(input.validate_int(false)?.into_py(py))
     }
 
     fn validate_strict<'s, 'data>(
@@ -54,7 +54,7 @@ impl Validator for IntValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.strict_int()?.into_py(py))
+        Ok(input.validate_int(true)?.into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -80,7 +80,7 @@ impl Validator for StrictIntValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.strict_int()?.into_py(py))
+        Ok(input.validate_int(true)?.into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -108,8 +108,8 @@ impl Validator for ConstrainedIntValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let int = match self.strict {
-            true => input.strict_int()?,
-            false => input.lax_int()?,
+            true => input.validate_int(true)?,
+            false => input.validate_int(false)?,
         };
         self._validation_logic(py, input, int)
     }
@@ -122,7 +122,7 @@ impl Validator for ConstrainedIntValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_int()?)
+        self._validation_logic(py, input, input.validate_int(true)?)
     }
 
     fn get_name(&self) -> &str {

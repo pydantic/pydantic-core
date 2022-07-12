@@ -58,8 +58,8 @@ impl Validator for ListValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let list = match self.strict {
-            true => input.strict_list()?,
-            false => input.lax_list()?,
+            true => input.validate_list(true)?,
+            false => input.validate_list(false)?,
         };
         self._validation_logic(py, input, list, extra, slots, recursion_guard)
     }
@@ -72,7 +72,7 @@ impl Validator for ListValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_list()?, extra, slots, recursion_guard)
+        self._validation_logic(py, input, input.validate_list(true)?, extra, slots, recursion_guard)
     }
 
     fn get_name(&self) -> &str {

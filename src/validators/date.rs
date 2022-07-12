@@ -61,17 +61,16 @@ impl Validator for DateValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let date = match self.strict {
-            true => input.strict_date()?,
-            false => {
-                match input.lax_date() {
-                    Ok(date) => date,
-                    // if the date error was an internal error, return that immediately
-                    Err(ValError::InternalErr(internal_err)) => return Err(ValError::InternalErr(internal_err)),
-                    // otherwise, try creating a date from a datetime input
-                    Err(date_err) => date_from_datetime(input, date_err)?,
-                }
-            }
+        let date = match input.validate_date(self.strict) {
+            Ok(date) => date,
+            // if the date error was an internal error, return that immediately
+            Err(ValError::InternalErr(internal_err)) => return Err(ValError::InternalErr(internal_err)),
+            Err(date_err) => match self.strict {
+                // if we're in strict mode, we doing try coercing from a date
+                true => return Err(date_err),
+                // otherwise, try creating a date from a datetime input
+                false => date_from_datetime(input, date_err),
+            }?,
         };
         self.validation_comparison(py, input, date)
     }
@@ -84,7 +83,7 @@ impl Validator for DateValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self.validation_comparison(py, input, input.strict_date()?)
+        self.validation_comparison(py, input, input.validate_date(true)?)
     }
 
     fn get_name(&self) -> &str {
@@ -132,7 +131,7 @@ fn date_from_datetime<'data>(
     input: &'data impl Input<'data>,
     date_err: ValError<'data>,
 ) -> ValResult<'data, EitherDate<'data>> {
-    let either_dt = match input.lax_datetime() {
+    let either_dt = match input.validate_datetime(false) {
         Ok(dt) => dt,
         Err(dt_err) => {
             return match dt_err {
@@ -176,7 +175,7 @@ fn convert_pydate(schema: &PyDict, field: &str) -> PyResult<Option<Date>> {
         Some(obj) => {
             let prefix = format!(r#"Invalid "{}" constraint for date"#, field);
             let date = obj
-                .lax_date()
+                .validate_date(false)
                 .map_err(|e| SchemaError::from_val_error(obj.py(), &prefix, e))?;
             Ok(Some(date.as_raw()?))
         }

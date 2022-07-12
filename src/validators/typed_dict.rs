@@ -219,7 +219,7 @@ impl Validator for TypedDictValidator {
                         None => unreachable!(),
                     };
                     for (raw_key, value) in $iter {
-                        let either_str = match raw_key.strict_str() {
+                        let either_str = match raw_key.validate_str(true) {
                             Ok(k) => k,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {

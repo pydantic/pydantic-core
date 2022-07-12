@@ -39,7 +39,7 @@ impl Validator for BytesValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_bytes = input.lax_bytes()?;
+        let either_bytes = input.validate_bytes(false)?;
         Ok(either_bytes.into_py(py))
     }
 
@@ -51,7 +51,7 @@ impl Validator for BytesValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_bytes = input.strict_bytes()?;
+        let either_bytes = input.validate_bytes(true)?;
         Ok(either_bytes.into_py(py))
     }
 
@@ -78,7 +78,7 @@ impl Validator for StrictBytesValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_bytes = input.strict_bytes()?;
+        let either_bytes = input.validate_bytes(true)?;
         Ok(either_bytes.into_py(py))
     }
 
@@ -104,8 +104,8 @@ impl Validator for BytesConstrainedValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let bytes = match self.strict {
-            true => input.strict_bytes()?,
-            false => input.lax_bytes()?,
+            true => input.validate_bytes(true)?,
+            false => input.validate_bytes(false)?,
         };
         self._validation_logic(py, input, bytes)
     }
@@ -118,7 +118,7 @@ impl Validator for BytesConstrainedValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_bytes()?)
+        self._validation_logic(py, input, input.validate_bytes(true)?)
     }
 
     fn get_name(&self) -> &str {

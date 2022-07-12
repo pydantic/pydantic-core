@@ -61,10 +61,7 @@ impl Validator for TimeValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let time = match self.strict {
-            true => input.strict_time()?,
-            false => input.lax_time()?,
-        };
+        let time = input.validate_time(self.strict)?;
         self.validation_comparison(py, input, time)
     }
 
@@ -76,7 +73,7 @@ impl Validator for TimeValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self.validation_comparison(py, input, input.strict_time()?)
+        self.validation_comparison(py, input, input.validate_time(true)?)
     }
 
     fn get_name(&self) -> &str {
@@ -123,7 +120,7 @@ fn convert_pytime(schema: &PyDict, field: &str) -> PyResult<Option<Time>> {
         Some(obj) => {
             let prefix = format!(r#"Invalid "{}" constraint for time"#, field);
             let date = obj
-                .lax_time()
+                .validate_time(false)
                 .map_err(|e| SchemaError::from_val_error(obj.py(), &prefix, e))?;
             Ok(Some(date.as_raw()?))
         }

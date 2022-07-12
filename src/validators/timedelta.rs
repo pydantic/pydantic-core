@@ -61,10 +61,7 @@ impl Validator for TimeDeltaValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let timedelta = match self.strict {
-            true => input.strict_timedelta()?,
-            false => input.lax_timedelta()?,
-        };
+        let timedelta = input.validate_timedelta(self.strict)?;
         self.validation_comparison(py, input, timedelta)
     }
 
@@ -76,7 +73,7 @@ impl Validator for TimeDeltaValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self.validation_comparison(py, input, input.strict_timedelta()?)
+        self.validation_comparison(py, input, input.validate_timedelta(true)?)
     }
 
     fn get_name(&self) -> &str {
@@ -123,7 +120,7 @@ fn py_timedelta_as_timedelta(schema: &PyDict, field: &str) -> PyResult<Option<Du
         Some(obj) => {
             let prefix = format!(r#"Invalid "{}" constraint for timedelta"#, field);
             let timedelta = obj
-                .lax_timedelta()
+                .validate_timedelta(false)
                 .map_err(|e| SchemaError::from_val_error(obj.py(), &prefix, e))?;
             Ok(Some(timedelta.as_raw()))
         }

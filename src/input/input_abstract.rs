@@ -21,89 +21,41 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn is_none(&self) -> bool;
 
-    fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>>;
+    fn validate_str<'data>(&'data self, strict: bool) -> ValResult<EitherString<'data>>;
 
-    fn lax_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
-        self.strict_str()
+    fn validate_bool(&self, strict: bool) -> ValResult<bool>;
+
+    fn validate_int(&self, strict: bool) -> ValResult<i64>;
+
+    fn validate_float(&self, strict: bool) -> ValResult<f64>;
+
+    fn is_type(&self, _class: &PyType) -> ValResult<bool> {
+        Ok(false)
     }
 
-    fn strict_bool(&self) -> ValResult<bool>;
+    fn validate_dict<'data>(&'data self, strict: bool) -> ValResult<GenericMapping<'data>>;
 
-    fn lax_bool(&self) -> ValResult<bool>;
-
-    fn strict_int(&self) -> ValResult<i64>;
-
-    fn lax_int(&self) -> ValResult<i64>;
-
-    fn strict_float(&self) -> ValResult<f64>;
-
-    fn lax_float(&self) -> ValResult<f64>;
-
-    fn strict_model_check(&self, class: &PyType) -> ValResult<bool>;
-
-    fn strict_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>>;
-
-    fn lax_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
-        self.strict_dict()
+    fn typed_dict<'data>(&'data self, _from_attributes: bool, from_mapping: bool) -> ValResult<GenericMapping<'data>> {
+        self.validate_dict(!from_mapping)
     }
 
-    fn typed_dict<'data>(&'data self, _from_attributes: bool, _from_mapping: bool) -> ValResult<GenericMapping<'data>> {
-        self.strict_dict()
-    }
+    fn validate_list<'data>(&'data self, strict: bool) -> ValResult<GenericSequence<'data>>;
 
-    fn strict_list<'data>(&'data self) -> ValResult<GenericSequence<'data>>;
+    fn validate_set<'data>(&'data self, strict: bool) -> ValResult<GenericSequence<'data>>;
 
-    fn lax_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        self.strict_list()
-    }
+    fn validate_frozenset<'data>(&'data self, strict: bool) -> ValResult<GenericSequence<'data>>;
 
-    fn strict_set<'data>(&'data self) -> ValResult<GenericSequence<'data>>;
+    fn validate_bytes<'data>(&'data self, strict: bool) -> ValResult<EitherBytes<'data>>;
 
-    fn lax_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        self.strict_set()
-    }
+    fn validate_date(&self, strict: bool) -> ValResult<EitherDate>;
 
-    fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>>;
+    fn validate_time(&self, strict: bool) -> ValResult<EitherTime>;
 
-    fn lax_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        self.strict_frozenset()
-    }
+    fn validate_datetime(&self, strict: bool) -> ValResult<EitherDateTime>;
 
-    fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>>;
+    fn validate_tuple<'data>(&'data self, strict: bool) -> ValResult<GenericSequence<'data>>;
 
-    fn lax_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
-        self.strict_bytes()
-    }
-
-    fn strict_date(&self) -> ValResult<EitherDate>;
-
-    fn lax_date(&self) -> ValResult<EitherDate> {
-        self.strict_date()
-    }
-
-    fn strict_time(&self) -> ValResult<EitherTime>;
-
-    fn lax_time(&self) -> ValResult<EitherTime> {
-        self.strict_time()
-    }
-
-    fn strict_datetime(&self) -> ValResult<EitherDateTime>;
-
-    fn lax_datetime(&self) -> ValResult<EitherDateTime> {
-        self.strict_datetime()
-    }
-
-    fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>>;
-
-    fn lax_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        self.strict_tuple()
-    }
-
-    fn strict_timedelta(&self) -> ValResult<EitherTimedelta>;
-
-    fn lax_timedelta(&self) -> ValResult<EitherTimedelta> {
-        self.strict_timedelta()
-    }
+    fn validate_timedelta(&self, strict: bool) -> ValResult<EitherTimedelta>;
 
     fn is_instance(&self, _class: &PyType) -> PyResult<bool> {
         Ok(false)

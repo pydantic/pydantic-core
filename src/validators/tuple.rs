@@ -33,10 +33,7 @@ impl Validator for TupleVarLenValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let tuple = match self.strict {
-            true => input.strict_tuple()?,
-            false => input.lax_tuple()?,
-        };
+        let tuple = input.validate_tuple(self.strict)?;
         self._validation_logic(py, input, tuple, extra, slots, recursion_guard)
     }
 
@@ -48,7 +45,7 @@ impl Validator for TupleVarLenValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_tuple()?, extra, slots, recursion_guard)
+        self._validation_logic(py, input, input.validate_tuple(true)?, extra, slots, recursion_guard)
     }
 
     fn get_name(&self) -> &str {
@@ -131,8 +128,8 @@ impl Validator for TupleFixLenValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let tuple = match self.strict {
-            true => input.strict_tuple()?,
-            false => input.lax_tuple()?,
+            true => input.validate_tuple(true)?,
+            false => input.validate_tuple(false)?,
         };
         self._validation_logic(py, input, tuple, extra, slots, recursion_guard)
     }
@@ -145,7 +142,7 @@ impl Validator for TupleFixLenValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        self._validation_logic(py, input, input.strict_tuple()?, extra, slots, recursion_guard)
+        self._validation_logic(py, input, input.validate_tuple(true)?, extra, slots, recursion_guard)
     }
 
     fn get_name(&self) -> &str {
