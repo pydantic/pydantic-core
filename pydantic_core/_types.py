@@ -114,10 +114,25 @@ class ModelClassSchema(TypedDict):
     config: NotRequired[Config]
 
 
+class OnErrorRaiseSchema(TypedDict):
+    type: Literal['raise']
+
+
+class OnErrorIgnoreSchema(TypedDict):
+    type: Literal['ignore']
+
+
+class OnErrorFallbackSchema(TypedDict, total=False):
+    type: Required[Literal['fallback']]
+    default: Any
+    default_factory: Callable[[], Any]
+
+
 class TypedDictField(TypedDict, total=False):
     schema: Required[Schema]
     required: bool
     default: Any
+    on_error: Union[OnErrorRaiseSchema, OnErrorIgnoreSchema, OnErrorFallbackSchema]  # default: OnErrorRaiseSchema
     alias: str
     aliases: List[List[Union[str, int]]]
 

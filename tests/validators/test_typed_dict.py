@@ -1030,3 +1030,56 @@ def test_alias_extra_forbid(py_or_json):
         }
     )
     assert v.validate_test({'FieldA': 1}) == {'field_a': 1}
+
+
+def test_on_error(py_or_json):
+    v = py_or_json(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'a': {'schema': {'type': 'str'}, 'on_error': {'type': 'raise'}},
+                'b': {'schema': {'type': 'str'}, 'on_error': {'type': 'ignore'}, 'required': False},
+                'c': {'schema': {'type': 'str'}, 'on_error': {'type': 'fallback', 'default': 'pika'}},
+                'd': {'schema': {'type': 'str'}, 'on_error': {'type': 'fallback', 'default_factory': lambda: 'chu'}},
+                'e': {
+                    'schema': {'type': 'str'},
+                    'default': 'bulbi',
+                    'on_error': {'type': 'fallback', 'default': 'pika'},
+                },
+                'f': {
+                    'schema': {'type': 'str'},
+                    'default': 'cara',
+                    'on_error': {'type': 'fallback', 'default_factory': lambda: 'chu'},
+                },
+            },
+        }
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_test({})
+    assert exc_info.value.errors() == [
+        {'kind': 'missing', 'loc': ['a'], 'message': 'Field required', 'input_value': {}}
+    ]
+
+    assert v.validate_test({'a': 'va', 'b': 'vb', 'c': 'vc', 'd': 'vd', 'e': 've', 'f': 'vf'}) == {
+        'a': 'va',
+        'b': 'vb',
+        'c': 'vc',
+        'd': 'vd',
+        'e': 've',
+        'f': 'vf',
+    }
+    assert v.validate_test({'a': 'va', 'c': 'vc', 'd': 'vd'}) == {
+        'a': 'va',
+        'c': 'vc',
+        'd': 'vd',
+        'e': 'bulbi',
+        'f': 'cara',
+    }
+    assert v.validate_test({'a': 'va', 'b': ['vb'], 'c': ['vc'], 'd': ['vd']}) == {
+        'a': 'va',
+        'c': 'pika',
+        'd': 'chu',
+        'e': 'bulbi',
+        'f': 'cara',
+    }

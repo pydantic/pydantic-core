@@ -14,12 +14,21 @@ use crate::SchemaError;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
+enum OnError {
+    Raise,
+    Ignore,
+    Default(PyObject),
+    DefaultFactory(PyObject),
+}
+
+#[derive(Debug, Clone)]
 struct TypedDictField {
     name: String,
     lookup_key: LookupKey,
     name_pystring: Py<PyString>,
     required: bool,
     default: Option<PyObject>,
+    on_error: OnError,
     validator: CombinedValidator,
 }
 
@@ -88,6 +97,32 @@ impl BuildValidator for TypedDictValidator {
                 .get_as("default")
                 .map_err(|err| PyTypeError::new_err(format!("Field \"{}\":\n  {}", field_name, err)))?;
 
+            let on_error: OnError = match field_info.get_as::<&PyDict>("on_error")? {
+                Some(on_error_dict) => {
+                    let on_error_type = on_error_dict.get_as_req("type")?;
+                    match on_error_type {
+                        "raise" => OnError::Raise,
+                        "ignore" => OnError::Ignore,
+                        "fallback" => {
+                            match (
+                                on_error_dict.get_as("default")?,
+                                on_error_dict.get_as("default_factory")?,
+                            ) {
+                                (Some(default), None) => OnError::Default(default),
+                                (None, Some(default_factory)) => OnError::DefaultFactory(default_factory),
+                                _ => {
+                                    return py_error!(
+                                        "'default' and 'default_factory' cannot be both specified for 'on_error'"
+                                    )
+                                }
+                            }
+                        }
+                        _ => return py_error!("Invalid on_error type: {}", on_error_type),
+                    }
+                }
+                None => OnError::Raise,
+            };
+
             fields.push(TypedDictField {
                 name: field_name.to_string(),
                 lookup_key: LookupKey::from_py(py, field_info, field_name, populate_by_name)?,
@@ -106,6 +141,7 @@ impl BuildValidator for TypedDictValidator {
                     None => full,
                 },
                 default,
+                on_error,
             });
         }
         Ok(Self {
@@ -156,21 +192,45 @@ impl Validator for TypedDictValidator {
             field: None,
         };
 
+        macro_rules! error_fallback {
+            ($field: ident) => {{
+                match (&$field.on_error, &$field.required) {
+                    (OnError::Ignore, false) => Ok(()),
+                    (OnError::Default(default), _) => {
+                        output_dict
+                            .set_item(&$field.name_pystring, default.as_ref(py))
+                            .map_err(as_internal)?;
+                        Ok(())
+                    }
+                    (OnError::DefaultFactory(default_factory), _) => {
+                        output_dict
+                            .set_item(&$field.name_pystring, default_factory.as_ref(py).call0()?)
+                            .map_err(as_internal)?;
+                        Ok(())
+                    }
+                    _ => Err("error should be raised"),
+                }
+            }};
+        }
+
         macro_rules! process {
             ($dict:ident, $get_method:ident, $iter:block) => {{
                 for field in &self.fields {
                     let op_key_value = match field.lookup_key.$get_method($dict) {
                         Ok(v) => v,
-                        Err(err) => {
-                            errors.push(ValLineError::new_with_loc(
-                                ErrorKind::GetAttributeError {
-                                    error: py_err_string(py, err),
-                                },
-                                input,
-                                field.name.clone(),
-                            ));
-                            continue;
-                        }
+                        Err(err) => match error_fallback!(field) {
+                            Ok(()) => continue,
+                            _ => {
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorKind::GetAttributeError {
+                                        error: py_err_string(py, err),
+                                    },
+                                    input,
+                                    field.name.clone(),
+                                ));
+                                continue;
+                            }
+                        },
                     };
                     if let Some((used_key, value)) = op_key_value {
                         if let Some(ref mut used_keys) = used_keys {
@@ -190,12 +250,18 @@ impl Validator for TypedDictValidator {
                                     fs.push(field.name_pystring.clone_ref(py));
                                 }
                             }
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    errors.push(err.with_outer_location(field.name.clone().into()));
+                            Err(ValError::LineErrors(line_errors)) => match error_fallback!(field) {
+                                Ok(()) => continue,
+                                _ => {
+                                    for err in line_errors {
+                                        errors.push(err.with_outer_location(field.name.clone().into()));
+                                    }
                                 }
-                            }
-                            Err(err) => return Err(err),
+                            },
+                            Err(err) => match error_fallback!(field) {
+                                Ok(()) => continue,
+                                _ => return Err(err),
+                            },
                         }
                     } else if let Some(ref default) = field.default {
                         // TODO default needs to be copied here
@@ -205,11 +271,16 @@ impl Validator for TypedDictValidator {
                     } else if !field.required {
                         continue;
                     } else {
-                        errors.push(ValLineError::new_with_loc(
-                            ErrorKind::Missing,
-                            input,
-                            field.name.clone(),
-                        ));
+                        match error_fallback!(field) {
+                            Ok(()) => continue,
+                            _ => {
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorKind::Missing,
+                                    input,
+                                    field.name.clone(),
+                                ));
+                            }
+                        }
                     }
                 }
 
