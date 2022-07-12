@@ -243,7 +243,7 @@ struct ValidatorCallable {
     slots: Vec<CombinedValidator>,
     data: Option<Py<PyDict>>,
     field: Option<String>,
-    strict: bool,
+    strict: Option<bool>,
     recursion_guard: RecursionGuard,
 }
 

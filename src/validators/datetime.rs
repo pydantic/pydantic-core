@@ -61,7 +61,7 @@ impl Validator for DateTimeValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let datetime = input.validate_datetime(self.strict || extra.strict)?;
+        let datetime = input.validate_datetime(extra.strict.unwrap_or(self.strict))?;
         if let Some(constraints) = &self.constraints {
             // if we get an error from as_speedate, it's probably because the input datetime was invalid
             // specifically had an invalid tzinfo, hence here we return a validation error

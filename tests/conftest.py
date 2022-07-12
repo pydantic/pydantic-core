@@ -45,20 +45,20 @@ class PyAndJsonValidator:
         self.validator = SchemaValidator(schema)
         self.validator_type = validator_type
 
-    def validate_python(self, py_input):
-        return self.validator.validate_python(py_input)
+    def validate_python(self, py_input, strict: Optional[bool] = None):
+        return self.validator.validate_python(py_input, strict)
 
-    def validate_test(self, py_input):
+    def validate_test(self, py_input, strict: Optional[bool] = None):
         if self.validator_type == 'json':
-            return self.validator.validate_json(json.dumps(py_input))
+            return self.validator.validate_json(json.dumps(py_input), strict)
         elif self.validator_type == 'python':
-            return self.validator.validate_python(py_input)
+            return self.validator.validate_python(py_input, strict)
 
-    def isinstance_test(self, py_input):
+    def isinstance_test(self, py_input, strict: Optional[bool] = None):
         if self.validator_type == 'json':
-            return self.validator.isinstance_json(json.dumps(py_input))
+            return self.validator.isinstance_json(json.dumps(py_input), strict)
         elif self.validator_type == 'python':
-            return self.validator.isinstance_python(py_input)
+            return self.validator.isinstance_python(py_input, strict)
 
 
 PyAndJson = Type[PyAndJsonValidator]

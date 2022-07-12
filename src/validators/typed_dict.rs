@@ -134,7 +134,7 @@ impl Validator for TypedDictValidator {
             // we're validating assignment, completely different logic
             return self.validate_assignment(py, field, input, extra, slots, recursion_guard);
         }
-        let strict = self.strict || extra.strict;
+        let strict = extra.strict.unwrap_or(self.strict);
         let dict = input.validate_typed_dict(strict, self.from_attributes)?;
 
         let output_dict = PyDict::new(py);

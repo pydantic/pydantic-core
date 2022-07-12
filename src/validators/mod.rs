@@ -77,22 +77,22 @@ impl SchemaValidator {
         Ok((cls, args).into_py(py))
     }
 
-    pub fn validate_python(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
+    pub fn validate_python(&self, py: Python, input: &PyAny, strict: Option<bool>) -> PyResult<PyObject> {
         let r = self.validator.validate(
             py,
             input,
-            &Extra::default(),
+            &Extra::new(strict),
             &self.slots,
             &mut RecursionGuard::default(),
         );
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
-    pub fn isinstance_python(&self, py: Python, input: &PyAny) -> PyResult<bool> {
+    pub fn isinstance_python(&self, py: Python, input: &PyAny, strict: Option<bool>) -> PyResult<bool> {
         match self.validator.validate(
             py,
             input,
-            &Extra::default(),
+            &Extra::new(strict),
             &self.slots,
             &mut RecursionGuard::default(),
         ) {
@@ -102,13 +102,13 @@ impl SchemaValidator {
         }
     }
 
-    pub fn validate_json(&self, py: Python, input: &PyAny) -> PyResult<PyObject> {
+    pub fn validate_json(&self, py: Python, input: &PyAny, strict: Option<bool>) -> PyResult<PyObject> {
         match parse_json(input)? {
             Ok(input) => {
                 let r = self.validator.validate(
                     py,
                     &input,
-                    &Extra::default(),
+                    &Extra::new(strict),
                     &self.slots,
                     &mut RecursionGuard::default(),
                 );
@@ -122,13 +122,13 @@ impl SchemaValidator {
         }
     }
 
-    pub fn isinstance_json(&self, py: Python, input: &PyAny) -> PyResult<bool> {
+    pub fn isinstance_json(&self, py: Python, input: &PyAny, strict: Option<bool>) -> PyResult<bool> {
         match parse_json(input)? {
             Ok(input) => {
                 match self.validator.validate(
                     py,
                     &input,
-                    &Extra::default(),
+                    &Extra::new(strict),
                     &self.slots,
                     &mut RecursionGuard::default(),
                 ) {
@@ -145,7 +145,7 @@ impl SchemaValidator {
         let extra = Extra {
             data: Some(data),
             field: Some(field.as_str()),
-            strict: false,
+            strict: None,
         };
         let r = self
             .validator
@@ -311,7 +311,16 @@ pub struct Extra<'a> {
     /// The field being assigned to when validating assignment
     pub field: Option<&'a str>,
     /// whether we're in strict or lax mode
-    pub strict: bool,
+    pub strict: Option<bool>,
+}
+
+impl<'a> Extra<'a> {
+    pub fn new(strict: Option<bool>) -> Self {
+        Extra {
+            strict,
+            ..Default::default()
+        }
+    }
 }
 
 impl<'a> Extra<'a> {
@@ -319,7 +328,7 @@ impl<'a> Extra<'a> {
         Self {
             data: self.data,
             field: self.field,
-            strict: true,
+            strict: Some(true),
         }
     }
 }

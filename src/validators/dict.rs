@@ -62,7 +62,7 @@ impl Validator for DictValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let dict = input.validate_dict(self.strict || extra.strict)?;
+        let dict = input.validate_dict(extra.strict.unwrap_or(self.strict))?;
         match dict {
             GenericMapping::PyDict(py_dict) => self.validate_dict(py, input, py_dict, extra, slots, recursion_guard),
             GenericMapping::PyGetAttr(_) => unreachable!(),

@@ -33,7 +33,7 @@ impl Validator for SetValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let seq = input.validate_set(self.strict || extra.strict)?;
+        let seq = input.validate_set(extra.strict.unwrap_or(self.strict))?;
         let length = seq.generic_len();
         if let Some(min_length) = self.min_items {
             if length < min_length {

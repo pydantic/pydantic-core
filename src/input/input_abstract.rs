@@ -14,7 +14,6 @@ use super::{GenericMapping, GenericSequence};
 /// the convention is to either implement:
 /// * `strict_*` & `lax_*` if they have different behaviour
 /// * or, `validate_*` and `strict_*` to just call `validate_*`
-
 pub trait Input<'a>: fmt::Debug + ToPyObject {
     fn as_loc_item(&'a self) -> LocItem;
 

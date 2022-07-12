@@ -33,7 +33,7 @@ impl Validator for TupleVarLenValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let seq = input.validate_tuple(self.strict || extra.strict)?;
+        let seq = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
         let length = seq.generic_len();
         if let Some(min_length) = self.min_items {
             if length < min_length {
@@ -102,7 +102,7 @@ impl Validator for TupleFixLenValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let seq = input.validate_tuple(self.strict || extra.strict)?;
+        let seq = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
         let expected_length = self.items_validators.len();
 
         if expected_length != seq.generic_len() {

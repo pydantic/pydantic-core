@@ -72,7 +72,7 @@ impl Validator for ModelClassValidator {
         let class = self.class.as_ref(py);
         if input.is_type(class)? {
             Ok(input.to_object(py))
-        } else if self.strict || extra.strict {
+        } else if extra.strict.unwrap_or(self.strict) {
             Err(ValError::new(
                 ErrorKind::ModelClassType {
                     class_name: self.get_name().to_string(),

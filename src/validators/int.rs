@@ -46,7 +46,7 @@ impl Validator for IntValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.validate_int(self.strict || extra.strict)?.into_py(py))
+        Ok(input.validate_int(extra.strict.unwrap_or(self.strict))?.into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -73,7 +73,7 @@ impl Validator for ConstrainedIntValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let int = input.validate_int(self.strict || extra.strict)?;
+        let int = input.validate_int(extra.strict.unwrap_or(self.strict))?;
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
                 return Err(ValError::new(ErrorKind::IntMultipleOf { multiple_of }, input));

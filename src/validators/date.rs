@@ -61,7 +61,7 @@ impl Validator for DateValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let date = match input.validate_date(self.strict || extra.strict) {
+        let date = match input.validate_date(extra.strict.unwrap_or(self.strict)) {
             Ok(date) => date,
             // if the date error was an internal error, return that immediately
             Err(ValError::InternalErr(internal_err)) => return Err(ValError::InternalErr(internal_err)),
