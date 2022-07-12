@@ -234,7 +234,7 @@ def test_strict_union():
     assert v.validate_python(123) == 123
 
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_python('123') == 123
+        v.validate_python('123')
 
     assert exc_info.value.errors() == [
         {'kind': 'bool_type', 'loc': ['bool'], 'message': 'Value must be a valid boolean', 'input_value': '123'},
