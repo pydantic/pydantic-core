@@ -4,10 +4,11 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Optional, Type
+from typing import Any, Optional, Type
 
 import pytest
 from hypothesis import settings
+from typing_extensions import Literal
 
 from pydantic_core import SchemaValidator
 

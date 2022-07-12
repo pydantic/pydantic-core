@@ -1,8 +1,9 @@
 import re
-from typing import Any, Dict, Literal, Type
+from typing import Any, Dict, Type
 
 import pytest
 from dirty_equals import IsNonNegative, IsTuple
+from typing_extensions import Literal
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
