@@ -1,12 +1,13 @@
 import re
 from datetime import date, datetime, time
 from decimal import Decimal
+from typing import Any, Dict
 
 import pytest
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
-from ..conftest import Err
+from ..conftest import Err, PyOrJson
 
 
 @pytest.mark.parametrize(
@@ -72,7 +73,7 @@ def test_date(input_value, expected):
         ([1], Err('Value must be a valid date [kind=date_type')),
     ],
 )
-def test_date_json(py_or_json, input_value, expected):
+def test_date_json(py_or_json: PyOrJson, input_value, expected):
     v = py_or_json({'type': 'date'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -163,7 +164,7 @@ def test_date_strict_json_ctx():
         ({'gt': date(2000, 1, 1)}, '2000-01-01', Err('Value must be greater than 2000-01-01 [kind=greater_than,')),
     ],
 )
-def test_date_kwargs(kwargs, input_value, expected):
+def test_date_kwargs(kwargs: Dict[str, Any], input_value, expected):
     v = SchemaValidator({'type': 'date', **kwargs})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -183,7 +184,7 @@ def test_dict_py():
     assert v.validate_python({date(2000, 1, 1): 2, date(2000, 1, 2): 4}) == {date(2000, 1, 1): 2, date(2000, 1, 2): 4}
 
 
-def test_dict(py_or_json):
+def test_dict(py_or_json: PyOrJson):
     v = py_or_json({'type': 'dict', 'keys_schema': 'date', 'values_schema': 'int'})
     assert v.validate_test({'2000-01-01': 2, '2000-01-02': 4}) == {date(2000, 1, 1): 2, date(2000, 1, 2): 4}
 

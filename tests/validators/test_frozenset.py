@@ -1,17 +1,18 @@
 import re
+from typing import Any, Dict
 
 import pytest
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err
+from ..conftest import Err, PyOrJson
 
 
 @pytest.mark.parametrize(
     'input_value,expected',
     [([], frozenset()), ([1, 2, 3], {1, 2, 3}), ([1, 2, '3'], {1, 2, 3}), ([1, 2, 3, 2, 3], {1, 2, 3})],
 )
-def test_frozenset_ints_both(py_or_json, input_value, expected):
+def test_frozenset_ints_both(py_or_json: PyOrJson, input_value, expected):
     v = py_or_json({'type': 'frozenset', 'items_schema': {'type': 'int'}})
     output = v.validate_test(input_value)
     assert output == expected
@@ -28,7 +29,7 @@ def test_frozenset_ints_both(py_or_json, input_value, expected):
         (False, Err('Value must be a valid frozenset')),
     ],
 )
-def test_frozenset_no_validators_both(py_or_json, input_value, expected):
+def test_frozenset_no_validators_both(py_or_json: PyOrJson, input_value, expected):
     v = py_or_json({'type': 'frozenset'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -110,7 +111,7 @@ def test_frozenset_multiple_errors():
         ({'max_items': 3}, {1, 2, 3, 4}, Err('Input must have at most 3 items [kind=too_long,')),
     ],
 )
-def test_frozenset_kwargs_python(kwargs, input_value, expected):
+def test_frozenset_kwargs_python(kwargs: Dict[str, Any], input_value, expected):
     v = SchemaValidator({'type': 'frozenset', **kwargs})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -180,7 +181,7 @@ def test_union_frozenset_int_frozenset_str(input_value, expected):
         assert isinstance(output, frozenset)
 
 
-def test_frozenset_as_dict_keys(py_or_json):
+def test_frozenset_as_dict_keys(py_or_json: PyOrJson):
     v = py_or_json({'type': 'dict', 'keys_schema': {'type': 'frozenset'}, 'value': 'int'})
     with pytest.raises(ValidationError, match=re.escape('Value must be a valid frozenset')):
         v.validate_test({'foo': 'bar'})

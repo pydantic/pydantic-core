@@ -4,7 +4,7 @@ import pytest
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err
+from ..conftest import Err, PyOrJson
 
 
 @pytest.mark.parametrize(
@@ -34,7 +34,7 @@ from ..conftest import Err
         (2.0, Err('unable to interpret input [kind=bool_parsing, input_value=2.0, input_type=float]')),
     ],
 )
-def test_bool(py_or_json, input_value, expected):
+def test_bool(py_or_json: PyOrJson, input_value, expected):
     v = py_or_json({'type': 'bool'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -45,7 +45,7 @@ def test_bool(py_or_json, input_value, expected):
         assert v.isinstance_test(input_value) is True
 
 
-def test_bool_strict(py_or_json):
+def test_bool_strict(py_or_json: PyOrJson):
     v = py_or_json({'type': 'bool', 'strict': True})
     assert v.validate_test(True) is True
     error_message = "Value must be a valid boolean [kind=bool_type, input_value='true', input_type=str]"

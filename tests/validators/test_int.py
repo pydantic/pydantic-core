@@ -1,11 +1,12 @@
 import re
 from decimal import Decimal
+from typing import Any, Dict
 
 import pytest
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err
+from ..conftest import Err, PyOrJson
 
 
 @pytest.mark.parametrize(
@@ -34,7 +35,7 @@ from ..conftest import Err
         pytest.param([1, 2], Err('Value must be a valid integer [kind=int_type'), id='list'),
     ],
 )
-def test_int_py_or_json(py_or_json, input_value, expected):
+def test_int_py_or_json(py_or_json: PyOrJson, input_value, expected):
     v = py_or_json({'type': 'int'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -100,7 +101,7 @@ def test_int(input_value, expected):
         ),
     ],
 )
-def test_int_strict(py_or_json, input_value, expected):
+def test_int_strict(py_or_json: PyOrJson, input_value, expected):
     v = py_or_json({'type': 'int', 'strict': True})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -134,7 +135,7 @@ def test_int_strict(py_or_json, input_value, expected):
     ],
     ids=repr,
 )
-def test_int_kwargs(py_or_json, kwargs, input_value, expected):
+def test_int_kwargs(py_or_json: PyOrJson, kwargs: Dict[str, Any], input_value, expected):
     v = py_or_json({'type': 'int', **kwargs})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
@@ -150,7 +151,7 @@ def test_int_kwargs(py_or_json, kwargs, input_value, expected):
         assert isinstance(output, int)
 
 
-def test_union_int(py_or_json):
+def test_union_int(py_or_json: PyOrJson):
     v = py_or_json({'type': 'union', 'choices': [{'type': 'int', 'strict': True}, {'type': 'int', 'multiple_of': 7}]})
     assert v.validate_test('14') == 14
     assert v.validate_test(5) == 5
@@ -169,7 +170,7 @@ def test_union_int(py_or_json):
     ]
 
 
-def test_union_int_simple(py_or_json):
+def test_union_int_simple(py_or_json: PyOrJson):
     v = py_or_json({'type': 'union', 'choices': [{'type': 'int'}]})
     assert v.validate_test('5') == 5
     with pytest.raises(ValidationError) as exc_info:
@@ -194,7 +195,7 @@ def test_int_repr():
     assert repr(v).startswith('SchemaValidator(name="constrained-int", validator=ConstrainedInt(\n')
 
 
-def test_long_int(py_or_json):
+def test_long_int(py_or_json: PyOrJson):
     v = py_or_json({'type': 'int'})
 
     with pytest.raises(ValidationError) as exc_info:
@@ -217,7 +218,7 @@ def test_long_int(py_or_json):
     )
 
 
-def test_int_nan(py_or_json):
+def test_int_nan(py_or_json: PyOrJson):
     v = py_or_json({'type': 'int'})
 
     with pytest.raises(ValidationError, match='Value must be a valid integer, got negative infinity'):

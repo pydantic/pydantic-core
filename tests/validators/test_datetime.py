@@ -8,7 +8,7 @@ import pytz
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
-from ..conftest import Err
+from ..conftest import Err, PyOrJson
 
 
 @pytest.mark.parametrize(
@@ -114,7 +114,7 @@ def test_keep_tz_bound():
         ([1, 2, 3], Err('Value must be a valid datetime [kind=datetime_type')),
     ],
 )
-def test_datetime_json(py_or_json, input_value, expected):
+def test_datetime_json(py_or_json: PyOrJson, input_value, expected):
     v = py_or_json({'type': 'datetime'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -230,7 +230,7 @@ def test_dict_py():
     }
 
 
-def test_dict(py_or_json):
+def test_dict(py_or_json: PyOrJson):
     v = py_or_json({'type': 'dict', 'keys_schema': 'datetime', 'values_schema': 'int'})
     assert v.validate_test({'2000-01-01T00:00': 2, '2000-01-02T00:00': 4}) == {
         datetime(2000, 1, 1): 2,
