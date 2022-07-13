@@ -7,7 +7,7 @@ import pytest
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err, PyOrJson
+from ..conftest import Err, PyAndJson
 
 
 @pytest.mark.parametrize(
@@ -27,7 +27,7 @@ from ..conftest import Err, PyOrJson
         ([1, 2], Err('Value must be a valid number [kind=float_type, input_value=[1, 2], input_type=list]')),
     ],
 )
-def test_float(py_or_json: PyOrJson, input_value, expected):
+def test_float(py_or_json: PyAndJson, input_value, expected):
     v = py_or_json({'type': 'float'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -51,7 +51,7 @@ def test_float(py_or_json: PyOrJson, input_value, expected):
     ],
     ids=repr,
 )
-def test_float_strict(py_or_json: PyOrJson, input_value, expected):
+def test_float_strict(py_or_json: PyAndJson, input_value, expected):
     v = py_or_json({'type': 'float', 'strict': True})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -88,7 +88,7 @@ def test_float_strict(py_or_json: PyOrJson, input_value, expected):
         ({'multiple_of': 0.5}, 0.6, Err('Value must be a multiple of 0.5')),
     ],
 )
-def test_float_kwargs(py_or_json: PyOrJson, kwargs: Dict[str, Any], input_value, expected):
+def test_float_kwargs(py_or_json: PyAndJson, kwargs: Dict[str, Any], input_value, expected):
     v = py_or_json({'type': 'float', **kwargs})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
@@ -103,7 +103,7 @@ def test_float_kwargs(py_or_json: PyOrJson, kwargs: Dict[str, Any], input_value,
         assert isinstance(output, float)
 
 
-def test_union_float(py_or_json: PyOrJson):
+def test_union_float(py_or_json: PyAndJson):
     v = py_or_json(
         {'type': 'union', 'choices': [{'type': 'float', 'strict': True}, {'type': 'float', 'multiple_of': 7}]}
     )
@@ -123,7 +123,7 @@ def test_union_float(py_or_json: PyOrJson):
     ]
 
 
-def test_union_float_simple(py_or_json: PyOrJson):
+def test_union_float_simple(py_or_json: PyAndJson):
     v = py_or_json({'type': 'union', 'choices': [{'type': 'float'}]})
     assert v.validate_test('5') == 5
     with pytest.raises(ValidationError) as exc_info:
@@ -160,7 +160,7 @@ def test_float_not_json(input_value, expected):
         assert isinstance(output, float)
 
 
-def test_float_nan(py_or_json: PyOrJson):
+def test_float_nan(py_or_json: PyAndJson):
     v = py_or_json({'type': 'float'})
     assert v.validate_test('1' * 800) == float('inf')
     assert v.validate_test('-' + '1' * 800) == float('-inf')

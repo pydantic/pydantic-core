@@ -7,7 +7,7 @@ import pytest
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
-from ..conftest import Err, PyOrJson
+from ..conftest import Err, PyAndJson
 
 
 @pytest.mark.parametrize(
@@ -68,7 +68,7 @@ def test_time(input_value, expected):
         pytest.param(True, Err('Value must be a valid time [kind=time_type'), id='bool'),
     ],
 )
-def test_time_json(py_or_json: PyOrJson, input_value, expected):
+def test_time_json(py_or_json: PyAndJson, input_value, expected):
     v = py_or_json({'type': 'time'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -177,7 +177,7 @@ def test_dict_py():
     assert v.validate_python({time(12, 1, 1): 2, time(12, 1, 2): 4}) == {time(12, 1, 1): 2, time(12, 1, 2): 4}
 
 
-def test_dict(py_or_json: PyOrJson):
+def test_dict(py_or_json: PyAndJson):
     v = py_or_json({'type': 'dict', 'keys_schema': 'time', 'values_schema': 'int'})
     assert v.validate_test({'12:01:01': 2, '12:01:02': 4}) == {time(12, 1, 1): 2, time(12, 1, 2): 4}
 

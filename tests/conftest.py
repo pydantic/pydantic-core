@@ -12,7 +12,7 @@ from typing_extensions import Literal
 
 from pydantic_core import SchemaValidator
 
-__all__ = ('Err', 'PyOrJson')
+__all__ = ('Err', 'PyAndJson')
 
 hyp_max_examples = os.getenv('HYPOTHESIS_MAX_EXAMPLES')
 if hyp_max_examples:
@@ -32,7 +32,7 @@ class Err:
             return f'Err({self.message!r})'
 
 
-class PyOrJsonValidator:
+class PyAndJsonValidator:
     def __init__(self, schema, validator_type: Optional[Literal['json', 'python']] = None):
         self.validator = SchemaValidator(schema)
         self.validator_type = validator_type
@@ -53,15 +53,15 @@ class PyOrJsonValidator:
             return self.validator.isinstance_python(py_input)
 
 
-PyOrJson = Type[PyOrJsonValidator]
+PyAndJson = Type[PyAndJsonValidator]
 
 
 @pytest.fixture(params=['python', 'json'])
-def py_or_json(request) -> PyOrJson:
-    class ChosenPyOrJsonValidator(PyOrJsonValidator):
-        __init__ = functools.partialmethod(PyOrJsonValidator.__init__, validator_type=request.param)
+def py_or_json(request) -> PyAndJson:
+    class ChosenPyAndJsonValidator(PyAndJsonValidator):
+        __init__ = functools.partialmethod(PyAndJsonValidator.__init__, validator_type=request.param)
 
-    return ChosenPyOrJsonValidator
+    return ChosenPyAndJsonValidator
 
 
 @pytest.fixture

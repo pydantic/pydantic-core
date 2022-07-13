@@ -8,10 +8,10 @@ from dirty_equals import HasRepr, IsStr
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err, PyOrJson
+from ..conftest import Err, PyAndJson
 
 
-def test_dict(py_or_json: PyOrJson):
+def test_dict(py_or_json: PyAndJson):
     v = py_or_json({'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
     assert v.validate_test({'1': 2, '3': 4}) == {1: 2, 3: 4}
     v = py_or_json({'type': 'dict', 'strict': True, 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
@@ -46,7 +46,7 @@ def test_dict_cases(input_value, expected):
         assert v.validate_python(input_value) == expected
 
 
-def test_dict_value_error(py_or_json: PyOrJson):
+def test_dict_value_error(py_or_json: PyAndJson):
     v = py_or_json({'type': 'dict', 'values_schema': 'int'})
     assert v.validate_test({'a': 2, 'b': '4'}) == {'a': 2, 'b': 4}
     with pytest.raises(ValidationError, match='Value must be a valid integer') as exc_info:

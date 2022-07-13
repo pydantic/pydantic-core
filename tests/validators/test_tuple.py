@@ -7,7 +7,7 @@ from typing_extensions import Literal
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
-from ..conftest import Err, PyOrJson
+from ..conftest import Err, PyAndJson
 
 TupleVariant = Literal['tuple-var-len', 'tuple-fix-len']
 
@@ -31,7 +31,7 @@ TupleVariant = Literal['tuple-var-len', 'tuple-fix-len']
         ),
     ],
 )
-def test_tuple_json(py_or_json: PyOrJson, tuple_variant: TupleVariant, items, input_value, expected):
+def test_tuple_json(py_or_json: PyAndJson, tuple_variant: TupleVariant, items, input_value, expected):
     v = py_or_json({'type': tuple_variant, 'items_schema': items})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):

@@ -6,7 +6,7 @@ from dirty_equals import IsList, IsNonNegative
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err, PyOrJson
+from ..conftest import Err, PyAndJson
 
 
 @pytest.mark.parametrize(
@@ -18,7 +18,7 @@ from ..conftest import Err, PyOrJson
         ('5', Err("Value must be a valid list/array [kind=list_type, input_value='5', input_type=str]")),
     ],
 )
-def test_list_json(py_or_json: PyOrJson, input_value, expected):
+def test_list_json(py_or_json: PyAndJson, input_value, expected):
     v = py_or_json({'type': 'list', 'items_schema': {'type': 'int'}})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
