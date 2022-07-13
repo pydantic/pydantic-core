@@ -107,7 +107,7 @@ importlib.invalidate_caches()
 print('installed packages:', micropip.list())
 
 import pytest
-pytest.main()
+pytest.main(['-v'])
 `);
   } catch (e) {
     console.error(e);

@@ -1,3 +1,4 @@
+import sys
 from typing import Optional
 
 import pytest
@@ -9,6 +10,7 @@ from ..conftest import Err
 from .test_typed_dict import Cls
 
 
+@pytest.mark.skipif(sys.platform == 'emscripten', reason='testing if this is the problem with emscripten')
 def test_branch_nullable():
     v = SchemaValidator(
         {
