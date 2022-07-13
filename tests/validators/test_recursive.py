@@ -10,7 +10,6 @@ from ..conftest import Err
 from .test_typed_dict import Cls
 
 
-@pytest.mark.skipif(sys.platform == 'emscripten', reason='FIXME waiting for pyodide error found in #167')
 def test_branch_nullable():
     v = SchemaValidator(
         {
@@ -538,7 +537,6 @@ def test_union_cycle(strict: bool):
     ]
 
 
-@pytest.mark.skipif(sys.platform == 'emscripten', reason='FIXME waiting for pyodide error found in #167')
 def test_function_name():
     def f(input_value, **kwargs):
         return input_value + ' Changed'
