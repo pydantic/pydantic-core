@@ -32,7 +32,7 @@ class Err:
             return f'Err({self.message!r})'
 
 
-class CustomSchemaValidator:
+class PyOrJsonValidator:
     def __init__(self, schema, validator_type: Optional[Literal['json', 'python']] = None):
         self.validator = SchemaValidator(schema)
         self.validator_type = validator_type
@@ -53,15 +53,15 @@ class CustomSchemaValidator:
             return self.validator.isinstance_python(py_input)
 
 
-PyOrJson = Type[CustomSchemaValidator]
+PyOrJson = Type[PyOrJsonValidator]
 
 
 @pytest.fixture(params=['python', 'json'])
 def py_or_json(request) -> PyOrJson:
-    class SpecificCustomSchemaValidator(CustomSchemaValidator):
-        __init__ = functools.partialmethod(CustomSchemaValidator.__init__, validator_type=request.param)
+    class ChosenPyOrJsonValidator(PyOrJsonValidator):
+        __init__ = functools.partialmethod(PyOrJsonValidator.__init__, validator_type=request.param)
 
-    return SpecificCustomSchemaValidator
+    return ChosenPyOrJsonValidator
 
 
 @pytest.fixture
