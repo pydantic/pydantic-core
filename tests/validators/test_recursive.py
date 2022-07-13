@@ -580,6 +580,7 @@ def test_function_name():
     ]
 
 
+@pytest.mark.skipif(sys.platform == 'emscripten', reason='testing if this is the problem with emscripten')
 @pytest.mark.parametrize('strict', [True, False], ids=lambda s: f'strict={s}')
 def test_function_change_id(strict: bool):
     def f(input_value, **kwargs):
