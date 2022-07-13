@@ -78,7 +78,7 @@ function setupStreams(FS, TTY) {
 async function main() {
   const root_dir = path.resolve(__dirname, '..');
   const wheel_path = await find_wheel(path.join(root_dir, 'dist'));
-  let errcode = 0;
+  let errcode = 1;
   try {
     const pyodide = await loadPyodide();
     const FS = pyodide.FS;

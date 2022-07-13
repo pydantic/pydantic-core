@@ -538,6 +538,7 @@ def test_union_cycle(strict: bool):
     ]
 
 
+@pytest.mark.skipif(sys.platform == 'emscripten', reason='testing if this is the problem with emscripten')
 def test_function_name():
     def f(input_value, **kwargs):
         return input_value + ' Changed'
