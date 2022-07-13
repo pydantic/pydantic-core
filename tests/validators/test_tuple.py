@@ -31,8 +31,8 @@ TupleVariant = Literal['tuple-var-len', 'tuple-fix-len']
         ),
     ],
 )
-def test_tuple_json(py_or_json: PyAndJson, tuple_variant: TupleVariant, items, input_value, expected):
-    v = py_or_json({'type': tuple_variant, 'items_schema': items})
+def test_tuple_json(py_and_json: PyAndJson, tuple_variant: TupleVariant, items, input_value, expected):
+    v = py_and_json({'type': tuple_variant, 'items_schema': items})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)

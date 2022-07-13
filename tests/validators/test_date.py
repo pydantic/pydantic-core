@@ -73,8 +73,8 @@ def test_date(input_value, expected):
         ([1], Err('Value must be a valid date [kind=date_type')),
     ],
 )
-def test_date_json(py_or_json: PyAndJson, input_value, expected):
-    v = py_or_json({'type': 'date'})
+def test_date_json(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json({'type': 'date'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -184,8 +184,8 @@ def test_dict_py():
     assert v.validate_python({date(2000, 1, 1): 2, date(2000, 1, 2): 4}) == {date(2000, 1, 1): 2, date(2000, 1, 2): 4}
 
 
-def test_dict(py_or_json: PyAndJson):
-    v = py_or_json({'type': 'dict', 'keys_schema': 'date', 'values_schema': 'int'})
+def test_dict(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'dict', 'keys_schema': 'date', 'values_schema': 'int'})
     assert v.validate_test({'2000-01-01': 2, '2000-01-02': 4}) == {date(2000, 1, 1): 2, date(2000, 1, 2): 4}
 
 

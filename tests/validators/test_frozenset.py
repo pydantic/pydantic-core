@@ -12,8 +12,8 @@ from ..conftest import Err, PyAndJson
     'input_value,expected',
     [([], frozenset()), ([1, 2, 3], {1, 2, 3}), ([1, 2, '3'], {1, 2, 3}), ([1, 2, 3, 2, 3], {1, 2, 3})],
 )
-def test_frozenset_ints_both(py_or_json: PyAndJson, input_value, expected):
-    v = py_or_json({'type': 'frozenset', 'items_schema': {'type': 'int'}})
+def test_frozenset_ints_both(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json({'type': 'frozenset', 'items_schema': {'type': 'int'}})
     output = v.validate_test(input_value)
     assert output == expected
     assert isinstance(output, frozenset)
@@ -29,8 +29,8 @@ def test_frozenset_ints_both(py_or_json: PyAndJson, input_value, expected):
         (False, Err('Value must be a valid frozenset')),
     ],
 )
-def test_frozenset_no_validators_both(py_or_json: PyAndJson, input_value, expected):
-    v = py_or_json({'type': 'frozenset'})
+def test_frozenset_no_validators_both(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json({'type': 'frozenset'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -181,8 +181,8 @@ def test_union_frozenset_int_frozenset_str(input_value, expected):
         assert isinstance(output, frozenset)
 
 
-def test_frozenset_as_dict_keys(py_or_json: PyAndJson):
-    v = py_or_json({'type': 'dict', 'keys_schema': {'type': 'frozenset'}, 'value': 'int'})
+def test_frozenset_as_dict_keys(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'frozenset'}, 'value': 'int'})
     with pytest.raises(ValidationError, match=re.escape('Value must be a valid frozenset')):
         v.validate_test({'foo': 'bar'})
 

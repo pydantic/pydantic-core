@@ -18,8 +18,8 @@ from ..conftest import Err, PyAndJson
         (5, Err('Value must be a valid set [kind=set_type, input_value=5, input_type=int]')),
     ],
 )
-def test_set_ints_both(py_or_json: PyAndJson, input_value, expected):
-    v = py_or_json({'type': 'set', 'items_schema': {'type': 'int'}})
+def test_set_ints_both(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json({'type': 'set', 'items_schema': {'type': 'int'}})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -28,8 +28,8 @@ def test_set_ints_both(py_or_json: PyAndJson, input_value, expected):
 
 
 @pytest.mark.parametrize('input_value,expected', [([1, 2.5, '3'], {1, 2.5, '3'})])
-def test_set_no_validators_both(py_or_json: PyAndJson, input_value, expected):
-    v = py_or_json({'type': 'set'})
+def test_set_no_validators_both(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json({'type': 'set'})
     assert v.validate_test(input_value) == expected
 
 
@@ -43,8 +43,8 @@ def test_set_no_validators_both(py_or_json: PyAndJson, input_value, expected):
         (False, Err('Value must be a valid set')),
     ],
 )
-def test_frozenset_no_validators_both(py_or_json: PyAndJson, input_value, expected):
-    v = py_or_json({'type': 'set'})
+def test_frozenset_no_validators_both(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json({'type': 'set'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -183,7 +183,7 @@ def test_union_set_int_set_str(input_value, expected):
         assert v.validate_python(input_value) == expected
 
 
-def test_set_as_dict_keys(py_or_json: PyAndJson):
-    v = py_or_json({'type': 'dict', 'keys_schema': {'type': 'set'}, 'value': 'int'})
+def test_set_as_dict_keys(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'set'}, 'value': 'int'})
     with pytest.raises(ValidationError, match=re.escape('Value must be a valid set')):
         v.validate_test({'foo': 'bar'})

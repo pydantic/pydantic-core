@@ -5,8 +5,8 @@ from pydantic_core import ValidationError
 from ..conftest import PyAndJson
 
 
-def test_none(py_or_json: PyAndJson):
-    v = py_or_json('none')
+def test_none(py_and_json: PyAndJson):
+    v = py_and_json('none')
     assert v.validate_test(None) is None
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test(1)

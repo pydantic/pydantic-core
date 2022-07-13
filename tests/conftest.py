@@ -57,7 +57,7 @@ PyAndJson = Type[PyAndJsonValidator]
 
 
 @pytest.fixture(params=['python', 'json'])
-def py_or_json(request) -> PyAndJson:
+def py_and_json(request) -> PyAndJson:
     class ChosenPyAndJsonValidator(PyAndJsonValidator):
         __init__ = functools.partialmethod(PyAndJsonValidator.__init__, validator_type=request.param)
 

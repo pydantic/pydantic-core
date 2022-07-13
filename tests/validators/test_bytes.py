@@ -64,8 +64,8 @@ def test_constrained_bytes_python_bytes(opts: Dict[str, Any], input, expected):
         ({}, {}, Err('Value must be a valid bytes')),
     ],
 )
-def test_constrained_bytes(py_or_json: PyAndJson, opts: Dict[str, Any], input, expected):
-    v = py_or_json({'type': 'bytes', **opts})
+def test_constrained_bytes(py_and_json: PyAndJson, opts: Dict[str, Any], input, expected):
+    v = py_and_json({'type': 'bytes', **opts})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input)
