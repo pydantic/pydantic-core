@@ -47,6 +47,7 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorKind::BytesType, self)),
         }
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
         self.validate_bytes(false)
     }
@@ -118,6 +119,7 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorKind::DictType, self)),
         }
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
         self.validate_dict(false)
     }
@@ -128,6 +130,7 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorKind::ListType, self)),
         }
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         self.validate_list(false)
     }
@@ -139,6 +142,7 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorKind::TupleType, self)),
         }
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         self.validate_tuple(false)
     }
@@ -150,6 +154,7 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorKind::SetType, self)),
         }
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         self.validate_set(false)
     }
@@ -161,6 +166,7 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorKind::FrozenSetType, self)),
         }
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         self.validate_frozenset(false)
     }
@@ -173,6 +179,7 @@ impl<'a> Input<'a> for JsonInput {
     }
     // NO custom `lax_date` implementation, if strict_date fails, the validator will fallback to lax_datetime
     // then check there's no remainder
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_date(&self) -> ValResult<EitherDate> {
         self.validate_date(false)
     }
@@ -248,11 +255,11 @@ impl<'a> Input<'a> for String {
     fn validate_bytes<'data>(&'data self, _strict: bool) -> ValResult<EitherBytes<'data>> {
         Ok(self.as_bytes().into())
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
         self.validate_bytes(false)
     }
 
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_bool(&self) -> ValResult<bool> {
         Err(ValError::new(ErrorKind::BoolType, self))
     }
@@ -260,7 +267,6 @@ impl<'a> Input<'a> for String {
         str_as_bool(self, self)
     }
 
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_int(&self) -> ValResult<i64> {
         Err(ValError::new(ErrorKind::IntType, self))
     }
@@ -286,6 +292,7 @@ impl<'a> Input<'a> for String {
     fn validate_dict<'data>(&'data self, _strict: bool) -> ValResult<GenericMapping<'data>> {
         Err(ValError::new(ErrorKind::DictType, self))
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
         self.validate_dict(false)
     }
@@ -294,6 +301,7 @@ impl<'a> Input<'a> for String {
     fn validate_list<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
         Err(ValError::new(ErrorKind::ListType, self))
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_list<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         self.validate_list(false)
     }
@@ -302,6 +310,7 @@ impl<'a> Input<'a> for String {
     fn validate_tuple<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
         Err(ValError::new(ErrorKind::TupleType, self))
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         self.validate_tuple(false)
     }
@@ -310,6 +319,7 @@ impl<'a> Input<'a> for String {
     fn validate_set<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
         Err(ValError::new(ErrorKind::SetType, self))
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_set<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         self.validate_set(false)
     }
@@ -318,6 +328,7 @@ impl<'a> Input<'a> for String {
     fn validate_frozenset<'data>(&'data self, _strict: bool) -> ValResult<GenericSequence<'data>> {
         Err(ValError::new(ErrorKind::FrozenSetType, self))
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_frozenset<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
         self.validate_frozenset(false)
     }
@@ -325,6 +336,7 @@ impl<'a> Input<'a> for String {
     fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
         bytes_as_date(self, self.as_bytes())
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_date(&self) -> ValResult<EitherDate> {
         self.validate_date(false)
     }
@@ -332,6 +344,7 @@ impl<'a> Input<'a> for String {
     fn validate_time(&self, _strict: bool) -> ValResult<EitherTime> {
         bytes_as_time(self, self.as_bytes())
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_time(&self) -> ValResult<EitherTime> {
         self.validate_time(false)
     }
@@ -339,6 +352,7 @@ impl<'a> Input<'a> for String {
     fn validate_datetime(&self, _strict: bool) -> ValResult<EitherDateTime> {
         bytes_as_datetime(self, self.as_bytes())
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_datetime(&self) -> ValResult<EitherDateTime> {
         self.validate_datetime(false)
     }
@@ -346,6 +360,7 @@ impl<'a> Input<'a> for String {
     fn validate_timedelta(&self, _strict: bool) -> ValResult<EitherTimedelta> {
         bytes_as_timedelta(self, self.as_bytes())
     }
+    #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_timedelta(&self) -> ValResult<EitherTimedelta> {
         self.validate_timedelta(false)
     }

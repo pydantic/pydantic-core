@@ -89,12 +89,12 @@ async function main() {
     await pyodide.loadPackage(['micropip', 'pytest', 'pytz']);
     // language=python
     errcode = await pyodide.runPythonAsync(`
-import sys
 import micropip
 import importlib
 
-# see https://github.com/pyodide/pyodide/issues/2840 and https://github.com/samuelcolvin/pydantic-core/pull/167
-# sys.setrecursionlimit(200)
+# ugly hack to get tests to work on arm64 (my m1 mac)
+# see https://github.com/pyodide/pyodide/issues/2840
+import sys; sys.setrecursionlimit(200)
 
 await micropip.install([
     'dirty-equals',
@@ -107,7 +107,7 @@ importlib.invalidate_caches()
 print('installed packages:', micropip.list())
 
 import pytest
-pytest.main(['-v'])
+pytest.main()
 `);
   } catch (e) {
     console.error(e);

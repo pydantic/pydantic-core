@@ -226,3 +226,10 @@ def test_int_nan(py_and_json: PyAndJson):
 
     with pytest.raises(ValidationError, match='Value must be a valid integer, got NaN'):
         v.validate_test('nan')
+
+
+def test_int_key(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'dict', 'keys_schema': 'int', 'values_schema': 'int'})
+    assert v.validate_test({'1': 1, '2': 2}) == {1: 1, 2: 2}
+    with pytest.raises(ValidationError, match='Value must be a valid integer'):
+        v.validate_test({'1': 1, '2': 2}, strict=True)

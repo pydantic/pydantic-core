@@ -166,3 +166,11 @@ def test_float_nan(py_and_json: PyAndJson):
     assert v.validate_test('-' + '1' * 800) == float('-inf')
     r = v.validate_test('nan')
     assert math.isnan(r)
+
+
+def test_float_key(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'dict', 'keys_schema': 'float', 'values_schema': 'int'})
+    assert v.validate_test({'1': 1, '2': 2}) == {1: 1, 2: 2}
+    assert v.validate_test({'1.5': 1, '2.4': 2}) == {1.5: 1, 2.4: 2}
+    with pytest.raises(ValidationError, match='Value must be a valid number'):
+        v.validate_test({'1.5': 1, '2.5': 2}, strict=True)
