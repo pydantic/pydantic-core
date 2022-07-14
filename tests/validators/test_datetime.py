@@ -1,4 +1,5 @@
 import json
+import platform
 import re
 from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from decimal import Decimal
@@ -8,7 +9,7 @@ import pytz
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
-from ..conftest import Err
+from ..conftest import Err, PyAndJson
 
 
 @pytest.mark.parametrize(
@@ -114,8 +115,8 @@ def test_keep_tz_bound():
         ([1, 2, 3], Err('Value must be a valid datetime [kind=datetime_type')),
     ],
 )
-def test_datetime_json(py_or_json, input_value, expected):
-    v = py_or_json({'type': 'datetime'})
+def test_datetime_json(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json({'type': 'datetime'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -211,13 +212,20 @@ def test_custom_invalid_tz():
     # perhaps this should be a ValidationError? but we don't catch other errors
     with pytest.raises(ValidationError) as excinfo:
         schema.validate_python(dt)
+
+    # exception messages differ between python and pypy
+    if platform.python_implementation() == 'PyPy':
+        error_message = 'NotImplementedError: tzinfo subclass must override utcoffset()'
+    else:
+        error_message = 'NotImplementedError: a tzinfo subclass must implement utcoffset()'
+
     assert excinfo.value.errors() == [
         {
             'kind': 'datetime_object_invalid',
             'loc': [],
-            'message': 'Invalid datetime object, got NotImplementedError: a tzinfo subclass must implement utcoffset()',
+            'message': f'Invalid datetime object, got {error_message}',
             'input_value': dt,
-            'context': {'error': 'NotImplementedError: a tzinfo subclass must implement utcoffset()'},
+            'context': {'error': error_message},
         }
     ]
 
@@ -230,8 +238,8 @@ def test_dict_py():
     }
 
 
-def test_dict(py_or_json):
-    v = py_or_json({'type': 'dict', 'keys_schema': 'datetime', 'values_schema': 'int'})
+def test_dict(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'dict', 'keys_schema': 'datetime', 'values_schema': 'int'})
     assert v.validate_test({'2000-01-01T00:00': 2, '2000-01-02T00:00': 4}) == {
         datetime(2000, 1, 1): 2,
         datetime(2000, 1, 2): 4,
