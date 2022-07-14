@@ -2,7 +2,7 @@ import pytest
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err
+from ..conftest import Err, PyAndJson
 
 
 @pytest.mark.parametrize(
@@ -70,8 +70,8 @@ from ..conftest import Err
     ],
     ids=repr,
 )
-def test_simple_tagged_union(py_or_json, input_value, expected):
-    v = py_or_json(
+def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
         {
             'type': 'tagged-union',
             'tag_key': 'foo',

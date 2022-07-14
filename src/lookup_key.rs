@@ -75,7 +75,7 @@ impl LookupKey {
                         .collect::<PyResult<Vec<Path>>>()?;
 
                     if locs.is_empty() {
-                        py_error!("{} must have at least one element", plural_name)
+                        py_error!("\"{}\" must have at least one element", plural_name)
                     } else {
                         if let Some(alt_alias) = alt_alias {
                             locs.push(vec![PathItem::S(alt_alias.to_string(), py_string!(py, alt_alias))])

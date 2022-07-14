@@ -574,7 +574,7 @@ def test_paths_allow_by_name(py_and_json: PyAndJson, input_value):
     [
         ({'alias': ['foo']}, "TypeError: 'list' object cannot be converted to 'PyString'"),
         ({'alias': 'foo', 'aliases': []}, "'alias' and 'aliases' cannot be used together"),
-        ({'aliases': []}, 'aliases must have at least one element'),
+        ({'aliases': []}, '"aliases" must have at least one element'),
         ({'aliases': [[]]}, 'Each alias path must have at least one element'),
         ({'aliases': [123]}, "TypeError: 'int' object cannot be converted to 'PyList'"),
         ({'aliases': [[[]]]}, 'TypeError: Alias path items must be with a string or int'),
