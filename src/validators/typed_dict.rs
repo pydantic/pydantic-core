@@ -209,8 +209,21 @@ impl Validator for TypedDictValidator {
                             .set_item(&field.name_pystring, default.as_ref(py))
                             .map_err(Into::<ValError>::into)?;
                     } else if let Some(ref default_factory) = field.default_factory {
+                        let default = match default_factory.as_ref(py).call0() {
+                            Ok(default) => default,
+                            Err(err) => {
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorKind::InvalidDefaultFactory {
+                                        error: py_err_string(py, err),
+                                    },
+                                    input,
+                                    field.name.clone(),
+                                ));
+                                continue;
+                            }
+                        };
                         output_dict
-                            .set_item(&field.name_pystring, default_factory.as_ref(py).call0()?)
+                            .set_item(&field.name_pystring, default)
                             .map_err(Into::<ValError>::into)?;
                     } else if !field.required {
                         continue;
