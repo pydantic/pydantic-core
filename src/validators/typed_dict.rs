@@ -205,7 +205,6 @@ impl Validator for TypedDictValidator {
                             Err(err) => return Err(err),
                         }
                     } else if let Some(ref default) = field.default {
-                        // TODO default needs to be copied here
                         output_dict
                             .set_item(&field.name_pystring, default.as_ref(py))
                             .map_err(Into::<ValError>::into)?;
