@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFrozenSet};
 
 use crate::build_tools::SchemaDict;
-use crate::errors::{as_internal, ErrorKind, ValError, ValResult};
+use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
@@ -47,7 +47,9 @@ impl Validator for FrozenSetValidator {
         }
 
         let output = seq.validate_to_vec(py, length, &self.item_validator, extra, slots, recursion_guard)?;
-        Ok(PyFrozenSet::new(py, &output).map_err(as_internal)?.into_py(py))
+        Ok(PyFrozenSet::new(py, &output)
+            .map_err(Into::<ValError>::into)?
+            .into_py(py))
     }
 
     fn get_name(&self) -> &str {
