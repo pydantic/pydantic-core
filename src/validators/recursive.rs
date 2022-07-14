@@ -96,11 +96,11 @@ impl Validator for RecursiveRefValidator {
 // see #143 this is a backup in case the identity check recursion guard fails
 // if a single validator "depth" (how many times it's called inside itself) exceeds the limit,
 // we raise a recursion error.
-#[cfg(not(PyPy))]
-const BACKUP_GUARD_LIMIT: u16 = 255;
-
-#[cfg(PyPy)]
-const BACKUP_GUARD_LIMIT: u16 = 123;
+const BACKUP_GUARD_LIMIT: u16 = if cfg!(PyPy) || cfg!(target_family = "wasm") {
+    123
+} else {
+    255
+};
 
 fn guard_validate<'s, 'data>(
     validator_id: usize,

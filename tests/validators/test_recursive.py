@@ -1,4 +1,3 @@
-import sys
 from typing import Optional
 
 import pytest
@@ -578,7 +577,6 @@ def test_function_name():
     ]
 
 
-@pytest.mark.skipif(sys.platform == 'emscripten', reason='FIXME waiting for pyodide error found in #167')
 @pytest.mark.parametrize('strict', [True, False], ids=lambda s: f'strict={s}')
 def test_function_change_id(strict: bool):
     def f(input_value, **kwargs):

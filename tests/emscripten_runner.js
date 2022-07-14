@@ -94,7 +94,7 @@ import micropip
 import importlib
 
 # see https://github.com/pyodide/pyodide/issues/2840 and https://github.com/samuelcolvin/pydantic-core/pull/167
-sys.setrecursionlimit(200)
+# sys.setrecursionlimit(200)
 
 await micropip.install([
     'dirty-equals',
