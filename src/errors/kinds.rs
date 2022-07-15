@@ -31,8 +31,6 @@ pub enum ErrorKind {
     InvalidKey,
     #[strum(message = "Error extracting attribute: {error}")]
     GetAttributeError { error: String },
-    #[strum(message = "The default factory must be a valid zero-argument callable: {error}")]
-    InvalidDefaultFactory { error: String },
     // ---------------------
     // model class specific errors
     #[strum(message = "Value must be an instance of {class_name}")]
@@ -243,7 +241,6 @@ impl ErrorKind {
         match self {
             Self::InvalidJson { error } => render!(template, error),
             Self::GetAttributeError { error } => render!(template, error),
-            Self::InvalidDefaultFactory { error } => render!(template, error),
             Self::ModelClassType { class_name } => render!(template, class_name),
             Self::GreaterThan { gt } => render!(template, gt),
             Self::GreaterThanEqual { ge } => render!(template, ge),
@@ -294,7 +291,6 @@ impl ErrorKind {
         match self {
             Self::InvalidJson { error } => py_dict!(py, error),
             Self::GetAttributeError { error } => py_dict!(py, error),
-            Self::InvalidDefaultFactory { error } => py_dict!(py, error),
             Self::ModelClassType { class_name } => py_dict!(py, class_name),
             Self::GreaterThan { gt } => py_dict!(py, gt),
             Self::GreaterThanEqual { ge } => py_dict!(py, ge),

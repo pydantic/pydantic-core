@@ -1074,22 +1074,13 @@ def test_field_required_and_default_factory():
 @pytest.mark.parametrize(
     'default_factory,error_message',
     [
-        (lambda: 1 + 'a', "TypeError: unsupported operand type(s) for +: 'int' and 'str'"),
-        (lambda x: 'a' + x, "TypeError: <lambda>() missing 1 required positional argument: 'x'"),
+        (lambda: 1 + 'a', "unsupported operand type(s) for +: 'int' and 'str'"),
+        (lambda x: 'a' + x, "<lambda>() missing 1 required positional argument: 'x'"),
     ],
 )
 def test_bad_default_factory(default_factory, error_message):
     v = SchemaValidator(
         {'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}, 'default_factory': default_factory}}}
     )
-    with pytest.raises(ValidationError) as exc_info:
+    with pytest.raises(TypeError, match=re.escape(error_message)):
         v.validate_python({})
-    assert exc_info.value.errors() == [
-        {
-            'kind': 'invalid_default_factory',
-            'loc': ['x'],
-            'message': f'The default factory must be a valid zero-argument callable: {error_message}',
-            'input_value': {},
-            'context': {'error': error_message},
-        }
-    ]
