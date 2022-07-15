@@ -191,9 +191,7 @@ impl Validator for TypedDictValidator {
                             .validate(py, value, &extra, slots, recursion_guard)
                         {
                             Ok(value) => {
-                                output_dict
-                                    .set_item(&field.name_pystring, value)
-                                    ?;
+                                output_dict.set_item(&field.name_pystring, value)?;
                                 if let Some(ref mut fs) = fields_set_vec {
                                     fs.push(field.name_pystring.clone_ref(py));
                                 }
@@ -208,9 +206,7 @@ impl Validator for TypedDictValidator {
                     } else if let Some(ref default) = field.default {
                         output_dict.set_item(&field.name_pystring, default)?;
                     } else if let Some(ref default_factory) = field.default_factory {
-                        output_dict
-                            .set_item(&field.name_pystring, default_factory.call0(py)?)
-                            ?;
+                        output_dict.set_item(&field.name_pystring, default_factory.call0(py)?)?;
                     } else if !field.required {
                         continue;
                     } else {
@@ -262,9 +258,7 @@ impl Validator for TypedDictValidator {
                         if let Some(ref validator) = self.extra_validator {
                             match validator.validate(py, value, &extra, slots, recursion_guard) {
                                 Ok(value) => {
-                                    output_dict
-                                        .set_item(py_key, value)
-                                        ?;
+                                    output_dict.set_item(py_key, value)?;
                                     if let Some(ref mut fs) = fields_set_vec {
                                         fs.push(py_key.into_py(py));
                                     }
@@ -277,9 +271,7 @@ impl Validator for TypedDictValidator {
                                 Err(err) => return Err(err),
                             }
                         } else {
-                            output_dict
-                                .set_item(py_key, value.to_object(py))
-                                ?;
+                            output_dict.set_item(py_key, value.to_object(py))?;
                             if let Some(ref mut fs) = fields_set_vec {
                                 fs.push(py_key.into_py(py));
                             }

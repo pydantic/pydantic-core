@@ -44,10 +44,7 @@ impl Validator for IsInstanceValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        match input
-            .is_instance(self.class.as_ref(py))
-            ?
-        {
+        match input.is_instance(self.class.as_ref(py))? {
             true => Ok(input.to_object(py)),
             false => Err(ValError::new(
                 ErrorKind::IsInstanceOf {
