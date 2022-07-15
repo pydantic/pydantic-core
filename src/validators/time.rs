@@ -85,7 +85,7 @@ impl Validator for TimeValidator {
             check_constraint!(ge, GreaterThanEqual);
             check_constraint!(gt, GreaterThan);
         }
-        time.try_into_py(py).map_err(Into::<ValError>::into)
+        Ok(time.try_into_py(py)?)
     }
 
     fn get_name(&self) -> &str {

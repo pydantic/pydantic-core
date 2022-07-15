@@ -45,7 +45,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn is_type(&self, class: &PyType) -> ValResult<bool> {
-        self.get_type().eq(class).map_err(Into::<ValError>::into)
+        Ok(self.get_type().eq(class)?)
     }
 
     fn is_instance(&self, class: &PyType) -> PyResult<bool> {
@@ -396,7 +396,7 @@ impl<'a> Input<'a> for PyAny {
         } else if let Ok(float) = self.extract::<f64>() {
             float_as_datetime(self, float)
         } else if let Ok(date) = self.cast_as::<PyDate>() {
-            date_as_datetime(date).map_err(Into::<ValError>::into)
+            Ok(date_as_datetime(date)?)
         } else {
             Err(ValError::new(ErrorKind::DateTimeType, self))
         }
