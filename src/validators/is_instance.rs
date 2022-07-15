@@ -46,7 +46,7 @@ impl Validator for IsInstanceValidator {
     ) -> ValResult<'data, PyObject> {
         match input
             .is_instance(self.class.as_ref(py))
-            .map_err(Into::<ValError>::into)?
+            ?
         {
             true => Ok(input.to_object(py)),
             false => Err(ValError::new(
