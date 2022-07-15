@@ -4,7 +4,7 @@ use pyo3::exceptions::{PyAttributeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 
-use crate::build_tools::{py_error, SchemaDict};
+use crate::build_tools::{py_error};
 use crate::input::{JsonInput, JsonObject};
 
 /// Used got getting items from python dicts, python objects, or JSON objects, in different ways
@@ -47,44 +47,46 @@ impl LookupKey {
         py: Python,
         field: &PyDict,
         alt_alias: Option<&str>,
-        single_name: &str,
-        plural_name: &str,
+        name: &str,
     ) -> PyResult<Option<Self>> {
-        match field.get_as::<String>(single_name)? {
-            Some(alias) => {
-                if field.contains(plural_name)? {
-                    py_error!("'{}' and '{}' cannot be used together", single_name, plural_name)
-                } else {
-                    let alias_py = py_string!(py, &alias);
-                    match alt_alias {
-                        Some(alt_alias) => Ok(Some(LookupKey::Choice(
-                            alias,
-                            alt_alias.to_string(),
-                            alias_py,
-                            py_string!(py, alt_alias),
-                        ))),
-                        None => Ok(Some(LookupKey::Simple(alias, alias_py))),
-                    }
+        if let Some(value) = field.get_item(name) {
+            if let Ok(alias_py) = value.cast_as::<PyString>() {
+                let alias: String = alias_py.extract()?;
+                let alias_py: Py<PyString> = alias_py.into_py(py);
+                match alt_alias {
+                    Some(alt_alias) => Ok(Some(LookupKey::Choice(
+                        alias,
+                        alt_alias.to_string(),
+                        alias_py,
+                        py_string!(py, alt_alias),
+                    ))),
+                    None => Ok(Some(LookupKey::Simple(alias, alias_py))),
                 }
-            }
-            None => match field.get_as::<&PyList>(plural_name)? {
-                Some(aliases) => {
-                    let mut locs = aliases
+            } else{
+                let list: &PyList = value.cast_as()?;
+                let first = match list.get_item(0) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        return py_error!("\"{}\" must have at least one element", name)
+                    }
+                };
+                let mut locs = if first.cast_as::<PyString>().is_ok() {
+                    // list rather than list of lists
+                    vec![Self::path_choice(py, first)?]
+                } else {
+                    list
                         .iter()
                         .map(|obj| Self::path_choice(py, obj))
-                        .collect::<PyResult<Vec<Path>>>()?;
+                        .collect::<PyResult<Vec<Path>>>()?
+                };
 
-                    if locs.is_empty() {
-                        py_error!("\"{}\" must have at least one element", plural_name)
-                    } else {
-                        if let Some(alt_alias) = alt_alias {
-                            locs.push(vec![PathItem::S(alt_alias.to_string(), py_string!(py, alt_alias))])
-                        }
-                        Ok(Some(LookupKey::PathChoices(locs)))
-                    }
+                if let Some(alt_alias) = alt_alias {
+                    locs.push(vec![PathItem::S(alt_alias.to_string(), py_string!(py, alt_alias))])
                 }
-                None => Ok(None),
-            },
+                Ok(Some(LookupKey::PathChoices(locs)))
+            }
+        } else {
+            Ok(None)
         }
     }
 

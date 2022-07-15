@@ -135,7 +135,7 @@ impl BuildValidator for TaggedUnionValidator {
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let lookup_key = match LookupKey::from_py(py, schema, None, "tag_key", "tag_keys")? {
+        let lookup_key = match LookupKey::from_py(py, schema, None, "tag_key")? {
             Some(lookup_key) => lookup_key,
             None => return py_error!(PyKeyError; "'tag_key' or 'tag_keys' must be set on a tagged union"),
         };
@@ -186,7 +186,7 @@ impl Validator for TaggedUnionValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let dict = input.typed_dict(self.from_attributes, !self.strict)?;
+        let dict = input.validate_typed_dict(self.strict, self.from_attributes)?;
 
         macro_rules! find_validator {
             ($dict:ident, $get_method:ident) => {{

@@ -1,4 +1,3 @@
-use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyList, PySet, PyString};
 use pyo3::{intern, PyTypeInfo};
@@ -95,7 +94,7 @@ impl BuildValidator for TypedDictValidator {
                 };
 
             let alt_alias = if populate_by_name { Some(field_name) } else { None };
-            let lookup_key = match LookupKey::from_py(py, field_info, alt_alias, "alias", "aliases")? {
+            let lookup_key = match LookupKey::from_py(py, field_info, alt_alias, "alias")? {
                 Some(key) => key,
                 None => LookupKey::from_string(py, field_name),
             };
