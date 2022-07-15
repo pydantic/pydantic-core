@@ -48,8 +48,7 @@ impl BuildValidator for TypedDictValidator {
 
         let extra_behavior = schema_or_config::<&str>(schema, config, "extra_behavior", "typed_dict_extra_behavior")?;
         let full = schema_or_config(schema, config, "full", "typed_dict_full")?.unwrap_or(true);
-        let from_attributes =
-            schema_or_config(schema, config, "from_attributes", "typed_dict_from_attributes")?.unwrap_or(false);
+        let from_attributes = schema_or_config(schema, config, "from_attributes", "from_attributes")?.unwrap_or(false);
         let populate_by_name =
             schema_or_config(schema, config, "populate_by_name", "typed_dict_populate_by_name")?.unwrap_or(false);
 

@@ -35,7 +35,8 @@ class Config(TypedDict, total=False):
     typed_dict_extra_behavior: Literal['allow', 'forbid', 'ignore']
     typed_dict_full: bool  # default: True
     typed_dict_populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
-    typed_dict_from_attributes: bool
+    # used on typed-dicts and tagged union keys
+    from_attributes: bool
     # fields related to string fields only
     str_max_length: int
     str_min_length: int

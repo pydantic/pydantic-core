@@ -161,8 +161,7 @@ impl BuildValidator for TaggedUnionValidator {
             choices.insert(tag, validator);
         }
 
-        let from_attributes =
-            schema_or_config(schema, config, "from_attributes", "typed_dict_from_attributes")?.unwrap_or(false);
+        let from_attributes = schema_or_config(schema, config, "from_attributes", "from_attributes")?.unwrap_or(false);
         let key_repr = lookup_key.to_string();
 
         Ok(Self {

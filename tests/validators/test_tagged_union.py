@@ -1,8 +1,9 @@
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
 from ..conftest import Err, PyAndJson
+from .test_typed_dict import Cls
 
 
 @pytest.mark.parametrize(
@@ -109,3 +110,52 @@ def test_tag_keys():
     )
     assert v.validate_python({'food': 'apple', 'a': 'apple', 'b': '13'}) == {'a': 'apple', 'b': 13}
     assert v.validate_python({'menu': ['x', 'banana'], 'c': 'C', 'd': [1, '2']}) == {'c': 'C', 'd': [1, 2]}
+
+
+def test_from_attributes():
+    v = SchemaValidator(
+        {
+            'type': 'tagged-union',
+            'tag_key': 'foobar',
+            'choices': {
+                'apple': {'type': 'typed-dict', 'fields': {'a': {'schema': 'str'}, 'b': {'schema': 'int'}}},
+                'banana': {'type': 'typed-dict', 'fields': {'c': {'schema': 'str'}, 'd': {'schema': 'int'}}},
+            },
+        },
+        {'from_attributes': True},
+    )
+    assert v.validate_python({'foobar': 'apple', 'a': 'apple', 'b': '13'}) == {'a': 'apple', 'b': 13}
+    assert v.validate_python(Cls(foobar='apple', a='apple', b='13')) == {'a': 'apple', 'b': 13}
+    assert v.validate_python({'foobar': 'banana', 'c': 'banana', 'd': '31'}) == {'c': 'banana', 'd': 31}
+    assert v.validate_python(Cls(foobar='banana', c='banana', d='31')) == {'c': 'banana', 'd': 31}
+
+
+def test_no_tag_key():
+    with pytest.raises(SchemaError, match="'tag_key' or 'tag_keys' must be set on a tagged union"):
+        SchemaValidator(
+            {
+                'type': 'tagged-union',
+                'choices': {
+                    'apple': {'type': 'typed-dict', 'fields': {'a': {'schema': 'str'}}},
+                    'banana': {'type': 'typed-dict', 'fields': {'c': {'schema': 'str'}}},
+                },
+            }
+        )
+
+
+def test_use_ref():
+    v = SchemaValidator(
+        {
+            'type': 'tagged-union',
+            'tag_key': 'foobar',
+            'choices': {
+                'apple': {'type': 'typed-dict', 'ref': 'apple', 'fields': {'a': {'schema': 'str'}}},
+                'apple2': {'type': 'recursive-ref', 'schema_ref': 'apple'},
+                'banana': {'type': 'typed-dict', 'fields': {'b': {'schema': 'str'}}},
+            },
+        },
+        {'from_attributes': True},
+    )
+    assert v.validate_python({'foobar': 'apple', 'a': 'apple'}) == {'a': 'apple'}
+    assert v.validate_python({'foobar': 'apple2', 'a': 'apple'}) == {'a': 'apple'}
+    assert v.validate_python({'foobar': 'banana', 'b': 'banana'}) == {'b': 'banana'}
