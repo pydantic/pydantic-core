@@ -205,12 +205,10 @@ impl Validator for TypedDictValidator {
                             Err(err) => return Err(err),
                         }
                     } else if let Some(ref default) = field.default {
-                        output_dict
-                            .set_item(&field.name_pystring, default.as_ref(py))
-                            .map_err(Into::<ValError>::into)?;
+                        output_dict.set_item(&field.name_pystring, default)?;
                     } else if let Some(ref default_factory) = field.default_factory {
                         output_dict
-                            .set_item(&field.name_pystring, default_factory.as_ref(py).call0()?)
+                            .set_item(&field.name_pystring, default_factory.call0(py)?)
                             .map_err(Into::<ValError>::into)?;
                     } else if !field.required {
                         continue;
