@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::os::raw::c_int;
 use std::ptr::null_mut;
 
@@ -8,7 +9,7 @@ use pyo3::types::{PyDict, PyTuple, PyType};
 use pyo3::{ffi, intern};
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{as_internal, ErrorKind, ValError, ValResult};
+use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
@@ -30,8 +31,10 @@ impl BuildValidator for ModelClassValidator {
         config: Option<&PyDict>,
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
-        let class: &PyType = schema.get_as_req("class_type")?;
+        // models ignore the parent config and always use the config from this model
+        let config = build_config(schema.py(), schema, config)?;
 
+        let class: &PyType = schema.get_as_req("class_type")?;
         let sub_schema: &PyAny = schema.get_as_req("schema")?;
         let (validator, td_schema) = build_validator(sub_schema, config, build_context)?;
         let schema_type: String = td_schema.get_as_req("type")?;
@@ -67,9 +70,9 @@ impl Validator for ModelClassValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let class = self.class.as_ref(py);
-        if input.strict_model_check(class)? {
+        if input.is_type(class)? {
             Ok(input.to_object(py))
-        } else if self.strict {
+        } else if extra.strict.unwrap_or(self.strict) {
             Err(ValError::new(
                 ErrorKind::ModelClassType {
                     class_name: self.get_name().to_string(),
@@ -78,23 +81,7 @@ impl Validator for ModelClassValidator {
             ))
         } else {
             let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-            self.create_class(py, output).map_err(as_internal)
-        }
-    }
-
-    fn validate_strict<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        _extra: &Extra,
-        _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        if input.strict_model_check(self.class.as_ref(py))? {
-            Ok(input.to_object(py))
-        } else {
-            // errors from `validate_strict` are never used used, so we can keep this simple
-            Err(ValError::LineErrors(vec![]))
+            Ok(self.create_class(py, output)?)
         }
     }
 
@@ -155,5 +142,41 @@ fn error_on_minusone(py: Python<'_>, result: c_int) -> PyResult<()> {
         Ok(())
     } else {
         Err(PyErr::fetch(py))
+    }
+}
+
+fn build_config<'a>(
+    py: Python<'a>,
+    schema: &'a PyDict,
+    parent_config: Option<&'a PyDict>,
+) -> PyResult<Option<&'a PyDict>> {
+    let child_config: Option<&PyDict> = schema.get_as("config")?;
+    match (parent_config, child_config) {
+        (Some(parent), None) => Ok(Some(parent)),
+        (None, Some(child)) => Ok(Some(child)),
+        (None, None) => Ok(None),
+        (Some(parent), Some(child)) => {
+            let parent_choose: i32 = parent.get_as("config_choose_priority")?.unwrap_or_default();
+            let child_choose: i32 = child.get_as("config_choose_priority")?.unwrap_or_default();
+            match parent_choose.cmp(&child_choose) {
+                Ordering::Greater => Ok(Some(parent)),
+                Ordering::Less => Ok(Some(child)),
+                Ordering::Equal => {
+                    let parent_merge: i32 = parent.get_as("config_merge_priority")?.unwrap_or_default();
+                    let child_merge: i32 = child.get_as("config_merge_priority")?.unwrap_or_default();
+                    match parent_merge.cmp(&child_merge) {
+                        Ordering::Greater => {
+                            child.getattr(intern!(py, "update"))?.call1((parent,))?;
+                            Ok(Some(child))
+                        }
+                        // otherwise child is the winner
+                        _ => {
+                            parent.getattr(intern!(py, "update"))?.call1((child,))?;
+                            Ok(Some(parent))
+                        }
+                    }
+                }
+            }
+        }
     }
 }

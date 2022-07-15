@@ -1,9 +1,13 @@
+import platform
 import re
 from copy import deepcopy
+from typing import Type
 
 import pytest
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
+
+from ..conftest import plain_repr
 
 
 def test_function_before():
@@ -108,20 +112,20 @@ def test_function_wrap():
 
 def test_function_wrap_repr():
     def f(input_value, *, validator, **kwargs):
-        return repr(validator)
+        return plain_repr(validator)
 
     v = SchemaValidator({'title': 'Test', 'type': 'function', 'mode': 'wrap', 'function': f, 'schema': 'str'})
 
-    assert v.validate_python('input value') == 'ValidatorCallable(Str(StrValidator))'
+    assert v.validate_python('input value') == 'ValidatorCallable(Str(StrValidator{strict:false}))'
 
 
 def test_function_wrap_str():
     def f(input_value, *, validator, **kwargs):
-        return str(validator)
+        return plain_repr(validator)
 
     v = SchemaValidator({'title': 'Test', 'type': 'function', 'mode': 'wrap', 'function': f, 'schema': 'str'})
 
-    assert v.validate_python('input value') == 'ValidatorCallable(Str(StrValidator))'
+    assert v.validate_python('input value') == 'ValidatorCallable(Str(StrValidator{strict:false}))'
 
 
 def test_function_wrap_not_callable():
@@ -196,12 +200,12 @@ def test_function_after_config():
                     'schema': {'type': 'function', 'mode': 'after', 'function': f, 'schema': {'type': 'str'}}
                 }
             },
-            'config': {'foo': 'bar'},
-        }
+        },
+        {'config_choose_priority': 2},
     )
 
     assert v.validate_python({'test_field': 321}) == {'test_field': '321 Changed'}
-    assert f_kwargs == {'data': {}, 'config': {'foo': 'bar'}}
+    assert f_kwargs == {'data': {}, 'config': {'config_choose_priority': 2}}
 
 
 def test_config_no_model():
@@ -259,7 +263,14 @@ def test_function_wrong_sig():
         return input_value + ' Changed'
 
     v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'str'}})
-    with pytest.raises(TypeError, match=re.escape("f() got an unexpected keyword argument 'data'")):
+
+    # exception messages differ between python and pypy
+    if platform.python_implementation() == 'PyPy':
+        error_message = 'f() got 2 unexpected keyword arguments'
+    else:
+        error_message = "f() got an unexpected keyword argument 'data'"
+
+    with pytest.raises(TypeError, match=re.escape(error_message)):
         v.validate_python('input value')
 
 
@@ -335,7 +346,7 @@ def test_raise_assertion_error_plain():
 
 
 @pytest.mark.parametrize('base_error', [ValueError, AssertionError])
-def test_error_with_error(base_error):
+def test_error_with_error(base_error: Type[Exception]):
     class MyError(base_error):
         def __str__(self):
             raise RuntimeError('internal error')

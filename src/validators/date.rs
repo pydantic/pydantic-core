@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 use speedate::{Date, Time};
 
 use crate::build_tools::{is_strict, SchemaDict, SchemaError};
-use crate::errors::{as_internal, ErrorKind, ValError, ValResult};
+use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::{EitherDate, Input};
 use crate::recursion_guard::RecursionGuard;
 
@@ -57,50 +57,23 @@ impl Validator for DateValidator {
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        _extra: &Extra,
+        extra: &Extra,
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let date = match self.strict {
-            true => input.strict_date()?,
-            false => {
-                match input.lax_date() {
-                    Ok(date) => date,
-                    // if the date error was an internal error, return that immediately
-                    Err(ValError::InternalErr(internal_err)) => return Err(ValError::InternalErr(internal_err)),
-                    // otherwise, try creating a date from a datetime input
-                    Err(date_err) => date_from_datetime(input, date_err)?,
-                }
-            }
+        let date = match input.validate_date(extra.strict.unwrap_or(self.strict)) {
+            Ok(date) => date,
+            // if the date error was an internal error, return that immediately
+            Err(ValError::InternalErr(internal_err)) => return Err(ValError::InternalErr(internal_err)),
+            Err(date_err) => match self.strict {
+                // if we're in strict mode, we doing try coercing from a date
+                true => return Err(date_err),
+                // otherwise, try creating a date from a datetime input
+                false => date_from_datetime(input, date_err),
+            }?,
         };
-        self.validation_comparison(py, input, date)
-    }
-
-    fn validate_strict<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        _extra: &Extra,
-        _slots: &'data [CombinedValidator],
-        _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        self.validation_comparison(py, input, input.strict_date()?)
-    }
-
-    fn get_name(&self) -> &str {
-        Self::EXPECTED_TYPE
-    }
-}
-
-impl DateValidator {
-    fn validation_comparison<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        date: EitherDate<'data>,
-    ) -> ValResult<'data, PyObject> {
         if let Some(constraints) = &self.constraints {
-            let raw_date = date.as_raw().map_err(as_internal)?;
+            let raw_date = date.as_raw()?;
 
             macro_rules! check_constraint {
                 ($constraint:ident, $error:ident) => {
@@ -122,7 +95,11 @@ impl DateValidator {
             check_constraint!(ge, GreaterThanEqual);
             check_constraint!(gt, GreaterThan);
         }
-        date.try_into_py(py).map_err(as_internal)
+        Ok(date.try_into_py(py)?)
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
     }
 }
 
@@ -132,7 +109,7 @@ fn date_from_datetime<'data>(
     input: &'data impl Input<'data>,
     date_err: ValError<'data>,
 ) -> ValResult<'data, EitherDate<'data>> {
-    let either_dt = match input.lax_datetime() {
+    let either_dt = match input.validate_datetime(false) {
         Ok(dt) => dt,
         Err(dt_err) => {
             return match dt_err {
@@ -157,7 +134,7 @@ fn date_from_datetime<'data>(
             };
         }
     };
-    let dt = either_dt.as_raw().map_err(as_internal)?;
+    let dt = either_dt.as_raw()?;
     let zero_time = Time {
         hour: 0,
         minute: 0,
@@ -176,7 +153,7 @@ fn convert_pydate(schema: &PyDict, field: &str) -> PyResult<Option<Date>> {
         Some(obj) => {
             let prefix = format!(r#"Invalid "{}" constraint for date"#, field);
             let date = obj
-                .lax_date()
+                .validate_date(false)
                 .map_err(|e| SchemaError::from_val_error(obj.py(), &prefix, e))?;
             Ok(Some(date.as_raw()?))
         }

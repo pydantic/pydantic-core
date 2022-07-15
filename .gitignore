@@ -24,8 +24,7 @@ docs/_build/
 /*.profraw
 /flame/
 /.benchmarks/
-/tests/package.json
-/tests/package-lock.json
-/tests/node_modules
-/.hypothesis/
-/src/self_schema.py
+.hypothesis/
+node_modules/
+package-lock.json
+/pytest-speed/

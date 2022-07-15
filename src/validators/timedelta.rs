@@ -1,30 +1,30 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use speedate::DateTime;
+use speedate::Duration;
 
-use crate::build_tools::{is_strict, SchemaDict, SchemaError};
-use crate::errors::{py_err_string, ErrorKind, ValError, ValResult};
+use crate::build_tools::{is_strict, SchemaDict};
+use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
+use crate::SchemaError;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
-pub struct DateTimeValidator {
+pub struct TimeDeltaValidator {
     strict: bool,
-    constraints: Option<DateTimeConstraints>,
+    constraints: Option<TimedeltaConstraints>,
 }
 
 #[derive(Debug, Clone)]
-struct DateTimeConstraints {
-    le: Option<DateTime>,
-    lt: Option<DateTime>,
-    ge: Option<DateTime>,
-    gt: Option<DateTime>,
+struct TimedeltaConstraints {
+    le: Option<Duration>,
+    lt: Option<Duration>,
+    ge: Option<Duration>,
+    gt: Option<Duration>,
 }
-
-impl BuildValidator for DateTimeValidator {
-    const EXPECTED_TYPE: &'static str = "datetime";
+impl BuildValidator for TimeDeltaValidator {
+    const EXPECTED_TYPE: &'static str = "timedelta";
 
     fn build(
         schema: &PyDict,
@@ -39,11 +39,11 @@ impl BuildValidator for DateTimeValidator {
         Ok(Self {
             strict: is_strict(schema, config)?,
             constraints: match has_constraints {
-                true => Some(DateTimeConstraints {
-                    le: py_datetime_as_datetime(schema, "le")?,
-                    lt: py_datetime_as_datetime(schema, "lt")?,
-                    ge: py_datetime_as_datetime(schema, "ge")?,
-                    gt: py_datetime_as_datetime(schema, "gt")?,
+                true => Some(TimedeltaConstraints {
+                    le: py_timedelta_as_timedelta(schema, "le")?,
+                    lt: py_timedelta_as_timedelta(schema, "lt")?,
+                    ge: py_timedelta_as_timedelta(schema, "ge")?,
+                    gt: py_timedelta_as_timedelta(schema, "gt")?,
                 }),
                 false => None,
             },
@@ -52,7 +52,7 @@ impl BuildValidator for DateTimeValidator {
     }
 }
 
-impl Validator for DateTimeValidator {
+impl Validator for TimeDeltaValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -61,21 +61,14 @@ impl Validator for DateTimeValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let datetime = input.validate_datetime(extra.strict.unwrap_or(self.strict))?;
+        let timedelta = input.validate_timedelta(extra.strict.unwrap_or(self.strict))?;
         if let Some(constraints) = &self.constraints {
-            // if we get an error from as_speedate, it's probably because the input datetime was invalid
-            // specifically had an invalid tzinfo, hence here we return a validation error
-            let speedate_dt = match datetime.as_raw() {
-                Ok(dt) => dt,
-                Err(err) => {
-                    let error = py_err_string(py, err);
-                    return Err(ValError::new(ErrorKind::DateTimeObjectInvalid { error }, input));
-                }
-            };
+            let raw_timedelta = timedelta.as_raw();
+
             macro_rules! check_constraint {
                 ($constraint:ident, $error:ident) => {
                     if let Some(constraint) = &constraints.$constraint {
-                        if !speedate_dt.$constraint(constraint) {
+                        if !raw_timedelta.$constraint(constraint) {
                             return Err(ValError::new(
                                 ErrorKind::$error {
                                     $constraint: constraint.to_string(),
@@ -92,7 +85,7 @@ impl Validator for DateTimeValidator {
             check_constraint!(ge, GreaterThanEqual);
             check_constraint!(gt, GreaterThan);
         }
-        Ok(datetime.try_into_py(py)?)
+        Ok(timedelta.try_into_py(py)?)
     }
 
     fn get_name(&self) -> &str {
@@ -100,14 +93,14 @@ impl Validator for DateTimeValidator {
     }
 }
 
-fn py_datetime_as_datetime(schema: &PyDict, field: &str) -> PyResult<Option<DateTime>> {
+fn py_timedelta_as_timedelta(schema: &PyDict, field: &str) -> PyResult<Option<Duration>> {
     match schema.get_as::<&PyAny>(field)? {
         Some(obj) => {
-            let prefix = format!(r#"Invalid "{}" constraint for datetime"#, field);
-            let date = obj
-                .validate_datetime(false)
+            let prefix = format!(r#"Invalid "{}" constraint for timedelta"#, field);
+            let timedelta = obj
+                .validate_timedelta(false)
                 .map_err(|e| SchemaError::from_val_error(obj.py(), &prefix, e))?;
-            Ok(Some(date.as_raw()?))
+            Ok(Some(timedelta.as_raw()))
         }
         None => Ok(None),
     }

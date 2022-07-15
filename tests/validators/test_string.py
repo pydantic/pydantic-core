@@ -1,19 +1,12 @@
 import re
 from decimal import Decimal
+from typing import Any, Dict
 
 import pytest
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
-from ..conftest import Err
-
-
-def test_str_constrained():
-    v = SchemaValidator({'type': 'str', 'max_length': 5})
-    assert v.validate_python('test') == 'test'
-
-    with pytest.raises(ValidationError, match='String must have at most 5 characters'):
-        v.validate_python('test long')
+from ..conftest import Err, PyAndJson
 
 
 @pytest.mark.parametrize(
@@ -27,8 +20,8 @@ def test_str_constrained():
         ([], Err('Value must be a valid string [kind=str_type, input_value=[], input_type=list]')),
     ],
 )
-def test_str(py_or_json, input_value, expected):
-    v = py_or_json({'type': 'str'})
+def test_str(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json({'type': 'str'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -86,13 +79,29 @@ def test_str_not_json(input_value, expected):
         ({'strip_whitespace': True, 'pattern': r'\d+$'}, 'foobar 123 ', Err("String must match pattern '\\d+$'")),
     ],
 )
-def test_constrained_str(py_or_json, kwargs, input_value, expected):
-    v = py_or_json({'type': 'str', **kwargs})
+def test_constrained_str(py_and_json: PyAndJson, kwargs: Dict[str, Any], input_value, expected):
+    v = py_and_json({'type': 'str', **kwargs})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
     else:
         assert v.validate_test(input_value) == expected
+
+
+def test_str_constrained():
+    v = SchemaValidator({'type': 'str', 'max_length': 5})
+    assert v.validate_python('test') == 'test'
+
+    with pytest.raises(ValidationError, match='String must have at most 5 characters'):
+        v.validate_python('test long')
+
+
+def test_str_constrained_config():
+    v = SchemaValidator({'type': 'str'}, {'str_max_length': 5})
+    assert v.validate_python('test') == 'test'
+
+    with pytest.raises(ValidationError, match='String must have at most 5 characters'):
+        v.validate_python('test long')
 
 
 def test_invalid_regex():

@@ -32,8 +32,8 @@ impl BuildValidator for FunctionBuilder {
 }
 
 macro_rules! kwargs {
-    ($py:ident, $($k:expr => $v:expr),* $(,)?) => {{
-        Some(pyo3::types::IntoPyDict::into_py_dict([$(($k, $v.into_py($py)),)*], $py).into())
+    ($py:ident, $($k:ident: $v:expr),* $(,)?) => {{
+        Some(pyo3::types::IntoPyDict::into_py_dict([$((stringify!($k), $v.into_py($py)),)*], $py).into())
     }};
 }
 
@@ -50,7 +50,10 @@ macro_rules! impl_build {
                 Ok(Self {
                     validator: Box::new(validator),
                     func: get_function(schema)?,
-                    config: config.map(|c| c.into()),
+                    config: match config {
+                        Some(c) => c.into(),
+                        None => schema.py().None(),
+                    },
                     name,
                 }
                 .into())
@@ -63,7 +66,7 @@ macro_rules! impl_build {
 pub struct FunctionBeforeValidator {
     validator: Box<CombinedValidator>,
     func: PyObject,
-    config: Option<Py<PyDict>>,
+    config: PyObject,
     name: String,
 }
 
@@ -78,7 +81,7 @@ impl Validator for FunctionBeforeValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
+        let kwargs = kwargs!(py, data: extra.data, config: self.config.clone_ref(py));
         let value = self
             .func
             .call(py, (input.to_object(py),), kwargs)
@@ -114,7 +117,7 @@ impl Validator for FunctionBeforeValidator {
 pub struct FunctionAfterValidator {
     validator: Box<CombinedValidator>,
     func: PyObject,
-    config: Option<Py<PyDict>>,
+    config: PyObject,
     name: String,
 }
 
@@ -130,7 +133,7 @@ impl Validator for FunctionAfterValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let v = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-        let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
+        let kwargs = kwargs!(py, data: extra.data, config: self.config.clone_ref(py));
         self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
     }
 
@@ -146,7 +149,7 @@ impl Validator for FunctionAfterValidator {
 #[derive(Debug, Clone)]
 pub struct FunctionPlainValidator {
     func: PyObject,
-    config: Option<Py<PyDict>>,
+    config: PyObject,
 }
 
 impl FunctionPlainValidator {
@@ -156,7 +159,10 @@ impl FunctionPlainValidator {
         } else {
             Ok(Self {
                 func: get_function(schema)?,
-                config: config.map(|c| c.into()),
+                config: match config {
+                    Some(c) => c.into(),
+                    None => schema.py().None(),
+                },
             }
             .into())
         }
@@ -172,7 +178,7 @@ impl Validator for FunctionPlainValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let kwargs = kwargs!(py, "data" => extra.data, "config" => self.config.as_ref());
+        let kwargs = kwargs!(py, data: extra.data, config: self.config.clone_ref(py));
         self.func
             .call(py, (input.to_object(py),), kwargs)
             .map_err(|e| convert_err(py, e, input))
@@ -187,7 +193,7 @@ impl Validator for FunctionPlainValidator {
 pub struct FunctionWrapValidator {
     validator: Box<CombinedValidator>,
     func: PyObject,
-    config: Option<Py<PyDict>>,
+    config: PyObject,
     name: String,
 }
 
@@ -207,13 +213,14 @@ impl Validator for FunctionWrapValidator {
             slots: slots.to_vec(),
             data: extra.data.map(|d| d.into_py(py)),
             field: extra.field.map(|f| f.to_string()),
+            strict: extra.strict,
             recursion_guard: recursion_guard.clone(),
         };
         let kwargs = kwargs!(
             py,
-            "validator" => validator_kwarg,
-            "data" => extra.data,
-            "config" => self.config.as_ref()
+            validator: validator_kwarg,
+            data: extra.data,
+            config: self.config.clone_ref(py),
         );
         self.func
             .call(py, (input.to_object(py),), kwargs)
@@ -236,6 +243,7 @@ struct ValidatorCallable {
     slots: Vec<CombinedValidator>,
     data: Option<Py<PyDict>>,
     field: Option<String>,
+    strict: Option<bool>,
     recursion_guard: RecursionGuard,
 }
 
@@ -245,6 +253,7 @@ impl ValidatorCallable {
         let extra = Extra {
             data: self.data.as_ref().map(|data| data.as_ref(py)),
             field: self.field.as_deref(),
+            strict: self.strict,
         };
         self.validator
             .validate(py, arg, &extra, &self.slots, &mut self.recursion_guard)

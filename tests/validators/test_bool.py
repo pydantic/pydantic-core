@@ -4,7 +4,7 @@ import pytest
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err
+from ..conftest import Err, PyAndJson, plain_repr
 
 
 @pytest.mark.parametrize(
@@ -13,7 +13,9 @@ from ..conftest import Err
         (False, False),
         (True, True),
         (0, False),
+        (0.0, False),
         (1, True),
+        (1.0, True),
         ('yes', True),
         ('no', False),
         ('true', True),
@@ -27,10 +29,13 @@ from ..conftest import Err
         ),
         (2, Err('Value must be a valid boolean, unable to interpret input [kind=bool_parsing, input_value=2')),
         ([], Err('Value must be a valid boolean [kind=bool_type, input_value=[], input_type=list]')),
+        (1.1, Err('Value must be a valid boolean [kind=bool_type, input_value=1.1, input_type=float]')),
+        (2, Err('unable to interpret input [kind=bool_parsing, input_value=2, input_type=int]')),
+        (2.0, Err('unable to interpret input [kind=bool_parsing, input_value=2.0, input_type=float]')),
     ],
 )
-def test_bool(py_or_json, input_value, expected):
-    v = py_or_json({'type': 'bool'})
+def test_bool(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json({'type': 'bool'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -40,8 +45,8 @@ def test_bool(py_or_json, input_value, expected):
         assert v.isinstance_test(input_value) is True
 
 
-def test_bool_strict(py_or_json):
-    v = py_or_json({'type': 'bool', 'strict': True})
+def test_bool_strict(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'bool', 'strict': True})
     assert v.validate_test(True) is True
     error_message = "Value must be a valid boolean [kind=bool_type, input_value='true', input_type=str]"
     with pytest.raises(ValidationError, match=re.escape(error_message)):
@@ -71,6 +76,15 @@ def test_bool_error():
 
 def test_bool_repr():
     v = SchemaValidator({'type': 'bool'})
-    assert repr(v) == 'SchemaValidator(name="bool", validator=Bool(\n    BoolValidator,\n))'
+    assert plain_repr(v) == 'SchemaValidator(name="bool",validator=Bool(BoolValidator{strict:false}))'
     v = SchemaValidator({'type': 'bool', 'strict': True})
-    assert repr(v) == 'SchemaValidator(name="strict-bool", validator=StrictBool(\n    StrictBoolValidator,\n))'
+    assert plain_repr(v) == 'SchemaValidator(name="bool",validator=Bool(BoolValidator{strict:true}))'
+
+
+def test_bool_key(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'dict', 'keys_schema': 'bool', 'values_schema': 'int'})
+    assert v.validate_test({True: 1, False: 2}) == {True: 1, False: 2}
+    assert v.validate_test({'true': 1, 'off': 2}) == {True: 1, False: 2}
+    assert v.validate_test({'true': 1, 'off': 2}, strict=False) == {True: 1, False: 2}
+    with pytest.raises(ValidationError, match='Value must be a valid boolean'):
+        v.validate_test({'true': 1, 'off': 2}, strict=True)

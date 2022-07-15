@@ -3,19 +3,20 @@ use std::str::from_utf8;
 use pyo3::exceptions::{PyAttributeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{
-    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDict, PyFrozenSet, PyInt, PyList, PyMapping, PySequence, PySet,
-    PyString, PyTime, PyTuple, PyType,
+    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyInt, PyList, PyMapping,
+    PySequence, PySet, PyString, PyTime, PyTuple, PyType,
 };
 use pyo3::{intern, AsPyPointer};
 
-use crate::errors::{as_internal, py_err_string, ErrorKind, InputValue, LocItem, ValError, ValResult};
+use crate::errors::{py_err_string, ErrorKind, InputValue, LocItem, ValError, ValResult};
 
 use super::datetime::{
-    bytes_as_date, bytes_as_datetime, bytes_as_time, date_as_datetime, float_as_datetime, float_as_time,
-    int_as_datetime, int_as_time, EitherDate, EitherDateTime, EitherTime,
+    bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, date_as_datetime, float_as_datetime,
+    float_as_duration, float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime,
+    EitherTime,
 };
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
-use super::{repr_string, EitherBytes, EitherString, GenericMapping, GenericSequence, Input};
+use super::{repr_string, EitherBytes, EitherString, EitherTimedelta, GenericMapping, GenericSequence, Input};
 
 impl<'a> Input<'a> for PyAny {
     fn as_loc_item(&'a self) -> LocItem {
@@ -41,6 +42,18 @@ impl<'a> Input<'a> for PyAny {
 
     fn is_none(&self) -> bool {
         self.is_none()
+    }
+
+    fn is_type(&self, class: &PyType) -> ValResult<bool> {
+        Ok(self.get_type().eq(class)?)
+    }
+
+    fn is_instance(&self, class: &PyType) -> PyResult<bool> {
+        self.is_instance(class)
+    }
+
+    fn callable(&self) -> bool {
+        self.is_callable()
     }
 
     fn strict_str<'data>(&'data self) -> ValResult<EitherString<'data>> {
@@ -71,13 +84,34 @@ impl<'a> Input<'a> for PyAny {
             // be returned as a string
             Err(ValError::new(ErrorKind::StrType, self))
         } else if let Ok(int) = self.cast_as::<PyInt>() {
-            let int = i64::extract(int).map_err(as_internal)?;
+            let int = i64::extract(int)?;
             Ok(int.to_string().into())
         } else if let Ok(float) = f64::extract(self) {
             // don't cast_as here so Decimals are covered - internally f64:extract uses PyFloat_AsDouble
             Ok(float.to_string().into())
         } else {
             Err(ValError::new(ErrorKind::StrType, self))
+        }
+    }
+
+    fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
+        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            Ok(py_bytes.into())
+        } else {
+            Err(ValError::new(ErrorKind::BytesType, self))
+        }
+    }
+
+    fn lax_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
+        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            Ok(py_bytes.into())
+        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+            let string = py_str.to_string_lossy().to_string();
+            Ok(string.into_bytes().into())
+        } else if let Ok(py_byte_array) = self.cast_as::<PyByteArray>() {
+            Ok(py_byte_array.to_vec().into())
+        } else {
+            Err(ValError::new(ErrorKind::BytesType, self))
         }
     }
 
@@ -96,6 +130,11 @@ impl<'a> Input<'a> for PyAny {
             str_as_bool(self, &either_str.as_cow())
         } else if let Ok(int) = self.extract::<i64>() {
             int_as_bool(self, int)
+        } else if let Ok(float) = self.extract::<f64>() {
+            match float_as_int(self, float) {
+                Ok(int) => int_as_bool(self, int),
+                _ => Err(ValError::new(ErrorKind::BoolType, self)),
+            }
         } else {
             Err(ValError::new(ErrorKind::BoolType, self))
         }
@@ -147,10 +186,6 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_model_check(&self, class: &PyType) -> ValResult<bool> {
-        self.get_type().eq(class).map_err(as_internal)
-    }
-
     fn strict_dict<'data>(&'data self) -> ValResult<GenericMapping<'data>> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
             Ok(dict.into())
@@ -169,12 +204,16 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn typed_dict<'data>(&'data self, from_attributes: bool, from_mapping: bool) -> ValResult<GenericMapping<'data>> {
+    fn validate_typed_dict<'data>(
+        &'data self,
+        strict: bool,
+        from_attributes: bool,
+    ) -> ValResult<GenericMapping<'data>> {
         if from_attributes {
             // if from_attributes, first try a dict, then mapping then from_attributes
             if let Ok(dict) = self.cast_as::<PyDict>() {
                 return Ok(dict.into());
-            } else if from_mapping {
+            } else if !strict {
                 // we can't do this in one set of if/else because we need to check from_mapping before doing this
                 if let Some(generic_mapping) = mapping_as_dict(self) {
                     return generic_mapping;
@@ -187,12 +226,10 @@ impl<'a> Input<'a> for PyAny {
                 // note the error here gives a hint about from_attributes
                 Err(ValError::new(ErrorKind::DictAttributesType, self))
             }
-        } else if from_mapping {
+        } else {
             // otherwise we just call back to lax_dict if from_mapping is allowed, not there error in this
             // case (correctly) won't hint about from_attributes
-            self.lax_dict()
-        } else {
-            self.strict_dict()
+            self.validate_dict(strict)
         }
     }
 
@@ -215,6 +252,28 @@ impl<'a> Input<'a> for PyAny {
             Ok(frozen_set.into())
         } else {
             Err(ValError::new(ErrorKind::ListType, self))
+        }
+    }
+
+    fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else {
+            Err(ValError::new(ErrorKind::TupleType, self))
+        }
+    }
+
+    fn lax_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
+        if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else if let Ok(list) = self.cast_as::<PyList>() {
+            Ok(list.into())
+        } else if let Ok(set) = self.cast_as::<PySet>() {
+            Ok(set.into())
+        } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
+            Ok(frozen_set.into())
+        } else {
+            Err(ValError::new(ErrorKind::TupleType, self))
         }
     }
 
@@ -259,27 +318,6 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else {
             Err(ValError::new(ErrorKind::FrozenSetType, self))
-        }
-    }
-
-    fn strict_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
-        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
-            Ok(py_bytes.into())
-        } else {
-            Err(ValError::new(ErrorKind::BytesType, self))
-        }
-    }
-
-    fn lax_bytes<'data>(&'data self) -> ValResult<EitherBytes<'data>> {
-        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
-            Ok(py_bytes.into())
-        } else if let Ok(py_str) = self.cast_as::<PyString>() {
-            let string = py_str.to_string_lossy().to_string();
-            Ok(string.into_bytes().into())
-        } else if let Ok(py_byte_array) = self.cast_as::<PyByteArray>() {
-            Ok(py_byte_array.to_vec().into())
-        } else {
-            Err(ValError::new(ErrorKind::BytesType, self))
         }
     }
 
@@ -358,31 +396,33 @@ impl<'a> Input<'a> for PyAny {
         } else if let Ok(float) = self.extract::<f64>() {
             float_as_datetime(self, float)
         } else if let Ok(date) = self.cast_as::<PyDate>() {
-            date_as_datetime(date).map_err(as_internal)
+            Ok(date_as_datetime(date)?)
         } else {
             Err(ValError::new(ErrorKind::DateTimeType, self))
         }
     }
 
-    fn strict_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        if let Ok(tuple) = self.cast_as::<PyTuple>() {
-            Ok(tuple.into())
+    fn strict_timedelta(&self) -> ValResult<EitherTimedelta> {
+        if let Ok(dt) = self.cast_as::<PyDelta>() {
+            Ok(dt.into())
         } else {
-            Err(ValError::new(ErrorKind::TupleType, self))
+            Err(ValError::new(ErrorKind::TimeDeltaType, self))
         }
     }
 
-    fn lax_tuple<'data>(&'data self) -> ValResult<GenericSequence<'data>> {
-        if let Ok(tuple) = self.cast_as::<PyTuple>() {
-            Ok(tuple.into())
-        } else if let Ok(list) = self.cast_as::<PyList>() {
-            Ok(list.into())
-        } else if let Ok(set) = self.cast_as::<PySet>() {
-            Ok(set.into())
-        } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
-            Ok(frozen_set.into())
+    fn lax_timedelta(&self) -> ValResult<EitherTimedelta> {
+        if let Ok(dt) = self.cast_as::<PyDelta>() {
+            Ok(dt.into())
+        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+            bytes_as_timedelta(self, py_str.to_string_lossy().as_bytes())
+        } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            bytes_as_timedelta(self, py_bytes.as_bytes())
+        } else if let Ok(int) = self.extract::<i64>() {
+            Ok(int_as_duration(int).into())
+        } else if let Ok(float) = self.extract::<f64>() {
+            Ok(float_as_duration(float).into())
         } else {
-            Err(ValError::new(ErrorKind::TupleType, self))
+            Err(ValError::new(ErrorKind::TimeDeltaType, self))
         }
     }
 }
@@ -423,10 +463,19 @@ fn mapping_seq_as_dict(seq: &PySequence) -> PyResult<&PyDict> {
     let dict = PyDict::new(seq.py());
     for r in seq.iter()? {
         let t: &PyTuple = r?.extract()?;
+
         if t.len() != 2 {
             return Err(PyTypeError::new_err("mapping items must be a tuple with 2 elements"));
         }
+
+        #[cfg(PyPy)]
+        let k = t.get_item(0)?;
+        #[cfg(PyPy)]
+        let v = t.get_item(1)?;
+
+        #[cfg(not(PyPy))]
         let k = unsafe { t.get_item_unchecked(0) };
+        #[cfg(not(PyPy))]
         let v = unsafe { t.get_item_unchecked(1) };
         dict.set_item(k, v)?;
     }

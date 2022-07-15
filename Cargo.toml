@@ -17,7 +17,7 @@ enum_dispatch = "0.3.8"
 serde = "1.0.137"
 indexmap = "1.8.1"
 mimalloc = { version = "0.1.29", default-features = false, optional = true }
-speedate = "0.4.1"
+speedate = "0.6.0"
 ahash = "0.7.6"
 nohash-hasher = "0.2.0"
 
@@ -41,3 +41,5 @@ codegen-units = 1
 
 [build-dependencies]
 version_check = "0.9.4"
+# used where logic has to be version/distrobution specific, e.g. pypy
+pyo3-build-config = "0.16.5"
