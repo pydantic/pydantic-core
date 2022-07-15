@@ -94,11 +94,11 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
         assert v.validate_test(input_value) == expected
 
 
-def test_tag_keys():
+def test_tag_key_path():
     v = SchemaValidator(
         {
             'type': 'tagged-union',
-            'tag_keys': [['food'], ['menu', 1]],
+            'tag_key': [['food'], ['menu', 1]],
             'choices': {
                 'apple': {'type': 'typed-dict', 'fields': {'a': {'schema': 'str'}, 'b': {'schema': 'int'}}},
                 'banana': {

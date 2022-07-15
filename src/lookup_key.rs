@@ -4,7 +4,7 @@ use pyo3::exceptions::{PyAttributeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 
-use crate::build_tools::{py_error};
+use crate::build_tools::py_error;
 use crate::input::{JsonInput, JsonObject};
 
 /// Used got getting items from python dicts, python objects, or JSON objects, in different ways
@@ -43,12 +43,7 @@ macro_rules! py_string {
 }
 
 impl LookupKey {
-    pub fn from_py(
-        py: Python,
-        field: &PyDict,
-        alt_alias: Option<&str>,
-        name: &str,
-    ) -> PyResult<Option<Self>> {
+    pub fn from_py(py: Python, field: &PyDict, alt_alias: Option<&str>, name: &str) -> PyResult<Option<Self>> {
         if let Some(value) = field.get_item(name) {
             if let Ok(alias_py) = value.cast_as::<PyString>() {
                 let alias: String = alias_py.extract()?;
@@ -62,22 +57,19 @@ impl LookupKey {
                     ))),
                     None => Ok(Some(LookupKey::Simple(alias, alias_py))),
                 }
-            } else{
+            } else {
                 let list: &PyList = value.cast_as()?;
                 let first = match list.get_item(0) {
                     Ok(v) => v,
-                    Err(_) => {
-                        return py_error!("\"{}\" must have at least one element", name)
-                    }
+                    Err(_) => return py_error!("\"{}\" must have at least one element", name),
                 };
-                let mut locs = if first.cast_as::<PyString>().is_ok() {
-                    // list rather than list of lists
-                    vec![Self::path_choice(py, first)?]
+                let mut locs: Vec<Path> = if first.cast_as::<PyString>().is_ok() {
+                    // list of strings rather than list of lists
+                    vec![Self::path_choice(py, list)?]
                 } else {
-                    list
-                        .iter()
+                    list.iter()
                         .map(|obj| Self::path_choice(py, obj))
-                        .collect::<PyResult<Vec<Path>>>()?
+                        .collect::<PyResult<_>>()?
                 };
 
                 if let Some(alt_alias) = alt_alias {

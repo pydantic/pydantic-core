@@ -120,8 +120,7 @@ class TypedDictField(TypedDict, total=False):
     required: bool
     default: Any
     default_factory: Callable[[], Any]
-    alias: str
-    aliases: List[List[Union[str, int]]]
+    alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
 
 
 class TypedDictSchema(TypedDict, total=False):
@@ -190,6 +189,14 @@ class UnionSchema(TypedDict, total=False):
     choices: Required[List[Schema]]
     strict: bool
     ref: str
+
+
+class TaggedUnionSchema(TypedDict):
+    type: Literal['tagged-union']
+    choices: Dict[str, Schema]
+    tag_key: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
+    strict: NotRequired[bool]
+    ref: NotRequired[str]
 
 
 class BytesSchema(TypedDict, total=False):
@@ -313,6 +320,7 @@ Schema = Union[
     TupleFixLenSchema,
     TupleVarLenSchema,
     UnionSchema,
+    TaggedUnionSchema,
     DateSchema,
     TimeSchema,
     DatetimeSchema,
