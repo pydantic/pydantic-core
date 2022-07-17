@@ -51,7 +51,7 @@ from .test_typed_dict import Cls
                             'Input tag "other" from "foo" must match one of the expected tags: "apple", "banana"'
                         ),
                         'input_value': {'foo': 'other'},
-                        'context': {'source': '"foo"', 'tag': 'other', 'expected_tags': '"apple", "banana"'},
+                        'context': {'discriminator': '"foo"', 'tag': 'other', 'expected_tags': '"apple", "banana"'},
                     }
                 ],
             ),
@@ -66,7 +66,7 @@ from .test_typed_dict import Cls
                         'loc': [],
                         'message': 'Unable to extract tag "foo"',
                         'input_value': {},
-                        'context': {'source': '"foo"'},
+                        'context': {'discriminator': '"foo"'},
                     }
                 ],
             ),
@@ -92,7 +92,7 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'tagged-union',
-            'tag_key': 'foo',
+            'discriminator': 'foo',
             'choices': {
                 'apple': {'type': 'typed-dict', 'fields': {'foo': {'schema': 'str'}, 'bar': {'schema': 'int'}}},
                 'banana': {
@@ -111,11 +111,11 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
         assert v.validate_test(input_value) == expected
 
 
-def test_tag_key_path():
+def test_discriminator_path():
     v = SchemaValidator(
         {
             'type': 'tagged-union',
-            'tag_key': [['food'], ['menu', 1]],
+            'discriminator': [['food'], ['menu', 1]],
             'choices': {
                 'apple': {'type': 'typed-dict', 'fields': {'a': {'schema': 'str'}, 'b': {'schema': 'int'}}},
                 'banana': {
@@ -157,9 +157,9 @@ def test_tag_key_path():
                     {
                         'kind': 'union_tag_not_found',
                         'loc': [],
-                        'message': 'Unable to extract tag tag_key_function()',
+                        'message': 'Unable to extract tag discriminator_function()',
                         'input_value': None,
-                        'context': {'source': 'tag_key_function()'},
+                        'context': {'discriminator': 'discriminator_function()'},
                     }
                 ],
             ),
@@ -173,19 +173,23 @@ def test_tag_key_path():
                         'kind': 'union_tag_invalid',
                         'loc': [],
                         'message': (
-                            'Input tag "other" from tag_key_function() '
+                            'Input tag "other" from discriminator_function() '
                             'must match one of the expected tags: "str", "int"'
                         ),
                         'input_value': ['wrong type'],
-                        'context': {'source': 'tag_key_function()', 'tag': 'other', 'expected_tags': '"str", "int"'},
+                        'context': {
+                            'discriminator': 'discriminator_function()',
+                            'tag': 'other',
+                            'expected_tags': '"str", "int"',
+                        },
                     }
                 ],
             ),
         ),
     ],
 )
-def test_tag_key_function(py_and_json: PyAndJson, input_value, expected):
-    def tag_key_function(obj):
+def test_discriminator_function(py_and_json: PyAndJson, input_value, expected):
+    def discriminator_function(obj):
         if isinstance(obj, str):
             return 'str'
         elif isinstance(obj, int):
@@ -198,7 +202,7 @@ def test_tag_key_function(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'tagged-union',
-            'tag_key': tag_key_function,
+            'discriminator': discriminator_function,
             'choices': {'str': {'type': 'literal', 'expected': ['foo', 'bar']}, 'int': {'type': 'int'}},
         }
     )
@@ -215,7 +219,7 @@ def test_from_attributes():
     v = SchemaValidator(
         {
             'type': 'tagged-union',
-            'tag_key': 'foobar',
+            'discriminator': 'foobar',
             'choices': {
                 'apple': {'type': 'typed-dict', 'fields': {'a': {'schema': 'str'}, 'b': {'schema': 'int'}}},
                 'banana': {'type': 'typed-dict', 'fields': {'c': {'schema': 'str'}, 'd': {'schema': 'int'}}},
@@ -229,8 +233,8 @@ def test_from_attributes():
     assert v.validate_python(Cls(foobar='banana', c='banana', d='31')) == {'c': 'banana', 'd': 31}
 
 
-def test_no_tag_key():
-    with pytest.raises(SchemaError, match="KeyError: 'tag_key'"):
+def test_no_discriminator():
+    with pytest.raises(SchemaError, match="KeyError: 'discriminator'"):
         SchemaValidator(
             {
                 'type': 'tagged-union',
@@ -246,7 +250,7 @@ def test_use_ref():
     v = SchemaValidator(
         {
             'type': 'tagged-union',
-            'tag_key': 'foobar',
+            'discriminator': 'foobar',
             'choices': {
                 'apple': {'type': 'typed-dict', 'ref': 'apple', 'fields': {'a': {'schema': 'str'}}},
                 'apple2': {'type': 'recursive-ref', 'schema_ref': 'apple'},

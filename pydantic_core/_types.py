@@ -194,7 +194,7 @@ class UnionSchema(TypedDict, total=False):
 class TaggedUnionSchema(TypedDict):
     type: Literal['tagged-union']
     choices: Dict[str, Schema]
-    tag_key: Union[str, List[Union[str, int]], List[List[Union[str, int]]], Callable[[Any], Optional[str]]]
+    discriminator: Union[str, List[Union[str, int]], List[List[Union[str, int]]], Callable[[Any], Optional[str]]]
     strict: NotRequired[bool]
     ref: NotRequired[str]
 

@@ -116,7 +116,7 @@ impl Validator for UnionValidator {
 }
 
 #[derive(Debug, Clone)]
-enum LookupMethod {
+enum Discriminator {
     LookupKey(LookupKey),
     Function(PyObject),
 }
@@ -124,11 +124,11 @@ enum LookupMethod {
 #[derive(Debug, Clone)]
 pub struct TaggedUnionValidator {
     choices: AHashMap<String, CombinedValidator>,
-    lookup_method: LookupMethod,
+    discriminator: Discriminator,
     from_attributes: bool,
     strict: bool,
     tags_repr: String,
-    source_repr: String,
+    discriminator_repr: String,
     name: String,
 }
 
@@ -142,16 +142,16 @@ impl BuildValidator for TaggedUnionValidator {
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
-        let source_repr: String;
-        let lookup_method: LookupMethod;
-        let tag_key: &PyAny = schema.get_as_req("tag_key")?;
-        if tag_key.is_callable() {
-            source_repr = format!("{}()", tag_key.getattr("__name__")?);
-            lookup_method = LookupMethod::Function(tag_key.to_object(py));
+        let discriminator_repr: String;
+        let discriminator: Discriminator;
+        let raw_discriminator: &PyAny = schema.get_as_req("discriminator")?;
+        if raw_discriminator.is_callable() {
+            discriminator_repr = format!("{}()", raw_discriminator.getattr("__name__")?);
+            discriminator = Discriminator::Function(raw_discriminator.to_object(py));
         } else {
-            let lookup_key = LookupKey::from_py(py, tag_key, None)?;
-            source_repr = format!("\"{}\"", lookup_key);
-            lookup_method = LookupMethod::LookupKey(lookup_key);
+            let lookup_key = LookupKey::from_py(py, raw_discriminator, None)?;
+            discriminator_repr = format!("\"{}\"", lookup_key);
+            discriminator = Discriminator::LookupKey(lookup_key);
         };
 
         let mut choices = AHashMap::new();
@@ -179,11 +179,11 @@ impl BuildValidator for TaggedUnionValidator {
 
         Ok(Self {
             choices,
-            lookup_method,
+            discriminator,
             from_attributes,
             strict: is_strict(schema, config)?,
             tags_repr,
-            source_repr,
+            discriminator_repr,
             name: format!("{}[{}]", Self::EXPECTED_TYPE, descr),
         }
         .into())
@@ -199,8 +199,8 @@ impl Validator for TaggedUnionValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        match self.lookup_method {
-            LookupMethod::LookupKey(ref lookup_key) => {
+        match self.discriminator {
+            Discriminator::LookupKey(ref lookup_key) => {
                 macro_rules! find_validator {
                     ($dict:ident, $get_method:ident) => {{
                         // note all these methods return PyResult<Option<(data, data)>>, the outer Err is just for
@@ -223,15 +223,15 @@ impl Validator for TaggedUnionValidator {
                     GenericMapping::PyGetAttr(obj) => find_validator!(obj, py_get_attr),
                     GenericMapping::JsonObject(mapping) => find_validator!(mapping, json_get),
                 }?;
-                self.call_validator(py, tag.as_cow(), input, extra, slots, recursion_guard)
+                self.find_call_validator(py, tag.as_cow(), input, extra, slots, recursion_guard)
             }
-            LookupMethod::Function(ref func) => {
+            Discriminator::Function(ref func) => {
                 let result = func.call1(py, (input.to_object(py),))?;
                 if result.is_none(py) {
                     Err(self.tag_not_found(input))
                 } else {
                     let result_str: &PyString = result.cast_as(py).unwrap();
-                    self.call_validator(py, result_str.to_string_lossy(), input, extra, slots, recursion_guard)
+                    self.find_call_validator(py, result_str.to_string_lossy(), input, extra, slots, recursion_guard)
                 }
             }
         }
@@ -249,7 +249,7 @@ impl Validator for TaggedUnionValidator {
 }
 
 impl TaggedUnionValidator {
-    fn call_validator<'s, 'data>(
+    fn find_call_validator<'s, 'data>(
         &'s self,
         py: Python<'data>,
         tag: Cow<str>,
@@ -266,7 +266,7 @@ impl TaggedUnionValidator {
         } else {
             Err(ValError::new(
                 ErrorKind::UnionTagInvalid {
-                    source: self.source_repr.clone(),
+                    discriminator: self.discriminator_repr.clone(),
                     tag: tag.to_string(),
                     expected_tags: self.tags_repr.clone(),
                 },
@@ -278,7 +278,7 @@ impl TaggedUnionValidator {
     fn tag_not_found<'s, 'data>(&'s self, input: &'data impl Input<'data>) -> ValError<'data> {
         ValError::new(
             ErrorKind::UnionTagNotFound {
-                source: self.source_repr.clone(),
+                discriminator: self.discriminator_repr.clone(),
             },
             input,
         )

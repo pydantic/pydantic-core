@@ -207,14 +207,14 @@ pub enum ErrorKind {
     CallableType,
     // ---------------------
     // union errors
-    #[strum(message = "Input tag \"{tag}\" from {source} must match one of the expected tags: {expected_tags}")]
+    #[strum(message = "Input tag \"{tag}\" from {discriminator} must match one of the expected tags: {expected_tags}")]
     UnionTagInvalid {
-        source: String,
+        discriminator: String,
         tag: String,
         expected_tags: String,
     },
-    #[strum(message = "Unable to extract tag {source}")]
-    UnionTagNotFound { source: String },
+    #[strum(message = "Unable to extract tag {discriminator}")]
+    UnionTagNotFound { discriminator: String },
 }
 
 macro_rules! render {
@@ -294,11 +294,11 @@ impl ErrorKind {
             Self::TimeDeltaParsing { error } => render!(template, error),
             Self::IsInstanceOf { class } => render!(template, class),
             Self::UnionTagInvalid {
-                source,
+                discriminator,
                 tag,
                 expected_tags,
-            } => render!(template, source, tag, expected_tags),
-            Self::UnionTagNotFound { source } => render!(template, source),
+            } => render!(template, discriminator, tag, expected_tags),
+            Self::UnionTagNotFound { discriminator } => render!(template, discriminator),
             _ => template.to_string(),
         }
     }
@@ -347,11 +347,11 @@ impl ErrorKind {
             Self::TimeDeltaParsing { error } => py_dict!(py, error),
             Self::IsInstanceOf { class } => py_dict!(py, class),
             Self::UnionTagInvalid {
-                source,
+                discriminator,
                 tag,
                 expected_tags,
-            } => py_dict!(py, source, tag, expected_tags),
-            Self::UnionTagNotFound { source } => py_dict!(py, source),
+            } => py_dict!(py, discriminator, tag, expected_tags),
+            Self::UnionTagNotFound { discriminator } => py_dict!(py, discriminator),
             _ => Ok(None),
         }
     }
