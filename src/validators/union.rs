@@ -121,6 +121,24 @@ enum Discriminator {
     Function(PyObject),
 }
 
+impl Discriminator {
+    fn new(py: Python, raw: &PyAny) -> PyResult<Self> {
+        if raw.is_callable() {
+            Ok(Self::Function(raw.to_object(py)))
+        } else {
+            let lookup_key = LookupKey::from_py(py, raw, None)?;
+            Ok(Self::LookupKey(lookup_key))
+        }
+    }
+
+    fn to_string_py(&self, py: Python) -> PyResult<String> {
+        match self {
+            Self::Function(f) => Ok(format!("{}()", f.getattr(py, "__name__")?)),
+            Self::LookupKey(lookup_key) => Ok(lookup_key.to_string()),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TaggedUnionValidator {
     choices: AHashMap<String, CombinedValidator>,
@@ -141,18 +159,8 @@ impl BuildValidator for TaggedUnionValidator {
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-
-        let discriminator_repr: String;
-        let discriminator: Discriminator;
-        let raw_discriminator: &PyAny = schema.get_as_req("discriminator")?;
-        if raw_discriminator.is_callable() {
-            discriminator_repr = format!("{}()", raw_discriminator.getattr("__name__")?);
-            discriminator = Discriminator::Function(raw_discriminator.to_object(py));
-        } else {
-            let lookup_key = LookupKey::from_py(py, raw_discriminator, None)?;
-            discriminator_repr = lookup_key.to_string();
-            discriminator = Discriminator::LookupKey(lookup_key);
-        };
+        let discriminator = Discriminator::new(py, schema.get_as_req("discriminator")?)?;
+        let discriminator_repr = discriminator.to_string_py(py)?;
 
         let mut choices = AHashMap::new();
         let mut first = true;
