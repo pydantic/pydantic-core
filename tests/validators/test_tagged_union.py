@@ -103,6 +103,7 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
             },
         }
     )
+    assert 'discriminator: LookupKey' in repr(v.validator)
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=expected.message) as exc_info:
             v.validate_test(input_value)
@@ -218,6 +219,7 @@ def test_discriminator_function(py_and_json: PyAndJson, input_value, expected):
             'choices': {'str': {'type': 'literal', 'expected': ['foo', 'bar']}, 'int': {'type': 'int'}},
         }
     )
+    assert 'discriminator: Function' in repr(v.validator)
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=expected.message) as exc_info:
             v.validate_python(input_value)
