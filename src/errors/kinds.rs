@@ -207,13 +207,15 @@ pub enum ErrorKind {
     CallableType,
     // ---------------------
     // union errors
-    #[strum(message = "Input tag \"{tag}\" from {discriminator} must match one of the expected tags: {expected_tags}")]
+    #[strum(
+        message = "Input tag '{tag}' found using {discriminator} does not match any of the expected tags: {expected_tags}"
+    )]
     UnionTagInvalid {
         discriminator: String,
         tag: String,
         expected_tags: String,
     },
-    #[strum(message = "Unable to extract tag {discriminator}")]
+    #[strum(message = "Unable to extract tag using discriminator {discriminator}")]
     UnionTagNotFound { discriminator: String },
 }
 

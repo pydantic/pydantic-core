@@ -1,6 +1,6 @@
 import pytest
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError
 
 from ..conftest import Err, PyAndJson
 from .test_typed_dict import Cls
@@ -48,10 +48,11 @@ from .test_typed_dict import Cls
                         'kind': 'union_tag_invalid',
                         'loc': [],
                         'message': (
-                            'Input tag "other" from "foo" must match one of the expected tags: "apple", "banana"'
+                            "Input tag 'other' found using 'foo' does not match any "
+                            "of the expected tags: 'apple', 'banana'"
                         ),
                         'input_value': {'foo': 'other'},
-                        'context': {'discriminator': '"foo"', 'tag': 'other', 'expected_tags': '"apple", "banana"'},
+                        'context': {'discriminator': "'foo'", 'tag': 'other', 'expected_tags': "'apple', 'banana'"},
                     }
                 ],
             ),
@@ -64,9 +65,9 @@ from .test_typed_dict import Cls
                     {
                         'kind': 'union_tag_not_found',
                         'loc': [],
-                        'message': 'Unable to extract tag "foo"',
+                        'message': "Unable to extract tag using discriminator 'foo'",
                         'input_value': {},
-                        'context': {'discriminator': '"foo"'},
+                        'context': {'discriminator': "'foo'"},
                     }
                 ],
             ),
@@ -111,8 +112,8 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
         assert v.validate_test(input_value) == expected
 
 
-def test_discriminator_path():
-    v = SchemaValidator(
+def test_discriminator_path(py_and_json: PyAndJson):
+    v = py_and_json(
         {
             'type': 'tagged-union',
             'discriminator': [['food'], ['menu', 1]],
@@ -125,8 +126,19 @@ def test_discriminator_path():
             },
         }
     )
-    assert v.validate_python({'food': 'apple', 'a': 'apple', 'b': '13'}) == {'a': 'apple', 'b': 13}
-    assert v.validate_python({'menu': ['x', 'banana'], 'c': 'C', 'd': [1, '2']}) == {'c': 'C', 'd': [1, 2]}
+    assert v.validate_test({'food': 'apple', 'a': 'apple', 'b': '13'}) == {'a': 'apple', 'b': 13}
+    assert v.validate_test({'menu': ['x', 'banana'], 'c': 'C', 'd': [1, '2']}) == {'c': 'C', 'd': [1, 2]}
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_test({})
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'union_tag_not_found',
+            'loc': [],
+            'message': "Unable to extract tag using discriminator 'food' | 'menu'.1",
+            'input_value': {},
+            'context': {'discriminator': "'food' | 'menu'.1"},
+        }
+    ]
 
 
 @pytest.mark.parametrize(
@@ -157,7 +169,7 @@ def test_discriminator_path():
                     {
                         'kind': 'union_tag_not_found',
                         'loc': [],
-                        'message': 'Unable to extract tag discriminator_function()',
+                        'message': 'Unable to extract tag using discriminator discriminator_function()',
                         'input_value': None,
                         'context': {'discriminator': 'discriminator_function()'},
                     }
@@ -173,14 +185,14 @@ def test_discriminator_path():
                         'kind': 'union_tag_invalid',
                         'loc': [],
                         'message': (
-                            'Input tag "other" from discriminator_function() '
-                            'must match one of the expected tags: "str", "int"'
+                            "Input tag 'other' found using discriminator_function() "
+                            "does not match any of the expected tags: 'str', 'int'"
                         ),
                         'input_value': ['wrong type'],
                         'context': {
                             'discriminator': 'discriminator_function()',
                             'tag': 'other',
-                            'expected_tags': '"str", "int"',
+                            'expected_tags': "'str', 'int'",
                         },
                     }
                 ],
@@ -231,19 +243,6 @@ def test_from_attributes():
     assert v.validate_python(Cls(foobar='apple', a='apple', b='13')) == {'a': 'apple', 'b': 13}
     assert v.validate_python({'foobar': 'banana', 'c': 'banana', 'd': '31'}) == {'c': 'banana', 'd': 31}
     assert v.validate_python(Cls(foobar='banana', c='banana', d='31')) == {'c': 'banana', 'd': 31}
-
-
-def test_no_discriminator():
-    with pytest.raises(SchemaError, match="KeyError: 'discriminator'"):
-        SchemaValidator(
-            {
-                'type': 'tagged-union',
-                'choices': {
-                    'apple': {'type': 'typed-dict', 'fields': {'a': {'schema': 'str'}}},
-                    'banana': {'type': 'typed-dict', 'fields': {'c': {'schema': 'str'}}},
-                },
-            }
-        )
 
 
 def test_use_ref():

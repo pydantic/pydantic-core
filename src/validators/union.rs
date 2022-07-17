@@ -150,7 +150,7 @@ impl BuildValidator for TaggedUnionValidator {
             discriminator = Discriminator::Function(raw_discriminator.to_object(py));
         } else {
             let lookup_key = LookupKey::from_py(py, raw_discriminator, None)?;
-            discriminator_repr = format!("\"{}\"", lookup_key);
+            discriminator_repr = lookup_key.to_string();
             discriminator = Discriminator::LookupKey(lookup_key);
         };
 
@@ -165,10 +165,10 @@ impl BuildValidator for TaggedUnionValidator {
             let validator = build_validator(value, config, build_context)?.0;
             if first {
                 first = false;
-                write!(tags_repr, r#""{}""#, tag).unwrap();
+                write!(tags_repr, "'{}'", tag).unwrap();
                 descr.push_str(validator.get_name());
             } else {
-                write!(tags_repr, r#", "{}""#, tag).unwrap();
+                write!(tags_repr, ", '{}'", tag).unwrap();
                 // no spaces in get_name() output to make loc easy to read
                 write!(descr, ",{}", validator.get_name()).unwrap();
             }
