@@ -68,9 +68,9 @@ class FloatSchema(TypedDict, total=False):
 
 class FunctionSchema(TypedDict):
     type: Literal['function']
-    mode: Literal['before', 'after', 'wrap']
+    mode: Literal['before', 'after', 'wrap', 'plain']
     function: Callable[..., Any]
-    schema: Schema
+    schema: NotRequired[Schema]
     ref: NotRequired[str]
 
 
@@ -274,8 +274,28 @@ class CallableSchema(TypedDict):
 
 # pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
 # 'int' is equivalent to {'type': 'int'}, this only applies to schema types which do not have other required fields
-BareType = Literal['any', 'bool', 'bytes', 'dict', 'float', 'int', 'list', 'none', 'set', 'str', 'tuple-var-len']
+BareType = Literal[
+    'any',
+    'none',
+    'str',
+    'bytes',
+    'dict',
+    'int',
+    'bool',
+    'float',
+    'dict',
+    'list',
+    'set',
+    'frozenset',
+    'tuple-var-len',
+    'date',
+    'time',
+    'datetime',
+    'timedelta',
+]
 
+# generate_self_schema.py is hard coded to convert this Union[BareType, Union[...rest]] where the second union is tagged
+# so `BareType` MUST come first
 Schema = Union[
     BareType,
     AnySchema,
