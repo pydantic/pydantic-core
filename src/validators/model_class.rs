@@ -49,10 +49,7 @@ impl BuildValidator for ModelClassValidator {
         Ok(Self {
             // we don't use is_strict here since we don't want validation to be strict in this case if
             // `config.strict` is set, only if this specific field is strict
-            strict: match config {
-                Some(c) => c.get_as("strict")?.unwrap_or(false),
-                None => false,
-            },
+            strict: schema.get_as("strict")?.unwrap_or(false),
             validator: Box::new(validator),
             class: class.into(),
             // Get the class's `__name__`, not using `class.name()` since it uses `__qualname__`

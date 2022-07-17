@@ -76,7 +76,6 @@ def test_model_class_root_validator():
 
     v = SchemaValidator(
         {
-            'title': 'Test',
             'type': 'function',
             'mode': 'wrap',
             'function': f,
@@ -190,13 +189,13 @@ def test_model_class_strict():
     v = SchemaValidator(
         {
             'type': 'model-class',
+            'strict': True,
             'class_type': MyModel,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
                 'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
             },
-            'config': {'strict': True},
         }
     )
     m = MyModel()

@@ -974,7 +974,7 @@ def test_alias_extra(py_and_json: PyAndJson):
     v = py_and_json(
         {
             'type': 'typed-dict',
-            'typed_dict_extra_behavior': 'allow',
+            'extra_behavior': 'allow',
             'fields': {'field_a': {'alias': [['FieldA'], ['foo', 2]], 'schema': 'int'}},
         }
     )
@@ -999,7 +999,7 @@ def test_alias_extra_from_attributes():
     v = SchemaValidator(
         {
             'type': 'typed-dict',
-            'typed_dict_extra_behavior': 'allow',
+            'extra_behavior': 'allow',
             'from_attributes': True,
             'fields': {'field_a': {'alias': [['FieldA'], ['foo', 2]], 'schema': 'int'}},
         }
@@ -1014,7 +1014,7 @@ def test_alias_extra_by_name(py_and_json: PyAndJson):
     v = py_and_json(
         {
             'type': 'typed-dict',
-            'typed_dict_extra_behavior': 'allow',
+            'extra_behavior': 'allow',
             'from_attributes': True,
             'populate_by_name': True,
             'fields': {'field_a': {'alias': 'FieldA', 'schema': 'int'}},
@@ -1028,11 +1028,7 @@ def test_alias_extra_by_name(py_and_json: PyAndJson):
 
 def test_alias_extra_forbid(py_and_json: PyAndJson):
     v = py_and_json(
-        {
-            'type': 'typed-dict',
-            'typed_dict_extra_behavior': 'forbid',
-            'fields': {'field_a': {'alias': 'FieldA', 'schema': 'int'}},
-        }
+        {'type': 'typed-dict', 'extra_behavior': 'forbid', 'fields': {'field_a': {'alias': 'FieldA', 'schema': 'int'}}}
     )
     assert v.validate_test({'FieldA': 1}) == {'field_a': 1}
 

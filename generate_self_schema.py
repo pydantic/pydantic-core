@@ -81,8 +81,6 @@ def get_schema(obj):
 def type_dict_schema(typed_dict):
     required_keys = typed_dict.__required_keys__
     fields = {}
-    if typed_dict.__name__ == 'Schema':
-        return {'type': 'typed-dict', 'fields': fields}
 
     for field_name, field_type in typed_dict.__annotations__.items():
         required = field_name in required_keys
@@ -121,7 +119,7 @@ def type_dict_schema(typed_dict):
 
         fields[field_name] = {'schema': schema, 'required': required}
 
-    return {'type': 'typed-dict', 'description': typed_dict.__name__, 'fields': fields}
+    return {'type': 'typed-dict', 'description': typed_dict.__name__, 'fields': fields, 'extra_behavior': 'forbid'}
 
 
 def union_schema(union_type):
