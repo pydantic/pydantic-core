@@ -22,10 +22,6 @@ except ImportError:
         return getattr(t, '__origin__', None)
 
 
-import sys
-
-sys
-sys.setrecursionlimit(100)
 THIS_DIR = Path(__file__).parent
 SAVE_PATH = THIS_DIR / 'src' / 'self_schema.py'
 
@@ -79,7 +75,7 @@ def get_schema(obj):
 
 
 def type_dict_schema(typed_dict):
-    required_keys = typed_dict.__required_keys__
+    required_keys = getattr(typed_dict, '__required_keys__', set())
     fields = {}
 
     for field_name, field_type in typed_dict.__annotations__.items():
