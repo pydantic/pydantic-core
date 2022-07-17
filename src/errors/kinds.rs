@@ -207,8 +207,14 @@ pub enum ErrorKind {
     CallableType,
     // ---------------------
     // union errors
-    #[strum(message = "Input key \"{key}\" must match one of the allowed tags {tags}")]
-    UnionTagNotFound { key: String, tags: String },
+    #[strum(message = "Input tag \"{tag}\" from {source} must match one of the expected tags: {expected_tags}")]
+    UnionTagInvalid {
+        source: String,
+        tag: String,
+        expected_tags: String,
+    },
+    #[strum(message = "Unable to extract tag {source}")]
+    UnionTagNotFound { source: String },
 }
 
 macro_rules! render {
@@ -287,7 +293,12 @@ impl ErrorKind {
             Self::DateTimeObjectInvalid { error } => render!(template, error),
             Self::TimeDeltaParsing { error } => render!(template, error),
             Self::IsInstanceOf { class } => render!(template, class),
-            Self::UnionTagNotFound { key, tags } => render!(template, key, tags),
+            Self::UnionTagInvalid {
+                source,
+                tag,
+                expected_tags,
+            } => render!(template, source, tag, expected_tags),
+            Self::UnionTagNotFound { source } => render!(template, source),
             _ => template.to_string(),
         }
     }
@@ -335,7 +346,12 @@ impl ErrorKind {
             Self::DateTimeObjectInvalid { error } => py_dict!(py, error),
             Self::TimeDeltaParsing { error } => py_dict!(py, error),
             Self::IsInstanceOf { class } => py_dict!(py, class),
-            Self::UnionTagNotFound { key, tags } => py_dict!(py, key, tags),
+            Self::UnionTagInvalid {
+                source,
+                tag,
+                expected_tags,
+            } => py_dict!(py, source, tag, expected_tags),
+            Self::UnionTagNotFound { source } => py_dict!(py, source),
             _ => Ok(None),
         }
     }

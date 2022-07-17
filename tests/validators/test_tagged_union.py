@@ -42,14 +42,31 @@ from .test_typed_dict import Cls
         (
             {'foo': 'other'},
             Err(
+                'union_tag_invalid',
+                [
+                    {
+                        'kind': 'union_tag_invalid',
+                        'loc': [],
+                        'message': (
+                            'Input tag "other" from "foo" must match one of the expected tags: "apple", "banana"'
+                        ),
+                        'input_value': {'foo': 'other'},
+                        'context': {'source': '"foo"', 'tag': 'other', 'expected_tags': '"apple", "banana"'},
+                    }
+                ],
+            ),
+        ),
+        (
+            {},
+            Err(
                 'union_tag_not_found',
                 [
                     {
                         'kind': 'union_tag_not_found',
                         'loc': [],
-                        'message': 'Input key "foo" must match one of the allowed tags "apple", "banana"',
-                        'input_value': {'foo': 'other'},
-                        'context': {'key': 'foo', 'tags': '"apple", "banana"'},
+                        'message': 'Unable to extract tag "foo"',
+                        'input_value': {},
+                        'context': {'source': '"foo"'},
                     }
                 ],
             ),
@@ -87,7 +104,7 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=expected.message) as exc_info:
-            v.validate_python(input_value)
+            v.validate_test(input_value)
         # debug(exc_info.value.errors())
         assert exc_info.value.errors() == expected.errors
     else:
@@ -112,6 +129,88 @@ def test_tag_key_path():
     assert v.validate_python({'menu': ['x', 'banana'], 'c': 'C', 'd': [1, '2']}) == {'c': 'C', 'd': [1, 2]}
 
 
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ('foo', 'foo'),
+        (123, 123),
+        (
+            'baz',
+            Err(
+                'literal_error',
+                [
+                    {
+                        'kind': 'literal_error',
+                        'loc': ['str'],
+                        'message': "Value must be one of: 'foo', 'bar'",
+                        'input_value': 'baz',
+                        'context': {'expected': "'foo', 'bar'"},
+                    }
+                ],
+            ),
+        ),
+        (
+            None,
+            Err(
+                'union_tag_not_found',
+                [
+                    {
+                        'kind': 'union_tag_not_found',
+                        'loc': [],
+                        'message': 'Unable to extract tag tag_key_function()',
+                        'input_value': None,
+                        'context': {'source': 'tag_key_function()'},
+                    }
+                ],
+            ),
+        ),
+        (
+            ['wrong type'],
+            Err(
+                'union_tag_invalid',
+                [
+                    {
+                        'kind': 'union_tag_invalid',
+                        'loc': [],
+                        'message': (
+                            'Input tag "other" from tag_key_function() '
+                            'must match one of the expected tags: "str", "int"'
+                        ),
+                        'input_value': ['wrong type'],
+                        'context': {'source': 'tag_key_function()', 'tag': 'other', 'expected_tags': '"str", "int"'},
+                    }
+                ],
+            ),
+        ),
+    ],
+)
+def test_tag_key_function(py_and_json: PyAndJson, input_value, expected):
+    def tag_key_function(obj):
+        if isinstance(obj, str):
+            return 'str'
+        elif isinstance(obj, int):
+            return 'int'
+        elif obj is None:
+            return None
+        else:
+            return 'other'
+
+    v = py_and_json(
+        {
+            'type': 'tagged-union',
+            'tag_key': tag_key_function,
+            'choices': {'str': {'type': 'literal', 'expected': ['foo', 'bar']}, 'int': {'type': 'int'}},
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=expected.message) as exc_info:
+            v.validate_python(input_value)
+        # debug(exc_info.value.errors())
+        assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_test(input_value) == expected
+
+
 def test_from_attributes():
     v = SchemaValidator(
         {
@@ -131,7 +230,7 @@ def test_from_attributes():
 
 
 def test_no_tag_key():
-    with pytest.raises(SchemaError, match="'tag_key' or 'tag_keys' must be set on a tagged union"):
+    with pytest.raises(SchemaError, match="KeyError: 'tag_key'"):
         SchemaValidator(
             {
                 'type': 'tagged-union',
