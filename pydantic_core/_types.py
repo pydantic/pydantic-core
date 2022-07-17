@@ -68,7 +68,7 @@ class FloatSchema(TypedDict, total=False):
 
 class FunctionSchema(TypedDict):
     type: Literal['function']
-    mode: Literal['before', 'after', 'wrap', 'plain']
+    mode: Literal['before', 'after', 'wrap']
     function: Callable[..., Any]
     schema: NotRequired[Schema]
     ref: NotRequired[str]
@@ -292,6 +292,7 @@ BareType = Literal[
     'time',
     'datetime',
     'timedelta',
+    'callable',
 ]
 
 # generate_self_schema.py is hard coded to convert this Union[BareType, Union[...rest]] where the second union is tagged

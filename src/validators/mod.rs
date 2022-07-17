@@ -61,7 +61,7 @@ impl SchemaValidator {
                 &self_schema.slots,
                 &mut RecursionGuard::default(),
             )
-            .map_err(|e| SchemaError::from_val_error(py, "Invalid Schema", e))?;
+            .map_err(|e| SchemaError::from_val_error(py, e))?;
         let schema = schema_obj.as_ref(py);
 
         let mut build_context = BuildContext::default();

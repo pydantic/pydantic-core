@@ -6,21 +6,17 @@ from pydantic_core import SchemaError, SchemaValidator
 
 
 def test_build_error_type():
-    with pytest.raises(SchemaError, match='Unknown schema type: "foobar"'):
+    with pytest.raises(SchemaError, match="Input tag 'foobar' found using self-schema does not match any of the"):
         SchemaValidator({'type': 'foobar', 'title': 'TestModel'})
 
 
 def test_build_error_internal():
-    msg = (
-        'Error building "str" validator:\n'
-        '  TypeError: \'str\' object cannot be interpreted as an integer'  # noqa Q003
-    )
-    with pytest.raises(SchemaError, match=msg):
+    with pytest.raises(SchemaError, match='Value must be a valid integer, unable to parse string as an integer'):
         SchemaValidator({'type': 'str', 'min_length': 'xxx', 'title': 'TestModel'})
 
 
 def test_build_error_deep():
-    with pytest.raises(SchemaError) as exc_info:
+    with pytest.raises(SchemaError, match='Value must be a valid integer, unable to parse string as an integer'):
         SchemaValidator(
             {
                 'title': 'MyTestModel',
@@ -28,12 +24,6 @@ def test_build_error_deep():
                 'fields': {'age': {'schema': {'type': 'int', 'ge': 'not-int'}}},
             }
         )
-    assert str(exc_info.value) == (
-        'Error building "typed-dict" validator:\n'
-        '  SchemaError: Field "age":\n'
-        '  SchemaError: Error building "int" validator:\n'
-        "  TypeError: 'str' object cannot be interpreted as an integer"
-    )
 
 
 def test_schema_as_string():
@@ -45,7 +35,7 @@ def test_schema_wrong_type():
     with pytest.raises(SchemaError) as exc_info:
         SchemaValidator(1)
     assert exc_info.value.args[0] == (
-        "Schema build error:\n  TypeError: 'int' object cannot be converted to 'PyString'"
+        'Invalid Schema:\n  Value must be a valid dictionary [kind=dict_type, input_value=1, input_type=int]'
     )
 
 

@@ -100,13 +100,19 @@ def test_model_class_bad_model():
     class MyModel:
         pass
 
-    with pytest.raises(SchemaError, match=re.escape("model-class expected a 'typed-dict' schema, got 'str'")):
+    with pytest.raises(SchemaError, match="model-class -> schema -> type\n  Value must be 'typed-dict'"):
         SchemaValidator({'type': 'model-class', 'class_type': MyModel, 'schema': {'type': 'str'}})
 
 
 def test_model_class_not_type():
     with pytest.raises(SchemaError, match=re.escape("TypeError: 'int' object cannot be converted to 'PyType'")):
-        SchemaValidator({'type': 'model-class', 'class_type': 123})
+        SchemaValidator(
+            {
+                'type': 'model-class',
+                'class_type': 123,
+                'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'field_a': {'schema': 'str'}}},
+            }
+        )
 
 
 def test_model_class_instance_direct():
@@ -184,13 +190,13 @@ def test_model_class_strict():
     v = SchemaValidator(
         {
             'type': 'model-class',
-            'strict': True,
             'class_type': MyModel,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
                 'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
             },
+            'config': {'strict': True},
         }
     )
     m = MyModel()
