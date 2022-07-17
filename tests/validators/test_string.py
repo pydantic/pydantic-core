@@ -105,6 +105,7 @@ def test_str_constrained_config():
 
 
 def test_invalid_regex():
+    # TODO uncomment and fix once #150 is done
     # with pytest.raises(SchemaError) as exc_info:
     #     SchemaValidator({'type': 'str', 'pattern': 123})
     # assert exc_info.value.args[0] == (
