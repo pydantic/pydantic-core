@@ -230,7 +230,7 @@ impl Validator for TaggedUnionValidator {
                 if result.is_none(py) {
                     Err(self.tag_not_found(input))
                 } else {
-                    let result_str: &PyString = result.cast_as(py).unwrap();
+                    let result_str: &PyString = result.cast_as(py)?;
                     self.find_call_validator(py, result_str.to_string_lossy(), input, extra, slots, recursion_guard)
                 }
             }

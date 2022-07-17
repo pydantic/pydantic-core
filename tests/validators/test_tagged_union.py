@@ -262,3 +262,9 @@ def test_use_ref():
     assert v.validate_python({'foobar': 'apple', 'a': 'apple'}) == {'a': 'apple'}
     assert v.validate_python({'foobar': 'apple2', 'a': 'apple'}) == {'a': 'apple'}
     assert v.validate_python({'foobar': 'banana', 'b': 'banana'}) == {'b': 'banana'}
+
+
+def test_downcast_error():
+    v = SchemaValidator({'type': 'tagged-union', 'discriminator': lambda x: 123, 'choices': {'str': 'str'}})
+    with pytest.raises(TypeError, match="'int' object cannot be converted to 'PyString'"):
+        v.validate_python('x')
