@@ -9,7 +9,7 @@ if sys.version_info < (3, 11):
 else:
     from typing import NotRequired, Required
 
-if sys.version_info < (3, 8):
+if sys.version_info < (3, 9):
     from typing_extensions import Literal, TypedDict
 else:
     from typing import Literal, TypedDict
