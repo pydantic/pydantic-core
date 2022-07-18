@@ -18,6 +18,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {
     strict: bool,
+    revalidate: bool,
     validator: Box<CombinedValidator>,
     class: Py<PyType>,
     name: String,
@@ -46,6 +47,7 @@ impl BuildValidator for ModelClassValidator {
             // we don't use is_strict here since we don't want validation to be strict in this case if
             // `config.strict` is set, only if this specific field is strict
             strict: schema.get_as("strict")?.unwrap_or(false),
+            revalidate: config.get_as("model_revalidate")?.unwrap_or(false),
             validator: Box::new(validator),
             class: class.into(),
             // Get the class's `__name__`, not using `class.name()` since it uses `__qualname__`
@@ -67,7 +69,13 @@ impl Validator for ModelClassValidator {
     ) -> ValResult<'data, PyObject> {
         let class = self.class.as_ref(py);
         if input.is_type(class)? {
-            Ok(input.to_object(py))
+            if self.revalidate {
+                // TODO Need to copy __fields_set__
+                let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
+                Ok(self.create_class(py, output)?)
+            } else {
+                Ok(input.to_object(py))
+            }
         } else if extra.strict.unwrap_or(self.strict) {
             Err(ValError::new(
                 ErrorKind::ModelClassType {

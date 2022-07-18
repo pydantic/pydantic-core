@@ -40,6 +40,28 @@ impl<'py> SchemaDict<'py> for PyDict {
     }
 }
 
+impl<'py> SchemaDict<'py> for Option<&PyDict> {
+    fn get_as<T>(&'py self, key: &str) -> PyResult<Option<T>>
+    where
+        T: FromPyObject<'py>,
+    {
+        match self {
+            Some(d) => d.get_as(key),
+            None => Ok(None),
+        }
+    }
+
+    fn get_as_req<T>(&'py self, key: &str) -> PyResult<T>
+    where
+        T: FromPyObject<'py>,
+    {
+        match self {
+            Some(d) => d.get_as_req(key),
+            None => py_error!(PyKeyError; "{}", key),
+        }
+    }
+}
+
 pub fn schema_or_config<'py, T>(
     schema: &'py PyDict,
     config: Option<&'py PyDict>,
