@@ -2,7 +2,7 @@ use std::process::Command;
 use std::str::from_utf8;
 
 fn generate_self_schema() {
-    let output = Command::new("python")
+    let output = Command::new("python3")
         .arg("generate_self_schema.py")
         .output()
         .expect("failed to execute process");
