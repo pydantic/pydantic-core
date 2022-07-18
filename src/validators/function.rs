@@ -51,12 +51,10 @@ macro_rules! impl_build {
                 let name = format!("{}[{}]", $name, validator.get_name());
                 Ok(Self {
                     validator: Box::new(validator),
-                    func: schema
-                        .get_as_req::<&PyAny>(intern!(py, "function"))?
-                        .into_py(schema.py()),
+                    func: schema.get_as_req::<&PyAny>(intern!(py, "function"))?.into_py(py),
                     config: match config {
                         Some(c) => c.into(),
-                        None => schema.py().None(),
+                        None => py.None(),
                     },
                     name,
                 }
@@ -163,12 +161,10 @@ impl FunctionPlainValidator {
             py_error!("Plain functions should not include a sub-schema")
         } else {
             Ok(Self {
-                func: schema
-                    .get_as_req::<&PyAny>(intern!(py, "function"))?
-                    .into_py(schema.py()),
+                func: schema.get_as_req::<&PyAny>(intern!(py, "function"))?.into_py(py),
                 config: match config {
                     Some(c) => c.into(),
-                    None => schema.py().None(),
+                    None => py.None(),
                 },
             }
             .into())

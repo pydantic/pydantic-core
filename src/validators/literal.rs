@@ -1,8 +1,8 @@
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use ahash::AHashSet;
-use pyo3::intern;
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValResult};

@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 use std::fmt::Write;
 
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 
 use ahash::AHashMap;
-use pyo3::intern;
 
 use crate::build_tools::{is_strict, schema_or_config, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
