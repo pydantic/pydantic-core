@@ -101,6 +101,7 @@ def test_function_wrap():
 
 def test_function_wrap_repr():
     def f(input_value, *, validator, **kwargs):
+        assert repr(validator) == str(validator)
         return plain_repr(validator)
 
     v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': 'str'})
