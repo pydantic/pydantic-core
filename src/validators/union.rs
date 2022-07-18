@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 
 use ahash::AHashMap;
+use pyo3::intern;
 
 use crate::build_tools::{is_strict, schema_or_config, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
@@ -30,7 +31,7 @@ impl BuildValidator for UnionValidator {
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
         let choices: Vec<CombinedValidator> = schema
-            .get_as_req::<&PyList>("choices")?
+            .get_as_req::<&PyList>(intern!(schema.py(), "choices"))?
             .iter()
             .map(|choice| build_validator(choice, config, build_context).map(|result| result.0))
             .collect::<PyResult<Vec<CombinedValidator>>>()?;
@@ -168,7 +169,7 @@ impl BuildValidator for TaggedUnionValidator {
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let discriminator = Discriminator::new(py, schema.get_as_req("discriminator")?)?;
+        let discriminator = Discriminator::new(py, schema.get_as_req(intern!(py, "discriminator"))?)?;
         let discriminator_repr = discriminator.to_string_py(py)?;
 
         let mut choices = AHashMap::new();
@@ -176,7 +177,7 @@ impl BuildValidator for TaggedUnionValidator {
         let mut tags_repr = String::with_capacity(50);
         let mut descr = String::with_capacity(50);
 
-        for item in schema.get_as_req::<&PyDict>("choices")?.items().iter() {
+        for item in schema.get_as_req::<&PyDict>(intern!(py, "choices"))?.items().iter() {
             let tag: String = item.get_item(0)?.extract()?;
             let value = item.get_item(1)?;
             let validator = build_validator(value, config, build_context)?.0;
@@ -258,7 +259,7 @@ impl Validator for TaggedUnionValidator {
                 } else {
                     let dict = input.strict_dict()?;
                     let mut tag = match dict {
-                        GenericMapping::PyDict(dict) => match dict.get_item("type") {
+                        GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "type")) {
                             Some(t) => t.strict_str()?,
                             None => return Err(self.tag_not_found(input)),
                         },
@@ -267,7 +268,7 @@ impl Validator for TaggedUnionValidator {
                     // custom logic to distinguish between different function schemas
                     if tag.as_cow().as_ref() == "function" {
                         let mode = match dict {
-                            GenericMapping::PyDict(dict) => match dict.get_item("mode") {
+                            GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "mode")) {
                                 Some(m) => m.strict_str()?,
                                 None => return Err(self.tag_not_found(input)),
                             },

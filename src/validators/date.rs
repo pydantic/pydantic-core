@@ -1,3 +1,4 @@
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDate, PyDict};
 use speedate::{Date, Time};
@@ -31,10 +32,11 @@ impl BuildValidator for DateValidator {
         config: Option<&PyDict>,
         _build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
-        let has_constraints = schema.get_item("le").is_some()
-            || schema.get_item("lt").is_some()
-            || schema.get_item("ge").is_some()
-            || schema.get_item("gt").is_some();
+        let py = schema.py();
+        let has_constraints = schema.get_item(intern!(py, "le")).is_some()
+            || schema.get_item(intern!(py, "lt")).is_some()
+            || schema.get_item(intern!(py, "ge")).is_some()
+            || schema.get_item(intern!(py, "gt")).is_some();
 
         Ok(Self {
             strict: is_strict(schema, config)?,
