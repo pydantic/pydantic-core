@@ -4,23 +4,11 @@ a definition of what inputs can be provided to `SchemaValidator()`.
 
 The schema is generated from `pydantic_core/_types.py`.
 """
-import os
-import sys
-from pathlib import Path
-
-THIS_DIR = Path(__file__).parent
-SAVE_PATH = THIS_DIR / 'src' / 'self_schema.py'
-print(os.environ)
-print(sys.version)
-# if SAVE_PATH.is_file() and os.getenv('DEBIAN_FRONTEND') == 'noninteractive':
-#     # self_schema.py and `os.getenv('DEBIAN_FRONTEND') == 'noninteractive'` suggests we're
-#     # in a maturin build, exit immediately
-#     sys.exit(0)
-
 import importlib.util
 import re
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
 from typing import Any, Dict, ForwardRef, List, Type, Union
 
 from black import Mode, TargetVersion, format_file_contents
