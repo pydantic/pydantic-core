@@ -65,15 +65,7 @@ impl SchemaValidator {
         let schema = schema_obj.as_ref(py);
 
         let mut build_context = BuildContext::default();
-        let mut validator = match build_validator(schema, config, &mut build_context) {
-            Ok((v, _)) => v,
-            Err(err) => {
-                return Err(match err.is_instance_of::<SchemaError>(py) {
-                    true => err,
-                    false => SchemaError::new_err(format!("Schema build error:\n  {}", err)),
-                });
-            }
-        };
+        let (mut validator, _) = build_validator(schema, config, &mut build_context)?;
         build_context.complete_validators()?;
         validator.complete(&build_context)?;
         let slots = build_context.into_slots()?;
@@ -193,12 +185,7 @@ impl SchemaValidator {
         let mut build_context = BuildContext::default();
         let validator = match build_validator(self_schema, None, &mut build_context) {
             Ok((v, _)) => v,
-            Err(err) => {
-                return Err(match err.is_instance_of::<SchemaError>(py) {
-                    true => err,
-                    false => SchemaError::new_err(format!("Schema build error:\n  {}", err)),
-                });
-            }
+            Err(err) => return Err(SchemaError::new_err(format!("Error building self-schema:\n  {}", err))),
         };
         Ok(Self {
             validator,

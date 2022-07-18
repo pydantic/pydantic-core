@@ -114,6 +114,20 @@ def test_model_class_not_type():
         )
 
 
+def test_not_return_fields_set():
+    class MyModel:
+        pass
+
+    with pytest.raises(SchemaError, match='model-class inner schema must have "return_fields_set" set to True'):
+        SchemaValidator(
+            {
+                'type': 'model-class',
+                'class_type': MyModel,
+                'schema': {'type': 'typed-dict', 'fields': {'field_a': {'schema': 'str'}}},
+            }
+        )
+
+
 def test_model_class_instance_direct():
     class MyModel:
         __slots__ = '__dict__', '__fields_set__'

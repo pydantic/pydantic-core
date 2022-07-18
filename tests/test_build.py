@@ -63,3 +63,24 @@ def test_not_schema_recursive_error():
     }
     v = SchemaValidator(schema)
     assert repr(v).count('TypedDictField') == 101
+
+
+def test_no_type():
+    with pytest.raises(SchemaError, match='Unable to extract tag using discriminator self-schema'):
+        SchemaValidator({})
+
+
+def test_wrong_type():
+    with pytest.raises(SchemaError, match="Input tag 'unknown' found using self-schema does not match any of the"):
+        SchemaValidator({'type': 'unknown'})
+
+
+def test_function_no_mode():
+    with pytest.raises(SchemaError, match='Unable to extract tag using discriminator self-schema'):
+        SchemaValidator({'type': 'function'})
+
+
+def test_try_self_schema_discriminator():
+    """Trying to use self-schema when it shouldn't be used"""
+    v = SchemaValidator({'type': 'tagged-union', 'choices': {'int': 'int'}, 'discriminator': 'self-schema'})
+    assert 'discriminator: LookupKey' in repr(v)

@@ -170,6 +170,7 @@ impl BuildValidator for TaggedUnionValidator {
         let py = schema.py();
         let discriminator = Discriminator::new(py, schema.get_as_req("discriminator")?)?;
         let discriminator_repr = discriminator.to_string_py(py)?;
+        dbg!(&discriminator_repr);
 
         let mut choices = AHashMap::new();
         let mut first = true;
@@ -262,8 +263,7 @@ impl Validator for TaggedUnionValidator {
                             Some(t) => t.strict_str()?,
                             None => return Err(self.tag_not_found(input)),
                         },
-                        // this shouldn't happen
-                        _ => return Err(self.tag_not_found(input)),
+                        _ => unreachable!(),
                     };
                     // custom logic to distinguish between different function schemas
                     if tag.as_cow().as_ref() == "function" {
@@ -272,8 +272,7 @@ impl Validator for TaggedUnionValidator {
                                 Some(m) => m.strict_str()?,
                                 None => return Err(self.tag_not_found(input)),
                             },
-                            // this shouldn't happen
-                            _ => return Err(self.tag_not_found(input)),
+                            _ => unreachable!(),
                         };
                         if mode.as_cow().as_ref() == "plain" {
                             tag = EitherString::Cow(Cow::Borrowed("function-plain"))
