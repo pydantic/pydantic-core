@@ -58,7 +58,7 @@ impl<'py> SchemaDict<'py> for Option<&PyDict> {
     {
         match self {
             Some(d) => d.get_as_req(key),
-            None => py_error!(PyKeyError; "{}", &key),
+            None => py_error!(PyKeyError; "{}", key),
         }
     }
 }
