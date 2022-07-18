@@ -138,18 +138,29 @@ impl Validator for StrConstrainedValidator {
 
 impl StrConstrainedValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedValidator> {
-        let pattern_str: Option<&str> = schema_or_config(schema, config, "pattern", "str_pattern")?;
+        let py = schema.py();
+        let pattern_str: Option<&str> =
+            schema_or_config(schema, config, intern!(py, "pattern"), intern!(py, "str_pattern"))?;
         let pattern = match pattern_str {
             Some(s) => Some(build_regex(s)?),
             None => None,
         };
-        let min_length: Option<usize> = schema_or_config(schema, config, "min_length", "str_min_length")?;
-        let max_length: Option<usize> = schema_or_config(schema, config, "max_length", "str_max_length")?;
+        let min_length: Option<usize> =
+            schema_or_config(schema, config, intern!(py, "min_length"), intern!(py, "str_min_length"))?;
+        let max_length: Option<usize> =
+            schema_or_config(schema, config, intern!(py, "max_length"), intern!(py, "str_max_length"))?;
 
-        let strip_whitespace: bool =
-            schema_or_config(schema, config, "strip_whitespace", "str_strip_whitespace")?.unwrap_or(false);
-        let to_lower: bool = schema_or_config(schema, config, "to_lower", "str_to_lower")?.unwrap_or(false);
-        let to_upper: bool = schema_or_config(schema, config, "to_upper", "str_to_upper")?.unwrap_or(false);
+        let strip_whitespace: bool = schema_or_config(
+            schema,
+            config,
+            intern!(py, "strip_whitespace"),
+            intern!(py, "str_strip_whitespace"),
+        )?
+        .unwrap_or(false);
+        let to_lower: bool =
+            schema_or_config(schema, config, intern!(py, "to_lower"), intern!(py, "str_to_lower"))?.unwrap_or(false);
+        let to_upper: bool =
+            schema_or_config(schema, config, intern!(py, "to_upper"), intern!(py, "str_to_upper"))?.unwrap_or(false);
 
         Ok(Self {
             strict: is_strict(schema, config)?,

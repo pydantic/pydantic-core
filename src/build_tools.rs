@@ -3,23 +3,23 @@ use std::fmt;
 
 use pyo3::exceptions::{PyException, PyKeyError};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use pyo3::{intern, FromPyObject, PyErrArguments, ToBorrowedObject};
+use pyo3::types::{PyDict, PyString};
+use pyo3::{intern, FromPyObject, PyErrArguments};
 
 use crate::errors::{pretty_line_errors, ValError};
 
 pub trait SchemaDict<'py> {
-    fn get_as<T>(&'py self, key: impl ToBorrowedObject + fmt::Display + Copy) -> PyResult<Option<T>>
+    fn get_as<T>(&'py self, key: &PyString) -> PyResult<Option<T>>
     where
         T: FromPyObject<'py>;
 
-    fn get_as_req<T>(&'py self, key: impl ToBorrowedObject + fmt::Display + Copy) -> PyResult<T>
+    fn get_as_req<T>(&'py self, key: &PyString) -> PyResult<T>
     where
         T: FromPyObject<'py>;
 }
 
 impl<'py> SchemaDict<'py> for PyDict {
-    fn get_as<T>(&'py self, key: impl ToBorrowedObject + fmt::Display + Copy) -> PyResult<Option<T>>
+    fn get_as<T>(&'py self, key: &PyString) -> PyResult<Option<T>>
     where
         T: FromPyObject<'py>,
     {
@@ -29,7 +29,7 @@ impl<'py> SchemaDict<'py> for PyDict {
         }
     }
 
-    fn get_as_req<T>(&'py self, key: impl ToBorrowedObject + fmt::Display + Copy) -> PyResult<T>
+    fn get_as_req<T>(&'py self, key: &PyString) -> PyResult<T>
     where
         T: FromPyObject<'py>,
     {
@@ -41,7 +41,7 @@ impl<'py> SchemaDict<'py> for PyDict {
 }
 
 impl<'py> SchemaDict<'py> for Option<&PyDict> {
-    fn get_as<T>(&'py self, key: impl ToBorrowedObject + fmt::Display + Copy) -> PyResult<Option<T>>
+    fn get_as<T>(&'py self, key: &PyString) -> PyResult<Option<T>>
     where
         T: FromPyObject<'py>,
     {
@@ -52,7 +52,7 @@ impl<'py> SchemaDict<'py> for Option<&PyDict> {
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
-    fn get_as_req<T>(&'py self, key: impl ToBorrowedObject + fmt::Display + Copy) -> PyResult<T>
+    fn get_as_req<T>(&'py self, key: &PyString) -> PyResult<T>
     where
         T: FromPyObject<'py>,
     {
@@ -66,8 +66,8 @@ impl<'py> SchemaDict<'py> for Option<&PyDict> {
 pub fn schema_or_config<'py, T>(
     schema: &'py PyDict,
     config: Option<&'py PyDict>,
-    schema_key: impl ToBorrowedObject + fmt::Display + Copy,
-    config_key: impl ToBorrowedObject + fmt::Display + Copy,
+    schema_key: &PyString,
+    config_key: &PyString,
 ) -> PyResult<Option<T>>
 where
     T: FromPyObject<'py>,

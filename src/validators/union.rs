@@ -193,7 +193,8 @@ impl BuildValidator for TaggedUnionValidator {
             choices.insert(tag, validator);
         }
 
-        let from_attributes = schema_or_config(schema, config, "from_attributes", "from_attributes")?.unwrap_or(false);
+        let key = intern!(py, "from_attributes");
+        let from_attributes = schema_or_config(schema, config, key, key)?.unwrap_or(false);
 
         Ok(Self {
             choices,

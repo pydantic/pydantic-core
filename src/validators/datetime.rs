@@ -1,6 +1,6 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDateTime, PyDict};
+use pyo3::types::{PyDateTime, PyDict, PyString};
 use speedate::DateTime;
 
 use crate::build_tools::{is_strict, SchemaDict};
@@ -42,10 +42,10 @@ impl BuildValidator for DateTimeValidator {
             strict: is_strict(schema, config)?,
             constraints: match has_constraints {
                 true => Some(DateTimeConstraints {
-                    le: py_datetime_as_datetime(schema, "le")?,
-                    lt: py_datetime_as_datetime(schema, "lt")?,
-                    ge: py_datetime_as_datetime(schema, "ge")?,
-                    gt: py_datetime_as_datetime(schema, "gt")?,
+                    le: py_datetime_as_datetime(schema, intern!(py, "le"))?,
+                    lt: py_datetime_as_datetime(schema, intern!(py, "lt"))?,
+                    ge: py_datetime_as_datetime(schema, intern!(py, "ge"))?,
+                    gt: py_datetime_as_datetime(schema, intern!(py, "gt"))?,
                 }),
                 false => None,
             },
@@ -102,7 +102,7 @@ impl Validator for DateTimeValidator {
     }
 }
 
-fn py_datetime_as_datetime(schema: &PyDict, field: &str) -> PyResult<Option<DateTime>> {
+fn py_datetime_as_datetime(schema: &PyDict, field: &PyString) -> PyResult<Option<DateTime>> {
     match schema.get_as::<&PyDateTime>(field)? {
         Some(dt) => Ok(Some(EitherDateTime::Py(dt).as_raw()?)),
         None => Ok(None),
