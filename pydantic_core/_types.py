@@ -95,7 +95,7 @@ class IntSchema(TypedDict, total=False):
 
 class ListSchema(TypedDict, total=False):
     type: Required[Literal['list']]
-    items_schema: Schema  # default: AnySchema
+    items_schema: Schema
     min_items: int
     max_items: int
     strict: bool
@@ -158,7 +158,7 @@ class RecursiveReferenceSchema(TypedDict):
 
 class SetSchema(TypedDict, total=False):
     type: Required[Literal['set']]
-    items_schema: Schema  # default: AnySchema
+    items_schema: Schema
     min_items: int
     max_items: int
     strict: bool
@@ -167,10 +167,18 @@ class SetSchema(TypedDict, total=False):
 
 class FrozenSetSchema(TypedDict, total=False):
     type: Required[Literal['frozenset']]
-    items_schema: Schema  # default: AnySchema
+    items_schema: Schema
     min_items: int
     max_items: int
     strict: bool
+    ref: str
+
+
+class SequenceSchema(TypedDict, total=False):
+    type: Required[Literal['sequence']]
+    items_schema: Schema
+    min_items: int
+    max_items: int
     ref: str
 
 
@@ -290,6 +298,7 @@ BareType = Literal[
     'set',
     'frozenset',
     'tuple-var-len',
+    'sequence',
     'date',
     'time',
     'datetime',
@@ -318,6 +327,7 @@ Schema = Union[
     RecursiveReferenceSchema,
     SetSchema,
     FrozenSetSchema,
+    SequenceSchema,
     StringSchema,
     TupleFixLenSchema,
     TupleVarLenSchema,

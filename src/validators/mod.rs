@@ -31,6 +31,7 @@ mod model_class;
 mod none;
 mod nullable;
 mod recursive;
+mod sequence;
 mod set;
 mod string;
 mod time;
@@ -304,6 +305,10 @@ pub fn build_validator<'a>(
         list::ListValidator,
         // sets - unique lists
         set::SetValidator,
+        // frozen sets
+        frozenset::FrozenSetValidator,
+        // sequences - list, tuple, set or frozenset
+        sequence::SequenceValidator,
         // dicts/objects (recursive)
         dict::DictValidator,
         // None/null
@@ -324,8 +329,6 @@ pub fn build_validator<'a>(
         time::TimeValidator,
         // datetimes
         datetime::DateTimeValidator,
-        // frozensets
-        frozenset::FrozenSetValidator,
         // timedelta
         timedelta::TimeDeltaValidator,
         // introspection types
@@ -393,6 +396,10 @@ pub enum CombinedValidator {
     List(list::ListValidator),
     // sets - unique lists
     Set(set::SetValidator),
+    // frozen sets
+    FrozenSet(frozenset::FrozenSetValidator),
+    // sequences - list, tuple, set or frozenset
+    Sequence(sequence::SequenceValidator),
     // tuples
     TupleVarLen(tuple::TupleVarLenValidator),
     TupleFixLen(tuple::TupleFixLenValidator),
@@ -425,8 +432,6 @@ pub enum CombinedValidator {
     Time(time::TimeValidator),
     // datetimes
     Datetime(datetime::DateTimeValidator),
-    // frozensets
-    FrozenSet(frozenset::FrozenSetValidator),
     // timedelta
     Timedelta(timedelta::TimeDeltaValidator),
     // introspection types
