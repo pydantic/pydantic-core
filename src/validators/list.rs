@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::SchemaDict;
 use crate::errors::ValResult;
-use crate::input::Input;
+use crate::input::{GenericSequence, Input};
 use crate::recursion_guard::RecursionGuard;
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -69,7 +69,10 @@ impl Validator for ListValidator {
 
         let output = match self.item_validator {
             Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
-            None => seq.to_vec(py),
+            None => match seq {
+                GenericSequence::List(list) => return Ok(list.into_py(py)),
+                _ => seq.to_vec(py),
+            },
         };
         Ok(output.into_py(py))
     }

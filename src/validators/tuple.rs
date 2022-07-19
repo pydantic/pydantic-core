@@ -38,7 +38,10 @@ impl Validator for TupleVarLenValidator {
 
         let output = match self.item_validator {
             Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
-            None => seq.to_vec(py),
+            None => match seq {
+                GenericSequence::Tuple(tuple) => return Ok(tuple.into_py(py)),
+                _ => seq.to_vec(py),
+            },
         };
         Ok(PyTuple::new(py, &output).into_py(py))
     }
