@@ -3,10 +3,10 @@ use pyo3::types::{PyDict, PyFrozenSet};
 
 use crate::build_tools::SchemaDict;
 use crate::errors::ValResult;
-use crate::input::{GenericSequence, Input};
+use crate::input::{GenericListLike, Input};
 use crate::recursion_guard::RecursionGuard;
 
-use super::list::sequence_build_function;
+use super::list::generic_list_like_build;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -19,7 +19,7 @@ pub struct FrozenSetValidator {
 
 impl BuildValidator for FrozenSetValidator {
     const EXPECTED_TYPE: &'static str = "frozenset";
-    sequence_build_function!();
+    generic_list_like_build!();
 }
 
 impl Validator for FrozenSetValidator {
@@ -38,7 +38,7 @@ impl Validator for FrozenSetValidator {
         let output = match self.item_validator {
             Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
             None => match seq {
-                GenericSequence::FrozenSet(f_set) => return Ok(f_set.into_py(py)),
+                GenericListLike::FrozenSet(f_set) => return Ok(f_set.into_py(py)),
                 _ => seq.to_vec(py),
             },
         };
