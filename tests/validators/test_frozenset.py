@@ -23,7 +23,7 @@ def test_frozenset_ints_both(py_and_json: PyAndJson, input_value, expected):
     'input_value,expected',
     [([], frozenset()), ([1, '2', b'3'], {1, '2', b'3'}), (frozenset([1, '2', b'3']), {1, '2', b'3'})],
 )
-def test_frozenset_any_both(input_value, expected):
+def test_frozenset_any(input_value, expected):
     v = SchemaValidator('frozenset')
     output = v.validate_python(input_value)
     assert output == expected

@@ -40,14 +40,32 @@ def test_list_strict():
 @pytest.mark.parametrize(
     'input_value,expected',
     [
+        ([1, 2, '3'], [1, 2, 3]),
         ((1, 2, '3'), [1, 2, 3]),
         ({1, 2, '3'}, IsList(1, 2, 3, check_order=False)),
         (frozenset([1, 2, '3']), IsList(1, 2, 3, check_order=False)),
     ],
 )
-def test_list(input_value, expected):
+def test_list_int(input_value, expected):
     v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
     assert v.validate_python(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ([], []),
+        ([1, '2', b'3'], [1, '2', b'3']),
+        (frozenset([1, '2', b'3']), IsList(1, '2', b'3', check_order=False)),
+        ((), []),
+        ((1, '2', b'3'), [1, '2', b'3']),
+        ({1, '2', b'3'}, IsList(1, '2', b'3', check_order=False)),
+    ],
+)
+def test_list_any(input_value, expected):
+    v = SchemaValidator('list')
+    output = v.validate_python(input_value)
+    assert output == expected
 
 
 @pytest.mark.parametrize(
