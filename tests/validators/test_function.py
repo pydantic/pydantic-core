@@ -252,7 +252,7 @@ def test_function_wrong_sig():
 
     # exception messages differ between python and pypy
     if platform.python_implementation() == 'PyPy':
-        error_message = 'f() got 2 unexpected keyword arguments'
+        error_message = 'f() got 3 unexpected keyword arguments'
     else:
         error_message = "f() got an unexpected keyword argument 'data'"
 
