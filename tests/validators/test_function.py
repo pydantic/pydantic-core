@@ -32,7 +32,7 @@ def test_function_before_raise():
         {
             'kind': 'value_error',
             'loc': [],
-            'message': 'Invalid value: foobar',
+            'message': 'Value error, foobar',
             'input_value': 'input value',
             'context': {'error': 'foobar'},
         }
@@ -304,7 +304,7 @@ def test_raise_assertion_error():
         {
             'kind': 'assertion_error',
             'loc': [],
-            'message': 'Assertion failed: foobar',
+            'message': 'Assertion failed, foobar',
             'input_value': 'input value',
             'context': {'error': 'foobar'},
         }
@@ -324,7 +324,7 @@ def test_raise_assertion_error_plain():
         {
             'kind': 'assertion_error',
             'loc': [],
-            'message': 'Assertion failed: Unknown error',
+            'message': 'Assertion failed, Unknown error',
             'input_value': 'input value',
             'context': {'error': 'Unknown error'},
         }

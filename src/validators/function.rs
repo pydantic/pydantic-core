@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{ErrorKind, ValError, ValResult, ValidationError};
+use crate::errors::{ErrorKind, ValError, ValResult, ValidationError, PydanticValueError};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
@@ -282,6 +282,8 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> Val
     if err.is_instance_of::<PyValueError>(py) {
         if let Ok(validation_error) = err.value(py).extract::<ValidationError>() {
             validation_error.into()
+        } else if let Ok(pydantic_value_error) = err.value(py).extract::<PydanticValueError>() {
+            pydantic_value_error.into_val_error(input)
         } else {
             match py_err_string(py, err) {
                 Ok(error) => ValError::new(ErrorKind::ValueError { error }, input),

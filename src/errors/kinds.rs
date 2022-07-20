@@ -3,6 +3,8 @@ use pyo3::types::PyDict;
 
 use strum::{Display, EnumMessage};
 
+use super::PydanticValueError;
+
 /// Definite each validation error.
 /// NOTE: if an error has parameters:
 /// * the variables in the message need to match the enum struct
@@ -151,11 +153,13 @@ pub enum ErrorKind {
     #[strum(message = "Data must have at most {max_length} bytes", serialize = "too_long")]
     BytesTooLong { max_length: usize },
     // ---------------------
-    // python errors from functions (the messages here will not be used as we sett message in these cases)
-    #[strum(message = "Invalid value: {error}")]
+    // python errors from functions
+    #[strum(message = "Value error, {error}")]
     ValueError { error: String },
-    #[strum(message = "Assertion failed: {error}")]
+    #[strum(message = "Assertion failed, {error}")]
     AssertionError { error: String },
+    // note strum message is not used here
+    CustomError { value_error: PydanticValueError },
     // ---------------------
     // literals
     #[strum(serialize = "literal_error", message = "Value must be {expected}")]
@@ -220,8 +224,8 @@ pub enum ErrorKind {
 }
 
 macro_rules! render {
-    ($template:ident, $($value:ident),* $(,)?) => {
-        $template
+    ($error_kind:ident, $($value:ident),* $(,)?) => {
+        $error_kind.get_message().expect("ErrorKind with no strum message")
         $(
             .replace(concat!("{", stringify!($value), "}"), $value)
         )*
@@ -229,8 +233,8 @@ macro_rules! render {
 }
 
 macro_rules! to_string_render {
-    ($template:ident, $($value:ident),* $(,)?) => {
-        $template
+    ($error_kind:ident, $($value:ident),* $(,)?) => {
+        $error_kind.get_message().expect("ErrorKind with no strum message")
         $(
             .replace(concat!("{", stringify!($value), "}"), $value.to_string().as_str())
         )*
@@ -248,60 +252,60 @@ macro_rules! py_dict {
 }
 
 impl ErrorKind {
-    pub fn render(&self) -> String {
-        let template: &'static str = self.get_message().expect("ErrorKind with no strum message");
+    pub fn render(&self, py: Python) -> String {
         match self {
-            Self::InvalidJson { error } => render!(template, error),
-            Self::GetAttributeError { error } => render!(template, error),
-            Self::ModelClassType { class_name } => render!(template, class_name),
-            Self::GreaterThan { gt } => render!(template, gt),
-            Self::GreaterThanEqual { ge } => render!(template, ge),
-            Self::LessThan { lt } => render!(template, lt),
-            Self::LessThanEqual { le } => render!(template, le),
-            Self::TooShort { min_length } => to_string_render!(template, min_length),
-            Self::TooLong { max_length } => to_string_render!(template, max_length),
-            Self::StrTooShort { min_length } => to_string_render!(template, min_length),
-            Self::StrTooLong { max_length } => to_string_render!(template, max_length),
-            Self::StrPatternMismatch { pattern } => render!(template, pattern),
-            Self::DictFromMapping { error } => render!(template, error),
+            Self::InvalidJson { error } => render!(self, error),
+            Self::GetAttributeError { error } => render!(self, error),
+            Self::ModelClassType { class_name } => render!(self, class_name),
+            Self::GreaterThan { gt } => render!(self, gt),
+            Self::GreaterThanEqual { ge } => render!(self, ge),
+            Self::LessThan { lt } => render!(self, lt),
+            Self::LessThanEqual { le } => render!(self, le),
+            Self::TooShort { min_length } => to_string_render!(self, min_length),
+            Self::TooLong { max_length } => to_string_render!(self, max_length),
+            Self::StrTooShort { min_length } => to_string_render!(self, min_length),
+            Self::StrTooLong { max_length } => to_string_render!(self, max_length),
+            Self::StrPatternMismatch { pattern } => render!(self, pattern),
+            Self::DictFromMapping { error } => render!(self, error),
             Self::TupleLengthMismatch {
                 expected_length,
                 plural,
             } => {
                 let plural = if *plural { "s" } else { "" };
-                to_string_render!(template, expected_length, plural)
+                to_string_render!(self, expected_length, plural)
             }
-            Self::IntNan { nan_value } => render!(template, nan_value),
-            Self::IntMultipleOf { multiple_of } => to_string_render!(template, multiple_of),
-            Self::IntGreaterThan { gt } => to_string_render!(template, gt),
-            Self::IntGreaterThanEqual { ge } => to_string_render!(template, ge),
-            Self::IntLessThan { lt } => to_string_render!(template, lt),
-            Self::IntLessThanEqual { le } => to_string_render!(template, le),
-            Self::FloatMultipleOf { multiple_of } => to_string_render!(template, multiple_of),
-            Self::FloatGreaterThan { gt } => to_string_render!(template, gt),
-            Self::FloatGreaterThanEqual { ge } => to_string_render!(template, ge),
-            Self::FloatLessThan { lt } => to_string_render!(template, lt),
-            Self::FloatLessThanEqual { le } => to_string_render!(template, le),
-            Self::BytesTooShort { min_length } => to_string_render!(template, min_length),
-            Self::BytesTooLong { max_length } => to_string_render!(template, max_length),
-            Self::ValueError { error } => render!(template, error),
-            Self::AssertionError { error } => render!(template, error),
-            Self::LiteralSingleError { expected } => render!(template, expected),
-            Self::LiteralMultipleError { expected } => render!(template, expected),
-            Self::DateParsing { error } => render!(template, error),
-            Self::DateFromDatetimeParsing { error } => render!(template, error),
-            Self::TimeParsing { error } => render!(template, error),
-            Self::DateTimeParsing { error } => render!(template, error),
-            Self::DateTimeObjectInvalid { error } => render!(template, error),
-            Self::TimeDeltaParsing { error } => render!(template, error),
-            Self::IsInstanceOf { class } => render!(template, class),
+            Self::IntNan { nan_value } => render!(self, nan_value),
+            Self::IntMultipleOf { multiple_of } => to_string_render!(self, multiple_of),
+            Self::IntGreaterThan { gt } => to_string_render!(self, gt),
+            Self::IntGreaterThanEqual { ge } => to_string_render!(self, ge),
+            Self::IntLessThan { lt } => to_string_render!(self, lt),
+            Self::IntLessThanEqual { le } => to_string_render!(self, le),
+            Self::FloatMultipleOf { multiple_of } => to_string_render!(self, multiple_of),
+            Self::FloatGreaterThan { gt } => to_string_render!(self, gt),
+            Self::FloatGreaterThanEqual { ge } => to_string_render!(self, ge),
+            Self::FloatLessThan { lt } => to_string_render!(self, lt),
+            Self::FloatLessThanEqual { le } => to_string_render!(self, le),
+            Self::BytesTooShort { min_length } => to_string_render!(self, min_length),
+            Self::BytesTooLong { max_length } => to_string_render!(self, max_length),
+            Self::ValueError { error } => render!(self, error),
+            Self::AssertionError { error } => render!(self, error),
+            Self::CustomError { value_error } => value_error.message(py),
+            Self::LiteralSingleError { expected } => render!(self, expected),
+            Self::LiteralMultipleError { expected } => render!(self, expected),
+            Self::DateParsing { error } => render!(self, error),
+            Self::DateFromDatetimeParsing { error } => render!(self, error),
+            Self::TimeParsing { error } => render!(self, error),
+            Self::DateTimeParsing { error } => render!(self, error),
+            Self::DateTimeObjectInvalid { error } => render!(self, error),
+            Self::TimeDeltaParsing { error } => render!(self, error),
+            Self::IsInstanceOf { class } => render!(self, class),
             Self::UnionTagInvalid {
                 discriminator,
                 tag,
                 expected_tags,
-            } => render!(template, discriminator, tag, expected_tags),
-            Self::UnionTagNotFound { discriminator } => render!(template, discriminator),
-            _ => template.to_string(),
+            } => render!(self, discriminator, tag, expected_tags),
+            Self::UnionTagNotFound { discriminator } => render!(self, discriminator),
+            _ => self.get_message().expect("ErrorKind with no strum message").to_string(),
         }
     }
 
@@ -339,6 +343,7 @@ impl ErrorKind {
             Self::BytesTooLong { max_length } => py_dict!(py, max_length),
             Self::ValueError { error } => py_dict!(py, error),
             Self::AssertionError { error } => py_dict!(py, error),
+            // Self::CustomError { value_error } => Ok(value_error.context),
             Self::LiteralSingleError { expected } => py_dict!(py, expected),
             Self::LiteralMultipleError { expected } => py_dict!(py, expected),
             Self::DateParsing { error } => py_dict!(py, error),
