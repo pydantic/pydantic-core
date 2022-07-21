@@ -41,7 +41,7 @@ impl PydanticValueError {
                 );
             }
         }
-        return message;
+        message
     }
 
     fn __repr__(&self, py: Python) -> String {
