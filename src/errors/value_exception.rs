@@ -4,7 +4,7 @@ use pyo3::types::{PyDict, PyString};
 
 use crate::input::Input;
 
-use super::{ValError, ErrorKind};
+use super::{ErrorKind, ValError};
 
 #[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
@@ -55,7 +55,15 @@ impl PydanticValueError {
 
 impl PydanticValueError {
     pub fn into_val_error<'a>(self, input: &'a impl Input<'a>) -> ValError<'a> {
-        let kind = ErrorKind::CustomError {value_error: self};
+        let kind = ErrorKind::CustomError { value_error: self };
         ValError::new(kind, input)
+    }
+
+    pub fn get_kind(&self) -> String {
+        self.kind.clone()
+    }
+
+    pub fn get_context(&self, py: Python) -> Option<Py<PyDict>> {
+        self.context.as_ref().map(|c| c.clone_ref(py))
     }
 }

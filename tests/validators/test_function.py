@@ -5,7 +5,7 @@ from typing import Type
 
 import pytest
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError
+from pydantic_core import PydanticValueError, SchemaError, SchemaValidator, ValidationError
 
 from ..conftest import plain_repr
 
@@ -354,3 +354,23 @@ def test_raise_type_error():
 
     with pytest.raises(TypeError, match='^foobar$'):
         v.validate_python('input value')
+
+
+def test_pydantic_value_error():
+    def f(input_value, **kwargs):
+        raise PydanticValueError('my_error', 'this is a custom error {foo}', {'foo': 'FOOBAR'})
+
+    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': f})
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(42)
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'my_error',
+            'loc': [],
+            'message': 'this is a custom error FOOBAR',
+            'input_value': 42,
+            'context': {'foo': 'FOOBAR'},
+        }
+    ]

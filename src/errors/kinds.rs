@@ -252,6 +252,13 @@ macro_rules! py_dict {
 }
 
 impl ErrorKind {
+    pub fn kind(&self) -> String {
+        match self {
+            Self::CustomError { value_error } => value_error.get_kind(),
+            _ => self.to_string(),
+        }
+    }
+
     pub fn render(&self, py: Python) -> String {
         match self {
             Self::InvalidJson { error } => render!(self, error),
@@ -309,7 +316,7 @@ impl ErrorKind {
         }
     }
 
-    pub fn py_dict(&self, py: Python) -> PyResult<Option<PyObject>> {
+    pub fn py_dict(&self, py: Python) -> PyResult<Option<Py<PyDict>>> {
         match self {
             Self::InvalidJson { error } => py_dict!(py, error),
             Self::GetAttributeError { error } => py_dict!(py, error),
@@ -343,7 +350,7 @@ impl ErrorKind {
             Self::BytesTooLong { max_length } => py_dict!(py, max_length),
             Self::ValueError { error } => py_dict!(py, error),
             Self::AssertionError { error } => py_dict!(py, error),
-            // Self::CustomError { value_error } => Ok(value_error.context),
+            Self::CustomError { value_error } => Ok(value_error.get_context(py)),
             Self::LiteralSingleError { expected } => py_dict!(py, expected),
             Self::LiteralMultipleError { expected } => py_dict!(py, expected),
             Self::DateParsing { error } => py_dict!(py, error),

@@ -16,7 +16,7 @@ mod validators;
 
 // required for benchmarks
 pub use build_tools::SchemaError;
-pub use errors::{ValidationError, PydanticValueError};
+pub use errors::{PydanticValueError, ValidationError};
 pub use validators::SchemaValidator;
 
 pub fn get_version() -> String {

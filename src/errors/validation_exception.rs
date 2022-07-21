@@ -100,10 +100,7 @@ macro_rules! truncate_input_value {
     };
 }
 
-pub fn pretty_py_line_errors<'a>(
-    py: Python,
-    line_errors_iter: impl Iterator<Item = &'a PyLineError>,
-) -> String {
+pub fn pretty_py_line_errors<'a>(py: Python, line_errors_iter: impl Iterator<Item = &'a PyLineError>) -> String {
     line_errors_iter
         .map(|i| i.pretty(py))
         .collect::<Result<Vec<_>, _>>()
@@ -144,7 +141,7 @@ impl<'a> From<PyLineError> for ValLineError<'a> {
 impl PyLineError {
     pub fn as_dict(&self, py: Python) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
-        dict.set_item("kind", self.kind.to_string())?;
+        dict.set_item("kind", self.kind.kind())?;
         dict.set_item("loc", self.location.to_object(py))?;
         dict.set_item("message", self.kind.render(py))?;
         dict.set_item("input_value", &self.input_value)?;
@@ -158,7 +155,7 @@ impl PyLineError {
         let mut output = String::with_capacity(200);
         write!(output, "{}", self.location)?;
 
-        write!(output, "  {} [kind={}", self.kind.render(py), self.kind)?;
+        write!(output, "  {} [kind={}", self.kind.render(py), self.kind.kind())?;
 
         let input_value = self.input_value.as_ref(py);
         let input_str = match repr_string(input_value) {

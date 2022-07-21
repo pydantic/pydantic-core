@@ -1,5 +1,5 @@
 import sys
-from typing import Any, Dict, List, Optional, Union, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict, Union
 
 from pydantic_core._types import Config, Schema
 
@@ -8,7 +8,7 @@ if sys.version_info < (3, 11):
 else:
     from typing import NotRequired
 
-__all__ = '__version__', 'SchemaValidator', 'SchemaError', 'ValidationError'
+__all__ = '__version__', 'SchemaValidator', 'SchemaError', 'ValidationError', 'PydanticValueError'
 __version__: str
 
 class SchemaValidator:
@@ -39,7 +39,7 @@ class ValidationError(ValueError):
     def error_count(self) -> int: ...
     def errors(self) -> List[ErrorDetails]: ...
 
-
 class PydanticValueError(ValueError):
-    def __init__(self, kind: str, message_template: str, context: Optional[Dict[str, Union[str, int]]] = None) -> None:
-        ...
+    def __init__(
+        self, kind: str, message_template: str, context: Optional[Dict[str, Union[str, int]]] = None
+    ) -> None: ...
