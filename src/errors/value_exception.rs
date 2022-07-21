@@ -47,10 +47,11 @@ impl PydanticValueError {
                 let (key, value): (&PyString, &PyAny) = item.extract()?;
                 if let Ok(value_str) = value.extract::<&PyString>() {
                     message = message.replace(&format!("{{{}}}", key.to_str()?), value_str.to_str()?);
+                } else if let Ok(value_int) = value.extract::<i64>() {
+                    message = message.replace(&format!("{{{}}}", key.to_str()?), &value_int.to_string());
                 } else {
-                    // works for ints, else best effort
-                    let value_int = value.to_string();
-                    message = message.replace(&format!("{{{}}}", key.to_str()?), &value_int);
+                    // fallback for anything else just in case
+                    message = message.replace(&format!("{{{}}}", key.to_str()?), &value.to_string());
                 }
             }
         }

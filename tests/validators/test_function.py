@@ -357,13 +357,17 @@ def test_raise_type_error():
 
 
 def test_pydantic_value_error():
-    e = PydanticValueError('my_error', 'this is a custom error {missed} {foo} {bar}', {'foo': 'FOOBAR', 'bar': 42})
-    assert e.message() == 'this is a custom error {missed} FOOBAR 42'
-    assert e.message_template == 'this is a custom error {missed} {foo} {bar}'
+    e = PydanticValueError(
+        'my_error', 'this is a custom error {missed} {foo} {bar} {spam}', {'foo': 'FOOBAR', 'bar': 42, 'spam': []}
+    )
+    assert e.message() == 'this is a custom error {missed} FOOBAR 42 []'
+    assert e.message_template == 'this is a custom error {missed} {foo} {bar} {spam}'
     assert e.kind == 'my_error'
-    assert e.context == {'foo': 'FOOBAR', 'bar': 42}
-    assert str(e) == 'this is a custom error {missed} FOOBAR 42'
-    assert repr(e) == "this is a custom error {missed} FOOBAR 42 [kind=my_error, context={'foo': 'FOOBAR', 'bar': 42}]"
+    assert e.context == {'foo': 'FOOBAR', 'bar': 42, 'spam': []}
+    assert str(e) == 'this is a custom error {missed} FOOBAR 42 []'
+    assert (
+        repr(e) == "this is a custom error {missed} FOOBAR 42 [] [kind=my_error, context={'foo': 'FOOBAR', 'bar': 42}]"
+    )
 
 
 def test_pydantic_value_error_none():
