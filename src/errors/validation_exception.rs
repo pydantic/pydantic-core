@@ -143,7 +143,7 @@ impl PyLineError {
         let dict = PyDict::new(py);
         dict.set_item("kind", self.kind.kind())?;
         dict.set_item("loc", self.location.to_object(py))?;
-        dict.set_item("message", self.kind.render(py))?;
+        dict.set_item("message", self.kind.render_message(py)?)?;
         dict.set_item("input_value", &self.input_value)?;
         if let Some(context) = self.kind.py_dict(py)? {
             dict.set_item("context", context)?;
@@ -155,7 +155,11 @@ impl PyLineError {
         let mut output = String::with_capacity(200);
         write!(output, "{}", self.location)?;
 
-        write!(output, "  {} [kind={}", self.kind.render(py), self.kind.kind())?;
+        let message = match self.kind.render_message(py) {
+            Ok(message) => message,
+            Err(err) => format!("(error rendering message: {})", err),
+        };
+        write!(output, "  {} [kind={}", message, self.kind.kind())?;
 
         let input_value = self.input_value.as_ref(py);
         let input_str = match repr_string(input_value) {

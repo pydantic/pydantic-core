@@ -357,8 +357,28 @@ def test_raise_type_error():
 
 
 def test_pydantic_value_error():
+    e = PydanticValueError('my_error', 'this is a custom error {missed} {foo} {bar}', {'foo': 'FOOBAR', 'bar': 42})
+    assert e.message() == 'this is a custom error {missed} FOOBAR 42'
+    assert e.message_template == 'this is a custom error {missed} {foo} {bar}'
+    assert e.kind == 'my_error'
+    assert e.context == {'foo': 'FOOBAR', 'bar': 42}
+    assert str(e) == 'this is a custom error {missed} FOOBAR 42'
+    assert repr(e) == "this is a custom error {missed} FOOBAR 42 [kind=my_error, context={'foo': 'FOOBAR', 'bar': 42}]"
+
+
+def test_pydantic_value_error_none():
+    e = PydanticValueError('my_error', 'this is a custom error {missed}')
+    assert e.message() == 'this is a custom error {missed}'
+    assert e.message_template == 'this is a custom error {missed}'
+    assert e.kind == 'my_error'
+    assert e.context is None
+    assert str(e) == 'this is a custom error {missed}'
+    assert repr(e) == 'this is a custom error {missed} [kind=my_error, context=None]'
+
+
+def test_pydantic_value_error_usage():
     def f(input_value, **kwargs):
-        raise PydanticValueError('my_error', 'this is a custom error {foo}', {'foo': 'FOOBAR'})
+        raise PydanticValueError('my_error', 'this is a custom error {foo} {bar}', {'foo': 'FOOBAR', 'bar': 42})
 
     v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': f})
 
@@ -369,8 +389,36 @@ def test_pydantic_value_error():
         {
             'kind': 'my_error',
             'loc': [],
-            'message': 'this is a custom error FOOBAR',
+            'message': 'this is a custom error FOOBAR 42',
             'input_value': 42,
-            'context': {'foo': 'FOOBAR'},
+            'context': {'foo': 'FOOBAR', 'bar': 42},
         }
     ]
+
+
+def test_pydantic_value_error_invalid_dict():
+    def f(input_value, **kwargs):
+        raise PydanticValueError('my_error', 'this is a custom error {foo}', {(): 'foobar'})
+
+    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': f})
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(42)
+
+    assert str(exc_info.value) == (
+        '1 validation error for function-plain\n'
+        "  (error rendering message: TypeError: 'tuple' object cannot be converted to 'PyString') "
+        '[kind=my_error, input_value=42, input_type=int]'
+    )
+    with pytest.raises(TypeError, match="'tuple' object cannot be converted to 'PyString'"):
+        exc_info.value.errors()
+
+
+def test_pydantic_value_error_invalid_type():
+    def f(input_value, **kwargs):
+        raise PydanticValueError('my_error', 'this is a custom error {foo}', [('foo', 123)])
+
+    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': f})
+
+    with pytest.raises(TypeError, match="argument 'context': 'list' object cannot be converted to 'PyDict'"):
+        v.validate_python(42)

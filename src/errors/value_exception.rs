@@ -30,26 +30,43 @@ impl PydanticValueError {
         self.kind.clone()
     }
 
-    pub fn message(&self, py: Python) -> String {
+    #[getter]
+    pub fn message_template(&self) -> String {
+        self.message_template.clone()
+    }
+
+    #[getter]
+    pub fn context(&self, py: Python) -> Option<Py<PyDict>> {
+        self.context.as_ref().map(|c| c.clone_ref(py))
+    }
+
+    pub fn message(&self, py: Python) -> PyResult<String> {
         let mut message = self.message_template.clone();
         if let Some(ref context) = self.context {
             for item in context.as_ref(py).items().iter() {
-                let (key, value): (&PyString, &PyString) = item.extract().unwrap();
-                message = message.replace(
-                    &format!("{{{}}}", key.to_string_lossy().as_ref()),
-                    value.to_string_lossy().as_ref(),
-                );
+                let (key, value): (&PyString, &PyAny) = item.extract()?;
+                if let Ok(value_str) = value.extract::<&PyString>() {
+                    message = message.replace(&format!("{{{}}}", key.to_str()?), value_str.to_str()?);
+                } else {
+                    // works for ints, else best effort
+                    let value_int = value.to_string();
+                    message = message.replace(&format!("{{{}}}", key.to_str()?), &value_int);
+                }
             }
         }
-        message
+        Ok(message)
     }
 
-    fn __repr__(&self, py: Python) -> String {
-        format!("{} [kind={}]", self.message(py), self.kind)
+    fn __str__(&self, py: Python) -> PyResult<String> {
+        self.message(py)
     }
 
-    fn __str__(&self, py: Python) -> String {
-        self.__repr__(py)
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        let msg = self.message(py)?;
+        match { self.context.as_ref() } {
+            Some(ctx) => Ok(format!("{} [kind={}, context={}]", msg, self.kind, ctx.as_ref(py))),
+            None => Ok(format!("{} [kind={}, context=None]", msg, self.kind)),
+        }
     }
 }
 
@@ -57,13 +74,5 @@ impl PydanticValueError {
     pub fn into_val_error<'a>(self, input: &'a impl Input<'a>) -> ValError<'a> {
         let kind = ErrorKind::CustomError { value_error: self };
         ValError::new(kind, input)
-    }
-
-    pub fn get_kind(&self) -> String {
-        self.kind.clone()
-    }
-
-    pub fn get_context(&self, py: Python) -> Option<Py<PyDict>> {
-        self.context.as_ref().map(|c| c.clone_ref(py))
     }
 }

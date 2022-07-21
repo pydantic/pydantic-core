@@ -306,19 +306,23 @@ pub enum ErrorKind {
 
 macro_rules! render {
     ($error_kind:ident, $($value:ident),* $(,)?) => {
-        $error_kind.get_message().expect("ErrorKind with no strum message")
-        $(
-            .replace(concat!("{", stringify!($value), "}"), $value)
-        )*
+        Ok(
+            $error_kind.get_message().expect("ErrorKind with no strum message")
+            $(
+                .replace(concat!("{", stringify!($value), "}"), $value)
+            )*
+        )
     };
 }
 
 macro_rules! to_string_render {
     ($error_kind:ident, $($value:ident),* $(,)?) => {
-        $error_kind.get_message().expect("ErrorKind with no strum message")
-        $(
-            .replace(concat!("{", stringify!($value), "}"), $value.to_string().as_str())
-        )*
+        Ok(
+            $error_kind.get_message().expect("ErrorKind with no strum message")
+            $(
+                .replace(concat!("{", stringify!($value), "}"), &$value.to_string())
+            )*
+        )
     };
 }
 
@@ -326,7 +330,7 @@ macro_rules! py_dict {
     ($py:ident, $($value:expr),* $(,)?) => {{
         let dict = PyDict::new($py);
         $(
-        dict.set_item(stringify!($value), $value.into_py($py))?;
+            dict.set_item(stringify!($value), $value.into_py($py))?;
         )*
         Ok(Some(dict.into_py($py)))
     }};
@@ -335,12 +339,12 @@ macro_rules! py_dict {
 impl ErrorKind {
     pub fn kind(&self) -> String {
         match self {
-            Self::CustomError { value_error } => value_error.get_kind(),
+            Self::CustomError { value_error } => value_error.kind(),
             _ => self.to_string(),
         }
     }
 
-    pub fn render(&self, py: Python) -> String {
+    pub fn render_message(&self, py: Python) -> PyResult<String> {
         match self {
             Self::InvalidJson { error } => render!(self, error),
             Self::GetAttributeError { error } => render!(self, error),
@@ -393,7 +397,7 @@ impl ErrorKind {
                 expected_tags,
             } => render!(self, discriminator, tag, expected_tags),
             Self::UnionTagNotFound { discriminator } => render!(self, discriminator),
-            _ => self.get_message().expect("ErrorKind with no strum message").to_string(),
+            _ => Ok(self.get_message().expect("ErrorKind with no strum message").to_string()),
         }
     }
 
@@ -431,7 +435,7 @@ impl ErrorKind {
             Self::BytesTooLong { max_length } => py_dict!(py, max_length),
             Self::ValueError { error } => py_dict!(py, error),
             Self::AssertionError { error } => py_dict!(py, error),
-            Self::CustomError { value_error } => Ok(value_error.get_context(py)),
+            Self::CustomError { value_error } => Ok(value_error.context(py)),
             Self::LiteralSingleError { expected } => py_dict!(py, expected),
             Self::LiteralMultipleError { expected } => py_dict!(py, expected),
             Self::DateParsing { error } => py_dict!(py, error),

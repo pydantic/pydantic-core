@@ -40,6 +40,11 @@ class ValidationError(ValueError):
     def errors(self) -> List[ErrorDetails]: ...
 
 class PydanticValueError(ValueError):
+    kind: str
+    message_template: str
+    context: Optional[Dict[str, Union[str, int]]]
+
     def __init__(
         self, kind: str, message_template: str, context: Optional[Dict[str, Union[str, int]]] = None
     ) -> None: ...
+    def message(self) -> str: ...
