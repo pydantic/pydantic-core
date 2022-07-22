@@ -422,8 +422,8 @@ pub enum CombinedValidator {
     // sets - unique lists
     Set(set::SetValidator),
     // tuples
-    TupleFixLen(tuple::TuplePositionalValidator),
-    TupleVarLen(tuple::TupleVariableValidator),
+    TuplePositional(tuple::TuplePositionalValidator),
+    TupleVariable(tuple::TupleVariableValidator),
     // dicts/objects (recursive)
     Dict(dict::DictValidator),
     // None/null
