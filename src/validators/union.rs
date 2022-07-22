@@ -267,8 +267,8 @@ impl Validator for TaggedUnionValidator {
                     };
                     let tag_cow = either_tag.as_cow();
                     let mut tag = tag_cow.as_ref();
-                    // custom logic to distinguish between different function schemas
-                    if tag == "function" {
+                    // custom logic to distinguish between different function and tuple schemas
+                    if tag == "function" || tag == "tuple" {
                         let mode = match dict {
                             GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "mode")) {
                                 Some(m) => m.strict_str()?,
@@ -276,20 +276,17 @@ impl Validator for TaggedUnionValidator {
                             },
                             _ => unreachable!(),
                         };
-                        if mode.as_cow().as_ref() == "plain" {
-                            tag = "function-plain";
-                        }
-                    } else if tag == "tuple" {
-                        let positional = match dict {
-                            GenericMapping::PyDict(dict) => {
-                                dict.contains(intern!(py, "positional_schema")).unwrap_or(false)
+                        if tag == "function" {
+                            if mode.as_cow().as_ref() == "plain" {
+                                tag = "function-plain";
                             }
-                            _ => unreachable!(),
-                        };
-                        if positional {
-                            tag = "tuple-positional";
                         } else {
-                            tag = "tuple-variable";
+                            // tag == "tuple"
+                            if mode.as_cow().as_ref() == "positional" {
+                                tag = "tuple-positional";
+                            } else {
+                                tag = "tuple-variable";
+                            }
                         }
                     }
                     self.find_call_validator(py, tag, input, extra, slots, recursion_guard)

@@ -21,9 +21,9 @@ impl BuildValidator for TupleBuilder {
         config: Option<&PyDict>,
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
-        match schema.get_as(intern!(schema.py(), "positional_schema"))? {
-            Some(p) => TuplePositionalSchema::build(p, schema, config, build_context),
-            None => TupleVariableValidator::build(schema, config, build_context),
+        match schema.get_as_req::<&str>(intern!(schema.py(), "mode"))? {
+            "positional" => TuplePositionalSchema::build(schema, config, build_context),
+            _ => TupleVariableValidator::build(schema, config, build_context),
         }
     }
 }
@@ -85,15 +85,15 @@ pub struct TuplePositionalSchema {
 
 impl TuplePositionalSchema {
     fn build(
-        positional_schema: &PyList,
         schema: &PyDict,
         config: Option<&PyDict>,
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
-        if positional_schema.is_empty() {
-            return py_error!("Empty positional schema");
+        let items: &PyList = schema.get_as_req(intern!(schema.py(), "items_schema"))?;
+        if items.is_empty() {
+            return py_error!("Empty positional items schema");
         }
-        let validators: Vec<CombinedValidator> = positional_schema
+        let validators: Vec<CombinedValidator> = items
             .iter()
             .map(|item| build_validator(item, config, build_context).map(|result| result.0))
             .collect::<PyResult<Vec<CombinedValidator>>>()?;

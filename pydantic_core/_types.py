@@ -251,13 +251,15 @@ class TimedeltaSchema(TypedDict, total=False):
 
 class TuplePositionalSchema(TypedDict, total=False):
     type: Required[Literal['tuple']]
-    positional_schema: Required[List[Schema]]
+    mode: Required[Literal['positional']]
+    items_schema: Required[List[Schema]]
     strict: bool
     ref: str
 
 
 class TupleVariableSchema(TypedDict, total=False):
     type: Required[Literal['tuple']]
+    mode: Required[Literal['variable']]
     items_schema: Schema
     min_items: int
     max_items: int
@@ -289,7 +291,6 @@ BareType = Literal[
     'list',
     'set',
     'frozenset',
-    'tuple',
     'date',
     'time',
     'datetime',

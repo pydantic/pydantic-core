@@ -157,7 +157,7 @@ def main():
         if key == 'function' and value['fields']['mode']['schema']['expected'] == ['plain']:
             key = 'function-plain'
         elif key == 'tuple':
-            if 'positional_schema' in value['fields']:
+            if value['fields']['mode']['schema']['expected'] == ['positional']:
                 key = 'tuple-positional'
             else:
                 key = 'tuple-variable'
