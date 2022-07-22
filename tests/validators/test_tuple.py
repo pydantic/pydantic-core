@@ -317,7 +317,18 @@ def test_tuple_fix_error():
 def test_tuple_fix_extra():
     v = SchemaValidator({'type': 'tuple', 'mode': 'positional', 'items_schema': ['int', 'str'], 'extra_schema': 'str'})
     assert v.validate_python([1, 'a']) == (1, 'a')
-    assert v.validate_python([1, 'a', 'b']) == (1, 'a', 'b')
+    assert v.validate_python((1, 'a')) == (1, 'a')
+    assert v.validate_python((1, 'a', 'b')) == (1, 'a', 'b')
     assert v.validate_python([1, 'a', 'b', 'c', 'd']) == (1, 'a', 'b', 'c', 'd')
     with pytest.raises(ValidationError, match='Input must have at least 2 items'):
         v.validate_python([1])
+
+
+def test_tuple_fix_extra_any():
+    v = SchemaValidator({'type': 'tuple', 'mode': 'positional', 'items_schema': ['str'], 'extra_schema': 'any'})
+    assert v.validate_python([1]) == ('1',)
+    assert v.validate_python([1, 2]) == ('1', 2)
+    assert v.validate_python((1, 2)) == ('1', 2)
+    assert v.validate_python([1, 2, b'3']) == ('1', 2, b'3')
+    with pytest.raises(ValidationError, match='Input must have at least 1 items'):
+        v.validate_python([])
