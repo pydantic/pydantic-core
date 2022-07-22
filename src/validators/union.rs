@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::fmt::Write;
 
 use pyo3::intern;
@@ -9,7 +8,7 @@ use ahash::AHashMap;
 
 use crate::build_tools::{is_strict, schema_or_config, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
-use crate::input::{EitherString, GenericMapping, Input};
+use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 
@@ -242,7 +241,7 @@ impl Validator for TaggedUnionValidator {
                     GenericMapping::PyGetAttr(obj) => find_validator!(obj, py_get_attr),
                     GenericMapping::JsonObject(mapping) => find_validator!(mapping, json_get),
                 }?;
-                self.find_call_validator(py, tag.as_cow(), input, extra, slots, recursion_guard)
+                self.find_call_validator(py, tag.as_cow().as_ref(), input, extra, slots, recursion_guard)
             }
             Discriminator::Function(ref func) => {
                 let tag = func.call1(py, (input.to_object(py),))?;
@@ -250,24 +249,26 @@ impl Validator for TaggedUnionValidator {
                     Err(self.tag_not_found(input))
                 } else {
                     let tag: &PyString = tag.cast_as(py)?;
-                    self.find_call_validator(py, tag.to_string_lossy(), input, extra, slots, recursion_guard)
+                    self.find_call_validator(py, tag.to_str()?, input, extra, slots, recursion_guard)
                 }
             }
             Discriminator::SelfSchema => {
                 if input.strict_str().is_ok() {
                     // input is a string, must be a bare type
-                    self.find_call_validator(py, Cow::Borrowed("plain-string"), input, extra, slots, recursion_guard)
+                    self.find_call_validator(py, "plain-string", input, extra, slots, recursion_guard)
                 } else {
                     let dict = input.strict_dict()?;
-                    let mut tag = match dict {
+                    let either_tag = match dict {
                         GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "type")) {
                             Some(t) => t.strict_str()?,
                             None => return Err(self.tag_not_found(input)),
                         },
                         _ => unreachable!(),
                     };
+                    let tag_cow = either_tag.as_cow();
+                    let mut tag = tag_cow.as_ref();
                     // custom logic to distinguish between different function schemas
-                    if tag.as_cow().as_ref() == "function" {
+                    if tag == "function" {
                         let mode = match dict {
                             GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "mode")) {
                                 Some(m) => m.strict_str()?,
@@ -276,10 +277,22 @@ impl Validator for TaggedUnionValidator {
                             _ => unreachable!(),
                         };
                         if mode.as_cow().as_ref() == "plain" {
-                            tag = EitherString::Cow(Cow::Borrowed("function-plain"))
+                            tag = "function-plain";
+                        }
+                    } else if tag == "tuple" {
+                        let positional = match dict {
+                            GenericMapping::PyDict(dict) => {
+                                dict.contains(intern!(py, "positional_schema")).unwrap_or(false)
+                            }
+                            _ => unreachable!(),
+                        };
+                        if positional {
+                            tag = "tuple-positional";
+                        } else {
+                            tag = "tuple-variable";
                         }
                     }
-                    self.find_call_validator(py, tag.as_cow(), input, extra, slots, recursion_guard)
+                    self.find_call_validator(py, tag, input, extra, slots, recursion_guard)
                 }
             }
         }
@@ -300,16 +313,16 @@ impl TaggedUnionValidator {
     fn find_call_validator<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        tag: Cow<str>,
+        tag: &str,
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        if let Some(validator) = self.choices.get(tag.as_ref()) {
+        if let Some(validator) = self.choices.get(tag) {
             match validator.validate(py, input, extra, slots, recursion_guard) {
                 Ok(res) => Ok(res),
-                Err(err) => Err(err.with_outer_location(tag.as_ref().into())),
+                Err(err) => Err(err.with_outer_location(tag.into())),
             }
         } else {
             Err(ValError::new(

@@ -3,36 +3,34 @@ from typing import Any, Dict, Type
 
 import pytest
 from dirty_equals import IsNonNegative, IsTuple
-from typing_extensions import Literal
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
 from ..conftest import Err, PyAndJson
 
-TupleVariant = Literal['tuple-var-len', 'tuple-fix-len']
-
 
 @pytest.mark.parametrize(
-    'tuple_variant,items,input_value,expected',
+    'schema_key,items,input_value,expected',
     [
-        ('tuple-var-len', {'type': 'int'}, [1, 2, 3], (1, 2, 3)),
+        ('items_schema', {'type': 'int'}, [1, 2, 3], (1, 2, 3)),
         (
-            'tuple-var-len',
+            'items_schema',
             {'type': 'int'},
             1,
             Err('Value must be a valid tuple [kind=tuple_type, input_value=1, input_type=int]'),
         ),
-        ('tuple-fix-len', [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}], [1, 2, '3'], (1, 2, 3)),
+        ('positional_schema', [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}], [1, 2, '3'], (1, 2, 3)),
         (
-            'tuple-fix-len',
+            'positional_schema',
             [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}],
             5,
             Err('Value must be a valid tuple [kind=tuple_type, input_value=5, input_type=int]'),
         ),
     ],
+    ids=repr,
 )
-def test_tuple_json(py_and_json: PyAndJson, tuple_variant: TupleVariant, items, input_value, expected):
-    v = py_and_json({'type': tuple_variant, 'items_schema': items})
+def test_tuple_json(py_and_json: PyAndJson, schema_key, items, input_value, expected):
+    v = py_and_json({'type': 'tuple', schema_key: items})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -41,7 +39,7 @@ def test_tuple_json(py_and_json: PyAndJson, tuple_variant: TupleVariant, items, 
 
 
 def test_any_no_copy():
-    v = SchemaValidator('tuple-var-len')
+    v = SchemaValidator('tuple')
     input_value = (1, '2', b'3')
     output = v.validate_python(input_value)
     assert output == input_value
@@ -50,25 +48,25 @@ def test_any_no_copy():
 
 
 @pytest.mark.parametrize(
-    'tuple_variant,items,input,expected',
+    'schema_key,items,input_value,expected',
     [
-        ('tuple-var-len', {'type': 'int'}, (1, 2, '33'), (1, 2, 33)),
-        ('tuple-var-len', {'type': 'str'}, (1, 2, '33'), ('1', '2', '33')),
-        ('tuple-fix-len', [{'type': 'int'}, {'type': 'str'}, {'type': 'float'}], (1, 2, 33), (1, '2', 33.0)),
+        ('items_schema', {'type': 'int'}, (1, 2, '33'), (1, 2, 33)),
+        ('items_schema', {'type': 'str'}, (1, 2, '33'), ('1', '2', '33')),
+        ('positional_schema', [{'type': 'int'}, {'type': 'str'}, {'type': 'float'}], (1, 2, 33), (1, '2', 33.0)),
     ],
 )
-def test_tuple_strict_passes_with_tuple(tuple_variant: TupleVariant, items, input, expected):
-    v = SchemaValidator({'type': tuple_variant, 'items_schema': items, 'strict': True})
-    assert v.validate_python(input) == expected
+def test_tuple_strict_passes_with_tuple(schema_key, items, input_value, expected):
+    v = SchemaValidator({'type': 'tuple', schema_key: items, 'strict': True})
+    assert v.validate_python(input_value) == expected
 
 
 @pytest.mark.parametrize(
-    'tuple_variant,items',
-    [('tuple-var-len', {'type': 'int'}), ('tuple-fix-len', [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}])],
+    'schema_key,items',
+    [('items_schema', {'type': 'int'}), ('positional_schema', [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}])],
 )
 @pytest.mark.parametrize('wrong_coll_type', [list, set, frozenset])
-def test_tuple_strict_fails_without_tuple(wrong_coll_type: Type[Any], tuple_variant: TupleVariant, items):
-    v = SchemaValidator({'type': tuple_variant, 'items_schema': items, 'strict': True})
+def test_tuple_strict_fails_without_tuple(wrong_coll_type: Type[Any], schema_key, items):
+    v = SchemaValidator({'type': 'tuple', schema_key: items, 'strict': True})
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(wrong_coll_type([1, 2, '33']))
     assert exc_info.value.errors() == [
@@ -92,7 +90,7 @@ def test_tuple_strict_fails_without_tuple(wrong_coll_type: Type[Any], tuple_vari
     ],
 )
 def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
-    v = SchemaValidator({'type': 'tuple-var-len', **kwargs})
+    v = SchemaValidator({'type': 'tuple', **kwargs})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -101,8 +99,8 @@ def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
 
 
 @pytest.mark.parametrize(
-    'tuple_variant,items',
-    [('tuple-var-len', {'type': 'int'}), ('tuple-fix-len', [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}])],
+    'schema_key,items',
+    [('items_schema', {'type': 'int'}), ('positional_schema', [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}])],
 )
 @pytest.mark.parametrize(
     'input_value,expected',
@@ -112,8 +110,8 @@ def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
         (frozenset([1, 2, '3']), IsTuple(1, 2, 3, check_order=False)),
     ],
 )
-def test_tuple_validate(input_value, expected, tuple_variant, items):
-    v = SchemaValidator({'type': tuple_variant, 'items_schema': items})
+def test_tuple_validate(input_value, expected, schema_key, items):
+    v = SchemaValidator({'type': 'tuple', schema_key: items})
     assert v.validate_python(input_value) == expected
 
 
@@ -129,7 +127,7 @@ def test_tuple_validate(input_value, expected, tuple_variant, items):
     ],
 )
 def test_tuple_var_len_errors(input_value, index):
-    v = SchemaValidator({'type': 'tuple-var-len', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator({'type': 'tuple', 'items_schema': {'type': 'int'}})
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python(input_value)
     assert exc_info.value.errors() == [
@@ -158,7 +156,7 @@ def test_tuple_var_len_errors(input_value, index):
     ],
 )
 def test_tuple_fix_len_errors(input_value, items, index):
-    v = SchemaValidator({'type': 'tuple-fix-len', 'items_schema': items})
+    v = SchemaValidator({'type': 'tuple', 'positional_schema': items})
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python(input_value)
     assert exc_info.value.errors() == [
@@ -180,20 +178,19 @@ def test_tuple_fix_len_errors(input_value, items, index):
     ids=['input too long', 'input too short'],
 )
 def test_tuple_fix_len_input_and_schemas_len_mismatch(items, input_value, expected):
-    v = SchemaValidator({'type': 'tuple-fix-len', 'items_schema': items})
+    v = SchemaValidator({'type': 'tuple', 'positional_schema': items})
     with pytest.raises(ValidationError, match=re.escape(expected.message)):
         v.validate_python(input_value)
 
 
-@pytest.mark.parametrize('items,expected', [([], Err('Missing schemas for tuple elements'))])
-def test_tuple_fix_len_schema_error(items, expected):
-    with pytest.raises(SchemaError, match=expected.message):
-        SchemaValidator({'type': 'tuple-fix-len', 'items_schema': items})
+def test_tuple_fix_len_schema_error():
+    with pytest.raises(SchemaError, match='SchemaError: Empty positional schema'):
+        SchemaValidator({'type': 'tuple', 'positional_schema': []})
 
 
 @pytest.mark.parametrize('input_value,expected', [((1, 2, 3), (1, 2, 3)), ([1, 2, 3], [1, 2, 3])])
 def test_union_tuple_list(input_value, expected):
-    v = SchemaValidator({'type': 'union', 'choices': [{'type': 'tuple-var-len'}, {'type': 'list'}]})
+    v = SchemaValidator({'type': 'union', 'choices': [{'type': 'tuple'}, {'type': 'list'}]})
     assert v.validate_python(input_value) == expected
 
 
@@ -211,14 +208,14 @@ def test_union_tuple_list(input_value, expected):
                     {
                         # first of all, not a tuple of ints ..
                         'kind': 'tuple_type',
-                        'loc': ['tuple-var-len[int]'],
+                        'loc': ['tuple[int, ...]'],
                         'message': 'Value must be a valid tuple',
                         'input_value': [5],
                     },
                     # .. and not a tuple of strings, either
                     {
                         'kind': 'tuple_type',
-                        'loc': ['tuple-var-len[str]'],
+                        'loc': ['tuple[str, ...]'],
                         'message': 'Value must be a valid tuple',
                         'input_value': [5],
                     },
@@ -232,8 +229,8 @@ def test_union_tuple_var_len(input_value, expected):
         {
             'type': 'union',
             'choices': [
-                {'type': 'tuple-var-len', 'items_schema': {'type': 'int'}, 'strict': True},
-                {'type': 'tuple-var-len', 'items_schema': {'type': 'str'}, 'strict': True},
+                {'type': 'tuple', 'items_schema': {'type': 'int'}, 'strict': True},
+                {'type': 'tuple', 'items_schema': {'type': 'str'}, 'strict': True},
             ],
         }
     )
@@ -259,13 +256,13 @@ def test_union_tuple_var_len(input_value, expected):
                 errors=[
                     {
                         'kind': 'tuple_type',
-                        'loc': ['tuple-fix-len[int, int, int]'],
+                        'loc': ['tuple[int, int, int]'],
                         'message': 'Value must be a valid tuple',
                         'input_value': [5, '1', 1],
                     },
                     {
                         'kind': 'tuple_type',
-                        'loc': ['tuple-fix-len[str, str, str]'],
+                        'loc': ['tuple[str, str, str]'],
                         'message': 'Value must be a valid tuple',
                         'input_value': [5, '1', 1],
                     },
@@ -280,13 +277,13 @@ def test_union_tuple_fix_len(input_value, expected):
             'type': 'union',
             'choices': [
                 {
-                    'type': 'tuple-fix-len',
-                    'items_schema': [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}],
+                    'type': 'tuple',
+                    'positional_schema': [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}],
                     'strict': True,
                 },
                 {
-                    'type': 'tuple-fix-len',
-                    'items_schema': [{'type': 'str'}, {'type': 'str'}, {'type': 'str'}],
+                    'type': 'tuple',
+                    'positional_schema': [{'type': 'str'}, {'type': 'str'}, {'type': 'str'}],
                     'strict': True,
                 },
             ],
@@ -302,7 +299,7 @@ def test_union_tuple_fix_len(input_value, expected):
 
 
 def test_tuple_fix_error():
-    v = SchemaValidator({'type': 'tuple-fix-len', 'items_schema': ['int', 'str']})
+    v = SchemaValidator({'type': 'tuple', 'positional_schema': ['int', 'str']})
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1])
 
