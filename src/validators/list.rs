@@ -18,9 +18,9 @@ pub struct ListValidator {
 
 macro_rules! generic_list_like_build {
     () => {
-        super::list::generic_list_like_build!("{}[{}]");
+        super::list::generic_list_like_build!("{}[{}]", Self::EXPECTED_TYPE);
     };
-    ($name_template:literal) => {
+    ($name_template:literal, $name:expr) => {
         fn build(
             schema: &PyDict,
             config: Option<&PyDict>,
@@ -31,11 +31,8 @@ macro_rules! generic_list_like_build {
                 Some(d) => Some(Box::new(build_validator(d, config, build_context)?.0)),
                 None => None,
             };
-            let inner_name = match item_validator {
-                Some(ref v) => v.get_name(),
-                None => "any",
-            };
-            let name = format!($name_template, Self::EXPECTED_TYPE, inner_name);
+            let inner_name = item_validator.as_ref().map(|v| v.get_name()).unwrap_or("any");
+            let name = format!($name_template, $name, inner_name);
             let min_items = schema.get_as(pyo3::intern!(py, "min_items"))?;
             let max_items = schema.get_as(pyo3::intern!(py, "max_items"))?;
             Ok(Self {

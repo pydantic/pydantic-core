@@ -21,8 +21,8 @@ impl BuildValidator for TupleBuilder {
         config: Option<&PyDict>,
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
-        match schema.get_as_req::<&str>(intern!(schema.py(), "mode"))? {
-            "positional" => TuplePositionalSchema::build(schema, config, build_context),
+        match schema.get_as::<&str>(intern!(schema.py(), "mode"))? {
+            Some("positional") => TuplePositionalValidator::build(schema, config, build_context),
             _ => TupleVariableValidator::build(schema, config, build_context),
         }
     }
@@ -37,8 +37,7 @@ pub struct TupleVariableValidator {
 }
 
 impl TupleVariableValidator {
-    const EXPECTED_TYPE: &'static str = "tuple";
-    generic_list_like_build!("{}[{}, ...]");
+    generic_list_like_build!("{}[{}, ...]", "tuple");
 }
 
 impl Validator for TupleVariableValidator {
@@ -77,13 +76,13 @@ impl Validator for TupleVariableValidator {
 }
 
 #[derive(Debug, Clone)]
-pub struct TuplePositionalSchema {
+pub struct TuplePositionalValidator {
     strict: bool,
     items_validators: Vec<CombinedValidator>,
     name: String,
 }
 
-impl TuplePositionalSchema {
+impl TuplePositionalValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
@@ -108,7 +107,7 @@ impl TuplePositionalSchema {
     }
 }
 
-impl Validator for TuplePositionalSchema {
+impl Validator for TuplePositionalValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,

@@ -259,7 +259,7 @@ class TuplePositionalSchema(TypedDict, total=False):
 
 class TupleVariableSchema(TypedDict, total=False):
     type: Required[Literal['tuple']]
-    mode: Required[Literal['variable']]
+    mode: Literal['variable']
     items_schema: Schema
     min_items: int
     max_items: int
@@ -289,6 +289,7 @@ BareType = Literal[
     'float',
     'dict',
     'list',
+    'tuple',
     'set',
     'frozenset',
     'date',

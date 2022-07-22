@@ -39,7 +39,7 @@ def test_tuple_json(py_and_json: PyAndJson, mode, items, input_value, expected):
 
 
 def test_any_no_copy():
-    v = SchemaValidator({'type': 'tuple', 'mode': 'variable'})
+    v = SchemaValidator('tuple')
     input_value = (1, '2', b'3')
     output = v.validate_python(input_value)
     assert output == input_value
