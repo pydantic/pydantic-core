@@ -299,6 +299,8 @@ pub enum ErrorKind {
     },
     // ---------------------
     // argument errors
+    #[strum(message = "Value must be a pair of values consisting of (args, kwargs), or a plain dict to call a function")]
+    ArgumentsType,
     #[strum(message = "Unexpected key word arguments")]
     UnexpectedKeywordArguments,
     #[strum(message = "Missing key word arguments")]
@@ -307,8 +309,6 @@ pub enum ErrorKind {
     UnexpectedPositionalArguments,
     #[strum(message = "Missing positional arguments")]
     MissingPositionalArguments,
-    #[strum(message = "Two elements (args, kwargs) required to call a function")]
-    TwoArgumentsRequired,
 }
 
 macro_rules! render {
