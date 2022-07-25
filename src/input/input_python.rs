@@ -64,7 +64,7 @@ impl<'a> Input<'a> for PyAny {
 
     fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
         if let Ok(kwargs) = self.cast_as::<PyDict>() {
-            Ok(GenericArguments::Py(None, Some(kwargs)))
+            Ok(GenericArguments::Py(None, kwargs))
         } else if let Ok((args, kwargs)) = self.extract::<(&PyAny, &PyAny)>() {
             let args = if let Ok(list) = args.cast_as::<PyList>() {
                 Some(list)
@@ -77,9 +77,7 @@ impl<'a> Input<'a> for PyAny {
                 return Err(ValError::new(ErrorKind::ArgumentsType, self));
             };
             let kwargs = if let Ok(dict) = kwargs.cast_as::<PyDict>() {
-                Some(dict)
-            } else if kwargs.is_none() {
-                None
+                dict
             } else {
                 // TODO, better error?
                 return Err(ValError::new(ErrorKind::ArgumentsType, self));

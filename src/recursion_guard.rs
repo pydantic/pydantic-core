@@ -1,11 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::hash::BuildHasherDefault;
 
 use nohash_hasher::NoHashHasher;
 
 type BuildNoHashHasher<T> = BuildHasherDefault<NoHashHasher<T>>;
 pub type NoHashSet<T> = HashSet<T, BuildNoHashHasher<T>>;
-pub type NoHashMap<K, V> = HashMap<K, V, BuildNoHashHasher<K>>;
 
 /// This is used to avoid cyclic references in input data causing recursive validation and a nasty segmentation fault.
 /// It's used in `validators/recursive.rs` to detect when a reference is reused within itself.
