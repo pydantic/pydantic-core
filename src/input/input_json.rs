@@ -1,12 +1,13 @@
 use crate::errors::{ErrorKind, InputValue, LocItem, ValError, ValResult};
-use crate::input::GenericArguments;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
     float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
-use super::{EitherBytes, EitherString, EitherTimedelta, GenericListLike, GenericMapping, Input, JsonInput};
+use super::{
+    EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericListLike, GenericMapping, Input, JsonInput,
+};
 
 impl<'a> Input<'a> for JsonInput {
     /// This is required by since JSON object keys are always strings, I don't think it can be called
@@ -27,24 +28,24 @@ impl<'a> Input<'a> for JsonInput {
         matches!(self, JsonInput::Null)
     }
 
-    fn validate_args_pair(&'a self) -> ValResult<'a, GenericArguments<'a>> {
+    fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
         match self {
-            JsonInput::Object(kwargs) => Ok(GenericArguments::Json((None, Some(kwargs)))),
+            JsonInput::Object(kwargs) => Ok(GenericArguments::Json(None, Some(kwargs))),
             JsonInput::Array(array) => {
                 if array.len() != 2 {
                     Err(ValError::new(ErrorKind::ArgumentsType, self))
                 } else {
                     let args = match unsafe { array.get_unchecked(0) } {
                         JsonInput::Array(args) => args,
-                        _ => Err(ValError::new(ErrorKind::ArgumentsType, self)),
+                        _ => return Err(ValError::new(ErrorKind::ArgumentsType, self)),
                     };
-                    let kwargs= match unsafe { array.get_unchecked(1) } {
+                    let kwargs = match unsafe { array.get_unchecked(1) } {
                         JsonInput::Object(kwargs) => kwargs,
-                        _ => Err(ValError::new(ErrorKind::ArgumentsType, self)),
+                        _ => return Err(ValError::new(ErrorKind::ArgumentsType, self)),
                     };
-                    Ok(GenericArguments::Json((Some(args), Some(kwargs))))
+                    Ok(GenericArguments::Json(Some(args), Some(kwargs)))
                 }
-            },
+            }
             _ => Err(ValError::new(ErrorKind::ArgumentsType, self)),
         }
     }
@@ -266,6 +267,11 @@ impl<'a> Input<'a> for String {
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn is_none(&self) -> bool {
         false
+    }
+
+    #[cfg_attr(has_no_coverage, no_coverage)]
+    fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
+        Err(ValError::new(ErrorKind::ArgumentsType, self))
     }
 
     fn validate_str(&'a self, _strict: bool) -> ValResult<EitherString<'a>> {

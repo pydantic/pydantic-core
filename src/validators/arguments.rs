@@ -1,21 +1,20 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use std::collections::HashMap;
+use pyo3::types::{PyDict, PyList, PyTuple};
+use std::hash::BuildHasherDefault;
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
-use crate::input::{GenericListLike, GenericMapping, Input};
-use crate::recursion_guard::RecursionGuard;
+use crate::errors::{ErrorKind, ValError, ValResult};
+use crate::input::{GenericArguments, GenericListLike, GenericMapping, Input, JsonInput, JsonObject};
+use crate::recursion_guard::{NoHashMap, RecursionGuard};
 
-use super::tuple::{TuplePositionalValidator, TupleVariableValidator};
+use super::tuple::TuplePositionalValidator;
 use super::typed_dict::TypedDictValidator;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ArgumentsValidator {
-    // TODO use nohash-hasher
-    argument_mapping: Option<Vec<(usize, String)>>,
+    arguments_mapping: Option<NoHashMap<usize, String>>,
     positional_args: Option<TuplePositionalValidator>,
     keyword_args: Option<TypedDictValidator>,
     name: String,
@@ -30,6 +29,17 @@ impl BuildValidator for ArgumentsValidator {
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
+
+        let arguments_mapping = match schema.get_as::<&PyDict>(intern!(py, "arguments_mapping"))? {
+            Some(d) => {
+                let mut arguments_mapping = NoHashMap::with_hasher(BuildHasherDefault::default());
+                for (key, value) in d.iter() {
+                    arguments_mapping.insert(key.extract()?, value.extract()?);
+                }
+                Some(arguments_mapping)
+            }
+            None => None,
+        };
 
         macro_rules! build_specific_validator {
             ($key:literal, $enum_key:ident) => {
@@ -55,12 +65,13 @@ impl BuildValidator for ArgumentsValidator {
         if positional_args.is_none() && keyword_args.is_none() {
             return py_error!("Arguments schema must have either 'positional_args' or 'keyword_args' defined");
         }
+        let name = format!("{}[{}, {}]", Self::EXPECTED_TYPE, p_args_name, k_args_name);
 
         Ok(Self {
-            argument_mapping: None,
+            arguments_mapping,
             positional_args,
             keyword_args,
-            name: format!("{}[{}, {}]", Self::EXPECTED_TYPE, p_args_name, k_args_name),
+            name,
         }
         .into())
     }
@@ -75,66 +86,27 @@ impl Validator for ArgumentsValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        // lax_dict because mappings are always allowed to arguments
-        if let Ok(dict) = input.lax_dict() {
-            self.validate_args_kwargs(py, None, Some(dict), input, extra, slots, recursion_guard)
-        } else {
-            let tuple = input.strict_tuple()?;
-            if tuple.generic_len() != 2 {
-                return Err(ValError::new(ErrorKind::TwoArgumentsRequired, input));
-            }
-            match tuple {
-                GenericListLike::Tuple(list_like) => {
-                    let (args, kwargs): (&PyAny, &PyAny) = list_like.extract()?;
-                    todo!("args: {}, kwargs: {}", args, kwargs)
-                }
-                GenericListLike::JsonArray(list_like) => {
-                    todo!()
-                }
-                _ => unreachable!(),
-            }
-        }
-    }
+        let mut args = input.validate_args()?;
+        self.prepare_args(py, &mut args)?;
 
-    fn get_name(&self) -> &str {
-        &self.name
-    }
-}
+        let (pargs, kwargs): (Option<GenericListLike>, Option<GenericMapping>) = match args {
+            GenericArguments::Py(op_pargs, op_kwargs) => (
+                op_pargs.map(|pargs| pargs.into()),
+                op_kwargs.map(|kwargs| kwargs.into()),
+            ),
+            GenericArguments::Json(op_pargs, op_kwargs) => (
+                op_pargs.map(|pargs| pargs.into()),
+                op_kwargs.map(|kwargs| kwargs.into()),
+            ),
+        };
 
-impl ArgumentsValidator {
-    fn validate_args_kwargs<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        args: Option<GenericListLike>,
-        kwargs: Option<GenericMapping>,
-        input: &'data impl Input<'data>,
-        extra: &Extra,
-        slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        match (args, &self.argument_mapping) {
-            (Some(args), Some(argument_mapping)) => {
-                let kwargs = match kwargs {
-                    Some(kwargs) => todo!(),
-                    None => PyDict::new(py),
-                };
-                for (index, name) in argument_mapping {
-
-                }
-            }
-        }
-
-        let arg_result = match (args, &self.positional_args) {
+        let arg_result = match (pargs, &self.positional_args) {
             (Some(args), Some(args_validator)) => {
                 Some(args_validator.validate_list_like(py, args, input, extra, slots, recursion_guard))
             }
             (Some(_), None) => Some(Err(ValError::new(ErrorKind::UnexpectedPositionalArguments, input))),
             (None, Some(_)) => Some(Err(ValError::new(ErrorKind::MissingPositionalArguments, input))),
             (None, None) => None,
-        };
-        match arg_result {
-            Err(ValError::InternalErr(err)) => return Err(ValError::InternalErr(err)),
-            _ => (),
         };
 
         let kwarg_result = match (kwargs, &self.keyword_args) {
@@ -147,15 +119,53 @@ impl ArgumentsValidator {
         };
 
         match (arg_result, kwarg_result) {
-            (Ok(args), Ok(kwargs)) => Ok((args, kwargs).to_object(py)),
-            (Err(args_error), Ok(_)) => Err(args_error),
-            (Ok(_), Err(kwargs_error)) => Err(kwargs_error),
-            (Err(_), Err(ValError::InternalErr(err))) => Err(ValError::InternalErr(err)),
-            (Err(ValError::LineErrors(mut args_errors)), Err(ValError::LineErrors(kwargs_errors))) => {
+            (Some(Ok(args)), Some(Ok(kwargs))) => Ok((args, kwargs).to_object(py)),
+            (Some(Ok(args)), None) => Ok((args, PyDict::new(py)).to_object(py)),
+            (None, Some(Ok(kwargs))) => Ok((PyTuple::empty(py), kwargs).to_object(py)),
+            (Some(Err(ValError::InternalErr(err))), _) => Err(ValError::InternalErr(err)),
+            (_, Some(Err(ValError::InternalErr(err)))) => Err(ValError::InternalErr(err)),
+            (Some(Err(ValError::LineErrors(mut args_errors))), Some(Err(ValError::LineErrors(kwargs_errors)))) => {
                 args_errors.extend(kwargs_errors);
                 Err(ValError::LineErrors(args_errors))
             }
-            _ => unreachable!(),
+            (Some(Err(args_error)), _) => Err(args_error),
+            (_, Some(Err(kwargs_error))) => Err(kwargs_error),
+            (None, None) => Ok((PyTuple::empty(py), PyDict::new(py)).to_object(py)),
         }
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl ArgumentsValidator {
+    /// Move positional arguments to keyword arguments based on mapping.
+    fn prepare_args<'s, 'data>(&'s self, py: Python<'data>, arguments: &mut GenericArguments<'data>) -> PyResult<()> {
+        if let Some(ref arguments_mapping) = self.arguments_mapping {
+            match arguments {
+                GenericArguments::Py(Some(pargs), op_kwargs) => {
+                    let mut new_args: Vec<&PyAny> = vec![];
+                    let kwargs = match op_kwargs {
+                        Some(kwargs) => kwargs,
+                        None => PyDict::new(py),
+                    };
+                    for (index, value) in pargs.iter().enumerate() {
+                        match arguments_mapping.get(&index) {
+                            Some(key) => kwargs.set_item(key, value)?,
+                            None => new_args.push(value),
+                        }
+                    }
+                    *arguments = match (new_args.is_empty(), kwargs.is_empty()) {
+                        (true, true) => GenericArguments::Py(None, None),
+                        (true, false) => GenericArguments::Py(None, Some(kwargs)),
+                        (false, true) => GenericArguments::Py(Some(PyList::new(py, new_args)), None),
+                        (false, false) => GenericArguments::Py(Some(PyList::new(py, new_args)), Some(kwargs)),
+                    }
+                }
+                _ => (),
+            }
+        }
+        Ok(())
     }
 }

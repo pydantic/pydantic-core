@@ -141,7 +141,7 @@ impl TuplePositionalValidator {
     pub fn validate_list_like<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        list_like: GenericListLike,
+        list_like: GenericListLike<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
@@ -149,7 +149,7 @@ impl TuplePositionalValidator {
     ) -> ValResult<'data, PyObject> {
         let expected_length = self.items_validators.len();
 
-        if seq.generic_len() < expected_length {
+        if list_like.generic_len() < expected_length {
             return Err(ValError::new(
                 ErrorKind::TooShort {
                     min_length: expected_length,

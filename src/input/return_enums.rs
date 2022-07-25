@@ -165,8 +165,8 @@ derive_from!(GenericMapping, JsonObject, JsonObject);
 
 #[derive(Debug)]
 pub enum GenericArguments<'a> {
-    Py((Option<&'a PyList>, Option<&'a PyDict>)),
-    Json((Option<&'a JsonArray>, Option<&'a JsonObject>)),
+    Py(Option<&'a PyList>, Option<&'a PyDict>),
+    Json(Option<&'a JsonArray>, Option<&'a JsonObject>),
 }
 
 #[derive(Debug)]

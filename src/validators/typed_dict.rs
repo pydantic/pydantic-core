@@ -187,7 +187,7 @@ impl TypedDictValidator {
     pub fn validate_generic_mapping<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        dict: GenericMapping,
+        dict: GenericMapping<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],

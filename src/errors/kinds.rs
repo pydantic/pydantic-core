@@ -299,7 +299,9 @@ pub enum ErrorKind {
     },
     // ---------------------
     // argument errors
-    #[strum(message = "Value must be a pair of values consisting of (args, kwargs), or a plain dict to call a function")]
+    #[strum(
+        message = "Value must be a pair of values consisting of (args, kwargs), or a plain dict to call a function"
+    )]
     ArgumentsType,
     #[strum(message = "Unexpected key word arguments")]
     UnexpectedKeywordArguments,
