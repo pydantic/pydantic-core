@@ -5,7 +5,7 @@ use std::hash::BuildHasherDefault;
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValResult};
-use crate::input::{GenericArguments, GenericListLike, GenericMapping, Input, JsonInput, JsonObject};
+use crate::input::{GenericArguments, GenericListLike, GenericMapping, Input};
 use crate::recursion_guard::{NoHashMap, RecursionGuard};
 
 use super::tuple::TuplePositionalValidator;
@@ -52,12 +52,12 @@ impl BuildValidator for ArgumentsValidator {
                 }
             };
         }
-        let positional_args = build_specific_validator!("positional_args", TuplePositional);
+        let positional_args = build_specific_validator!("positional_args_schema", TuplePositional);
         let p_args_name = match positional_args {
             Some(ref v) => v.get_name(),
             None => "-",
         };
-        let keyword_args = build_specific_validator!("keyword_args", TypedDict);
+        let keyword_args = build_specific_validator!("keyword_args_schema", TypedDict);
         let k_args_name = match keyword_args {
             Some(ref v) => v.get_name(),
             None => "-",
@@ -104,7 +104,10 @@ impl Validator for ArgumentsValidator {
             (Some(args), Some(args_validator)) => {
                 Some(args_validator.validate_list_like(py, args, input, extra, slots, recursion_guard))
             }
-            (Some(_), None) => Some(Err(ValError::new(ErrorKind::UnexpectedPositionalArguments, input))),
+            (Some(pa), None) => match pa.generic_len() {
+                0 => None,
+                _ => Some(Err(ValError::new(ErrorKind::UnexpectedPositionalArguments, input))),
+            },
             (None, Some(_)) => Some(Err(ValError::new(ErrorKind::MissingPositionalArguments, input))),
             (None, None) => None,
         };
@@ -113,7 +116,10 @@ impl Validator for ArgumentsValidator {
             (Some(args), Some(kwargs_validator)) => {
                 Some(kwargs_validator.validate_generic_mapping(py, args, input, extra, slots, recursion_guard))
             }
-            (Some(_), None) => Some(Err(ValError::new(ErrorKind::UnexpectedKeywordArguments, input))),
+            (Some(kw), None) => match kw.generic_len()? {
+                0 => None,
+                _ => Some(Err(ValError::new(ErrorKind::UnexpectedKeywordArguments, input))),
+            },
             (None, Some(_)) => Some(Err(ValError::new(ErrorKind::MissingKeywordArguments, input))),
             (None, None) => None,
         };
@@ -145,7 +151,7 @@ impl ArgumentsValidator {
         if let Some(ref arguments_mapping) = self.arguments_mapping {
             match arguments {
                 GenericArguments::Py(Some(pargs), op_kwargs) => {
-                    let mut new_args: Vec<&PyAny> = vec![];
+                    let mut pargs_vec: Vec<&PyAny> = vec![];
                     let kwargs = match op_kwargs {
                         Some(kwargs) => kwargs,
                         None => PyDict::new(py),
@@ -153,15 +159,17 @@ impl ArgumentsValidator {
                     for (index, value) in pargs.iter().enumerate() {
                         match arguments_mapping.get(&index) {
                             Some(key) => kwargs.set_item(key, value)?,
-                            None => new_args.push(value),
+                            None => pargs_vec.push(value),
                         }
                     }
-                    *arguments = match (new_args.is_empty(), kwargs.is_empty()) {
-                        (true, true) => GenericArguments::Py(None, None),
-                        (true, false) => GenericArguments::Py(None, Some(kwargs)),
-                        (false, true) => GenericArguments::Py(Some(PyList::new(py, new_args)), None),
-                        (false, false) => GenericArguments::Py(Some(PyList::new(py, new_args)), Some(kwargs)),
-                    }
+                    let pargs = match pargs_vec.len() {
+                        0 => None,
+                        _ => Some(PyList::new(py, &pargs_vec)),
+                    };
+                    *arguments = GenericArguments::Py(pargs, Some(kwargs));
+                }
+                GenericArguments::Json(Some(_pargs), _op_kwargs) => {
+                    todo!()
                 }
                 _ => (),
             }

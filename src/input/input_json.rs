@@ -36,14 +36,16 @@ impl<'a> Input<'a> for JsonInput {
                     Err(ValError::new(ErrorKind::ArgumentsType, self))
                 } else {
                     let args = match unsafe { array.get_unchecked(0) } {
-                        JsonInput::Array(args) => args,
+                        JsonInput::Null => None,
+                        JsonInput::Array(args) => Some(args),
                         _ => return Err(ValError::new(ErrorKind::ArgumentsType, self)),
                     };
                     let kwargs = match unsafe { array.get_unchecked(1) } {
-                        JsonInput::Object(kwargs) => kwargs,
+                        JsonInput::Null => None,
+                        JsonInput::Object(kwargs) => Some(kwargs),
                         _ => return Err(ValError::new(ErrorKind::ArgumentsType, self)),
                     };
-                    Ok(GenericArguments::Json(Some(args), Some(kwargs)))
+                    Ok(GenericArguments::Json(args, kwargs))
                 }
             }
             _ => Err(ValError::new(ErrorKind::ArgumentsType, self)),

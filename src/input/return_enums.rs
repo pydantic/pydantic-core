@@ -163,6 +163,16 @@ derive_from!(GenericMapping, PyDict, PyDict);
 derive_from!(GenericMapping, PyGetAttr, PyAny);
 derive_from!(GenericMapping, JsonObject, JsonObject);
 
+impl<'a> GenericMapping<'a> {
+    pub fn generic_len(&self) -> ValResult<'a, usize> {
+        match self {
+            Self::PyDict(v) => Ok(v.len()),
+            Self::PyGetAttr(v) => Ok(v.len()?),
+            Self::JsonObject(v) => Ok(v.len()),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum GenericArguments<'a> {
     Py(Option<&'a PyList>, Option<&'a PyDict>),
