@@ -1,10 +1,10 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyTuple};
+use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValResult};
-use crate::input::{GenericArguments, GenericListLike, GenericMapping, Input};
+use crate::input::{json_object_to_py, GenericArguments, GenericListLike, GenericMapping, Input};
 use crate::recursion_guard::RecursionGuard;
 
 use super::tuple::TuplePositionalValidator;
@@ -39,6 +39,7 @@ impl BuildValidator for ArgumentsValidator {
                         Ok((k, v))
                     })
                     .collect::<PyResult<Vec<_>>>()?;
+                #[allow(clippy::manual_map)]
                 match arguments_mapping.first() {
                     Some((s, _)) => Some((*s, arguments_mapping)),
                     None => None,
@@ -92,12 +93,15 @@ impl Validator for ArgumentsValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let args = input.validate_args()?;
-        let args = self.prepare_args(py, args)?;
+        let args = self.build_args(py, input)?;
 
-        let (pargs, kwargs): (Option<GenericListLike>, GenericMapping) = match args {
-            GenericArguments::Py(op_pargs, kwargs) => (op_pargs.map(|pargs| pargs.into()), kwargs.into()),
-            GenericArguments::Json(op_pargs, kwargs) => (op_pargs.map(|pargs| pargs.into()), kwargs.into()),
+        let (pargs, kwargs): (Option<GenericListLike>, Option<GenericMapping>) = match args {
+            GenericArguments::Py(op_pargs, kwargs) => {
+                (op_pargs.map(|pargs| pargs.into()), kwargs.map(|pargs| pargs.into()))
+            }
+            GenericArguments::Json(op_pargs, kwargs) => {
+                (op_pargs.map(|pargs| pargs.into()), kwargs.map(|pargs| pargs.into()))
+            }
         };
 
         let arg_result = match (pargs, &self.positional_args) {
@@ -113,13 +117,15 @@ impl Validator for ArgumentsValidator {
         };
 
         let kwarg_result = match (kwargs, &self.keyword_args) {
-            (kwargs, Some(kwargs_validator)) => {
+            (Some(kwargs), Some(kwargs_validator)) => {
                 Some(kwargs_validator.validate_generic_mapping(py, kwargs, input, extra, slots, recursion_guard))
             }
-            (kwargs, None) => match kwargs.generic_len()? {
+            (Some(kwargs), None) => match kwargs.generic_len()? {
                 0 => None,
                 _ => Some(Err(ValError::new(ErrorKind::UnexpectedKeywordArguments, input))),
             },
+            (None, Some(_)) => Some(Err(ValError::new(ErrorKind::MissingKeywordArguments, input))),
+            (None, None) => None,
         };
 
         match (arg_result, kwarg_result) {
@@ -145,17 +151,22 @@ impl Validator for ArgumentsValidator {
 
 impl ArgumentsValidator {
     /// Move positional arguments to keyword arguments based on mapping.
-    fn prepare_args<'s, 'data>(
+    fn build_args<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        mut arguments: GenericArguments<'data>,
-    ) -> PyResult<GenericArguments<'data>> {
+        input: &'data impl Input<'data>,
+    ) -> ValResult<'data, GenericArguments<'data>> {
+        let mut args = input.validate_args()?;
+
         if let Some((slice_at, ref arguments_mapping)) = self.arguments_mapping {
-            match arguments {
+            match args {
                 GenericArguments::Py(Some(pargs), kwargs) => {
                     let new_pargs = pargs.get_slice(0, slice_at);
-                    // have to copy the kwargs so we don't modify the input dict
-                    let kwargs = kwargs.copy()?;
+                    let kwargs = match kwargs {
+                        // have to copy the kwargs so we don't modify the input dict
+                        Some(kw) => kw.copy()?,
+                        None => PyDict::new(py),
+                    };
 
                     for (index, key) in arguments_mapping {
                         if let Ok(value) = pargs.get_item(*index) {
@@ -164,24 +175,32 @@ impl ArgumentsValidator {
                             break;
                         }
                     }
-                    Ok(GenericArguments::Py(Some(new_pargs), kwargs))
+                    args = GenericArguments::Py(Some(new_pargs), Some(kwargs));
                 }
-                GenericArguments::Json(Some(pargs), mut kwargs) => {
-                    let new_pargs = &pargs[..slice_at];
+                GenericArguments::Json(Some(pargs), kwargs) => {
+                    let pargs_slice = &pargs[..slice_at];
+                    let py_pargs = match pargs_slice.is_empty() {
+                        true => None,
+                        false => Some(PyList::new(py, pargs_slice)),
+                    };
 
+                    let py_kwargs = match kwargs {
+                        // have to copy the kwargs so we don't modify the input dict
+                        Some(kw) => json_object_to_py(kw, py),
+                        None => PyDict::new(py),
+                    };
                     for (index, key) in arguments_mapping {
                         if let Some(value) = pargs.get(*index) {
-                            kwargs.insert(key.clone(), value.clone());
+                            py_kwargs.set_item(key, value.to_object(py))?;
                         } else {
                             break;
                         }
                     }
-                    Ok(GenericArguments::Json(Some(new_pargs), kwargs))
+                    args = GenericArguments::Py(py_pargs, Some(py_kwargs));
                 }
-                _ => Ok(arguments),
+                _ => (),
             }
-        } else {
-            Ok(arguments)
         }
+        Ok(args)
     }
 }

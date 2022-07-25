@@ -7,7 +7,7 @@ use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
 use crate::recursion_guard::RecursionGuard;
 use crate::validators::{CombinedValidator, Extra, Validator};
 
-use super::parse_json::{JsonArray, JsonObject};
+use super::parse_json::{JsonArray, JsonInput, JsonObject};
 use super::Input;
 
 /// Container for all the "list-like" types which can be converted to each other in lax mode.
@@ -19,7 +19,7 @@ pub enum GenericListLike<'a> {
     Tuple(&'a PyTuple),
     Set(&'a PySet),
     FrozenSet(&'a PyFrozenSet),
-    JsonArray(&'a JsonArray),
+    JsonArray(&'a [JsonInput]),
 }
 
 macro_rules! derive_from {
@@ -36,6 +36,7 @@ derive_from!(GenericListLike, Tuple, PyTuple);
 derive_from!(GenericListLike, Set, PySet);
 derive_from!(GenericListLike, FrozenSet, PyFrozenSet);
 derive_from!(GenericListLike, JsonArray, JsonArray);
+derive_from!(GenericListLike, JsonArray, [JsonInput]);
 
 macro_rules! build_validate_to_vec {
     ($name:ident, $list_like_type:ty) => {
@@ -76,7 +77,7 @@ build_validate_to_vec!(validate_to_vec_list, PyList);
 build_validate_to_vec!(validate_to_vec_tuple, PyTuple);
 build_validate_to_vec!(validate_to_vec_set, PySet);
 build_validate_to_vec!(validate_to_vec_frozenset, PyFrozenSet);
-build_validate_to_vec!(validate_to_vec_jsonarray, JsonArray);
+build_validate_to_vec!(validate_to_vec_jsonarray, [JsonInput]);
 
 impl<'a> GenericListLike<'a> {
     pub fn generic_len(&self) -> usize {
@@ -163,6 +164,12 @@ derive_from!(GenericMapping, PyDict, PyDict);
 derive_from!(GenericMapping, PyGetAttr, PyAny);
 derive_from!(GenericMapping, JsonObject, JsonObject);
 
+impl<'a> From<&'a mut JsonObject> for GenericMapping<'a> {
+    fn from(s: &'a mut JsonObject) -> GenericMapping<'a> {
+        Self::JsonObject(s)
+    }
+}
+
 impl<'a> GenericMapping<'a> {
     pub fn generic_len(&self) -> ValResult<'a, usize> {
         match self {
@@ -175,8 +182,8 @@ impl<'a> GenericMapping<'a> {
 
 #[derive(Debug)]
 pub enum GenericArguments<'a> {
-    Py(Option<&'a PyList>, &'a PyDict),
-    Json(Option<&'a JsonArray>, &'a JsonObject),
+    Py(Option<&'a PyList>, Option<&'a PyDict>),
+    Json(Option<&'a [JsonInput]>, Option<&'a JsonObject>),
 }
 
 #[derive(Debug)]

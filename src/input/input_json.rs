@@ -30,18 +30,19 @@ impl<'a> Input<'a> for JsonInput {
 
     fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
         match self {
-            JsonInput::Object(kwargs) => Ok(GenericArguments::Json(None, kwargs)),
+            JsonInput::Object(kwargs) => Ok(GenericArguments::Json(None, Some(kwargs))),
             JsonInput::Array(array) => {
                 if array.len() != 2 {
                     Err(ValError::new(ErrorKind::ArgumentsType, self))
                 } else {
                     let args = match unsafe { array.get_unchecked(0) } {
                         JsonInput::Null => None,
-                        JsonInput::Array(args) => Some(args),
+                        JsonInput::Array(args) => Some(args.as_slice()),
                         _ => return Err(ValError::new(ErrorKind::ArgumentsType, self)),
                     };
                     let kwargs = match unsafe { array.get_unchecked(1) } {
-                        JsonInput::Object(kwargs) => kwargs,
+                        JsonInput::Null => None,
+                        JsonInput::Object(kwargs) => Some(kwargs),
                         _ => return Err(ValError::new(ErrorKind::ArgumentsType, self)),
                     };
                     Ok(GenericArguments::Json(args, kwargs))
