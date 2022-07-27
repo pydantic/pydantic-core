@@ -133,7 +133,34 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
         [(None, {'a': '1', 'b': 'a', 'c': 'True'}), ((), {'a': 1, 'b': 'a', 'c': True})],
         [((), {'a': 1, 'b': 'a', 'c': True}), ((), {'a': 1, 'b': 'a', 'c': True})],
         [((1,), {'a': 1, 'b': 'a', 'c': True}), Err('kind=unexpected_positional_arguments,')],
-        [((), {'a': 1, 'b': 'a', 'c': True, 'd': 'wrong'}), Err('kind=extra_forbidden,')],
+        [
+            ((), {'a': 1, 'b': 'a', 'c': True, 'd': 'wrong'}),
+            Err(
+                'kind=unexpected_keyword_argument,',
+                [
+                    {
+                        'kind': 'unexpected_keyword_argument',
+                        'loc': ['d'],
+                        'message': 'Unexpected keyword argument',
+                        'input_value': 'wrong',
+                    }
+                ],
+            ),
+        ],
+        [
+            ([], {'a': 1, 'b': 'a'}),
+            Err(
+                'kind=missing_keyword_argument,',
+                [
+                    {
+                        'kind': 'missing_keyword_argument',
+                        'loc': ['c'],
+                        'message': 'Missing keyword argument',
+                        'input_value': IsListOrTuple([], {'a': 1, 'b': 'a'}),
+                    }
+                ],
+            ),
+        ],
         [
             ((), {'a': 'x', 'b': 'a', 'c': 'wrong'}),
             Err(
@@ -171,7 +198,6 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
-        # debug(exc_info.value.errors())
         if expected.errors:
             assert exc_info.value.errors() == expected.errors
     else:

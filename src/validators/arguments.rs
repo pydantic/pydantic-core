@@ -108,7 +108,7 @@ impl Validator for ArgumentsValidator {
             (Some(args), Some(args_validator)) => Some(
                 args_validator
                     .validate_list_like(py, args, input, extra, slots, recursion_guard)
-                    .map_err(map_args_errors),
+                    .map_err(map_pargs_errors),
             ),
             (Some(pa), None) => match pa.generic_len() {
                 0 => None,
@@ -126,9 +126,11 @@ impl Validator for ArgumentsValidator {
         };
 
         let kwarg_result = match (kwargs, &self.keyword_args) {
-            (Some(kwargs), Some(kwargs_validator)) => {
-                Some(kwargs_validator.validate_generic_mapping(py, kwargs, input, extra, slots, recursion_guard))
-            }
+            (Some(kwargs), Some(kwargs_validator)) => Some(
+                kwargs_validator
+                    .validate_generic_mapping(py, kwargs, input, extra, slots, recursion_guard)
+                    .map_err(map_kwargs_errors),
+            ),
             (Some(kwargs), None) => match kwargs.generic_len()? {
                 0 => None,
                 _ => Some(Err(self.unexpected_kwargs(kwargs))),
@@ -243,7 +245,7 @@ impl ArgumentsValidator {
     }
 }
 
-fn map_args_errors(error: ValError) -> ValError {
+fn map_pargs_errors(error: ValError) -> ValError {
     match error {
         ValError::LineErrors(line_errors) => {
             let line_errors = line_errors
@@ -256,6 +258,23 @@ fn map_args_errors(error: ValError) -> ValError {
                     } => e.with_kind(ErrorKind::UnexpectedPositionalArguments {
                         unexpected_count: input_length - max_length,
                     }),
+                    _ => e,
+                })
+                .collect();
+            ValError::LineErrors(line_errors)
+        }
+        internal_error => internal_error,
+    }
+}
+
+fn map_kwargs_errors(error: ValError) -> ValError {
+    match error {
+        ValError::LineErrors(line_errors) => {
+            let line_errors = line_errors
+                .into_iter()
+                .map(|e| match e.kind {
+                    ErrorKind::Missing => e.with_kind(ErrorKind::MissingKeywordArgument),
+                    ErrorKind::ExtraForbidden => e.with_kind(ErrorKind::UnexpectedKeywordArgument),
                     _ => e,
                 })
                 .collect();
