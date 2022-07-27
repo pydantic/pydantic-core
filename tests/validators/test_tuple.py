@@ -333,7 +333,7 @@ def test_tuple_fix_extra():
     assert v.validate_python([1, 'a', 'b', 'c', 'd']) == (1, 'a', 'b', 'c', 'd')
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1])
-    assert exc_info.value.errors() == [{'kind': 'missing', 'loc': [0], 'message': 'Input required', 'input_value': []}]
+    assert exc_info.value.errors() == [{'kind': 'missing', 'loc': [1], 'message': 'Input required', 'input_value': [1]}]
 
 
 def test_tuple_fix_extra_any():
