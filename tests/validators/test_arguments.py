@@ -59,9 +59,24 @@ from ..conftest import Err, PyAndJson
                     {
                         'kind': 'unexpected_positional_arguments',
                         'loc': [],
-                        'message': '42 unexpected positional arguments',
+                        'message': '1 unexpected positional argument',
                         'input_value': IsListOrTuple([1, 'a', True, 4], None),
-                        'context': {'unexpected_count': 42},
+                        'context': {'unexpected_count': 1},
+                    }
+                ],
+            ),
+        ],
+        [
+            ([1, 'a', True, 4, 5], None),
+            Err(
+                'kind=unexpected_positional_arguments,',
+                [
+                    {
+                        'kind': 'unexpected_positional_arguments',
+                        'loc': [],
+                        'message': '2 unexpected positional arguments',
+                        'input_value': IsListOrTuple([1, 'a', True, 4, 5], None),
+                        'context': {'unexpected_count': 2},
                     }
                 ],
             ),

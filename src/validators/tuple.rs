@@ -174,6 +174,7 @@ impl TuplePositionalValidator {
                                 return Err(ValError::new(
                                     ErrorKind::TooLong {
                                         max_length: expected_length,
+                                        input_length: ll_length,
                                     },
                                     input,
                                 ));

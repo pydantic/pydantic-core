@@ -83,9 +83,9 @@ def test_tuple_strict_fails_without_tuple(wrong_coll_type: Type[Any], mode, item
     [
         ({}, (1, 2, 3, 4), (1, 2, 3, 4)),
         ({'min_items': 3}, (1, 2, 3, 4), (1, 2, 3, 4)),
-        ({'min_items': 3}, (1, 2), Err('Input must have at least 3 items [kind=too_short')),
+        ({'min_items': 3}, (1, 2), Err('Input must have at least 3 items, got 2 items [kind=too_short,')),
         ({'max_items': 4}, (1, 2, 3, 4), (1, 2, 3, 4)),
-        ({'max_items': 3}, (1, 2, 3, 4), Err('Input must have at most 3 items [kind=too_long')),
+        ({'max_items': 3}, (1, 2, 3, 4), Err('Input must have at most 3 items, got 4 items [kind=too_long,')),
     ],
 )
 def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
@@ -193,9 +193,9 @@ def test_extra_arguments(py_and_json: PyAndJson):
         {
             'kind': 'too_long',
             'loc': [],
-            'message': 'Input must have at most 2 items',
+            'message': 'Input must have at most 2 items, got 4 items',
             'input_value': [1, 2, 3, 4],
-            'context': {'max_length': 2},
+            'context': {'max_length': 2, 'input_length': 4},
         }
     ]
 

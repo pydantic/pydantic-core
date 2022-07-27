@@ -71,13 +71,19 @@ pub enum ErrorKind {
     },
     // ---------------------
     // generic length errors - used for everything with a length except strings and bytes which need custom messages
-    #[strum(message = "Input must have at least {min_length} items")]
+    #[strum(
+        message = "Input must have at least {min_length} item{expected_plural}, got {input_length} item{input_plural}"
+    )]
     TooShort {
         min_length: usize,
+        input_length: usize,
     },
-    #[strum(message = "Input must have at most {max_length} items")]
+    #[strum(
+        message = "Input must have at most {max_length} item{expected_plural}, got {input_length} item{input_plural}"
+    )]
     TooLong {
         max_length: usize,
+        input_length: usize,
     },
     // ---------------------
     // string errors
@@ -370,8 +376,22 @@ impl ErrorKind {
             Self::GreaterThanEqual { ge } => render!(self, ge),
             Self::LessThan { lt } => render!(self, lt),
             Self::LessThanEqual { le } => render!(self, le),
-            Self::TooShort { min_length } => to_string_render!(self, min_length),
-            Self::TooLong { max_length } => to_string_render!(self, max_length),
+            Self::TooShort {
+                min_length,
+                input_length,
+            } => {
+                let expected_plural = plural_s(min_length);
+                let input_plural = plural_s(input_length);
+                to_string_render!(self, min_length, input_length, expected_plural, input_plural)
+            }
+            Self::TooLong {
+                max_length,
+                input_length,
+            } => {
+                let expected_plural = plural_s(max_length);
+                let input_plural = plural_s(input_length);
+                to_string_render!(self, max_length, input_length, expected_plural, input_plural)
+            }
             Self::StrTooShort { min_length } => to_string_render!(self, min_length),
             Self::StrTooLong { max_length } => to_string_render!(self, max_length),
             Self::StrPatternMismatch { pattern } => render!(self, pattern),
@@ -424,8 +444,14 @@ impl ErrorKind {
             Self::GreaterThanEqual { ge } => py_dict!(py, ge),
             Self::LessThan { lt } => py_dict!(py, lt),
             Self::LessThanEqual { le } => py_dict!(py, le),
-            Self::TooShort { min_length } => py_dict!(py, min_length),
-            Self::TooLong { max_length } => py_dict!(py, max_length),
+            Self::TooShort {
+                min_length,
+                input_length,
+            } => py_dict!(py, min_length, input_length),
+            Self::TooLong {
+                max_length,
+                input_length,
+            } => py_dict!(py, max_length, input_length),
             Self::StrTooShort { min_length } => py_dict!(py, min_length),
             Self::StrTooLong { max_length } => py_dict!(py, max_length),
             Self::StrPatternMismatch { pattern } => py_dict!(py, pattern),

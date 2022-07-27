@@ -97,18 +97,30 @@ impl<'a> GenericListLike<'a> {
     ) -> ValResult<'data, Option<usize>> {
         let mut length: Option<usize> = None;
         if let Some((min_items, max_items)) = size_range {
-            let len = self.generic_len();
+            let input_length = self.generic_len();
             if let Some(min_length) = min_items {
-                if len < min_length {
-                    return Err(ValError::new(ErrorKind::TooShort { min_length }, input));
+                if input_length < min_length {
+                    return Err(ValError::new(
+                        ErrorKind::TooShort {
+                            min_length,
+                            input_length,
+                        },
+                        input,
+                    ));
                 }
             }
             if let Some(max_length) = max_items {
-                if len > max_length {
-                    return Err(ValError::new(ErrorKind::TooLong { max_length }, input));
+                if input_length > max_length {
+                    return Err(ValError::new(
+                        ErrorKind::TooLong {
+                            max_length,
+                            input_length,
+                        },
+                        input,
+                    ));
                 }
             }
-            length = Some(len);
+            length = Some(input_length);
         }
         Ok(length)
     }

@@ -250,9 +250,12 @@ fn map_args_errors(error: ValError) -> ValError {
                 .into_iter()
                 .map(|e| match e.kind {
                     ErrorKind::Missing => e.with_kind(ErrorKind::MissingPositionalArgument),
-                    ErrorKind::TooLong { max_length: _ } => {
-                        e.with_kind(ErrorKind::UnexpectedPositionalArguments { unexpected_count: 42 })
-                    }
+                    ErrorKind::TooLong {
+                        max_length,
+                        input_length,
+                    } => e.with_kind(ErrorKind::UnexpectedPositionalArguments {
+                        unexpected_count: input_length - max_length,
+                    }),
                     _ => e,
                 })
                 .collect();
