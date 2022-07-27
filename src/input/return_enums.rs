@@ -176,12 +176,6 @@ derive_from!(GenericMapping, PyDict, PyDict);
 derive_from!(GenericMapping, PyGetAttr, PyAny);
 derive_from!(GenericMapping, JsonObject, JsonObject);
 
-impl<'a> From<&'a mut JsonObject> for GenericMapping<'a> {
-    fn from(s: &'a mut JsonObject) -> GenericMapping<'a> {
-        Self::JsonObject(s)
-    }
-}
-
 impl<'a> GenericMapping<'a> {
     pub fn generic_len(&self) -> ValResult<'a, usize> {
         match self {
