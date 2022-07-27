@@ -173,14 +173,14 @@ def test_multiple_missing(py_and_json: PyAndJson):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1])
     assert exc_info.value.errors() == [
-        {'kind': 'missing', 'loc': [1], 'message': 'Input required', 'input_value': [1]},
-        {'kind': 'missing', 'loc': [2], 'message': 'Input required', 'input_value': [1]},
-        {'kind': 'missing', 'loc': [3], 'message': 'Input required', 'input_value': [1]},
+        {'kind': 'missing', 'loc': [1], 'message': 'Field required', 'input_value': [1]},
+        {'kind': 'missing', 'loc': [2], 'message': 'Field required', 'input_value': [1]},
+        {'kind': 'missing', 'loc': [3], 'message': 'Field required', 'input_value': [1]},
     ]
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1, 2, 3])
     assert exc_info.value.errors() == [
-        {'kind': 'missing', 'loc': [3], 'message': 'Input required', 'input_value': [1, 2, 3]}
+        {'kind': 'missing', 'loc': [3], 'message': 'Field required', 'input_value': [1, 2, 3]}
     ]
 
 
@@ -322,7 +322,7 @@ def test_tuple_fix_error():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1])
 
-    assert exc_info.value.errors() == [{'kind': 'missing', 'loc': [1], 'message': 'Input required', 'input_value': [1]}]
+    assert exc_info.value.errors() == [{'kind': 'missing', 'loc': [1], 'message': 'Field required', 'input_value': [1]}]
 
 
 def test_tuple_fix_extra():
@@ -333,7 +333,7 @@ def test_tuple_fix_extra():
     assert v.validate_python([1, 'a', 'b', 'c', 'd']) == (1, 'a', 'b', 'c', 'd')
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1])
-    assert exc_info.value.errors() == [{'kind': 'missing', 'loc': [1], 'message': 'Input required', 'input_value': [1]}]
+    assert exc_info.value.errors() == [{'kind': 'missing', 'loc': [1], 'message': 'Field required', 'input_value': [1]}]
 
 
 def test_tuple_fix_extra_any():
@@ -344,4 +344,4 @@ def test_tuple_fix_extra_any():
     assert v.validate_python([1, 2, b'3']) == ('1', 2, b'3')
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([])
-    assert exc_info.value.errors() == [{'kind': 'missing', 'loc': [0], 'message': 'Input required', 'input_value': []}]
+    assert exc_info.value.errors() == [{'kind': 'missing', 'loc': [0], 'message': 'Field required', 'input_value': []}]

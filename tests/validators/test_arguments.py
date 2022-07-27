@@ -1,7 +1,6 @@
 import re
 
 import pytest
-from dirty_equals import IsListOrTuple
 
 from pydantic_core import ValidationError
 
@@ -20,14 +19,13 @@ from ..conftest import Err, PyAndJson
         [
             ([1, 'a', True], {'x': 1}),
             Err(
-                'kind=unexpected_keyword_arguments,',
+                'kind=unexpected_keyword_argument,',
                 [
                     {
-                        'kind': 'unexpected_keyword_arguments',
-                        'loc': [],
-                        'message': 'Input included 1 unexpected key word argument',
-                        'input_value': IsListOrTuple([1, 'a', True], {'x': 1}),
-                        'context': {'count': 1},
+                        'kind': 'unexpected_keyword_argument',
+                        'loc': ['x'],
+                        'message': 'Unexpected keyword argument',
+                        'input_value': 1,
                     }
                 ],
             ),

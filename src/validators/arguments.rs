@@ -3,12 +3,12 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::{py_error, SchemaDict};
-use crate::errors::{ErrorKind, ValError, ValResult};
+use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
 use crate::input::{json_object_to_py, GenericArguments, GenericListLike, GenericMapping, Input};
 use crate::recursion_guard::RecursionGuard;
 
 use super::tuple::TuplePositionalValidator;
-use super::typed_dict::TypedDictValidator;
+use super::typed_dict::{IterAttributes, TypedDictValidator};
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -110,9 +110,16 @@ impl Validator for ArgumentsValidator {
             }
             (Some(pa), None) => match pa.generic_len() {
                 0 => None,
-                _ => Some(Err(ValError::new(ErrorKind::UnexpectedPositionalArguments, input))),
+                unexpected_count => Some(Err(ValError::new(
+                    ErrorKind::UnexpectedPositionalArguments { unexpected_count },
+                    input,
+                ))),
             },
-            (None, Some(_)) => Some(Err(ValError::new(ErrorKind::MissingPositionalArguments, input))),
+            (None, Some(args_validator)) => Some(Err(ValError::LineErrors(
+                (0..args_validator.len())
+                    .map(|index| ValLineError::new_with_loc(ErrorKind::MissingPositionalArgument, input, index))
+                    .collect(),
+            ))),
             (None, None) => None,
         };
 
@@ -122,12 +129,15 @@ impl Validator for ArgumentsValidator {
             }
             (Some(kwargs), None) => match kwargs.generic_len()? {
                 0 => None,
-                count => Some(Err(ValError::new(
-                    ErrorKind::UnexpectedKeywordArguments { count },
-                    input,
-                ))),
+                _ => Some(Err(self.unexpected_kwargs(kwargs))),
             },
-            (None, Some(_)) => Some(Err(ValError::new(ErrorKind::MissingKeywordArguments, input))),
+            (None, Some(kwargs_validator)) => Some(Err(ValError::LineErrors(
+                kwargs_validator
+                    .keys()
+                    .into_iter()
+                    .map(|key| ValLineError::new_with_loc(ErrorKind::MissingKeywordArgument, input, key))
+                    .collect(),
+            ))),
             (None, None) => None,
         };
 
@@ -212,5 +222,21 @@ impl ArgumentsValidator {
             }
         }
         Ok(args)
+    }
+
+    pub fn unexpected_kwargs<'s, 'data>(&'s self, dict: GenericMapping<'data>) -> ValError<'data> {
+        macro_rules! collect_errors {
+            ($iter:expr) => {{
+                $iter
+                    .map(|(k, v)| ValLineError::new_with_loc(ErrorKind::UnexpectedKeywordArgument, v, k.as_loc_item()))
+                    .collect()
+            }};
+        }
+        let errors: Vec<ValLineError> = match dict {
+            GenericMapping::PyDict(d) => collect_errors!(d.iter()),
+            GenericMapping::PyGetAttr(d) => collect_errors!(IterAttributes::new(d)),
+            GenericMapping::JsonObject(d) => collect_errors!(d.iter()),
+        };
+        ValError::LineErrors(errors)
     }
 }

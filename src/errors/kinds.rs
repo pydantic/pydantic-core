@@ -27,11 +27,11 @@ pub enum ErrorKind {
     // typed dict specific errors
     #[strum(message = "Value must be a valid dictionary or instance to extract fields from")]
     DictAttributesType,
-    #[strum(message = "Input required")]
+    #[strum(message = "Field required")]
     Missing,
     #[strum(message = "Extra values are not permitted")]
     ExtraForbidden,
-    #[strum(message = "Model keys must be strings")]
+    #[strum(message = "Keys must be strings")]
     InvalidKey,
     #[strum(message = "Error extracting attribute: {error}")]
     GetAttributeError {
@@ -299,18 +299,18 @@ pub enum ErrorKind {
     },
     // ---------------------
     // argument errors
-    #[strum(message = "Arguments must be a tuple of (args, kwargs) or a plain dict")]
+    #[strum(message = "Arguments must be a tuple of (positional arguments, keyword arguments) or a plain dict")]
     ArgumentsType,
-    #[strum(message = "Input included {count} unexpected key word argument{plural}")]
-    UnexpectedKeywordArguments {
-        count: usize,
+    #[strum(message = "Unexpected keyword argument")]
+    UnexpectedKeywordArgument,
+    #[strum(message = "Missing keyword argument")]
+    MissingKeywordArgument,
+    #[strum(message = "{unexpected_count} unexpected positional argument{plural}")]
+    UnexpectedPositionalArguments {
+        unexpected_count: usize,
     },
-    #[strum(message = "Missing key word arguments")]
-    MissingKeywordArguments,
-    #[strum(message = "Unexpected positional arguments")]
-    UnexpectedPositionalArguments,
-    #[strum(message = "Missing positional arguments")]
-    MissingPositionalArguments,
+    #[strum(message = "Missing positional argument")]
+    MissingPositionalArgument,
 }
 
 macro_rules! render {
@@ -407,9 +407,9 @@ impl ErrorKind {
                 expected_tags,
             } => render!(self, discriminator, tag, expected_tags),
             Self::UnionTagNotFound { discriminator } => render!(self, discriminator),
-            Self::UnexpectedKeywordArguments { count } => {
-                let plural = plural_s(count);
-                to_string_render!(self, count, plural)
+            Self::UnexpectedPositionalArguments { unexpected_count } => {
+                let plural = plural_s(unexpected_count);
+                to_string_render!(self, unexpected_count, plural)
             }
             _ => Ok(self.get_message().expect("ErrorKind with no strum message").to_string()),
         }
@@ -461,7 +461,7 @@ impl ErrorKind {
                 expected_tags,
             } => py_dict!(py, discriminator, tag, expected_tags),
             Self::UnionTagNotFound { discriminator } => py_dict!(py, discriminator),
-            Self::UnexpectedKeywordArguments { count } => py_dict!(py, count),
+            Self::UnexpectedPositionalArguments { unexpected_count } => py_dict!(py, unexpected_count),
             _ => Ok(None),
         }
     }

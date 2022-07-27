@@ -101,9 +101,9 @@ class TestModelClass:
         with pytest.raises(ValidationError) as exc_info:
             schema_validator.validate_python({'a': 2})
         assert exc_info.value.errors() == [
-            {'kind': 'missing', 'loc': ['ModelA', 'b'], 'message': 'Input required', 'input_value': {'a': 2}},
-            {'kind': 'missing', 'loc': ['ModelB', 'c'], 'message': 'Input required', 'input_value': {'a': 2}},
-            {'kind': 'missing', 'loc': ['ModelB', 'd'], 'message': 'Input required', 'input_value': {'a': 2}},
+            {'kind': 'missing', 'loc': ['ModelA', 'b'], 'message': 'Field required', 'input_value': {'a': 2}},
+            {'kind': 'missing', 'loc': ['ModelB', 'c'], 'message': 'Field required', 'input_value': {'a': 2}},
+            {'kind': 'missing', 'loc': ['ModelB', 'd'], 'message': 'Field required', 'input_value': {'a': 2}},
         ]
 
 
@@ -228,7 +228,7 @@ def test_no_choices():
     assert exc_info.value.args[0] == (
         'Invalid Schema:\n'
         'union -> choices\n'
-        "  Input required [kind=missing, input_value={'type': 'union'}, input_type=dict]"
+        "  Field required [kind=missing, input_value={'type': 'union'}, input_type=dict]"
     )
 
 

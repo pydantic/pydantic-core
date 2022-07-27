@@ -184,6 +184,10 @@ impl Validator for TypedDictValidator {
 }
 
 impl TypedDictValidator {
+    pub fn keys(&self) -> Vec<String> {
+        self.fields.iter().map(|f| f.name.clone()).collect()
+    }
+
     pub fn validate_generic_mapping<'s, 'data>(
         &'s self,
         py: Python<'data>,

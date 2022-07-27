@@ -138,6 +138,10 @@ impl Validator for TuplePositionalValidator {
 }
 
 impl TuplePositionalValidator {
+    pub fn len(&self) -> usize {
+        self.items_validators.len()
+    }
+
     pub fn validate_list_like<'s, 'data>(
         &'s self,
         py: Python<'data>,

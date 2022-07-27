@@ -122,7 +122,7 @@ def test_function_wrap_not_callable():
     with pytest.raises(SchemaError, match='function -> function\n  Input must be callable'):
         SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': [], 'schema': 'str'})
 
-    with pytest.raises(SchemaError, match='function -> function\n  Input required'):
+    with pytest.raises(SchemaError, match='function -> function\n  Field required'):
         SchemaValidator({'type': 'function', 'mode': 'wrap', 'schema': 'str'})
 
 
