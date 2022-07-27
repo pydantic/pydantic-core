@@ -1,6 +1,7 @@
 import re
 
 import pytest
+from dirty_equals import IsListOrTuple
 
 from pydantic_core import ValidationError
 
@@ -30,7 +31,41 @@ from ..conftest import Err, PyAndJson
                 ],
             ),
         ],
-        [((1, 'a', True, 4), None), Err('kind=too_long,')],
+        [
+            ([1], None),
+            Err(
+                'kind=missing_positional_argument,',
+                [
+                    {
+                        'kind': 'missing_positional_argument',
+                        'loc': [1],
+                        'message': 'Missing positional argument',
+                        'input_value': IsListOrTuple([1], None),
+                    },
+                    {
+                        'kind': 'missing_positional_argument',
+                        'loc': [2],
+                        'message': 'Missing positional argument',
+                        'input_value': IsListOrTuple([1], None),
+                    },
+                ],
+            ),
+        ],
+        [
+            ([1, 'a', True, 4], None),
+            Err(
+                'kind=unexpected_positional_arguments,',
+                [
+                    {
+                        'kind': 'unexpected_positional_arguments',
+                        'loc': [],
+                        'message': '42 unexpected positional arguments',
+                        'input_value': IsListOrTuple([1, 'a', True, 4], None),
+                        'context': {'unexpected_count': 42},
+                    }
+                ],
+            ),
+        ],
         [
             (('x', 'a', 'wrong'), None),
             Err(
@@ -64,7 +99,7 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
-        # debug(exc_info.value.errors())
+        debug(exc_info.value.errors())
         if expected.errors:
             assert exc_info.value.errors() == expected.errors
     else:

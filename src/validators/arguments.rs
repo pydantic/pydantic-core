@@ -105,9 +105,11 @@ impl Validator for ArgumentsValidator {
         };
 
         let arg_result = match (pargs, &self.positional_args) {
-            (Some(args), Some(args_validator)) => {
-                Some(args_validator.validate_list_like(py, args, input, extra, slots, recursion_guard))
-            }
+            (Some(args), Some(args_validator)) => Some(
+                args_validator
+                    .validate_list_like(py, args, input, extra, slots, recursion_guard)
+                    .map_err(map_args_errors),
+            ),
             (Some(pa), None) => match pa.generic_len() {
                 0 => None,
                 unexpected_count => Some(Err(ValError::new(
@@ -238,5 +240,24 @@ impl ArgumentsValidator {
             GenericMapping::JsonObject(d) => collect_errors!(d.iter()),
         };
         ValError::LineErrors(errors)
+    }
+}
+
+fn map_args_errors(error: ValError) -> ValError {
+    match error {
+        ValError::LineErrors(line_errors) => {
+            let line_errors = line_errors
+                .into_iter()
+                .map(|e| match e.kind {
+                    ErrorKind::Missing => e.with_kind(ErrorKind::MissingPositionalArgument),
+                    ErrorKind::TooLong { max_length: _ } => {
+                        e.with_kind(ErrorKind::UnexpectedPositionalArguments { unexpected_count: 42 })
+                    }
+                    _ => e,
+                })
+                .collect();
+            ValError::LineErrors(line_errors)
+        }
+        internal_error => internal_error,
     }
 }
