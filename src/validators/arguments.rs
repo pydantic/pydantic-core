@@ -178,6 +178,13 @@ impl ArgumentsValidator {
                     args = GenericArguments::Py(Some(new_pargs), Some(kwargs));
                 }
                 GenericArguments::Json(Some(pargs), kwargs) => {
+                    // TODO ideally we wouldn't have to fallback to python objects here, but instead could continue
+                    // to operate on JsonInput and JsonArray/JsonObject, but all the approaches I tried failed:
+                    // * creating a new JsonObject allowed it to be mutated but `validate_generic_mapping` needs
+                    //   a reference and the reference has the wrong lifetime
+                    // * if we try to mutate kwargs directly we run into problems as it's a reference, not a
+                    //   mutable reference to make it editable we'd have to make input mutable everywhere which seems
+                    //   ugly
                     let pargs_slice = &pargs[..slice_at];
                     let py_pargs = match pargs_slice.is_empty() {
                         true => None,

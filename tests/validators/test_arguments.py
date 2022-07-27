@@ -17,7 +17,7 @@ from ..conftest import Err, PyAndJson
         ['x', Err('kind=arguments_type,')],
         [((1, 'a', True), ()), Err('kind=arguments_type,')],
         [((1, 'a', True), {'x': 1}), Err('kind=unexpected_keyword_arguments,')],
-        [((1, 'a', True, 4), None), Err('kind=tuple_length_mismatch,')],
+        [((1, 'a', True, 4), None), Err('kind=too_long,')],
         [
             (('x', 'a', 'wrong'), None),
             Err(
