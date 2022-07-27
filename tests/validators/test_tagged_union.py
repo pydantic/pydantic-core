@@ -28,12 +28,12 @@ from .test_typed_dict import Cls
         (
             {'foo': 'banana'},
             Err(
-                'Field required',
+                'Input required',
                 [
                     {
                         'kind': 'missing',
                         'loc': ['banana', 'spam'],
-                        'message': 'Field required',
+                        'message': 'Input required',
                         'input_value': {'foo': 'banana'},
                     }
                 ],

@@ -1,6 +1,7 @@
 import re
 
 import pytest
+from dirty_equals import IsListOrTuple
 
 from pydantic_core import ValidationError
 
@@ -16,7 +17,21 @@ from ..conftest import Err, PyAndJson
         [((1, 'a', 'true'), None), ((1, 'a', True), {})],
         ['x', Err('kind=arguments_type,')],
         [((1, 'a', True), ()), Err('kind=arguments_type,')],
-        [((1, 'a', True), {'x': 1}), Err('kind=unexpected_keyword_arguments,')],
+        [
+            ([1, 'a', True], {'x': 1}),
+            Err(
+                'kind=unexpected_keyword_arguments,',
+                [
+                    {
+                        'kind': 'unexpected_keyword_arguments',
+                        'loc': [],
+                        'message': 'Input included 1 unexpected key word argument',
+                        'input_value': IsListOrTuple([1, 'a', True], {'x': 1}),
+                        'context': {'count': 1},
+                    }
+                ],
+            ),
+        ],
         [((1, 'a', True, 4), None), Err('kind=too_long,')],
         [
             (('x', 'a', 'wrong'), None),
@@ -51,6 +66,7 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
+        # debug(exc_info.value.errors())
         if expected.errors:
             assert exc_info.value.errors() == expected.errors
     else:
@@ -107,6 +123,7 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
+        # debug(exc_info.value.errors())
         if expected.errors:
             assert exc_info.value.errors() == expected.errors
     else:

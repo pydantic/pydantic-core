@@ -98,7 +98,7 @@ def test_missing_error():
         == """\
 1 validation error for typed-dict
 field_b
-  Field required [kind=missing, input_value={'field_a': 123}, input_type=dict]"""
+  Input required [kind=missing, input_value={'field_a': 123}, input_type=dict]"""
     )
 
 
@@ -107,7 +107,7 @@ field_b
     [
         ({}, {'a': '123'}, {'a': 123}),
         ({}, Map(a=123), {'a': 123}),
-        ({}, {b'a': '123'}, Err('Field required [kind=missing,')),
+        ({}, {b'a': '123'}, Err('Input required [kind=missing,')),
         ({}, {'a': '123', 'c': 4}, {'a': 123}),
         ({'typed_dict_extra_behavior': 'allow'}, {'a': '123', 'c': 4}, {'a': 123, 'c': 4}),
         (
@@ -157,8 +157,12 @@ def test_forbid_extra():
         }
     )
 
-    with pytest.raises(ValidationError, match='field_b | Extra values are not permitted'):
+    with pytest.raises(ValidationError) as exc_info:
         v.validate_python({'field_a': 123, 'field_b': 1})
+
+    assert exc_info.value.errors() == [
+        {'kind': 'extra_forbidden', 'loc': ['field_b'], 'message': 'Extra values are not permitted', 'input_value': 1}
+    ]
 
 
 def test_allow_extra():
@@ -350,7 +354,7 @@ def test_json_error():
 
 
 def test_missing_schema_key():
-    with pytest.raises(SchemaError, match='typed-dict -> fields -> x -> schema\n  Field required'):
+    with pytest.raises(SchemaError, match='typed-dict -> fields -> x -> schema\n  Input required'):
         SchemaValidator({'type': 'typed-dict', 'fields': {'x': {'type': 'str'}}})
 
 
@@ -366,7 +370,7 @@ def test_fields_required_by_default():
         assert v.validate_python({'x': 'pika'})
 
     assert exc_info.value.errors() == [
-        {'kind': 'missing', 'loc': ['y'], 'message': 'Field required', 'input_value': {'x': 'pika'}}
+        {'kind': 'missing', 'loc': ['y'], 'message': 'Input required', 'input_value': {'x': 'pika'}}
     ]
 
 
@@ -439,7 +443,7 @@ def test_all_optional_fields_with_required_fields():
         assert v.validate_python({'y': 'chu'}) == ({'y': 'chu'}, {'y'})
 
     assert exc_info.value.errors() == [
-        {'kind': 'missing', 'loc': ['x'], 'message': 'Field required', 'input_value': {'y': 'chu'}}
+        {'kind': 'missing', 'loc': ['x'], 'message': 'Input required', 'input_value': {'y': 'chu'}}
     ]
 
 
@@ -454,9 +458,9 @@ def test_field_required_and_default():
 def test_alias(py_and_json: PyAndJson):
     v = py_and_json({'type': 'typed-dict', 'fields': {'field_a': {'alias': 'FieldA', 'schema': 'int'}}})
     assert v.validate_test({'FieldA': '123'}) == {'field_a': 123}
-    with pytest.raises(ValidationError, match=r'field_a\n +Field required \[kind=missing,'):
+    with pytest.raises(ValidationError, match=r'field_a\n +Input required \[kind=missing,'):
         assert v.validate_test({'foobar': '123'})
-    with pytest.raises(ValidationError, match=r'field_a\n +Field required \[kind=missing,'):
+    with pytest.raises(ValidationError, match=r'field_a\n +Input required \[kind=missing,'):
         assert v.validate_test({'field_a': '123'})
 
 
@@ -485,7 +489,7 @@ def test_alias_allow_pop(py_and_json: PyAndJson):
     assert v.validate_test({'FieldA': '123'}) == ({'field_a': 123}, {'field_a'})
     assert v.validate_test({'field_a': '123'}) == ({'field_a': 123}, {'field_a'})
     assert v.validate_test({'FieldA': '1', 'field_a': '2'}) == ({'field_a': 1}, {'field_a'})
-    with pytest.raises(ValidationError, match=r'field_a\n +Field required \[kind=missing,'):
+    with pytest.raises(ValidationError, match=r'field_a\n +Input required \[kind=missing,'):
         assert v.validate_test({'foobar': '123'})
 
 
@@ -493,10 +497,10 @@ def test_alias_allow_pop(py_and_json: PyAndJson):
     'input_value,expected',
     [
         ({'foo': {'bar': '123'}}, {'field_a': 123}),
-        ({'x': '123'}, Err(r'field_a\n +Field required \[kind=missing,')),
-        ({'foo': '123'}, Err(r'field_a\n +Field required \[kind=missing,')),
-        ({'foo': [1, 2, 3]}, Err(r'field_a\n +Field required \[kind=missing,')),
-        ({'foo': {'bat': '123'}}, Err(r'field_a\n +Field required \[kind=missing,')),
+        ({'x': '123'}, Err(r'field_a\n +Input required \[kind=missing,')),
+        ({'foo': '123'}, Err(r'field_a\n +Input required \[kind=missing,')),
+        ({'foo': [1, 2, 3]}, Err(r'field_a\n +Input required \[kind=missing,')),
+        ({'foo': {'bat': '123'}}, Err(r'field_a\n +Input required \[kind=missing,')),
     ],
     ids=repr,
 )
@@ -518,11 +522,11 @@ def test_alias_path(py_and_json: PyAndJson, input_value, expected):
         ({'foo': (1, 2, 3, 4)}, ({'field_a': 4}, {'field_a'})),
         ({'spam': 5}, ({'field_a': 5}, {'field_a'})),
         ({'spam': 1, 'foo': {'bar': {'bat': 2}}}, ({'field_a': 2}, {'field_a'})),
-        ({'foo': {'x': 2}}, Err(r'field_a\n +Field required \[kind=missing,')),
-        ({'x': '123'}, Err(r'field_a\n +Field required \[kind=missing,')),
-        ({'x': {2: 33}}, Err(r'field_a\n +Field required \[kind=missing,')),
-        ({'foo': '01234'}, Err(r'field_a\n +Field required \[kind=missing,')),
-        ({'foo': [1]}, Err(r'field_a\n +Field required \[kind=missing,')),
+        ({'foo': {'x': 2}}, Err(r'field_a\n +Input required \[kind=missing,')),
+        ({'x': '123'}, Err(r'field_a\n +Input required \[kind=missing,')),
+        ({'x': {2: 33}}, Err(r'field_a\n +Input required \[kind=missing,')),
+        ({'foo': '01234'}, Err(r'field_a\n +Input required \[kind=missing,')),
+        ({'foo': [1]}, Err(r'field_a\n +Input required \[kind=missing,')),
     ],
     ids=repr,
 )
@@ -763,7 +767,7 @@ def test_from_attributes_missing():
         {
             'kind': 'missing',
             'loc': ['c'],
-            'message': 'Field required',
+            'message': 'Input required',
             'input_value': HasRepr(IsStr(regex='.+Foobar object at.+')),
         }
     ]
@@ -931,10 +935,10 @@ def test_from_attributes_error_error():
         (Cls(foo=(1, 2, 3, 4)), {'my_field': 4}),
         (Cls(spam=5), {'my_field': 5}),
         (Cls(spam=1, foo=Cls(bar=Cls(bat=2))), {'my_field': 2}),
-        (Cls(x='123'), Err(r'my_field\n +Field required \[kind=missing,')),
-        (Cls(x={2: 33}), Err(r'my_field\n +Field required \[kind=missing,')),
-        (Cls(foo='01234'), Err(r'my_field\n +Field required \[kind=missing,')),
-        (Cls(foo=[1]), Err(r'my_field\n +Field required \[kind=missing,')),
+        (Cls(x='123'), Err(r'my_field\n +Input required \[kind=missing,')),
+        (Cls(x={2: 33}), Err(r'my_field\n +Input required \[kind=missing,')),
+        (Cls(foo='01234'), Err(r'my_field\n +Input required \[kind=missing,')),
+        (Cls(foo=[1]), Err(r'my_field\n +Input required \[kind=missing,')),
         (Cls, Err(r'Value must be a valid dictionary')),
     ],
     ids=repr,

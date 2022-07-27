@@ -122,7 +122,10 @@ impl Validator for ArgumentsValidator {
             }
             (Some(kwargs), None) => match kwargs.generic_len()? {
                 0 => None,
-                _ => Some(Err(ValError::new(ErrorKind::UnexpectedKeywordArguments, input))),
+                count => Some(Err(ValError::new(
+                    ErrorKind::UnexpectedKeywordArguments { count },
+                    input,
+                ))),
             },
             (None, Some(_)) => Some(Err(ValError::new(ErrorKind::MissingKeywordArguments, input))),
             (None, None) => None,

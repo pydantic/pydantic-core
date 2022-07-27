@@ -27,7 +27,7 @@ pub enum ErrorKind {
     // typed dict specific errors
     #[strum(message = "Value must be a valid dictionary or instance to extract fields from")]
     DictAttributesType,
-    #[strum(message = "Field required")]
+    #[strum(message = "Input required")]
     Missing,
     #[strum(message = "Extra values are not permitted")]
     ExtraForbidden,
@@ -299,12 +299,12 @@ pub enum ErrorKind {
     },
     // ---------------------
     // argument errors
-    #[strum(
-        message = "Value must be a pair of values consisting of (args, kwargs), or a plain dict to call a function"
-    )]
+    #[strum(message = "Arguments must be a tuple of (args, kwargs) or a plain dict")]
     ArgumentsType,
-    #[strum(message = "Unexpected key word arguments")]
-    UnexpectedKeywordArguments,
+    #[strum(message = "Input included {count} unexpected key word argument{plural}")]
+    UnexpectedKeywordArguments {
+        count: usize,
+    },
     #[strum(message = "Missing key word arguments")]
     MissingKeywordArguments,
     #[strum(message = "Unexpected positional arguments")]
@@ -343,6 +343,14 @@ macro_rules! py_dict {
         )*
         Ok(Some(dict.into_py($py)))
     }};
+}
+
+fn plural_s(value: &usize) -> &'static str {
+    if *value == 1 {
+        ""
+    } else {
+        "s"
+    }
 }
 
 impl ErrorKind {
@@ -399,6 +407,10 @@ impl ErrorKind {
                 expected_tags,
             } => render!(self, discriminator, tag, expected_tags),
             Self::UnionTagNotFound { discriminator } => render!(self, discriminator),
+            Self::UnexpectedKeywordArguments { count } => {
+                let plural = plural_s(count);
+                to_string_render!(self, count, plural)
+            }
             _ => Ok(self.get_message().expect("ErrorKind with no strum message").to_string()),
         }
     }
@@ -449,6 +461,7 @@ impl ErrorKind {
                 expected_tags,
             } => py_dict!(py, discriminator, tag, expected_tags),
             Self::UnionTagNotFound { discriminator } => py_dict!(py, discriminator),
+            Self::UnexpectedKeywordArguments { count } => py_dict!(py, count),
             _ => Ok(None),
         }
     }
