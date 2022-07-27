@@ -14,8 +14,9 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 #[derive(Debug, Clone)]
 pub struct ArgumentsValidator {
     arguments_mapping: Option<(usize, Vec<(usize, String)>)>,
-    positional_args: Option<TuplePositionalValidator>,
-    keyword_args: Option<TypedDictValidator>,
+    pargs_validator: Option<TuplePositionalValidator>,
+    kwargs_validator: Option<TypedDictValidator>,
+    always_validate_kwargs: bool,
     name: String,
 }
 
@@ -59,25 +60,32 @@ impl BuildValidator for ArgumentsValidator {
                 }
             };
         }
-        let positional_args = build_specific_validator!("positional_args_schema", TuplePositional);
-        let p_args_name = match positional_args {
+        let pargs_validator = build_specific_validator!("positional_args_schema", TuplePositional);
+        let p_args_name = match pargs_validator {
             Some(ref v) => v.get_name(),
             None => "-",
         };
-        let keyword_args = build_specific_validator!("keyword_args_schema", TypedDict);
-        let k_args_name = match keyword_args {
+        let kwargs_validator = build_specific_validator!("keyword_args_schema", TypedDict);
+        let k_args_name = match kwargs_validator {
             Some(ref v) => v.get_name(),
             None => "-",
         };
-        if positional_args.is_none() && keyword_args.is_none() {
-            return py_error!("Arguments schema must have either 'positional_args' or 'keyword_args' defined");
+        if pargs_validator.is_none() && kwargs_validator.is_none() {
+            return py_error!(
+                "Arguments schema must have either 'positional_args_schema' or 'keyword_args_schema' defined"
+            );
         }
         let name = format!("{}[{}, {}]", Self::EXPECTED_TYPE, p_args_name, k_args_name);
+        let always_validate_kwargs = match kwargs_validator {
+            Some(ref v) => v.has_optional_fields(),
+            None => false,
+        };
 
         Ok(Self {
             arguments_mapping,
-            positional_args,
-            keyword_args,
+            pargs_validator,
+            kwargs_validator,
+            always_validate_kwargs,
             name,
         }
         .into())
@@ -104,7 +112,7 @@ impl Validator for ArgumentsValidator {
             }
         };
 
-        let arg_result = match (pargs, &self.positional_args) {
+        let arg_result = match (pargs, &self.pargs_validator) {
             (Some(args), Some(args_validator)) => Some(
                 args_validator
                     .validate_list_like(py, args, input, extra, slots, recursion_guard)
@@ -125,7 +133,7 @@ impl Validator for ArgumentsValidator {
             (None, None) => None,
         };
 
-        let kwarg_result = match (kwargs, &self.keyword_args) {
+        let kwarg_result = match (kwargs, &self.kwargs_validator) {
             (Some(kwargs), Some(kwargs_validator)) => Some(
                 kwargs_validator
                     .validate_generic_mapping(py, kwargs, input, extra, slots, recursion_guard)
@@ -135,13 +143,24 @@ impl Validator for ArgumentsValidator {
                 0 => None,
                 _ => Some(Err(self.unexpected_kwargs(kwargs))),
             },
-            (None, Some(kwargs_validator)) => Some(Err(ValError::LineErrors(
-                kwargs_validator
-                    .keys()
-                    .into_iter()
-                    .map(|key| ValLineError::new_with_loc(ErrorKind::MissingKeywordArgument, input, key))
-                    .collect(),
-            ))),
+            (None, Some(kwargs_validator)) => {
+                if self.always_validate_kwargs {
+                    let kwargs = GenericMapping::PyDict(PyDict::new(py));
+                    Some(
+                        kwargs_validator
+                            .validate_generic_mapping(py, kwargs, input, extra, slots, recursion_guard)
+                            .map_err(map_kwargs_errors),
+                    )
+                } else {
+                    Some(Err(ValError::LineErrors(
+                        kwargs_validator
+                            .keys()
+                            .into_iter()
+                            .map(|key| ValLineError::new_with_loc(ErrorKind::MissingKeywordArgument, input, key))
+                            .collect(),
+                    )))
+                }
+            }
             (None, None) => None,
         };
 

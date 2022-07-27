@@ -282,6 +282,7 @@ def test_arguments_mapping(py_and_json: PyAndJson, input_value, expected):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
+        # debug(exc_info.value.errors())
         if expected.errors:
             assert exc_info.value.errors() == expected.errors
     else:
@@ -324,5 +325,38 @@ def test_arguments_mapping_build():
 
 
 def test_build_no_args():
-    with pytest.raises(SchemaError, match="Arguments schema must have either 'positional_args' or 'keyword_args' defi"):
+    m = "Arguments schema must have either 'positional_args_schema' or 'keyword_args_schema' defined"
+    with pytest.raises(SchemaError, match=m):
         SchemaValidator({'type': 'arguments'})
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        [(None, {'a': 1}), ((), {'a': 1})],
+        [(None, None), ((), {'a': 1})],
+        [((), {'a': 1}), ((), {'a': 1})],
+        [((), None), ((), {'a': 1})],
+    ],
+    ids=repr,
+)
+def test_all_optional(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {
+            'type': 'arguments',
+            'arguments_mapping': {0: 'a'},
+            'keyword_args_schema': {
+                'type': 'typed-dict',
+                'extra_behavior': 'forbid',
+                'fields': {'a': {'schema': 'int', 'default': 1}},
+            },
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_test(input_value)
+        # debug(exc_info.value.errors())
+        if expected.errors:
+            assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_test(input_value) == expected

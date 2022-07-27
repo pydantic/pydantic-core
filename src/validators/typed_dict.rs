@@ -24,6 +24,12 @@ struct TypedDictField {
     validator: CombinedValidator,
 }
 
+impl TypedDictField {
+    fn input_required(&self) -> bool {
+        self.required && self.default.is_none() && self.default_factory.is_none()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TypedDictValidator {
     fields: Vec<TypedDictField>,
@@ -186,6 +192,10 @@ impl Validator for TypedDictValidator {
 impl TypedDictValidator {
     pub fn keys(&self) -> Vec<String> {
         self.fields.iter().map(|f| f.name.clone()).collect()
+    }
+
+    pub fn has_optional_fields(&self) -> bool {
+        self.fields.iter().any(|f| !f.input_required())
     }
 
     pub fn validate_generic_mapping<'s, 'data>(
