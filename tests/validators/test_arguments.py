@@ -251,7 +251,7 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
-        debug(exc_info.value.errors())
+        # debug(exc_info.value.errors())
         if expected.errors:
             assert exc_info.value.errors() == expected.errors
     else:
