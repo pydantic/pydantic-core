@@ -149,12 +149,12 @@ impl TuplePositionalValidator {
     ) -> ValResult<'data, PyObject> {
         let expected_length = self.items_validators.len();
 
-        if list_like.generic_len() < expected_length {
-            return Err(ValError::new(
-                ErrorKind::TooShort {
-                    min_length: expected_length,
-                },
-                input,
+        let ll_length = list_like.generic_len();
+        if ll_length < expected_length {
+            return Err(ValError::LineErrors(
+                (ll_length..expected_length)
+                    .map(|index| ValLineError::new_with_loc(ErrorKind::Missing, input, index))
+                    .collect(),
             ));
         }
         let mut output: Vec<PyObject> = Vec::with_capacity(expected_length);
