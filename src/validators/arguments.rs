@@ -318,7 +318,7 @@ impl ArgumentsValidator {
         }
         let errors: Vec<ValLineError> = match dict {
             GenericMapping::PyDict(d) => collect_errors!(d.iter()),
-            GenericMapping::PyGetAttr(d) => collect_errors!(IterAttributes::new(d)),
+            GenericMapping::PyGetAttr(d) => collect_errors!(d.iter_attrs()),
             GenericMapping::JsonObject(d) => collect_errors!(d.iter()),
         };
         ValError::LineErrors(errors)
