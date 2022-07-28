@@ -12,8 +12,15 @@ use super::typed_dict::{IterAttributes, TypedDictValidator};
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
+struct ArgumentsMapping {
+    slice_at: usize,
+    max_length: usize,
+    mapping: Vec<(usize, String)>,
+}
+
+#[derive(Debug, Clone)]
 pub struct ArgumentsValidator {
-    arguments_mapping: Option<(usize, Vec<(usize, String)>)>,
+    arguments_mapping: Option<ArgumentsMapping>,
     pargs_validator: Option<TuplePositionalValidator>,
     kwargs_validator: Option<TypedDictValidator>,
     always_validate_kwargs: bool,
@@ -32,7 +39,7 @@ impl BuildValidator for ArgumentsValidator {
 
         let arguments_mapping = match schema.get_as::<&PyDict>(intern!(py, "arguments_mapping"))? {
             Some(d) => {
-                let arguments_mapping = d
+                let mut mapping: Vec<(usize, String)> = d
                     .iter()
                     .map(|(k, v)| {
                         let k = k.extract()?;
@@ -40,9 +47,17 @@ impl BuildValidator for ArgumentsValidator {
                         Ok((k, v))
                     })
                     .collect::<PyResult<Vec<_>>>()?;
-                #[allow(clippy::manual_map)]
-                match arguments_mapping.first() {
-                    Some((s, _)) => Some((*s, arguments_mapping)),
+
+                mapping.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
+                match mapping.first() {
+                    Some((slice_at, _)) => {
+                        let (max_length, _) = mapping.last().unwrap();
+                        Some(ArgumentsMapping {
+                            slice_at: *slice_at,
+                            max_length: *max_length + 1,
+                            mapping,
+                        })
+                    }
                     None => None,
                 }
             }
@@ -197,17 +212,26 @@ impl ArgumentsValidator {
     ) -> ValResult<'data, GenericArguments<'data>> {
         let mut args = input.validate_args()?;
 
-        if let Some((slice_at, ref arguments_mapping)) = self.arguments_mapping {
+        if let Some(ref arguments_mapping) = self.arguments_mapping {
             match args {
                 GenericArguments::Py(Some(pargs), kwargs) => {
-                    let new_pargs = pargs.get_slice(0, slice_at);
+                    let len = pargs.len();
+                    if len > arguments_mapping.max_length {
+                        return Err(ValError::new(
+                            ErrorKind::UnexpectedPositionalArguments {
+                                unexpected_count: len - arguments_mapping.max_length,
+                            },
+                            input,
+                        ));
+                    }
+                    let new_pargs = pargs.get_slice(0, arguments_mapping.slice_at);
                     let kwargs = match kwargs {
                         // have to copy the kwargs so we don't modify the input dict
                         Some(kw) => kw.copy()?,
                         None => PyDict::new(py),
                     };
 
-                    for (index, key) in arguments_mapping {
+                    for (index, key) in &arguments_mapping.mapping {
                         if let Ok(value) = pargs.get_item(*index) {
                             kwargs.set_item(key, value)?;
                         } else {
@@ -224,18 +248,26 @@ impl ArgumentsValidator {
                     // * if we try to mutate kwargs directly we run into problems as it's a reference, not a
                     //   mutable reference to make it editable we'd have to make input mutable everywhere which seems
                     //   ugly
-                    let pargs_slice = &pargs[..slice_at];
+                    let len = pargs.len();
+                    if len > arguments_mapping.max_length {
+                        return Err(ValError::new(
+                            ErrorKind::UnexpectedPositionalArguments {
+                                unexpected_count: len - arguments_mapping.max_length,
+                            },
+                            input,
+                        ));
+                    }
+                    let pargs_slice = &pargs[..arguments_mapping.slice_at];
                     let py_pargs = match pargs_slice.is_empty() {
                         true => None,
                         false => Some(PyList::new(py, pargs_slice)),
                     };
 
                     let py_kwargs = match kwargs {
-                        // have to copy the kwargs so we don't modify the input dict
                         Some(kw) => json_object_to_py(kw, py),
                         None => PyDict::new(py),
                     };
-                    for (index, key) in arguments_mapping {
+                    for (index, key) in &arguments_mapping.mapping {
                         if let Some(value) = pargs.get(*index) {
                             py_kwargs.set_item(key, value.to_object(py))?;
                         } else {

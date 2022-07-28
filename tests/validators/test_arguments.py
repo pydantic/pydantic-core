@@ -5,7 +5,7 @@ from dirty_equals import IsListOrTuple
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
-from ..conftest import Err, PyAndJson
+from ..conftest import Err, PyAndJson, plain_repr
 
 
 @pytest.mark.parametrize(
@@ -264,7 +264,21 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
         [(None, {'a': 1, 'b': 'bb', 'c': True}), ((), {'a': 1, 'b': 'bb', 'c': True})],
         [((1, 'bb'), {'c': True}), ((), {'a': 1, 'b': 'bb', 'c': True})],
         [((1,), {'b': 'bb', 'c': True}), ((), {'a': 1, 'b': 'bb', 'c': True})],
-        # [((1, 'bb', 'cc'), {'b': 'bb', 'c': True}), Err('kind=unexpected_positional_arguments,')],
+        [
+            ([1, 'bb', 'cc'], {'b': 'bb', 'c': True}),
+            Err(
+                'kind=unexpected_positional_arguments,',
+                [
+                    {
+                        'kind': 'unexpected_positional_arguments',
+                        'loc': [],
+                        'message': '1 unexpected positional argument',
+                        'input_value': IsListOrTuple([1, 'bb', 'cc'], {'b': 'bb', 'c': True}),
+                        'context': {'unexpected_count': 1},
+                    }
+                ],
+            ),
+        ],
     ],
     ids=repr,
 )
@@ -304,7 +318,7 @@ def test_arguments_mapping_build():
     v = SchemaValidator(
         {
             'type': 'arguments',
-            'arguments_mapping': {0: 'a', 1: 'b'},
+            'arguments_mapping': {1: 'b', 0: 'a'},
             'keyword_args_schema': {
                 'type': 'typed-dict',
                 'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'str'}, 'c': {'schema': 'bool'}},
@@ -312,6 +326,9 @@ def test_arguments_mapping_build():
         }
     )
     assert re.search(r'arguments_mapping: (\w+)', repr(v)).group(1) == 'Some'
+    arguments_mapping = re.search('arguments_mapping:(.*?),pargs_validator', plain_repr(v)).group(1)
+    # check that mapping has been sorted
+    assert arguments_mapping == 'Some(ArgumentsMapping{slice_at:0,max_length:2,mapping:[(0,"a"),(1,"b"),]})'
     v = SchemaValidator(
         {
             'type': 'arguments',
@@ -401,7 +418,21 @@ def test_var_args_only(py_and_json: PyAndJson, input_value, expected):
     [
         [([1, 'a', 'true'], {'b': 'bb', 'c': 3}), ((1, 'a'), {'a': True, 'b': 'bb', 'c': 3})],
         [([1, 'a'], {'a': 'true', 'b': 'bb', 'c': 3}), ((1, 'a'), {'a': True, 'b': 'bb', 'c': 3})],
-        # [([1, 'a', 'true', 4], {'b': 'bb', 'c': 3}), Err('')],
+        [
+            ([1, 'a', 'true', 4, 5], {'b': 'bb', 'c': 3}),
+            Err(
+                'kind=unexpected_positional_arguments,',
+                [
+                    {
+                        'kind': 'unexpected_positional_arguments',
+                        'loc': [],
+                        'message': '2 unexpected positional arguments',
+                        'input_value': IsListOrTuple([1, 'a', 'true', 4, 5], {'b': 'bb', 'c': 3}),
+                        'context': {'unexpected_count': 2},
+                    }
+                ],
+            ),
+        ],
     ],
     ids=repr,
 )
@@ -421,7 +452,6 @@ def test_both(py_and_json: PyAndJson, input_value, expected):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
-        # debug(exc_info.value.errors())
         if expected.errors:
             assert exc_info.value.errors() == expected.errors
     else:
