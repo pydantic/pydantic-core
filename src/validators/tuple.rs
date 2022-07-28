@@ -2,7 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
-use crate::build_tools::{is_strict, py_error, SchemaDict};
+use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
 use crate::input::{GenericListLike, Input};
 use crate::recursion_guard::RecursionGuard;
@@ -91,9 +91,6 @@ impl TuplePositionalValidator {
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let items: &PyList = schema.get_as_req(intern!(py, "items_schema"))?;
-        if items.is_empty() {
-            return py_error!("Empty positional items schema");
-        }
         let validators: Vec<CombinedValidator> = items
             .iter()
             .map(|item| build_validator(item, config, build_context).map(|result| result.0))

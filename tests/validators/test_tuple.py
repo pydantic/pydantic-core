@@ -4,7 +4,7 @@ from typing import Any, Dict, Type
 import pytest
 from dirty_equals import IsNonNegative, IsTuple
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError
 
 from ..conftest import Err, PyAndJson
 
@@ -200,9 +200,20 @@ def test_extra_arguments(py_and_json: PyAndJson):
     ]
 
 
-def test_tuple_fix_len_schema_error():
-    with pytest.raises(SchemaError, match='SchemaError: Empty positional items schema'):
-        SchemaValidator({'type': 'tuple', 'mode': 'positional', 'items_schema': []})
+def test_positional_empty(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'tuple', 'mode': 'positional', 'items_schema': []})
+    assert v.validate_test([]) == ()
+    assert v.validate_python(()) == ()
+    with pytest.raises(ValidationError, match='kind=too_long,'):
+        v.validate_test([1])
+
+
+def test_positional_empty_extra(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'tuple', 'mode': 'positional', 'items_schema': [], 'extra_schema': 'int'})
+    assert v.validate_test([]) == ()
+    assert v.validate_python(()) == ()
+    assert v.validate_test([1]) == (1,)
+    assert v.validate_test(list(range(100))) == tuple(range(100))
 
 
 @pytest.mark.parametrize('input_value,expected', [((1, 2, 3), (1, 2, 3)), ([1, 2, 3], [1, 2, 3])])

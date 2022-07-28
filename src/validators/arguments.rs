@@ -125,11 +125,14 @@ impl Validator for ArgumentsValidator {
                     input,
                 ))),
             },
-            (None, Some(args_validator)) => Some(Err(ValError::LineErrors(
-                (0..args_validator.len())
-                    .map(|index| ValLineError::new_with_loc(ErrorKind::MissingPositionalArgument, input, index))
-                    .collect(),
-            ))),
+            (None, Some(args_validator)) => match args_validator.len() {
+                0 => None,
+                args_count => Some(Err(ValError::LineErrors(
+                    (0..args_count)
+                        .map(|index| ValLineError::new_with_loc(ErrorKind::MissingPositionalArgument, input, index))
+                        .collect(),
+                ))),
+            },
             (None, None) => None,
         };
 

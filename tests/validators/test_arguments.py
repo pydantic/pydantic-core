@@ -264,6 +264,7 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
         [(None, {'a': 1, 'b': 'bb', 'c': True}), ((), {'a': 1, 'b': 'bb', 'c': True})],
         [((1, 'bb'), {'c': True}), ((), {'a': 1, 'b': 'bb', 'c': True})],
         [((1,), {'b': 'bb', 'c': True}), ((), {'a': 1, 'b': 'bb', 'c': True})],
+        # [((1, 'bb', 'cc'), {'b': 'bb', 'c': True}), Err('kind=unexpected_positional_arguments,')],
     ],
     ids=repr,
 )
@@ -351,6 +352,94 @@ def test_all_optional(py_and_json: PyAndJson, input_value, expected):
                 'fields': {'a': {'schema': 'int', 'default': 1}},
             },
         }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_test(input_value)
+        # debug(exc_info.value.errors())
+        if expected.errors:
+            assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_test(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        [([1, 2, 3], None), ((1, 2, 3), {})],
+        [([1], None), ((1,), {})],
+        [([], None), ((), {})],
+        [([], {}), ((), {})],
+        [([1, 2, 3], {'a': 1}), Err('a\n  Unexpected keyword argument [kind=unexpected_keyword_argument,')],
+    ],
+    ids=repr,
+)
+def test_var_args_only(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {
+            'type': 'arguments',
+            'positional_args_schema': {
+                'type': 'tuple',
+                'mode': 'positional',
+                'items_schema': [],
+                'extra_schema': 'int',
+            },
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_test(input_value)
+        # debug(exc_info.value.errors())
+        if expected.errors:
+            assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_test(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        [([1, 'a', 'true'], {'b': 'bb', 'c': 3}), ((1, 'a'), {'a': True, 'b': 'bb', 'c': 3})],
+        [([1, 'a'], {'a': 'true', 'b': 'bb', 'c': 3}), ((1, 'a'), {'a': True, 'b': 'bb', 'c': 3})],
+        # [([1, 'a', 'true', 4], {'b': 'bb', 'c': 3}), Err('')],
+    ],
+    ids=repr,
+)
+def test_both(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {
+            'type': 'arguments',
+            'arguments_mapping': {2: 'a'},
+            'positional_args_schema': {'type': 'tuple', 'mode': 'positional', 'items_schema': ['int', 'str']},
+            'keyword_args_schema': {
+                'type': 'typed-dict',
+                'extra_behavior': 'forbid',
+                'fields': {'a': {'schema': 'bool'}, 'b': {'schema': 'str'}, 'c': {'schema': 'int'}},
+            },
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_test(input_value)
+        # debug(exc_info.value.errors())
+        if expected.errors:
+            assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_test(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        [([], {}), ((), {})],
+        [(None, None), ((), {})],
+        [([1], None), Err('1 unexpected positional argument [kind=unexpected_positional_arguments,')],
+    ],
+    ids=repr,
+)
+def test_no_args(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {'type': 'arguments', 'positional_args_schema': {'type': 'tuple', 'mode': 'positional', 'items_schema': []}}
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
