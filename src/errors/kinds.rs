@@ -317,6 +317,10 @@ pub enum ErrorKind {
     },
     #[strum(message = "Missing positional argument")]
     MissingPositionalArgument,
+    #[strum(message = "Got multiple values for argument '{arg}'")]
+    MultipleArgumentValues {
+        arg: String,
+    },
 }
 
 macro_rules! render {
@@ -431,6 +435,7 @@ impl ErrorKind {
                 let plural = plural_s(unexpected_count);
                 to_string_render!(self, unexpected_count, plural)
             }
+            Self::MultipleArgumentValues { arg } => render!(self, arg),
             _ => Ok(self.get_message().expect("ErrorKind with no strum message").to_string()),
         }
     }
@@ -488,6 +493,7 @@ impl ErrorKind {
             } => py_dict!(py, discriminator, tag, expected_tags),
             Self::UnionTagNotFound { discriminator } => py_dict!(py, discriminator),
             Self::UnexpectedPositionalArguments { unexpected_count } => py_dict!(py, unexpected_count),
+            Self::MultipleArgumentValues { arg } => py_dict!(py, arg),
             _ => Ok(None),
         }
     }

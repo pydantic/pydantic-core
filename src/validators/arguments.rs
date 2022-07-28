@@ -1,6 +1,6 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyTuple};
+use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
@@ -15,7 +15,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 struct ArgumentsMapping {
     slice_at: usize,
     max_length: usize,
-    mapping: Vec<(usize, String)>,
+    mapping: Vec<(usize, Py<PyString>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -39,12 +39,12 @@ impl BuildValidator for ArgumentsValidator {
 
         let arguments_mapping = match schema.get_as::<&PyDict>(intern!(py, "arguments_mapping"))? {
             Some(d) => {
-                let mut mapping: Vec<(usize, String)> = d
+                let mut mapping: Vec<(usize, Py<PyString>)> = d
                     .iter()
                     .map(|(k, v)| {
                         let k = k.extract()?;
-                        let v = v.extract()?;
-                        Ok((k, v))
+                        let v: &PyString = v.cast_as()?;
+                        Ok((k, v.into_py(py)))
                     })
                     .collect::<PyResult<Vec<_>>>()?;
 
@@ -231,14 +231,27 @@ impl ArgumentsValidator {
                         None => PyDict::new(py),
                     };
 
+                    let mut errors = vec![];
                     for (index, key) in &arguments_mapping.mapping {
                         if let Ok(value) = pargs.get_item(*index) {
-                            kwargs.set_item(key, value)?;
+                            if kwargs.contains(key)? {
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorKind::MultipleArgumentValues { arg: key.to_string() },
+                                    value,
+                                    *index,
+                                ));
+                            } else {
+                                kwargs.set_item(key, value)?;
+                            }
                         } else {
                             break;
                         }
                     }
-                    args = GenericArguments::Py(Some(new_pargs), Some(kwargs));
+                    if errors.is_empty() {
+                        args = GenericArguments::Py(Some(new_pargs), Some(kwargs));
+                    } else {
+                        return Err(ValError::LineErrors(errors));
+                    }
                 }
                 GenericArguments::Json(Some(pargs), kwargs) => {
                     // TODO ideally we wouldn't have to fallback to python objects here, but instead could continue
@@ -267,14 +280,27 @@ impl ArgumentsValidator {
                         Some(kw) => json_object_to_py(kw, py),
                         None => PyDict::new(py),
                     };
+                    let mut errors = vec![];
                     for (index, key) in &arguments_mapping.mapping {
                         if let Some(value) = pargs.get(*index) {
-                            py_kwargs.set_item(key, value.to_object(py))?;
+                            if py_kwargs.contains(key)? {
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorKind::MultipleArgumentValues { arg: key.to_string() },
+                                    value,
+                                    *index,
+                                ));
+                            } else {
+                                py_kwargs.set_item(key, value.to_object(py))?;
+                            }
                         } else {
                             break;
                         }
                     }
-                    args = GenericArguments::Py(py_pargs, Some(py_kwargs));
+                    if errors.is_empty() {
+                        args = GenericArguments::Py(py_pargs, Some(py_kwargs));
+                    } else {
+                        return Err(ValError::LineErrors(errors));
+                    }
                 }
                 _ => (),
             }

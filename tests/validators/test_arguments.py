@@ -1,7 +1,7 @@
 import re
 
 import pytest
-from dirty_equals import IsListOrTuple
+from dirty_equals import IsListOrTuple, IsStr
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
@@ -279,6 +279,43 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
                 ],
             ),
         ],
+        [
+            ((1,), {'a': 11, 'b': 'bb', 'c': True}),
+            Err(
+                'kind=multiple_argument_values,',
+                [
+                    {
+                        'kind': 'multiple_argument_values',
+                        'loc': [0],
+                        'message': "Got multiple values for argument 'a'",
+                        'input_value': 1,
+                        'context': {'arg': 'a'},
+                    }
+                ],
+            ),
+        ],
+        [
+            ((1, 'bb'), {'a': 11, 'b': 'bb', 'c': True}),
+            Err(
+                'kind=multiple_argument_values,',
+                [
+                    {
+                        'kind': 'multiple_argument_values',
+                        'loc': [0],
+                        'message': "Got multiple values for argument 'a'",
+                        'input_value': 1,
+                        'context': {'arg': 'a'},
+                    },
+                    {
+                        'kind': 'multiple_argument_values',
+                        'loc': [1],
+                        'message': "Got multiple values for argument 'b'",
+                        'input_value': 'bb',
+                        'context': {'arg': 'b'},
+                    },
+                ],
+            ),
+        ],
     ],
     ids=repr,
 )
@@ -328,7 +365,16 @@ def test_arguments_mapping_build():
     assert re.search(r'arguments_mapping: (\w+)', repr(v)).group(1) == 'Some'
     arguments_mapping = re.search('arguments_mapping:(.*?),pargs_validator', plain_repr(v)).group(1)
     # check that mapping has been sorted
-    assert arguments_mapping == 'Some(ArgumentsMapping{slice_at:0,max_length:2,mapping:[(0,"a"),(1,"b"),]})'
+    assert arguments_mapping == IsStr(
+        regex=(
+            r'Some\('
+            r'ArgumentsMapping{'
+            r'slice_at:0,'
+            r'max_length:2,'
+            r'mapping:\[\(0,Py\(0x[0-9a-f]+\)\),\(1,Py\(0x[0-9a-f]+\)\),\]}'
+            r'\)'
+        )
+    )
     v = SchemaValidator(
         {
             'type': 'arguments',
