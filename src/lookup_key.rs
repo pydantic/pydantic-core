@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 
 use crate::build_tools::py_error;
-use crate::input::{JsonInput, JsonObject};
+use crate::input::{JsonInput, JsonObject, PyArgs};
 
 /// Used got getting items from python dicts, python objects, or JSON objects, in different ways
 #[derive(Debug, Clone)]
@@ -20,6 +20,8 @@ pub enum LookupKey {
     /// ints are also supported to index arrays/lists/tuples and dicts with int keys
     /// we reuse Location as the enum is the same, and the meaning is the same
     PathChoices(Vec<Path>),
+    ArgsPositional(usize),
+    ArgsSimpleEither(usize, String, Py<PyString>),
 }
 
 impl fmt::Display for LookupKey {
@@ -160,7 +162,24 @@ impl LookupKey {
                 // got to the end of path_choices, without a match, return None
                 Ok(None)
             }
+            _ => unreachable!(),
         }
+    }
+
+    pub fn py_get_args<'data, 's>(&'s self, obj: &'data PyArgs) -> PyResult<Option<(&'s str, &'data PyAny)>> {
+        let mut arg_match: Option<&PyAny> = None;
+        if let Some(pargs) = obj.pargs {
+            match self {
+                LookupKey::ArgsPositional(index) => {
+                    arg_match = pargs.get_item(*index).ok();
+                }
+                LookupKey::ArgsSimpleEither(index, _, _) => {
+                    arg_match = pargs.get_item(*index).ok();
+                }
+                _ => (),
+            };
+        }
+        todo!()
     }
 
     pub fn json_get<'data, 's>(&'s self, dict: &'data JsonObject) -> PyResult<Option<(&'s str, &'data JsonInput)>> {

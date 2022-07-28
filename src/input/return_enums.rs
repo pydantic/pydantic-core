@@ -186,11 +186,50 @@ impl<'a> GenericMapping<'a> {
     }
 }
 
+pub struct PyArgs<'a> {
+    pub pargs: Option<&'a PyList>,
+    pub kwargs: Option<&'a PyDict>,
+}
+
+impl<'a> PyArgs<'a> {
+    pub fn new(pargs: Option<&'a PyList>, kwargs: Option<&'a PyDict>) -> Self {
+        Self { pargs, kwargs }
+    }
+
+    pub fn iter(&'a self) -> impl Iterator<Item = &'a PyAny> {
+        self.kwargs.unwrap().iter()
+    }
+
+    pub fn get_args(&'a self, index: usize) -> Option<&'a PyAny> {
+        match self.args {
+            Some(args) => args.get_item(index).ok(),
+            None => None,
+        }
+    }
+}
+
+pub struct JsonArgs<'a> {
+    args: Option<&'a [JsonInput]>,
+    kwargs: Option<&'a JsonObject>,
+}
+
+impl<'a> JsonArgs<'a> {
+    pub fn new(args: Option<&'a [JsonInput]>, kwargs: Option<&'a JsonObject>) -> Self {
+        Self { args, kwargs }
+    }
+
+    pub fn iter(&'a self) -> impl Iterator<Item = &'a JsonInput> {
+        self.kwargs.unwrap().iter()
+    }
+}
+
 #[derive(Debug)]
 pub enum GenericArguments<'a> {
-    Py(Option<&'a PyList>, Option<&'a PyDict>),
-    Json(Option<&'a [JsonInput]>, Option<&'a JsonObject>),
+    Py(PyArgs<'a>),
+    Json(JsonArgs<'a>),
 }
+derive_from!(GenericArguments, Py, PyArgs);
+derive_from!(GenericArguments, Json, JsonArgs);
 
 #[derive(Debug)]
 pub enum EitherString<'a> {
