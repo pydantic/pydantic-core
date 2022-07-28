@@ -1,4 +1,7 @@
 import re
+from functools import wraps
+from inspect import Parameter, signature
+from typing import Any, get_type_hints
 
 import pytest
 from dirty_equals import IsListOrTuple, IsStr
@@ -18,6 +21,7 @@ from ..conftest import Err, PyAndJson, plain_repr
         ['x', Err('kind=arguments_type,')],
         [((1, 'a', True), ()), Err('kind=arguments_type,')],
         [(4, {}), Err('kind=arguments_type,')],
+        [(1, 2, 3), Err('kind=arguments_type,')],
         [
             ([1, 'a', True], {'x': 1}),
             Err(
@@ -525,3 +529,214 @@ def test_no_args(py_and_json: PyAndJson, input_value, expected):
             assert exc_info.value.errors() == expected.errors
     else:
         assert v.validate_test(input_value) == expected
+
+
+def double_or_bust(input_value, **kwargs):
+    if input_value == 1:
+        raise RuntimeError('bust')
+    return input_value * 2
+
+
+def test_positional_internal_error(py_and_json: PyAndJson):
+
+    v = py_and_json(
+        {
+            'type': 'arguments',
+            'positional_args_schema': {
+                'type': 'tuple',
+                'mode': 'positional',
+                'items_schema': ['int', {'type': 'function', 'mode': 'plain', 'function': double_or_bust}],
+            },
+        }
+    )
+    assert v.validate_test(((1, 2), None)) == ((1, 4), {})
+    with pytest.raises(RuntimeError, match='bust'):
+        v.validate_test(((1, 1), None))
+
+
+def test_kwarg_internal_error(py_and_json: PyAndJson):
+    v = py_and_json(
+        {
+            'type': 'arguments',
+            'keyword_args_schema': {
+                'type': 'typed-dict',
+                'extra_behavior': 'forbid',
+                'fields': {
+                    'a': {'schema': 'int'},
+                    'b': {'schema': {'type': 'function', 'mode': 'plain', 'function': double_or_bust}},
+                },
+            },
+        }
+    )
+    assert v.validate_test((None, {'a': 1, 'b': 2})) == ((), {'a': 1, 'b': 4})
+    with pytest.raises(RuntimeError, match='bust'):
+        v.validate_test((None, {'a': 1, 'b': 1}))
+
+
+def validate(function):
+    """
+    a demo validation decorator to test arguments
+    """
+    parameters = signature(function).parameters
+
+    type_hints = get_type_hints(function)
+
+    arguments_mapping = {}
+    positional_args = []
+    extra_args_schema = None
+    keyword_args = {}
+    extra_kwargs_schema = None
+    for i, (name, p) in enumerate(parameters.items()):
+        if p.annotation is p.empty:
+            annotation = Any
+        else:
+            annotation = type_hints[name]
+
+        assert annotation in (bool, int, float, str, Any), f'schema for {annotation} not implemented'
+        schema = annotation.__name__.lower()
+
+        if p.kind == Parameter.POSITIONAL_ONLY:
+            positional_args.append(schema)
+            if p.default is not p.empty:
+                raise NotImplementedError('default values for positional only arguments are not supported')
+        elif p.kind == Parameter.POSITIONAL_OR_KEYWORD:
+            keyword_args[name] = field = {'schema': schema}
+            if p.default is not p.empty:
+                field['default'] = p.default
+            arguments_mapping[i] = name
+        elif p.kind == Parameter.KEYWORD_ONLY:
+            keyword_args[name] = field = {'schema': schema}
+            if p.default is not p.empty:
+                field['default'] = p.default
+        elif p.kind == Parameter.VAR_POSITIONAL:
+            extra_args_schema = schema
+        else:
+            assert p.kind == Parameter.VAR_KEYWORD, p.kind
+            extra_kwargs_schema = schema
+
+    schema = {
+        'type': 'arguments',
+        'arguments_mapping': arguments_mapping,
+        'keyword_args_schema': {
+            'type': 'typed-dict',
+            'extra_behavior': 'forbid',
+            'fields': {'a': {'schema': 'bool'}, 'b': {'schema': 'str'}, 'c': {'schema': 'int'}},
+        },
+    }
+    if positional_args or extra_args_schema:
+        schema['positional_args_schema'] = {'type': 'tuple', 'mode': 'positional', 'items_schema': positional_args}
+        if extra_args_schema:
+            schema['positional_args_schema']['extra_schema'] = extra_args_schema
+    if keyword_args or extra_kwargs_schema:
+        schema['keyword_args_schema'] = {'type': 'typed-dict', 'extra_behavior': 'forbid', 'fields': keyword_args}
+        if extra_kwargs_schema:
+            schema['keyword_args_schema']['extra_behavior'] = 'allow'
+            schema['keyword_args_schema']['extra_validator'] = extra_kwargs_schema
+
+    validator = SchemaValidator(schema)
+
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        validated_args, validated_kwargs = validator.validate_python((args, kwargs))
+        return function(*validated_args, **validated_kwargs)
+
+    return wrapper
+
+
+def test_function_any():
+    @validate
+    def foobar(a, b, c):
+        return a, b, c
+
+    assert foobar(1, 2, 3) == (1, 2, 3)
+    assert foobar(a=1, b=2, c=3) == (1, 2, 3)
+    assert foobar(1, b=2, c=3) == (1, 2, 3)
+
+    with pytest.raises(ValidationError, match='1 unexpected positional argument'):
+        foobar(1, 2, 3, 4)
+
+    with pytest.raises(ValidationError, match='d\n  Unexpected keyword argument'):
+        foobar(1, 2, 3, d=4)
+
+
+def test_function_types():
+    @validate
+    def foobar(a: int, b: int, *, c: int):
+        return a, b, c
+
+    assert foobar(1, 2, c='3') == (1, 2, 3)
+    assert foobar(a=1, b='2', c=3) == (1, 2, 3)
+
+    with pytest.raises(ValidationError, match='1 unexpected positional argument'):
+        foobar(1, 2, 3)
+
+    with pytest.raises(ValidationError) as exc_info:
+        foobar(1, 'b')
+
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'int_parsing',
+            'loc': ['b'],
+            'message': 'Value must be a valid integer, unable to parse string as an integer',
+            'input_value': 'b',
+        },
+        {
+            'kind': 'missing_keyword_argument',
+            'loc': ['c'],
+            'message': 'Missing keyword argument',
+            'input_value': ((1, 'b'), {}),
+        },
+    ]
+
+    with pytest.raises(ValidationError) as exc_info:
+        foobar(1, 'b', c='c')
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'int_parsing',
+            'loc': ['b'],
+            'message': 'Value must be a valid integer, unable to parse string as an integer',
+            'input_value': 'b',
+        },
+        {
+            'kind': 'int_parsing',
+            'loc': ['c'],
+            'message': 'Value must be a valid integer, unable to parse string as an integer',
+            'input_value': 'c',
+        },
+    ]
+
+
+def test_function_positional_only():
+    @validate
+    def foobar(a: int, b: int, /, c: int):
+        return a, b, c
+
+    assert foobar('1', 2, 3) == (1, 2, 3)
+    assert foobar('1', 2, c=3) == (1, 2, 3)
+    with pytest.raises(ValidationError) as exc_info:
+        foobar('1', b=2, c=3)
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'missing_positional_argument',
+            'loc': [1],
+            'message': 'Missing positional argument',
+            'input_value': (('1',), {'b': 2, 'c': 3}),
+        },
+        {
+            'kind': 'unexpected_keyword_argument',
+            'loc': ['b'],
+            'message': 'Unexpected keyword argument',
+            'input_value': 2,
+        },
+    ]
+
+
+def test_function_args_kwargs():
+    @validate
+    def foobar(*args, **kwargs):
+        return args, kwargs
+
+    assert foobar(1, 2, 3, a=4, b=5) == ((1, 2, 3), {'a': 4, 'b': 5})
+    assert foobar(1, 2, 3) == ((1, 2, 3), {})
+    assert foobar(a=1, b=2, c=3) == ((), {'a': 1, 'b': 2, 'c': 3})
+    assert foobar() == ((), {})
