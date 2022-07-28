@@ -4,7 +4,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input};
+use crate::input::{GenericMapping, Input, JsonObject};
 use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
@@ -65,32 +65,11 @@ impl Validator for DictValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let dict = input.validate_dict(extra.strict.unwrap_or(self.strict))?;
-
-        let mut op_len: Option<usize> = None;
-        if let Some(min_length) = self.min_items {
-            let len = dict.generic_len()?;
-            if len < min_length {
-                return Err(ValError::new(ErrorKind::TooShort { min_length }, input));
-            }
-            op_len = Some(len);
-        }
-        if let Some(max_length) = self.max_items {
-            let len = match op_len {
-                Some(len) => len,
-                None => dict.generic_len()?,
-            };
-            if len > max_length {
-                return Err(ValError::new(ErrorKind::TooLong { max_length }, input));
-            }
-        }
-
         match dict {
-            GenericMapping::PyDict(py_dict) => {
-                self.validate_generic_dict(py, py_dict.iter(), extra, slots, recursion_guard)
-            }
+            GenericMapping::PyDict(py_dict) => self.validate_dict(py, input, py_dict, extra, slots, recursion_guard),
             GenericMapping::PyGetAttr(_) => unreachable!(),
             GenericMapping::JsonObject(json_object) => {
-                self.validate_generic_dict(py, json_object.iter(), extra, slots, recursion_guard)
+                self.validate_json_object(py, input, json_object, extra, slots, recursion_guard)
             }
         }
     }
@@ -105,55 +84,77 @@ impl Validator for DictValidator {
     }
 }
 
-impl DictValidator {
-    fn validate_generic_dict<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        dict_iter: impl Iterator<Item = (&'data (impl Input<'data> + 'data), &'data (impl Input<'data> + 'data))>,
-        extra: &Extra,
-        slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let output = PyDict::new(py);
-        let mut errors: Vec<ValLineError> = Vec::new();
-
-        let key_validator = self.key_validator.as_ref();
-        let value_validator = self.value_validator.as_ref();
-
-        for (key, value) in dict_iter {
-            let output_key = match key_validator.validate(py, key, extra, slots, recursion_guard) {
-                Ok(value) => Some(value),
-                Err(ValError::LineErrors(line_errors)) => {
-                    for err in line_errors {
-                        // these are added in reverse order so [key] is shunted along by the second call
-                        errors.push(
-                            err.with_outer_location("[key]".into())
-                                .with_outer_location(key.as_loc_item()),
-                        );
-                    }
-                    None
+macro_rules! build_validate {
+    ($name:ident, $dict_type:ty) => {
+        fn $name<'s, 'data>(
+            &'s self,
+            py: Python<'data>,
+            input: &'data impl Input<'data>,
+            dict: &'data $dict_type,
+            extra: &Extra,
+            slots: &'data [CombinedValidator],
+            recursion_guard: &'s mut RecursionGuard,
+        ) -> ValResult<'data, PyObject> {
+            let mut op_len: Option<usize> = None;
+            if let Some(min_length) = self.min_items {
+                let len = dict.len();
+                if len < min_length {
+                    return Err(ValError::new(ErrorKind::TooShort { min_length }, input));
                 }
-                Err(err) => return Err(err),
-            };
-            let output_value = match value_validator.validate(py, value, extra, slots, recursion_guard) {
-                Ok(value) => Some(value),
-                Err(ValError::LineErrors(line_errors)) => {
-                    for err in line_errors {
-                        errors.push(err.with_outer_location(key.as_loc_item()));
-                    }
-                    None
+                op_len = Some(len);
+            }
+            if let Some(max_length) = self.max_items {
+                let len = op_len.unwrap_or_else(|| dict.len());
+                if len > max_length {
+                    return Err(ValError::new(ErrorKind::TooLong { max_length }, input));
                 }
-                Err(err) => return Err(err),
-            };
-            if let (Some(key), Some(value)) = (output_key, output_value) {
-                output.set_item(key, value)?;
+            }
+            let output = PyDict::new(py);
+            let mut errors: Vec<ValLineError> = Vec::new();
+
+            let key_validator = self.key_validator.as_ref();
+            let value_validator = self.value_validator.as_ref();
+
+            for (key, value) in dict.iter() {
+                let output_key = match key_validator.validate(py, key, extra, slots, recursion_guard) {
+                    Ok(value) => Some(value),
+                    Err(ValError::LineErrors(line_errors)) => {
+                        for err in line_errors {
+                            // these are added in reverse order so [key] is shunted along by the second call
+                            errors.push(
+                                err.with_outer_location("[key]".into())
+                                    .with_outer_location(key.as_loc_item()),
+                            );
+                        }
+                        None
+                    }
+                    Err(err) => return Err(err),
+                };
+                let output_value = match value_validator.validate(py, value, extra, slots, recursion_guard) {
+                    Ok(value) => Some(value),
+                    Err(ValError::LineErrors(line_errors)) => {
+                        for err in line_errors {
+                            errors.push(err.with_outer_location(key.as_loc_item()));
+                        }
+                        None
+                    }
+                    Err(err) => return Err(err),
+                };
+                if let (Some(key), Some(value)) = (output_key, output_value) {
+                    output.set_item(key, value)?;
+                }
+            }
+
+            if errors.is_empty() {
+                Ok(output.into())
+            } else {
+                Err(ValError::LineErrors(errors))
             }
         }
+    };
+}
 
-        if errors.is_empty() {
-            Ok(output.into())
-        } else {
-            Err(ValError::LineErrors(errors))
-        }
-    }
+impl DictValidator {
+    build_validate!(validate_dict, PyDict);
+    build_validate!(validate_json_object, JsonObject);
 }
