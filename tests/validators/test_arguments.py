@@ -594,7 +594,11 @@ def validate(function):
             annotation = type_hints[name]
 
         assert annotation in (bool, int, float, str, Any), f'schema for {annotation} not implemented'
-        schema = annotation.__name__.lower()
+        if annotation in (bool, int, float, str):
+            schema = annotation.__name__
+        else:
+            assert annotation is Any
+            schema = 'any'
 
         if p.kind == Parameter.POSITIONAL_ONLY:
             positional_args.append(schema)
