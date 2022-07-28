@@ -1,4 +1,5 @@
 import re
+import sys
 from functools import wraps
 from inspect import Parameter, signature
 from typing import Any, get_type_hints
@@ -706,11 +707,19 @@ def test_function_types():
     ]
 
 
-def test_function_positional_only():
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='requires python3.10 or higher')
+def test_function_positional_only(import_execute):
+    # language=Python
+    m = import_execute(
+        """
+def create_function(validate):
     @validate
     def foobar(a: int, b: int, /, c: int):
         return a, b, c
-
+    return foobar
+"""
+    )
+    foobar = m.create_function(validate)
     assert foobar('1', 2, 3) == (1, 2, 3)
     assert foobar('1', 2, c=3) == (1, 2, 3)
     with pytest.raises(ValidationError) as exc_info:
