@@ -74,7 +74,6 @@ impl<'a> Input<'a> for PyAny {
             } else if let Ok(tuple) = args.cast_as::<PyTuple>() {
                 Some(PyList::new(self.py(), tuple.iter().collect::<Vec<_>>()))
             } else {
-                // TODO, better error?
                 return Err(ValError::new(ErrorKind::ArgumentsType, self));
             };
             let kwargs = if let Ok(dict) = kwargs.cast_as::<PyDict>() {
@@ -82,7 +81,6 @@ impl<'a> Input<'a> for PyAny {
             } else if kwargs.is_none() {
                 None
             } else {
-                // TODO, better error?
                 return Err(ValError::new(ErrorKind::ArgumentsType, self));
             };
             Ok(PyArgs::new(args, kwargs).into())

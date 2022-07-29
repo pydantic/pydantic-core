@@ -4,9 +4,9 @@ use pyo3::{intern, PyTypeInfo};
 
 use ahash::AHashSet;
 
-use crate::build_tools::{is_strict, py_error, schema_or_config, SchemaDict};
+use crate::build_tools::{is_strict, py_error, schema_or_config, schema_or_config_same, SchemaDict};
 use crate::errors::{py_err_string, ErrorKind, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input, JsonObject};
+use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 use crate::SchemaError;
@@ -22,12 +22,6 @@ struct TypedDictField {
     default: Option<PyObject>,
     default_factory: Option<PyObject>,
     validator: CombinedValidator,
-}
-
-impl TypedDictField {
-    fn input_required(&self) -> bool {
-        self.required && self.default.is_none() && self.default_factory.is_none()
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -60,20 +54,8 @@ impl BuildValidator for TypedDictValidator {
         )?;
         let full =
             schema_or_config(schema, config, intern!(py, "full"), intern!(py, "typed_dict_full"))?.unwrap_or(true);
-        let from_attributes = schema_or_config(
-            schema,
-            config,
-            intern!(py, "from_attributes"),
-            intern!(py, "from_attributes"),
-        )?
-        .unwrap_or(false);
-        let populate_by_name = schema_or_config(
-            schema,
-            config,
-            intern!(py, "populate_by_name"),
-            intern!(py, "typed_dict_populate_by_name"),
-        )?
-        .unwrap_or(false);
+        let from_attributes = schema_or_config_same(schema, config, intern!(py, "from_attributes"))?.unwrap_or(false);
+        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
         let return_fields_set = schema.get_as(intern!(py, "return_fields_set"))?.unwrap_or(false);
 
@@ -170,11 +152,161 @@ impl Validator for TypedDictValidator {
     ) -> ValResult<'data, PyObject> {
         if let Some(field) = extra.field {
             // we're validating assignment, completely different logic
-            self.validate_assignment(py, field, input, extra, slots, recursion_guard)
+            return self.validate_assignment(py, field, input, extra, slots, recursion_guard);
+        }
+        let strict = extra.strict.unwrap_or(self.strict);
+        let dict = input.validate_typed_dict(strict, self.from_attributes)?;
+
+        let output_dict = PyDict::new(py);
+        let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
+        let mut fields_set_vec: Option<Vec<Py<PyString>>> = match self.return_fields_set {
+            true => Some(Vec::with_capacity(self.fields.len())),
+            false => None,
+        };
+
+        // we only care about which keys have been used if we're iterating over the object for extra after
+        // the first pass
+        let mut used_keys: Option<AHashSet<&str>> = match self.check_extra {
+            true => Some(AHashSet::with_capacity(self.fields.len())),
+            false => None,
+        };
+
+        let extra = Extra {
+            data: Some(output_dict),
+            field: None,
+            strict: extra.strict,
+            context: extra.context,
+        };
+
+        macro_rules! process {
+            ($dict:ident, $get_method:ident, $iter_method:ident) => {{
+                for field in &self.fields {
+                    let op_key_value = match field.lookup_key.$get_method($dict) {
+                        Ok(v) => v,
+                        Err(err) => {
+                            errors.push(ValLineError::new_with_loc(
+                                ErrorKind::GetAttributeError {
+                                    error: py_err_string(py, err),
+                                },
+                                input,
+                                field.name.clone(),
+                            ));
+                            continue;
+                        }
+                    };
+                    if let Some((used_key, value)) = op_key_value {
+                        if let Some(ref mut used_keys) = used_keys {
+                            // key is "used" whether or not validation passes, since we want to skip this key in
+                            // extra logic either way
+                            used_keys.insert(used_key);
+                        }
+                        match field
+                            .validator
+                            .validate(py, value, &extra, slots, recursion_guard)
+                        {
+                            Ok(value) => {
+                                output_dict.set_item(&field.name_pystring, value)?;
+                                if let Some(ref mut fs) = fields_set_vec {
+                                    fs.push(field.name_pystring.clone_ref(py));
+                                }
+                            }
+                            Err(ValError::LineErrors(line_errors)) => {
+                                for err in line_errors {
+                                    errors.push(err.with_outer_location(field.name.clone().into()));
+                                }
+                            }
+                            Err(err) => return Err(err),
+                        }
+                    } else if let Some(ref default) = field.default {
+                        output_dict.set_item(&field.name_pystring, default)?;
+                    } else if let Some(ref default_factory) = field.default_factory {
+                        output_dict.set_item(&field.name_pystring, default_factory.call0(py)?)?;
+                    } else if !field.required {
+                        continue;
+                    } else {
+                        errors.push(ValLineError::new_with_loc(
+                            ErrorKind::Missing,
+                            input,
+                            field.name.clone(),
+                        ));
+                    }
+                }
+
+                if self.check_extra {
+                    let used_keys = match used_keys {
+                        Some(v) => v,
+                        None => unreachable!(),
+                    };
+                    for (raw_key, value) in $dict.$iter_method() {
+                        let either_str = match raw_key.strict_str() {
+                            Ok(k) => k,
+                            Err(ValError::LineErrors(line_errors)) => {
+                                for err in line_errors {
+                                    errors.push(
+                                        err.with_outer_location(raw_key.as_loc_item())
+                                            .with_kind(ErrorKind::InvalidKey),
+                                    );
+                                }
+                                continue;
+                            }
+                            Err(err) => return Err(err),
+                        };
+                        if used_keys.contains(either_str.as_cow().as_ref()) {
+                            continue;
+                        }
+
+                        if self.forbid_extra {
+                            errors.push(ValLineError::new_with_loc(
+                                ErrorKind::ExtraForbidden,
+                                input,
+                                raw_key.as_loc_item(),
+                            ));
+                            continue;
+                        }
+
+                        let py_key = either_str.as_py_string(py);
+                        if let Some(ref mut fs) = fields_set_vec {
+                            fs.push(py_key.into_py(py));
+                        }
+
+                        if let Some(ref validator) = self.extra_validator {
+                            match validator.validate(py, value, &extra, slots, recursion_guard) {
+                                Ok(value) => {
+                                    output_dict.set_item(py_key, value)?;
+                                    if let Some(ref mut fs) = fields_set_vec {
+                                        fs.push(py_key.into_py(py));
+                                    }
+                                }
+                                Err(ValError::LineErrors(line_errors)) => {
+                                    for err in line_errors {
+                                        errors.push(err.with_outer_location(raw_key.as_loc_item()));
+                                    }
+                                }
+                                Err(err) => return Err(err),
+                            }
+                        } else {
+                            output_dict.set_item(py_key, value.to_object(py))?;
+                            if let Some(ref mut fs) = fields_set_vec {
+                                fs.push(py_key.into_py(py));
+                            }
+                        }
+                    }
+                }
+            }};
+        }
+        match dict {
+            GenericMapping::PyDict(d) => process!(d, py_get_item, iter),
+            GenericMapping::PyGetAttr(d) => process!(d, py_get_attr, iter_attrs),
+            GenericMapping::JsonObject(d) => process!(d, json_get, iter),
+        }
+
+        if !errors.is_empty() {
+            Err(ValError::LineErrors(errors))
+        } else if let Some(fs) = fields_set_vec {
+            let fields_set = PySet::new(py, &fs)?;
+            Ok((output_dict, fields_set).to_object(py))
         } else {
-            let strict = extra.strict.unwrap_or(self.strict);
-            let dict = input.validate_typed_dict(strict, self.from_attributes)?;
-            self.validate_generic_mapping(py, dict, input, extra, slots, recursion_guard)
+            Ok(output_dict.to_object(py))
         }
     }
 
@@ -189,200 +321,7 @@ impl Validator for TypedDictValidator {
     }
 }
 
-macro_rules! build_validate_generic_mapping {
-    ($name:ident, $dict_type:ident, $get_method:ident, $iter_method:ident) => {
-        pub fn $name<'s, 'data>(
-            &'s self,
-            py: Python<'data>,
-            dict: &'data $dict_type,
-            input: &'data impl Input<'data>,
-            extra: &Extra,
-            slots: &'data [CombinedValidator],
-            recursion_guard: &'s mut RecursionGuard,
-        ) -> ValResult<'data, PyObject> {
-            let output_dict = PyDict::new(py);
-            let fields_len = self.fields.len();
-            let mut errors: Vec<ValLineError> = Vec::with_capacity(fields_len);
-            let mut fields_set_vec: Option<Vec<Py<PyString>>> = match self.return_fields_set {
-                true => Some(Vec::with_capacity(fields_len)),
-                false => None,
-            };
-
-            // we only care about which keys have been used if we're iterating over the object for extra after
-            // the first pass
-            let mut used_keys: Option<AHashSet<&str>> = match self.check_extra {
-                true => Some(AHashSet::with_capacity(fields_len)),
-                false => None,
-            };
-
-            let extra = Extra {
-                data: Some(output_dict),
-                field: None,
-                strict: extra.strict,
-                context: extra.context,
-            };
-
-            for field in &self.fields {
-                let op_key_value = match field.lookup_key.$get_method(dict) {
-                    Ok(v) => v,
-                    Err(err) => {
-                        errors.push(ValLineError::new_with_loc(
-                            ErrorKind::GetAttributeError {
-                                error: py_err_string(py, err),
-                            },
-                            input,
-                            field.name.clone(),
-                        ));
-                        continue;
-                    }
-                };
-                if let Some((used_key, value)) = op_key_value {
-                    if let Some(ref mut used_keys) = used_keys {
-                        // key is "used" whether or not validation passes, since we want to skip this key in
-                        // extra logic either way
-                        used_keys.insert(used_key);
-                    }
-                    match field
-                        .validator
-                        .validate(py, value, &extra, slots, recursion_guard)
-                    {
-                        Ok(value) => {
-                            output_dict.set_item(&field.name_pystring, value)?;
-                            if let Some(ref mut fs) = fields_set_vec {
-                                fs.push(field.name_pystring.clone_ref(py));
-                            }
-                        }
-                        Err(ValError::LineErrors(line_errors)) => {
-                            for err in line_errors {
-                                errors.push(err.with_outer_location(field.name.clone().into()));
-                            }
-                        }
-                        Err(err) => return Err(err),
-                    }
-                } else if let Some(ref default) = field.default {
-                    output_dict.set_item(&field.name_pystring, default)?;
-                } else if let Some(ref default_factory) = field.default_factory {
-                    output_dict.set_item(&field.name_pystring, default_factory.call0(py)?)?;
-                } else if !field.required {
-                    continue;
-                } else {
-                    errors.push(ValLineError::new_with_loc(
-                        ErrorKind::Missing,
-                        input,
-                        field.name.clone(),
-                    ));
-                }
-            }
-
-            if self.check_extra {
-                let used_keys = match used_keys {
-                    Some(v) => v,
-                    None => unreachable!(),
-                };
-                let iter = dict.$iter_method();
-                for (raw_key, value) in iter {
-                    let either_str = match raw_key.strict_str() {
-                        Ok(k) => k,
-                        Err(ValError::LineErrors(line_errors)) => {
-                            for err in line_errors {
-                                errors.push(
-                                    err.with_outer_location(raw_key.as_loc_item())
-                                        .with_kind(ErrorKind::InvalidKey),
-                                );
-                            }
-                            continue;
-                        }
-                        Err(err) => return Err(err),
-                    };
-                    if used_keys.contains(either_str.as_cow().as_ref()) {
-                        continue;
-                    }
-
-                    if self.forbid_extra {
-                        errors.push(ValLineError::new_with_loc(
-                            ErrorKind::ExtraForbidden,
-                            value,
-                            raw_key.as_loc_item(),
-                        ));
-                        continue;
-                    }
-
-                    let py_key = either_str.as_py_string(py);
-                    if let Some(ref mut fs) = fields_set_vec {
-                        fs.push(py_key.into_py(py));
-                    }
-
-                    if let Some(ref validator) = self.extra_validator {
-                        match validator.validate(py, value, &extra, slots, recursion_guard) {
-                            Ok(value) => {
-                                output_dict.set_item(py_key, value)?;
-                                if let Some(ref mut fs) = fields_set_vec {
-                                    fs.push(py_key.into_py(py));
-                                }
-                            }
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    errors.push(err.with_outer_location(raw_key.as_loc_item()));
-                                }
-                            }
-                            Err(err) => return Err(err),
-                        }
-                    } else {
-                        output_dict.set_item(py_key, value.to_object(py))?;
-                        if let Some(ref mut fs) = fields_set_vec {
-                            fs.push(py_key.into_py(py));
-                        }
-                    }
-                }
-            }
-
-            if !errors.is_empty() {
-                Err(ValError::LineErrors(errors))
-            } else if let Some(fs) = fields_set_vec {
-                let fields_set = PySet::new(py, &fs)?;
-                Ok((output_dict, fields_set).to_object(py))
-            } else {
-                Ok(output_dict.to_object(py))
-            }
-        }
-    };
-}
-
 impl TypedDictValidator {
-    build_validate_generic_mapping!(validate_generic_mapping_py_dict, PyDict, py_get_item, iter);
-    build_validate_generic_mapping!(validate_generic_mapping_py_any, PyAny, py_get_attr, iter_attrs);
-    build_validate_generic_mapping!(validate_generic_mapping_json_object, JsonObject, json_get, iter);
-
-    pub fn keys(&self) -> Vec<String> {
-        self.fields.iter().map(|f| f.name.clone()).collect()
-    }
-
-    pub fn has_optional_fields(&self) -> bool {
-        self.fields.iter().any(|f| !f.input_required())
-    }
-
-    pub fn validate_generic_mapping<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        dict: GenericMapping<'data>,
-        input: &'data impl Input<'data>,
-        extra: &Extra,
-        slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        match dict {
-            GenericMapping::PyDict(d) => {
-                self.validate_generic_mapping_py_dict(py, d, input, extra, slots, recursion_guard)
-            }
-            GenericMapping::PyGetAttr(d) => {
-                self.validate_generic_mapping_py_any(py, d, input, extra, slots, recursion_guard)
-            }
-            GenericMapping::JsonObject(d) => {
-                self.validate_generic_mapping_json_object(py, d, input, extra, slots, recursion_guard)
-            }
-        }
-    }
-
     fn validate_assignment<'s, 'data>(
         &'s self,
         py: Python<'data>,

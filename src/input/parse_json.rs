@@ -31,14 +31,6 @@ pub enum JsonInput {
 pub type JsonArray = Vec<JsonInput>;
 pub type JsonObject = IndexMap<String, JsonInput>;
 
-pub fn json_object_to_py<'py>(json_object: &JsonObject, py: Python<'py>) -> &'py PyDict {
-    let dict = PyDict::new(py);
-    for (k, v) in json_object.iter() {
-        dict.set_item(k, v.to_object(py)).unwrap();
-    }
-    dict
-}
-
 impl ToPyObject for JsonInput {
     fn to_object(&self, py: Python<'_>) -> PyObject {
         match self {
@@ -48,7 +40,13 @@ impl ToPyObject for JsonInput {
             Self::Float(f) => f.into_py(py),
             Self::String(s) => s.into_py(py),
             Self::Array(v) => v.iter().map(|v| v.to_object(py)).collect::<Vec<_>>().into_py(py),
-            Self::Object(o) => json_object_to_py(o, py).into_py(py),
+            Self::Object(o) => {
+                let dict = PyDict::new(py);
+                for (k, v) in o.iter() {
+                    dict.set_item(k, v.to_object(py)).unwrap();
+                }
+                dict.into_py(py)
+            }
         }
     }
 }
