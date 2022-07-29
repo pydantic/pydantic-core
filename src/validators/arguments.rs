@@ -1,3 +1,4 @@
+use ahash::AHashSet;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple};
@@ -25,8 +26,9 @@ struct Argument {
 #[derive(Debug, Clone)]
 pub struct ArgumentsValidator {
     arguments: Vec<Argument>,
-    positional_args: usize,
+    positional_args_count: usize,
     var_args_validator: Option<Box<CombinedValidator>>,
+    var_kwargs_validator: Option<Box<CombinedValidator>>,
 }
 
 impl BuildValidator for ArgumentsValidator {
@@ -44,7 +46,7 @@ impl BuildValidator for ArgumentsValidator {
         let arguments_list: &PyList = schema.get_as_req(intern!(py, "arguments"))?;
         let mut arguments: Vec<Argument> = Vec::with_capacity(arguments_list.len());
 
-        let mut positional_args = 0;
+        let mut positional_args_count = 0;
 
         for (arg_index, arg) in arguments_list.iter().enumerate() {
             let arg: &PyDict = arg.cast_as()?;
@@ -53,7 +55,7 @@ impl BuildValidator for ArgumentsValidator {
             let mode: &str = arg.get_as_req(intern!(py, "mode"))?;
             let positional = mode == "positional_only" || mode == "positional_or_keyword";
             if positional {
-                positional_args = arg_index;
+                positional_args_count = arg_index;
             }
 
             let mut kw_lookup_key = None;
@@ -100,8 +102,12 @@ impl BuildValidator for ArgumentsValidator {
 
         Ok(Self {
             arguments,
-            positional_args,
+            positional_args_count,
             var_args_validator: match schema.get_item(intern!(py, "var_args_schema")) {
+                Some(v) => Some(Box::new(build_validator(v, config, build_context)?.0)),
+                None => None,
+            },
+            var_kwargs_validator: match schema.get_item(intern!(py, "var_kwargs_validator")) {
                 Some(v) => Some(Box::new(build_validator(v, config, build_context)?.0)),
                 None => None,
             },
@@ -141,21 +147,25 @@ impl ArgumentsValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_args);
+        let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_args_count);
         let output_kwargs = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
+        let mut used_args = 0;
+        let mut used_kwargs: AHashSet<&str> = AHashSet::with_capacity(self.arguments.len());
 
         for (index, argument_info) in self.arguments.iter().enumerate() {
             let mut pos_value: Option<&PyAny> = None;
             if let Some(args) = py_args.args {
                 if argument_info.positional {
                     pos_value = args.get_item(index).ok();
+                    used_args = index;
                 }
             }
             let mut kw_value: Option<&PyAny> = None;
             if let Some(kwargs) = py_args.kwargs {
                 if let Some(ref lookup_key) = argument_info.kw_lookup_key {
-                    if let Some((_, value)) = lookup_key.py_get_item(kwargs)? {
+                    if let Some((key, value)) = lookup_key.py_get_item(kwargs)? {
+                        used_kwargs.insert(key);
                         kw_value = Some(value);
                     }
                 }
@@ -213,17 +223,80 @@ impl ArgumentsValidator {
                         } else {
                             output_args.push(default);
                         }
+                    } else if argument_info.kwarg_key.is_some() {
+                        errors.push(ValLineError::new_with_loc(
+                            ErrorKind::MissingArgument,
+                            input,
+                            argument_info.name.clone(),
+                        ));
                     } else {
-                        if argument_info.kwarg_key.is_some() {
-                            errors.push(ValLineError::new_with_loc(
-                                ErrorKind::MissingArgument,
-                                input,
-                                argument_info.name.clone(),
-                            ));
-                        } else {
-                            errors.push(ValLineError::new_with_loc(ErrorKind::MissingArgument, input, index));
-                        }
+                        errors.push(ValLineError::new_with_loc(ErrorKind::MissingArgument, input, index));
                     };
+                }
+            }
+        }
+        if let Some(args) = py_args.args {
+            let len = args.len();
+            // TODO can we use self.positional_args_count instead of used_args? I think so.
+            if len > used_args {
+                if let Some(ref validator) = self.var_args_validator {
+                    for (index, item) in args.get_slice(used_args, len).iter().enumerate() {
+                        match validator.validate(py, item, extra, slots, recursion_guard) {
+                            Ok(value) => output_args.push(value),
+                            Err(ValError::LineErrors(line_errors)) => {
+                                errors.extend(
+                                    line_errors
+                                        .into_iter()
+                                        .map(|err| err.with_outer_location((index + used_args).into())),
+                                );
+                            }
+                            Err(err) => return Err(err),
+                        }
+                    }
+                } else {
+                    errors.push(ValLineError::new(
+                        ErrorKind::UnexpectedPositionalArguments {
+                            unexpected_count: len - used_args,
+                        },
+                        input,
+                    ));
+                }
+            }
+        }
+        if let Some(kwargs) = py_args.kwargs {
+            for (raw_key, value) in kwargs.iter() {
+                let either_str = match raw_key.strict_str() {
+                    Ok(k) => k,
+                    Err(ValError::LineErrors(line_errors)) => {
+                        for err in line_errors {
+                            errors.push(
+                                err.with_outer_location(raw_key.as_loc_item())
+                                    .with_kind(ErrorKind::InvalidKey),
+                            );
+                        }
+                        continue;
+                    }
+                    Err(err) => return Err(err),
+                };
+                if !used_kwargs.contains(either_str.as_cow().as_ref()) {
+                    match self.var_kwargs_validator {
+                        Some(ref validator) => match validator.validate(py, value, extra, slots, recursion_guard) {
+                            Ok(value) => output_kwargs.set_item(either_str.as_py_string(py), value)?,
+                            Err(ValError::LineErrors(line_errors)) => {
+                                for err in line_errors {
+                                    errors.push(err.with_outer_location(raw_key.as_loc_item()));
+                                }
+                            }
+                            Err(err) => return Err(err),
+                        },
+                        None => {
+                            errors.push(ValLineError::new_with_loc(
+                                ErrorKind::UnexpectedKeywordArgument,
+                                value,
+                                raw_key.as_loc_item(),
+                            ));
+                        }
+                    }
                 }
             }
         }
