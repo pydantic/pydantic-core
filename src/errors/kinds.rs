@@ -137,9 +137,9 @@ pub enum ErrorKind {
     IntParsing,
     #[strum(message = "Input should be a valid integer, got a number with a fractional part")]
     IntFromFloat,
-    #[strum(message = "Input should be a valid integer, got {nan_input}")]
+    #[strum(message = "Input should be a valid integer, got {nan_value}")]
     IntNan {
-        nan_input: &'static str,
+        nan_value: &'static str,
     },
     #[strum(serialize = "multiple_of", message = "Input should be a multiple of {multiple_of}")]
     IntMultipleOf {
@@ -223,7 +223,7 @@ pub enum ErrorKind {
     },
     // Note: strum message and serialize are not used here
     CustomError {
-        input_error: PydanticValueError,
+        value_error: PydanticValueError,
     },
     // ---------------------
     // literals
@@ -312,32 +312,32 @@ pub enum ErrorKind {
 }
 
 macro_rules! render {
-    ($error_kind:ident, $($input:ident),* $(,)?) => {
+    ($error_kind:ident, $($value:ident),* $(,)?) => {
         Ok(
             $error_kind.get_message().expect("ErrorKind with no strum message")
             $(
-                .replace(concat!("{", stringify!($input), "}"), $input)
+                .replace(concat!("{", stringify!($value), "}"), $value)
             )*
         )
     };
 }
 
 macro_rules! to_string_render {
-    ($error_kind:ident, $($input:ident),* $(,)?) => {
+    ($error_kind:ident, $($value:ident),* $(,)?) => {
         Ok(
             $error_kind.get_message().expect("ErrorKind with no strum message")
             $(
-                .replace(concat!("{", stringify!($input), "}"), &$input.to_string())
+                .replace(concat!("{", stringify!($value), "}"), &$value.to_string())
             )*
         )
     };
 }
 
 macro_rules! py_dict {
-    ($py:ident, $($input:expr),* $(,)?) => {{
+    ($py:ident, $($value:expr),* $(,)?) => {{
         let dict = PyDict::new($py);
         $(
-            dict.set_item(stringify!($input), $input.into_py($py))?;
+            dict.set_item(stringify!($value), $value.into_py($py))?;
         )*
         Ok(Some(dict.into_py($py)))
     }};
@@ -346,7 +346,7 @@ macro_rules! py_dict {
 impl ErrorKind {
     pub fn kind(&self) -> String {
         match self {
-            Self::CustomError { input_error } => input_error.kind(),
+            Self::CustomError { value_error } => value_error.kind(),
             _ => self.to_string(),
         }
     }
@@ -366,7 +366,7 @@ impl ErrorKind {
             Self::StrTooLong { max_length } => to_string_render!(self, max_length),
             Self::StrPatternMismatch { pattern } => render!(self, pattern),
             Self::DictFromMapping { error } => render!(self, error),
-            Self::IntNan { nan_input } => render!(self, nan_input),
+            Self::IntNan { nan_value } => render!(self, nan_value),
             Self::IntMultipleOf { multiple_of } => to_string_render!(self, multiple_of),
             Self::IntGreaterThan { gt } => to_string_render!(self, gt),
             Self::IntGreaterThanEqual { ge } => to_string_render!(self, ge),
@@ -381,7 +381,7 @@ impl ErrorKind {
             Self::BytesTooLong { max_length } => to_string_render!(self, max_length),
             Self::ValueError { error } => render!(self, error),
             Self::AssertionError { error } => render!(self, error),
-            Self::CustomError { input_error } => input_error.message(py),
+            Self::CustomError { value_error } => value_error.message(py),
             Self::LiteralSingleError { expected } => render!(self, expected),
             Self::LiteralMultipleError { expected } => render!(self, expected),
             Self::DateParsing { error } => render!(self, error),
@@ -416,7 +416,7 @@ impl ErrorKind {
             Self::StrTooLong { max_length } => py_dict!(py, max_length),
             Self::StrPatternMismatch { pattern } => py_dict!(py, pattern),
             Self::DictFromMapping { error } => py_dict!(py, error),
-            Self::IntNan { nan_input } => py_dict!(py, nan_input),
+            Self::IntNan { nan_value } => py_dict!(py, nan_value),
             Self::IntMultipleOf { multiple_of } => py_dict!(py, multiple_of),
             Self::IntGreaterThan { gt } => py_dict!(py, gt),
             Self::IntGreaterThanEqual { ge } => py_dict!(py, ge),
@@ -431,7 +431,7 @@ impl ErrorKind {
             Self::BytesTooLong { max_length } => py_dict!(py, max_length),
             Self::ValueError { error } => py_dict!(py, error),
             Self::AssertionError { error } => py_dict!(py, error),
-            Self::CustomError { input_error } => Ok(input_error.context(py)),
+            Self::CustomError { value_error } => Ok(value_error.context(py)),
             Self::LiteralSingleError { expected } => py_dict!(py, expected),
             Self::LiteralMultipleError { expected } => py_dict!(py, expected),
             Self::DateParsing { error } => py_dict!(py, error),

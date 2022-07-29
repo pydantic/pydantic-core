@@ -208,7 +208,7 @@ def test_long_int(py_and_json: PyAndJson):
             'loc': [],
             'message': 'Input should be a valid integer, got infinity',
             'input_value': '1' * 400,
-            'context': {'nan_input': 'infinity'},
+            'context': {'nan_value': 'infinity'},
         }
     ]
     assert repr(exc_info.value) == (
