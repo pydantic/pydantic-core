@@ -25,11 +25,11 @@ pub enum ErrorKind {
     RecursionLoop,
     // ---------------------
     // typed dict specific errors
-    #[strum(message = "Value should be a valid dictionary or instance to extract fields from")]
+    #[strum(message = "Input should be a valid dictionary or instance to extract fields from")]
     DictAttributesType,
     #[strum(message = "Field required")]
     Missing,
-    #[strum(message = "Extra values are not permitted")]
+    #[strum(message = "Extra inputs are not permitted")]
     ExtraForbidden,
     #[strum(message = "Model keys should be strings")]
     InvalidKey,
@@ -39,33 +39,33 @@ pub enum ErrorKind {
     },
     // ---------------------
     // model class specific errors
-    #[strum(message = "Value should be an instance of {class_name}")]
+    #[strum(message = "Input should be an instance of {class_name}")]
     ModelClassType {
         class_name: String,
     },
     // ---------------------
     // None errors
-    #[strum(message = "Value should be None/null")]
+    #[strum(message = "Input should be None/null")]
     NoneRequired,
     // boolean errors
-    #[strum(message = "Value should be a valid boolean")]
+    #[strum(message = "Input should be a valid boolean")]
     Bool,
     // ---------------------
     // generic comparison errors - used for all inequality comparisons except int and float which have their
     // own type, bounds arguments are Strings so they can be created from any type
-    #[strum(message = "Value should be greater than {gt}")]
+    #[strum(message = "Input should be greater than {gt}")]
     GreaterThan {
         gt: String,
     },
-    #[strum(message = "Value should be greater than or equal to {ge}")]
+    #[strum(message = "Input should be greater than or equal to {ge}")]
     GreaterThanEqual {
         ge: String,
     },
-    #[strum(message = "Value should be less than {lt}")]
+    #[strum(message = "Input should be less than {lt}")]
     LessThan {
         lt: String,
     },
-    #[strum(message = "Value should be less than or equal to {le}")]
+    #[strum(message = "Input should be less than or equal to {le}")]
     LessThanEqual {
         le: String,
     },
@@ -81,9 +81,9 @@ pub enum ErrorKind {
     },
     // ---------------------
     // string errors
-    #[strum(message = "Value should be a valid string")]
+    #[strum(message = "Input should be a valid string")]
     StrType,
-    #[strum(message = "Value should be a valid string, unable to parse raw data as a unicode string")]
+    #[strum(message = "Input should be a valid string, unable to parse raw data as a unicode string")]
     StrUnicode,
     #[strum(
         message = "String should have at least {min_length} characters",
@@ -105,7 +105,7 @@ pub enum ErrorKind {
     },
     // ---------------------
     // dict errors
-    #[strum(message = "Value should be a valid dictionary")]
+    #[strum(message = "Input should be a valid dictionary")]
     DictType,
     #[strum(message = "Unable to convert mapping to a dictionary, error: {error}")]
     DictFromMapping {
@@ -113,95 +113,95 @@ pub enum ErrorKind {
     },
     // ---------------------
     // list errors
-    #[strum(message = "Value should be a valid list/array")]
+    #[strum(message = "Input should be a valid list/array")]
     ListType,
     // ---------------------
     // tuple errors
-    #[strum(message = "Value should be a valid tuple")]
+    #[strum(message = "Input should be a valid tuple")]
     TupleType,
     // ---------------------
     // set errors
-    #[strum(message = "Value should be a valid set")]
+    #[strum(message = "Input should be a valid set")]
     SetType,
     // ---------------------
     // bool errors
-    #[strum(message = "Value should be a valid boolean")]
+    #[strum(message = "Input should be a valid boolean")]
     BoolType,
-    #[strum(message = "Value should be a valid boolean, unable to interpret input")]
+    #[strum(message = "Input should be a valid boolean, unable to interpret input")]
     BoolParsing,
     // ---------------------
     // int errors
-    #[strum(message = "Value should be a valid integer")]
+    #[strum(message = "Input should be a valid integer")]
     IntType,
-    #[strum(message = "Value should be a valid integer, unable to parse string as an integer")]
+    #[strum(message = "Input should be a valid integer, unable to parse string as an integer")]
     IntParsing,
-    #[strum(message = "Value should be a valid integer, got a number with a fractional part")]
+    #[strum(message = "Input should be a valid integer, got a number with a fractional part")]
     IntFromFloat,
-    #[strum(message = "Value should be a valid integer, got {nan_value}")]
+    #[strum(message = "Input should be a valid integer, got {nan_input}")]
     IntNan {
-        nan_value: &'static str,
+        nan_input: &'static str,
     },
-    #[strum(serialize = "multiple_of", message = "Value should be a multiple of {multiple_of}")]
+    #[strum(serialize = "multiple_of", message = "Input should be a multiple of {multiple_of}")]
     IntMultipleOf {
         multiple_of: i64,
     },
-    #[strum(serialize = "greater_than", message = "Value should be greater than {gt}")]
+    #[strum(serialize = "greater_than", message = "Input should be greater than {gt}")]
     IntGreaterThan {
         gt: i64,
     },
     #[strum(
         serialize = "greater_than_equal",
-        message = "Value should be greater than or equal to {ge}"
+        message = "Input should be greater than or equal to {ge}"
     )]
     IntGreaterThanEqual {
         ge: i64,
     },
-    #[strum(serialize = "less_than", message = "Value should be less than {lt}")]
+    #[strum(serialize = "less_than", message = "Input should be less than {lt}")]
     IntLessThan {
         lt: i64,
     },
     #[strum(
         serialize = "less_than_equal",
-        message = "Value should be less than or equal to {le}"
+        message = "Input should be less than or equal to {le}"
     )]
     IntLessThanEqual {
         le: i64,
     },
     // ---------------------
     // float errors
-    #[strum(message = "Value should be a valid number")]
+    #[strum(message = "Input should be a valid number")]
     FloatType,
-    #[strum(message = "Value should be a valid number, unable to parse string as an number")]
+    #[strum(message = "Input should be a valid number, unable to parse string as an number")]
     FloatParsing,
-    #[strum(serialize = "multiple_of", message = "Value should be a multiple of {multiple_of}")]
+    #[strum(serialize = "multiple_of", message = "Input should be a multiple of {multiple_of}")]
     FloatMultipleOf {
         multiple_of: f64,
     },
-    #[strum(serialize = "greater_than", message = "Value should be greater than {gt}")]
+    #[strum(serialize = "greater_than", message = "Input should be greater than {gt}")]
     FloatGreaterThan {
         gt: f64,
     },
     #[strum(
         serialize = "greater_than_equal",
-        message = "Value should be greater than or equal to {ge}"
+        message = "Input should be greater than or equal to {ge}"
     )]
     FloatGreaterThanEqual {
         ge: f64,
     },
-    #[strum(serialize = "less_than", message = "Value should be less than {lt}")]
+    #[strum(serialize = "less_than", message = "Input should be less than {lt}")]
     FloatLessThan {
         lt: f64,
     },
     #[strum(
         serialize = "less_than_equal",
-        message = "Value should be less than or equal to {le}"
+        message = "Input should be less than or equal to {le}"
     )]
     FloatLessThanEqual {
         le: f64,
     },
     // ---------------------
     // bytes errors
-    #[strum(message = "Value should be a valid bytes")]
+    #[strum(message = "Input should be a valid bytes")]
     BytesType,
     #[strum(message = "Data should have at least {min_length} bytes", serialize = "too_short")]
     BytesTooShort {
@@ -223,27 +223,27 @@ pub enum ErrorKind {
     },
     // Note: strum message and serialize are not used here
     CustomError {
-        value_error: PydanticValueError,
+        input_error: PydanticValueError,
     },
     // ---------------------
     // literals
-    #[strum(serialize = "literal_error", message = "Value should be {expected}")]
+    #[strum(serialize = "literal_error", message = "Input should be {expected}")]
     LiteralSingleError {
         expected: String,
     },
-    #[strum(serialize = "literal_error", message = "Value should be one of: {expected}")]
+    #[strum(serialize = "literal_error", message = "Input should be one of: {expected}")]
     LiteralMultipleError {
         expected: String,
     },
     // ---------------------
     // date errors
-    #[strum(message = "Value should be a valid date")]
+    #[strum(message = "Input should be a valid date")]
     DateType,
-    #[strum(message = "Value should be a valid date in the format YYYY-MM-DD, {error}")]
+    #[strum(message = "Input should be a valid date in the format YYYY-MM-DD, {error}")]
     DateParsing {
         error: &'static str,
     },
-    #[strum(message = "Value should be a valid date or datetime, {error}")]
+    #[strum(message = "Input should be a valid date or datetime, {error}")]
     DateFromDatetimeParsing {
         error: String,
     },
@@ -251,19 +251,19 @@ pub enum ErrorKind {
     DateFromDatetimeInexact,
     // ---------------------
     // date errors
-    #[strum(message = "Value should be a valid time")]
+    #[strum(message = "Input should be a valid time")]
     TimeType,
-    #[strum(message = "Value should be in a valid time format, {error}")]
+    #[strum(message = "Input should be in a valid time format, {error}")]
     TimeParsing {
         error: &'static str,
     },
     // ---------------------
     // datetime errors
-    #[strum(serialize = "datetime_type", message = "Value should be a valid datetime")]
+    #[strum(serialize = "datetime_type", message = "Input should be a valid datetime")]
     DateTimeType,
     #[strum(
         serialize = "datetime_parsing",
-        message = "Value should be a valid datetime, {error}"
+        message = "Input should be a valid datetime, {error}"
     )]
     DateTimeParsing {
         error: &'static str,
@@ -277,15 +277,15 @@ pub enum ErrorKind {
     },
     // ---------------------
     // timedelta errors
-    #[strum(message = "Value should be a valid timedelta")]
+    #[strum(message = "Input should be a valid timedelta")]
     TimeDeltaType,
-    #[strum(message = "Value should be a valid timedelta, {error}")]
+    #[strum(message = "Input should be a valid timedelta, {error}")]
     TimeDeltaParsing {
         error: &'static str,
     },
     // ---------------------
     // frozenset errors
-    #[strum(message = "Value should be a valid frozenset")]
+    #[strum(message = "Input should be a valid frozenset")]
     FrozenSetType,
     // ---------------------
     // introspection types - e.g. isinstance, callable
@@ -312,32 +312,32 @@ pub enum ErrorKind {
 }
 
 macro_rules! render {
-    ($error_kind:ident, $($value:ident),* $(,)?) => {
+    ($error_kind:ident, $($input:ident),* $(,)?) => {
         Ok(
             $error_kind.get_message().expect("ErrorKind with no strum message")
             $(
-                .replace(concat!("{", stringify!($value), "}"), $value)
+                .replace(concat!("{", stringify!($input), "}"), $input)
             )*
         )
     };
 }
 
 macro_rules! to_string_render {
-    ($error_kind:ident, $($value:ident),* $(,)?) => {
+    ($error_kind:ident, $($input:ident),* $(,)?) => {
         Ok(
             $error_kind.get_message().expect("ErrorKind with no strum message")
             $(
-                .replace(concat!("{", stringify!($value), "}"), &$value.to_string())
+                .replace(concat!("{", stringify!($input), "}"), &$input.to_string())
             )*
         )
     };
 }
 
 macro_rules! py_dict {
-    ($py:ident, $($value:expr),* $(,)?) => {{
+    ($py:ident, $($input:expr),* $(,)?) => {{
         let dict = PyDict::new($py);
         $(
-            dict.set_item(stringify!($value), $value.into_py($py))?;
+            dict.set_item(stringify!($input), $input.into_py($py))?;
         )*
         Ok(Some(dict.into_py($py)))
     }};
@@ -346,7 +346,7 @@ macro_rules! py_dict {
 impl ErrorKind {
     pub fn kind(&self) -> String {
         match self {
-            Self::CustomError { value_error } => value_error.kind(),
+            Self::CustomError { input_error } => input_error.kind(),
             _ => self.to_string(),
         }
     }
@@ -366,7 +366,7 @@ impl ErrorKind {
             Self::StrTooLong { max_length } => to_string_render!(self, max_length),
             Self::StrPatternMismatch { pattern } => render!(self, pattern),
             Self::DictFromMapping { error } => render!(self, error),
-            Self::IntNan { nan_value } => render!(self, nan_value),
+            Self::IntNan { nan_input } => render!(self, nan_input),
             Self::IntMultipleOf { multiple_of } => to_string_render!(self, multiple_of),
             Self::IntGreaterThan { gt } => to_string_render!(self, gt),
             Self::IntGreaterThanEqual { ge } => to_string_render!(self, ge),
@@ -381,7 +381,7 @@ impl ErrorKind {
             Self::BytesTooLong { max_length } => to_string_render!(self, max_length),
             Self::ValueError { error } => render!(self, error),
             Self::AssertionError { error } => render!(self, error),
-            Self::CustomError { value_error } => value_error.message(py),
+            Self::CustomError { input_error } => input_error.message(py),
             Self::LiteralSingleError { expected } => render!(self, expected),
             Self::LiteralMultipleError { expected } => render!(self, expected),
             Self::DateParsing { error } => render!(self, error),
@@ -416,7 +416,7 @@ impl ErrorKind {
             Self::StrTooLong { max_length } => py_dict!(py, max_length),
             Self::StrPatternMismatch { pattern } => py_dict!(py, pattern),
             Self::DictFromMapping { error } => py_dict!(py, error),
-            Self::IntNan { nan_value } => py_dict!(py, nan_value),
+            Self::IntNan { nan_input } => py_dict!(py, nan_input),
             Self::IntMultipleOf { multiple_of } => py_dict!(py, multiple_of),
             Self::IntGreaterThan { gt } => py_dict!(py, gt),
             Self::IntGreaterThanEqual { ge } => py_dict!(py, ge),
@@ -431,7 +431,7 @@ impl ErrorKind {
             Self::BytesTooLong { max_length } => py_dict!(py, max_length),
             Self::ValueError { error } => py_dict!(py, error),
             Self::AssertionError { error } => py_dict!(py, error),
-            Self::CustomError { value_error } => Ok(value_error.context(py)),
+            Self::CustomError { input_error } => Ok(input_error.context(py)),
             Self::LiteralSingleError { expected } => py_dict!(py, expected),
             Self::LiteralMultipleError { expected } => py_dict!(py, expected),
             Self::DateParsing { error } => py_dict!(py, error),

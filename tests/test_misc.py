@@ -60,23 +60,23 @@ def test_validation_error_multiple():
         {
             'kind': 'float_parsing',
             'loc': ['x'],
-            'message': 'Value should be a valid number, unable to parse string as an number',
+            'message': 'Input should be a valid number, unable to parse string as an number',
             'input_value': 'x' * 60,
         },
         {
             'kind': 'int_parsing',
             'loc': ['y'],
-            'message': 'Value should be a valid integer, unable to parse string as an integer',
+            'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'y',
         },
     ]
     assert repr(exc_info.value) == (
         '2 validation errors for MyModel\n'
         'x\n'
-        '  Value should be a valid number, unable to parse string as an number [kind=float_parsing, '
+        '  Input should be a valid number, unable to parse string as an number [kind=float_parsing, '
         "input_value='xxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxx', input_type=str]\n"
         'y\n'
-        "  Value should be a valid integer, unable to parse string as an integer [kind=int_parsing, input_value='y', "
+        "  Input should be a valid integer, unable to parse string as an integer [kind=int_parsing, input_value='y', "
         'input_type=str]'
     )
 

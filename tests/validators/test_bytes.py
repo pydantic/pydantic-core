@@ -14,9 +14,9 @@ def test_strict_bytes_validator():
     assert v.validate_python(b'foo') == b'foo'
     assert v.validate_json('"foo"') == b'foo'
 
-    with pytest.raises(ValidationError, match='Value should be a valid bytes'):
+    with pytest.raises(ValidationError, match='Input should be a valid bytes'):
         v.validate_python('foo')
-    with pytest.raises(ValidationError, match='Value should be a valid bytes'):
+    with pytest.raises(ValidationError, match='Input should be a valid bytes'):
         v.validate_python(bytearray(b'foo'))
 
 
@@ -58,10 +58,10 @@ def test_constrained_bytes_python_bytes(opts: Dict[str, Any], input, expected):
         ({'max_length': 5}, 'foobar', Err('Data should have at most 5 bytes')),
         ({'min_length': 2}, 'foo', b'foo'),
         ({'min_length': 2}, 'f', Err('Data should have at least 2 bytes')),
-        ({}, 1, Err('Value should be a valid bytes')),
-        ({}, 1.0, Err('Value should be a valid bytes')),
-        ({}, [], Err('Value should be a valid bytes')),
-        ({}, {}, Err('Value should be a valid bytes')),
+        ({}, 1, Err('Input should be a valid bytes')),
+        ({}, 1.0, Err('Input should be a valid bytes')),
+        ({}, [], Err('Input should be a valid bytes')),
+        ({}, {}, Err('Input should be a valid bytes')),
     ],
 )
 def test_constrained_bytes(py_and_json: PyAndJson, opts: Dict[str, Any], input, expected):

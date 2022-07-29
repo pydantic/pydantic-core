@@ -139,14 +139,14 @@ def test_wrap_error():
         {
             'kind': 'int_parsing',
             'loc': [],
-            'message': 'Value should be a valid integer, unable to parse string as an integer',
+            'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         }
     ]
 
 
 def test_wrong_mode():
-    with pytest.raises(SchemaError, match='function -> mode\n  Value should be one of'):
+    with pytest.raises(SchemaError, match='function -> mode\n  Input should be one of'):
         SchemaValidator({'type': 'function', 'mode': 'foobar', 'schema': 'str'})
 
 
@@ -221,7 +221,7 @@ def test_function_plain():
 
 
 def test_plain_with_schema():
-    with pytest.raises(SchemaError, match='function-plain -> schema\n  Extra values are not permitted'):
+    with pytest.raises(SchemaError, match='function-plain -> schema\n  Extra inputs are not permitted'):
         SchemaValidator({'type': 'function', 'mode': 'plain', 'function': lambda x: x, 'schema': 'str'})
 
 
@@ -287,7 +287,7 @@ def test_class_with_validator():
         v.validate_python(True)
 
     assert exc_info.value.errors() == [
-        {'kind': 'str_type', 'loc': [], 'message': 'Value should be a valid string', 'input_value': True}
+        {'kind': 'str_type', 'loc': [], 'message': 'Input should be a valid string', 'input_value': True}
     ]
 
 

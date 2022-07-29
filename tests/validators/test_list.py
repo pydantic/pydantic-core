@@ -14,8 +14,8 @@ from ..conftest import Err, PyAndJson
     [
         ([1, 2, 3], [1, 2, 3]),
         ([1, 2, '3'], [1, 2, 3]),
-        (5, Err('Value should be a valid list/array [kind=list_type, input_value=5, input_type=int]')),
-        ('5', Err("Value should be a valid list/array [kind=list_type, input_value='5', input_type=str]")),
+        (5, Err('Input should be a valid list/array [kind=list_type, input_value=5, input_type=int]')),
+        ('5', Err("Input should be a valid list/array [kind=list_type, input_value='5', input_type=str]")),
     ],
 )
 def test_list_json(py_and_json: PyAndJson, input_value, expected):
@@ -33,7 +33,7 @@ def test_list_strict():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python((1, 2, '33'))
     assert exc_info.value.errors() == [
-        {'kind': 'list_type', 'loc': [], 'message': 'Value should be a valid list/array', 'input_value': (1, 2, '33')}
+        {'kind': 'list_type', 'loc': [], 'message': 'Input should be a valid list/array', 'input_value': (1, 2, '33')}
     ]
 
 
@@ -87,7 +87,7 @@ def test_list_error(input_value, index):
         {
             'kind': 'int_parsing',
             'loc': [index],
-            'message': 'Value should be a valid integer, unable to parse string as an integer',
+            'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         }
     ]

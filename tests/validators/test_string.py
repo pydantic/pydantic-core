@@ -15,9 +15,9 @@ from ..conftest import Err, PyAndJson
         ('foobar', 'foobar'),
         (123, '123'),
         (123.456, '123.456'),
-        (False, Err('Value should be a valid string [kind=str_type')),
-        (True, Err('Value should be a valid string [kind=str_type')),
-        ([], Err('Value should be a valid string [kind=str_type, input_value=[], input_type=list]')),
+        (False, Err('Input should be a valid string [kind=str_type')),
+        (True, Err('Input should be a valid string [kind=str_type')),
+        ([], Err('Input should be a valid string [kind=str_type, input_value=[], input_type=list]')),
     ],
 )
 def test_str(py_and_json: PyAndJson, input_value, expected):
@@ -37,11 +37,11 @@ def test_str(py_and_json: PyAndJson, input_value, expected):
         (bytearray(b'foobar'), 'foobar'),
         (
             b'\x81',
-            Err('Value should be a valid string, unable to parse raw data as a unicode string [kind=str_unicode'),
+            Err('Input should be a valid string, unable to parse raw data as a unicode string [kind=str_unicode'),
         ),
         (
             bytearray(b'\x81'),
-            Err('Value should be a valid string, unable to parse raw data as a unicode string [kind=str_unicode'),
+            Err('Input should be a valid string, unable to parse raw data as a unicode string [kind=str_unicode'),
         ),
         # null bytes are very annoying, but we can't really block them here
         (b'\x00', '\x00'),
@@ -63,7 +63,7 @@ def test_str_not_json(input_value, expected):
     [
         ({}, 123, '123'),
         ({'strict': True}, 'Foobar', 'Foobar'),
-        ({'strict': True}, 123, Err('Value should be a valid string [kind=str_type, input_value=123, input_type=int]')),
+        ({'strict': True}, 123, Err('Input should be a valid string [kind=str_type, input_value=123, input_type=int]')),
         ({'to_upper': True}, 'fooBar', 'FOOBAR'),
         ({'to_lower': True}, 'fooBar', 'foobar'),
         ({'strip_whitespace': True}, ' foobar  ', 'foobar'),

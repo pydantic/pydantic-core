@@ -73,7 +73,7 @@ impl PydanticValueError {
 
 impl PydanticValueError {
     pub fn into_val_error<'a>(self, input: &'a impl Input<'a>) -> ValError<'a> {
-        let kind = ErrorKind::CustomError { value_error: self };
+        let kind = ErrorKind::CustomError { input_error: self };
         ValError::new(kind, input)
     }
 }

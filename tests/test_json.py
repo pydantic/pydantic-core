@@ -31,7 +31,7 @@ def test_null():
 def test_str():
     assert SchemaValidator({'type': 'str'}).validate_json('"foobar"') == 'foobar'
     assert SchemaValidator({'type': 'str'}).validate_json('123') == '123'
-    with pytest.raises(ValidationError, match=r'Value should be a valid string \[kind=str_type,'):
+    with pytest.raises(ValidationError, match=r'Input should be a valid string \[kind=str_type,'):
         SchemaValidator({'type': 'str'}).validate_json('false')
 
 
@@ -81,7 +81,7 @@ def test_error_loc():
         {
             'kind': 'int_parsing',
             'loc': ['field_a', 2],
-            'message': 'Value should be a valid integer, unable to parse string as an integer',
+            'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         }
     ]

@@ -17,14 +17,14 @@ from ..conftest import Err, PyAndJson
             'variable',
             {'type': 'int'},
             1,
-            Err('Value should be a valid tuple [kind=tuple_type, input_value=1, input_type=int]'),
+            Err('Input should be a valid tuple [kind=tuple_type, input_value=1, input_type=int]'),
         ),
         ('positional', [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}], [1, 2, '3'], (1, 2, 3)),
         (
             'positional',
             [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}],
             5,
-            Err('Value should be a valid tuple [kind=tuple_type, input_value=5, input_type=int]'),
+            Err('Input should be a valid tuple [kind=tuple_type, input_value=5, input_type=int]'),
         ),
     ],
     ids=repr,
@@ -72,7 +72,7 @@ def test_tuple_strict_fails_without_tuple(wrong_coll_type: Type[Any], mode, item
         {
             'kind': 'tuple_type',
             'loc': [],
-            'message': 'Value should be a valid tuple',
+            'message': 'Input should be a valid tuple',
             'input_value': wrong_coll_type([1, 2, '33']),
         }
     ]
@@ -132,7 +132,7 @@ def test_tuple_var_len_errors(input_value, index):
         {
             'kind': 'int_parsing',
             'loc': [index],
-            'message': 'Value should be a valid integer, unable to parse string as an integer',
+            'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         }
     ]
@@ -161,7 +161,7 @@ def test_tuple_fix_len_errors(input_value, items, index):
         {
             'kind': 'int_parsing',
             'loc': [index],
-            'message': 'Value should be a valid integer, unable to parse string as an integer',
+            'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         }
     ]
@@ -207,14 +207,14 @@ def test_union_tuple_list(input_value, expected):
                         # first of all, not a tuple of ints ..
                         'kind': 'tuple_type',
                         'loc': ['tuple[int, ...]'],
-                        'message': 'Value should be a valid tuple',
+                        'message': 'Input should be a valid tuple',
                         'input_value': [5],
                     },
                     # .. and not a tuple of strings, either
                     {
                         'kind': 'tuple_type',
                         'loc': ['tuple[str, ...]'],
-                        'message': 'Value should be a valid tuple',
+                        'message': 'Input should be a valid tuple',
                         'input_value': [5],
                     },
                 ],
@@ -255,13 +255,13 @@ def test_union_tuple_var_len(input_value, expected):
                     {
                         'kind': 'tuple_type',
                         'loc': ['tuple[int, int, int]'],
-                        'message': 'Value should be a valid tuple',
+                        'message': 'Input should be a valid tuple',
                         'input_value': [5, '1', 1],
                     },
                     {
                         'kind': 'tuple_type',
                         'loc': ['tuple[str, str, str]'],
-                        'message': 'Value should be a valid tuple',
+                        'message': 'Input should be a valid tuple',
                         'input_value': [5, '1', 1],
                     },
                 ],
