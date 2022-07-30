@@ -200,8 +200,8 @@ impl<'a> PyArgs<'a> {
 
 #[derive(Debug)]
 pub struct JsonArgs<'a> {
-    args: Option<&'a [JsonInput]>,
-    kwargs: Option<&'a JsonObject>,
+    pub args: Option<&'a [JsonInput]>,
+    pub kwargs: Option<&'a JsonObject>,
 }
 
 impl<'a> JsonArgs<'a> {

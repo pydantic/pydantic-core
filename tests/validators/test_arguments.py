@@ -45,13 +45,13 @@ from ..conftest import Err, PyAndJson, plain_repr
                     {
                         'kind': 'missing_positional_argument',
                         'loc': [1],
-                        'message': 'Missing positional argument',
+                        'message': 'Missing required positional argument',
                         'input_value': IsListOrTuple([1], None),
                     },
                     {
                         'kind': 'missing_positional_argument',
                         'loc': [2],
-                        'message': 'Missing positional argument',
+                        'message': 'Missing required positional argument',
                         'input_value': IsListOrTuple([1], None),
                     },
                 ],
@@ -115,19 +115,19 @@ from ..conftest import Err, PyAndJson, plain_repr
                     {
                         'kind': 'missing_positional_argument',
                         'loc': [0],
-                        'message': 'Missing positional argument',
+                        'message': 'Missing required positional argument',
                         'input_value': IsListOrTuple(None, None),
                     },
                     {
                         'kind': 'missing_positional_argument',
                         'loc': [1],
-                        'message': 'Missing positional argument',
+                        'message': 'Missing required positional argument',
                         'input_value': IsListOrTuple(None, None),
                     },
                     {
                         'kind': 'missing_positional_argument',
                         'loc': [2],
-                        'message': 'Missing positional argument',
+                        'message': 'Missing required positional argument',
                         'input_value': IsListOrTuple(None, None),
                     },
                 ],
@@ -140,7 +140,11 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
-            'positional_args_schema': {'type': 'tuple', 'mode': 'positional', 'items_schema': ['int', 'str', 'bool']},
+            'arguments_schema': [
+                {'name': 'a', 'mode': 'positional_only', 'schema': 'int'},
+                {'name': 'b', 'mode': 'positional_only', 'schema': 'str'},
+                {'name': 'c', 'mode': 'positional_only', 'schema': 'bool'},
+            ],
         }
     )
     if isinstance(expected, Err):
@@ -187,7 +191,7 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
                     {
                         'kind': 'missing_keyword_argument',
                         'loc': ['c'],
-                        'message': 'Missing keyword argument',
+                        'message': 'Missing required keyword argument',
                         'input_value': IsListOrTuple([], {'a': 1, 'b': 'a'}),
                     }
                 ],
@@ -221,19 +225,19 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
                     {
                         'kind': 'missing_keyword_argument',
                         'loc': ['a'],
-                        'message': 'Missing keyword argument',
+                        'message': 'Missing required keyword argument',
                         'input_value': IsListOrTuple(None, None),
                     },
                     {
                         'kind': 'missing_keyword_argument',
                         'loc': ['b'],
-                        'message': 'Missing keyword argument',
+                        'message': 'Missing required keyword argument',
                         'input_value': IsListOrTuple(None, None),
                     },
                     {
                         'kind': 'missing_keyword_argument',
                         'loc': ['c'],
-                        'message': 'Missing keyword argument',
+                        'message': 'Missing required keyword argument',
                         'input_value': IsListOrTuple(None, None),
                     },
                 ],
@@ -246,11 +250,11 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
-            'keyword_args_schema': {
-                'type': 'typed-dict',
-                'extra_behavior': 'forbid',
-                'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'str'}, 'c': {'schema': 'bool'}},
-            },
+            'arguments_schema': [
+                {'name': 'a', 'mode': 'keyword_only', 'schema': 'int'},
+                {'name': 'b', 'mode': 'keyword_only', 'schema': 'str'},
+                {'name': 'c', 'mode': 'keyword_only', 'schema': 'bool'},
+            ],
         }
     )
     if isinstance(expected, Err):
@@ -688,7 +692,7 @@ def test_function_types():
         {
             'kind': 'missing_keyword_argument',
             'loc': ['c'],
-            'message': 'Missing keyword argument',
+            'message': 'Missing required keyword argument',
             'input_value': ((1, 'b'), {}),
         },
     ]
@@ -732,7 +736,7 @@ def create_function(validate):
         {
             'kind': 'missing_positional_argument',
             'loc': [1],
-            'message': 'Missing positional argument',
+            'message': 'Missing required positional argument',
             'input_value': (('1',), {'b': 2, 'c': 3}),
         },
         {

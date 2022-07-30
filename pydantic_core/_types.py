@@ -278,11 +278,21 @@ class CallableSchema(TypedDict):
     type: Literal['callable']
 
 
+class ArgumentInfo(TypedDict):
+    name: str
+    mode: Literal['positional_only', 'positional_or_keyword', 'keyword_only']
+    schema: Schema
+    default: NotRequired[Any]
+    default_factory: NotRequired[Callable[[], Any]]
+    alias: NotRequired[Union[str, List[Union[str, int]], List[List[Union[str, int]]]]]
+
+
 class ArgumentsSchema(TypedDict, total=False):
     type: Required[Literal['arguments']]
-    arguments_mapping: Dict[int, str]
-    positional_args_schema: TuplePositionalSchema
-    keyword_args_schema: TypedDictSchema
+    arguments_schema: Required[List[ArgumentInfo]]
+    populate_by_name: bool
+    var_args_schema: Schema
+    var_kwargs_validator: Schema
     ref: str
 
 

@@ -309,13 +309,13 @@ pub enum ErrorKind {
     ArgumentsType,
     #[strum(message = "Unexpected keyword argument")]
     UnexpectedKeywordArgument,
-    #[strum(message = "Missing argument")]
-    MissingArgument,
+    #[strum(message = "Missing required keyword argument")]
+    MissingKeywordArgument,
     #[strum(message = "{unexpected_count} unexpected positional argument{plural}")]
     UnexpectedPositionalArguments {
         unexpected_count: usize,
     },
-    #[strum(message = "Missing positional argument")]
+    #[strum(message = "Missing required positional argument")]
     MissingPositionalArgument,
     #[strum(message = "Got multiple values for argument '{arg}'")]
     MultipleArgumentValues {
