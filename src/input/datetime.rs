@@ -8,6 +8,7 @@ use crate::errors::{ErrorKind, ValError, ValResult};
 
 use super::Input;
 
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub enum EitherDate<'a> {
     Raw(Date),
     Py(&'a PyDate),
@@ -53,6 +54,7 @@ impl<'a> EitherDate<'a> {
     }
 }
 
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub enum EitherTime<'a> {
     Raw(Time),
     Py(&'a PyTime),
@@ -70,7 +72,7 @@ impl<'a> From<&'a PyTime> for EitherTime<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub enum EitherTimedelta<'a> {
     Raw(Duration),
     Py(&'a PyDelta),
@@ -168,6 +170,7 @@ impl<'a> EitherTime<'a> {
     }
 }
 
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub enum EitherDateTime<'a> {
     Raw(DateTime),
     Py(&'a PyDateTime),
