@@ -258,7 +258,7 @@ impl Validator for TypedDictValidator {
                         if self.forbid_extra {
                             errors.push(ValLineError::new_with_loc(
                                 ErrorKind::ExtraForbidden,
-                                input,
+                                value,
                                 raw_key.as_loc_item(),
                             ));
                             continue;

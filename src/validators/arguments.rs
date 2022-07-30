@@ -177,12 +177,12 @@ impl Validator for ArgumentsValidator {
                     }
 
                     match (pos_value, kw_value) {
-                        (Some(_), Some(_)) => {
+                        (Some(_), Some(kw_value)) => {
                             errors.push(ValLineError::new_with_loc(
                                 ErrorKind::MultipleArgumentValues {
                                     arg: argument_info.name.clone(),
                                 },
-                                input,
+                                kw_value,
                                 index,
                             ));
                         }
@@ -243,10 +243,9 @@ impl Validator for ArgumentsValidator {
                 // if there are args check any where index > positional_args_count since they won't have been checked yet
                 if let Some(args) = $args.args {
                     let len = args.len();
-                    dbg!(self.positional_args_count);
                     if len > self.positional_args_count {
                         if let Some(ref validator) = self.var_args_validator {
-                            for (index, item) in $slice_macro!(args, self.positional_args_count - 1, len).iter().enumerate() {
+                            for (index, item) in $slice_macro!(args, self.positional_args_count, len).iter().enumerate() {
                                 match validator.validate(py, item, extra, slots, recursion_guard) {
                                     Ok(value) => output_args.push(value),
                                     Err(ValError::LineErrors(line_errors)) => {

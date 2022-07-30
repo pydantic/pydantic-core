@@ -5,11 +5,11 @@ from inspect import Parameter, signature
 from typing import Any, get_type_hints
 
 import pytest
-from dirty_equals import IsListOrTuple, IsStr
+from dirty_equals import IsListOrTuple
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err, PyAndJson, plain_repr
+from ..conftest import Err, PyAndJson
 
 
 @pytest.mark.parametrize(
@@ -151,7 +151,7 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
         # debug(exc_info.value.errors())
-        if expected.errors:
+        if expected.errors is not None:
             assert exc_info.value.errors() == expected.errors
     else:
         assert v.validate_test(input_value) == expected
@@ -261,7 +261,7 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
         # debug(exc_info.value.errors())
-        if expected.errors:
+        if expected.errors is not None:
             assert exc_info.value.errors() == expected.errors
     else:
         assert v.validate_test(input_value) == expected
@@ -271,23 +271,8 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
     'input_value,expected',
     [
         [(None, {'a': 1, 'b': 'bb', 'c': True}), ((), {'a': 1, 'b': 'bb', 'c': True})],
-        [((1, 'bb'), {'c': True}), ((), {'a': 1, 'b': 'bb', 'c': True})],
-        [((1,), {'b': 'bb', 'c': True}), ((), {'a': 1, 'b': 'bb', 'c': True})],
-        [
-            ([1, 'bb', 'cc'], {'b': 'bb', 'c': True}),
-            Err(
-                'kind=unexpected_positional_arguments,',
-                [
-                    {
-                        'kind': 'unexpected_positional_arguments',
-                        'loc': [],
-                        'message': '1 unexpected positional argument',
-                        'input_value': IsListOrTuple([1, 'bb', 'cc'], {'b': 'bb', 'c': True}),
-                        'context': {'unexpected_count': 1},
-                    }
-                ],
-            ),
-        ],
+        [((1, 'bb'), {'c': True}), ((1, 'bb'), {'c': True})],
+        [((1,), {'b': 'bb', 'c': True}), ((1,), {'b': 'bb', 'c': True})],
         [
             ((1,), {'a': 11, 'b': 'bb', 'c': True}),
             Err(
@@ -297,14 +282,36 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
                         'kind': 'multiple_argument_values',
                         'loc': [0],
                         'message': "Got multiple values for argument 'a'",
-                        'input_value': 1,
+                        'input_value': 11,
                         'context': {'arg': 'a'},
                     }
                 ],
             ),
         ],
         [
-            ((1, 'bb'), {'a': 11, 'b': 'bb', 'c': True}),
+            ([1, 'bb', 'cc'], {'b': 'bb', 'c': True}),
+            Err(
+                'kind=unexpected_positional_arguments,',
+                [
+                    {
+                        'kind': 'multiple_argument_values',
+                        'loc': [1],
+                        'message': "Got multiple values for argument 'b'",
+                        'input_value': 'bb',
+                        'context': {'arg': 'b'},
+                    },
+                    {
+                        'kind': 'unexpected_positional_arguments',
+                        'loc': [],
+                        'message': '1 unexpected positional argument',
+                        'input_value': IsListOrTuple([1, 'bb', 'cc'], {'b': 'bb', 'c': True}),
+                        'context': {'unexpected_count': 1},
+                    },
+                ],
+            ),
+        ],
+        [
+            ((1, 'b1'), {'a': 11, 'b': 'b2', 'c': True}),
             Err(
                 'kind=multiple_argument_values,',
                 [
@@ -312,14 +319,14 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
                         'kind': 'multiple_argument_values',
                         'loc': [0],
                         'message': "Got multiple values for argument 'a'",
-                        'input_value': 1,
+                        'input_value': 11,
                         'context': {'arg': 'a'},
                     },
                     {
                         'kind': 'multiple_argument_values',
                         'loc': [1],
                         'message': "Got multiple values for argument 'b'",
-                        'input_value': 'bb',
+                        'input_value': 'b2',
                         'context': {'arg': 'b'},
                     },
                 ],
@@ -328,79 +335,43 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
     ],
     ids=repr,
 )
-def test_arguments_mapping(py_and_json: PyAndJson, input_value, expected):
+def test_positional_or_keyword(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
-            'arguments_mapping': {0: 'a', 1: 'b'},
-            'keyword_args_schema': {
-                'type': 'typed-dict',
-                'extra_behavior': 'forbid',
-                'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'str'}, 'c': {'schema': 'bool'}},
-            },
+            'arguments_schema': [
+                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int'},
+                {'name': 'b', 'mode': 'positional_or_keyword', 'schema': 'str'},
+                {'name': 'c', 'mode': 'keyword_only', 'schema': 'bool'},
+            ],
         }
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
         # debug(exc_info.value.errors())
-        if expected.errors:
+        if expected.errors is not None:
             assert exc_info.value.errors() == expected.errors
     else:
         assert v.validate_test(input_value) == expected
 
 
-def test_arguments_mapping_build():
-    v = SchemaValidator(
+@pytest.mark.parametrize('input_value,expected', [[((1,), None), ((1,), {})], [((), None), ((42,), {})]], ids=repr)
+def test_positional_optional(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
         {
             'type': 'arguments',
-            'keyword_args_schema': {
-                'type': 'typed-dict',
-                'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'str'}, 'c': {'schema': 'bool'}},
-            },
+            'arguments_schema': [{'name': 'a', 'mode': 'positional_only', 'schema': 'int', 'default': 42}],
         }
     )
-    assert re.search(r'arguments_mapping: (\w+)', repr(v)).group(1) == 'None'
-    v = SchemaValidator(
-        {
-            'type': 'arguments',
-            'arguments_mapping': {1: 'b', 0: 'a'},
-            'keyword_args_schema': {
-                'type': 'typed-dict',
-                'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'str'}, 'c': {'schema': 'bool'}},
-            },
-        }
-    )
-    assert re.search(r'arguments_mapping: (\w+)', repr(v)).group(1) == 'Some'
-    arguments_mapping = re.search('arguments_mapping:(.*?),pargs_validator', plain_repr(v)).group(1)
-    # check that mapping has been sorted
-    assert arguments_mapping == IsStr(
-        regex=(
-            r'Some\('
-            r'ArgumentsMapping{'
-            r'slice_at:0,'
-            r'max_length:2,'
-            r'mapping:\[\(0,Py\(0x[0-9a-f]+\)\),\(1,Py\(0x[0-9a-f]+\)\),\]}'
-            r'\)'
-        )
-    )
-    v = SchemaValidator(
-        {
-            'type': 'arguments',
-            'arguments_mapping': {},
-            'keyword_args_schema': {
-                'type': 'typed-dict',
-                'fields': {'a': {'schema': 'int'}, 'b': {'schema': 'str'}, 'c': {'schema': 'bool'}},
-            },
-        }
-    )
-    assert re.search(r'arguments_mapping: (\w+)', repr(v)).group(1) == 'None'
-
-
-def test_build_no_args():
-    m = "Arguments schema must have either 'positional_args_schema' or 'keyword_args_schema' defined"
-    with pytest.raises(SchemaError, match=m):
-        SchemaValidator({'type': 'arguments'})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_test(input_value)
+        # debug(exc_info.value.errors())
+        if expected.errors is not None:
+            assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_test(input_value) == expected
 
 
 @pytest.mark.parametrize(
@@ -413,23 +384,18 @@ def test_build_no_args():
     ],
     ids=repr,
 )
-def test_all_optional(py_and_json: PyAndJson, input_value, expected):
+def test_p_or_k_optional(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
-            'arguments_mapping': {0: 'a'},
-            'keyword_args_schema': {
-                'type': 'typed-dict',
-                'extra_behavior': 'forbid',
-                'fields': {'a': {'schema': 'int', 'default': 1}},
-            },
+            'arguments_schema': [{'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int', 'default': 1}],
         }
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
         # debug(exc_info.value.errors())
-        if expected.errors:
+        if expected.errors is not None:
             assert exc_info.value.errors() == expected.errors
     else:
         assert v.validate_test(input_value) == expected
@@ -447,22 +413,12 @@ def test_all_optional(py_and_json: PyAndJson, input_value, expected):
     ids=repr,
 )
 def test_var_args_only(py_and_json: PyAndJson, input_value, expected):
-    v = py_and_json(
-        {
-            'type': 'arguments',
-            'positional_args_schema': {
-                'type': 'tuple',
-                'mode': 'positional',
-                'items_schema': [],
-                'extra_schema': 'int',
-            },
-        }
-    )
+    v = py_and_json({'type': 'arguments', 'arguments_schema': [], 'var_args_schema': 'int'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
         # debug(exc_info.value.errors())
-        if expected.errors:
+        if expected.errors is not None:
             assert exc_info.value.errors() == expected.errors
     else:
         assert v.validate_test(input_value) == expected
@@ -471,7 +427,70 @@ def test_var_args_only(py_and_json: PyAndJson, input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        [([1, 'a', 'true'], {'b': 'bb', 'c': 3}), ((1, 'a'), {'a': True, 'b': 'bb', 'c': 3})],
+        [([1, 2, 3], None), ((1, 2, 3), {})],
+        [(['1', '2', '3'], None), ((1, 2, 3), {})],
+        [([1], None), ((1,), {})],
+        [([], None), Err('0\n  Missing required positional argument')],
+        [
+            (['x'], None),
+            Err(
+                'kind=int_parsing,',
+                [
+                    {
+                        'kind': 'int_parsing',
+                        'loc': [0],
+                        'message': 'Value must be a valid integer, unable to parse string as an integer',
+                        'input_value': 'x',
+                    }
+                ],
+            ),
+        ],
+        [
+            ([1, 'x', 'y'], None),
+            Err(
+                'kind=int_parsing,',
+                [
+                    {
+                        'kind': 'int_parsing',
+                        'loc': [1],
+                        'message': 'Value must be a valid integer, unable to parse string as an integer',
+                        'input_value': 'x',
+                    },
+                    {
+                        'kind': 'int_parsing',
+                        'loc': [2],
+                        'message': 'Value must be a valid integer, unable to parse string as an integer',
+                        'input_value': 'y',
+                    },
+                ],
+            ),
+        ],
+        [([1, 2, 3], {'a': 1}), Err('a\n  Unexpected keyword argument [kind=unexpected_keyword_argument,')],
+    ],
+    ids=repr,
+)
+def test_args_var_args_only(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {
+            'type': 'arguments',
+            'arguments_schema': [{'name': 'a', 'mode': 'positional_only', 'schema': 'int'}],
+            'var_args_schema': 'int',
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_test(input_value)
+        # debug(exc_info.value.errors())
+        if expected.errors is not None:
+            assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_test(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        [([1, 'a', 'true'], {'b': 'bb', 'c': 3}), ((1, 'a', True), {'b': 'bb', 'c': 3})],
         [([1, 'a'], {'a': 'true', 'b': 'bb', 'c': 3}), ((1, 'a'), {'a': True, 'b': 'bb', 'c': 3})],
         [
             ([1, 'a', 'true', 4, 5], {'b': 'bb', 'c': 3}),
@@ -495,19 +514,19 @@ def test_both(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
-            'arguments_mapping': {2: 'a'},
-            'positional_args_schema': {'type': 'tuple', 'mode': 'positional', 'items_schema': ['int', 'str']},
-            'keyword_args_schema': {
-                'type': 'typed-dict',
-                'extra_behavior': 'forbid',
-                'fields': {'a': {'schema': 'bool'}, 'b': {'schema': 'str'}, 'c': {'schema': 'int'}},
-            },
+            'arguments_schema': [
+                {'name': '1', 'mode': 'positional_only', 'schema': 'int'},
+                {'name': '2', 'mode': 'positional_only', 'schema': 'str'},
+                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'bool'},
+                {'name': 'b', 'mode': 'keyword_only', 'schema': 'str'},
+                {'name': 'c', 'mode': 'keyword_only', 'schema': 'int'},
+            ],
         }
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
-        if expected.errors:
+        if expected.errors is not None:
             assert exc_info.value.errors() == expected.errors
     else:
         assert v.validate_test(input_value) == expected
@@ -518,19 +537,41 @@ def test_both(py_and_json: PyAndJson, input_value, expected):
     [
         [([], {}), ((), {})],
         [(None, None), ((), {})],
+        [(None, {}), ((), {})],
+        [([], None), ((), {})],
         [([1], None), Err('1 unexpected positional argument [kind=unexpected_positional_arguments,')],
+        [([], {'a': 1}), Err('a\n  Unexpected keyword argument [kind=unexpected_keyword_argument,')],
+        [
+            ([1], {'a': 2}),
+            Err(
+                '[kind=unexpected_keyword_argument,',
+                [
+                    {
+                        'kind': 'unexpected_positional_arguments',
+                        'loc': [],
+                        'message': '1 unexpected positional argument',
+                        'input_value': IsListOrTuple([1], {'a': 2}),
+                        'context': {'unexpected_count': 1},
+                    },
+                    {
+                        'kind': 'unexpected_keyword_argument',
+                        'loc': ['a'],
+                        'message': 'Unexpected keyword argument',
+                        'input_value': 2,
+                    },
+                ],
+            ),
+        ],
     ],
     ids=repr,
 )
 def test_no_args(py_and_json: PyAndJson, input_value, expected):
-    v = py_and_json(
-        {'type': 'arguments', 'positional_args_schema': {'type': 'tuple', 'mode': 'positional', 'items_schema': []}}
-    )
+    v = py_and_json({'type': 'arguments', 'arguments_schema': []})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
         # debug(exc_info.value.errors())
-        if expected.errors:
+        if expected.errors is not None:
             assert exc_info.value.errors() == expected.errors
     else:
         assert v.validate_test(input_value) == expected
@@ -542,16 +583,18 @@ def double_or_bust(input_value, **kwargs):
     return input_value * 2
 
 
-def test_positional_internal_error(py_and_json: PyAndJson):
-
+def test_internal_error(py_and_json: PyAndJson):
     v = py_and_json(
         {
             'type': 'arguments',
-            'positional_args_schema': {
-                'type': 'tuple',
-                'mode': 'positional',
-                'items_schema': ['int', {'type': 'function', 'mode': 'plain', 'function': double_or_bust}],
-            },
+            'arguments_schema': [
+                {'name': 'a', 'mode': 'positional_only', 'schema': 'int'},
+                {
+                    'name': 'b',
+                    'mode': 'positional_only',
+                    'schema': {'type': 'function', 'mode': 'plain', 'function': double_or_bust},
+                },
+            ],
         }
     )
     assert v.validate_test(((1, 2), None)) == ((1, 4), {})
@@ -559,23 +602,27 @@ def test_positional_internal_error(py_and_json: PyAndJson):
         v.validate_test(((1, 1), None))
 
 
-def test_kwarg_internal_error(py_and_json: PyAndJson):
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        [((1, 2), None), ((1, 2), {})],
+        [((1,), None), ((1,), {'b': 42})],
+        [((1,), {'b': 3}), ((1,), {'b': 3})],
+        [(None, {'a': 1}), ((), {'a': 1, 'b': 42})],
+    ],
+    ids=repr,
+)
+def test_default_factory(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
-            'keyword_args_schema': {
-                'type': 'typed-dict',
-                'extra_behavior': 'forbid',
-                'fields': {
-                    'a': {'schema': 'int'},
-                    'b': {'schema': {'type': 'function', 'mode': 'plain', 'function': double_or_bust}},
-                },
-            },
+            'arguments_schema': [
+                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int'},
+                {'name': 'b', 'mode': 'positional_or_keyword', 'schema': 'int', 'default_factory': lambda: 42},
+            ],
         }
     )
-    assert v.validate_test((None, {'a': 1, 'b': 2})) == ((), {'a': 1, 'b': 4})
-    with pytest.raises(RuntimeError, match='bust'):
-        v.validate_test((None, {'a': 1, 'b': 1}))
+    assert v.validate_test(input_value) == expected
 
 
 def validate(function):
@@ -585,12 +632,14 @@ def validate(function):
     parameters = signature(function).parameters
 
     type_hints = get_type_hints(function)
+    mode_lookup = {
+        Parameter.POSITIONAL_ONLY: 'positional_only',
+        Parameter.POSITIONAL_OR_KEYWORD: 'positional_or_keyword',
+        Parameter.KEYWORD_ONLY: 'keyword_only',
+    }
 
-    arguments_mapping = {}
-    positional_args = []
-    extra_args_schema = None
-    keyword_args = {}
-    extra_kwargs_schema = None
+    arguments_schema = []
+    schema = {'type': 'arguments', 'arguments_schema': arguments_schema}
     for i, (name, p) in enumerate(parameters.items()):
         if p.annotation is p.empty:
             annotation = Any
@@ -599,48 +648,21 @@ def validate(function):
 
         assert annotation in (bool, int, float, str, Any), f'schema for {annotation} not implemented'
         if annotation in (bool, int, float, str):
-            schema = annotation.__name__
+            arg_schema = annotation.__name__
         else:
             assert annotation is Any
-            schema = 'any'
+            arg_schema = 'any'
 
-        if p.kind == Parameter.POSITIONAL_ONLY:
-            positional_args.append(schema)
+        if p.kind in mode_lookup:
+            s = {'name': name, 'mode': mode_lookup[p.kind], 'schema': arg_schema}
             if p.default is not p.empty:
-                raise NotImplementedError('default values for positional only arguments are not supported')
-        elif p.kind == Parameter.POSITIONAL_OR_KEYWORD:
-            keyword_args[name] = field = {'schema': schema}
-            if p.default is not p.empty:
-                field['default'] = p.default
-            arguments_mapping[i] = name
-        elif p.kind == Parameter.KEYWORD_ONLY:
-            keyword_args[name] = field = {'schema': schema}
-            if p.default is not p.empty:
-                field['default'] = p.default
+                s['default'] = p.default
+            arguments_schema.append(s)
         elif p.kind == Parameter.VAR_POSITIONAL:
-            extra_args_schema = schema
+            schema['var_args_schema'] = arg_schema
         else:
             assert p.kind == Parameter.VAR_KEYWORD, p.kind
-            extra_kwargs_schema = schema
-
-    schema = {
-        'type': 'arguments',
-        'arguments_mapping': arguments_mapping,
-        'keyword_args_schema': {
-            'type': 'typed-dict',
-            'extra_behavior': 'forbid',
-            'fields': {'a': {'schema': 'bool'}, 'b': {'schema': 'str'}, 'c': {'schema': 'int'}},
-        },
-    }
-    if positional_args or extra_args_schema:
-        schema['positional_args_schema'] = {'type': 'tuple', 'mode': 'positional', 'items_schema': positional_args}
-        if extra_args_schema:
-            schema['positional_args_schema']['extra_schema'] = extra_args_schema
-    if keyword_args or extra_kwargs_schema:
-        schema['keyword_args_schema'] = {'type': 'typed-dict', 'extra_behavior': 'forbid', 'fields': keyword_args}
-        if extra_kwargs_schema:
-            schema['keyword_args_schema']['extra_behavior'] = 'allow'
-            schema['keyword_args_schema']['extra_validator'] = extra_kwargs_schema
+            schema['var_kwargs_validator'] = arg_schema
 
     validator = SchemaValidator(schema)
 
@@ -657,6 +679,7 @@ def test_function_any():
     def foobar(a, b, c):
         return a, b, c
 
+    assert foobar(1, 2, 3) == (1, 2, 3)
     assert foobar(1, 2, 3) == (1, 2, 3)
     assert foobar(a=1, b=2, c=3) == (1, 2, 3)
     assert foobar(1, b=2, c=3) == (1, 2, 3)
@@ -685,7 +708,7 @@ def test_function_types():
     assert exc_info.value.errors() == [
         {
             'kind': 'int_parsing',
-            'loc': ['b'],
+            'loc': [1],
             'message': 'Value must be a valid integer, unable to parse string as an integer',
             'input_value': 'b',
         },
@@ -699,10 +722,11 @@ def test_function_types():
 
     with pytest.raises(ValidationError) as exc_info:
         foobar(1, 'b', c='c')
+
     assert exc_info.value.errors() == [
         {
             'kind': 'int_parsing',
-            'loc': ['b'],
+            'loc': [1],
             'message': 'Value must be a valid integer, unable to parse string as an integer',
             'input_value': 'b',
         },
@@ -746,6 +770,23 @@ def create_function(validate):
             'input_value': 2,
         },
     ]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='requires python3.10 or higher')
+def test_function_positional_only_default(import_execute):
+    # language=Python
+    m = import_execute(
+        """
+def create_function(validate):
+    @validate
+    def foobar(a: int, b: int = 42, /):
+        return a, b
+    return foobar
+"""
+    )
+    foobar = m.create_function(validate)
+    assert foobar('1', 2) == (1, 2)
+    assert foobar('1') == (1, 42)
 
 
 def test_function_args_kwargs():
