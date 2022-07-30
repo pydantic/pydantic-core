@@ -7,7 +7,7 @@ from typing import Any, get_type_hints
 import pytest
 from dirty_equals import IsListOrTuple
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
 from ..conftest import Err, PyAndJson
 
@@ -623,6 +623,19 @@ def test_default_factory(py_and_json: PyAndJson, input_value, expected):
         }
     )
     assert v.validate_test(input_value) == expected
+
+
+def test_build_non_default_follows():
+    with pytest.raises(SchemaError, match='Non-default argument follows default argument'):
+        SchemaValidator(
+            {
+                'type': 'arguments',
+                'arguments_schema': [
+                    {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int', 'default_factory': lambda: 42},
+                    {'name': 'b', 'mode': 'positional_or_keyword', 'schema': 'int'},
+                ],
+            }
+        )
 
 
 def validate(function):

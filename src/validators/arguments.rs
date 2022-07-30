@@ -47,6 +47,7 @@ impl BuildValidator for ArgumentsValidator {
         let mut arguments: Vec<Argument> = Vec::with_capacity(arguments_list.len());
 
         let mut positional_args_count = 0;
+        let mut had_default_arg = false;
 
         for (arg_index, arg) in arguments_list.iter().enumerate() {
             let arg: &PyDict = arg.cast_as()?;
@@ -80,15 +81,15 @@ impl BuildValidator for ArgumentsValidator {
                 Err(err) => return py_error!("Argument \"{}\":\n  {}", name, err),
             };
 
-            let (default, default_factory) = match (
-                arg.get_as(intern!(py, "default"))?,
-                arg.get_as(intern!(py, "default_factory"))?,
-            ) {
-                (Some(_default), Some(_default_factory)) => {
-                    return py_error!("'default' and 'default_factory' cannot be used together")
-                }
-                (default, default_factory) => (default, default_factory),
-            };
+            let default = arg.get_as(intern!(py, "default"))?;
+            let default_factory = arg.get_as(intern!(py, "default_factory"))?;
+            if default.is_some() && default_factory.is_some() {
+                return py_error!("'default' and 'default_factory' cannot be used together");
+            } else if had_default_arg && (default.is_none() && default_factory.is_none()) {
+                return py_error!("Non-default argument follows default argument");
+            } else if default.is_some() || default_factory.is_some() {
+                had_default_arg = true;
+            }
             arguments.push(Argument {
                 positional,
                 kw_lookup_key,
