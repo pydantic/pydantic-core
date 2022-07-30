@@ -260,12 +260,13 @@ impl Validator for ArgumentsValidator {
                                 }
                             }
                         } else {
-                            errors.push(ValLineError::new(
-                                ErrorKind::UnexpectedPositionalArguments {
-                                    unexpected_count: len - self.positional_args_count,
-                                },
-                                input,
-                            ));
+                            for (index, item) in $slice_macro!(args, self.positional_args_count, len).iter().enumerate() {
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorKind::UnexpectedPositionalArgument,
+                                    item,
+                                    index + self.positional_args_count,
+                                ));
+                            }
                         }
                     }
                 }

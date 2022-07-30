@@ -63,11 +63,10 @@ from ..conftest import Err, PyAndJson
                 '',
                 [
                     {
-                        'kind': 'unexpected_positional_arguments',
-                        'loc': [],
-                        'message': '1 unexpected positional argument',
-                        'input_value': IsListOrTuple([1, 'a', True, 4], None),
-                        'context': {'unexpected_count': 1},
+                        'kind': 'unexpected_positional_argument',
+                        'loc': [3],
+                        'message': 'Unexpected positional argument',
+                        'input_value': 4,
                     }
                 ],
             ),
@@ -78,12 +77,17 @@ from ..conftest import Err, PyAndJson
                 '',
                 [
                     {
-                        'kind': 'unexpected_positional_arguments',
-                        'loc': [],
-                        'message': '2 unexpected positional arguments',
-                        'input_value': IsListOrTuple([1, 'a', True, 4, 5], None),
-                        'context': {'unexpected_count': 2},
-                    }
+                        'kind': 'unexpected_positional_argument',
+                        'loc': [3],
+                        'message': 'Unexpected positional argument',
+                        'input_value': 4,
+                    },
+                    {
+                        'kind': 'unexpected_positional_argument',
+                        'loc': [4],
+                        'message': 'Unexpected positional argument',
+                        'input_value': 5,
+                    },
                 ],
             ),
         ],
@@ -168,7 +172,7 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
         [{'a': 1, 'b': 'a', 'c': True}, ((), {'a': 1, 'b': 'a', 'c': True})],
         [(None, {'a': '1', 'b': 'a', 'c': 'True'}), ((), {'a': 1, 'b': 'a', 'c': True})],
         [((), {'a': 1, 'b': 'a', 'c': True}), ((), {'a': 1, 'b': 'a', 'c': True})],
-        [((1,), {'a': 1, 'b': 'a', 'c': True}), Err('kind=unexpected_positional_arguments,')],
+        [((1,), {'a': 1, 'b': 'a', 'c': True}), Err('kind=unexpected_positional_argument,')],
         [
             ((), {'a': 1, 'b': 'a', 'c': True, 'd': 'wrong'}),
             Err(
@@ -291,7 +295,7 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
         [
             ([1, 'bb', 'cc'], {'b': 'bb', 'c': True}),
             Err(
-                'kind=unexpected_positional_arguments,',
+                'kind=unexpected_positional_argument,',
                 [
                     {
                         'kind': 'multiple_argument_values',
@@ -301,11 +305,10 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
                         'context': {'arg': 'b'},
                     },
                     {
-                        'kind': 'unexpected_positional_arguments',
-                        'loc': [],
-                        'message': '1 unexpected positional argument',
-                        'input_value': IsListOrTuple([1, 'bb', 'cc'], {'b': 'bb', 'c': True}),
-                        'context': {'unexpected_count': 1},
+                        'kind': 'unexpected_positional_argument',
+                        'loc': [2],
+                        'message': 'Unexpected positional argument',
+                        'input_value': 'cc',
                     },
                 ],
             ),
@@ -495,15 +498,20 @@ def test_args_var_args_only(py_and_json: PyAndJson, input_value, expected):
         [
             ([1, 'a', 'true', 4, 5], {'b': 'bb', 'c': 3}),
             Err(
-                'kind=unexpected_positional_arguments,',
+                'kind=unexpected_positional_argument,',
                 [
                     {
-                        'kind': 'unexpected_positional_arguments',
-                        'loc': [],
-                        'message': '2 unexpected positional arguments',
-                        'input_value': IsListOrTuple([1, 'a', 'true', 4, 5], {'b': 'bb', 'c': 3}),
-                        'context': {'unexpected_count': 2},
-                    }
+                        'kind': 'unexpected_positional_argument',
+                        'loc': [3],
+                        'message': 'Unexpected positional argument',
+                        'input_value': 4,
+                    },
+                    {
+                        'kind': 'unexpected_positional_argument',
+                        'loc': [4],
+                        'message': 'Unexpected positional argument',
+                        'input_value': 5,
+                    },
                 ],
             ),
         ],
@@ -539,7 +547,7 @@ def test_both(py_and_json: PyAndJson, input_value, expected):
         [(None, None), ((), {})],
         [(None, {}), ((), {})],
         [([], None), ((), {})],
-        [([1], None), Err('1 unexpected positional argument [kind=unexpected_positional_arguments,')],
+        [([1], None), Err('0\n  Unexpected positional argument [kind=unexpected_positional_argument,')],
         [([], {'a': 1}), Err('a\n  Unexpected keyword argument [kind=unexpected_keyword_argument,')],
         [
             ([1], {'a': 2}),
@@ -547,11 +555,10 @@ def test_both(py_and_json: PyAndJson, input_value, expected):
                 '[kind=unexpected_keyword_argument,',
                 [
                     {
-                        'kind': 'unexpected_positional_arguments',
-                        'loc': [],
-                        'message': '1 unexpected positional argument',
-                        'input_value': IsListOrTuple([1], {'a': 2}),
-                        'context': {'unexpected_count': 1},
+                        'kind': 'unexpected_positional_argument',
+                        'loc': [0],
+                        'message': 'Unexpected positional argument',
+                        'input_value': 1,
                     },
                     {
                         'kind': 'unexpected_keyword_argument',
@@ -773,7 +780,7 @@ def test_function_any():
     assert foobar(a=1, b=2, c=3) == (1, 2, 3)
     assert foobar(1, b=2, c=3) == (1, 2, 3)
 
-    with pytest.raises(ValidationError, match='1 unexpected positional argument'):
+    with pytest.raises(ValidationError, match='Unexpected positional argument'):
         foobar(1, 2, 3, 4)
 
     with pytest.raises(ValidationError, match='d\n  Unexpected keyword argument'):
@@ -788,7 +795,7 @@ def test_function_types():
     assert foobar(1, 2, c='3') == (1, 2, 3)
     assert foobar(a=1, b='2', c=3) == (1, 2, 3)
 
-    with pytest.raises(ValidationError, match='1 unexpected positional argument'):
+    with pytest.raises(ValidationError, match='Unexpected positional argument'):
         foobar(1, 2, 3)
 
     with pytest.raises(ValidationError) as exc_info:
