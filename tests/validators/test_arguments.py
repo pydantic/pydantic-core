@@ -284,10 +284,9 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
                 [
                     {
                         'kind': 'multiple_argument_values',
-                        'loc': [0],
-                        'message': "Got multiple values for argument 'a'",
+                        'loc': ['a'],
+                        'message': 'Got multiple values for argument',
                         'input_value': 11,
-                        'context': {'arg': 'a'},
                     }
                 ],
             ),
@@ -299,10 +298,9 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
                 [
                     {
                         'kind': 'multiple_argument_values',
-                        'loc': [1],
-                        'message': "Got multiple values for argument 'b'",
+                        'loc': ['b'],
+                        'message': 'Got multiple values for argument',
                         'input_value': 'bb',
-                        'context': {'arg': 'b'},
                     },
                     {
                         'kind': 'unexpected_positional_argument',
@@ -320,17 +318,15 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
                 [
                     {
                         'kind': 'multiple_argument_values',
-                        'loc': [0],
-                        'message': "Got multiple values for argument 'a'",
+                        'loc': ['a'],
+                        'message': 'Got multiple values for argument',
                         'input_value': 11,
-                        'context': {'arg': 'a'},
                     },
                     {
                         'kind': 'multiple_argument_values',
-                        'loc': [1],
-                        'message': "Got multiple values for argument 'b'",
+                        'loc': ['b'],
+                        'message': 'Got multiple values for argument',
                         'input_value': 'b2',
-                        'context': {'arg': 'b'},
                     },
                 ],
             ),

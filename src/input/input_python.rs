@@ -67,12 +67,12 @@ impl<'a> Input<'a> for PyAny {
         if let Ok(kwargs) = self.cast_as::<PyDict>() {
             Ok(PyArgs::new(None, Some(kwargs)).into())
         } else if let Ok((args, kwargs)) = self.extract::<(&PyAny, &PyAny)>() {
-            let args = if let Ok(list) = args.cast_as::<PyList>() {
-                Some(list)
+            let args = if let Ok(tuple) = args.cast_as::<PyTuple>() {
+                Some(tuple)
             } else if args.is_none() {
                 None
-            } else if let Ok(tuple) = args.cast_as::<PyTuple>() {
-                Some(PyList::new(self.py(), tuple.iter().collect::<Vec<_>>()))
+            } else if let Ok(list) = args.cast_as::<PyList>() {
+                Some(PyTuple::new(self.py(), list.iter().collect::<Vec<_>>()))
             } else {
                 return Err(ValError::new(ErrorKind::ArgumentsType, self));
             };

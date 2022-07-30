@@ -178,12 +178,12 @@ derive_from!(GenericMapping, JsonObject, JsonObject);
 
 #[derive(Debug)]
 pub struct PyArgs<'a> {
-    pub args: Option<&'a PyList>,
+    pub args: Option<&'a PyTuple>,
     pub kwargs: Option<&'a PyDict>,
 }
 
 impl<'a> PyArgs<'a> {
-    pub fn new(args: Option<&'a PyList>, kwargs: Option<&'a PyDict>) -> Self {
+    pub fn new(args: Option<&'a PyTuple>, kwargs: Option<&'a PyDict>) -> Self {
         Self { args, kwargs }
     }
 }

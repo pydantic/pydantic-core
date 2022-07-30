@@ -180,11 +180,9 @@ impl Validator for ArgumentsValidator {
                     match (pos_value, kw_value) {
                         (Some(_), Some(kw_value)) => {
                             errors.push(ValLineError::new_with_loc(
-                                ErrorKind::MultipleArgumentValues {
-                                    arg: argument_info.name.clone(),
-                                },
+                                ErrorKind::MultipleArgumentValues,
                                 kw_value,
-                                index,
+                                argument_info.name.clone(),
                             ));
                         }
                         (Some(pos_value), None) => {
