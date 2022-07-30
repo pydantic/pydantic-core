@@ -108,7 +108,7 @@ impl BuildValidator for ArgumentsValidator {
                 Some(v) => Some(Box::new(build_validator(v, config, build_context)?.0)),
                 None => None,
             },
-            var_kwargs_validator: match schema.get_item(intern!(py, "var_kwargs_validator")) {
+            var_kwargs_validator: match schema.get_item(intern!(py, "var_kwargs_schema")) {
                 Some(v) => Some(Box::new(build_validator(v, config, build_context)?.0)),
                 None => None,
             },

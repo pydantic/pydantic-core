@@ -641,6 +641,33 @@ def test_build_non_default_follows():
 @pytest.mark.parametrize(
     'input_value,expected',
     [
+        [((1, 2), None), ((1, 2), {})],
+        [((1,), {'b': '4', 'c': 'a'}), ((1,), {'b': 4, 'c': 'a'})],
+        [((1, 2), {'x': 'abc'}), ((1, 2), {'x': 'abc'})],
+    ],
+    ids=repr,
+)
+def test_kwargs(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {
+            'type': 'arguments',
+            'arguments_schema': [
+                {'name': 'a', 'mode': 'positional_only', 'schema': 'int'},
+                {'name': 'b', 'mode': 'positional_or_keyword', 'schema': 'int'},
+            ],
+            'var_kwargs_schema': 'str',
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_test(input_value)
+    else:
+        assert v.validate_test(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
         [((1,), None), ((1,), {})],
         [(None, {'Foo': 1}), ((), {'a': 1})],
         [(None, {'a': 1}), Err('a\n  Missing required keyword argument [kind=missing_keyword_argument,')],
@@ -724,7 +751,7 @@ def validate(function):
             schema['var_args_schema'] = arg_schema
         else:
             assert p.kind == Parameter.VAR_KEYWORD, p.kind
-            schema['var_kwargs_validator'] = arg_schema
+            schema['var_kwargs_schema'] = arg_schema
 
     validator = SchemaValidator(schema)
 
@@ -849,6 +876,24 @@ def create_function(validate):
     foobar = m.create_function(validate)
     assert foobar('1', 2) == (1, 2)
     assert foobar('1') == (1, 42)
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='requires python3.10 or higher')
+def test_function_positional_kwargs(import_execute):
+    # language=Python
+    m = import_execute(
+        """
+def create_function(validate):
+    @validate
+    def foobar(a: int, b: int, /, **kwargs: bool):
+        return a, b, kwargs
+    return foobar
+"""
+    )
+    foobar = m.create_function(validate)
+    assert foobar('1', 2) == (1, 2, {})
+    assert foobar('1', 2, c=True) == (1, 2, {'c': True})
+    assert foobar('1', 2, a='false') == (1, 2, {'a': False})
 
 
 def test_function_args_kwargs():

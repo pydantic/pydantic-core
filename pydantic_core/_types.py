@@ -292,7 +292,7 @@ class ArgumentsSchema(TypedDict, total=False):
     arguments_schema: Required[List[ArgumentInfo]]
     populate_by_name: bool
     var_args_schema: Schema
-    var_kwargs_validator: Schema
+    var_kwargs_schema: Schema
     ref: str
 
 
