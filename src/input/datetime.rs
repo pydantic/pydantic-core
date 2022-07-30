@@ -389,7 +389,8 @@ pub fn float_as_duration(total_seconds: f64) -> Duration {
 }
 
 #[pyclass(module = "pydantic_core._pydantic_core", extends = PyTzInfo)]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 struct TzInfo {
     seconds: i32,
 }
