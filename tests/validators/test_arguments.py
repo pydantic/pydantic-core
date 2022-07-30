@@ -638,6 +638,55 @@ def test_build_non_default_follows():
         )
 
 
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        [((1,), None), ((1,), {})],
+        [(None, {'Foo': 1}), ((), {'a': 1})],
+        [(None, {'a': 1}), Err('a\n  Missing required keyword argument [kind=missing_keyword_argument,')],
+    ],
+    ids=repr,
+)
+def test_alias(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {
+            'type': 'arguments',
+            'arguments_schema': [{'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int', 'alias': 'Foo'}],
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_test(input_value)
+    else:
+        assert v.validate_test(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        [((1,), None), ((1,), {})],
+        [(None, {'Foo': 1}), ((), {'a': 1})],
+        [(None, {'a': 1}), ((), {'a': 1})],
+        [(None, {'a': 1, 'b': 2}), Err('b\n  Unexpected keyword argument [kind=unexpected_keyword_argument,')],
+        [(None, {'a': 1, 'Foo': 2}), Err('a\n  Unexpected keyword argument [kind=unexpected_keyword_argument,')],
+    ],
+    ids=repr,
+)
+def test_alias_populate_by_name(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {
+            'type': 'arguments',
+            'arguments_schema': [{'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int', 'alias': 'Foo'}],
+            'populate_by_name': True,
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_test(input_value)
+    else:
+        assert v.validate_test(input_value) == expected
+
+
 def validate(function):
     """
     a demo validation decorator to test arguments
