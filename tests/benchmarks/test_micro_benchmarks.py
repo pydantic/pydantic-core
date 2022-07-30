@@ -791,15 +791,15 @@ def test_arguments(benchmark):
     v = SchemaValidator(
         {
             'type': 'arguments',
-            'arguments_mapping': {2: 'a'},
-            'positional_args_schema': {'type': 'tuple', 'mode': 'positional', 'items_schema': ['int', 'str']},
-            'keyword_args_schema': {
-                'type': 'typed-dict',
-                'extra_behavior': 'forbid',
-                'fields': {'a': {'schema': 'bool'}, 'b': {'schema': 'str'}, 'c': {'schema': 'int'}},
-            },
+            'arguments_schema': [
+                {'name': 'args1', 'mode': 'positional_only', 'schema': 'int'},
+                {'name': 'args2', 'mode': 'positional_only', 'schema': 'str'},
+                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'bool'},
+                {'name': 'b', 'mode': 'keyword_only', 'schema': 'str'},
+                {'name': 'c', 'mode': 'keyword_only', 'schema': 'int'},
+            ],
         }
     )
-    assert v.validate_python(([1, 'a', 'true'], {'b': 'bb', 'c': 3})) == ((1, 'a'), {'a': True, 'b': 'bb', 'c': 3})
+    assert v.validate_python(([1, 'a', 'true'], {'b': 'bb', 'c': 3})) == ((1, 'a', True), {'b': 'bb', 'c': 3})
 
     benchmark(v.validate_python, ([1, 'a', 'true'], {'b': 'bb', 'c': 3}))

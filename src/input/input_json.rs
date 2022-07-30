@@ -6,7 +6,8 @@ use super::datetime::{
 };
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 use super::{
-    EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericListLike, GenericMapping, Input, JsonInput,
+    EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericListLike, GenericMapping, Input, JsonArgs,
+    JsonInput,
 };
 
 impl<'a> Input<'a> for JsonInput {
@@ -30,7 +31,7 @@ impl<'a> Input<'a> for JsonInput {
 
     fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
         match self {
-            JsonInput::Object(kwargs) => Ok(GenericArguments::Json(None, Some(kwargs))),
+            JsonInput::Object(kwargs) => Ok(JsonArgs::new(None, Some(kwargs)).into()),
             JsonInput::Array(array) => {
                 if array.len() != 2 {
                     Err(ValError::new(ErrorKind::ArgumentsType, self))
@@ -45,7 +46,7 @@ impl<'a> Input<'a> for JsonInput {
                         JsonInput::Object(kwargs) => Some(kwargs),
                         _ => return Err(ValError::new(ErrorKind::ArgumentsType, self)),
                     };
-                    Ok(GenericArguments::Json(args, kwargs))
+                    Ok(JsonArgs::new(args, kwargs).into())
                 }
             }
             _ => Err(ValError::new(ErrorKind::ArgumentsType, self)),

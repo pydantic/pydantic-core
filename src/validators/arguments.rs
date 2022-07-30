@@ -1,30 +1,34 @@
+use ahash::AHashSet;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 
-use crate::build_tools::{py_error, SchemaDict};
+use crate::build_tools::{py_error, schema_or_config_same, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
-use crate::input::{json_object_to_py, GenericArguments, GenericListLike, GenericMapping, Input};
+use crate::input::{GenericArguments, Input};
+use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
+use crate::SchemaError;
 
-use super::tuple::TuplePositionalValidator;
-use super::typed_dict::{IterAttributes, TypedDictValidator};
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
-struct ArgumentsMapping {
-    slice_at: usize,
-    max_length: usize,
-    mapping: Vec<(usize, Py<PyString>)>,
+struct Argument {
+    positional: bool,
+    name: String,
+    kw_lookup_key: Option<LookupKey>,
+    kwarg_key: Option<Py<PyString>>,
+    default: Option<PyObject>,
+    default_factory: Option<PyObject>,
+    validator: CombinedValidator,
 }
 
 #[derive(Debug, Clone)]
 pub struct ArgumentsValidator {
-    arguments_mapping: Option<ArgumentsMapping>,
-    pargs_validator: Option<TuplePositionalValidator>,
-    kwargs_validator: Option<TypedDictValidator>,
-    always_validate_kwargs: bool,
-    name: String,
+    arguments: Vec<Argument>,
+    positional_args_count: usize,
+    var_args_validator: Option<Box<CombinedValidator>>,
+    var_kwargs_validator: Option<Box<CombinedValidator>>,
 }
 
 impl BuildValidator for ArgumentsValidator {
@@ -37,74 +41,104 @@ impl BuildValidator for ArgumentsValidator {
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
-        let arguments_mapping = match schema.get_as::<&PyDict>(intern!(py, "arguments_mapping"))? {
-            Some(d) => {
-                let mut mapping: Vec<(usize, Py<PyString>)> = d
-                    .iter()
-                    .map(|(k, v)| {
-                        let k = k.extract()?;
-                        let v: &PyString = v.cast_as()?;
-                        Ok((k, v.into_py(py)))
-                    })
-                    .collect::<PyResult<Vec<_>>>()?;
+        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
-                mapping.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
-                match mapping.first() {
-                    Some((slice_at, _)) => {
-                        let (max_length, _) = mapping.last().unwrap();
-                        Some(ArgumentsMapping {
-                            slice_at: *slice_at,
-                            max_length: *max_length + 1,
-                            mapping,
-                        })
-                    }
-                    None => None,
-                }
+        let arguments_list: &PyList = schema.get_as_req(intern!(py, "arguments_schema"))?;
+        let mut arguments: Vec<Argument> = Vec::with_capacity(arguments_list.len());
+
+        let mut positional_args_count = 0;
+        let mut had_default_arg = false;
+
+        for (arg_index, arg) in arguments_list.iter().enumerate() {
+            let arg: &PyDict = arg.cast_as()?;
+
+            let name: String = arg.get_as_req(intern!(py, "name"))?;
+            let mode: &str = arg.get_as_req(intern!(py, "mode"))?;
+            let positional = mode == "positional_only" || mode == "positional_or_keyword";
+            if positional {
+                positional_args_count = arg_index + 1;
             }
-            None => None,
-        };
 
-        macro_rules! build_specific_validator {
-            ($key:literal, $enum_key:ident) => {
-                match schema.get_item(intern!(py, $key)) {
-                    Some(sub_schema) => match build_validator(sub_schema, config, build_context)?.0 {
-                        CombinedValidator::$enum_key(v) => Some(v),
-                        _ => return py_error!("Wrong validator type from {}", $key),
-                    },
-                    None => None,
-                }
+            let mut kw_lookup_key = None;
+            let mut kwarg_key = None;
+            if mode == "keyword_only" || mode == "positional_or_keyword" {
+                kw_lookup_key = match arg.get_item(intern!(py, "alias")) {
+                    Some(alias) => {
+                        let alt_alias = if populate_by_name { Some(name.as_str()) } else { None };
+                        Some(LookupKey::from_py(py, alias, alt_alias)?)
+                    }
+                    None => Some(LookupKey::from_string(py, &name)),
+                };
+                kwarg_key = Some(PyString::intern(py, &name).into());
+            }
+
+            let schema: &PyAny = arg
+                .get_as_req(intern!(py, "schema"))
+                .map_err(|err| SchemaError::new_err(format!("Argument \"{}\":\n  {}", name, err)))?;
+
+            let validator = match build_validator(schema, config, build_context) {
+                Ok((v, _)) => v,
+                Err(err) => return py_error!("Argument \"{}\":\n  {}", name, err),
             };
+
+            let default = arg.get_as(intern!(py, "default"))?;
+            let default_factory = arg.get_as(intern!(py, "default_factory"))?;
+            if default.is_some() && default_factory.is_some() {
+                return py_error!("'default' and 'default_factory' cannot be used together");
+            } else if had_default_arg && (default.is_none() && default_factory.is_none()) {
+                return py_error!("Non-default argument follows default argument");
+            } else if default.is_some() || default_factory.is_some() {
+                had_default_arg = true;
+            }
+            arguments.push(Argument {
+                positional,
+                kw_lookup_key,
+                name,
+                kwarg_key,
+                default,
+                default_factory,
+                validator,
+            });
         }
-        let pargs_validator = build_specific_validator!("positional_args_schema", TuplePositional);
-        let p_args_name = match pargs_validator {
-            Some(ref v) => v.get_name(),
-            None => "-",
-        };
-        let kwargs_validator = build_specific_validator!("keyword_args_schema", TypedDict);
-        let k_args_name = match kwargs_validator {
-            Some(ref v) => v.get_name(),
-            None => "-",
-        };
-        if pargs_validator.is_none() && kwargs_validator.is_none() {
-            return py_error!(
-                "Arguments schema must have either 'positional_args_schema' or 'keyword_args_schema' defined"
-            );
-        }
-        let name = format!("{}[{}, {}]", Self::EXPECTED_TYPE, p_args_name, k_args_name);
-        let always_validate_kwargs = match kwargs_validator {
-            Some(ref v) => v.has_optional_fields(),
-            None => false,
-        };
 
         Ok(Self {
-            arguments_mapping,
-            pargs_validator,
-            kwargs_validator,
-            always_validate_kwargs,
-            name,
+            arguments,
+            positional_args_count,
+            var_args_validator: match schema.get_item(intern!(py, "var_args_schema")) {
+                Some(v) => Some(Box::new(build_validator(v, config, build_context)?.0)),
+                None => None,
+            },
+            var_kwargs_validator: match schema.get_item(intern!(py, "var_kwargs_schema")) {
+                Some(v) => Some(Box::new(build_validator(v, config, build_context)?.0)),
+                None => None,
+            },
         }
         .into())
     }
+}
+
+macro_rules! py_get {
+    ($obj:ident, $index:ident) => {
+        $obj.get_item($index).ok()
+    };
+}
+
+macro_rules! py_slice {
+    ($obj:ident, $from:expr, $to:expr) => {
+        $obj.get_slice($from, $to)
+    };
+}
+
+macro_rules! json_get {
+    ($obj:ident, $index:ident) => {
+        $obj.get($index)
+    };
+}
+
+macro_rules! json_slice {
+    ($obj:ident, $from:expr, $to:expr) => {
+        $obj[$from..$to]
+    };
 }
 
 impl Validator for ArgumentsValidator {
@@ -116,250 +150,178 @@ impl Validator for ArgumentsValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let args = self.build_args(py, input)?;
+        let args = input.validate_args()?;
 
-        let (pargs, kwargs): (Option<GenericListLike>, Option<GenericMapping>) = match args {
-            GenericArguments::Py(op_pargs, kwargs) => {
-                (op_pargs.map(|pargs| pargs.into()), kwargs.map(|pargs| pargs.into()))
-            }
-            GenericArguments::Json(op_pargs, kwargs) => {
-                (op_pargs.map(|pargs| pargs.into()), kwargs.map(|pargs| pargs.into()))
-            }
-        };
+        let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_args_count);
+        let output_kwargs = PyDict::new(py);
+        let mut errors: Vec<ValLineError> = Vec::new();
+        let mut used_kwargs: AHashSet<&str> = AHashSet::with_capacity(self.arguments.len());
 
-        let arg_result = match (pargs, &self.pargs_validator) {
-            (Some(args), Some(args_validator)) => Some(
-                args_validator
-                    .validate_list_like(py, args, input, extra, slots, recursion_guard)
-                    .map_err(map_pargs_errors),
-            ),
-            (Some(pa), None) => match pa.generic_len() {
-                0 => None,
-                unexpected_count => Some(Err(ValError::new(
-                    ErrorKind::UnexpectedPositionalArguments { unexpected_count },
-                    input,
-                ))),
-            },
-            (None, Some(args_validator)) => match args_validator.len() {
-                0 => None,
-                args_count => Some(Err(ValError::LineErrors(
-                    (0..args_count)
-                        .map(|index| ValLineError::new_with_loc(ErrorKind::MissingPositionalArgument, input, index))
-                        .collect(),
-                ))),
-            },
-            (None, None) => None,
-        };
+        macro_rules! process {
+            ($args:ident, $get_method:ident, $get_macro:ident, $slice_macro:ident) => {{
+                // go through arguments getting the value from args or kwargs and validating it
+                for (index, argument_info) in self.arguments.iter().enumerate() {
+                    let mut pos_value = None;
+                    if let Some(args) = $args.args {
+                        if argument_info.positional {
+                            pos_value = $get_macro!(args, index);
+                        }
+                    }
+                    let mut kw_value = None;
+                    if let Some(kwargs) = $args.kwargs {
+                        if let Some(ref lookup_key) = argument_info.kw_lookup_key {
+                            if let Some((key, value)) = lookup_key.$get_method(kwargs)? {
+                                used_kwargs.insert(key);
+                                kw_value = Some(value);
+                            }
+                        }
+                    }
 
-        let kwarg_result = match (kwargs, &self.kwargs_validator) {
-            (Some(kwargs), Some(kwargs_validator)) => Some(
-                kwargs_validator
-                    .validate_generic_mapping(py, kwargs, input, extra, slots, recursion_guard)
-                    .map_err(map_kwargs_errors),
-            ),
-            (Some(kwargs), None) => match kwargs.generic_len()? {
-                0 => None,
-                _ => Some(Err(self.unexpected_kwargs(kwargs))),
-            },
-            (None, Some(kwargs_validator)) => {
-                if self.always_validate_kwargs {
-                    let kwargs = GenericMapping::PyDict(PyDict::new(py));
-                    Some(
-                        kwargs_validator
-                            .validate_generic_mapping(py, kwargs, input, extra, slots, recursion_guard)
-                            .map_err(map_kwargs_errors),
-                    )
-                } else {
-                    Some(Err(ValError::LineErrors(
-                        kwargs_validator
-                            .keys()
-                            .into_iter()
-                            .map(|key| ValLineError::new_with_loc(ErrorKind::MissingKeywordArgument, input, key))
-                            .collect(),
-                    )))
+                    match (pos_value, kw_value) {
+                        (Some(_), Some(kw_value)) => {
+                            errors.push(ValLineError::new_with_loc(
+                                ErrorKind::MultipleArgumentValues {
+                                    arg: argument_info.name.clone(),
+                                },
+                                kw_value,
+                                index,
+                            ));
+                        }
+                        (Some(pos_value), None) => {
+                            match argument_info
+                                .validator
+                                .validate(py, pos_value, extra, slots, recursion_guard)
+                            {
+                                Ok(value) => output_args.push(value),
+                                Err(ValError::LineErrors(line_errors)) => {
+                                    errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
+                                }
+                                Err(err) => return Err(err),
+                            }
+                        }
+                        (None, Some(kw_value)) => {
+                            match argument_info
+                                .validator
+                                .validate(py, kw_value, extra, slots, recursion_guard)
+                            {
+                                Ok(value) => output_kwargs.set_item(argument_info.kwarg_key.as_ref().unwrap(), value)?,
+                                Err(ValError::LineErrors(line_errors)) => {
+                                    errors.extend(
+                                        line_errors
+                                            .into_iter()
+                                            .map(|err| err.with_outer_location(argument_info.name.clone().into())),
+                                    );
+                                }
+                                Err(err) => return Err(err),
+                            }
+                        }
+                        (None, None) => {
+                            if let Some(ref default) = argument_info.default {
+                                if let Some(ref kwarg_key) = argument_info.kwarg_key {
+                                    output_kwargs.set_item(kwarg_key, default)?;
+                                } else {
+                                    output_args.push(default.clone_ref(py));
+                                }
+                            } else if let Some(ref default_factory) = argument_info.default_factory {
+                                let default = default_factory.call0(py)?;
+                                if let Some(ref kwarg_key) = argument_info.kwarg_key {
+                                    output_kwargs.set_item(kwarg_key, default)?;
+                                } else {
+                                    output_args.push(default);
+                                }
+                            } else if argument_info.kwarg_key.is_some() {
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorKind::MissingKeywordArgument,
+                                    input,
+                                    argument_info.name.clone(),
+                                ));
+                            } else {
+                                errors.push(ValLineError::new_with_loc(ErrorKind::MissingPositionalArgument, input, index));
+                            };
+                        }
+                    }
                 }
-            }
-            (None, None) => None,
-        };
-
-        match (arg_result, kwarg_result) {
-            (Some(Ok(args)), Some(Ok(kwargs))) => Ok((args, kwargs).to_object(py)),
-            (Some(Ok(args)), None) => Ok((args, PyDict::new(py)).to_object(py)),
-            (None, Some(Ok(kwargs))) => Ok((PyTuple::empty(py), kwargs).to_object(py)),
-            (Some(Err(ValError::InternalErr(err))), _) => Err(ValError::InternalErr(err)),
-            (_, Some(Err(ValError::InternalErr(err)))) => Err(ValError::InternalErr(err)),
-            (Some(Err(ValError::LineErrors(mut args_errors))), Some(Err(ValError::LineErrors(kwargs_errors)))) => {
-                args_errors.extend(kwargs_errors);
-                Err(ValError::LineErrors(args_errors))
-            }
-            (Some(Err(args_error)), _) => Err(args_error),
-            (_, Some(Err(kwargs_error))) => Err(kwargs_error),
-            (None, None) => Ok((PyTuple::empty(py), PyDict::new(py)).to_object(py)),
+                // if there are args check any where index > positional_args_count since they won't have been checked yet
+                if let Some(args) = $args.args {
+                    let len = args.len();
+                    if len > self.positional_args_count {
+                        if let Some(ref validator) = self.var_args_validator {
+                            for (index, item) in $slice_macro!(args, self.positional_args_count, len).iter().enumerate() {
+                                match validator.validate(py, item, extra, slots, recursion_guard) {
+                                    Ok(value) => output_args.push(value),
+                                    Err(ValError::LineErrors(line_errors)) => {
+                                        errors.extend(
+                                            line_errors
+                                                .into_iter()
+                                                .map(|err| err.with_outer_location((index + self.positional_args_count).into())),
+                                        );
+                                    }
+                                    Err(err) => return Err(err),
+                                }
+                            }
+                        } else {
+                            for (index, item) in $slice_macro!(args, self.positional_args_count, len).iter().enumerate() {
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorKind::UnexpectedPositionalArgument,
+                                    item,
+                                    index + self.positional_args_count,
+                                ));
+                            }
+                        }
+                    }
+                }
+                // if there are kwargs check any that haven't been processed yet
+                if let Some(kwargs) = $args.kwargs {
+                    for (raw_key, value) in kwargs.iter() {
+                        let either_str = match raw_key.strict_str() {
+                            Ok(k) => k,
+                            Err(ValError::LineErrors(line_errors)) => {
+                                for err in line_errors {
+                                    errors.push(
+                                        err.with_outer_location(raw_key.as_loc_item())
+                                            .with_kind(ErrorKind::InvalidKey),
+                                    );
+                                }
+                                continue;
+                            }
+                            Err(err) => return Err(err),
+                        };
+                        if !used_kwargs.contains(either_str.as_cow().as_ref()) {
+                            match self.var_kwargs_validator {
+                                Some(ref validator) => match validator.validate(py, value, extra, slots, recursion_guard) {
+                                    Ok(value) => output_kwargs.set_item(either_str.as_py_string(py), value)?,
+                                    Err(ValError::LineErrors(line_errors)) => {
+                                        for err in line_errors {
+                                            errors.push(err.with_outer_location(raw_key.as_loc_item()));
+                                        }
+                                    }
+                                    Err(err) => return Err(err),
+                                },
+                                None => {
+                                    errors.push(ValLineError::new_with_loc(
+                                        ErrorKind::UnexpectedKeywordArgument,
+                                        value,
+                                        raw_key.as_loc_item(),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }};
+        }
+        match args {
+            GenericArguments::Py(a) => process!(a, py_get_item, py_get, py_slice),
+            GenericArguments::Json(a) => process!(a, json_get, json_get, json_slice),
+        }
+        if !errors.is_empty() {
+            Err(ValError::LineErrors(errors))
+        } else {
+            Ok((PyTuple::new(py, output_args), output_kwargs).to_object(py))
         }
     }
 
     fn get_name(&self) -> &str {
-        &self.name
-    }
-}
-
-impl ArgumentsValidator {
-    /// Move positional arguments to keyword arguments based on mapping.
-    fn build_args<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-    ) -> ValResult<'data, GenericArguments<'data>> {
-        let mut args = input.validate_args()?;
-
-        if let Some(ref arguments_mapping) = self.arguments_mapping {
-            match args {
-                GenericArguments::Py(Some(pargs), kwargs) => {
-                    let len = pargs.len();
-                    if len > arguments_mapping.max_length {
-                        return Err(ValError::new(
-                            ErrorKind::UnexpectedPositionalArguments {
-                                unexpected_count: len - arguments_mapping.max_length,
-                            },
-                            input,
-                        ));
-                    }
-                    let new_pargs = pargs.get_slice(0, arguments_mapping.slice_at);
-                    let kwargs = match kwargs {
-                        // have to copy the kwargs so we don't modify the input dict
-                        Some(kw) => kw.copy()?,
-                        None => PyDict::new(py),
-                    };
-
-                    let mut errors = vec![];
-                    for (index, key) in &arguments_mapping.mapping {
-                        if let Ok(value) = pargs.get_item(*index) {
-                            if kwargs.contains(key)? {
-                                errors.push(ValLineError::new_with_loc(
-                                    ErrorKind::MultipleArgumentValues { arg: key.to_string() },
-                                    value,
-                                    *index,
-                                ));
-                            } else {
-                                kwargs.set_item(key, value)?;
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-                    if errors.is_empty() {
-                        args = GenericArguments::Py(Some(new_pargs), Some(kwargs));
-                    } else {
-                        return Err(ValError::LineErrors(errors));
-                    }
-                }
-                GenericArguments::Json(Some(pargs), kwargs) => {
-                    // TODO ideally we wouldn't have to fallback to python objects here, but instead could continue
-                    // to operate on JsonInput and JsonArray/JsonObject, but all the approaches I tried failed:
-                    // * creating a new JsonObject allowed it to be mutated but `validate_generic_mapping` needs
-                    //   a reference and the reference has the wrong lifetime
-                    // * if we try to mutate kwargs directly we run into problems as it's a reference, not a
-                    //   mutable reference to make it editable we'd have to make input mutable everywhere which seems
-                    //   ugly
-                    let len = pargs.len();
-                    if len > arguments_mapping.max_length {
-                        return Err(ValError::new(
-                            ErrorKind::UnexpectedPositionalArguments {
-                                unexpected_count: len - arguments_mapping.max_length,
-                            },
-                            input,
-                        ));
-                    }
-                    let pargs_slice = &pargs[..arguments_mapping.slice_at];
-                    let py_pargs = match pargs_slice.is_empty() {
-                        true => None,
-                        false => Some(PyList::new(py, pargs_slice)),
-                    };
-
-                    let py_kwargs = match kwargs {
-                        Some(kw) => json_object_to_py(kw, py),
-                        None => PyDict::new(py),
-                    };
-                    let mut errors = vec![];
-                    for (index, key) in &arguments_mapping.mapping {
-                        if let Some(value) = pargs.get(*index) {
-                            if py_kwargs.contains(key)? {
-                                errors.push(ValLineError::new_with_loc(
-                                    ErrorKind::MultipleArgumentValues { arg: key.to_string() },
-                                    value,
-                                    *index,
-                                ));
-                            } else {
-                                py_kwargs.set_item(key, value.to_object(py))?;
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-                    if errors.is_empty() {
-                        args = GenericArguments::Py(py_pargs, Some(py_kwargs));
-                    } else {
-                        return Err(ValError::LineErrors(errors));
-                    }
-                }
-                _ => (),
-            }
-        }
-        Ok(args)
-    }
-
-    pub fn unexpected_kwargs<'s, 'data>(&'s self, dict: GenericMapping<'data>) -> ValError<'data> {
-        macro_rules! collect_errors {
-            ($iter:expr) => {{
-                $iter
-                    .map(|(k, v)| ValLineError::new_with_loc(ErrorKind::UnexpectedKeywordArgument, v, k.as_loc_item()))
-                    .collect()
-            }};
-        }
-        let errors: Vec<ValLineError> = match dict {
-            GenericMapping::PyDict(d) => collect_errors!(d.iter()),
-            GenericMapping::PyGetAttr(d) => collect_errors!(d.iter_attrs()),
-            GenericMapping::JsonObject(d) => collect_errors!(d.iter()),
-        };
-        ValError::LineErrors(errors)
-    }
-}
-
-fn map_pargs_errors(error: ValError) -> ValError {
-    match error {
-        ValError::LineErrors(line_errors) => {
-            let line_errors = line_errors
-                .into_iter()
-                .map(|e| match e.kind {
-                    ErrorKind::Missing => e.with_kind(ErrorKind::MissingPositionalArgument),
-                    ErrorKind::TooLong {
-                        max_length,
-                        input_length,
-                    } => e.with_kind(ErrorKind::UnexpectedPositionalArguments {
-                        unexpected_count: input_length - max_length,
-                    }),
-                    _ => e,
-                })
-                .collect();
-            ValError::LineErrors(line_errors)
-        }
-        internal_error => internal_error,
-    }
-}
-
-fn map_kwargs_errors(error: ValError) -> ValError {
-    match error {
-        ValError::LineErrors(line_errors) => {
-            let line_errors = line_errors
-                .into_iter()
-                .map(|e| match e.kind {
-                    ErrorKind::Missing => e.with_kind(ErrorKind::MissingKeywordArgument),
-                    ErrorKind::ExtraForbidden => e.with_kind(ErrorKind::UnexpectedKeywordArgument),
-                    _ => e,
-                })
-                .collect();
-            ValError::LineErrors(line_errors)
-        }
-        internal_error => internal_error,
+        Self::EXPECTED_TYPE
     }
 }

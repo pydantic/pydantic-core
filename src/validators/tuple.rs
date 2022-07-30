@@ -120,34 +120,6 @@ impl Validator for TuplePositionalValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let list_like = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
-        self.validate_list_like(py, list_like, input, extra, slots, recursion_guard)
-    }
-
-    fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
-        self.items_validators
-            .iter_mut()
-            .try_for_each(|v| v.complete(build_context))
-    }
-}
-
-impl TuplePositionalValidator {
-    pub fn len(&self) -> usize {
-        self.items_validators.len()
-    }
-
-    pub fn validate_list_like<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        list_like: GenericListLike<'data>,
-        input: &'data impl Input<'data>,
-        extra: &Extra,
-        slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
         let expected_length = self.items_validators.len();
 
         let ll_length = list_like.generic_len();
@@ -205,5 +177,15 @@ impl TuplePositionalValidator {
         } else {
             Err(ValError::LineErrors(errors))
         }
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
+        self.items_validators
+            .iter_mut()
+            .try_for_each(|v| v.complete(build_context))
     }
 }

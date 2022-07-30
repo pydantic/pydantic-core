@@ -18,6 +18,7 @@ use super::datetime::{
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 use super::{
     repr_string, EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericListLike, GenericMapping, Input,
+    PyArgs,
 };
 
 impl<'a> Input<'a> for PyAny {
@@ -64,7 +65,7 @@ impl<'a> Input<'a> for PyAny {
 
     fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
         if let Ok(kwargs) = self.cast_as::<PyDict>() {
-            Ok(GenericArguments::Py(None, Some(kwargs)))
+            Ok(PyArgs::new(None, Some(kwargs)).into())
         } else if let Ok((args, kwargs)) = self.extract::<(&PyAny, &PyAny)>() {
             let args = if let Ok(list) = args.cast_as::<PyList>() {
                 Some(list)
@@ -73,7 +74,6 @@ impl<'a> Input<'a> for PyAny {
             } else if let Ok(tuple) = args.cast_as::<PyTuple>() {
                 Some(PyList::new(self.py(), tuple.iter().collect::<Vec<_>>()))
             } else {
-                // TODO, better error?
                 return Err(ValError::new(ErrorKind::ArgumentsType, self));
             };
             let kwargs = if let Ok(dict) = kwargs.cast_as::<PyDict>() {
@@ -81,10 +81,9 @@ impl<'a> Input<'a> for PyAny {
             } else if kwargs.is_none() {
                 None
             } else {
-                // TODO, better error?
                 return Err(ValError::new(ErrorKind::ArgumentsType, self));
             };
-            Ok(GenericArguments::Py(args, kwargs))
+            Ok(PyArgs::new(args, kwargs).into())
         } else {
             Err(ValError::new(ErrorKind::ArgumentsType, self))
         }
