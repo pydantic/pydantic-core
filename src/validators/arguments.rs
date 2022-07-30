@@ -76,10 +76,7 @@ impl BuildValidator for ArgumentsValidator {
                 .get_as_req(intern!(py, "schema"))
                 .map_err(|err| SchemaError::new_err(format!("Argument \"{}\":\n  {}", name, err)))?;
 
-            let validator = match build_validator(schema, config, build_context) {
-                Ok((v, _)) => v,
-                Err(err) => return py_error!("Argument \"{}\":\n  {}", name, err),
-            };
+            let (validator, _) = build_validator(schema, config, build_context)?;
 
             let default = arg.get_as(intern!(py, "default"))?;
             let default_factory = arg.get_as(intern!(py, "default_factory"))?;

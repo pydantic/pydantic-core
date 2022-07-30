@@ -9,7 +9,7 @@ from dirty_equals import IsListOrTuple
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
-from ..conftest import Err, PyAndJson
+from ..conftest import Err, PyAndJson, plain_repr
 
 
 @pytest.mark.parametrize(
@@ -628,6 +628,19 @@ def test_default_factory(py_and_json: PyAndJson, input_value, expected):
     assert v.validate_test(input_value) == expected
 
 
+def test_repr():
+    v = SchemaValidator(
+        {
+            'type': 'arguments',
+            'arguments_schema': [
+                {'name': 'b', 'mode': 'positional_or_keyword', 'schema': 'int'},
+                {'name': 'a', 'mode': 'keyword_only', 'schema': 'int', 'default_factory': lambda: 42},
+            ],
+        }
+    )
+    assert 'positional_args_count:1,' in plain_repr(v)
+
+
 def test_build_non_default_follows():
     with pytest.raises(SchemaError, match='Non-default argument follows default argument'):
         SchemaValidator(
@@ -636,6 +649,24 @@ def test_build_non_default_follows():
                 'arguments_schema': [
                     {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int', 'default_factory': lambda: 42},
                     {'name': 'b', 'mode': 'positional_or_keyword', 'schema': 'int'},
+                ],
+            }
+        )
+
+
+def test_build_default_and_default_factory():
+    with pytest.raises(SchemaError, match="'default' and 'default_factory' cannot be used together"):
+        SchemaValidator(
+            {
+                'type': 'arguments',
+                'arguments_schema': [
+                    {
+                        'name': 'a',
+                        'mode': 'positional_or_keyword',
+                        'schema': 'int',
+                        'default_factory': lambda: 1,
+                        'default': 2,
+                    }
                 ],
             }
         )

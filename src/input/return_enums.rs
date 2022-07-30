@@ -217,6 +217,7 @@ impl<'a> From<JsonArgs<'a>> for GenericArguments<'a> {
         Self::Json(s)
     }
 }
+
 #[derive(Debug)]
 pub enum EitherString<'a> {
     Cow(Cow<'a, str>),

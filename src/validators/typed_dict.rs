@@ -383,7 +383,7 @@ impl TypedDictValidator {
     }
 }
 
-pub trait IterAttributes<'a> {
+trait IterAttributes<'a> {
     fn iter_attrs(&self) -> AttributesIterator<'a>;
 }
 
@@ -397,7 +397,7 @@ impl<'a> IterAttributes<'a> for &'a PyAny {
     }
 }
 
-pub struct AttributesIterator<'a> {
+struct AttributesIterator<'a> {
     object: &'a PyAny,
     attributes: &'a PyList,
     index: usize,
