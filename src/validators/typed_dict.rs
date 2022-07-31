@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyList, PySet, PyString};
 use pyo3::{intern, PyTypeInfo};
@@ -30,6 +32,18 @@ struct TypedDictField {
     default: Option<PyObject>,
     default_factory: Option<PyObject>,
     validator: CombinedValidator,
+}
+
+impl TypedDictField {
+    fn default_value(&self, py: Python) -> PyResult<Option<Cow<PyObject>>> {
+        if let Some(ref default) = self.default {
+            Ok(Some(Cow::Borrowed(default)))
+        } else if let Some(ref default_factory) = self.default_factory {
+            Ok(Some(Cow::Owned(default_factory.call0(py)?)))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -260,19 +274,15 @@ impl Validator for TypedDictValidator {
                                 }
                                 OnError::Omit => continue,
                                 OnError::FallbackOnDefault => {
-                                    if let Some(ref default) = field.default {
-                                        output_dict.set_item(&field.name_pystring, default)?;
-                                    } else if let Some(ref default_factory) = field.default_factory {
-                                        output_dict.set_item(&field.name_pystring, default_factory.call0(py)?)?;
+                                    if let Some(default_value) = field.default_value(py)? {
+                                        output_dict.set_item(&field.name_pystring, default_value.as_ref())?;
                                     }
                                 }
                             },
                             Err(err) => return Err(err),
                         }
-                    } else if let Some(ref default) = field.default {
-                        output_dict.set_item(&field.name_pystring, default)?;
-                    } else if let Some(ref default_factory) = field.default_factory {
-                        output_dict.set_item(&field.name_pystring, default_factory.call0(py)?)?;
+                    } else if let Some(default_value) = field.default_value(py)? {
+                        output_dict.set_item(&field.name_pystring, default_value.as_ref())?
                     } else if !field.required {
                         continue;
                     } else {
