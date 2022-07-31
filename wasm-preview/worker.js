@@ -76,7 +76,8 @@ self.onmessage = async () => {
   self.postMessage('Downloading repo archive to get tests...\n')
   const [python_code, tests_zip,] = await Promise.all([
     get(`./run_tests.py?v=${Date.now()}`, 'text'),
-    get('https://githubproxy.samuelcolvin.workers.dev/samuelcolvin/pydantic-core/archive/refs/heads/main.zip', 'blob'),
+    // 95c4f56 commit matches the pydantic-core wheel being used, so tests should pass
+    get('https://githubproxy.samuelcolvin.workers.dev/samuelcolvin/pydantic-core/archive/refs/95c4f56/main.zip', 'blob'),
     importScripts('https://cdn.jsdelivr.net/pyodide/v0.21.0a3/full/pyodide.js')
   ])
 
