@@ -71,8 +71,8 @@ impl Validator for LiteralSingleStringValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_str = input.strict_str()?;
-        if either_str.as_cow().as_ref() == self.expected.as_str() {
+        let py_str = input.strict_str(py)?;
+        if py_str.to_string_lossy().as_ref() == self.expected.as_str() {
             Ok(input.to_object(py))
         } else {
             Err(ValError::new(
@@ -165,8 +165,8 @@ impl Validator for LiteralMultipleStringsValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_str = input.strict_str()?;
-        if self.expected.contains(either_str.as_cow().as_ref()) {
+        let either_str = input.strict_str(py)?;
+        if self.expected.contains(either_str.to_string_lossy().as_ref()) {
             Ok(input.to_object(py))
         } else {
             Err(ValError::new(
@@ -290,8 +290,8 @@ impl Validator for LiteralGeneralValidator {
             }
         }
         if !self.expected_str.is_empty() {
-            if let Ok(either_str) = input.strict_str() {
-                if self.expected_str.contains(either_str.as_cow().as_ref()) {
+            if let Ok(py_str) = input.strict_str(py) {
+                if self.expected_str.contains(py_str.to_string_lossy().as_ref()) {
                     return Ok(input.to_object(py));
                 }
             }

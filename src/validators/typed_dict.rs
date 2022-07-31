@@ -238,12 +238,12 @@ impl Validator for TypedDictValidator {
                         None => unreachable!(),
                     };
                     for (raw_key, value) in $dict.$iter_method() {
-                        let either_str = match raw_key.strict_str() {
+                        let py_key = match raw_key.strict_str(py) {
                             Ok(k) => k,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
                                     errors.push(
-                                        err.with_outer_location(raw_key.as_loc_item())
+                                        err.with_outer_location(raw_key.as_loc_item(py))
                                             .with_kind(ErrorKind::InvalidKey),
                                     );
                                 }
@@ -251,7 +251,7 @@ impl Validator for TypedDictValidator {
                             }
                             Err(err) => return Err(err),
                         };
-                        if used_keys.contains(either_str.as_cow().as_ref()) {
+                        if used_keys.contains(py_key.to_string_lossy().as_ref()) {
                             continue;
                         }
 
@@ -259,12 +259,11 @@ impl Validator for TypedDictValidator {
                             errors.push(ValLineError::new_with_loc(
                                 ErrorKind::ExtraForbidden,
                                 value,
-                                raw_key.as_loc_item(),
+                                raw_key.as_loc_item(py),
                             ));
                             continue;
                         }
 
-                        let py_key = either_str.as_py_string(py);
                         if let Some(ref mut fs) = fields_set_vec {
                             fs.push(py_key.into_py(py));
                         }
@@ -279,7 +278,7 @@ impl Validator for TypedDictValidator {
                                 }
                                 Err(ValError::LineErrors(line_errors)) => {
                                     for err in line_errors {
-                                        errors.push(err.with_outer_location(raw_key.as_loc_item()));
+                                        errors.push(err.with_outer_location(raw_key.as_loc_item(py)));
                                     }
                                 }
                                 Err(err) => return Err(err),

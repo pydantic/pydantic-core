@@ -61,7 +61,7 @@ impl Validator for StrValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.validate_str(extra.strict.unwrap_or(self.strict))?.into_py(py))
+        Ok(input.validate_str(py, extra.strict.unwrap_or(self.strict))?.into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -89,8 +89,8 @@ impl Validator for StrConstrainedValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_str = input.validate_str(extra.strict.unwrap_or(self.strict))?;
-        let cow = either_str.as_cow();
+        let either_str = input.validate_str(py, extra.strict.unwrap_or(self.strict))?;
+        let cow = either_str.to_string_lossy();
         let mut str = cow.as_ref();
         if let Some(min_length) = self.min_length {
             if str.len() < min_length {
@@ -126,7 +126,7 @@ impl Validator for StrConstrainedValidator {
             PyString::new(py, str)
         } else {
             // we haven't modified the string, return the original as it might be a PyString
-            either_str.as_py_string(py)
+            either_str
         };
         Ok(py_string.into_py(py))
     }

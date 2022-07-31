@@ -63,7 +63,7 @@ impl Validator for TimeValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let time = input.validate_time(extra.strict.unwrap_or(self.strict))?;
+        let time = input.validate_time(py, extra.strict.unwrap_or(self.strict))?;
         if let Some(constraints) = &self.constraints {
             let raw_time = time.as_raw()?;
 

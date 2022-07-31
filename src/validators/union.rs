@@ -130,8 +130,8 @@ impl Discriminator {
     fn new(py: Python, raw: &PyAny) -> PyResult<Self> {
         if raw.is_callable() {
             return Ok(Self::Function(raw.to_object(py)));
-        } else if let Ok(str) = raw.strict_str() {
-            if str.as_cow().as_ref() == "self-schema-discriminator" {
+        } else if let Ok(str) = raw.strict_str(py) {
+            if str.to_string_lossy().as_ref() == "self-schema-discriminator" {
                 return Ok(Self::SelfSchema);
             }
         }
@@ -227,9 +227,9 @@ impl Validator for TaggedUnionValidator {
                         match lookup_key.$get_method($dict)? {
                             Some((_, value)) => {
                                 if self.strict {
-                                    value.strict_str()
+                                    value.strict_str(py)
                                 } else {
-                                    value.lax_str()
+                                    value.lax_str(py)
                                 }
                             }
                             None => Err(self.tag_not_found(input)),
@@ -242,7 +242,7 @@ impl Validator for TaggedUnionValidator {
                     GenericMapping::PyGetAttr(obj) => find_validator!(obj, py_get_attr),
                     GenericMapping::JsonObject(mapping) => find_validator!(mapping, json_get),
                 }?;
-                self.find_call_validator(py, tag.as_cow(), input, extra, slots, recursion_guard)
+                self.find_call_validator(py, tag.to_string_lossy(), input, extra, slots, recursion_guard)
             }
             Discriminator::Function(ref func) => {
                 let tag = func.call1(py, (input.to_object(py),))?;
@@ -281,38 +281,38 @@ impl TaggedUnionValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
     ) -> ValResult<'data, Cow<'data, str>> {
-        if input.strict_str().is_ok() {
+        if input.strict_str(py).is_ok() {
             // input is a string, must be a bare type
             Ok(Cow::Borrowed("plain-string"))
         } else {
             let dict = input.strict_dict()?;
             let either_tag = match dict {
                 GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "type")) {
-                    Some(t) => t.strict_str()?,
+                    Some(t) => t.strict_str(py)?,
                     None => return Err(self.tag_not_found(input)),
                 },
                 _ => unreachable!(),
             };
-            let tag_cow = either_tag.as_cow();
+            let tag_cow = either_tag.to_string_lossy();
             let tag = tag_cow.as_ref();
             // custom logic to distinguish between different function and tuple schemas
             if tag == "function" || tag == "tuple" {
                 let mode = match dict {
                     GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "mode")) {
-                        Some(m) => Some(m.strict_str()?),
+                        Some(m) => Some(m.strict_str(py)?),
                         None => None,
                     },
                     _ => unreachable!(),
                 };
                 if tag == "function" {
                     let mode = mode.ok_or_else(|| self.tag_not_found(input))?;
-                    if mode.as_cow().as_ref() == "plain" {
+                    if mode.to_string_lossy().as_ref() == "plain" {
                         return Ok(Cow::Borrowed("function-plain"));
                     }
                 } else {
                     // tag == "tuple"
                     if let Some(mode) = mode {
-                        if mode.as_cow().as_ref() == "positional" {
+                        if mode.to_string_lossy().as_ref() == "positional" {
                             return Ok(Cow::Borrowed("tuple-positional"));
                         }
                     }

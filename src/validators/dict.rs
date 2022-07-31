@@ -135,7 +135,7 @@ macro_rules! build_validate {
                             // these are added in reverse order so [key] is shunted along by the second call
                             errors.push(
                                 err.with_outer_location("[key]".into())
-                                    .with_outer_location(key.as_loc_item()),
+                                    .with_outer_location(key.as_loc_item(py)),
                             );
                         }
                         None
@@ -146,7 +146,7 @@ macro_rules! build_validate {
                     Ok(value) => Some(value),
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {
-                            errors.push(err.with_outer_location(key.as_loc_item()));
+                            errors.push(err.with_outer_location(key.as_loc_item(py)));
                         }
                         None
                     }

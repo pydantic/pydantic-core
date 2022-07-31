@@ -7,10 +7,12 @@ use pyo3::intern;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyByteArray, PyBytes, PyDict, PyString};
+use serde::de::DeserializeSeed;
+use serde_json::Deserializer;
 
 use crate::build_tools::{py_error, SchemaDict, SchemaError};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult, ValidationError};
-use crate::input::{Input, JsonInput};
+use crate::input::{Input, JsonDeserializer, JsonInput};
 use crate::recursion_guard::RecursionGuard;
 
 mod any;
@@ -228,13 +230,17 @@ impl SchemaValidator {
 }
 
 fn parse_json(input: &PyAny) -> PyResult<serde_json::Result<JsonInput>> {
+    let de = JsonDeserializer::new(input.py());
     if let Ok(py_bytes) = input.cast_as::<PyBytes>() {
-        Ok(serde_json::from_slice(py_bytes.as_bytes()))
+        let mut deserializer = Deserializer::from_slice(py_bytes.as_bytes());
+        Ok(de.deserialize(&mut deserializer))
     } else if let Ok(py_str) = input.cast_as::<PyString>() {
         let str = py_str.to_str()?;
-        Ok(serde_json::from_str(str))
+        let mut deserializer = Deserializer::from_str(str);
+        Ok(de.deserialize(&mut deserializer))
     } else if let Ok(py_byte_array) = input.cast_as::<PyByteArray>() {
-        Ok(serde_json::from_slice(unsafe { py_byte_array.as_bytes() }))
+        let mut deserializer = Deserializer::from_slice(unsafe { py_byte_array.as_bytes() });
+        Ok(de.deserialize(&mut deserializer))
     } else {
         let input_type = input.get_type().name().unwrap_or("unknown");
         py_error!(PyTypeError; "JSON input must be str, bytes or bytearray, not {}", input_type)

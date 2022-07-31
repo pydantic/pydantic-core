@@ -268,12 +268,12 @@ impl Validator for ArgumentsValidator {
                 // if there are kwargs check any that haven't been processed yet
                 if let Some(kwargs) = $args.kwargs {
                     for (raw_key, value) in kwargs.iter() {
-                        let either_str = match raw_key.strict_str() {
+                        let key = match raw_key.strict_str(py) {
                             Ok(k) => k,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
                                     errors.push(
-                                        err.with_outer_location(raw_key.as_loc_item())
+                                        err.with_outer_location(raw_key.as_loc_item(py))
                                             .with_kind(ErrorKind::InvalidKey),
                                     );
                                 }
@@ -281,13 +281,13 @@ impl Validator for ArgumentsValidator {
                             }
                             Err(err) => return Err(err),
                         };
-                        if !used_kwargs.contains(either_str.as_cow().as_ref()) {
+                        if !used_kwargs.contains(key.to_string_lossy().as_ref()) {
                             match self.var_kwargs_validator {
                                 Some(ref validator) => match validator.validate(py, value, extra, slots, recursion_guard) {
-                                    Ok(value) => output_kwargs.set_item(either_str.as_py_string(py), value)?,
+                                    Ok(value) => output_kwargs.set_item(key, value)?,
                                     Err(ValError::LineErrors(line_errors)) => {
                                         for err in line_errors {
-                                            errors.push(err.with_outer_location(raw_key.as_loc_item()));
+                                            errors.push(err.with_outer_location(raw_key.as_loc_item(py)));
                                         }
                                     }
                                     Err(err) => return Err(err),
@@ -296,7 +296,7 @@ impl Validator for ArgumentsValidator {
                                     errors.push(ValLineError::new_with_loc(
                                         ErrorKind::UnexpectedKeywordArgument,
                                         value,
-                                        raw_key.as_loc_item(),
+                                        raw_key.as_loc_item(py),
                                     ));
                                 }
                             }

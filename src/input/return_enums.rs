@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTuple};
+use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyList, PySet, PyTuple};
 
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
 use crate::recursion_guard::RecursionGuard;
@@ -202,52 +202,6 @@ impl<'a> From<PyArgs<'a>> for GenericArguments<'a> {
 impl<'a> From<JsonArgs<'a>> for GenericArguments<'a> {
     fn from(s: JsonArgs<'a>) -> GenericArguments<'a> {
         Self::Json(s)
-    }
-}
-
-#[cfg_attr(debug_assertions, derive(Debug))]
-pub enum EitherString<'a> {
-    Cow(Cow<'a, str>),
-    Py(&'a PyString),
-}
-
-impl<'a> EitherString<'a> {
-    pub fn as_cow(&self) -> Cow<str> {
-        match self {
-            Self::Cow(data) => data.clone(),
-            Self::Py(py_str) => py_str.to_string_lossy(),
-        }
-    }
-
-    pub fn as_py_string(&'a self, py: Python<'a>) -> &'a PyString {
-        match self {
-            Self::Cow(cow) => PyString::new(py, cow),
-            Self::Py(py_string) => py_string,
-        }
-    }
-}
-
-impl<'a> From<String> for EitherString<'a> {
-    fn from(data: String) -> Self {
-        Self::Cow(Cow::Owned(data))
-    }
-}
-
-impl<'a> From<&'a str> for EitherString<'a> {
-    fn from(data: &'a str) -> Self {
-        Self::Cow(Cow::Borrowed(data))
-    }
-}
-
-impl<'a> From<&'a PyString> for EitherString<'a> {
-    fn from(date: &'a PyString) -> Self {
-        Self::Py(date)
-    }
-}
-
-impl<'a> IntoPy<PyObject> for EitherString<'a> {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        self.as_py_string(py).into_py(py)
     }
 }
 

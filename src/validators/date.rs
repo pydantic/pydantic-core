@@ -63,7 +63,7 @@ impl Validator for DateValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let date = match input.validate_date(extra.strict.unwrap_or(self.strict)) {
+        let date = match input.validate_date(py, extra.strict.unwrap_or(self.strict)) {
             Ok(date) => date,
             // if the date error was an internal error, return that immediately
             Err(ValError::InternalErr(internal_err)) => return Err(ValError::InternalErr(internal_err)),
@@ -71,7 +71,7 @@ impl Validator for DateValidator {
                 // if we're in strict mode, we doing try coercing from a date
                 true => return Err(date_err),
                 // otherwise, try creating a date from a datetime input
-                false => date_from_datetime(input, date_err),
+                false => date_from_datetime(py, input, date_err),
             }?,
         };
         if let Some(constraints) = &self.constraints {
@@ -108,10 +108,11 @@ impl Validator for DateValidator {
 /// In lax mode, if the input is not a date, we try parsing the input as a datetime, then check it is an
 /// "exact date", e.g. has a zero time component.
 fn date_from_datetime<'data>(
+    py: Python,
     input: &'data impl Input<'data>,
     date_err: ValError<'data>,
 ) -> ValResult<'data, EitherDate<'data>> {
-    let either_dt = match input.validate_datetime(false) {
+    let either_dt = match input.validate_datetime(py, false) {
         Ok(dt) => dt,
         Err(dt_err) => {
             return match dt_err {

@@ -45,7 +45,7 @@ impl Validator for BytesValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_bytes = input.validate_bytes(extra.strict.unwrap_or(self.strict))?;
+        let either_bytes = input.validate_bytes(py, extra.strict.unwrap_or(self.strict))?;
         Ok(either_bytes.into_py(py))
     }
 
@@ -70,7 +70,7 @@ impl Validator for BytesConstrainedValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_bytes = input.validate_bytes(extra.strict.unwrap_or(self.strict))?;
+        let either_bytes = input.validate_bytes(py, extra.strict.unwrap_or(self.strict))?;
         let len = either_bytes.len()?;
 
         if let Some(min_length) = self.min_length {

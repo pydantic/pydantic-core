@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::str::from_utf8;
 
 use pyo3::exceptions::PyAttributeError;
@@ -17,12 +18,11 @@ use super::datetime::{
 };
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 use super::{
-    repr_string, EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericListLike, GenericMapping, Input,
-    PyArgs,
+    repr_string, EitherBytes, EitherTimedelta, GenericArguments, GenericListLike, GenericMapping, Input, PyArgs,
 };
 
 impl<'a> Input<'a> for PyAny {
-    fn as_loc_item(&self) -> LocItem {
+    fn as_loc_item(&self, _py: Python) -> LocItem {
         if let Ok(key_str) = self.extract::<String>() {
             key_str.into()
         } else if let Ok(key_int) = self.extract::<usize>() {
@@ -89,45 +89,45 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
+    fn strict_str(&'a self, _py: Python<'a>) -> ValResult<&'a PyString> {
         if let Ok(py_str) = self.cast_as::<PyString>() {
-            Ok(py_str.into())
+            Ok(py_str)
         } else {
             Err(ValError::new(ErrorKind::StrType, self))
         }
     }
 
-    fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
+    fn lax_str(&'a self, py: Python<'a>) -> ValResult<&'a PyString> {
         if let Ok(py_str) = self.cast_as::<PyString>() {
-            Ok(py_str.into())
+            Ok(py_str)
         } else if let Ok(bytes) = self.cast_as::<PyBytes>() {
             let str = match from_utf8(bytes.as_bytes()) {
                 Ok(s) => s,
                 Err(_) => return Err(ValError::new(ErrorKind::StrUnicode, self)),
             };
-            Ok(str.into())
+            Ok(PyString::new(py, str))
         } else if let Ok(py_byte_array) = self.cast_as::<PyByteArray>() {
             let str = match from_utf8(unsafe { py_byte_array.as_bytes() }) {
                 Ok(s) => s,
                 Err(_) => return Err(ValError::new(ErrorKind::StrUnicode, self)),
             };
-            Ok(str.into())
+            Ok(PyString::new(py, str))
         } else if self.cast_as::<PyBool>().is_ok() {
             // do this before int and float parsing as `False` is cast to `0` and we don't want False to
             // be returned as a string
             Err(ValError::new(ErrorKind::StrType, self))
         } else if let Ok(int) = self.cast_as::<PyInt>() {
             let int = i64::extract(int)?;
-            Ok(int.to_string().into())
+            Ok(PyString::new(py, &int.to_string()))
         } else if let Ok(float) = f64::extract(self) {
             // don't cast_as here so Decimals are covered - internally f64:extract uses PyFloat_AsDouble
-            Ok(float.to_string().into())
+            Ok(PyString::new(py, &float.to_string()))
         } else {
             Err(ValError::new(ErrorKind::StrType, self))
         }
     }
 
-    fn strict_bytes(&'a self) -> ValResult<EitherBytes<'a>> {
+    fn strict_bytes(&'a self, _py: Python) -> ValResult<EitherBytes<'a>> {
         if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
             Ok(py_bytes.into())
         } else {
@@ -135,7 +135,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_bytes(&'a self) -> ValResult<EitherBytes<'a>> {
+    fn lax_bytes(&'a self, _py: Python) -> ValResult<EitherBytes<'a>> {
         if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
             Ok(py_bytes.into())
         } else if let Ok(py_str) = self.cast_as::<PyString>() {
@@ -156,11 +156,11 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_bool(&self) -> ValResult<bool> {
+    fn lax_bool(&self, _py: Python) -> ValResult<bool> {
         if let Ok(bool) = self.extract::<bool>() {
             Ok(bool)
-        } else if let Some(either_str) = maybe_as_string(self, ErrorKind::BoolParsing)? {
-            str_as_bool(self, &either_str.as_cow())
+        } else if let Some(str) = maybe_as_string(self, ErrorKind::BoolParsing)? {
+            str_as_bool(self, &str)
         } else if let Ok(int) = self.extract::<i64>() {
             int_as_bool(self, int)
         } else if let Ok(float) = self.extract::<f64>() {
@@ -184,12 +184,12 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_int(&self) -> ValResult<i64> {
+    fn lax_int(&self, py: Python) -> ValResult<i64> {
         if let Ok(int) = self.extract::<i64>() {
             Ok(int)
-        } else if let Some(either_str) = maybe_as_string(self, ErrorKind::IntParsing)? {
-            str_as_int(self, &either_str.as_cow())
-        } else if let Ok(float) = self.lax_float() {
+        } else if let Some(str) = maybe_as_string(self, ErrorKind::IntParsing)? {
+            str_as_int(self, &str)
+        } else if let Ok(float) = self.lax_float(py) {
             float_as_int(self, float)
         } else {
             Err(ValError::new(ErrorKind::IntType, self))
@@ -206,11 +206,11 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_float(&self) -> ValResult<f64> {
+    fn lax_float(&self, _py: Python) -> ValResult<f64> {
         if let Ok(float) = self.extract::<f64>() {
             Ok(float)
-        } else if let Some(either_str) = maybe_as_string(self, ErrorKind::FloatParsing)? {
-            match either_str.as_cow().as_ref().parse() {
+        } else if let Some(str) = maybe_as_string(self, ErrorKind::FloatParsing)? {
+            match str.as_ref().parse() {
                 Ok(i) => Ok(i),
                 Err(_) => Err(ValError::new(ErrorKind::FloatParsing, self)),
             }
@@ -350,7 +350,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_date(&self) -> ValResult<EitherDate> {
+    fn strict_date(&self, _py: Python) -> ValResult<EitherDate> {
         if self.cast_as::<PyDateTime>().is_ok() {
             // have to check if it's a datetime first, otherwise the line below converts to a date
             Err(ValError::new(ErrorKind::DateType, self))
@@ -361,7 +361,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_date(&self) -> ValResult<EitherDate> {
+    fn lax_date(&self, _py: Python) -> ValResult<EitherDate> {
         if self.cast_as::<PyDateTime>().is_ok() {
             // have to check if it's a datetime first, otherwise the line below converts to a date
             // even if we later try coercion from a datetime, we don't want to return a datetime now
@@ -377,7 +377,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_time(&self) -> ValResult<EitherTime> {
+    fn strict_time(&self, _py: Python) -> ValResult<EitherTime> {
         if let Ok(time) = self.cast_as::<PyTime>() {
             Ok(time.into())
         } else {
@@ -385,7 +385,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_time(&self) -> ValResult<EitherTime> {
+    fn lax_time(&self, _py: Python) -> ValResult<EitherTime> {
         if let Ok(time) = self.cast_as::<PyTime>() {
             Ok(time.into())
         } else if let Ok(str) = self.extract::<String>() {
@@ -403,7 +403,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_datetime(&self) -> ValResult<EitherDateTime> {
+    fn strict_datetime(&self, _py: Python) -> ValResult<EitherDateTime> {
         if let Ok(dt) = self.cast_as::<PyDateTime>() {
             Ok(dt.into())
         } else {
@@ -411,7 +411,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_datetime(&self) -> ValResult<EitherDateTime> {
+    fn lax_datetime(&self, _py: Python) -> ValResult<EitherDateTime> {
         if let Ok(dt) = self.cast_as::<PyDateTime>() {
             Ok(dt.into())
         } else if let Ok(str) = self.extract::<String>() {
@@ -431,7 +431,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_timedelta(&self) -> ValResult<EitherTimedelta> {
+    fn strict_timedelta(&self, _py: Python) -> ValResult<EitherTimedelta> {
         if let Ok(dt) = self.cast_as::<PyDelta>() {
             Ok(dt.into())
         } else {
@@ -439,7 +439,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_timedelta(&self) -> ValResult<EitherTimedelta> {
+    fn lax_timedelta(&self, _py: Python) -> ValResult<EitherTimedelta> {
         if let Ok(dt) = self.cast_as::<PyDelta>() {
             Ok(dt.into())
         } else if let Ok(py_str) = self.cast_as::<PyString>() {
@@ -515,12 +515,12 @@ fn from_attributes_applicable(obj: &PyAny) -> bool {
 }
 
 /// Utility for extracting a string from a PyAny, if possible.
-fn maybe_as_string(v: &PyAny, unicode_error: ErrorKind) -> ValResult<Option<EitherString>> {
+fn maybe_as_string(v: &PyAny, unicode_error: ErrorKind) -> ValResult<Option<Cow<str>>> {
     if let Ok(py_string) = v.cast_as::<PyString>() {
-        Ok(Some(py_string.into()))
+        Ok(Some(py_string.to_string_lossy()))
     } else if let Ok(bytes) = v.cast_as::<PyBytes>() {
         match from_utf8(bytes.as_bytes()) {
-            Ok(s) => Ok(Some(s.into())),
+            Ok(s) => Ok(Some(Cow::Owned(s.to_string()))),
             Err(_) => Err(ValError::new(unicode_error, v)),
         }
     } else {

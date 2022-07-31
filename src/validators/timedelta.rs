@@ -62,7 +62,7 @@ impl Validator for TimeDeltaValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let timedelta = input.validate_timedelta(extra.strict.unwrap_or(self.strict))?;
+        let timedelta = input.validate_timedelta(py, extra.strict.unwrap_or(self.strict))?;
         if let Some(constraints) = &self.constraints {
             let raw_timedelta = timedelta.as_raw();
 

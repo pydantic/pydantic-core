@@ -2,8 +2,8 @@ use std::fmt;
 
 use indexmap::IndexMap;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use serde::de::{Deserialize, DeserializeSeed, Error as SerdeError, MapAccess, SeqAccess, Visitor};
+use pyo3::types::{PyDict, PyString};
+use serde::de::{DeserializeSeed, Error as SerdeError, MapAccess, SeqAccess, Visitor};
 
 /// similar to serde `Value` but with int and float split
 #[derive(Clone, Debug)]
@@ -12,7 +12,7 @@ pub enum JsonInput {
     Bool(bool),
     Int(i64),
     Float(f64),
-    String(String),
+    String(Py<PyString>),
     Array(JsonArray),
     Object(JsonObject),
 }
@@ -39,99 +39,92 @@ impl ToPyObject for JsonInput {
     }
 }
 
-impl<'de> Deserialize<'de> for JsonInput {
-    fn deserialize<D>(deserializer: D) -> Result<JsonInput, D::Error>
+pub struct JsonDeserializer<'py> {
+    py: Python<'py>,
+}
+
+impl<'a> JsonDeserializer<'a> {
+    pub fn new(py: Python<'a>) -> Self {
+        Self { py }
+    }
+}
+
+impl<'de, 'py> DeserializeSeed<'de> for &JsonDeserializer<'py> {
+    type Value = JsonInput;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<JsonInput, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        struct JsonVisitor;
+        deserializer.deserialize_any(self)
+    }
+}
 
-        impl<'de> Visitor<'de> for JsonVisitor {
-            type Value = JsonInput;
+impl<'de, 'py> Visitor<'de> for &JsonDeserializer<'py> {
+    type Value = JsonInput;
 
-            #[cfg_attr(has_no_coverage, no_coverage)]
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("any valid JSON value")
-            }
+    #[cfg_attr(has_no_coverage, no_coverage)]
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("any valid JSON value")
+    }
 
-            fn visit_bool<E>(self, value: bool) -> Result<JsonInput, E> {
-                Ok(JsonInput::Bool(value))
-            }
+    fn visit_bool<E>(self, value: bool) -> Result<JsonInput, E> {
+        Ok(JsonInput::Bool(value))
+    }
 
-            fn visit_i64<E>(self, value: i64) -> Result<JsonInput, E> {
-                Ok(JsonInput::Int(value))
-            }
+    fn visit_i64<E>(self, value: i64) -> Result<JsonInput, E> {
+        Ok(JsonInput::Int(value))
+    }
 
-            fn visit_u64<E>(self, value: u64) -> Result<JsonInput, E> {
-                Ok(JsonInput::Int(value as i64))
-            }
+    fn visit_u64<E>(self, value: u64) -> Result<JsonInput, E> {
+        Ok(JsonInput::Int(value as i64))
+    }
 
-            fn visit_f64<E>(self, value: f64) -> Result<JsonInput, E> {
-                Ok(JsonInput::Float(value))
-            }
+    fn visit_f64<E>(self, value: f64) -> Result<JsonInput, E> {
+        Ok(JsonInput::Float(value))
+    }
 
-            fn visit_str<E>(self, value: &str) -> Result<JsonInput, E>
-            where
-                E: SerdeError,
-            {
-                Ok(JsonInput::String(value.to_string()))
-            }
+    fn visit_str<E>(self, value: &str) -> Result<JsonInput, E>
+    where
+        E: SerdeError,
+    {
+        let py_string = PyString::new(self.py, value);
+        Ok(JsonInput::String(py_string.into_py(self.py)))
+    }
 
-            #[cfg_attr(has_no_coverage, no_coverage)]
-            fn visit_string<E>(self, _: String) -> Result<JsonInput, E> {
-                unreachable!()
-            }
+    fn visit_unit<E>(self) -> Result<JsonInput, E> {
+        Ok(JsonInput::Null)
+    }
 
-            #[cfg_attr(has_no_coverage, no_coverage)]
-            fn visit_none<E>(self) -> Result<JsonInput, E> {
-                unreachable!()
-            }
+    fn visit_seq<V>(self, mut visitor: V) -> Result<JsonInput, V::Error>
+    where
+        V: SeqAccess<'de>,
+    {
+        let mut vec = Vec::new();
 
-            #[cfg_attr(has_no_coverage, no_coverage)]
-            fn visit_some<D>(self, _: D) -> Result<JsonInput, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                unreachable!()
-            }
-
-            fn visit_unit<E>(self) -> Result<JsonInput, E> {
-                Ok(JsonInput::Null)
-            }
-
-            fn visit_seq<V>(self, mut visitor: V) -> Result<JsonInput, V::Error>
-            where
-                V: SeqAccess<'de>,
-            {
-                let mut vec = Vec::new();
-
-                while let Some(elem) = visitor.next_element()? {
-                    vec.push(elem);
-                }
-
-                Ok(JsonInput::Array(vec))
-            }
-
-            fn visit_map<V>(self, mut visitor: V) -> Result<JsonInput, V::Error>
-            where
-                V: MapAccess<'de>,
-            {
-                match visitor.next_key_seed(KeyDeserializer)? {
-                    Some(first_key) => {
-                        let mut values = IndexMap::new();
-
-                        values.insert(first_key, visitor.next_value()?);
-                        while let Some((key, value)) = visitor.next_entry()? {
-                            values.insert(key, value);
-                        }
-                        Ok(JsonInput::Object(values))
-                    }
-                    None => Ok(JsonInput::Object(IndexMap::new())),
-                }
-            }
+        while let Some(elem) = visitor.next_element_seed(self)? {
+            vec.push(elem);
         }
 
-        deserializer.deserialize_any(JsonVisitor)
+        Ok(JsonInput::Array(vec))
+    }
+
+    fn visit_map<V>(self, mut visitor: V) -> Result<JsonInput, V::Error>
+    where
+        V: MapAccess<'de>,
+    {
+        match visitor.next_key_seed(KeyDeserializer)? {
+            Some(first_key) => {
+                let mut values = IndexMap::new();
+
+                values.insert(first_key, visitor.next_value_seed(self)?);
+                while let Some((key, value)) = visitor.next_entry_seed(KeyDeserializer, self)? {
+                    values.insert(key, value);
+                }
+                Ok(JsonInput::Object(values))
+            }
+            None => Ok(JsonInput::Object(IndexMap::new())),
+        }
     }
 }
 
@@ -161,13 +154,5 @@ impl<'de> Visitor<'de> for KeyDeserializer {
         E: serde::de::Error,
     {
         Ok(s.to_string())
-    }
-
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn visit_string<E>(self, _: String) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        unreachable!()
     }
 }
