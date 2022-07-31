@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<title>pydantic-core unit tests</title>
+<style>
+  html, body {
+    height: 100%;
+    background: rgb(30, 31, 46);
+    color: white;
+  }
+  main {
+    max-width: 800px;
+    height: calc(100% - 80px);
+    overflow-y: scroll;
+    overflow-x: hidden;
+    margin: 20px auto;
+    padding: 10px 15px;
+    border: 1px solid #aaa;
+    border-radius: 5px;
+  }
+  pre {
+    margin: 0;
+    padding: 0;
+    white-space: pre-wrap;
+  }
+</style>
+<main>
+<pre id="output">loading...</pre>
+</main>
+
+<script src="https://smokeshow.helpmanual.io/2d1p666q3x5f0j26223o/ansi-to-html.browser.js"></script>
+<script>
+  const output_el = document.getElementById('output')
+  const decoder = new TextDecoder()
+  const Convert = require('ansi-to-html')
+  const ansi_converter = new Convert()
+  let terminal_output = ''
+
+  output_el.innerText = 'Starting worker...'
+  const worker = new Worker('./worker.js')
+  worker.onmessage = ({data}) => {
+    for (let chunk of data) {
+      let arr = new Uint8Array(chunk)
+      let extra = decoder.decode(arr)
+      terminal_output += extra
+    }
+    output_el.innerHTML = ansi_converter.toHtml(terminal_output)
+    // scrolls to the bottom of the div
+    output_el.scrollIntoView(false)
+  }
+  worker.postMessage({})
+</script>
