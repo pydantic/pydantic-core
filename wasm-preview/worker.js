@@ -75,7 +75,7 @@ async function get(url, mode) {
 self.onmessage = async () => {
   self.postMessage('Downloading repo archive to get tests...\n')
   const [python_code, tests_zip,] = await Promise.all([
-    get('./run_tests.py', 'text'),
+    get(`./run_tests.py?v=${Date.now()}`, 'text'),
     get('https://githubproxy.samuelcolvin.workers.dev/samuelcolvin/pydantic-core/archive/refs/heads/main.zip', 'blob'),
     importScripts('https://cdn.jsdelivr.net/pyodide/v0.21.0a3/full/pyodide.js')
   ])

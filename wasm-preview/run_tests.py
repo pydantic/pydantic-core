@@ -2,6 +2,7 @@ import base64
 import re
 import sys
 import importlib
+import traceback
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
@@ -20,7 +21,7 @@ pydantic_core_wheel = (
 
 
 async def main(tests_zip: str):
-    print('Extracting test files...')
+    print(f'Extracting test files (size: {len(tests_zip):,})...')
     zip_file = ZipFile(BytesIO(base64.b64decode(tests_zip)))
     count = 0
     for name in zip_file.namelist():
@@ -46,4 +47,5 @@ async def main(tests_zip: str):
 try:
     await main(tests_zip)
 except Exception as e:
-    print(f'ERROR: {e}')
+    traceback.print_exc()
+    raise

@@ -54,7 +54,7 @@
   let terminal_output = ''
 
   output_el.innerText = 'Starting worker...'
-  const worker = new Worker('./worker.js')
+  const worker = new Worker(`./worker.js?v=${Date.now()}`)
   worker.onmessage = ({data}) => {
     if (typeof data == 'string') {
       terminal_output += data
