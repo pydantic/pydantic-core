@@ -96,7 +96,7 @@ impl BuildValidator for TypedDictValidator {
             let field_name: &str = key.extract()?;
             let schema: &PyAny = field_info
                 .get_as_req(intern!(py, "schema"))
-                .map_err(|err| SchemaError::new_err(format!("Field \"{}\":\n  {}", field_name, err)))?;
+                .map_err(|err| SchemaError::new_err(format!("Field '{}':\n  {}", field_name, err)))?;
 
             let (default, default_factory) = match (
                 field_info.get_as(intern!(py, "default"))?,
@@ -119,7 +119,7 @@ impl BuildValidator for TypedDictValidator {
             let required = match field_info.get_as::<bool>(intern!(py, "required"))? {
                 Some(required) => {
                     if required && (default.is_some() || default_factory.is_some()) {
-                        return py_error!("Field \"{}\": a required field cannot have a default value", field_name);
+                        return py_error!("Field '{}': a required field cannot have a default value", field_name);
                     }
                     required
                 }
@@ -132,7 +132,7 @@ impl BuildValidator for TypedDictValidator {
                     "omit" => {
                         if required {
                             return py_error!(
-                                "Field \"{}\": \"on_error = {}\" cannot be set for required fields",
+                                "Field '{}': 'on_error = {}' cannot be set for required fields",
                                 field_name,
                                 on_error.as_str()
                             );
@@ -143,7 +143,7 @@ impl BuildValidator for TypedDictValidator {
                     "fallback_on_default" => {
                         if default.is_none() && default_factory.is_none() {
                             return py_error!(
-                                "Field \"{}\": \"on_error = {}\" requires a `default` or `default_factory`",
+                                "Field '{}': 'on_error = {}' requires a `default` or `default_factory`",
                                 field_name,
                                 on_error.as_str()
                             );

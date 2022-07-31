@@ -449,7 +449,7 @@ def test_all_optional_fields_with_required_fields():
 
 def test_field_required_and_default():
     """A field cannot be required and have a default value"""
-    with pytest.raises(SchemaError, match='Field "x": a required field cannot have a default value'):
+    with pytest.raises(SchemaError, match="Field 'x': a required field cannot have a default value"):
         SchemaValidator(
             {'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}, 'required': True, 'default': 'pika'}}}
         )
@@ -1077,7 +1077,7 @@ def test_default_and_default_factory():
 
 def test_field_required_and_default_factory():
     """A field cannot be required and have a default factory"""
-    with pytest.raises(SchemaError, match='Field "x": a required field cannot have a default value'):
+    with pytest.raises(SchemaError, match="Field 'x': a required field cannot have a default value"):
         SchemaValidator(
             {
                 'type': 'typed-dict',
@@ -1107,12 +1107,12 @@ class TestOnError:
             SchemaValidator({'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}, 'on_error': 'rais'}}})
 
     def test_on_error_bad_omit(self):
-        with pytest.raises(SchemaError, match='Field "x": "on_error = omit" cannot be set for required fields'):
+        with pytest.raises(SchemaError, match="Field 'x': 'on_error = omit' cannot be set for required fields"):
             SchemaValidator({'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}, 'on_error': 'omit'}}})
 
     def test_on_error_bad_fallback_on_default(self):
         with pytest.raises(
-            SchemaError, match='Field "x": "on_error = fallback_on_default" requires a `default` or `default_factory`'
+            SchemaError, match="Field 'x': 'on_error = fallback_on_default' requires a `default` or `default_factory`"
         ):
             SchemaValidator(
                 {'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}, 'on_error': 'fallback_on_default'}}}
