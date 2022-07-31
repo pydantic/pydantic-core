@@ -44,6 +44,7 @@ def main():
         uploader.upload_file(this_dir / 'index.html', content_type='text/html')
         wheel_url = uploader.upload_file(wheel_file)
 
+        print('Setting "{{ pydantic_core_wheel_url }}" to "%s" in run_tests.py' % wheel_url)
         run_test_code = (this_dir / 'run_tests.py').read_text().replace('{{ pydantic_core_wheel_url }}', wheel_url)
         uploader.upload_file(run_test_code.encode(), url_path='run_tests.py', content_type='text/plain')
 
@@ -68,7 +69,7 @@ class Uploader:
             assert self.url.endswith('/'), self.url
 
     def upload_file(self, file: 'Path | bytes', *, url_path: str = None, content_type: str = None) -> str:
-        headers = {'Authorisation': self.secret_key}
+        headers = {'Authorisation': self.secret_key, 'Response-Header-Access-Control-Allow-Origin': '*'}
         if content_type:
             headers['Content-Type'] = content_type
 
