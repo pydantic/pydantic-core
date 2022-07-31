@@ -126,15 +126,15 @@ impl BuildValidator for TypedDictValidator {
                 None => full,
             };
 
-            let on_error = match field_info.get_as::<String>(intern!(py, "on_error"))? {
-                Some(on_error) => match on_error.as_str() {
+            let on_error = match field_info.get_as::<&str>(intern!(py, "on_error"))? {
+                Some(on_error) => match on_error {
                     "raise" => OnError::Raise,
                     "omit" => {
                         if required {
                             return py_error!(
                                 "Field '{}': 'on_error = {}' cannot be set for required fields",
                                 field_name,
-                                on_error.as_str()
+                                on_error
                             );
                         }
 
@@ -145,7 +145,7 @@ impl BuildValidator for TypedDictValidator {
                             return py_error!(
                                 "Field '{}': 'on_error = {}' requires a `default` or `default_factory`",
                                 field_name,
-                                on_error.as_str()
+                                on_error
                             );
                         }
 
