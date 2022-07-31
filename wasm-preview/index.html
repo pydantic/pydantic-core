@@ -5,14 +5,20 @@
     height: 100%;
     background: rgb(30, 31, 46);
     color: white;
+    font-family: monospace;
+    overflow: hidden;
   }
   main {
     max-width: 800px;
-    height: calc(100% - 80px);
+    height: 100%;
+    margin: 10px auto;
+  }
+  section {
+    margin-top: 20px;
+    padding: 10px 15px;
+    height: calc(100% - 160px);
     overflow-y: scroll;
     overflow-x: hidden;
-    margin: 20px auto;
-    padding: 10px 15px;
     border: 1px solid #aaa;
     border-radius: 5px;
   }
@@ -21,9 +27,22 @@
     padding: 0;
     white-space: pre-wrap;
   }
+  a {
+    color: #58a6ff;
+    text-decoration: none;
+  }
 </style>
 <main>
-<pre id="output">loading...</pre>
+  <h1>
+    <a href="https://github.com/samuelcolvin/pydantic-core/tree/main/wasm-preview">pydantic-core</a> unit tests
+  </h1>
+  <aside>
+    pydantic-core is compiled to webassembly and run in the browser using
+    <a href="https://pyodide.org/en/stable/">pyodide</a>.
+  </aside>
+  <section>
+    <pre id="output">loading...</pre>
+  </section>
 </main>
 
 <script src="https://smokeshow.helpmanual.io/2d1p666q3x5f0j26223o/ansi-to-html.browser.js"></script>
