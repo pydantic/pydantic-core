@@ -1121,14 +1121,20 @@ class TestOnError:
     def test_on_error_raise_by_default(self, py_and_json: PyAndJson):
         v = py_and_json({'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}}}})
         assert v.validate_test({'x': 'foo'}) == {'x': 'foo'}
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError) as exc_info:
             v.validate_test({'x': ['foo']})
+        assert exc_info.value.errors() == [
+            {'input_value': ['foo'], 'kind': 'str_type', 'loc': ['x'], 'message': 'Input should be a valid string'}
+        ]
 
     def test_on_error_raise_explicit(self, py_and_json: PyAndJson):
         v = py_and_json({'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}, 'on_error': 'raise'}}})
         assert v.validate_test({'x': 'foo'}) == {'x': 'foo'}
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError) as exc_info:
             v.validate_test({'x': ['foo']})
+        assert exc_info.value.errors() == [
+            {'input_value': ['foo'], 'kind': 'str_type', 'loc': ['x'], 'message': 'Input should be a valid string'}
+        ]
 
     def test_on_error_omit(self, py_and_json: PyAndJson):
         v = py_and_json(
