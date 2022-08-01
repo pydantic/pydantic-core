@@ -1,3 +1,4 @@
+import platform
 import re
 from typing import Any, Dict
 
@@ -43,6 +44,20 @@ def test_list_strict():
         ((1, 2, '3'), [1, 2, 3]),
         ({1, 2, '3'}, Err('Input should be a valid list/array [kind=list_type,')),
         (frozenset({1, 2, '3'}), Err('Input should be a valid list/array [kind=list_type,')),
+        pytest.param(
+            {1: 1, 2: 2, '3': '3'}.keys(),
+            [1, 2, 3],
+            marks=pytest.mark.skipif(
+                platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy'
+            ),
+        ),
+        pytest.param(
+            {1: 1, 2: 2, '3': '3'}.values(),
+            [1, 2, 3],
+            marks=pytest.mark.skipif(
+                platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy'
+            ),
+        ),
     ],
 )
 def test_list_int(input_value, expected):

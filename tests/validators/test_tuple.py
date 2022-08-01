@@ -1,3 +1,4 @@
+import platform
 import re
 from typing import Any, Dict, Type
 
@@ -105,6 +106,20 @@ def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
     [
         ((1, 2, '3'), (1, 2, 3)),
         ([1, 2, '3'], (1, 2, 3)),
+        pytest.param(
+            {1: 1, 2: 2, '3': '3'}.keys(),
+            (1, 2, 3),
+            marks=pytest.mark.skipif(
+                platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy'
+            ),
+        ),
+        pytest.param(
+            {1: 1, 2: 2, '3': '3'}.values(),
+            (1, 2, 3),
+            marks=pytest.mark.skipif(
+                platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy'
+            ),
+        ),
         ({1, 2, '3'}, Err('Input should be a valid tuple [kind=tuple_type,')),
         (frozenset([1, 2, '3']), Err('Input should be a valid tuple [kind=tuple_type,')),
     ],

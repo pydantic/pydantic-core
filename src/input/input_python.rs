@@ -11,6 +11,8 @@ use pyo3::{intern, AsPyPointer};
 
 use crate::errors::{py_err_string, ErrorKind, InputValue, LocItem, ValError, ValResult};
 
+#[cfg(not(PyPy))]
+use super::_pyo3_dict::{PyDictKeys, PyDictValues};
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, date_as_datetime, float_as_datetime,
     float_as_duration, float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime,
@@ -271,6 +273,24 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
+    #[cfg(not(PyPy))]
+    fn lax_list(&'a self) -> ValResult<GenericListLike<'a>> {
+        if let Ok(list) = self.cast_as::<PyList>() {
+            Ok(list.into())
+        } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else if let Ok(dict_keys) = self.cast_as::<PyDictKeys>() {
+            let tuple = PyTuple::new(self.py(), dict_keys.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
+        } else if let Ok(dict_values) = self.cast_as::<PyDictValues>() {
+            let tuple = PyTuple::new(self.py(), dict_values.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
+        } else {
+            Err(ValError::new(ErrorKind::ListType, self))
+        }
+    }
+
+    #[cfg(PyPy)]
     fn lax_list(&'a self) -> ValResult<GenericListLike<'a>> {
         if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
@@ -289,6 +309,24 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
+    #[cfg(not(PyPy))]
+    fn lax_tuple(&'a self) -> ValResult<GenericListLike<'a>> {
+        if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else if let Ok(list) = self.cast_as::<PyList>() {
+            Ok(list.into())
+        } else if let Ok(dict_keys) = self.cast_as::<PyDictKeys>() {
+            let tuple = PyTuple::new(self.py(), dict_keys.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
+        } else if let Ok(dict_values) = self.cast_as::<PyDictValues>() {
+            let tuple = PyTuple::new(self.py(), dict_values.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
+        } else {
+            Err(ValError::new(ErrorKind::TupleType, self))
+        }
+    }
+
+    #[cfg(PyPy)]
     fn lax_tuple(&'a self) -> ValResult<GenericListLike<'a>> {
         if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
@@ -307,6 +345,28 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
+    #[cfg(not(PyPy))]
+    fn lax_set(&'a self) -> ValResult<GenericListLike<'a>> {
+        if let Ok(set) = self.cast_as::<PySet>() {
+            Ok(set.into())
+        } else if let Ok(list) = self.cast_as::<PyList>() {
+            Ok(list.into())
+        } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
+            Ok(frozen_set.into())
+        } else if let Ok(dict_keys) = self.cast_as::<PyDictKeys>() {
+            let tuple = PyTuple::new(self.py(), dict_keys.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
+        } else if let Ok(dict_values) = self.cast_as::<PyDictValues>() {
+            let tuple = PyTuple::new(self.py(), dict_values.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
+        } else {
+            Err(ValError::new(ErrorKind::SetType, self))
+        }
+    }
+
+    #[cfg(PyPy)]
     fn lax_set(&'a self) -> ValResult<GenericListLike<'a>> {
         if let Ok(set) = self.cast_as::<PySet>() {
             Ok(set.into())
@@ -329,6 +389,28 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
+    #[cfg(not(PyPy))]
+    fn lax_frozenset(&'a self) -> ValResult<GenericListLike<'a>> {
+        if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
+            Ok(frozen_set.into())
+        } else if let Ok(set) = self.cast_as::<PySet>() {
+            Ok(set.into())
+        } else if let Ok(list) = self.cast_as::<PyList>() {
+            Ok(list.into())
+        } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else if let Ok(dict_keys) = self.cast_as::<PyDictKeys>() {
+            let tuple = PyTuple::new(self.py(), dict_keys.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
+        } else if let Ok(dict_values) = self.cast_as::<PyDictValues>() {
+            let tuple = PyTuple::new(self.py(), dict_values.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
+        } else {
+            Err(ValError::new(ErrorKind::FrozenSetType, self))
+        }
+    }
+
+    #[cfg(PyPy)]
     fn lax_frozenset(&'a self) -> ValResult<GenericListLike<'a>> {
         if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
             Ok(frozen_set.into())
