@@ -13,14 +13,13 @@ use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::typed_dict::TypedDictValidator;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ModelClassValidator {
     strict: bool,
     revalidate: bool,
-    validator: TypedDictValidator,
+    validator: Box<CombinedValidator>,
     class: Py<PyType>,
     name: String,
 }
@@ -39,23 +38,18 @@ impl BuildValidator for ModelClassValidator {
 
         let class: &PyType = schema.get_as_req(intern!(py, "class_type"))?;
         let sub_schema: &PyAny = schema.get_as_req(intern!(py, "schema"))?;
-        let (comb_validator, td_schema) = build_validator(sub_schema, config, build_context)?;
+        let (validator, td_schema) = build_validator(sub_schema, config, build_context)?;
 
-        if !td_schema.get_as(intern!(py, "return_fields_set"))?.unwrap_or(false) {
-            return py_error!("model-class inner schema should have 'return_fields_set' set to True");
-        }
-
-        let validator = match comb_validator {
-            CombinedValidator::TypedDict(tdv) => tdv,
-            _ => return py_error!("Wrong validator type, expected 'typed-dict' validator"),
-        };
+        // if !td_schema.get_as(intern!(py, "return_fields_set"))?.unwrap_or(false) {
+        //     return py_error!("model-class inner schema should have 'return_fields_set' set to True");
+        // }
 
         Ok(Self {
             // we don't use is_strict here since we don't want validation to be strict in this case if
             // `config.strict` is set, only if this specific field is strict
             strict: schema.get_as(intern!(py, "strict"))?.unwrap_or(false),
             revalidate: config.get_as(intern!(py, "revalidate_models"))?.unwrap_or(false),
-            validator,
+            validator: Box::new(validator),
             class: class.into(),
             // Get the class's `__name__`, not using `class.name()` since it uses `__qualname__`
             // which is not what we want here

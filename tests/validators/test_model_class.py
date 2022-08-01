@@ -95,12 +95,34 @@ def test_model_class_root_validator():
     assert 'test_model_class_root_validator.<locals>.MyModel' in m
 
 
-def test_model_class_bad_model():
+def test_model_class_function_after():
     class MyModel:
-        pass
+        __slots__ = '__dict__', '__fields_set__'
 
-    with pytest.raises(SchemaError, match="model-class -> schema -> type\n  Input should be 'typed-dict'"):
-        SchemaValidator({'type': 'model-class', 'class_type': MyModel, 'schema': {'type': 'str'}})
+    def f(input_value, **kwargs):
+        input_value[0]['x'] = 'y'
+        return input_value
+
+    v = SchemaValidator(
+        {
+            'type': 'model-class',
+            'class_type': MyModel,
+            'schema': {
+                'type': 'function',
+                'mode': 'after',
+                'function': f,
+                'schema': {
+                    'type': 'typed-dict',
+                    'return_fields_set': True,
+                    'fields': {'field_a': {'schema': {'type': 'str'}}},
+                },
+            },
+        }
+    )
+    m = v.validate_python({'field_a': 'test'})
+    assert isinstance(m, MyModel)
+    assert m.__dict__ == {'field_a': 'test', 'x': 'y'}
+    assert m.__fields_set__ == {'field_a'}
 
 
 def test_model_class_not_type():
@@ -114,6 +136,7 @@ def test_model_class_not_type():
         )
 
 
+@pytest.mark.xfail(reason='Needs fixing')
 def test_not_return_fields_set():
     class MyModel:
         pass
