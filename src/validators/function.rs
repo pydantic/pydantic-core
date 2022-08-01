@@ -47,7 +47,7 @@ macro_rules! impl_build {
                 build_context: &mut BuildContext,
             ) -> PyResult<CombinedValidator> {
                 let py = schema.py();
-                let validator = build_validator(schema.get_as_req(intern!(py, "schema"))?, config, build_context)?.0;
+                let validator = build_validator(schema.get_as_req(intern!(py, "schema"))?, config, build_context)?;
                 let name = format!("{}[{}]", $name, validator.get_name());
                 Ok(Self {
                     validator: Box::new(validator),
@@ -110,6 +110,10 @@ impl Validator for FunctionBeforeValidator {
         &self.name
     }
 
+    fn ask(&self, question: &str) -> bool {
+        self.validator.ask(question)
+    }
+
     fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
         self.validator.complete(build_context)
     }
@@ -141,6 +145,10 @@ impl Validator for FunctionAfterValidator {
 
     fn get_name(&self) -> &str {
         &self.name
+    }
+
+    fn ask(&self, question: &str) -> bool {
+        self.validator.ask(question)
     }
 
     fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
@@ -234,6 +242,10 @@ impl Validator for FunctionWrapValidator {
 
     fn get_name(&self) -> &str {
         &self.name
+    }
+
+    fn ask(&self, question: &str) -> bool {
+        self.validator.ask(question)
     }
 
     fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {

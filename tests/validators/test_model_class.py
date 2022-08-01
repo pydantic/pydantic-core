@@ -4,6 +4,8 @@ import pytest
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
+from ..conftest import plain_repr
+
 
 def test_model_class():
     class MyModel:
@@ -23,6 +25,7 @@ def test_model_class():
             },
         }
     )
+    assert 'expect_fields_set:true' in plain_repr(v)
     assert repr(v).startswith('SchemaValidator(name="MyModel", validator=ModelClass(\n')
     m = v.validate_python({'field_a': 'test', 'field_b': 12})
     assert isinstance(m, MyModel)
@@ -90,6 +93,7 @@ def test_model_class_root_validator():
             },
         }
     )
+    assert 'expect_fields_set:true' in plain_repr(v)
     m = v.validate_python({'field_a': 'test'})
     assert isinstance(m, str)
     assert 'test_model_class_root_validator.<locals>.MyModel' in m
@@ -136,19 +140,23 @@ def test_model_class_not_type():
         )
 
 
-@pytest.mark.xfail(reason='Needs fixing')
 def test_not_return_fields_set():
     class MyModel:
-        pass
+        __slots__ = '__dict__', '__fields_set__'
 
-    with pytest.raises(SchemaError, match="model-class inner schema should have 'return_fields_set' set to True"):
-        SchemaValidator(
-            {
-                'type': 'model-class',
-                'class_type': MyModel,
-                'schema': {'type': 'typed-dict', 'fields': {'field_a': {'schema': 'str'}}},
-            }
-        )
+    v = SchemaValidator(
+        {
+            'type': 'model-class',
+            'class_type': MyModel,
+            'schema': {'type': 'typed-dict', 'fields': {'field_a': {'schema': 'str'}}},
+        }
+    )
+    assert 'expect_fields_set:false' in plain_repr(v)
+
+    m = v.validate_python({'field_a': 'test'})
+    assert isinstance(m, MyModel)
+    assert m.__dict__ == {'field_a': 'test'}
+    assert not hasattr(m, '__fields_set__')
 
 
 def test_model_class_instance_direct():

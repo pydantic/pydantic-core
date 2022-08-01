@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple, PyType};
 use pyo3::{ffi, intern};
 
-use crate::build_tools::{py_error, SchemaDict};
+use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -22,6 +22,7 @@ pub struct ModelClassValidator {
     validator: Box<CombinedValidator>,
     class: Py<PyType>,
     name: String,
+    expect_fields_set: bool,
 }
 
 impl BuildValidator for ModelClassValidator {
@@ -38,11 +39,9 @@ impl BuildValidator for ModelClassValidator {
 
         let class: &PyType = schema.get_as_req(intern!(py, "class_type"))?;
         let sub_schema: &PyAny = schema.get_as_req(intern!(py, "schema"))?;
-        let (validator, td_schema) = build_validator(sub_schema, config, build_context)?;
+        let validator = build_validator(sub_schema, config, build_context)?;
 
-        // if !td_schema.get_as(intern!(py, "return_fields_set"))?.unwrap_or(false) {
-        //     return py_error!("model-class inner schema should have 'return_fields_set' set to True");
-        // }
+        let expect_fields_set = validator.ask("return_fields_set");
 
         Ok(Self {
             // we don't use is_strict here since we don't want validation to be strict in this case if
@@ -54,6 +53,7 @@ impl BuildValidator for ModelClassValidator {
             // Get the class's `__name__`, not using `class.name()` since it uses `__qualname__`
             // which is not what we want here
             name: class.getattr(intern!(py, "__name__"))?.extract()?,
+            expect_fields_set,
         }
         .into())
     }
@@ -73,9 +73,13 @@ impl Validator for ModelClassValidator {
             if self.revalidate {
                 let fields_set = input.get_attr(intern!(py, "__fields_set__"));
                 let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-                let (model_dict, validation_fields_set): (&PyAny, &PyAny) = output.extract(py)?;
-                let fields_set = fields_set.unwrap_or(validation_fields_set);
-                Ok(self.create_class(py, model_dict, fields_set)?)
+                if self.expect_fields_set {
+                    let (model_dict, validation_fields_set): (&PyAny, &PyAny) = output.extract(py)?;
+                    let fields_set = fields_set.unwrap_or(validation_fields_set);
+                    Ok(self.create_class(py, model_dict, Some(fields_set))?)
+                } else {
+                    Ok(self.create_class(py, output.as_ref(py), fields_set)?)
+                }
             } else {
                 Ok(input.to_object(py))
             }
@@ -88,8 +92,12 @@ impl Validator for ModelClassValidator {
             ))
         } else {
             let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-            let (model_dict, fields_set): (&PyAny, &PyAny) = output.extract(py)?;
-            Ok(self.create_class(py, model_dict, fields_set)?)
+            if self.expect_fields_set {
+                let (model_dict, fields_set): (&PyAny, &PyAny) = output.extract(py)?;
+                Ok(self.create_class(py, model_dict, Some(fields_set))?)
+            } else {
+                Ok(self.create_class(py, output.as_ref(py), None)?)
+            }
         }
     }
 
@@ -99,7 +107,7 @@ impl Validator for ModelClassValidator {
 }
 
 impl ModelClassValidator {
-    fn create_class(&self, py: Python, model_dict: &PyAny, fields_set: &PyAny) -> PyResult<PyObject> {
+    fn create_class(&self, py: Python, model_dict: &PyAny, fields_set: Option<&PyAny>) -> PyResult<PyObject> {
         // based on the following but with the second argument of new_func set to an empty tuple as required
         // https://github.com/PyO3/pyo3/blob/d2caa056e9aacc46374139ef491d112cb8af1a25/src/pyclass_init.rs#L35-L77
         let args = PyTuple::empty(py);
@@ -120,7 +128,9 @@ impl ModelClassValidator {
 
         let instance_ref = instance.as_ref(py);
         force_setattr(py, instance_ref, intern!(py, "__dict__"), model_dict)?;
-        force_setattr(py, instance_ref, intern!(py, "__fields_set__"), fields_set)?;
+        if let Some(fields_set) = fields_set {
+            force_setattr(py, instance_ref, intern!(py, "__fields_set__"), fields_set)?;
+        }
 
         Ok(instance)
     }
