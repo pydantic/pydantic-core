@@ -204,7 +204,8 @@ def test_tagged_union_sub_schema():
     assert m.__dict__ == {'foo': 'apple', 'bar': 123}
     assert not hasattr(m, '__fields_set__')
     # error because banana has return_fields_set=True
-    with pytest.raises(TypeError, match="__dict__ must be set to a dictionary, not a 'tuple'"):
+    # "__dict__ must be set to a dictionary, not a 'tuple'" on cpython, different on pypy
+    with pytest.raises(TypeError):
         v.validate_python({'foo': 'banana', 'spam': [1, 2, 3]})
 
 
@@ -214,7 +215,7 @@ def test_bad_sub_schema():
 
     v = SchemaValidator({'type': 'model-class', 'class_type': MyModel, 'schema': 'int'})
     assert 'expect_fields_set:false' in plain_repr(v)
-    with pytest.raises(TypeError, match="__dict__ must be set to a dictionary, not a 'int'"):
+    with pytest.raises(TypeError):
         v.validate_python(123)
 
 
