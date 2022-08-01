@@ -2,7 +2,6 @@ import re
 from typing import Any, Dict
 
 import pytest
-from dirty_equals import IsList, IsNonNegative
 
 from pydantic_core import SchemaValidator, ValidationError
 
@@ -42,13 +41,17 @@ def test_list_strict():
     [
         ([1, 2, '3'], [1, 2, 3]),
         ((1, 2, '3'), [1, 2, 3]),
-        ({1, 2, '3'}, IsList(1, 2, 3, check_order=False)),
-        (frozenset([1, 2, '3']), IsList(1, 2, 3, check_order=False)),
+        ({1, 2, '3'}, Err('Input should be a valid list/array [kind=list_type,')),
+        (frozenset({1, 2, '3'}), Err('Input should be a valid list/array [kind=list_type,')),
     ],
 )
 def test_list_int(input_value, expected):
     v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
-    assert v.validate_python(input_value) == expected
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected
 
 
 @pytest.mark.parametrize(
@@ -56,33 +59,28 @@ def test_list_int(input_value, expected):
     [
         ([], []),
         ([1, '2', b'3'], [1, '2', b'3']),
-        (frozenset([1, '2', b'3']), IsList(1, '2', b'3', check_order=False)),
+        (frozenset([1, '2', b'3']), Err('Input should be a valid list/array [kind=list_type,')),
         ((), []),
         ((1, '2', b'3'), [1, '2', b'3']),
-        ({1, '2', b'3'}, IsList(1, '2', b'3', check_order=False)),
+        ({1, '2', b'3'}, Err('Input should be a valid list/array [kind=list_type,')),
     ],
 )
 def test_list_any(input_value, expected):
     v = SchemaValidator('list')
-    output = v.validate_python(input_value)
-    assert output == expected
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected
 
 
 @pytest.mark.parametrize(
-    'input_value,index',
-    [
-        (['wrong'], 0),
-        (('wrong',), 0),
-        ({'wrong'}, 0),
-        ([1, 2, 3, 'wrong'], 3),
-        ((1, 2, 3, 'wrong', 4), 3),
-        ({1, 2, 'wrong'}, IsNonNegative()),
-    ],
+    'input_value,index', [(['wrong'], 0), (('wrong',), 0), ([1, 2, 3, 'wrong'], 3), ((1, 2, 3, 'wrong', 4), 3)]
 )
 def test_list_error(input_value, index):
     v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
     with pytest.raises(ValidationError) as exc_info:
-        assert v.validate_python(input_value)
+        v.validate_python(input_value)
     assert exc_info.value.errors() == [
         {
             'kind': 'int_parsing',
