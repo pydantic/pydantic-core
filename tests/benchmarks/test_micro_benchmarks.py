@@ -83,7 +83,7 @@ class TestBenchmarkSimpleModel:
     def test_pyd_python(self, pydantic_model, benchmark):
         benchmark(pydantic_model.parse_obj, self.data)
 
-    @pytest.mark.benchmark(group='simple model FS - python')
+    @pytest.mark.benchmark(group='simple model - python')
     def test_core_python_fs(self, core_validator_fs, benchmark):
         m = core_validator_fs.validate_python(self.data)
         assert m.name == 'John'
@@ -91,7 +91,7 @@ class TestBenchmarkSimpleModel:
         assert m.__fields_set__ == {'name', 'age', 'friends', 'settings'}
         benchmark(core_validator_fs.validate_python, self.data)
 
-    @pytest.mark.benchmark(group='simple model not FS - python')
+    @pytest.mark.benchmark(group='simple model - python')
     def test_core_python_not_fs(self, core_validator_not_fs, benchmark):
         m = core_validator_not_fs.validate_python(self.data)
         assert m.name == 'John'
@@ -109,12 +109,12 @@ class TestBenchmarkSimpleModel:
             obj = json.loads(json_data)
             return pydantic_model.parse_obj(obj)
 
-    @pytest.mark.benchmark(group='simple model FS - JSON')
+    @pytest.mark.benchmark(group='simple model - JSON')
     def test_core_json_fs(self, core_validator_fs, benchmark):
         json_data = json.dumps(self.data)
         benchmark(core_validator_fs.validate_json, json_data)
 
-    @pytest.mark.benchmark(group='simple model not FS - JSON')
+    @pytest.mark.benchmark(group='simple model - JSON')
     def test_core_json_not_fs(self, core_validator_not_fs, benchmark):
         json_data = json.dumps(self.data)
         benchmark(core_validator_not_fs.validate_json, json_data)

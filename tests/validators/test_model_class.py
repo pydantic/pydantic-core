@@ -99,6 +99,125 @@ def test_model_class_root_validator():
     assert 'test_model_class_root_validator.<locals>.MyModel' in m
 
 
+@pytest.mark.parametrize('mode', ['before', 'after', 'wrap'])
+@pytest.mark.parametrize('return_fields_set', [True, False])
+def test_function_ask(mode, return_fields_set):
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+
+    def f(input_value, **kwargs):
+        return input_value
+
+    v = SchemaValidator(
+        {
+            'type': 'model-class',
+            'class_type': MyModel,
+            'schema': {
+                'type': 'function',
+                'mode': mode,
+                'function': f,
+                'schema': {
+                    'type': 'typed-dict',
+                    'return_fields_set': return_fields_set,
+                    'fields': {'field_a': {'schema': {'type': 'str'}}},
+                },
+            },
+        }
+    )
+    expect_fields_set = re.search('expect_fields_set:(true|false)', plain_repr(v)).group(1)
+    assert expect_fields_set == str(return_fields_set).lower()
+
+
+def test_function_plain_ask():
+    class MyModel:
+        pass
+
+    def f(input_value, **kwargs):
+        return input_value
+
+    v = SchemaValidator(
+        {'type': 'model-class', 'class_type': MyModel, 'schema': {'type': 'function', 'mode': 'plain', 'function': f}}
+    )
+    assert 'expect_fields_set:false' in plain_repr(v)
+    m = v.validate_python({'field_a': 'test'})
+    assert isinstance(m, MyModel)
+    assert m.__dict__ == {'field_a': 'test'}
+    assert not hasattr(m, '__fields_set__')
+
+
+def test_union_sub_schema():
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+
+    v = SchemaValidator(
+        {
+            'type': 'model-class',
+            'class_type': MyModel,
+            'schema': {
+                'type': 'union',
+                'choices': [
+                    {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'foo': {'schema': 'int'}}},
+                    {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'bar': {'schema': 'int'}}},
+                ],
+            },
+        }
+    )
+    assert 'expect_fields_set:true' in plain_repr(v)
+    m = v.validate_python({'foo': '123'})
+    assert isinstance(m, MyModel)
+    assert m.__dict__ == {'foo': 123}
+    assert m.__fields_set__ == {'foo'}
+    m = v.validate_python({'bar': '123'})
+    assert isinstance(m, MyModel)
+    assert m.__dict__ == {'bar': 123}
+    assert m.__fields_set__ == {'bar'}
+
+
+def test_tagged_union_sub_schema():
+    class MyModel:
+        pass
+
+    v = SchemaValidator(
+        {
+            'type': 'model-class',
+            'class_type': MyModel,
+            'schema': {
+                'type': 'tagged-union',
+                'discriminator': 'foo',
+                'choices': {
+                    'apple': {'type': 'typed-dict', 'fields': {'foo': {'schema': 'str'}, 'bar': {'schema': 'int'}}},
+                    'banana': {
+                        'type': 'typed-dict',
+                        'return_fields_set': True,
+                        'fields': {
+                            'foo': {'schema': 'str'},
+                            'spam': {'schema': {'type': 'list', 'items_schema': 'int'}},
+                        },
+                    },
+                },
+            },
+        }
+    )
+    assert 'expect_fields_set:false' in plain_repr(v)  # because only one choice has return_fields_set=True!
+    m = v.validate_python({'foo': 'apple', 'bar': '123'})
+    assert isinstance(m, MyModel)
+    assert m.__dict__ == {'foo': 'apple', 'bar': 123}
+    assert not hasattr(m, '__fields_set__')
+    # error because banana has return_fields_set=True
+    with pytest.raises(TypeError, match="__dict__ must be set to a dictionary, not a 'tuple'"):
+        v.validate_python({'foo': 'banana', 'spam': [1, 2, 3]})
+
+
+def test_bad_sub_schema():
+    class MyModel:
+        pass
+
+    v = SchemaValidator({'type': 'model-class', 'class_type': MyModel, 'schema': 'int'})
+    assert 'expect_fields_set:false' in plain_repr(v)
+    with pytest.raises(TypeError, match="__dict__ must be set to a dictionary, not a 'int'"):
+        v.validate_python(123)
+
+
 def test_model_class_function_after():
     class MyModel:
         __slots__ = '__dict__', '__fields_set__'
@@ -284,7 +403,8 @@ def test_revalidate():
         def __init__(self, a, b, fields_set):
             self.field_a = a
             self.field_b = b
-            self.__fields_set__ = fields_set
+            if fields_set is not None:
+                self.__fields_set__ = fields_set
 
     v = SchemaValidator(
         {
@@ -324,6 +444,13 @@ def test_revalidate():
             'input_value': 'not int',
         }
     ]
+
+    m5 = MyModel('x', 5, None)
+    m6 = v.validate_python(m5)
+    assert isinstance(m6, MyModel)
+    assert m6 is not m5
+    assert m6.__dict__ == {'field_a': 'x', 'field_b': 5}
+    assert m6.__fields_set__ == {'field_a', 'field_b'}
 
 
 def test_revalidate_extra():
