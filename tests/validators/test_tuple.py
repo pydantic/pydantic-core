@@ -133,6 +133,17 @@ def test_tuple_validate(input_value, expected, mode, items):
         assert v.validate_python(input_value) == expected
 
 
+# Since `test_tuple_validate` is parametrized above, the generator is consumed
+# on the first test run. This is a workaround to make sure the generator is
+# always recreated.
+@pytest.mark.parametrize(
+    'mode,items', [('variable', {'type': 'int'}), ('positional', [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}])]
+)
+def test_tuple_validate_iterator(mode, items):
+    v = SchemaValidator({'type': 'tuple', 'mode': mode, 'items_schema': items})
+    assert v.validate_python((x for x in [1, 2, '3'])) == (1, 2, 3)
+
+
 @pytest.mark.parametrize(
     'input_value,index',
     [

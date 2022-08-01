@@ -58,6 +58,7 @@ def test_list_strict():
                 platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy'
             ),
         ),
+        ((x for x in [1, 2, '3']), [1, 2, 3]),
     ],
 )
 def test_list_int(input_value, expected):

@@ -4,8 +4,8 @@ use std::str::from_utf8;
 use pyo3::exceptions::PyAttributeError;
 use pyo3::prelude::*;
 use pyo3::types::{
-    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyInt, PyList, PyMapping,
-    PySequence, PySet, PyString, PyTime, PyTuple, PyType,
+    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyInt, PyIterator, PyList,
+    PyMapping, PySequence, PySet, PyString, PyTime, PyTuple, PyType,
 };
 use pyo3::{intern, AsPyPointer};
 
@@ -279,6 +279,9 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
+        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
+            let tuple = PyTuple::new(self.py(), iterator.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
         } else if let Ok(dict_keys) = self.cast_as::<PyDictKeys>() {
             let tuple = PyTuple::new(self.py(), dict_keys.iter()?.flatten().collect::<Vec<_>>());
             Ok(tuple.into())
@@ -295,6 +298,9 @@ impl<'a> Input<'a> for PyAny {
         if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
+            let tuple = PyTuple::new(self.py(), iterator.iter()?.flatten().collect::<Vec<_>>());
             Ok(tuple.into())
         } else {
             Err(ValError::new(ErrorKind::ListType, self))
@@ -315,6 +321,9 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
+        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
+            let tuple = PyTuple::new(self.py(), iterator.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
         } else if let Ok(dict_keys) = self.cast_as::<PyDictKeys>() {
             let tuple = PyTuple::new(self.py(), dict_keys.iter()?.flatten().collect::<Vec<_>>());
             Ok(tuple.into())
@@ -332,6 +341,9 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
+        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
+            let tuple = PyTuple::new(self.py(), iterator.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
         } else {
             Err(ValError::new(ErrorKind::TupleType, self))
         }
@@ -355,6 +367,9 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
             Ok(frozen_set.into())
+        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
+            let tuple = PyTuple::new(self.py(), iterator.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
         } else if let Ok(dict_keys) = self.cast_as::<PyDictKeys>() {
             let tuple = PyTuple::new(self.py(), dict_keys.iter()?.flatten().collect::<Vec<_>>());
             Ok(tuple.into())
@@ -376,6 +391,9 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
             Ok(frozen_set.into())
+        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
+            let tuple = PyTuple::new(self.py(), iterator.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
         } else {
             Err(ValError::new(ErrorKind::SetType, self))
         }
@@ -399,6 +417,9 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
+        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
+            let tuple = PyTuple::new(self.py(), iterator.iter()?.flatten().collect::<Vec<_>>());
+            Ok(tuple.into())
         } else if let Ok(dict_keys) = self.cast_as::<PyDictKeys>() {
             let tuple = PyTuple::new(self.py(), dict_keys.iter()?.flatten().collect::<Vec<_>>());
             Ok(tuple.into())
@@ -419,6 +440,9 @@ impl<'a> Input<'a> for PyAny {
         } else if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+            Ok(tuple.into())
+        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
+            let tuple = PyTuple::new(self.py(), iterator.iter()?.flatten().collect::<Vec<_>>());
             Ok(tuple.into())
         } else {
             Err(ValError::new(ErrorKind::FrozenSetType, self))

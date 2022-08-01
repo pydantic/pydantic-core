@@ -85,6 +85,7 @@ def test_frozenset_no_validators_both(py_and_json: PyAndJson, input_value, expec
                 platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy'
             ),
         ),
+        ((x for x in [1, 2, '3']), frozenset({1, 2, 3})),
         ({'abc'}, Err('0\n  Input should be a valid integer')),
         ({1, 2, 'wrong'}, Err('Input should be a valid integer')),
         ({1: 2}, Err('1 validation error for frozenset[int]\n  Input should be a valid frozenset')),
