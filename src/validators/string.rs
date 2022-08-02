@@ -1,11 +1,12 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::PyDict;
 use regex::Regex;
 
 use crate::build_tools::{is_strict, py_error, schema_or_config};
 use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
+use crate::py_string_cache::make_py_string;
 use crate::recursion_guard::RecursionGuard;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -119,11 +120,11 @@ impl Validator for StrConstrainedValidator {
         }
 
         let py_string = if self.to_lower {
-            PyString::new(py, &str.to_lowercase())
+            make_py_string(py, &str.to_lowercase())
         } else if self.to_upper {
-            PyString::new(py, &str.to_uppercase())
+            make_py_string(py, &str.to_uppercase())
         } else if self.strip_whitespace {
-            PyString::new(py, str)
+            make_py_string(py, str)
         } else {
             // we haven't modified the string, return the original as it might be a PyString
             either_str.as_py_string(py)

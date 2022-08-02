@@ -11,6 +11,7 @@ mod build_tools;
 mod errors;
 mod input;
 mod lookup_key;
+mod py_string_cache;
 mod recursion_guard;
 mod validators;
 

@@ -12,13 +12,14 @@ const LENGTH_LIMIT: usize = 63;
 // gives max cache size of ~2MB
 const MAX_ITEMS: usize = 32_000;
 
-pub fn get_py_string<'py, 's>(py: Python<'py>, s: &'s str) -> &'py PyString {
+pub fn make_py_string<'py>(py: Python<'py>, s: &str) -> &'py PyString {
     if s.len() > LENGTH_LIMIT {
         return PyString::new(py, s);
     }
 
     let cache = PY_STRING_CACHE.get_or_init(py, || Arc::new(Mutex::new(AHashMap::with_capacity(100))));
-    let mut hashmap = cache.lock().expect("Failed to lock PY_STRING_CACHE");
+
+    let mut hashmap = cache.lock().expect("Failed to acquire PY_STRING_CACHE lock");
     if let Some(py_string) = hashmap.get(s) {
         py_string.clone_ref(py).into_ref(py)
     } else {
