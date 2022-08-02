@@ -535,6 +535,13 @@ def test_list_of_nullable_core(benchmark):
     benchmark(v.validate_python, list_of_nullable_data)
 
 
+@pytest.mark.benchmark(group='uppercase-str')
+def test_string_to_upper(benchmark):
+    v = SchemaValidator('str', {'str_to_upper': True})
+
+    benchmark(v.validate_python, 'foobar')
+
+
 some_bytes = b'0' * 1000
 
 
