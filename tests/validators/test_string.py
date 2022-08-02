@@ -13,8 +13,8 @@ from ..conftest import Err, PyAndJson
     'input_value,expected',
     [
         ('foobar', 'foobar'),
-        (123, '123'),
-        (123.456, '123.456'),
+        (123, Err('Input should be a valid string [kind=str_type, input_value=123, input_type=int]')),
+        (123.456, Err('Input should be a valid string [kind=str_type, input_value=123.456, input_type=int]')),
         (False, Err('Input should be a valid string [kind=str_type')),
         (True, Err('Input should be a valid string [kind=str_type')),
         ([], Err('Input should be a valid string [kind=str_type, input_value=[], input_type=list]')),
@@ -46,8 +46,11 @@ def test_str(py_and_json: PyAndJson, input_value, expected):
         ),
         # null bytes are very annoying, but we can't really block them here
         (b'\x00', '\x00'),
-        (123, '123'),
-        (Decimal('123'), '123'),
+        (123, Err('Input should be a valid string [kind=str_type, input_value=123, input_type=int]')),
+        (
+            Decimal('123'),
+            Err("Input should be a valid string [kind=str_type, input_value=Decimal('123'), input_type=int]"),
+        ),
     ],
 )
 def test_str_not_json(input_value, expected):
@@ -62,9 +65,13 @@ def test_str_not_json(input_value, expected):
 @pytest.mark.parametrize(
     'kwargs,input_value,expected',
     [
-        ({}, 123, '123'),
+        ({}, b'abc', 'abc'),
         ({'strict': True}, 'Foobar', 'Foobar'),
-        ({'strict': True}, 123, Err('Input should be a valid string [kind=str_type, input_value=123, input_type=int]')),
+        (
+            {'strict': True},
+            b'abc',
+            Err('Input should be a valid string [kind=str_type, input_value=123, input_type=int]'),
+        ),
         ({'to_upper': True}, 'fooBar', 'FOOBAR'),
         ({'to_lower': True}, 'fooBar', 'foobar'),
         ({'strip_whitespace': True}, ' foobar  ', 'foobar'),
