@@ -91,7 +91,7 @@ def test_complete_invalid():
     lax_validator = SchemaValidator(lax_schema)
     with pytest.raises(ValidationError) as exc_info:
         lax_validator.validate_python(input_data_wrong())
-    assert len(exc_info.value.errors()) == 736
+    assert len(exc_info.value.errors()) == 738
 
     model = pydantic_model()
     if model is None:
@@ -138,6 +138,17 @@ def test_complete_core_error(benchmark):
             pass
         else:
             raise RuntimeError('expected ValueError')
+
+
+@pytest.mark.benchmark(group='complete-wrong')
+def test_complete_core_isinstance(benchmark):
+    v = SchemaValidator(schema())
+    data = input_data_wrong()
+    assert v.isinstance_python(data) is False
+
+    @benchmark
+    def f():
+        v.isinstance_python(data)
 
 
 @skip_pydantic

@@ -76,7 +76,7 @@ impl BuildValidator for ArgumentsValidator {
                 .get_as_req(intern!(py, "schema"))
                 .map_err(|err| SchemaError::new_err(format!("Argument \"{}\":\n  {}", name, err)))?;
 
-            let (validator, _) = build_validator(schema, config, build_context)?;
+            let validator = build_validator(schema, config, build_context)?;
 
             let default = arg.get_as(intern!(py, "default"))?;
             let default_factory = arg.get_as(intern!(py, "default_factory"))?;
@@ -102,11 +102,11 @@ impl BuildValidator for ArgumentsValidator {
             arguments,
             positional_args_count,
             var_args_validator: match schema.get_item(intern!(py, "var_args_schema")) {
-                Some(v) => Some(Box::new(build_validator(v, config, build_context)?.0)),
+                Some(v) => Some(Box::new(build_validator(v, config, build_context)?)),
                 None => None,
             },
             var_kwargs_validator: match schema.get_item(intern!(py, "var_kwargs_schema")) {
-                Some(v) => Some(Box::new(build_validator(v, config, build_context)?.0)),
+                Some(v) => Some(Box::new(build_validator(v, config, build_context)?)),
                 None => None,
             },
         }
@@ -281,7 +281,7 @@ impl Validator for ArgumentsValidator {
                             }
                             Err(err) => return Err(err),
                         };
-                        if !used_kwargs.contains(either_str.as_cow().as_ref()) {
+                        if !used_kwargs.contains(either_str.as_cow()?.as_ref()) {
                             match self.var_kwargs_validator {
                                 Some(ref validator) => match validator.validate(py, value, extra, slots, recursion_guard) {
                                     Ok(value) => output_kwargs.set_item(either_str.as_py_string(py), value)?,
