@@ -45,19 +45,22 @@ def test_list_strict():
         ({1, 2, '3'}, Err('Input should be a valid list/array [kind=list_type,')),
         (frozenset({1, 2, '3'}), Err('Input should be a valid list/array [kind=list_type,')),
         pytest.param(
-            {1: 1, 2: 2, '3': '3'}.keys(),
+            {1: 10, 2: 20, '3': '30'}.keys(),
             [1, 2, 3],
             marks=pytest.mark.skipif(
                 platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy'
             ),
         ),
         pytest.param(
-            {1: 1, 2: 2, '3': '3'}.values(),
-            [1, 2, 3],
+            {1: 10, 2: 20, '3': '30'}.values(),
+            [10, 20, 30],
             marks=pytest.mark.skipif(
                 platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy'
             ),
         ),
+        ({1: 10, 2: 20, '3': '30'}, Err('Input should be a valid list/array [kind=list_type,')),
+        # https://github.com/samuelcolvin/pydantic-core/issues/211
+        ({1: 10, 2: 20, '3': '30'}.items(), Err('Input should be a valid list/array [kind=list_type,')),
         ((x for x in [1, 2, '3']), [1, 2, 3]),
     ],
 )
