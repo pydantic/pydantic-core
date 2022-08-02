@@ -3,6 +3,7 @@ import re
 from typing import Any, Dict
 
 import pytest
+from dirty_equals import HasRepr, IsStr
 
 from pydantic_core import SchemaValidator, ValidationError
 
@@ -203,3 +204,25 @@ def test_list_function_internal_error():
     with pytest.raises(RuntimeError, match='^error 1$') as exc_info:
         v.validate_python([1, 2])
     assert exc_info.value.args[0] == 'error 1'
+
+
+def test_generator_error():
+    def gen(error: bool):
+        yield 1
+        yield 2
+        if error:
+            raise RuntimeError('error')
+        yield 3
+
+    v = SchemaValidator({'type': 'list', 'items_schema': 'int'})
+    assert v.validate_python(gen(False)) == [1, 2, 3]
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(gen(True))
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'iteration_error',
+            'loc': [],
+            'message': 'Error iterating over object',
+            'input_value': HasRepr(IsStr(regex='<generator object test_generator_error.<locals>.gen at 0x[0-9a-f]+>')),
+        }
+    ]
