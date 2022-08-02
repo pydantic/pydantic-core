@@ -124,3 +124,9 @@ def test_invalid_json():
             'context': {'error': 'trailing comma at line 3 column 3'},
         }
     ]
+
+
+def test_hit_pystring_cache_limit():
+    v = SchemaValidator({'type': 'str'})
+    for i in range(35_000):
+        assert v.validate_json(f'"{i}"') == str(i)

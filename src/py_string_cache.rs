@@ -29,7 +29,7 @@ pub fn make_py_string<'py>(py: Python<'py>, s: &str) -> &'py PyString {
                 hashmap.remove(&k);
             }
         }
-        let py_string = PyString::intern(py, s);
+        let py_string = PyString::new(py, s);
         hashmap.insert(s.to_string(), py_string.into_py(py));
         py_string
     }
