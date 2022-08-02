@@ -5,6 +5,7 @@ mod input_abstract;
 mod input_json;
 mod input_python;
 mod parse_json;
+mod py_string_cache;
 mod return_enums;
 mod shared;
 

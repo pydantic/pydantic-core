@@ -8,6 +8,7 @@ use crate::recursion_guard::RecursionGuard;
 use crate::validators::{CombinedValidator, Extra, Validator};
 
 use super::parse_json::{JsonArray, JsonInput, JsonObject};
+use super::py_string_cache::get_py_string;
 use super::Input;
 
 /// Container for all the "list-like" types which can be converted to each other in lax mode.
@@ -221,7 +222,7 @@ impl<'a> EitherString<'a> {
 
     pub fn as_py_string(&'a self, py: Python<'a>) -> &'a PyString {
         match self {
-            Self::Cow(cow) => PyString::new(py, cow),
+            Self::Cow(cow) => get_py_string(py, cow),
             Self::Py(py_string) => py_string,
         }
     }
