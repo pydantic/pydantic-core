@@ -388,3 +388,18 @@ def test_tuple_fix_extra_any():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([])
     assert exc_info.value.errors() == [{'kind': 'missing', 'loc': [0], 'message': 'Field required', 'input_value': []}]
+
+
+def test_generator_error():
+    def gen(error: bool):
+        yield 1
+        yield 2
+        if error:
+            raise RuntimeError('error')
+        yield 3
+
+    v = SchemaValidator({'type': 'tuple', 'items_schema': 'int'})
+    assert v.validate_python(gen(False)) == (1, 2, 3)
+
+    with pytest.raises(ValidationError, match=r'Error iterating over object \[kind=iteration_error,'):
+        v.validate_python(gen(True))

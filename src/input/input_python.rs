@@ -24,19 +24,19 @@ use super::{
     PyArgs,
 };
 
+#[cfg(not(PyPy))]
 macro_rules! extract_gen_dict {
     ($type:ty, $obj:ident) => {{
-        let py = $obj.py();
         let map_err = |_| ValError::new(ErrorKind::IterationError, $obj);
         if let Ok(iterator) = $obj.cast_as::<PyIterator>() {
             let vec = iterator.collect::<PyResult<Vec<_>>>().map_err(map_err)?;
-            Some(<$type>::new(py, vec))
+            Some(<$type>::new($obj.py(), vec))
         } else if let Ok(dict_keys) = $obj.cast_as::<PyDictKeys>() {
             let vec = dict_keys.iter()?.collect::<PyResult<Vec<_>>>().map_err(map_err)?;
-            Some(<$type>::new(py, vec))
+            Some(<$type>::new($obj.py(), vec))
         } else if let Ok(dict_values) = $obj.cast_as::<PyDictValues>() {
             let vec = dict_values.iter()?.collect::<PyResult<Vec<_>>>().map_err(map_err)?;
-            Some(<$type>::new(py, vec))
+            Some(<$type>::new($obj.py(), vec))
         } else {
             None
         }
@@ -315,7 +315,7 @@ impl<'a> Input<'a> for PyAny {
             let vec = iterator
                 .collect::<PyResult<Vec<_>>>()
                 .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
-            Some(PyList::new(py, vec))
+            Ok(PyList::new(self.py(), vec).into())
         } else {
             Err(ValError::new(ErrorKind::ListType, self))
         }
@@ -352,7 +352,7 @@ impl<'a> Input<'a> for PyAny {
             let vec = iterator
                 .collect::<PyResult<Vec<_>>>()
                 .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
-            Some(PyTuple::new(py, vec))
+            Ok(PyTuple::new(self.py(), vec).into())
         } else {
             Err(ValError::new(ErrorKind::TupleType, self))
         }
@@ -397,7 +397,7 @@ impl<'a> Input<'a> for PyAny {
             let vec = iterator
                 .collect::<PyResult<Vec<_>>>()
                 .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
-            Some(PyTuple::new(py, vec))
+            Ok(PyTuple::new(self.py(), vec).into())
         } else {
             Err(ValError::new(ErrorKind::SetType, self))
         }
@@ -442,7 +442,7 @@ impl<'a> Input<'a> for PyAny {
             let vec = iterator
                 .collect::<PyResult<Vec<_>>>()
                 .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
-            Some(PyTuple::new(py, vec))
+            Ok(PyTuple::new(self.py(), vec).into())
         } else {
             Err(ValError::new(ErrorKind::FrozenSetType, self))
         }

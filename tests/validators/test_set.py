@@ -204,3 +204,20 @@ def test_set_as_dict_keys(py_and_json: PyAndJson):
     v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'set'}, 'values_schema': 'int'})
     with pytest.raises(ValidationError, match=re.escape('Input should be a valid set')):
         v.validate_test({'foo': 'bar'})
+
+
+def test_generator_error():
+    def gen(error: bool):
+        yield 1
+        yield 2
+        if error:
+            raise RuntimeError('error')
+        yield 3
+
+    v = SchemaValidator({'type': 'set', 'items_schema': 'int'})
+    r = v.validate_python(gen(False))
+    assert r == {1, 2, 3}
+    assert isinstance(r, set)
+
+    with pytest.raises(ValidationError, match=r'Error iterating over object \[kind=iteration_error,'):
+        v.validate_python(gen(True))

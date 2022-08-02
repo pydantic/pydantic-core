@@ -106,7 +106,10 @@ def test_frozenset_ints_python(input_value, expected):
         assert isinstance(output, frozenset)
 
 
-@pytest.mark.parametrize('input_value,expected', [([1, 2.5, '3'], {1, 2.5, '3'}), ([(1, 2), (3, 4)], {(1, 2), (3, 4)})])
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [(frozenset([1, 2.5, '3']), {1, 2.5, '3'}), ([1, 2.5, '3'], {1, 2.5, '3'}), ([(1, 2), (3, 4)], {(1, 2), (3, 4)})],
+)
 def test_frozenset_no_validators_python(input_value, expected):
     v = SchemaValidator({'type': 'frozenset'})
     output = v.validate_python(input_value)
@@ -233,3 +236,20 @@ def test_repr():
         'strict:true,item_validator:None,size_range:Some((Some(42),None)),name:"frozenset[any]"'
         '}))'
     )
+
+
+def test_generator_error():
+    def gen(error: bool):
+        yield 1
+        yield 2
+        if error:
+            raise RuntimeError('error')
+        yield 3
+
+    v = SchemaValidator({'type': 'frozenset', 'items_schema': 'int'})
+    r = v.validate_python(gen(False))
+    assert r == {1, 2, 3}
+    assert isinstance(r, frozenset)
+
+    with pytest.raises(ValidationError, match=r'Error iterating over object \[kind=iteration_error,'):
+        v.validate_python(gen(True))
