@@ -4,8 +4,8 @@ use std::str::from_utf8;
 use pyo3::exceptions::PyAttributeError;
 use pyo3::prelude::*;
 use pyo3::types::{
-    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList,
-    PyMapping, PySequence, PySet, PyString, PyTime, PyTuple, PyType,
+    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList, PyMapping,
+    PySequence, PySet, PyString, PyTime, PyTuple, PyType,
 };
 use pyo3::{intern, AsPyPointer};
 
