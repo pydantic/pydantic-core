@@ -14,7 +14,7 @@ from ..conftest import Err, PyAndJson
     [
         ('foobar', 'foobar'),
         (123, Err('Input should be a valid string [kind=str_type, input_value=123, input_type=int]')),
-        (123.456, Err('Input should be a valid string [kind=str_type, input_value=123.456, input_type=int]')),
+        (123.456, Err('Input should be a valid string [kind=str_type, input_value=123.456, input_type=float]')),
         (False, Err('Input should be a valid string [kind=str_type')),
         (True, Err('Input should be a valid string [kind=str_type')),
         ([], Err('Input should be a valid string [kind=str_type, input_value=[], input_type=list]')),
@@ -49,7 +49,7 @@ def test_str(py_and_json: PyAndJson, input_value, expected):
         (123, Err('Input should be a valid string [kind=str_type, input_value=123, input_type=int]')),
         (
             Decimal('123'),
-            Err("Input should be a valid string [kind=str_type, input_value=Decimal('123'), input_type=int]"),
+            Err("Input should be a valid string [kind=str_type, input_value=Decimal('123'), input_type=Decimal]"),
         ),
     ],
 )
@@ -65,13 +65,8 @@ def test_str_not_json(input_value, expected):
 @pytest.mark.parametrize(
     'kwargs,input_value,expected',
     [
-        ({}, b'abc', 'abc'),
+        ({}, 'abc', 'abc'),
         ({'strict': True}, 'Foobar', 'Foobar'),
-        (
-            {'strict': True},
-            b'abc',
-            Err('Input should be a valid string [kind=str_type, input_value=123, input_type=int]'),
-        ),
         ({'to_upper': True}, 'fooBar', 'FOOBAR'),
         ({'to_lower': True}, 'fooBar', 'foobar'),
         ({'strip_whitespace': True}, ' foobar  ', 'foobar'),
@@ -98,6 +93,23 @@ def test_constrained_str(py_and_json: PyAndJson, kwargs: Dict[str, Any], input_v
             v.validate_test(input_value)
     else:
         assert v.validate_test(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'kwargs,input_value,expected',
+    [
+        ({}, b'abc', 'abc'),
+        ({'strict': True}, 'Foobar', 'Foobar'),
+        ({'strict': True}, 123, Err('Input should be a valid string [kind=str_type, input_value=123, input_type=int]')),
+    ],
+)
+def test_constrained_str_py_only(kwargs: Dict[str, Any], input_value, expected):
+    v = SchemaValidator({'type': 'str', **kwargs})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected
 
 
 def test_unicode_error():
