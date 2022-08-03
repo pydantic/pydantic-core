@@ -1,5 +1,6 @@
 import dataclasses
 import re
+from collections import namedtuple
 
 import pytest
 
@@ -58,7 +59,7 @@ def test_function_call_arguments(py_and_json: PyAndJson, input_value, expected):
         ['x', TypeError('Arguments validator should return a tuple')],
         # lists are not allowed, input must strictly be a tuple
         [[(1, 2, 3), {}], TypeError('Arguments validator should return a tuple')],
-        [((1, 2, 3, 4), {}), TypeError('<locals>.my_function() takes 3 positional arguments but 4 were given')],
+        [((1, 2, 3, 4), {}), TypeError('my_function() takes 3 positional arguments but 4 were given')],
         [{'a': 1, 'b': 1, 'c': 1, 'd': 1}, TypeError("my_function() got an unexpected keyword argument 'd'")],
     ],
 )
@@ -143,3 +144,35 @@ def test_dataclass():
     assert dataclasses.is_dataclass(d)
     assert d.a == 1
     assert d.b == '2'
+    d = v.validate_python(((), {'a': 1, 'b': '2'}))
+    assert dataclasses.is_dataclass(d)
+    assert d.a == 1
+    assert d.b == '2'
+    assert 'name:"call-function[my_dataclass]"' in plain_repr(v)
+
+
+def test_named_tuple():
+    Point = namedtuple('Point', ['x', 'y'])
+
+    v = SchemaValidator(
+        {
+            'type': 'call-function',
+            'function': Point,
+            'arguments_schema': {
+                'type': 'arguments',
+                'arguments_schema': [
+                    {'name': 'x', 'mode': 'positional_or_keyword', 'schema': 'float'},
+                    {'name': 'y', 'mode': 'positional_or_keyword', 'schema': 'float'},
+                ],
+            },
+        }
+    )
+    d = v.validate_python((('1.1', '2.2'), {}))
+    assert isinstance(d, Point)
+    assert d.x == 1.1
+    assert d.y == 2.2
+
+    d = v.validate_python({'x': 1.1, 'y': 2.2})
+    assert isinstance(d, Point)
+    assert d.x == 1.1
+    assert d.y == 2.2
