@@ -295,7 +295,7 @@ fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> Val
         if let Ok(pydantic_value_error) = err.value(py).extract::<PydanticValueError>() {
             pydantic_value_error.into_val_error(input)
         } else if let Ok(validation_error) = err.value(py).extract::<ValidationError>() {
-            validation_error.into()
+            validation_error.into_py(py)
         } else {
             py_err_string!(err.value(py), ValueError, input)
         }
