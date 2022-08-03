@@ -290,7 +290,7 @@ class ArgumentInfo(TypedDict):
 
 class ArgumentsSchema(TypedDict, total=False):
     type: Required[Literal['arguments']]
-    arguments_schema: Required[List[ArgumentInfo]]
+    parameters_schema: Required[List[ArgumentInfo]]
     populate_by_name: bool
     var_args_schema: Schema
     var_kwargs_schema: Schema

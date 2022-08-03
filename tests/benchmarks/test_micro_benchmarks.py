@@ -829,7 +829,7 @@ def test_arguments(benchmark):
     v = SchemaValidator(
         {
             'type': 'arguments',
-            'arguments_schema': [
+            'parameters_schema': [
                 {'name': 'args1', 'mode': 'positional_only', 'schema': 'int'},
                 {'name': 'args2', 'mode': 'positional_only', 'schema': 'str'},
                 {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'bool'},
