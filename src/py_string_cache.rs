@@ -9,7 +9,11 @@ use pyo3::types::PyString;
 use ahash::AHasher;
 use nohash_hasher::BuildNoHashHasher;
 
-type PyStringCache = Arc<Mutex<(AHasher, HashMap<u64, Py<PyString>, BuildNoHashHasher<u64>>)>>;
+type PyStringCache = (
+    u128,
+    u128,
+    Arc<Mutex<HashMap<u64, Py<PyString>, BuildNoHashHasher<u64>>>>,
+);
 static PY_STRING_CACHE: GILOnceCell<PyStringCache> = GILOnceCell::new();
 
 const LENGTH_LIMIT: usize = 63;
@@ -21,15 +25,14 @@ pub fn make_py_string<'py>(py: Python<'py>, s: &str) -> &'py PyString {
         return PyString::new(py, s);
     }
 
-    let cache = PY_STRING_CACHE.get_or_init(py, || {
-        let hasher = AHasher::default();
+    let (key1, key2, cache) = PY_STRING_CACHE.get_or_init(py, || {
         let hashmap = HashMap::with_capacity_and_hasher(100, BuildHasherDefault::default());
-        Arc::new(Mutex::new((hasher, hashmap)))
+        (123, 321, Arc::new(Mutex::new(hashmap)))
     });
 
-    let mut cache = cache.lock().expect("Failed to acquire PY_STRING_CACHE lock");
-    let (hasher, hashmap) = &mut *cache;
+    let mut hashmap = cache.lock().expect("Failed to acquire PY_STRING_CACHE lock");
 
+    let mut hasher = AHasher::new_with_keys(*key1, *key2);
     hasher.write(s.as_bytes());
     let key = hasher.finish();
 
