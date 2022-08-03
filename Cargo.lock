@@ -23,6 +23,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "associative-cache"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46016233fc1bb55c23b856fe556b7db6ccd05119a0a392e04f0b3b7c79058f16"
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -192,6 +198,7 @@ name = "pydantic-core"
 version = "0.0.1"
 dependencies = [
  "ahash",
+ "associative-cache",
  "enum_dispatch",
  "indexmap",
  "mimalloc",

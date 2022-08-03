@@ -20,6 +20,7 @@ mimalloc = { version = "0.1.29", default-features = false, optional = true }
 speedate = "0.6.0"
 ahash = "0.7.6"
 nohash-hasher = "0.2.0"
+associative-cache = "1.0.1"
 
 [lib]
 name = "_pydantic_core"
