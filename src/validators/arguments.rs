@@ -43,13 +43,13 @@ impl BuildValidator for ArgumentsValidator {
 
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
-        let arguments_list: &PyList = schema.get_as_req(intern!(py, "parameters_schema"))?;
-        let mut parameters: Vec<Parameter> = Vec::with_capacity(arguments_list.len());
+        let arguments_schema: &PyList = schema.get_as_req(intern!(py, "arguments_schema"))?;
+        let mut parameters: Vec<Parameter> = Vec::with_capacity(arguments_schema.len());
 
         let mut positional_params_count = 0;
         let mut had_default_arg = false;
 
-        for (arg_index, arg) in arguments_list.iter().enumerate() {
+        for (arg_index, arg) in arguments_schema.iter().enumerate() {
             let arg: &PyDict = arg.cast_as()?;
 
             let name: String = arg.get_as_req(intern!(py, "name"))?;
