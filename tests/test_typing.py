@@ -98,6 +98,19 @@ def test_schema_typing() -> None:
     schema: Schema = {'type': 'callable'}
     SchemaValidator(schema)
 
+    schema: Schema = {
+        'type': 'arguments',
+        'arguments_schema': [
+            {'name': 'a', 'mode': 'positional_only', 'schema': 'int'},
+            {'name': 'b', 'schema': 'str'},
+            {'name': 'c', 'mode': 'keyword_only', 'schema': 'bool'},
+        ],
+    }
+    SchemaValidator(schema)
+
+    schema: Schema = {'type': 'call-function', 'arguments_schema': 'any', 'function': foo}
+    SchemaValidator(schema)
+
 
 def test_schema_typing_error() -> None:
     _: Schema = {'type': 'wrong'}  # type: ignore

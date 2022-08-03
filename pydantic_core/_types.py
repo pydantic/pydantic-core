@@ -297,7 +297,7 @@ class ArgumentsSchema(TypedDict, total=False):
     ref: str
 
 
-class CallFunctionSchema(TypedDict, total=False):
+class CallFunctionSchema(TypedDict):
     type: Literal['call-function']
     function: Callable[..., Any]
     arguments_schema: Schema
