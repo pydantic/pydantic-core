@@ -30,23 +30,22 @@ pub fn make_py_string<'py>(py: Python<'py>, s: &str) -> &'py PyString {
         (123, 321, Arc::new(Mutex::new(hashmap)))
     });
 
-    let mut hashmap = cache.lock().expect("Failed to acquire PY_STRING_CACHE lock");
-
     let mut hasher = AHasher::new_with_keys(*key1, *key2);
     hasher.write(s.as_bytes());
     let key = hasher.finish();
 
+    let mut hashmap = cache.lock().expect("Failed to acquire PY_STRING_CACHE lock");
     if let Some(py_string) = hashmap.get(&key) {
         py_string.clone_ref(py).into_ref(py)
     } else {
-        let py_string = PyString::new(py, s);
-        hashmap.insert(key, py_string.into_py(py));
-        if hashmap.len() > MAX_ITEMS {
+        if hashmap.len() >= MAX_ITEMS {
             let keys: Vec<_> = hashmap.keys().take(1000).cloned().collect();
             for k in keys {
                 hashmap.remove(&k);
             }
         }
+        let py_string = PyString::new(py, s);
+        hashmap.insert(key, py_string.into_py(py));
         py_string
     }
 }
