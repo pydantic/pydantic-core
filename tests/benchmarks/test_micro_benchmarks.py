@@ -539,7 +539,7 @@ def test_list_of_nullable_core(benchmark):
 def test_string_to_upper(benchmark):
     v = SchemaValidator('str', {'str_to_upper': True})
 
-    benchmark(v.validate_python, 'foobar')
+    benchmark(v.validate_python, 'f' * 63)
 
 
 some_bytes = b'0' * 1000

@@ -1,9 +1,8 @@
 use std::collections::HashSet;
 use std::hash::BuildHasherDefault;
 
-use nohash_hasher::NoHashHasher;
+use nohash_hasher::BuildNoHashHasher;
 
-type BuildNoHashHasher<T> = BuildHasherDefault<NoHashHasher<T>>;
 pub type NoHashSet<T> = HashSet<T, BuildNoHashHasher<T>>;
 
 /// This is used to avoid cyclic references in input data causing recursive validation and a nasty segmentation fault.
