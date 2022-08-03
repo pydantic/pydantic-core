@@ -297,8 +297,8 @@ class ArgumentsSchema(TypedDict, total=False):
     ref: str
 
 
-class CallFunctionSchema(TypedDict):
-    type: Literal['call-function']
+class CallSchema(TypedDict):
+    type: Literal['call']
     function: Callable[..., Any]
     arguments_schema: Schema
     return_schema: NotRequired[Schema]
@@ -361,5 +361,5 @@ Schema = Union[
     IsInstanceSchema,
     CallableSchema,
     ArgumentsSchema,
-    CallFunctionSchema,
+    CallSchema,
 ]

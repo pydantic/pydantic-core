@@ -108,7 +108,7 @@ def test_schema_typing() -> None:
     }
     SchemaValidator(schema)
 
-    schema: Schema = {'type': 'call-function', 'arguments_schema': 'any', 'function': foo}
+    schema: Schema = {'type': 'call', 'arguments_schema': 'any', 'function': foo}
     SchemaValidator(schema)
 
 

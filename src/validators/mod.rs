@@ -17,7 +17,7 @@ mod any;
 mod arguments;
 mod bool;
 mod bytes;
-mod call_function;
+mod call;
 mod callable;
 mod date;
 mod datetime;
@@ -337,7 +337,7 @@ pub fn build_validator<'a>(
         // functions - before, after, plain & wrap
         function::FunctionBuilder,
         // function call - validation around a function call
-        call_function::CallFunctionValidator,
+        call::CallValidator,
         // recursive (self-referencing) models
         recursive::RecursiveRefValidator,
         // literals
@@ -440,7 +440,7 @@ pub enum CombinedValidator {
     FunctionPlain(function::FunctionPlainValidator),
     FunctionWrap(function::FunctionWrapValidator),
     // function call - validation around a function call
-    FunctionCall(call_function::CallFunctionValidator),
+    FunctionCall(call::CallValidator),
     // recursive (self-referencing) models
     Recursive(recursive::RecursiveContainerValidator),
     RecursiveRef(recursive::RecursiveRefValidator),

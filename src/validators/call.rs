@@ -11,15 +11,15 @@ use crate::recursion_guard::RecursionGuard;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
-pub struct CallFunctionValidator {
+pub struct CallValidator {
     function: PyObject,
     arguments_validator: Box<CombinedValidator>,
     return_validator: Option<Box<CombinedValidator>>,
     name: String,
 }
 
-impl BuildValidator for CallFunctionValidator {
-    const EXPECTED_TYPE: &'static str = "call-function";
+impl BuildValidator for CallValidator {
+    const EXPECTED_TYPE: &'static str = "call";
 
     fn build(
         schema: &PyDict,
@@ -50,7 +50,7 @@ impl BuildValidator for CallFunctionValidator {
     }
 }
 
-impl Validator for CallFunctionValidator {
+impl Validator for CallValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
