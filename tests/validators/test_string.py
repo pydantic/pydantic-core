@@ -13,6 +13,7 @@ from ..conftest import Err, PyAndJson
     'input_value,expected',
     [
         ('foobar', 'foobar'),
+        ('foobar' * 100, 'foobar' * 100),
         (123, Err('Input should be a valid string [kind=str_type, input_value=123, input_type=int]')),
         (123.456, Err('Input should be a valid string [kind=str_type, input_value=123.456, input_type=float]')),
         (False, Err('Input should be a valid string [kind=str_type')),
@@ -67,6 +68,7 @@ def test_str_not_json(input_value, expected):
     [
         ({}, 'abc', 'abc'),
         ({'strict': True}, 'Foobar', 'Foobar'),
+        ({'strict': True}, 'Foobar' * 100, 'Foobar' * 100),
         ({'to_upper': True}, 'fooBar', 'FOOBAR'),
         ({'to_lower': True}, 'fooBar', 'foobar'),
         ({'strip_whitespace': True}, ' foobar  ', 'foobar'),

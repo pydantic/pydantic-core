@@ -16,6 +16,9 @@ const LENGTH_LIMIT: usize = 63;
 // gives max cache size of ~1MB
 const MAX_ITEMS: usize = 16_000;
 
+/// Creating PyStrings from a &str or String is somewhat expensive, so we cache short strings, this can make a 10%
+/// improvement to performance where we're creating lots of pystrings from rust strings, e.g. JSON parsing.
+/// Some scenarios might not want this, we could have a compile time option to disable it.
 pub fn make_py_string<'py>(py: Python<'py>, s: &str) -> &'py PyString {
     if s.len() > LENGTH_LIMIT {
         return PyString::new(py, s);
