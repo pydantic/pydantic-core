@@ -17,6 +17,7 @@ mod any;
 mod arguments;
 mod bool;
 mod bytes;
+mod call_function;
 mod callable;
 mod date;
 mod datetime;
@@ -24,12 +25,11 @@ mod dict;
 mod float;
 mod frozenset;
 mod function;
-mod function_call;
 mod int;
 mod is_instance;
 mod list;
 mod literal;
-mod model_class;
+mod new_class;
 mod none;
 mod nullable;
 mod recursive;
@@ -315,7 +315,7 @@ pub fn build_validator<'a>(
         // nullables
         nullable::NullableValidator,
         // model classes
-        model_class::ModelClassValidator,
+        new_class::NewClassValidator,
         // strings
         string::StrValidator,
         // integers
@@ -337,7 +337,7 @@ pub fn build_validator<'a>(
         // functions - before, after, plain & wrap
         function::FunctionBuilder,
         // function call - validation around a function call
-        function_call::FunctionCallValidator,
+        call_function::CallFunctionValidator,
         // recursive (self-referencing) models
         recursive::RecursiveRefValidator,
         // literals
@@ -411,7 +411,7 @@ pub enum CombinedValidator {
     // nullables
     Nullable(nullable::NullableValidator),
     // model classes
-    ModelClass(model_class::ModelClassValidator),
+    ModelClass(new_class::NewClassValidator),
     // strings
     Str(string::StrValidator),
     StrConstrained(string::StrConstrainedValidator),
@@ -440,7 +440,7 @@ pub enum CombinedValidator {
     FunctionPlain(function::FunctionPlainValidator),
     FunctionWrap(function::FunctionWrapValidator),
     // function call - validation around a function call
-    FunctionCall(function_call::FunctionCallValidator),
+    FunctionCall(call_function::CallFunctionValidator),
     // recursive (self-referencing) models
     Recursive(recursive::RecursiveContainerValidator),
     RecursiveRef(recursive::RecursiveRefValidator),

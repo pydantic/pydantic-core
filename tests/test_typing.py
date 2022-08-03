@@ -53,7 +53,7 @@ def test_schema_typing() -> None:
     schema: Schema = {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'any'}}
     SchemaValidator(schema)
     schema: Schema = {
-        'type': 'model-class',
+        'type': 'new-class',
         'class_type': Foo,
         'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'bar': {'schema': {'type': 'str'}}}},
     }

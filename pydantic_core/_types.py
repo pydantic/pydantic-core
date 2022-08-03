@@ -109,8 +109,8 @@ class LiteralSchema(TypedDict):
     ref: NotRequired[str]
 
 
-class ModelClassSchema(TypedDict):
-    type: Literal['model-class']
+class NewClassSchema(TypedDict):
+    type: Literal['new-class']
     class_type: type
     schema: Schema
     strict: NotRequired[bool]
@@ -297,8 +297,8 @@ class ArgumentsSchema(TypedDict, total=False):
     ref: str
 
 
-class FunctionCallSchema(TypedDict, total=False):
-    type: Literal['function-call']
+class CallFunctionSchema(TypedDict, total=False):
+    type: Literal['call-function']
     function: Callable[..., Any]
     arguments_schema: Schema
     return_schema: NotRequired[Schema]
@@ -343,7 +343,7 @@ Schema = Union[
     ListSchema,
     LiteralSchema,
     TypedDictSchema,
-    ModelClassSchema,
+    NewClassSchema,
     NoneSchema,
     NullableSchema,
     RecursiveReferenceSchema,
@@ -361,5 +361,5 @@ Schema = Union[
     IsInstanceSchema,
     CallableSchema,
     ArgumentsSchema,
-    FunctionCallSchema,
+    CallFunctionSchema,
 ]

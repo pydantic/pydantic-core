@@ -1,3 +1,4 @@
+import dataclasses
 import re
 
 import pytest
@@ -24,7 +25,7 @@ def test_function_call_arguments(py_and_json: PyAndJson, input_value, expected):
 
     v = py_and_json(
         {
-            'type': 'function-call',
+            'type': 'call-function',
             'function': my_function,
             'arguments_schema': {
                 'type': 'arguments',
@@ -66,7 +67,7 @@ def test_function_args_any(input_value, expected):
         return a + b + c
 
     v = SchemaValidator(
-        {'type': 'function-call', 'function': my_function, 'arguments_schema': 'any', 'return_schema': 'int'}
+        {'type': 'call-function', 'function': my_function, 'arguments_schema': 'any', 'return_schema': 'int'}
     )
 
     if isinstance(expected, Exception):
@@ -81,8 +82,8 @@ def test_function_return_any(input_value, expected):
     def my_function(a):
         return a
 
-    v = SchemaValidator({'type': 'function-call', 'function': my_function, 'arguments_schema': 'any'})
-    assert 'name:"function-call[my_function]"' in plain_repr(v)
+    v = SchemaValidator({'type': 'call-function', 'function': my_function, 'arguments_schema': 'any'})
+    assert 'name:"call-function[my_function]"' in plain_repr(v)
 
     assert v.validate_python(input_value) == expected
 
@@ -96,7 +97,7 @@ def test_in_union():
             'type': 'union',
             'choices': [
                 {
-                    'type': 'function-call',
+                    'type': 'call-function',
                     'function': my_function,
                     'arguments_schema': {
                         'type': 'arguments',
@@ -112,8 +113,33 @@ def test_in_union():
     assert exc_info.value.errors() == [
         {
             'kind': 'unexpected_positional_argument',
-            'loc': ['function-call[my_function]', 'arguments', 1],
+            'loc': ['call-function[my_function]', 'arguments', 1],
             'message': 'Unexpected positional argument',
             'input_value': 2,
         }
     ]
+
+
+def test_dataclass():
+    @dataclasses.dataclass
+    class my_dataclass:
+        a: int
+        b: str
+
+    v = SchemaValidator(
+        {
+            'type': 'call-function',
+            'function': my_dataclass,
+            'arguments_schema': {
+                'type': 'arguments',
+                'arguments_schema': [
+                    {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int'},
+                    {'name': 'b', 'mode': 'positional_or_keyword', 'schema': 'str'},
+                ],
+            },
+        }
+    )
+    d = v.validate_python((('1', b'2'), {}))
+    assert dataclasses.is_dataclass(d)
+    assert d.a == 1
+    assert d.b == '2'
