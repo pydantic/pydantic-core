@@ -24,6 +24,7 @@ mod dict;
 mod float;
 mod frozenset;
 mod function;
+mod function_call;
 mod int;
 mod is_instance;
 mod list;
@@ -335,6 +336,8 @@ pub fn build_validator<'a>(
         none::NoneValidator,
         // functions - before, after, plain & wrap
         function::FunctionBuilder,
+        // function call - validation around a function call
+        function_call::FunctionCallValidator,
         // recursive (self-referencing) models
         recursive::RecursiveRefValidator,
         // literals
@@ -436,6 +439,8 @@ pub enum CombinedValidator {
     FunctionAfter(function::FunctionAfterValidator),
     FunctionPlain(function::FunctionPlainValidator),
     FunctionWrap(function::FunctionWrapValidator),
+    // function call - validation around a function call
+    FunctionCall(function_call::FunctionCallValidator),
     // recursive (self-referencing) models
     Recursive(recursive::RecursiveContainerValidator),
     RecursiveRef(recursive::RecursiveRefValidator),

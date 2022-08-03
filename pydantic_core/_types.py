@@ -279,13 +279,13 @@ class CallableSchema(TypedDict):
     type: Literal['callable']
 
 
-class Parameter(TypedDict):
-    name: str
-    mode: Literal['positional_only', 'positional_or_keyword', 'keyword_only']
-    schema: Schema
-    default: NotRequired[Any]
-    default_factory: NotRequired[Callable[[], Any]]
-    alias: NotRequired[Union[str, List[Union[str, int]], List[List[Union[str, int]]]]]
+class Parameter(TypedDict, total=False):
+    name: Required[str]
+    mode: Literal['positional_only', 'positional_or_keyword', 'keyword_only']  # default positional_or_keyword
+    schema: Required[Schema]
+    default: Any
+    default_factory: Callable[[], Any]
+    alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
 
 
 class ArgumentsSchema(TypedDict, total=False):
@@ -295,6 +295,14 @@ class ArgumentsSchema(TypedDict, total=False):
     var_args_schema: Schema
     var_kwargs_schema: Schema
     ref: str
+
+
+class FunctionCallSchema(TypedDict, total=False):
+    type: Literal['function-call']
+    function: Callable[..., Any]
+    arguments_schema: Schema
+    return_schema: NotRequired[Schema]
+    ref: NotRequired[str]
 
 
 # pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
@@ -353,4 +361,5 @@ Schema = Union[
     IsInstanceSchema,
     CallableSchema,
     ArgumentsSchema,
+    FunctionCallSchema,
 ]
