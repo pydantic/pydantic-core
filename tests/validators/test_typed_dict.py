@@ -241,6 +241,24 @@ def test_validate_assignment():
     assert v.validate_assignment('field_a', b'abc', {'field_a': 'test'}) == ({'field_a': 'abc'}, {'field_a'})
 
 
+def test_validate_assignment_strict_field():
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'return_fields_set': True,
+            'fields': {'field_a': {'schema': {'type': 'str', 'strict': True}}},
+        }
+    )
+
+    assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_assignment('field_a', b'abc', {'field_a': 'test'})
+    assert exc_info.value.errors() == [
+        {'input_value': b'abc', 'kind': 'str_type', 'loc': ['field_a'], 'message': 'Input should be a valid string'}
+    ]
+
+
 def test_validate_assignment_functions():
     calls = []
 
