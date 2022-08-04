@@ -1211,3 +1211,25 @@ class TestOnError:
         assert v.validate_test({'x': ['foo']}) == {'x': '1'}
         assert v.validate_test({'x': ['foo', 'bar']}) == {'x': '2'}
         assert v.validate_test({'x': {'a': 'b'}}) == {'x': "{'a': 'b'}"}
+
+
+def test_frozen_field():
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'name': {'schema': {'type': 'str'}},
+                'age': {'schema': {'type': 'int'}},
+                'is_developer': {'schema': {'type': 'bool'}, 'default': True, 'frozen': True},
+            },
+        }
+    )
+    r1 = v.validate_python({'name': 'Samuel', 'age': '36'})
+    assert r1 == {'name': 'Samuel', 'age': 36, 'is_developer': True}
+    r2 = v.validate_assignment('age', '35', r1)
+    assert r2 == {'name': 'Samuel', 'age': 35, 'is_developer': True}
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_assignment('is_developer', False, r2)
+    assert exc_info.value.errors() == [
+        {'kind': 'frozen', 'loc': ['is_developer'], 'message': 'Field is frozen', 'input_value': False}
+    ]
