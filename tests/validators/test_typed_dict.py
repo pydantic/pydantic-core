@@ -354,6 +354,24 @@ def test_validate_assignment_allow_extra_validate():
     ]
 
 
+def test_validate_assignment_with_strict():
+    v = SchemaValidator(
+        {'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}}, 'y': {'schema': {'type': 'int'}}}}
+    )
+
+    r = v.validate_python({'x': 'a', 'y': '123'})
+    assert r == {'x': 'a', 'y': 123}
+
+    assert v.validate_assignment('y', '124', r) == {'x': 'a', 'y': 124}
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_assignment('y', '124', r, True)
+
+    assert exc_info.value.errors() == [
+        {'kind': 'int_type', 'loc': ['y'], 'message': 'Input should be a valid integer', 'input_value': '124'}
+    ]
+
+
 def test_json_error():
     v = SchemaValidator(
         {'type': 'typed-dict', 'fields': {'field_a': {'schema': {'type': 'list', 'items_schema': 'int'}}}}
