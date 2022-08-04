@@ -168,9 +168,8 @@ impl Validator for TuplePositionalValidator {
         match collection {
             GenericCollection::List(collection) => iter!(collection),
             GenericCollection::Tuple(collection) => iter!(collection),
-            GenericCollection::Set(collection) => iter!(collection),
-            GenericCollection::FrozenSet(collection) => iter!(collection),
             GenericCollection::JsonArray(collection) => iter!(collection),
+            _ => unreachable!(),
         }
         if errors.is_empty() {
             Ok(PyTuple::new(py, &output).into_py(py))
