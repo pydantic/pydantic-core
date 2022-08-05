@@ -12,7 +12,7 @@ use super::Input;
 
 /// Container for all the collections (sized iterable containers) types, which
 /// can mostly be converted to each other in lax mode.
-/// This matches python's definition of `Collection`.
+/// This mostly matches python's definition of `Collection`.
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub enum GenericCollection<'a> {
     List(&'a PyList),

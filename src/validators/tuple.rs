@@ -122,10 +122,10 @@ impl Validator for TuplePositionalValidator {
         let collection = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
         let expected_length = self.items_validators.len();
 
-        let ll_length = collection.generic_len();
-        if ll_length < expected_length {
+        let col_length = collection.generic_len();
+        if col_length < expected_length {
             return Err(ValError::LineErrors(
-                (ll_length..expected_length)
+                (col_length..expected_length)
                     .map(|index| ValLineError::new_with_loc(ErrorKind::Missing, input, index))
                     .collect(),
             ));
@@ -143,7 +143,7 @@ impl Validator for TuplePositionalValidator {
                                 return Err(ValError::new(
                                     ErrorKind::TooLong {
                                         max_length: expected_length,
-                                        input_length: ll_length,
+                                        input_length: col_length,
                                     },
                                     input,
                                 ));
