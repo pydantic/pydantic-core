@@ -37,6 +37,15 @@ def test_str():
         s.validate_json('123')
 
 
+def test_bytes():
+    s = SchemaValidator({'type': 'bytes'})
+    assert s.validate_json('"foobar"') == b'foobar'
+    with pytest.raises(ValidationError, match=r'Input should be a valid bytes \[kind=bytes_type,'):
+        s.validate_json('false')
+    with pytest.raises(ValidationError, match=r'Input should be a valid bytes \[kind=bytes_type,'):
+        s.validate_json('123')
+
+
 @pytest.mark.parametrize(
     'input_value,output_value',
     [('123.4', 123.4), ('123.0', 123.0), ('123', 123.0), ('"123.4"', 123.4), ('"123.0"', 123.0), ('"123"', 123.0)],
