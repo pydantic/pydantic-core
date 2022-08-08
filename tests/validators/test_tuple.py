@@ -107,6 +107,13 @@ def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
         ((1, 2, '3'), (1, 2, 3)),
         ([1, 2, '3'], (1, 2, 3)),
         pytest.param(
+            {1: 10, 2: 20, '3': '30'}.items(),
+            Err('Input should be a valid integer [kind=int_type,'),
+            marks=pytest.mark.skipif(
+                platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy'
+            ),
+        ),
+        pytest.param(
             {1: 10, 2: 20, '3': '30'}.keys(),
             (1, 2, 3),
             marks=pytest.mark.skipif(
@@ -121,8 +128,6 @@ def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
             ),
         ),
         ({1: 10, 2: 20, '3': '30'}, Err('Input should be a valid tuple [kind=tuple_type,')),
-        # https://github.com/pydantic/pydantic-core/issues/211
-        ({1: 10, 2: 20, '3': '30'}.items(), Err('Input should be a valid tuple [kind=tuple_type,')),
         ({1, 2, '3'}, Err('Input should be a valid tuple [kind=tuple_type,')),
         (frozenset([1, 2, '3']), Err('Input should be a valid tuple [kind=tuple_type,')),
     ],
