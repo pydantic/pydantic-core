@@ -46,13 +46,6 @@ def test_list_strict():
         ({1, 2, '3'}, Err('Input should be a valid list/array [kind=list_type,')),
         (frozenset({1, 2, '3'}), Err('Input should be a valid list/array [kind=list_type,')),
         pytest.param(
-            {1: 10, 2: 20, '3': '30'}.items(),
-            Err('Input should be a valid integer [kind=int_type,'),
-            marks=pytest.mark.skipif(
-                platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy'
-            ),
-        ),
-        pytest.param(
             {1: 10, 2: 20, '3': '30'}.keys(),
             [1, 2, 3],
             marks=pytest.mark.skipif(
@@ -231,3 +224,28 @@ def test_generator_error():
             'input_value': HasRepr(IsStr(regex='<generator object test_generator_error.<locals>.gen at 0x[0-9a-f]+>')),
         }
     ]
+
+
+@pytest.mark.skipif(platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy')
+@pytest.mark.parametrize(
+    'input_value,items_schema,expected',
+    [
+        pytest.param(
+            {1: 10, 2: 20, '3': '30'}.items(),
+            {'type': 'tuple', 'items_schema': {'type': 'any'}},
+            [(1, 10), (2, 20), ('3', '30')],
+            id='list_Tuple[Any, Any]',
+        ),
+        pytest.param(
+            {1: 10, 2: 20, '3': '30'}.items(),
+            {'type': 'tuple', 'items_schema': {'type': 'int'}},
+            [(1, 10), (2, 20), (3, 30)],
+            id='list_Tuple[int, int]',
+        ),
+    ],
+)
+def test_list_from_dict_items(input_value, items_schema, expected):
+    v = SchemaValidator({'type': 'list', 'items_schema': items_schema})
+    output = v.validate_python(input_value)
+    assert isinstance(output, list)
+    assert output == expected
