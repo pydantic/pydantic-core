@@ -230,7 +230,7 @@ jobs:
   build:
     name: build on ${{ matrix.platform || matrix.os }} (${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
     # only run on push to main and on release
-#    if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main')"
+    if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main')"
     needs: [test, lint]
     strategy:
       fail-fast: false
