@@ -141,9 +141,13 @@ def test_union_float_simple(py_and_json: PyAndJson):
 
 def test_float_repr():
     v = SchemaValidator({'type': 'float'})
-    assert plain_repr(v) == 'SchemaValidator(name="float",validator=Float(FloatValidator{strict:false}))'
+    assert (
+        plain_repr(v) == 'SchemaValidator(name="float",validator=Float(FloatValidator{strict:false,only_finite:false}))'
+    )
     v = SchemaValidator({'type': 'float', 'strict': True})
-    assert plain_repr(v) == 'SchemaValidator(name="float",validator=Float(FloatValidator{strict:true}))'
+    assert (
+        plain_repr(v) == 'SchemaValidator(name="float",validator=Float(FloatValidator{strict:true,only_finite:false}))'
+    )
     v = SchemaValidator({'type': 'float', 'multiple_of': 7})
     assert plain_repr(v).startswith('SchemaValidator(name="constrained-float",validator=ConstrainedFloat(')
 
@@ -174,3 +178,106 @@ def test_float_key(py_and_json: PyAndJson):
     assert v.validate_test({'1.5': 1, '2.4': 2}) == {1.5: 1, 2.4: 2}
     with pytest.raises(ValidationError, match='Input should be a valid number'):
         v.validate_test({'1.5': 1, '2.5': 2}, strict=True)
+
+
+@pytest.mark.parametrize(
+    'input_value,only_finite,expected',
+    [
+        ('NaN', False, lambda x: math.isnan(x)),
+        (
+            'NaN',
+            True,
+            Err(
+                'Input should be finite (neither infinite nor NaN) '
+                "[kind=float_finite, input_value='NaN', input_type=str]"
+            ),
+        ),
+        ('+inf', False, lambda x: math.isinf(x) and x > 0),
+        (
+            '+inf',
+            True,
+            Err(
+                'Input should be finite (neither infinite nor NaN) '
+                "[kind=float_finite, input_value='+inf', input_type=str]"
+            ),
+        ),
+        ('+infinity', False, lambda x: math.isinf(x) and x > 0),
+        (
+            '+infinity',
+            True,
+            Err(
+                'Input should be finite (neither infinite nor NaN) '
+                "[kind=float_finite, input_value='+infinity', input_type=str]"
+            ),
+        ),
+        ('-inf', False, lambda x: math.isinf(x) and x < 0),
+        (
+            '-inf',
+            True,
+            Err(
+                'Input should be finite (neither infinite nor NaN) '
+                "[kind=float_finite, input_value='-inf', input_type=str]"
+            ),
+        ),
+        ('-infinity', False, lambda x: math.isinf(x) and x < 0),
+        (
+            '-infinity',
+            True,
+            Err(
+                'Input should be finite (neither infinite nor NaN) '
+                "[kind=float_finite, input_value='-infinity', input_type=str]"
+            ),
+        ),
+        ('0.7', False, lambda x: x == 0.7),
+        ('0.7', True, lambda x: x == 0.7),
+        (
+            'pika',
+            False,
+            Err(
+                'Input should be a valid number, unable to parse string as an number '
+                "[kind=float_parsing, input_value='pika', input_type=str]"
+            ),
+        ),
+        (
+            'pika',
+            True,
+            Err(
+                'Input should be a valid number, unable to parse string as an number '
+                "[kind=float_parsing, input_value='pika', input_type=str]"
+            ),
+        ),
+    ],
+)
+def test_non_finite_json_values(py_and_json: PyAndJson, input_value, only_finite, expected):
+    v = py_and_json({'type': 'float', 'only_finite': only_finite})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_test(input_value)
+    else:
+        res = v.validate_test(input_value)
+        assert expected(res)
+
+
+@pytest.mark.parametrize('strict', (True, False))
+@pytest.mark.parametrize(
+    'input_value,only_finite,expected',
+    [
+        (float('nan'), False, lambda x: math.isnan(x)),
+        (
+            float('nan'),
+            True,
+            Err(
+                'Input should be finite (neither infinite nor NaN) '
+                '[kind=float_finite, input_value=nan, input_type=float]'
+            ),
+        ),
+    ],
+)
+def test_non_finite_float_values(strict, input_value, only_finite, expected):
+    v = SchemaValidator({'type': 'float', 'only_finite': only_finite, 'strict': strict})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        res = v.validate_python(input_value)
+        assert expected(res)

@@ -12,6 +12,7 @@ use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 #[derive(Debug, Clone)]
 pub struct FloatValidator {
     strict: bool,
+    only_finite: bool,
 }
 
 impl BuildValidator for FloatValidator {
@@ -33,6 +34,7 @@ impl BuildValidator for FloatValidator {
         } else {
             Ok(Self {
                 strict: is_strict(schema, config)?,
+                only_finite: schema.get_as(intern!(py, "only_finite"))?.unwrap_or(false),
             }
             .into())
         }
@@ -48,7 +50,9 @@ impl Validator for FloatValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.validate_float(extra.strict.unwrap_or(self.strict))?.into_py(py))
+        Ok(input
+            .validate_float(extra.strict.unwrap_or(self.strict), self.only_finite)?
+            .into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -59,6 +63,7 @@ impl Validator for FloatValidator {
 #[derive(Debug, Clone)]
 pub struct ConstrainedFloatValidator {
     strict: bool,
+    only_finite: bool,
     multiple_of: Option<f64>,
     le: Option<f64>,
     lt: Option<f64>,
@@ -75,7 +80,7 @@ impl Validator for ConstrainedFloatValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let float = input.validate_float(extra.strict.unwrap_or(self.strict))?;
+        let float = input.validate_float(extra.strict.unwrap_or(self.strict), self.only_finite)?;
         if let Some(multiple_of) = self.multiple_of {
             if float % multiple_of != 0.0 {
                 return Err(ValError::new(ErrorKind::FloatMultipleOf { multiple_of }, input));
@@ -113,6 +118,7 @@ impl ConstrainedFloatValidator {
         let py = schema.py();
         Ok(Self {
             strict: is_strict(schema, config)?,
+            only_finite: schema.get_as(intern!(py, "only_finite"))?.unwrap_or(false),
             multiple_of: schema.get_as(intern!(py, "multiple_of"))?,
             le: schema.get_as(intern!(py, "le"))?,
             lt: schema.get_as(intern!(py, "lt"))?,
