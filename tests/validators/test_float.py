@@ -264,3 +264,34 @@ def test_non_finite_float_values(strict, input_value, allow_inf_nan, expected):
     else:
         res = v.validate_python(input_value)
         assert expected(res)
+
+
+@pytest.mark.parametrize(
+    'input_value,allow_inf_nan,expected',
+    [
+        (float('+inf'), True, lambda x: math.isinf(x) and x > 0),
+        (
+            float('+inf'),
+            False,
+            Err('Input should be a finite number [kind=float_finite_number, input_value=inf, input_type=float]'),
+        ),
+        (
+            float('-inf'),
+            True,
+            Err('Input should be greater than 0 [kind=greater_than, input_value=-inf, input_type=float]'),
+        ),
+        (
+            float('-inf'),
+            False,
+            Err('Input should be a finite number [kind=float_finite_number, input_value=-inf, input_type=float]'),
+        ),
+    ],
+)
+def test_non_finite_constrained_float_values(input_value, allow_inf_nan, expected):
+    v = SchemaValidator({'type': 'float', 'allow_inf_nan': allow_inf_nan, 'gt': 0})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        res = v.validate_python(input_value)
+        assert expected(res)
