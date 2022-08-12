@@ -133,7 +133,7 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::String(str) => match str.parse::<f64>() {
                 Ok(i) => {
                     if !allow_inf_nan && !i.is_finite() {
-                        return Err(ValError::new(ErrorKind::FloatFinite, self));
+                        return Err(ValError::new(ErrorKind::FloatFiniteNumber, self));
                     }
 
                     Ok(i)

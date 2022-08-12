@@ -213,7 +213,7 @@ impl<'a> Input<'a> for PyAny {
             Err(ValError::new(ErrorKind::FloatType, self))
         } else if let Ok(float) = self.extract::<f64>() {
             if !allow_inf_nan && !float.is_finite() {
-                return Err(ValError::new(ErrorKind::FloatFinite, self));
+                return Err(ValError::new(ErrorKind::FloatFiniteNumber, self));
             }
 
             Ok(float)
@@ -225,7 +225,7 @@ impl<'a> Input<'a> for PyAny {
     fn lax_float(&self, allow_inf_nan: bool) -> ValResult<f64> {
         if let Ok(float) = self.extract::<f64>() {
             if !allow_inf_nan && !float.is_finite() {
-                return Err(ValError::new(ErrorKind::FloatFinite, self));
+                return Err(ValError::new(ErrorKind::FloatFiniteNumber, self));
             }
 
             Ok(float)
@@ -233,7 +233,7 @@ impl<'a> Input<'a> for PyAny {
             match cow_str.as_ref().parse::<f64>() {
                 Ok(i) => {
                     if !allow_inf_nan && !i.is_finite() {
-                        return Err(ValError::new(ErrorKind::FloatFinite, self));
+                        return Err(ValError::new(ErrorKind::FloatFiniteNumber, self));
                     }
 
                     Ok(i)
