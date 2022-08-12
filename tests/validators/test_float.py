@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Any, Dict
 
 import pytest
+from dirty_equals import FunctionCheck
 
 from pydantic_core import SchemaValidator, ValidationError
 
@@ -184,38 +185,38 @@ def test_float_key(py_and_json: PyAndJson):
 @pytest.mark.parametrize(
     'input_value,allow_inf_nan,expected',
     [
-        ('NaN', True, lambda x: math.isnan(x)),
+        ('NaN', True, FunctionCheck(math.isnan)),
         (
             'NaN',
             False,
             Err("Input should be a finite number [kind=float_finite_number, input_value='NaN', input_type=str]"),
         ),
-        ('+inf', True, lambda x: math.isinf(x) and x > 0),
+        ('+inf', True, FunctionCheck(lambda x: math.isinf(x) and x > 0)),
         (
             '+inf',
             False,
             Err("Input should be a finite number [kind=float_finite_number, input_value='+inf', input_type=str]"),
         ),
-        ('+infinity', True, lambda x: math.isinf(x) and x > 0),
+        ('+infinity', True, FunctionCheck(lambda x: math.isinf(x) and x > 0)),
         (
             '+infinity',
             False,
             Err("Input should be a finite number [kind=float_finite_number, input_value='+infinity', input_type=str]"),
         ),
-        ('-inf', True, lambda x: math.isinf(x) and x < 0),
+        ('-inf', True, FunctionCheck(lambda x: math.isinf(x) and x < 0)),
         (
             '-inf',
             False,
             Err("Input should be a finite number [kind=float_finite_number, input_value='-inf', input_type=str]"),
         ),
-        ('-infinity', True, lambda x: math.isinf(x) and x < 0),
+        ('-infinity', True, FunctionCheck(lambda x: math.isinf(x) and x < 0)),
         (
             '-infinity',
             False,
             Err("Input should be a finite number [kind=float_finite_number, input_value='-infinity', input_type=str]"),
         ),
-        ('0.7', True, lambda x: x == 0.7),
-        ('0.7', False, lambda x: x == 0.7),
+        ('0.7', True, 0.7),
+        ('0.7', False, 0.7),
         (
             'pika',
             True,
@@ -240,15 +241,14 @@ def test_non_finite_json_values(py_and_json: PyAndJson, input_value, allow_inf_n
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
     else:
-        res = v.validate_test(input_value)
-        assert expected(res)
+        assert v.validate_test(input_value) == expected
 
 
 @pytest.mark.parametrize('strict', (True, False))
 @pytest.mark.parametrize(
     'input_value,allow_inf_nan,expected',
     [
-        (float('nan'), True, lambda x: math.isnan(x)),
+        (float('nan'), True, FunctionCheck(math.isnan)),
         (
             float('nan'),
             False,
@@ -262,14 +262,13 @@ def test_non_finite_float_values(strict, input_value, allow_inf_nan, expected):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
     else:
-        res = v.validate_python(input_value)
-        assert expected(res)
+        assert v.validate_python(input_value) == expected
 
 
 @pytest.mark.parametrize(
     'input_value,allow_inf_nan,expected',
     [
-        (float('+inf'), True, lambda x: math.isinf(x) and x > 0),
+        (float('+inf'), True, FunctionCheck(lambda x: math.isinf(x) and x > 0)),
         (
             float('+inf'),
             False,
@@ -293,5 +292,4 @@ def test_non_finite_constrained_float_values(input_value, allow_inf_nan, expecte
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
     else:
-        res = v.validate_python(input_value)
-        assert expected(res)
+        assert v.validate_python(input_value) == expected
