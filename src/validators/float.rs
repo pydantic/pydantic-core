@@ -50,9 +50,11 @@ impl Validator for FloatValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input
-            .validate_float(extra.strict.unwrap_or(self.strict), self.allow_inf_nan)?
-            .into_py(py))
+        let float = input.validate_float(extra.strict.unwrap_or(self.strict))?;
+        if !self.allow_inf_nan && !float.is_finite() {
+            return Err(ValError::new(ErrorKind::FloatFiniteNumber, input));
+        }
+        Ok(float.into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -80,7 +82,10 @@ impl Validator for ConstrainedFloatValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let float = input.validate_float(extra.strict.unwrap_or(self.strict), self.allow_inf_nan)?;
+        let float = input.validate_float(extra.strict.unwrap_or(self.strict))?;
+        if !self.allow_inf_nan && !float.is_finite() {
+            return Err(ValError::new(ErrorKind::FloatFiniteNumber, input));
+        }
         if let Some(multiple_of) = self.multiple_of {
             if float % multiple_of != 0.0 {
                 return Err(ValError::new(ErrorKind::FloatMultipleOf { multiple_of }, input));

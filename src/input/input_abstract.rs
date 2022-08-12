@@ -96,17 +96,17 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         self.strict_int()
     }
 
-    fn validate_float(&self, strict: bool, allow_inf_nan: bool) -> ValResult<f64> {
+    fn validate_float(&self, strict: bool) -> ValResult<f64> {
         if strict {
-            self.strict_float(allow_inf_nan)
+            self.strict_float()
         } else {
-            self.lax_float(allow_inf_nan)
+            self.lax_float()
         }
     }
-    fn strict_float(&self, allow_inf_nan: bool) -> ValResult<f64>;
+    fn strict_float(&self) -> ValResult<f64>;
     #[cfg_attr(has_no_coverage, no_coverage)]
-    fn lax_float(&self, allow_inf_nan: bool) -> ValResult<f64> {
-        self.strict_float(allow_inf_nan)
+    fn lax_float(&self) -> ValResult<f64> {
+        self.strict_float()
     }
 
     fn validate_dict(&'a self, strict: bool) -> ValResult<GenericMapping<'a>> {

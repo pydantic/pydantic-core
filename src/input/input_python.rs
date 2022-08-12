@@ -201,43 +201,29 @@ impl<'a> Input<'a> for PyAny {
             Ok(int)
         } else if let Some(cow_str) = maybe_as_string(self, ErrorKind::IntParsing)? {
             str_as_int(self, &cow_str)
-        } else if let Ok(float) = self.lax_float(false) {
+        } else if let Ok(float) = self.lax_float() {
             float_as_int(self, float)
         } else {
             Err(ValError::new(ErrorKind::IntType, self))
         }
     }
 
-    fn strict_float(&self, allow_inf_nan: bool) -> ValResult<f64> {
+    fn strict_float(&self) -> ValResult<f64> {
         if self.extract::<bool>().is_ok() {
             Err(ValError::new(ErrorKind::FloatType, self))
         } else if let Ok(float) = self.extract::<f64>() {
-            if !allow_inf_nan && !float.is_finite() {
-                return Err(ValError::new(ErrorKind::FloatFiniteNumber, self));
-            }
-
             Ok(float)
         } else {
             Err(ValError::new(ErrorKind::FloatType, self))
         }
     }
 
-    fn lax_float(&self, allow_inf_nan: bool) -> ValResult<f64> {
+    fn lax_float(&self) -> ValResult<f64> {
         if let Ok(float) = self.extract::<f64>() {
-            if !allow_inf_nan && !float.is_finite() {
-                return Err(ValError::new(ErrorKind::FloatFiniteNumber, self));
-            }
-
             Ok(float)
         } else if let Some(cow_str) = maybe_as_string(self, ErrorKind::FloatParsing)? {
             match cow_str.as_ref().parse::<f64>() {
-                Ok(i) => {
-                    if !allow_inf_nan && !i.is_finite() {
-                        return Err(ValError::new(ErrorKind::FloatFiniteNumber, self));
-                    }
-
-                    Ok(i)
-                }
+                Ok(i) => Ok(i),
                 Err(_) => Err(ValError::new(ErrorKind::FloatParsing, self)),
             }
         } else {
