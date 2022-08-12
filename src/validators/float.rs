@@ -2,7 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_tools::{is_strict, SchemaDict};
+use crate::build_tools::{is_strict, schema_or_config_same, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -34,7 +34,7 @@ impl BuildValidator for FloatValidator {
         } else {
             Ok(Self {
                 strict: is_strict(schema, config)?,
-                allow_inf_nan: schema.get_as(intern!(py, "allow_inf_nan"))?.unwrap_or(true),
+                allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
             }
             .into())
         }
@@ -123,7 +123,7 @@ impl ConstrainedFloatValidator {
         let py = schema.py();
         Ok(Self {
             strict: is_strict(schema, config)?,
-            allow_inf_nan: schema.get_as(intern!(py, "allow_inf_nan"))?.unwrap_or(true),
+            allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
             multiple_of: schema.get_as(intern!(py, "multiple_of"))?,
             le: schema.get_as(intern!(py, "le"))?,
             lt: schema.get_as(intern!(py, "lt"))?,
