@@ -261,14 +261,15 @@ def test_generator_error():
             {1: 10, 2: 20, '3': '30'}.items(),
             {'type': 'tuple', 'items_schema': {'type': 'any'}},
             frozenset(((1, 10), (2, 20), ('3', '30'))),
-            id='frozenset_Tuple[Any, Any]',
+            id='Tuple[Any, Any]',
         ),
         pytest.param(
             {1: 10, 2: 20, '3': '30'}.items(),
             {'type': 'tuple', 'items_schema': {'type': 'int'}},
             frozenset(((1, 10), (2, 20), (3, 30))),
-            id='frozenset_Tuple[int, int]',
+            id='Tuple[int, int]',
         ),
+        pytest.param({1: 10, 2: 20, '3': '30'}.items(), 'any', {(1, 10), (2, 20), ('3', '30')}, id='Any'),
     ],
 )
 def test_frozenset_from_dict_items(input_value, items_schema, expected):

@@ -234,14 +234,15 @@ def test_generator_error():
             {1: 10, 2: 20, '3': '30'}.items(),
             {'type': 'tuple', 'items_schema': {'type': 'any'}},
             [(1, 10), (2, 20), ('3', '30')],
-            id='list_Tuple[Any, Any]',
+            id='Tuple[Any, Any]',
         ),
         pytest.param(
             {1: 10, 2: 20, '3': '30'}.items(),
             {'type': 'tuple', 'items_schema': {'type': 'int'}},
             [(1, 10), (2, 20), (3, 30)],
-            id='list_Tuple[int, int]',
+            id='Tuple[int, int]',
         ),
+        pytest.param({1: 10, 2: 20, '3': '30'}.items(), 'any', [(1, 10), (2, 20), ('3', '30')], id='Any'),
     ],
 )
 def test_list_from_dict_items(input_value, items_schema, expected):
