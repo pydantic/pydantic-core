@@ -208,11 +208,11 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_float(&self, only_finite: bool) -> ValResult<f64> {
+    fn strict_float(&self, allow_inf_nan: bool) -> ValResult<f64> {
         if self.extract::<bool>().is_ok() {
             Err(ValError::new(ErrorKind::FloatType, self))
         } else if let Ok(float) = self.extract::<f64>() {
-            if only_finite && !float.is_finite() {
+            if !allow_inf_nan && !float.is_finite() {
                 return Err(ValError::new(ErrorKind::FloatFinite, self));
             }
 
@@ -222,9 +222,9 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_float(&self, only_finite: bool) -> ValResult<f64> {
+    fn lax_float(&self, allow_inf_nan: bool) -> ValResult<f64> {
         if let Ok(float) = self.extract::<f64>() {
-            if only_finite && !float.is_finite() {
+            if !allow_inf_nan && !float.is_finite() {
                 return Err(ValError::new(ErrorKind::FloatFinite, self));
             }
 
@@ -232,7 +232,7 @@ impl<'a> Input<'a> for PyAny {
         } else if let Some(cow_str) = maybe_as_string(self, ErrorKind::FloatParsing)? {
             match cow_str.as_ref().parse::<f64>() {
                 Ok(i) => {
-                    if only_finite && !i.is_finite() {
+                    if !allow_inf_nan && !i.is_finite() {
                         return Err(ValError::new(ErrorKind::FloatFinite, self));
                     }
 

@@ -59,7 +59,7 @@ class DictSchema(TypedDict, total=False):
 
 class FloatSchema(TypedDict, total=False):
     type: Required[Literal['float']]
-    only_finite: bool  # whether 'NaN', '+inf', '-inf' should be forbidden. default: False
+    allow_inf_nan: bool  # whether 'NaN', '+inf', '-inf' should be forbidden. default: True
     multiple_of: float
     le: float
     ge: float

@@ -142,11 +142,12 @@ def test_union_float_simple(py_and_json: PyAndJson):
 def test_float_repr():
     v = SchemaValidator({'type': 'float'})
     assert (
-        plain_repr(v) == 'SchemaValidator(name="float",validator=Float(FloatValidator{strict:false,only_finite:false}))'
+        plain_repr(v)
+        == 'SchemaValidator(name="float",validator=Float(FloatValidator{strict:false,allow_inf_nan:true}))'
     )
     v = SchemaValidator({'type': 'float', 'strict': True})
     assert (
-        plain_repr(v) == 'SchemaValidator(name="float",validator=Float(FloatValidator{strict:true,only_finite:false}))'
+        plain_repr(v) == 'SchemaValidator(name="float",validator=Float(FloatValidator{strict:true,allow_inf_nan:true}))'
     )
     v = SchemaValidator({'type': 'float', 'multiple_of': 7})
     assert plain_repr(v).startswith('SchemaValidator(name="constrained-float",validator=ConstrainedFloat(')
@@ -181,55 +182,63 @@ def test_float_key(py_and_json: PyAndJson):
 
 
 @pytest.mark.parametrize(
-    'input_value,only_finite,expected',
+    'input_value,allow_inf_nan,expected',
     [
-        ('NaN', False, lambda x: math.isnan(x)),
+        ('NaN', True, lambda x: math.isnan(x)),
         (
             'NaN',
-            True,
+            False,
             Err(
                 'Input should be finite (neither infinite nor NaN) '
                 "[kind=float_finite, input_value='NaN', input_type=str]"
             ),
         ),
-        ('+inf', False, lambda x: math.isinf(x) and x > 0),
+        ('+inf', True, lambda x: math.isinf(x) and x > 0),
         (
             '+inf',
-            True,
+            False,
             Err(
                 'Input should be finite (neither infinite nor NaN) '
                 "[kind=float_finite, input_value='+inf', input_type=str]"
             ),
         ),
-        ('+infinity', False, lambda x: math.isinf(x) and x > 0),
+        ('+infinity', True, lambda x: math.isinf(x) and x > 0),
         (
             '+infinity',
-            True,
+            False,
             Err(
                 'Input should be finite (neither infinite nor NaN) '
                 "[kind=float_finite, input_value='+infinity', input_type=str]"
             ),
         ),
-        ('-inf', False, lambda x: math.isinf(x) and x < 0),
+        ('-inf', True, lambda x: math.isinf(x) and x < 0),
         (
             '-inf',
-            True,
+            False,
             Err(
                 'Input should be finite (neither infinite nor NaN) '
                 "[kind=float_finite, input_value='-inf', input_type=str]"
             ),
         ),
-        ('-infinity', False, lambda x: math.isinf(x) and x < 0),
+        ('-infinity', True, lambda x: math.isinf(x) and x < 0),
         (
             '-infinity',
-            True,
+            False,
             Err(
                 'Input should be finite (neither infinite nor NaN) '
                 "[kind=float_finite, input_value='-infinity', input_type=str]"
             ),
         ),
-        ('0.7', False, lambda x: x == 0.7),
         ('0.7', True, lambda x: x == 0.7),
+        ('0.7', False, lambda x: x == 0.7),
+        (
+            'pika',
+            True,
+            Err(
+                'Input should be a valid number, unable to parse string as an number '
+                "[kind=float_parsing, input_value='pika', input_type=str]"
+            ),
+        ),
         (
             'pika',
             False,
@@ -238,18 +247,10 @@ def test_float_key(py_and_json: PyAndJson):
                 "[kind=float_parsing, input_value='pika', input_type=str]"
             ),
         ),
-        (
-            'pika',
-            True,
-            Err(
-                'Input should be a valid number, unable to parse string as an number '
-                "[kind=float_parsing, input_value='pika', input_type=str]"
-            ),
-        ),
     ],
 )
-def test_non_finite_json_values(py_and_json: PyAndJson, input_value, only_finite, expected):
-    v = py_and_json({'type': 'float', 'only_finite': only_finite})
+def test_non_finite_json_values(py_and_json: PyAndJson, input_value, allow_inf_nan, expected):
+    v = py_and_json({'type': 'float', 'allow_inf_nan': allow_inf_nan})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -260,12 +261,12 @@ def test_non_finite_json_values(py_and_json: PyAndJson, input_value, only_finite
 
 @pytest.mark.parametrize('strict', (True, False))
 @pytest.mark.parametrize(
-    'input_value,only_finite,expected',
+    'input_value,allow_inf_nan,expected',
     [
-        (float('nan'), False, lambda x: math.isnan(x)),
+        (float('nan'), True, lambda x: math.isnan(x)),
         (
             float('nan'),
-            True,
+            False,
             Err(
                 'Input should be finite (neither infinite nor NaN) '
                 '[kind=float_finite, input_value=nan, input_type=float]'
@@ -273,8 +274,8 @@ def test_non_finite_json_values(py_and_json: PyAndJson, input_value, only_finite
         ),
     ],
 )
-def test_non_finite_float_values(strict, input_value, only_finite, expected):
-    v = SchemaValidator({'type': 'float', 'only_finite': only_finite, 'strict': strict})
+def test_non_finite_float_values(strict, input_value, allow_inf_nan, expected):
+    v = SchemaValidator({'type': 'float', 'allow_inf_nan': allow_inf_nan, 'strict': strict})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)

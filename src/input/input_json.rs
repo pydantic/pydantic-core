@@ -115,14 +115,14 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
-    fn strict_float(&self, _only_finite: bool) -> ValResult<f64> {
+    fn strict_float(&self, _allow_inf_nan: bool) -> ValResult<f64> {
         match self {
             JsonInput::Float(f) => Ok(*f),
             JsonInput::Int(i) => Ok(*i as f64),
             _ => Err(ValError::new(ErrorKind::FloatType, self)),
         }
     }
-    fn lax_float(&self, only_finite: bool) -> ValResult<f64> {
+    fn lax_float(&self, allow_inf_nan: bool) -> ValResult<f64> {
         match self {
             JsonInput::Bool(b) => match *b {
                 true => Ok(1.0),
@@ -132,7 +132,7 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::Int(i) => Ok(*i as f64),
             JsonInput::String(str) => match str.parse::<f64>() {
                 Ok(i) => {
-                    if only_finite && !i.is_finite() {
+                    if !allow_inf_nan && !i.is_finite() {
                         return Err(ValError::new(ErrorKind::FloatFinite, self));
                     }
 
@@ -314,10 +314,10 @@ impl<'a> Input<'a> for String {
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
-    fn strict_float(&self, _only_finite: bool) -> ValResult<f64> {
+    fn strict_float(&self, _allow_inf_nan: bool) -> ValResult<f64> {
         Err(ValError::new(ErrorKind::FloatType, self))
     }
-    fn lax_float(&self, _only_finite: bool) -> ValResult<f64> {
+    fn lax_float(&self, _allow_inf_nan: bool) -> ValResult<f64> {
         match self.parse() {
             Ok(i) => Ok(i),
             Err(_) => Err(ValError::new(ErrorKind::FloatParsing, self)),
