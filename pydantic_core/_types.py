@@ -126,6 +126,7 @@ class TypedDictField(TypedDict, total=False):
     on_error: Literal['raise', 'omit', 'fallback_on_default']  # default: 'raise'
     alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
     frozen: bool
+    validate_always: bool  # default: False
 
 
 class TypedDictSchema(TypedDict, total=False):

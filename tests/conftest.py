@@ -55,6 +55,9 @@ class PyAndJsonValidator:
             assert self.validator_type == 'python', self.validator_type
             return self.validator.validate_python(py_input, strict, context)
 
+    def validate_assignment(self, py_input, strict: 'bool | None' = None, context: Any = None):
+        return self.validator.validate_assignment(py_input, strict, context)
+
     def isinstance_test(self, py_input, strict: 'bool | None' = None, context: Any = None):
         if self.validator_type == 'json':
             return self.validator.isinstance_json(json.dumps(py_input), strict, context)

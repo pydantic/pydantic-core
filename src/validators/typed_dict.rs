@@ -33,6 +33,7 @@ struct TypedDictField {
     default_factory: Option<PyObject>,
     validator: CombinedValidator,
     frozen: bool,
+    validate_always: bool,
 }
 
 impl TypedDictField {
@@ -184,6 +185,9 @@ impl BuildValidator for TypedDictValidator {
                 default_factory,
                 on_error,
                 frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
+                validate_always: field_info
+                    .get_as::<bool>(intern!(py, "validate_always"))?
+                    .unwrap_or(false),
             });
         }
 
@@ -283,6 +287,27 @@ impl Validator for TypedDictValidator {
                                 }
                             },
                             Err(err) => return Err(err),
+                        }
+                    } else if field.validate_always {
+                        // maybe change the fallback of default value to a sentinel ?
+                        let default_value = field.default_value(py)?.unwrap_or(Cow::Owned(py.None()));
+                        match field.validator.validate(
+                            py,
+                            default_value.cast_as::<PyAny>(py)?,
+                            &extra,
+                            slots,
+                            recursion_guard,
+                        ) {
+                            Ok(value) => {
+                                output_dict.set_item(&field.name_pystring, value)?;
+                            }
+                            Err(_) => {
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorKind::InvalidDefault,
+                                    input,
+                                    field.name.clone(),
+                                ));
+                            }
                         }
                     } else if let Some(default_value) = field.default_value(py)? {
                         output_dict.set_item(&field.name_pystring, default_value.as_ref())?

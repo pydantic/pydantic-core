@@ -2,7 +2,7 @@ import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Mapping
+from typing import Any, Dict, Mapping
 
 import pytest
 from dirty_equals import HasRepr, IsStr
@@ -1268,4 +1268,50 @@ def test_frozen_field():
         v.validate_assignment('is_developer', False, r2)
     assert exc_info.value.errors() == [
         {'kind': 'frozen', 'loc': ['is_developer'], 'message': 'Field is frozen', 'input_value': False}
+    ]
+
+
+def test_validate_always(py_and_json: PyAndJson):
+    def get_set_area(input_value: Any, *, data: Dict[str, Any], **kwargs: Any) -> int:
+        if input_value is None:
+            return data['width'] ** 2
+        else:
+            data['width'] = int(input_value) ** 0.5
+            return input_value
+
+    v = py_and_json(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'width': {'schema': {'type': 'float'}, 'default': '3', 'validate_always': True},
+                'area': {
+                    'schema': {
+                        'type': 'function',
+                        'mode': 'before',
+                        'function': get_set_area,
+                        'schema': {'type': 'int'},
+                    },
+                    'validate_always': True,
+                },
+            },
+        }
+    )
+
+    r1 = v.validate_test({})
+    assert r1 == {'width': 3.0, 'area': 9}
+    r2 = v.validate_assignment('area', 400, r1)
+    assert r2 == {'width': 20.0, 'area': 400}
+
+
+def test_validate_always_bad_default(py_and_json: PyAndJson):
+    v = py_and_json(
+        {
+            'type': 'typed-dict',
+            'fields': {'width': {'schema': {'type': 'int'}, 'default': '3.1', 'validate_always': True}},
+        }
+    )
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_test({})
+    assert exc_info.value.errors() == [
+        {'kind': 'invalid_default', 'loc': ['width'], 'message': 'Invalid default or computed value', 'input_value': {}}
     ]

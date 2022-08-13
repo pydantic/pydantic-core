@@ -36,6 +36,8 @@ pub enum ErrorKind {
     ExtraForbidden,
     #[strum(message = "Keys should be strings")]
     InvalidKey,
+    #[strum(message = "Invalid default or computed value")]
+    InvalidDefault,
     #[strum(message = "Error extracting attribute: {error}")]
     GetAttributeError {
         error: String,
