@@ -1271,7 +1271,7 @@ def test_frozen_field():
     ]
 
 
-def test_validate_always(py_and_json: PyAndJson):
+def test_validate_default(py_and_json: PyAndJson):
     def get_set_area(input_value: Any, *, data: Dict[str, Any], **kwargs: Any) -> int:
         if input_value is None:
             return data['width'] ** 2
@@ -1283,7 +1283,7 @@ def test_validate_always(py_and_json: PyAndJson):
         {
             'type': 'typed-dict',
             'fields': {
-                'width': {'schema': {'type': 'float'}, 'default': '3', 'validate_always': True},
+                'width': {'schema': {'type': 'float'}, 'default': '3', 'validate_default': True},
                 'area': {
                     'schema': {
                         'type': 'function',
@@ -1291,7 +1291,7 @@ def test_validate_always(py_and_json: PyAndJson):
                         'function': get_set_area,
                         'schema': {'type': 'int'},
                     },
-                    'validate_always': True,
+                    'validate_default': True,
                 },
             },
         }
@@ -1303,11 +1303,11 @@ def test_validate_always(py_and_json: PyAndJson):
     assert r2 == {'width': 20.0, 'area': 400}
 
 
-def test_validate_always_bad_default(py_and_json: PyAndJson):
+def test_validate_default_bad_default(py_and_json: PyAndJson):
     v = py_and_json(
         {
             'type': 'typed-dict',
-            'fields': {'width': {'schema': {'type': 'int'}, 'default': '3.1', 'validate_always': True}},
+            'fields': {'width': {'schema': {'type': 'int'}, 'default': '3.1', 'validate_default': True}},
         }
     )
     with pytest.raises(ValidationError) as exc_info:

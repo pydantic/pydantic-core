@@ -33,7 +33,7 @@ struct TypedDictField {
     default_factory: Option<PyObject>,
     validator: CombinedValidator,
     frozen: bool,
-    validate_always: bool,
+    validate_default: bool,
 }
 
 impl TypedDictField {
@@ -185,8 +185,8 @@ impl BuildValidator for TypedDictValidator {
                 default_factory,
                 on_error,
                 frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
-                validate_always: field_info
-                    .get_as::<bool>(intern!(py, "validate_always"))?
+                validate_default: field_info
+                    .get_as::<bool>(intern!(py, "validate_default"))?
                     .unwrap_or(false),
             });
         }
@@ -288,7 +288,7 @@ impl Validator for TypedDictValidator {
                             },
                             Err(err) => return Err(err),
                         }
-                    } else if field.validate_always {
+                    } else if field.validate_default {
                         // maybe change the fallback of default value to a sentinel ?
                         let default_value = field.default_value(py)?.unwrap_or(Cow::Owned(py.None()));
                         match field.validator.validate(
