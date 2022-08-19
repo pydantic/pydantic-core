@@ -56,7 +56,7 @@ jobs:
       name: cache rust
       uses: Swatinem/rust-cache@v1
       with:
-        key: "v2"
+        key: v3
 
     - run: cargo install rustfilt coverage-prepare
       if: steps.cache-rust.outputs.cache-hit != 'true'
@@ -98,7 +98,6 @@ jobs:
     - run: coverage xml
 
     - run: coverage-prepare lcov pydantic_core/*.so
-    - run: mv rust_coverage.lcov default.lcov
 
     - uses: codecov/codecov-action@v2
       if: matrix.rust-toolchain == 'nightly'
