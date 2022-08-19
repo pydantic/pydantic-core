@@ -55,6 +55,8 @@ jobs:
     - id: cache-rust
       name: cache rust
       uses: Swatinem/rust-cache@v1
+      with:
+        key: "v2"
 
     - run: cargo install rustfilt coverage-prepare
       if: steps.cache-rust.outputs.cache-hit != 'true'
