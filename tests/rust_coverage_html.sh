@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -ex
+
 rust-profdata merge -sparse default.profraw -o default.profdata
 
 rust-cov report -Xdemangler=rustfilt $(ls pydantic_core/*.so) \
