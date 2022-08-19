@@ -12,7 +12,7 @@ install:
 
 .PHONY: install-rust-coverage
 install-rust-coverage:
-	cargo install rustfilt cargo-binutils
+	cargo install rustfilt coverage-prepare
 	rustup component add llvm-tools-preview
 
 .PHONY: build-dev
@@ -91,7 +91,7 @@ testcov: build-coverage test
 	@rm -rf htmlcov
 	@mkdir -p htmlcov
 	coverage html -d htmlcov/python
-	./tests/rust_coverage_html.sh
+	coverage-prepare html pydantic_core/*.so
 
 .PHONY: all
 all: format build-dev lint test
