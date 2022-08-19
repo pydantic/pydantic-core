@@ -98,6 +98,7 @@ jobs:
     - run: coverage xml
 
     - run: coverage-prepare lcov pydantic_core/*.so
+    - run: mv rust_coverage.lcov default.lcov
 
     - uses: codecov/codecov-action@v2
       if: matrix.rust-toolchain == 'nightly'
