@@ -2,7 +2,7 @@
 
 set -ex
 
-rust-profdata merge -sparse default.profraw -o default.profdata
+rust-profdata merge -sparse *.profraw -o default.profdata
 
 rust-cov report -Xdemangler=rustfilt $(ls pydantic_core/*.so) \
     -instr-profile=default.profdata \
@@ -15,4 +15,4 @@ rust-cov export -Xdemangler=rustfilt $(ls pydantic_core/*.so) \
     --ignore-filename-regex='library/std' \
     -format=lcov > default.lcov
 
-rm default.profraw default.profdata
+rm *.profraw default.profdata
