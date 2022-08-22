@@ -309,6 +309,16 @@ class CallSchema(TypedDict):
     ref: NotRequired[str]
 
 
+class WithDefaultSchema(TypedDict, total=False):
+    type: Required[Literal['default']]
+    schema: Required[Schema]
+    default: Any
+    default_factory: Callable[[], Any]
+    on_error: Literal['raise', 'omit', 'fallback_on_default']  # default: 'raise'
+    strict: bool
+    ref: str
+
+
 # pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
 # 'int' is equivalent to {'type': 'int'}, this only applies to schema types which do not have other required fields
 BareType = Literal[
@@ -366,4 +376,5 @@ Schema = Union[
     CallableSchema,
     ArgumentsSchema,
     CallSchema,
+    WithDefaultSchema,
 ]

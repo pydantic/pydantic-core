@@ -138,6 +138,10 @@ impl SchemaError {
                 SchemaError::new_err(format!("Invalid Schema:\n{}", details))
             }
             ValError::InternalErr(py_err) => py_err,
+            // shouldn't happen
+            ValError::Omit => {
+                SchemaError::new_err(r#"Uncaught Omit error, please check your usage of "default" validators."#)
+            }
         }
     }
 }

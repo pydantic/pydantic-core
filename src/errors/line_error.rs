@@ -14,6 +14,7 @@ pub type ValResult<'a, T> = Result<T, ValError<'a>>;
 pub enum ValError<'a> {
     LineErrors(Vec<ValLineError<'a>>),
     InternalErr(PyErr),
+    Omit,
 }
 
 impl<'a> From<PyErr> for ValError<'a> {
@@ -57,6 +58,7 @@ impl<'a> ValError<'a> {
                 Self::LineErrors(line_errors)
             }
             Self::InternalErr(err) => Self::InternalErr(err),
+            Self::Omit => Self::Omit,
         }
     }
 }

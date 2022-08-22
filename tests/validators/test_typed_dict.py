@@ -74,7 +74,10 @@ def test_with_default():
         {
             'type': 'typed-dict',
             'return_fields_set': True,
-            'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}, 'default': 666}},
+            'fields': {
+                'field_a': {'schema': {'type': 'str'}},
+                'field_b': {'schema': {'type': 'default', 'schema': 'int', 'default': 666}},
+            },
         }
     )
 
