@@ -500,7 +500,7 @@ impl<'a> Iterator for AttributesIterator<'a> {
                     .to_string_lossy();
                 if !name_cow.as_ref().starts_with('_') {
                     // getattr is most likely to fail due to an exception in a @property, skip
-                    if let Ok(attr) = self.object.getattr(name) {
+                    if let Ok(attr) = self.object.getattr(name_cow.as_ref()) {
                         // we don't want bound methods to be included, is there a better way to check?
                         // ref https://stackoverflow.com/a/18955425/949890
                         let is_bound = matches!(attr.hasattr(intern!(attr.py(), "__self__")), Ok(true));
