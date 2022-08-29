@@ -1,6 +1,6 @@
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyTime, PyTzInfo};
-use pyo3::{ffi, intern};
 use speedate::{Date, DateTime, Duration, Time};
 use strum::EnumMessage;
 
@@ -219,17 +219,22 @@ impl<'a> EitherDateTime<'a> {
 
     pub fn try_into_py(self, py: Python<'a>) -> PyResult<PyObject> {
         let dt = match self {
-            Self::Raw(datetime) => {
-                let tz: Option<&PyTzInfo> = match datetime.offset {
-                    Some(offset) => {
-                        let tz_info = TzInfo::new(offset);
-                        let obj = Py::new(py, tz_info)?.to_object(py);
-                        let ptr = obj.as_ref(py).into_ptr() as *mut ffi::PyObject;
-                        unsafe { Some(py.from_borrowed_ptr(ptr)) }
-                    }
-                    None => None,
-                };
-                PyDateTime::new(
+            Self::Raw(datetime) => match datetime.offset {
+                Some(offset) => {
+                    let tz_info = TzInfo::new(offset);
+                    PyDateTime::new(
+                        py,
+                        datetime.date.year as i32,
+                        datetime.date.month,
+                        datetime.date.day,
+                        datetime.time.hour,
+                        datetime.time.minute,
+                        datetime.time.second,
+                        datetime.time.microsecond,
+                        Some(Py::new(py, tz_info)?.to_object(py).extract(py)?),
+                    )?
+                }
+                None => PyDateTime::new(
                     py,
                     datetime.date.year as i32,
                     datetime.date.month,
@@ -238,9 +243,9 @@ impl<'a> EitherDateTime<'a> {
                     datetime.time.minute,
                     datetime.time.second,
                     datetime.time.microsecond,
-                    tz,
-                )?
-            }
+                    None,
+                )?,
+            },
             Self::Py(dt) => dt,
         };
         Ok(dt.into_py(py))
