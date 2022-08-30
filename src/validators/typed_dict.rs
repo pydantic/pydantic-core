@@ -187,7 +187,7 @@ impl BuildValidator for TypedDictValidator {
                 default,
                 default_factory,
                 on_error,
-                frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
+                frozen: schema_or_config_same(field_info, config, intern!(py, "frozen"))?.unwrap_or(false),
             });
         }
 

@@ -31,7 +31,9 @@ class Config(TypedDict, total=False):
     config_choose_priority: int
     # if configs are merged, which should take precedence, default 0, default means child takes precedence
     config_merge_priority: int
-    # settings related to typed_dicts only
+    # settings related to typed-dicts and new classes
+    frozen: bool
+    # settings related to typed-dicts only
     typed_dict_extra_behavior: Literal['allow', 'forbid', 'ignore']
     typed_dict_total: bool  # default: True
     # used on typed-dicts and tagged union keys
