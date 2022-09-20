@@ -1159,7 +1159,7 @@ class TestOnError:
 
     def test_on_error_bad_fallback_on_default(self):
         with pytest.raises(
-            SchemaError, match="Field 'x': 'on_error = fallback_on_default' requires a `default` or `default_factory`"
+            SchemaError, match="'on_error = fallback_on_default' requires a `default` or `default_factory`"
         ):
             SchemaValidator(
                 {'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}, 'on_error': 'fallback_on_default'}}}
@@ -1218,9 +1218,12 @@ class TestOnError:
                 'type': 'typed-dict',
                 'fields': {
                     'x': {
-                        'schema': {'type': 'str'},
-                        'on_error': 'fallback_on_default',
-                        'default_factory': lambda: 'pika',
+                        'schema': {
+                            'type': 'default',
+                            'schema': {'type': 'str'},
+                            'on_error': 'fallback_on_default',
+                            'default_factory': lambda: 'pika',
+                        }
                     }
                 },
             }
@@ -1280,3 +1283,14 @@ def test_frozen_field():
     assert exc_info.value.errors() == [
         {'kind': 'frozen', 'loc': ['is_developer'], 'message': 'Field is frozen', 'input_value': False}
     ]
+
+
+def test_default_schema_with_default():
+    msg = "'default', 'default_factory' and 'on_error' on a field cannot be combined with a schema of type 'default'"
+    with pytest.raises(SchemaError, match=msg):
+        SchemaValidator(
+            {
+                'type': 'typed-dict',
+                'fields': {'name': {'schema': {'type': 'default', 'schema': 'str', 'default': 'F'}, 'default': 'B'}},
+            }
+        )
