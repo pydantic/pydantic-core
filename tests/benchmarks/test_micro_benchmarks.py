@@ -239,8 +239,11 @@ def test_recursive_model_core(recursive_model_data, benchmark):
                 'fields': {
                     'width': {'schema': {'type': 'int'}},
                     'branch': {
-                        'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
-                        'default': None,
+                        'schema': {
+                            'type': 'default',
+                            'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                            'default': None,
+                        }
                     },
                 },
             },

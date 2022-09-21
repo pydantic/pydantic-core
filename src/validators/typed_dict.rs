@@ -90,7 +90,8 @@ impl BuildValidator for TypedDictValidator {
             let field_info: &PyDict = value.cast_as()?;
             let field_name: &str = key.extract()?;
 
-            let schema = field_schema(py, field_info)
+            let schema = field_info
+                .get_as_req(intern!(py, "schema"))
                 .map_err(|err| SchemaError::new_err(format!("Field '{}':\n  {}", field_name, err)))?;
 
             let validator = match build_validator(schema, config, build_context) {
@@ -155,43 +156,6 @@ impl BuildValidator for TypedDictValidator {
         }
         .into())
     }
-}
-
-/// prepare a field schema by optionally extracting 'default', 'default_factory' and 'on_error'
-/// building a new schema
-/// we copy default, default_factory and on_error onto the schema to make schemas simpler to define
-/// and avoid modifying many existing tests
-fn field_schema<'a>(py: Python<'a>, field_info: &'a PyDict) -> PyResult<&'a PyAny> {
-    let mut to_copy = vec![];
-    for key in &["default", "default_factory", "on_error"] {
-        if let Some(value) = field_info.get_item(key) {
-            to_copy.push((key, value));
-        }
-    }
-
-    let schema = field_info.get_as_req(intern!(py, "schema"))?;
-    if to_copy.is_empty() {
-        // none of the special values were set, return the schema as-is
-        return Ok(schema);
-    }
-
-    // combining a "default" schema with 'default', 'default_factory' or 'on_error' is not permitted
-    if let Ok(schema_dict) = schema.cast_as::<PyDict>() {
-        if matches!(schema_dict.get_as_req::<&str>(intern!(py, "type")), Ok("default")) {
-            return py_error!(
-                "'default', 'default_factory' and 'on_error' on a field cannot be combined with a schema of type 'default'"
-            );
-        }
-    }
-
-    // create a new "default" schema wrapping the existing schema
-    let new_schema = PyDict::new(py);
-    new_schema.set_item("type", "default")?;
-    new_schema.set_item("schema", schema)?;
-    for (name, value) in to_copy {
-        new_schema.set_item(name, value)?;
-    }
-    Ok(new_schema)
 }
 
 impl Validator for TypedDictValidator {

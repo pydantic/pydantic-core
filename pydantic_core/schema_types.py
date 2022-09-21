@@ -124,9 +124,6 @@ class NewClassSchema(TypedDict):
 class TypedDictField(TypedDict, total=False):
     schema: Required[Schema]
     required: bool
-    default: Any
-    default_factory: Callable[[], Any]
-    on_error: Literal['raise', 'omit', 'default']  # default: 'raise'
     alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
     frozen: bool
 
