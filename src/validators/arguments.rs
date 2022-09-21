@@ -9,6 +9,7 @@ use crate::input::{GenericArguments, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 
+use super::with_default::get_default;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -215,15 +216,13 @@ impl Validator for ArgumentsValidator {
                             }
                         }
                         (None, None) => {
-                            if let CombinedValidator::WithDefault(ref validator) = parameter.validator {
-                                if let Some(value) = validator.default_value(py)? {
-                                    if let Some(ref kwarg_key) = parameter.kwarg_key {
-                                        output_kwargs.set_item(kwarg_key, value.as_ref())?;
-                                    } else {
-                                        output_args.push(value.as_ref().clone_ref(py));
-                                    }
-                                    continue;
+                            if let Some(value) = get_default(py, &parameter.validator)? {
+                                if let Some(ref kwarg_key) = parameter.kwarg_key {
+                                    output_kwargs.set_item(kwarg_key, value.as_ref())?;
+                                } else {
+                                    output_args.push(value.as_ref().clone_ref(py));
                                 }
+                                continue;
                             }
 
                             if parameter.kwarg_key.is_some() {

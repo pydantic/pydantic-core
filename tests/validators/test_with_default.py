@@ -87,7 +87,6 @@ def test_tuple_variable():
     assert v.validate_python([1, 'wrong', 3]) == (1, 3)
 
 
-@pytest.mark.xfail(reason='TODO')
 def test_tuple_positional():
     v = SchemaValidator(
         {
@@ -97,7 +96,25 @@ def test_tuple_positional():
         }
     )
     assert v.validate_python((1, '2')) == (1, 2)
+    assert v.validate_python([1, '2']) == (1, 2)
+    assert v.validate_json('[1, "2"]') == (1, 2)
     assert v.validate_python((1,)) == (1, 42)
+
+
+def test_tuple_positional_omit():
+    v = SchemaValidator(
+        {
+            'type': 'tuple',
+            'mode': 'positional',
+            'items_schema': ['int', 'int'],
+            'extra_schema': {'type': 'default', 'schema': 'int', 'on_error': 'omit'},
+        }
+    )
+    assert v.validate_python((1, '2')) == (1, 2)
+    assert v.validate_python((1, '2', 3, '4')) == (1, 2, 3, 4)
+    assert v.validate_python((1, '2', 'wrong', '4')) == (1, 2, 4)
+    assert v.validate_python((1, '2', 3, 'x4')) == (1, 2, 3)
+    assert v.validate_json('[1, "2", 3, "x4"]') == (1, 2, 3)
 
 
 def test_on_error_default():

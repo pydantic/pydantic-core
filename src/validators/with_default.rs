@@ -126,3 +126,11 @@ impl WithDefaultValidator {
         matches!(self.on_error, OnError::Omit)
     }
 }
+
+pub fn get_default<'a>(py: Python<'a>, validator: &'a CombinedValidator) -> PyResult<Option<Cow<'a, PyObject>>> {
+    if let CombinedValidator::WithDefault(validator) = validator {
+        validator.default_value(py)
+    } else {
+        Ok(None)
+    }
+}

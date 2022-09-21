@@ -14,6 +14,7 @@ use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 
+use super::with_default::get_default;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -233,14 +234,9 @@ impl Validator for TypedDictValidator {
                             Err(err) => return Err(err),
                         }
                         continue;
-                    } else if let CombinedValidator::WithDefault(ref validator) = field.validator {
-                        if let Some(value) = validator.default_value(py)? {
-                            output_dict.set_item(&field.name_pystring, value.as_ref())?;
-                            continue;
-                        }
-                    }
-
-                    if field.required {
+                    } else if let Some(value) = get_default(py, &field.validator)? {
+                        output_dict.set_item(&field.name_pystring, value.as_ref())?;
+                    } else if field.required {
                         errors.push(ValLineError::new_with_loc(
                             ErrorKind::Missing,
                             input,
