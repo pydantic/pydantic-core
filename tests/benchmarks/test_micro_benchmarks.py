@@ -854,5 +854,7 @@ def test_with_default(benchmark):
     assert v.validate_python({'name': 'Foo'}) == {'name': 'Foo'}
     assert v.validate_python({}) == {'name': 'John'}
 
-    benchmark(v.validate_python, {}, name='with-default')
-    benchmark(v.validate_python, {'name': 'Foo'}, name='with-value')
+    @benchmark
+    def t():
+        v.validate_python({'name': 42})
+        v.validate_python({})
