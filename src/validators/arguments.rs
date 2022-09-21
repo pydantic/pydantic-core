@@ -84,7 +84,7 @@ impl BuildValidator for ArgumentsValidator {
             let has_default = match validator {
                 CombinedValidator::WithDefault(ref v) => {
                     if v.omit_on_error() {
-                        return py_error!("Parameter '{}': omit_on_error cannot be used with Arguments", name);
+                        return py_error!("Parameter '{}': omit_on_error cannot be used with arguments", name);
                     }
                     v.has_default()
                 }
