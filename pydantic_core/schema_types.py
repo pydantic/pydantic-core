@@ -126,7 +126,7 @@ class TypedDictField(TypedDict, total=False):
     required: bool
     default: Any
     default_factory: Callable[[], Any]
-    on_error: Literal['raise', 'omit', 'fallback_on_default']  # default: 'raise'
+    on_error: Literal['raise', 'omit', 'default']  # default: 'raise'
     alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
     frozen: bool
 
@@ -287,8 +287,6 @@ class Parameter(TypedDict, total=False):
     name: Required[str]
     mode: Literal['positional_only', 'positional_or_keyword', 'keyword_only']  # default positional_or_keyword
     schema: Required[Schema]
-    default: Any
-    default_factory: Callable[[], Any]
     alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
 
 
@@ -314,7 +312,7 @@ class WithDefaultSchema(TypedDict, total=False):
     schema: Required[Schema]
     default: Any
     default_factory: Callable[[], Any]
-    on_error: Literal['raise', 'omit', 'fallback_on_default']  # default: 'raise'
+    on_error: Literal['raise', 'omit', 'default']  # default: 'raise'
     strict: bool
     ref: str
 

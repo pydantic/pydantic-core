@@ -56,7 +56,7 @@ impl BuildValidator for WithDefaultValidator {
             Some(on_error) => match on_error {
                 "raise" => OnError::Raise,
                 "omit" => OnError::Omit,
-                "fallback_on_default" => {
+                "default" => {
                     if matches!(default, DefaultType::None) {
                         return py_error!("'on_error = {}' requires a `default` or `default_factory`", on_error);
                     }

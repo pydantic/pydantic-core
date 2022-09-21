@@ -1150,20 +1150,16 @@ def test_bad_default_factory(default_factory, error_message):
 
 class TestOnError:
     def test_on_error_bad_name(self):
-        with pytest.raises(SchemaError, match="Input should be one of: 'raise', 'omit', 'fallback_on_default'"):
+        with pytest.raises(SchemaError, match="Input should be one of: 'raise', 'omit', 'default'"):
             SchemaValidator({'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}, 'on_error': 'rais'}}})
 
     def test_on_error_bad_omit(self):
         with pytest.raises(SchemaError, match="Field 'x': 'on_error = omit' cannot be set for required fields"):
             SchemaValidator({'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}, 'on_error': 'omit'}}})
 
-    def test_on_error_bad_fallback_on_default(self):
-        with pytest.raises(
-            SchemaError, match="'on_error = fallback_on_default' requires a `default` or `default_factory`"
-        ):
-            SchemaValidator(
-                {'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}, 'on_error': 'fallback_on_default'}}}
-            )
+    def test_on_error_bad_default(self):
+        with pytest.raises(SchemaError, match="'on_error = default' requires a `default` or `default_factory`"):
+            SchemaValidator({'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}, 'on_error': 'default'}}})
 
     def test_on_error_raise_by_default(self, py_and_json: PyAndJson):
         v = py_and_json({'type': 'typed-dict', 'fields': {'x': {'schema': {'type': 'str'}}}})
@@ -1202,17 +1198,17 @@ class TestOnError:
         assert v.validate_test({}) == {'x': 'pika'}
         assert v.validate_test({'x': ['foo']}) == {}
 
-    def test_on_error_fallback_on_default(self, py_and_json: PyAndJson):
+    def test_on_error_default(self, py_and_json: PyAndJson):
         v = py_and_json(
             {
                 'type': 'typed-dict',
-                'fields': {'x': {'schema': {'type': 'str'}, 'on_error': 'fallback_on_default', 'default': 'pika'}},
+                'fields': {'x': {'schema': {'type': 'str'}, 'on_error': 'default', 'default': 'pika'}},
             }
         )
         assert v.validate_test({'x': 'foo'}) == {'x': 'foo'}
         assert v.validate_test({'x': ['foo']}) == {'x': 'pika'}
 
-    def test_on_error_fallback_on_default_factory(self, py_and_json: PyAndJson):
+    def test_on_error_default_factory(self, py_and_json: PyAndJson):
         v = py_and_json(
             {
                 'type': 'typed-dict',
@@ -1221,7 +1217,7 @@ class TestOnError:
                         'schema': {
                             'type': 'default',
                             'schema': {'type': 'str'},
-                            'on_error': 'fallback_on_default',
+                            'on_error': 'default',
                             'default_factory': lambda: 'pika',
                         }
                     }

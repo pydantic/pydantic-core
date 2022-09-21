@@ -18,8 +18,6 @@ struct Parameter {
     name: String,
     kw_lookup_key: Option<LookupKey>,
     kwarg_key: Option<Py<PyString>>,
-    default: Option<PyObject>,
-    default_factory: Option<PyObject>,
     validator: CombinedValidator,
 }
 
@@ -76,17 +74,26 @@ impl BuildValidator for ArgumentsValidator {
 
             let schema: &PyAny = arg
                 .get_as_req(intern!(py, "schema"))
-                .map_err(|err| SchemaError::new_err(format!("Parameter \"{}\":\n  {}", name, err)))?;
+                .map_err(|err| SchemaError::new_err(format!("Parameter '{}':\n  {}", name, err)))?;
 
-            let validator = build_validator(schema, config, build_context)?;
+            let validator = match build_validator(schema, config, build_context) {
+                Ok(v) => v,
+                Err(err) => return py_error!("Parameter '{}':\n  {}", name, err),
+            };
 
-            let default = arg.get_as(intern!(py, "default"))?;
-            let default_factory = arg.get_as(intern!(py, "default_factory"))?;
-            if default.is_some() && default_factory.is_some() {
-                return py_error!("'default' and 'default_factory' cannot be used together");
-            } else if had_default_arg && (default.is_none() && default_factory.is_none()) {
-                return py_error!("Non-default argument follows default argument");
-            } else if default.is_some() || default_factory.is_some() {
+            let has_default = match validator {
+                CombinedValidator::WithDefault(ref v) => {
+                    if v.omit_on_error() {
+                        return py_error!("Parameter '{}': omit_on_error cannot be used with Arguments", name);
+                    }
+                    v.has_default()
+                }
+                _ => false,
+            };
+
+            if had_default_arg && !has_default {
+                return py_error!("Non-default argument '{}' follows default argument", name);
+            } else if has_default {
                 had_default_arg = true;
             }
             parameters.push(Parameter {
@@ -94,8 +101,6 @@ impl BuildValidator for ArgumentsValidator {
                 kw_lookup_key,
                 name,
                 kwarg_key,
-                default,
-                default_factory,
                 validator,
             });
         }
@@ -213,20 +218,18 @@ impl Validator for ArgumentsValidator {
                             }
                         }
                         (None, None) => {
-                            if let Some(ref default) = parameter.default {
-                                if let Some(ref kwarg_key) = parameter.kwarg_key {
-                                    output_kwargs.set_item(kwarg_key, default)?;
-                                } else {
-                                    output_args.push(default.clone_ref(py));
+                            if let CombinedValidator::WithDefault(ref validator) = parameter.validator {
+                                if let Some(value) = validator.default_value(py)? {
+                                    if let Some(ref kwarg_key) = parameter.kwarg_key {
+                                        output_kwargs.set_item(kwarg_key, value.as_ref())?;
+                                    } else {
+                                        output_args.push(value.as_ref().clone_ref(py));
+                                    }
+                                    continue;
                                 }
-                            } else if let Some(ref default_factory) = parameter.default_factory {
-                                let default = default_factory.call0(py)?;
-                                if let Some(ref kwarg_key) = parameter.kwarg_key {
-                                    output_kwargs.set_item(kwarg_key, default)?;
-                                } else {
-                                    output_args.push(default);
-                                }
-                            } else if parameter.kwarg_key.is_some() {
+                            }
+
+                            if parameter.kwarg_key.is_some() {
                                 errors.push(ValLineError::new_with_loc(
                                     ErrorKind::MissingKeywordArgument,
                                     input,
