@@ -856,5 +856,5 @@ def test_with_default(benchmark):
 
     @benchmark
     def t():
-        v.validate_python({'name': 42})
+        v.validate_python({'name': 'Foo'})
         v.validate_python({})
