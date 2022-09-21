@@ -239,11 +239,8 @@ def test_recursive_model_core(recursive_model_data, benchmark):
                 'fields': {
                     'width': {'schema': {'type': 'int'}},
                     'branch': {
-                        'schema': {
-                            'type': 'default',
-                            'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
-                            'default': None,
-                        }
+                        'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                        'default': None,
                     },
                 },
             },
@@ -844,3 +841,15 @@ def test_arguments(benchmark):
     assert v.validate_python(((1, 'a', 'true'), {'b': 'bb', 'c': 3})) == ((1, 'a', True), {'b': 'bb', 'c': 3})
 
     benchmark(v.validate_python, ((1, 'a', 'true'), {'b': 'bb', 'c': 3}))
+
+
+@pytest.mark.benchmark(group='defaults')
+def test_with_default(benchmark):
+    v = SchemaValidator(
+        {'type': 'typed-dict', 'fields': {'name': {'schema': {'type': 'default', 'schema': 'str', 'default': 'John'}}}}
+    )
+    assert v.validate_python({'name': 'Foo'}) == {'name': 'Foo'}
+    assert v.validate_python({}) == {'name': 'John'}
+
+    benchmark(v.validate_python, {}, name='with-default')
+    benchmark(v.validate_python, {'name': 'Foo'}, name='with-value')
