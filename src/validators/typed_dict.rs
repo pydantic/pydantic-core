@@ -13,7 +13,6 @@ use crate::errors::{py_err_string, ErrorKind, ValError, ValLineError, ValResult}
 use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
-use crate::SchemaError;
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -90,9 +89,7 @@ impl BuildValidator for TypedDictValidator {
             let field_info: &PyDict = value.cast_as()?;
             let field_name: &str = key.extract()?;
 
-            let schema = field_info
-                .get_as_req(intern!(py, "schema"))
-                .map_err(|err| SchemaError::new_err(format!("Field '{}':\n  {}", field_name, err)))?;
+            let schema = field_info.get_as_req(intern!(py, "schema"))?;
 
             let validator = match build_validator(schema, config, build_context) {
                 Ok(v) => v,

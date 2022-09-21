@@ -8,7 +8,6 @@ use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
 use crate::input::{GenericArguments, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
-use crate::SchemaError;
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -72,9 +71,7 @@ impl BuildValidator for ArgumentsValidator {
                 kwarg_key = Some(PyString::intern(py, &name).into());
             }
 
-            let schema: &PyAny = arg
-                .get_as_req(intern!(py, "schema"))
-                .map_err(|err| SchemaError::new_err(format!("Parameter '{}':\n  {}", name, err)))?;
+            let schema: &PyAny = arg.get_as_req(intern!(py, "schema"))?;
 
             let validator = match build_validator(schema, config, build_context) {
                 Ok(v) => v,

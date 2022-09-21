@@ -941,3 +941,19 @@ def test_function_args_kwargs():
     assert foobar(1, 2, 3) == ((1, 2, 3), {})
     assert foobar(a=1, b=2, c=3) == ((), {'a': 1, 'b': 2, 'c': 3})
     assert foobar() == ((), {})
+
+
+def test_invalid_schema():
+    with pytest.raises(SchemaError, match="'default' and 'default_factory' cannot be used together"):
+        SchemaValidator(
+            {
+                'type': 'arguments',
+                'arguments_schema': [
+                    {
+                        'name': 'a',
+                        'mode': 'positional_or_keyword',
+                        'schema': {'type': 'default', 'schema': 'int', 'default': 1, 'default_factory': lambda: 2},
+                    }
+                ],
+            }
+        )
