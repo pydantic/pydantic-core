@@ -222,10 +222,7 @@ impl Validator for ArgumentsValidator {
                                 } else {
                                     output_args.push(value.as_ref().clone_ref(py));
                                 }
-                                continue;
-                            }
-
-                            if parameter.kwarg_key.is_some() {
+                            } else if parameter.kwarg_key.is_some() {
                                 errors.push(ValLineError::new_with_loc(
                                     ErrorKind::MissingKeywordArgument,
                                     input,

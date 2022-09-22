@@ -23,7 +23,7 @@ enum DefaultType {
 enum OnError {
     Raise,
     Omit,
-    FallbackOnDefault,
+    Default,
 }
 
 #[derive(Debug, Clone)]
@@ -53,18 +53,17 @@ impl BuildValidator for WithDefaultValidator {
             (None, None) => DefaultType::None,
         };
         let on_error = match schema.get_as::<&str>(intern!(py, "on_error"))? {
-            Some(on_error) => match on_error {
-                "raise" => OnError::Raise,
-                "omit" => OnError::Omit,
-                "default" => {
-                    if matches!(default, DefaultType::None) {
-                        return py_error!("'on_error = {}' requires a `default` or `default_factory`", on_error);
-                    }
-                    OnError::FallbackOnDefault
+            Some("raise") => OnError::Raise,
+            Some("omit") => OnError::Omit,
+            Some("default") => {
+                if matches!(default, DefaultType::None) {
+                    return py_error!("'on_error = default' requires a `default` or `default_factory`");
                 }
-                _ => unreachable!(),
-            },
+                OnError::Default
+            }
             None => OnError::Raise,
+            // schema validation means other values are impossible
+            _ => unreachable!(),
         };
 
         let sub_schema: &PyAny = schema.get_as_req(intern!(schema.py(), "schema"))?;
@@ -94,7 +93,7 @@ impl Validator for WithDefaultValidator {
             Ok(v) => Ok(v),
             Err(e) => match self.on_error {
                 OnError::Raise => Err(e),
-                OnError::FallbackOnDefault => Ok(self.default_value(py)?.unwrap().as_ref().clone()),
+                OnError::Default => Ok(self.default_value(py)?.unwrap().as_ref().clone()),
                 OnError::Omit => Err(ValError::Omit),
             },
         }
