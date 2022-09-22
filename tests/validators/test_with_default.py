@@ -124,6 +124,43 @@ def test_on_error_default():
     assert v.validate_python('wrong') == 2
 
 
+def test_factory_runtime_error():
+    def broken():
+        raise RuntimeError('this is broken')
+
+    v = SchemaValidator({'type': 'default', 'schema': 'int', 'on_error': 'default', 'default_factory': broken})
+    assert v.validate_python(42) == 42
+    assert v.validate_python('42') == 42
+    with pytest.raises(RuntimeError, match='this is broken'):
+        v.validate_python('wrong')
+
+
+def test_factory_type_error():
+    def broken(x):
+        return 7
+
+    v = SchemaValidator({'type': 'default', 'schema': 'int', 'on_error': 'default', 'default_factory': broken})
+    assert v.validate_python(42) == 42
+    assert v.validate_python('42') == 42
+    with pytest.raises(TypeError, match=r"\.broken\(\) missing 1 required positional argument: 'x'"):
+        v.validate_python('wrong')
+
+
+def test_typed_dict_error():
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'x': {'schema': 'str'},
+                'y': {'schema': {'type': 'default', 'schema': 'str', 'default_factory': lambda y: y * 2}},
+            },
+        }
+    )
+    assert v.validate_python({'x': 'x', 'y': 'y'}) == {'x': 'x', 'y': 'y'}
+    with pytest.raises(TypeError, match=r"\.<lambda>\(\) missing 1 required positional argument: 'y'"):
+        v.validate_python({'x': 'x'})
+
+
 def test_on_error_default_not_int():
     v = SchemaValidator({'type': 'default', 'schema': 'int', 'default': [1, 2, 3], 'on_error': 'default'})
     assert v.validate_python(42) == 42
