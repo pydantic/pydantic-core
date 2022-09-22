@@ -57,8 +57,7 @@ impl<'a> ValError<'a> {
                 }
                 Self::LineErrors(line_errors)
             }
-            Self::InternalErr(err) => Self::InternalErr(err),
-            Self::Omit => Self::Omit,
+            other => other,
         }
     }
 }

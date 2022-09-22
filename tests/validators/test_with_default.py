@@ -2,6 +2,8 @@ import pytest
 
 from pydantic_core import SchemaError, SchemaValidator
 
+from ..conftest import PyAndJson
+
 
 def test_typed_dict_default():
     v = SchemaValidator(
@@ -66,11 +68,11 @@ def test_arguments_omit():
         )
 
 
-def test_list():
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'default', 'schema': 'int', 'on_error': 'omit'}})
-    assert v.validate_python([1, 2, 3]) == [1, 2, 3]
-    assert v.validate_python([1, '2', 3]) == [1, 2, 3]
-    assert v.validate_python([1, 'wrong', 3]) == [1, 3]
+def test_list(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'list', 'items_schema': {'type': 'default', 'schema': 'int', 'on_error': 'omit'}})
+    assert v.validate_test([1, 2, 3]) == [1, 2, 3]
+    assert v.validate_test([1, '2', 3]) == [1, 2, 3]
+    assert v.validate_test([1, 'wrong', 3]) == [1, 3]
 
 
 def test_set():
@@ -80,8 +82,34 @@ def test_set():
     assert v.validate_python([1, 'wrong', 3]) == {1, 3}
 
 
-def test_tuple_variable():
-    v = SchemaValidator({'type': 'tuple', 'items_schema': {'type': 'default', 'schema': 'int', 'on_error': 'omit'}})
+def test_dict_values(py_and_json: PyAndJson):
+    v = py_and_json(
+        {
+            'type': 'dict',
+            'keys_schema': 'str',
+            'values_schema': {'type': 'default', 'schema': 'int', 'on_error': 'omit'},
+        }
+    )
+    assert v.validate_test({'a': 1, 'b': '2'}) == {'a': 1, 'b': 2}
+    assert v.validate_test({'a': 1, 'b': 'wrong'}) == {'a': 1}
+    assert v.validate_test({'a': 1, 'b': 'wrong', 'c': '3'}) == {'a': 1, 'c': 3}
+
+
+def test_dict_keys():
+    v = SchemaValidator(
+        {
+            'type': 'dict',
+            'keys_schema': {'type': 'default', 'schema': 'int', 'on_error': 'omit'},
+            'values_schema': 'str',
+        }
+    )
+    assert v.validate_python({1: 'a', '2': 'b'}) == {1: 'a', 2: 'b'}
+    assert v.validate_python({1: 'a', 'wrong': 'b'}) == {1: 'a'}
+    assert v.validate_python({1: 'a', 'wrong': 'b', 3: 'c'}) == {1: 'a', 3: 'c'}
+
+
+def test_tuple_variable(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'tuple', 'items_schema': {'type': 'default', 'schema': 'int', 'on_error': 'omit'}})
     assert v.validate_python((1, 2, 3)) == (1, 2, 3)
     assert v.validate_python([1, '2', 3]) == (1, 2, 3)
     assert v.validate_python([1, 'wrong', 3]) == (1, 3)
@@ -182,7 +210,7 @@ def test_on_error_default_factory():
 def test_on_error_omit():
     v = SchemaValidator({'type': 'default', 'schema': 'int', 'on_error': 'omit'})
     assert v.validate_python(42) == 42
-    with pytest.raises(ValueError, match='Uncaught Omit error, please check your usage of "default" validators.'):
+    with pytest.raises(ValueError, match='Uncaught Omit error, please check your usage of `default` validators.'):
         v.validate_python('wrong')
 
 

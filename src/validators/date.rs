@@ -132,8 +132,7 @@ fn date_from_datetime<'data>(
                     }
                     Err(ValError::LineErrors(line_errors))
                 }
-                ValError::InternalErr(internal_err) => Err(ValError::InternalErr(internal_err)),
-                ValError::Omit => unreachable!(),
+                other => Err(other),
             };
         }
     };

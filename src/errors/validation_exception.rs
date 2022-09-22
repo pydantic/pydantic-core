@@ -29,7 +29,7 @@ impl ValidationError {
             }
             ValError::InternalErr(err) => err,
             ValError::Omit => {
-                PyValueError::new_err(r#"Uncaught Omit error, please check your usage of "default" validators."#)
+                PyValueError::new_err("Uncaught Omit error, please check your usage of `default` validators.")
             }
         }
     }
