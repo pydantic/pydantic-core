@@ -5,7 +5,7 @@ from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict, IsStr
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
-from ..conftest import Err
+from ..conftest import Err, plain_repr
 from .test_typed_dict import Cls
 
 
@@ -31,6 +31,7 @@ def test_branch_nullable():
     )
 
     assert v.validate_python({'name': 'root'}) == {'name': 'root', 'sub_branch': None}
+    assert plain_repr(v).startswith('SchemaValidator(name="typed-dict",validator=Recursive(RecursiveContainerValidator')
 
     assert v.validate_python({'name': 'root', 'sub_branch': {'name': 'b1'}}) == (
         {'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': None}}
@@ -38,6 +39,14 @@ def test_branch_nullable():
     assert v.validate_python({'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': {'name': 'b2'}}}) == (
         {'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': {'name': 'b2', 'sub_branch': None}}}
     )
+
+
+def test_unused_ref():
+    v = SchemaValidator(
+        {'type': 'typed-dict', 'ref': 'Branch', 'fields': {'name': {'schema': 'str'}, 'other': {'schema': 'int'}}}
+    )
+    assert plain_repr(v).startswith('SchemaValidator(name="typed-dict",validator=TypedDict(TypedDictValidator')
+    assert v.validate_python({'name': 'root', 'other': '4'}) == {'name': 'root', 'other': 4}
 
 
 def test_nullable_error():
