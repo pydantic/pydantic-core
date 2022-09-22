@@ -142,7 +142,7 @@ def test_factory_type_error():
     v = SchemaValidator({'type': 'default', 'schema': 'int', 'on_error': 'default', 'default_factory': broken})
     assert v.validate_python(42) == 42
     assert v.validate_python('42') == 42
-    with pytest.raises(TypeError, match=r"\.broken\(\) missing 1 required positional argument: 'x'"):
+    with pytest.raises(TypeError, match=r"broken\(\) missing 1 required positional argument: 'x'"):
         v.validate_python('wrong')
 
 
@@ -157,7 +157,7 @@ def test_typed_dict_error():
         }
     )
     assert v.validate_python({'x': 'x', 'y': 'y'}) == {'x': 'x', 'y': 'y'}
-    with pytest.raises(TypeError, match=r"\.<lambda>\(\) missing 1 required positional argument: 'y'"):
+    with pytest.raises(TypeError, match=r"<lambda>\(\) missing 1 required positional argument: 'y'"):
         v.validate_python({'x': 'x'})
 
 
