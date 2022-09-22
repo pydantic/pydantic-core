@@ -13,7 +13,7 @@ use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Question, Validator};
 
 #[derive(Debug, Clone)]
 pub struct UnionValidator {
@@ -111,7 +111,7 @@ impl Validator for UnionValidator {
         &self.name
     }
 
-    fn ask(&self, question: &str) -> bool {
+    fn ask(&self, question: &Question) -> bool {
         self.choices.iter().all(|v| v.ask(question))
     }
 
@@ -272,7 +272,7 @@ impl Validator for TaggedUnionValidator {
         &self.name
     }
 
-    fn ask(&self, question: &str) -> bool {
+    fn ask(&self, question: &Question) -> bool {
         self.choices.values().all(|v| v.ask(question))
     }
 

@@ -8,7 +8,7 @@ use crate::errors::{ErrorKind, PydanticValueError, ValError, ValResult, Validati
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Question, Validator};
 
 pub struct FunctionBuilder;
 
@@ -96,7 +96,7 @@ impl Validator for FunctionBeforeValidator {
         &self.name
     }
 
-    fn ask(&self, question: &str) -> bool {
+    fn ask(&self, question: &Question) -> bool {
         self.validator.ask(question)
     }
 
@@ -133,7 +133,7 @@ impl Validator for FunctionAfterValidator {
         &self.name
     }
 
-    fn ask(&self, question: &str) -> bool {
+    fn ask(&self, question: &Question) -> bool {
         self.validator.ask(question)
     }
 
@@ -226,7 +226,7 @@ impl Validator for FunctionWrapValidator {
         &self.name
     }
 
-    fn ask(&self, question: &str) -> bool {
+    fn ask(&self, question: &Question) -> bool {
         self.validator.ask(question)
     }
 

@@ -15,7 +15,7 @@ use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 
 use super::with_default::get_default;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Question, Validator};
 
 #[derive(Debug, Clone)]
 struct TypedDictField {
@@ -327,11 +327,9 @@ impl Validator for TypedDictValidator {
         Self::EXPECTED_TYPE
     }
 
-    fn ask(&self, question: &str) -> bool {
-        if question == "return_fields_set" {
-            self.return_fields_set
-        } else {
-            false
+    fn ask(&self, question: &Question) -> bool {
+        match question {
+            Question::ReturnFieldsSet => self.return_fields_set,
         }
     }
 

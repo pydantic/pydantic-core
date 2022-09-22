@@ -286,7 +286,7 @@ fn build_single_validator<'a, T: BuildValidator>(
             let inner_val = T::build(schema_dict, config, build_context)?;
             let name = inner_val.get_name().to_string();
             build_context.complete_slot(slot_id, inner_val)?;
-            return Ok(recursive::RecursiveContainerValidator::create(slot_id, name));
+            return Ok(recursive::RecursiveRefValidator::from_id(slot_id, name));
         }
     }
 
@@ -465,7 +465,6 @@ pub enum CombinedValidator {
     // function call - validation around a function call
     FunctionCall(call::CallValidator),
     // recursive (self-referencing) models
-    Recursive(recursive::RecursiveContainerValidator),
     RecursiveRef(recursive::RecursiveRefValidator),
     // literals
     LiteralSingleString(literal::LiteralSingleStringValidator),
@@ -497,6 +496,11 @@ pub enum CombinedValidator {
     WithDefault(with_default::WithDefaultValidator),
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum Question {
+    ReturnFieldsSet,
+}
+
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
 /// validators defined in `build_validator` also need `EXPECTED_TYPE` as a const, but that can't be part of the trait
 #[enum_dispatch(CombinedValidator)]
@@ -519,7 +523,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
     /// to do more, validators which don't know the question and have sub-validators
     /// should return the result them in an `...iter().all(|v| v.ask(question))` way, ONLY
     /// if they return the value of the sub-validator, e.g. functions, unions
-    fn ask(&self, _question: &str) -> bool {
+    fn ask(&self, _question: &Question) -> bool {
         false
     }
 

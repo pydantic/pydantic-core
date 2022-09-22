@@ -10,7 +10,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::validators::build_validator;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Question, Validator};
 
 #[derive(Debug, Clone)]
 enum DefaultType {
@@ -103,7 +103,7 @@ impl Validator for WithDefaultValidator {
         &self.name
     }
 
-    fn ask(&self, question: &str) -> bool {
+    fn ask(&self, question: &Question) -> bool {
         self.validator.ask(question)
     }
 
