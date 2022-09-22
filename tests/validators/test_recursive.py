@@ -19,10 +19,7 @@ def test_branch_nullable():
                 'sub_branch': {
                     'schema': {
                         'type': 'default',
-                        'schema': {
-                            'type': 'union',
-                            'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'schema_ref': 'Branch'}],
-                        },
+                        'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
                         'default': None,
                     }
                 },
@@ -689,3 +686,28 @@ def test_many_uses_of_ref():
 
     long_input = {'name': 'Anne', 'other_names': [f'p-{i}' for i in range(300)]}
     assert v.validate_python(long_input) == long_input
+
+
+def test_error_inside_recursive_wrapper():
+    with pytest.raises(SchemaError) as exc_info:
+        SchemaValidator(
+            {
+                'type': 'typed-dict',
+                'ref': 'Branch',
+                'fields': {
+                    'sub_branch': {
+                        'schema': {
+                            'type': 'default',
+                            'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                            'default': None,
+                            'default_factory': lambda x: 'foobar',
+                        }
+                    }
+                },
+            }
+        )
+    assert str(exc_info.value) == (
+        'Field "sub_branch":\n'
+        '  SchemaError: Error building "default" validator:\n'
+        "  SchemaError: 'default' and 'default_factory' cannot be used together"
+    )

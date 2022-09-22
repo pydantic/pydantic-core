@@ -283,9 +283,7 @@ fn build_single_validator<'a, T: BuildValidator>(
         // unless it's used/referenced
         if build_context.ref_used(&schema_ref) {
             let slot_id = build_context.prepare_slot(schema_ref)?;
-            let inner_val = T::build(schema_dict, config, build_context).map_err(|err| {
-                SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", val_type, err))
-            })?;
+            let inner_val = T::build(schema_dict, config, build_context)?;
             let name = inner_val.get_name().to_string();
             build_context.complete_slot(slot_id, inner_val)?;
             return Ok(recursive::RecursiveContainerValidator::create(slot_id, name));
