@@ -1,7 +1,7 @@
 from typing import Optional
 
 import pytest
-from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict, IsStr
+from dirty_equals import AnyThing, HasAttributes, IsInstance, IsList, IsPartialDict, IsStr
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
@@ -713,7 +713,6 @@ def test_error_inside_recursive_wrapper():
     )
 
 
-@pytest.mark.xfail(reason='TODO: fix this')
 def test_new_class_td_recursive():
     class Foobar:
         __slots__ = '__dict__', '__fields_set__'
@@ -734,7 +733,11 @@ def test_new_class_td_recursive():
                                 {
                                     'type': 'new-class',
                                     'class_type': Foobar,
-                                    'schema': {'type': 'recursive-ref', 'schema_ref': '__main__.Foobar'},
+                                    'schema': {
+                                        'type': 'recursive-ref',
+                                        'schema_ref': '__main__.Foobar',
+                                        'return_fields_set': True,
+                                    },
                                 },
                                 'none',
                             ],
@@ -746,4 +749,6 @@ def test_new_class_td_recursive():
             },
         }
     )
-    v.validate_python(dict(x=1, y={'x': 2}))
+    d, fields_set = v.validate_python(dict(x=1, y={'x': 2}))
+    assert d == {'x': 1, 'y': IsInstance(Foobar) & HasAttributes(x=2)}
+    assert fields_set == {'y', 'x'}

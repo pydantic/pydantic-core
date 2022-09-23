@@ -284,9 +284,14 @@ fn build_single_validator<'a, T: BuildValidator>(
         if build_context.ref_used(&schema_ref) {
             let slot_id = build_context.prepare_slot(schema_ref)?;
             let inner_val = T::build(schema_dict, config, build_context)?;
+            let return_fields_set = inner_val.ask(&Question::ReturnFieldsSet);
             let name = inner_val.get_name().to_string();
             build_context.complete_slot(slot_id, inner_val)?;
-            return Ok(recursive::RecursiveRefValidator::from_id(slot_id, name));
+            return Ok(recursive::RecursiveRefValidator::from_id(
+                slot_id,
+                name,
+                return_fields_set,
+            ));
         }
     }
 

@@ -157,6 +157,9 @@ class NullableSchema(TypedDict, total=False):
 class RecursiveReferenceSchema(TypedDict):
     type: Literal['recursive-ref']
     schema_ref: str
+    # we have to include answers to "Questions" here as well as on the original validator
+    # since the validator is not available when `ask()` is called
+    return_fields_set: NotRequired[bool]
 
 
 class SetSchema(TypedDict, total=False):

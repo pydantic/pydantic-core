@@ -7,20 +7,22 @@ use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Question, Validator};
 
 #[derive(Debug, Clone)]
 pub struct RecursiveRefValidator {
     validator_id: usize,
     inner_name: String,
-    // TODO answers to questions, if there become lots, this could be a new struct
+    // we have to record the answers to `Question`s as we can't access the validator when `ask()` is called
+    return_fields_set: bool,
 }
 
 impl RecursiveRefValidator {
-    pub fn from_id(validator_id: usize, inner_name: String) -> CombinedValidator {
+    pub fn from_id(validator_id: usize, inner_name: String, return_fields_set: bool) -> CombinedValidator {
         Self {
             validator_id,
             inner_name,
+            return_fields_set,
         }
         .into()
     }
@@ -39,6 +41,9 @@ impl BuildValidator for RecursiveRefValidator {
         Ok(Self {
             validator_id,
             inner_name: "...".to_string(),
+            return_fields_set: schema
+                .get_as(intern!(schema.py(), "return_fields_set"))?
+                .unwrap_or(false),
         }
         .into())
     }
@@ -73,6 +78,12 @@ impl Validator for RecursiveRefValidator {
 
     fn get_name(&self) -> &str {
         &self.inner_name
+    }
+
+    fn ask(&self, question: &Question) -> bool {
+        match question {
+            Question::ReturnFieldsSet => self.return_fields_set,
+        }
     }
 
     /// don't need to call complete on the inner validator here, complete_validators takes care of that.
