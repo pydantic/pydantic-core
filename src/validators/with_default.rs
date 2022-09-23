@@ -4,13 +4,14 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::ask_answer::Question;
 use crate::build_tools::{py_error, SchemaDict};
 use crate::errors::{ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::validators::build_validator;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Question, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 enum DefaultType {

@@ -3,12 +3,13 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
+use crate::ask_answer::Question;
 use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorKind, PydanticValueError, ValError, ValResult, ValidationError};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Question, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 pub struct FunctionBuilder;
 

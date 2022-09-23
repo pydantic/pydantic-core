@@ -2,27 +2,28 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::ask_answer::{Answers, Question};
 use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Question, Validator};
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct RecursiveRefValidator {
     validator_id: usize,
     inner_name: String,
     // we have to record the answers to `Question`s as we can't access the validator when `ask()` is called
-    return_fields_set: bool,
+    answers: Answers,
 }
 
 impl RecursiveRefValidator {
-    pub fn from_id(validator_id: usize, inner_name: String, return_fields_set: bool) -> CombinedValidator {
+    pub fn from_id(validator_id: usize, inner_name: String, answers: Answers) -> CombinedValidator {
         Self {
             validator_id,
             inner_name,
-            return_fields_set,
+            answers,
         }
         .into()
     }
@@ -37,13 +38,11 @@ impl BuildValidator for RecursiveRefValidator {
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
         let name: String = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
-        let validator_id = build_context.find_slot_id(&name)?;
+        let (validator_id, answers) = build_context.find_slot_id_answer(&name)?;
         Ok(Self {
             validator_id,
             inner_name: "...".to_string(),
-            return_fields_set: schema
-                .get_as(intern!(schema.py(), "return_fields_set"))?
-                .unwrap_or(false),
+            answers,
         }
         .into())
     }
@@ -81,9 +80,7 @@ impl Validator for RecursiveRefValidator {
     }
 
     fn ask(&self, question: &Question) -> bool {
-        match question {
-            Question::ReturnFieldsSet => self.return_fields_set,
-        }
+        self.answers.ask(question)
     }
 
     /// don't need to call complete on the inner validator here, complete_validators takes care of that.

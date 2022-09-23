@@ -26,6 +26,7 @@ def test_branch_nullable():
             },
         }
     )
+    assert 'return_fields_set:false' in plain_repr(v)
 
     assert v.validate_python({'name': 'root'}) == {'name': 'root', 'sub_branch': None}
     assert plain_repr(v).startswith('SchemaValidator(name="typed-dict",validator=RecursiveRef(RecursiveRefValidator{')
@@ -733,11 +734,7 @@ def test_new_class_td_recursive():
                                 {
                                     'type': 'new-class',
                                     'class_type': Foobar,
-                                    'schema': {
-                                        'type': 'recursive-ref',
-                                        'schema_ref': '__main__.Foobar',
-                                        'return_fields_set': True,
-                                    },
+                                    'schema': {'type': 'recursive-ref', 'schema_ref': '__main__.Foobar'},
                                 },
                                 'none',
                             ],
@@ -749,6 +746,13 @@ def test_new_class_td_recursive():
             },
         }
     )
+    assert 'return_fields_set:true' in plain_repr(v)
     d, fields_set = v.validate_python(dict(x=1, y={'x': 2}))
-    assert d == {'x': 1, 'y': IsInstance(Foobar) & HasAttributes(x=2)}
+    assert d == {'x': 1, 'y': IsInstance(Foobar)}
     assert fields_set == {'y', 'x'}
+
+    f = d['y']
+    assert isinstance(f, Foobar)
+    assert f.x == 2
+    assert f.y is None
+    assert f.__fields_set__ == {'x'}

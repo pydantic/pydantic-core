@@ -9,6 +9,7 @@ use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyByteArray, PyBytes, PyDict, PyList, PyString};
 
+use crate::ask_answer::{Answers, Question};
 use crate::build_tools::{py_error, SchemaDict, SchemaError};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult, ValidationError};
 use crate::input::{Input, JsonInput};
@@ -270,7 +271,7 @@ pub trait BuildValidator: Sized {
 }
 
 /// Logic to create a particular validator, called in the `validator_match` macro, then in turn by `build_validator`
-fn build_single_validator<'a, T: BuildValidator>(
+fn build_specific_validator<'a, T: BuildValidator>(
     val_type: &str,
     schema_dict: &'a PyDict,
     config: Option<&'a PyDict>,
@@ -282,16 +283,12 @@ fn build_single_validator<'a, T: BuildValidator>(
         // this means refs can always be set without having an effect on the validator which is generated
         // unless it's used/referenced
         if build_context.ref_used(&schema_ref) {
-            let slot_id = build_context.prepare_slot(schema_ref)?;
+            let answers = Answers::new(schema_dict)?;
+            let slot_id = build_context.prepare_slot(schema_ref, answers.clone())?;
             let inner_val = T::build(schema_dict, config, build_context)?;
-            let return_fields_set = inner_val.ask(&Question::ReturnFieldsSet);
             let name = inner_val.get_name().to_string();
             build_context.complete_slot(slot_id, inner_val)?;
-            return Ok(recursive::RecursiveRefValidator::from_id(
-                slot_id,
-                name,
-                return_fields_set,
-            ));
+            return Ok(recursive::RecursiveRefValidator::from_id(slot_id, name, answers));
         }
     }
 
@@ -304,7 +301,7 @@ macro_rules! validator_match {
     ($type:ident, $dict:ident, $config:ident, $build_context:ident, $($validator:path,)+) => {
         match $type {
             $(
-                <$validator>::EXPECTED_TYPE => build_single_validator::<$validator>($type, $dict, $config, $build_context),
+                <$validator>::EXPECTED_TYPE => build_specific_validator::<$validator>($type, $dict, $config, $build_context),
             )+
             _ => {
                 return py_error!(r#"Unknown schema type: "{}""#, $type)
@@ -501,11 +498,6 @@ pub enum CombinedValidator {
     WithDefault(with_default::WithDefaultValidator),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum Question {
-    ReturnFieldsSet,
-}
-
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
 /// validators defined in `build_validator` also need `EXPECTED_TYPE` as a const, but that can't be part of the trait
 #[enum_dispatch(CombinedValidator)]
@@ -539,13 +531,20 @@ pub trait Validator: Send + Sync + Clone + Debug {
     }
 }
 
+#[derive(Clone)]
+struct Slot {
+    slot_ref: String,
+    op_validator: Option<CombinedValidator>,
+    answers: Answers,
+}
+
 /// `BuildContext` is used to store extra information while building validators,
 /// currently it just holds a vec "slots" which holds validators need to be accessed from multiple other validators
 /// and therefore can't be owned by them directly.
 #[derive(Default, Clone)]
 pub struct BuildContext {
     used_refs: AHashSet<String>,
-    slots: Vec<(String, Option<CombinedValidator>)>,
+    slots: Vec<Slot>,
 }
 
 impl BuildContext {
@@ -564,17 +563,26 @@ impl BuildContext {
     /// First of two part process to add a new validator slot, we add the `slot_ref` to the array, but not the
     /// actual `validator`, we can't add the validator until it's build.
     /// We need the `id` to build the validator, hence this two-step process.
-    pub fn prepare_slot(&mut self, slot_ref: String) -> PyResult<usize> {
+    pub fn prepare_slot(&mut self, slot_ref: String, answers: Answers) -> PyResult<usize> {
         let id = self.slots.len();
-        self.slots.push((slot_ref, None));
+        let slot = Slot {
+            slot_ref,
+            op_validator: None,
+            answers,
+        };
+        self.slots.push(slot);
         Ok(id)
     }
 
     /// Second part of adding a validator - we update the slot to include a validator
     pub fn complete_slot(&mut self, slot_id: usize, validator: CombinedValidator) -> PyResult<()> {
         match self.slots.get(slot_id) {
-            Some((val_ref, _)) => {
-                self.slots[slot_id] = (val_ref.clone(), Some(validator));
+            Some(slot) => {
+                self.slots[slot_id] = Slot {
+                    slot_ref: slot.slot_ref.clone(),
+                    op_validator: Some(validator),
+                    answers: slot.answers.clone(),
+                };
                 Ok(())
             }
             None => py_error!("Slots Error: slot {} not found", slot_id),
@@ -582,10 +590,13 @@ impl BuildContext {
     }
 
     /// find a slot by `slot_ref` - iterate over the slots until we find a matching reference - return the index
-    pub fn find_slot_id(&self, slot_ref: &str) -> PyResult<usize> {
-        let is_match = |(match_sr, _): &(String, Option<CombinedValidator>)| match_sr == slot_ref;
+    pub fn find_slot_id_answer(&self, slot_ref: &str) -> PyResult<(usize, Answers)> {
+        let is_match = |slot: &Slot| slot.slot_ref == slot_ref;
         match self.slots.iter().position(is_match) {
-            Some(id) => Ok(id),
+            Some(id) => {
+                let slot = self.slots.get(id).unwrap();
+                Ok((id, slot.answers.clone()))
+            }
             None => py_error!("Slots Error: ref '{}' not found", slot_ref),
         }
     }
@@ -594,7 +605,7 @@ impl BuildContext {
     /// to set its name
     pub fn find_validator(&self, slot_id: usize) -> PyResult<&CombinedValidator> {
         match self.slots.get(slot_id) {
-            Some((_, op_validator)) => match op_validator {
+            Some(slot) => match slot.op_validator {
                 Some(ref validator) => Ok(validator),
                 None => py_error!("Slots Error: slot {} not yet filled", slot_id),
             },
@@ -608,7 +619,7 @@ impl BuildContext {
         let self_clone = self.clone();
         self.slots
             .into_iter()
-            .map(|(_, opt_validator)| match opt_validator {
+            .map(|slot| match slot.op_validator {
                 Some(mut validator) => {
                     validator.complete(&self_clone)?;
                     Ok(validator)
