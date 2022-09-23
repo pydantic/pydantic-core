@@ -7,11 +7,11 @@ use pyo3::prelude::*;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-mod ask_answer;
 mod build_tools;
 mod errors;
 mod input;
 mod lookup_key;
+mod questions;
 mod recursion_guard;
 mod validators;
 

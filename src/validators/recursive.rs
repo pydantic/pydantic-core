@@ -2,10 +2,10 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::ask_answer::{Answers, Question};
 use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
+use crate::questions::{Answers, Question};
 use crate::recursion_guard::RecursionGuard;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};

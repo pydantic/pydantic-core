@@ -9,10 +9,10 @@ use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyByteArray, PyBytes, PyDict, PyList, PyString};
 
-use crate::ask_answer::{Answers, Question};
 use crate::build_tools::{py_error, SchemaDict, SchemaError};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult, ValidationError};
 use crate::input::{Input, JsonInput};
+use crate::questions::{Answers, Question};
 use crate::recursion_guard::RecursionGuard;
 
 mod any;

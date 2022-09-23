@@ -8,10 +8,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple, PyType};
 use pyo3::{ffi, intern};
 
-use crate::ask_answer::Question;
 use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
+use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};

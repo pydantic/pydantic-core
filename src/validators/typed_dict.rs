@@ -8,11 +8,11 @@ use pyo3::PyTypeInfo;
 
 use ahash::AHashSet;
 
-use crate::ask_answer::Question;
 use crate::build_tools::{is_strict, py_error, schema_or_config, schema_or_config_same, SchemaDict};
 use crate::errors::{py_err_string, ErrorKind, ValError, ValLineError, ValResult};
 use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
+use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
 
 use super::with_default::get_default;
