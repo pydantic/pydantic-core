@@ -583,3 +583,33 @@ def test_call_after_init_internal_error():
     )
     with pytest.raises(TypeError, match=r"wrong_signature\(\) got an unexpected keyword argument 'context'"):
         v.validate_python({'field_a': 'test'})
+
+
+def test_call_after_init_mutate():
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+        field_a: str
+        field_b: int
+
+        def call_me_baby(self, context, **kwargs):
+            self.field_a *= 2
+            self.__fields_set__ = {'field_a'}
+
+    v = SchemaValidator(
+        {
+            'type': 'new-class',
+            'class_type': MyModel,
+            'call_after_init': 'call_me_baby',
+            'schema': {
+                'type': 'typed-dict',
+                'return_fields_set': True,
+                'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
+            },
+        }
+    )
+    m = v.validate_python({'field_a': 'test', 'field_b': 12})
+    assert isinstance(m, MyModel)
+    assert m.field_a == 'testtest'
+    assert m.field_b == 12
+    assert m.__fields_set__ == {'field_a'}
+    assert m.__dict__ == {'field_a': 'testtest', 'field_b': 12}
