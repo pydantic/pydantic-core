@@ -14,7 +14,7 @@ use crate::input::Input;
 use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
 
-use super::function::{convert_err, kwargs};
+use super::function::convert_err;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -55,7 +55,7 @@ impl BuildValidator for NewClassValidator {
             class: class.into(),
             call_after_init: schema
                 .get_as::<&str>(intern!(py, "call_after_init"))?
-                .map(|s| PyString::new(py, s).into_py(py)),
+                .map(|s| PyString::intern(py, s).into_py(py)),
             // Get the class's `__name__`, not using `class.name()` since it uses `__qualname__`
             // which is not what we want here
             name: class.getattr(intern!(py, "__name__"))?.extract()?,
@@ -106,9 +106,10 @@ impl Validator for NewClassValidator {
             };
 
             if let Some(ref call_after_init) = self.call_after_init {
-                let kwargs = kwargs!(py, context: extra.context);
+                let kwargs = PyDict::new(py);
+                kwargs.set_item("context", extra.context)?;
                 instance
-                    .call_method(py, call_after_init.as_ref(py), (), kwargs)
+                    .call_method(py, call_after_init.as_ref(py), (), Some(kwargs))
                     .map_err(|e| convert_err(py, e, input))?;
             }
             Ok(instance)

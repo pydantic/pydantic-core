@@ -37,7 +37,6 @@ macro_rules! kwargs {
         Some(pyo3::types::IntoPyDict::into_py_dict([$((stringify!($k), $v.into_py($py)),)*], $py).into())
     }};
 }
-pub(crate) use kwargs;
 
 macro_rules! impl_build {
     ($impl_name:ident, $name:literal) => {
