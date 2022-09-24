@@ -233,8 +233,8 @@ jobs:
   build:
     name: build on ${{ matrix.platform || matrix.os }} (${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
     # only run on push to main and on release
-    if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main')"
-    needs: [test, lint]
+#    if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main')"
+#    needs: [test, lint]
     strategy:
       fail-fast: false
       matrix:
@@ -246,15 +246,15 @@ jobs:
             platform: linux
           - os: windows
             ls: dir
-            interpreter: 3.7 3.8 3.9 3.10
+            interpreter: 3.7 3.8 3.9 3.10 3.11
           - os: windows
             ls: dir
             target: i686
             python-architecture: x86
-            interpreter: 3.7 3.8 3.9 3.10
+            interpreter: 3.7 3.8 3.9 3.10 3.11
           - os: macos
             target: aarch64
-            interpreter: 3.7 3.8 3.9 3.10
+            interpreter: 3.7 3.8 3.9 3.10 3.11
           - os: ubuntu
             platform: linux
             target: i686
@@ -268,7 +268,7 @@ jobs:
             platform: linux
             target: armv7
             container: messense/manylinux_2_24-cross:armv7
-            interpreter: 3.7 3.8 3.9 3.10
+            interpreter: 3.7 3.8 3.9 3.10 3.11
           # musllinux
           - os: ubuntu
             platform: linux
