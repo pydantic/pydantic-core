@@ -115,14 +115,16 @@ def test_schema_typing() -> None:
     schema: CoreSchema = {'type': 'call', 'arguments_schema': 'any', 'function': foo}
     SchemaValidator(schema)
 
-    schema: CoreSchemaStrings = 'int'
-    SchemaValidator(schema)
 
-    schema: CoreSchemaCombined = 'int'
-    SchemaValidator(schema)
+def test_schema_unions():
+    schema_str: CoreSchemaStrings = 'int'
+    SchemaValidator(schema_str)
 
-    schema: CoreSchemaCombined = {'type': 'int'}
-    SchemaValidator(schema)
+    schema_str_combined: CoreSchemaCombined = 'int'
+    SchemaValidator(schema_str_combined)
+
+    schema_dict_combined: CoreSchemaCombined = {'type': 'int'}
+    SchemaValidator(schema_dict_combined)
 
 
 def test_schema_typing_error() -> None:
