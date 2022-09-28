@@ -22,7 +22,7 @@ fn json<'a>(py: Python<'a>, code: &'a str) -> &'a PyAny {
 fn ints_json(bench: &mut Bencher) {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    let validator = build_schema_validator(py, "{'type': 'int'}");
+    let validator = build_schema_validator(py, "{'type': {'type': 'int'}}");
 
     let result = validator.validate_json(py, json(py, "123"), None, None).unwrap();
     let result_int: i64 = result.extract(py).unwrap();
@@ -35,7 +35,7 @@ fn ints_json(bench: &mut Bencher) {
 fn ints_python(bench: &mut Bencher) {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    let validator = build_schema_validator(py, "{'type': 'int'}");
+    let validator = build_schema_validator(py, "{'type': {'type': 'int'}}");
 
     let input = 123_i64.into_py(py);
     let input = input.as_ref(py);
@@ -51,7 +51,7 @@ fn ints_python(bench: &mut Bencher) {
 fn list_int_json(bench: &mut Bencher) {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    let validator = build_schema_validator(py, "{'type': 'list', 'items_schema': 'int'}");
+    let validator = build_schema_validator(py, "{'type': 'list', 'items_schema': {'type': 'int'}}");
     let code = format!(
         "[{}]",
         (0..100).map(|x| x.to_string()).collect::<Vec<String>>().join(",")
@@ -61,7 +61,7 @@ fn list_int_json(bench: &mut Bencher) {
 }
 
 fn list_int_input(py: Python<'_>) -> (SchemaValidator, PyObject) {
-    let validator = build_schema_validator(py, "{'type': 'list', 'items_schema': 'int'}");
+    let validator = build_schema_validator(py, "{'type': 'list', 'items_schema': {'type': 'int'}}");
     let code = format!(
         "[{}]",
         (0..100).map(|x| x.to_string()).collect::<Vec<String>>().join(",")
@@ -102,7 +102,7 @@ fn list_int_python_isinstance(bench: &mut Bencher) {
 fn list_error_json(bench: &mut Bencher) {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    let validator = build_schema_validator(py, "{'type': 'list', 'items_schema': 'int'}");
+    let validator = build_schema_validator(py, "{'type': 'list', 'items_schema': {'type': 'int'}}");
     let code = format!(
         "[{}]",
         (0..100)
@@ -129,7 +129,7 @@ fn list_error_json(bench: &mut Bencher) {
 }
 
 fn list_error_python_input(py: Python<'_>) -> (SchemaValidator, PyObject) {
-    let validator = build_schema_validator(py, "{'type': 'list', 'items_schema': 'int'}");
+    let validator = build_schema_validator(py, "{'type': 'list', 'items_schema': {'type': 'int'}}");
     let code = format!(
         "[{}]",
         (0..100)
@@ -228,7 +228,10 @@ fn as_str(i: u8) -> String {
 fn dict_json(bench: &mut Bencher) {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    let validator = build_schema_validator(py, "{'type': 'dict', 'keys_schema': 'str', 'values_schema': 'int'}");
+    let validator = build_schema_validator(
+        py,
+        "{'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'int'}}",
+    );
 
     let code = format!(
         "{{{}}}",
@@ -245,7 +248,10 @@ fn dict_json(bench: &mut Bencher) {
 fn dict_python(bench: &mut Bencher) {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    let validator = build_schema_validator(py, "{'type': 'dict', 'keys_schema': 'str', 'values_schema': 'int'}");
+    let validator = build_schema_validator(
+        py,
+        "{'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'int'}}",
+    );
 
     let code = format!(
         "{{{}}}",
@@ -270,9 +276,9 @@ fn dict_value_error(bench: &mut Bencher) {
         py,
         r#"{
             'type': 'dict',
-            'keys_schema': 'str',
+            'keys_schema': {'type': 'str'},
             'values_schema': {
-                'type': 'int',
+                'type': {'type': 'int'},
                 'lt': 0,
             },
         }"#,
@@ -320,16 +326,16 @@ fn typed_dict_json(bench: &mut Bencher) {
           'type': 'typed-dict',
           'extra_behavior': 'ignore',
           'fields': {
-            'a': {'schema': 'int'},
-            'b': {'schema': 'int'},
-            'c': {'schema': 'int'},
-            'd': {'schema': 'int'},
-            'e': {'schema': 'int'},
-            'f': {'schema': 'int'},
-            'g': {'schema': 'int'},
-            'h': {'schema': 'int'},
-            'i': {'schema': 'int'},
-            'j': {'schema': 'int'},
+            'a': {'schema': {'type': 'int'}},
+            'b': {'schema': {'type': 'int'}},
+            'c': {'schema': {'type': 'int'}},
+            'd': {'schema': {'type': 'int'}},
+            'e': {'schema': {'type': 'int'}},
+            'f': {'schema': {'type': 'int'}},
+            'g': {'schema': {'type': 'int'}},
+            'h': {'schema': {'type': 'int'}},
+            'i': {'schema': {'type': 'int'}},
+            'j': {'schema': {'type': 'int'}},
           },
         }"#,
     );
@@ -349,16 +355,16 @@ fn typed_dict_python(bench: &mut Bencher) {
           'type': 'typed-dict',
           'extra_behavior': 'ignore',
           'fields': {
-            'a': {'schema': 'int'},
-            'b': {'schema': 'int'},
-            'c': {'schema': 'int'},
-            'd': {'schema': 'int'},
-            'e': {'schema': 'int'},
-            'f': {'schema': 'int'},
-            'g': {'schema': 'int'},
-            'h': {'schema': 'int'},
-            'i': {'schema': 'int'},
-            'j': {'schema': 'int'},
+            'a': {'schema': {'type': 'int'}},
+            'b': {'schema': {'type': 'int'}},
+            'c': {'schema': {'type': 'int'}},
+            'd': {'schema': {'type': 'int'}},
+            'e': {'schema': {'type': 'int'}},
+            'f': {'schema': {'type': 'int'}},
+            'g': {'schema': {'type': 'int'}},
+            'h': {'schema': {'type': 'int'}},
+            'i': {'schema': {'type': 'int'}},
+            'j': {'schema': {'type': 'int'}},
           },
         }"#,
     );
@@ -381,16 +387,16 @@ fn typed_dict_deep_error(bench: &mut Bencher) {
         r#"{
             'type': 'typed-dict',
             'fields': {
-                'field_a': {'schema': 'str'},
+                'field_a': {'schema': {'type': 'str'}},
                 'field_b': {
                     'schema': {
                         'type': 'typed-dict',
                         'fields': {
-                            'field_c': {'schema': 'str'},
+                            'field_c': {'schema': {'type': 'str'}},
                             'field_d': {
                                 'schema': {
                                     'type': 'typed-dict',
-                                    'fields': {'field_e': {'schema': 'str'}, 'field_f': {'schema': 'int'}},
+                                    'fields': {'field_e': {'schema': {'type': 'str'}}, 'field_f': {'schema': {'type': 'int'}}},
                                 }
                             },
                         },
