@@ -34,7 +34,7 @@ impl BuildValidator for ChainValidator {
             .collect::<Vec<CombinedValidator>>();
 
         match steps.len() {
-            0 => py_error!("One or more steps required for a chain validator"),
+            0 => py_error!("One or more steps are required for a chain validator"),
             1 => {
                 let step = steps.into_iter().next().unwrap();
                 Ok(step)
@@ -90,7 +90,9 @@ impl Validator for ChainValidator {
     }
 
     fn ask(&self, question: &Question) -> bool {
-        self.steps.iter().all(|v| v.ask(question))
+        // any makes more sense since at the moment we only use ask for "return_fields_set", might need
+        // more complex logic in future
+        self.steps.iter().any(|v| v.ask(question))
     }
 
     fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {

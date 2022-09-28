@@ -1,10 +1,11 @@
+import re
 from decimal import Decimal
 
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
-from ..conftest import PyAndJson
+from ..conftest import PyAndJson, plain_repr
 
 
 def test_chain():
@@ -94,3 +95,52 @@ def test_flatten():
 
     assert validator.validate_python('input') == 'input-1-2-3'
     assert validator.title == 'chain[function-plain,function-plain,function-plain]'
+
+
+def test_chain_empty():
+    with pytest.raises(SchemaError, match='One or more steps are required for a chain validator'):
+        SchemaValidator({'type': 'chain', 'steps': []})
+
+
+def test_chain_one():
+    validator = SchemaValidator(
+        {'type': 'chain', 'steps': [{'type': 'function', 'mode': 'plain', 'function': lambda v, **kwargs: f'{v}-1'}]}
+    )
+    assert validator.validate_python('input') == 'input-1'
+    assert validator.title == 'function-plain'
+
+
+def test_ask():
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+
+    calls = []
+
+    def f(input_value, **kwargs):
+        calls.append(input_value)
+        return input_value
+
+    v = SchemaValidator(
+        {
+            'type': 'new-class',
+            'class_type': MyModel,
+            'schema': {
+                'type': 'chain',
+                'steps': [
+                    {
+                        'type': 'typed-dict',
+                        'return_fields_set': True,
+                        'fields': {'field_a': {'schema': {'type': 'str'}}},
+                    },
+                    {'type': 'function', 'mode': 'plain', 'function': f},
+                ],
+            },
+        }
+    )
+    assert re.search('expect_fields_set:(true|false)', plain_repr(v)).group(1) == 'true'
+    m = v.validate_python({'field_a': 'abc'})
+    assert isinstance(m, MyModel)
+    assert m.field_a == 'abc'
+    assert m.__fields_set__ == {'field_a'}
+    # insert_assert(calls)
+    assert calls == [({'field_a': 'abc'}, {'field_a'})]
