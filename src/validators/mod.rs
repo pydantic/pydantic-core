@@ -383,8 +383,6 @@ pub fn build_validator<'a>(
         with_default::WithDefaultValidator,
         // chain validators
         chain::ChainValidator,
-        chain::Chain2Validator,
-        chain::Chain3Validator,
     )
 }
 
@@ -497,8 +495,6 @@ pub enum CombinedValidator {
     WithDefault(with_default::WithDefaultValidator),
     // chain validators
     Chain(chain::ChainValidator),
-    Chain2(chain::Chain2Validator),
-    Chain3(chain::Chain3Validator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

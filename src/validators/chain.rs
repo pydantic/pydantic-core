@@ -78,15 +78,11 @@ impl Validator for ChainValidator {
     ) -> ValResult<'data, PyObject> {
         let mut steps_iter = self.steps.iter();
         let first_step = steps_iter.next().unwrap();
-        let value = first_step
-            .validate(py, input, extra, slots, recursion_guard)
-            .map_err(|err| err.with_outer_location(self.name.clone().into()))?;
+        let value = first_step.validate(py, input, extra, slots, recursion_guard)?;
 
-        steps_iter
-            .try_fold(value, |v, step| {
-                step.validate(py, v.into_ref(py), extra, slots, recursion_guard)
-            })
-            .map_err(|err| err.with_outer_location(self.name.clone().into()))
+        steps_iter.try_fold(value, |v, step| {
+            step.validate(py, v.into_ref(py), extra, slots, recursion_guard)
+        })
     }
 
     fn get_name(&self) -> &str {
@@ -99,158 +95,5 @@ impl Validator for ChainValidator {
 
     fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
         self.steps.iter_mut().try_for_each(|v| v.complete(build_context))
-    }
-}
-
-// ---------------------------
-
-#[derive(Debug, Clone)]
-pub struct Chain2Validator {
-    validator1: Box<CombinedValidator>,
-    validator2: Box<CombinedValidator>,
-    name: String,
-}
-
-impl BuildValidator for Chain2Validator {
-    const EXPECTED_TYPE: &'static str = "chain2";
-
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        build_context: &mut BuildContext,
-    ) -> PyResult<CombinedValidator> {
-        let schema1: &PyAny = schema.get_as_req(intern!(schema.py(), "schema1"))?;
-        let validator1 = Box::new(build_validator(schema1, config, build_context)?);
-
-        let schema2: &PyAny = schema.get_as_req(intern!(schema.py(), "schema2"))?;
-        let validator2 = Box::new(build_validator(schema2, config, build_context)?);
-
-        let name = format!(
-            "{}[{}, {}]",
-            Self::EXPECTED_TYPE,
-            validator1.get_name(),
-            validator2.get_name()
-        );
-
-        Ok(Self {
-            validator1,
-            validator2,
-            name,
-        }
-        .into())
-    }
-}
-
-impl Validator for Chain2Validator {
-    fn validate<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        extra: &Extra,
-        slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let value = self
-            .validator1
-            .validate(py, input, extra, slots, recursion_guard)
-            .map_err(|err| err.with_outer_location(self.name.clone().into()))?;
-        return self
-            .validator2
-            .validate(py, value.into_ref(py), extra, slots, recursion_guard)
-            .map_err(|err| err.with_outer_location(self.name.clone().into()));
-    }
-
-    fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    fn ask(&self, question: &Question) -> bool {
-        self.validator1.ask(question) && self.validator2.ask(question)
-    }
-
-    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
-        self.validator1.complete(build_context)?;
-        self.validator2.complete(build_context)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Chain3Validator {
-    validator1: Box<CombinedValidator>,
-    validator2: Box<CombinedValidator>,
-    validator3: Box<CombinedValidator>,
-    name: String,
-}
-
-impl BuildValidator for Chain3Validator {
-    const EXPECTED_TYPE: &'static str = "chain3";
-
-    fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        build_context: &mut BuildContext,
-    ) -> PyResult<CombinedValidator> {
-        let schema1: &PyAny = schema.get_as_req(intern!(schema.py(), "schema1"))?;
-        let validator1 = Box::new(build_validator(schema1, config, build_context)?);
-
-        let schema2: &PyAny = schema.get_as_req(intern!(schema.py(), "schema2"))?;
-        let validator2 = Box::new(build_validator(schema2, config, build_context)?);
-
-        let schema3: &PyAny = schema.get_as_req(intern!(schema.py(), "schema3"))?;
-        let validator3 = Box::new(build_validator(schema3, config, build_context)?);
-
-        let name = format!(
-            "{}[{}, {}, {}]",
-            Self::EXPECTED_TYPE,
-            validator1.get_name(),
-            validator2.get_name(),
-            validator3.get_name()
-        );
-
-        Ok(Self {
-            validator1,
-            validator2,
-            validator3,
-            name,
-        }
-        .into())
-    }
-}
-
-impl Validator for Chain3Validator {
-    fn validate<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        extra: &Extra,
-        slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let value = self
-            .validator1
-            .validate(py, input, extra, slots, recursion_guard)
-            .map_err(|err| err.with_outer_location(self.name.clone().into()))?;
-        let value = self
-            .validator2
-            .validate(py, value.into_ref(py), extra, slots, recursion_guard)
-            .map_err(|err| err.with_outer_location(self.name.clone().into()))?;
-
-        self.validator3
-            .validate(py, value.into_ref(py), extra, slots, recursion_guard)
-            .map_err(|err| err.with_outer_location(self.name.clone().into()))
-    }
-
-    fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    fn ask(&self, question: &Question) -> bool {
-        self.validator1.ask(question) && self.validator2.ask(question) && self.validator3.ask(question)
-    }
-
-    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
-        self.validator1.complete(build_context)?;
-        self.validator2.complete(build_context)?;
-        self.validator3.complete(build_context)
     }
 }
