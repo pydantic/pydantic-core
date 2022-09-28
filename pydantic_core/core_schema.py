@@ -353,4 +353,5 @@ CoreSchema = Union[
     ArgumentsSchema,
     CallSchema,
     WithDefaultSchema,
+    ChainSchema,
 ]
