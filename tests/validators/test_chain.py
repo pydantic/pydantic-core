@@ -73,3 +73,24 @@ def test_json(py_and_json: PyAndJson, input_value, expected):
     output = validator.validate_test(input_value)
     assert output == expected
     assert isinstance(output, Decimal)
+
+
+def test_flatten():
+    validator = SchemaValidator(
+        {
+            'type': 'chain',
+            'steps': [
+                {'type': 'function', 'mode': 'plain', 'function': lambda v, **kwargs: f'{v}-1'},
+                {
+                    'type': 'chain',
+                    'steps': [
+                        {'type': 'function', 'mode': 'plain', 'function': lambda v, **kwargs: f'{v}-2'},
+                        {'type': 'function', 'mode': 'plain', 'function': lambda v, **kwargs: f'{v}-3'},
+                    ],
+                },
+            ],
+        }
+    )
+
+    assert validator.validate_python('input') == 'input-1-2-3'
+    assert validator.title == 'chain[function-plain,function-plain,function-plain]'

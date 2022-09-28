@@ -917,3 +917,40 @@ def test_chain_function(benchmark):
     assert validator.validate_python('42.42') == Decimal('42.42')
 
     benchmark(validator.validate_python, '42.42')
+
+
+@pytest.mark.benchmark(group='chain-functions')
+def test_chain_two_functions(benchmark):
+    validator = SchemaValidator(
+        {
+            'type': 'chain',
+            'steps': [
+                {'type': 'str'},
+                {'type': 'function', 'mode': 'plain', 'function': lambda v, **kwargs: Decimal(v)},
+                {'type': 'function', 'mode': 'plain', 'function': lambda v, **kwargs: v * 2},
+            ],
+        }
+    )
+    assert validator.validate_python('42.42') == Decimal('84.84')
+
+    benchmark(validator.validate_python, '42.42')
+
+
+@pytest.mark.benchmark(group='chain-functions')
+def test_chain_nested_functions(benchmark):
+    validator = SchemaValidator(
+        {
+            'type': 'function',
+            'schema': {
+                'type': 'function',
+                'schema': {'type': 'str'},
+                'mode': 'after',
+                'function': lambda v, **kwargs: Decimal(v),
+            },
+            'mode': 'after',
+            'function': lambda v, **kwargs: v * 2,
+        }
+    )
+    assert validator.validate_python('42.42') == Decimal('84.84')
+
+    benchmark(validator.validate_python, '42.42')

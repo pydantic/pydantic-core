@@ -52,6 +52,7 @@ pub struct SchemaValidator {
     validator: CombinedValidator,
     slots: Vec<CombinedValidator>,
     schema: PyObject,
+    #[pyo3(get)]
     title: PyObject,
 }
 
