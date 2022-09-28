@@ -37,22 +37,22 @@ def schema(*, strict: bool = False) -> dict:
                 'field_list_any': {'schema': 'list'},
                 'field_list_str': {'schema': {'type': 'list', 'items_schema': 'str'}},
                 'field_list_str_con': {
-                    'schema': {'type': 'list', 'items_schema': 'str', 'min_items': 3, 'max_items': 42}
+                    'schema': {'type': 'list', 'items_schema': 'str', 'min_length': 3, 'max_length': 42}
                 },
                 'field_set_any': {'schema': 'set'},
                 'field_set_int': {'schema': {'type': 'set', 'items_schema': 'int'}},
                 'field_set_int_con': {
-                    'schema': {'type': 'set', 'items_schema': 'int', 'min_items': 3, 'max_items': 42}
+                    'schema': {'type': 'set', 'items_schema': 'int', 'min_length': 3, 'max_length': 42}
                 },
                 'field_frozenset_any': {'schema': 'frozenset'},
                 'field_frozenset_bytes': {'schema': {'type': 'frozenset', 'items_schema': 'bytes'}},
                 'field_frozenset_bytes_con': {
-                    'schema': {'type': 'frozenset', 'items_schema': 'bytes', 'min_items': 3, 'max_items': 42}
+                    'schema': {'type': 'frozenset', 'items_schema': 'bytes', 'min_length': 3, 'max_length': 42}
                 },
                 'field_tuple_var_len_any': {'schema': 'tuple'},
                 'field_tuple_var_len_float': {'schema': {'type': 'tuple', 'items_schema': 'float'}},
                 'field_tuple_var_len_float_con': {
-                    'schema': {'type': 'tuple', 'items_schema': 'float', 'min_items': 3, 'max_items': 42}
+                    'schema': {'type': 'tuple', 'items_schema': 'float', 'min_length': 3, 'max_length': 42}
                 },
                 'field_tuple_fix_len': {
                     'schema': {'type': 'tuple', 'mode': 'positional', 'items_schema': ['str', 'int', 'float', 'bool']}
@@ -206,16 +206,16 @@ def pydantic_model():
         field_datetime_con: datetime  # todo ge='2000-01-01T06:00:00', lt='2020-01-02T12:13:14'
         field_list_any: list
         field_list_str: list[str]
-        field_list_str_con: conlist(str, min_items=3, max_items=42)
+        field_list_str_con: conlist(str, min_length=3, max_length=42)
         field_set_any: set
         field_set_int: set[int]
-        field_set_int_con: conset(int, min_items=3, max_items=42)
+        field_set_int_con: conset(int, min_length=3, max_length=42)
         field_frozenset_any: frozenset
         field_frozenset_bytes: frozenset[bytes]
-        field_frozenset_bytes_con: confrozenset(bytes, min_items=3, max_items=42)
+        field_frozenset_bytes_con: confrozenset(bytes, min_length=3, max_length=42)
         field_tuple_var_len_any: tuple[Any, ...]
         field_tuple_var_len_float: tuple[float, ...]
-        field_tuple_var_len_float_con: tuple[float, ...]  # todo min_items=3, max_items=42
+        field_tuple_var_len_float_con: tuple[float, ...]  # todo min_length=3, max_length=42
         field_tuple_fix_len: tuple[str, int, float, bool]
         field_dict_any: dict
         field_dict_str_float: dict[str, float]
