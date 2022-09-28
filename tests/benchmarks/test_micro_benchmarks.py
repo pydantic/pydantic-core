@@ -5,6 +5,7 @@ import json
 import os
 import platform
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Dict, FrozenSet, List, Optional, Set, Union
 
 import pytest
@@ -890,3 +891,75 @@ def test_with_default(benchmark):
     def t():
         v.validate_python({'name': 'Foo'})
         v.validate_python({})
+
+
+@pytest.mark.benchmark(group='chain')
+def test_chain_list2(benchmark):
+    validator = SchemaValidator(
+        {
+            'type': 'chain',
+            'steps': [
+                {'type': 'str'},
+                {'type': 'function', 'mode': 'plain', 'function': lambda v, **kwargs: Decimal(v)},
+            ],
+        }
+    )
+    assert validator.validate_python('42.42') == Decimal('42.42')
+
+    benchmark(validator.validate_python, '42.42')
+
+
+@pytest.mark.benchmark(group='chain')
+def test_chain2(benchmark):
+    validator = SchemaValidator(
+        {
+            'type': 'chain2',
+            'schema1': {'type': 'str'},
+            'schema2': {'type': 'function', 'mode': 'plain', 'function': lambda v, **kwargs: Decimal(v)},
+        }
+    )
+    assert validator.validate_python('42.42') == Decimal('42.42')
+
+    benchmark(validator.validate_python, '42.42')
+
+
+@pytest.mark.benchmark(group='chain')
+def test_chain_function(benchmark):
+    validator = SchemaValidator(
+        {'type': 'function', 'mode': 'after', 'schema': {'type': 'str'}, 'function': lambda v, **kwargs: Decimal(v)}
+    )
+    assert validator.validate_python('42.42') == Decimal('42.42')
+
+    benchmark(validator.validate_python, '42.42')
+
+
+@pytest.mark.benchmark(group='chain3')
+def test_chain3_list(benchmark):
+    validator = SchemaValidator(
+        {
+            'type': 'chain',
+            'steps': [
+                {'type': 'str'},
+                {'type': 'function', 'mode': 'plain', 'function': lambda v, **kwargs: Decimal(v)},
+                {'type': 'float'},
+            ],
+        }
+    )
+    assert validator.validate_python('42.42') == 42.42
+
+    benchmark(validator.validate_python, '42.42')
+
+
+@pytest.mark.benchmark(group='chain3')
+def test_chain3(benchmark):
+    validator = SchemaValidator(
+        {
+            'type': 'chain3',
+            'schema1': {'type': 'str'},
+            'schema2': {'type': 'function', 'mode': 'plain', 'function': lambda v, **kwargs: Decimal(v)},
+            'schema3': {'type': 'float'},
+        }
+    )
+    assert validator.validate_python('42.42') == 42.42
+
+    benchmark(validator.validate_python, '42.42')
