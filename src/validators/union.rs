@@ -20,7 +20,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 #[derive(Debug, Clone)]
 pub struct UnionValidator {
     choices: Vec<CombinedValidator>,
-    custom_error: Option<(String, String)>,
+    custom_error: Option<PydanticValueError>,
     strict: bool,
     name: String,
 }
@@ -52,13 +52,14 @@ impl BuildValidator for UnionValidator {
     }
 }
 
-fn get_custom_error(py: Python, schema: &PyDict) -> PyResult<Option<(String, String)>> {
+fn get_custom_error(py: Python, schema: &PyDict) -> PyResult<Option<PydanticValueError>> {
     match schema.get_as::<&PyDict>(intern!(py, "custom_error"))? {
-        Some(custom_error) => {
-            let kind = custom_error.get_as_req::<String>(intern!(py, "kind"))?;
-            let message = custom_error.get_as_req::<String>(intern!(py, "message"))?;
-            Ok(Some((kind, message)))
-        }
+        Some(custom_error) => Ok(Some(PydanticValueError::py_new(
+            py,
+            custom_error.get_as_req::<String>(intern!(py, "kind"))?,
+            custom_error.get_as_req::<String>(intern!(py, "message"))?,
+            None,
+        ))),
         None => Ok(None),
     }
 }
@@ -66,16 +67,14 @@ fn get_custom_error(py: Python, schema: &PyDict) -> PyResult<Option<(String, Str
 impl UnionValidator {
     fn or_custom_error<'s, 'data>(
         &'s self,
-        py: Python<'data>,
         errors: Option<Vec<ValLineError<'data>>>,
         input: &'data impl Input<'data>,
     ) -> ValError<'data> {
         if let Some(errors) = errors {
             ValError::LineErrors(errors)
         } else {
-            let (kind, message) = self.custom_error.as_ref().unwrap().clone();
-            let value_error = PydanticValueError::py_new(py, kind, message, None);
-            ValError::new(ErrorKind::CustomError { value_error }, input)
+            let value_error = self.custom_error.as_ref().unwrap();
+            value_error.clone().into_val_error(input)
         }
     }
 }
@@ -111,7 +110,7 @@ impl Validator for UnionValidator {
                 }
             }
 
-            Err(self.or_custom_error(py, errors, input))
+            Err(self.or_custom_error(errors, input))
         } else {
             // 1st pass: check if the value is an exact instance of one of the Union types,
             // e.g. use validate in strict mode
@@ -146,7 +145,7 @@ impl Validator for UnionValidator {
                 }
             }
 
-            Err(self.or_custom_error(py, errors, input))
+            Err(self.or_custom_error(errors, input))
         }
     }
 
@@ -202,7 +201,7 @@ pub struct TaggedUnionValidator {
     discriminator: Discriminator,
     from_attributes: bool,
     strict: bool,
-    custom_error: Option<(String, String)>,
+    custom_error: Option<PydanticValueError>,
     tags_repr: String,
     discriminator_repr: String,
     name: String,
@@ -281,7 +280,7 @@ impl Validator for TaggedUnionValidator {
                                     value.lax_str()
                                 }
                             }
-                            None => Err(self.tag_not_found(py, input)),
+                            None => Err(self.tag_not_found(input)),
                         }
                     }};
                 }
@@ -296,7 +295,7 @@ impl Validator for TaggedUnionValidator {
             Discriminator::Function(ref func) => {
                 let tag = func.call1(py, (input.to_object(py),))?;
                 if tag.is_none(py) {
-                    Err(self.tag_not_found(py, input))
+                    Err(self.tag_not_found(input))
                 } else {
                     let tag: &PyString = tag.cast_as(py)?;
                     self.find_call_validator(py, tag.to_string_lossy(), input, extra, slots, recursion_guard)
@@ -338,7 +337,7 @@ impl TaggedUnionValidator {
         let either_tag = match dict {
             GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "type")) {
                 Some(t) => t.strict_str()?,
-                None => return Err(self.tag_not_found(py, input)),
+                None => return Err(self.tag_not_found(input)),
             },
             _ => unreachable!(),
         };
@@ -354,7 +353,7 @@ impl TaggedUnionValidator {
                 _ => unreachable!(),
             };
             if tag == "function" {
-                let mode = mode.ok_or_else(|| self.tag_not_found(py, input))?;
+                let mode = mode.ok_or_else(|| self.tag_not_found(input))?;
                 if mode.as_cow()?.as_ref() == "plain" {
                     return Ok(Cow::Borrowed("function-plain"));
                 }
@@ -386,9 +385,7 @@ impl TaggedUnionValidator {
                 Err(err) => Err(err.with_outer_location(tag.as_ref().into())),
             }
         } else if let Some(ref custom_error) = self.custom_error {
-            let (kind, message) = custom_error.clone();
-            let value_error = PydanticValueError::py_new(py, kind, message, None);
-            Err(ValError::new(ErrorKind::CustomError { value_error }, input))
+            Err(custom_error.clone().into_val_error(input))
         } else {
             Err(ValError::new(
                 ErrorKind::UnionTagInvalid {
@@ -401,11 +398,9 @@ impl TaggedUnionValidator {
         }
     }
 
-    fn tag_not_found<'s, 'data>(&'s self, py: Python<'data>, input: &'data impl Input<'data>) -> ValError<'data> {
+    fn tag_not_found<'s, 'data>(&'s self, input: &'data impl Input<'data>) -> ValError<'data> {
         if let Some(ref custom_error) = self.custom_error {
-            let (kind, message) = custom_error.clone();
-            let value_error = PydanticValueError::py_new(py, kind, message, None);
-            ValError::new(ErrorKind::CustomError { value_error }, input)
+            custom_error.clone().into_val_error(input)
         } else {
             ValError::new(
                 ErrorKind::UnionTagNotFound {
