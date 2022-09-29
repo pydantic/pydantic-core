@@ -18,7 +18,7 @@ pub struct PydanticValueError {
 #[pymethods]
 impl PydanticValueError {
     #[new]
-    fn py_new(py: Python, kind: String, message_template: String, context: Option<&PyDict>) -> Self {
+    pub fn py_new(py: Python, kind: String, message_template: String, context: Option<&PyDict>) -> Self {
         Self {
             kind,
             message_template,
