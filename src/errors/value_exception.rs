@@ -7,8 +7,7 @@ use crate::input::Input;
 use super::{ErrorKind, ValError};
 
 #[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
-#[derive(Clone)]
-#[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(Debug, Clone)]
 pub struct PydanticValueError {
     kind: String,
     message_template: String,
