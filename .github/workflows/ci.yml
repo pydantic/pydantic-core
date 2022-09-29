@@ -3,7 +3,7 @@ name: ci
 on:
   push:
     branches:
-      - '**'
+      - main
     tags:
       - '**'
   pull_request: {}
@@ -109,8 +109,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - run: echo '${{ github.event.commits[0].message }}'
-    - run: echo '${{ toJson(github.event) }}'
+    - run: "echo 'full event: ${{ toJson(github.event) }}'"
+    - run: "echo 'labels: ${{ toJson(github.event.labels) }}'"
 
     - name: install rust
       uses: actions-rs/toolchain@v1
@@ -235,7 +235,7 @@ jobs:
   build:
     name: build on ${{ matrix.platform || matrix.os }} (${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
     # only run on push to main and on release
-    if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || contains(github.event.commits[0].message, '[full-build]'))"
+    if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || contains(toJson(github.event.labels), 'Full Build'))"
     needs: [test, lint]
     strategy:
       fail-fast: false
