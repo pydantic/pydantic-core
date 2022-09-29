@@ -3,7 +3,7 @@ name: ci
 on:
   push:
     branches:
-      - main
+      - '**'
     tags:
       - '**'
   pull_request: {}
@@ -109,7 +109,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-#    - run: echo '${{ github.event.commits[0].message }}'
+    - run: echo '${{ github.event.commits[0].message }}'
     - run: echo '${{ toJson(github.event) }}'
 
     - name: install rust
