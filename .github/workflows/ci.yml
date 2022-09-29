@@ -109,8 +109,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - run: "echo 'labels: ${{ toJson(github.event.pull_request.labels) }}'"
-    - run: "echo 'full build: ${{ contains(github.event.pull_request.labels.*.name, 'Full Build') }}'"
 
     - name: install rust
       uses: actions-rs/toolchain@v1
