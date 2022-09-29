@@ -82,7 +82,7 @@ def test_str_not_json(input_value, expected):
         ({'max_length': 5, 'strip_whitespace': True}, '1234  ', '1234'),
         # to_upper and strip comes after pattern check
         ({'to_upper': True, 'pattern': 'abc'}, 'abc', 'ABC'),
-        ({'strip_whitespace': True, 'pattern': r'\d+$'}, 'foobar 123 ', Err("String should match pattern '\\d+$'")),
+        ({'strip_whitespace': True, 'pattern': r'\d+$'}, 'foobar 123 ', 'foobar 123'),
         ({'min_length': 1}, '🐈 Hello', '🐈 Hello'),
     ],
 )
