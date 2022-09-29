@@ -31,7 +31,7 @@ def plain_repr(obj):
 @dataclass
 class Err:
     message: str
-    errors: Any = None
+    errors: Any | None = None
 
     def __repr__(self):
         if self.errors:
