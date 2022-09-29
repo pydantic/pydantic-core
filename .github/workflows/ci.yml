@@ -233,8 +233,8 @@ jobs:
   build:
     name: build on ${{ matrix.platform || matrix.os }} (${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
     # only run on push to main and on release
-#    if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main')"
-#    needs: [test, lint]
+    if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main')"
+    needs: [test, lint]
     strategy:
       fail-fast: false
       matrix:
@@ -344,14 +344,19 @@ jobs:
           name: pypi_files
           path: dist
 
-      - run: |
+      - name: list dist files
+        run: |
          ls -lh dist/
          echo "`ls dist | wc -l` files"
-      - run: |
+
+      - name: extract and list s-dist file
+        run: |
          mkdir sdist-files
          tar -xvf dist/*.tar.gz -C sdist-files
          tree -a sdist-files
-      - run: |
+
+      - name: extract and list wheel file
+        run: |
          ls dist/*cp310-manylinux*x86_64.whl | head -n 1
          python -m zipfile --list `ls dist/*cp310-manylinux*x86_64.whl | head -n 1`
 
