@@ -344,12 +344,16 @@ jobs:
           name: pypi_files
           path: dist
 
-      - run: ls -lh dist/
-      - run: echo "`ls dist | wc -l` files"
-      - run: mkdir sdist-files
-      - run: tar -xvf dist/*.tar.gz -C sdist-files
-      - run: tree -a sdist-files
-      - run: python -m zipfile --list `ls dist/*x86_64.whl | head -n 1`
+      - run: |
+         ls -lh dist/
+         echo "`ls dist | wc -l` files"
+      - run: |
+         mkdir sdist-files
+         tar -xvf dist/*.tar.gz -C sdist-files
+         tree -a sdist-files
+      - run: |
+         ls dist/*cp310-manylinux*x86_64.whl | head -n 1
+         python -m zipfile --list `ls dist/*cp310-manylinux*x86_64.whl | head -n 1`
 
   release:
     needs: [build, build-wasm-emscripten]

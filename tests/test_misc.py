@@ -18,7 +18,6 @@ def test_version():
 
 
 def test_build_profile():
-    assert isinstance(build_profile, str)
     assert build_profile in ('debug', 'release')
 
 
