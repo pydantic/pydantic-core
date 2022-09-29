@@ -109,8 +109,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - run: "echo 'full event: ${{ toJson(github.event) }}'"
     - run: "echo 'labels: ${{ toJson(github.event.pull_request.labels) }}'"
+    - run: "echo 'full build: ${{ contains(github.event.pull_request.labels.*.name, 'Full Build') }}'"
 
     - name: install rust
       uses: actions-rs/toolchain@v1
@@ -235,7 +235,7 @@ jobs:
   build:
     name: build on ${{ matrix.platform || matrix.os }} (${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
     # only run on push to main and on release
-    if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || contains(github.event.pull_request.*.name, 'Full Build'))"
+    if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'Full Build'))"
     needs: [test, lint]
     strategy:
       fail-fast: false
