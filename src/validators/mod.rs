@@ -22,6 +22,7 @@ mod bool;
 mod bytes;
 mod call;
 mod callable;
+mod chain;
 mod date;
 mod datetime;
 mod dict;
@@ -51,6 +52,7 @@ pub struct SchemaValidator {
     validator: CombinedValidator,
     slots: Vec<CombinedValidator>,
     schema: PyObject,
+    #[pyo3(get)]
     title: PyObject,
 }
 
@@ -203,10 +205,10 @@ impl SchemaValidator {
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
-    pub fn __repr__(&self) -> String {
+    pub fn __repr__(&self, py: Python) -> String {
         format!(
             "SchemaValidator(name={:?}, validator={:#?}, slots={:#?})",
-            self.validator.get_name(),
+            self.title.extract::<&str>(py).unwrap(),
             self.validator,
             self.slots,
         )
@@ -317,16 +319,8 @@ pub fn build_validator<'a>(
     config: Option<&'a PyDict>,
     build_context: &mut BuildContext,
 ) -> PyResult<CombinedValidator> {
-    let py = schema.py();
-    let dict: &PyDict = match schema.cast_as() {
-        Ok(s) => s,
-        Err(_) => {
-            let dict = PyDict::new(py);
-            dict.set_item("type", schema)?;
-            dict
-        }
-    };
-    let type_: &str = dict.get_as_req(intern!(py, "type"))?;
+    let dict: &PyDict = schema.cast_as()?;
+    let type_: &str = dict.get_as_req(intern!(schema.py(), "type"))?;
     validator_match!(
         type_,
         dict,
@@ -388,6 +382,8 @@ pub fn build_validator<'a>(
         arguments::ArgumentsValidator,
         // default value
         with_default::WithDefaultValidator,
+        // chain validators
+        chain::ChainValidator,
     )
 }
 
@@ -498,6 +494,8 @@ pub enum CombinedValidator {
     Arguments(arguments::ArgumentsValidator),
     // default value
     WithDefault(with_default::WithDefaultValidator),
+    // chain validators
+    Chain(chain::ChainValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

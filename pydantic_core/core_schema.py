@@ -15,17 +15,7 @@ else:
     from typing import Literal, TypedDict
 
 
-class AnySchema(TypedDict):
-    type: Literal['any']
-
-
-class BoolSchema(TypedDict, total=False):
-    type: Required[Literal['bool']]
-    strict: bool
-    ref: str
-
-
-class Config(TypedDict, total=False):
+class CoreConfig(TypedDict, total=False):
     strict: bool
     # higher priority configs take precedence of over lower, if priority matches the two configs are merged, default 0
     config_choose_priority: int
@@ -49,12 +39,22 @@ class Config(TypedDict, total=False):
     allow_inf_nan: bool  # default: True
 
 
+class AnySchema(TypedDict):
+    type: Literal['any']
+
+
+class BoolSchema(TypedDict, total=False):
+    type: Required[Literal['bool']]
+    strict: bool
+    ref: str
+
+
 class DictSchema(TypedDict, total=False):
     type: Required[Literal['dict']]
-    keys_schema: Schema  # default: AnySchema
-    values_schema: Schema  # default: AnySchema
-    min_length: int
-    max_length: int
+    keys_schema: CoreSchema  # default: AnySchema
+    values_schema: CoreSchema  # default: AnySchema
+    min_items: int
+    max_items: int
     strict: bool
     ref: str
 
@@ -75,7 +75,7 @@ class FunctionSchema(TypedDict):
     type: Literal['function']
     mode: Literal['before', 'after', 'wrap']
     function: Callable[..., Any]
-    schema: Schema
+    schema: CoreSchema
     ref: NotRequired[str]
 
 
@@ -99,9 +99,9 @@ class IntSchema(TypedDict, total=False):
 
 class ListSchema(TypedDict, total=False):
     type: Required[Literal['list']]
-    items_schema: Schema  # default: AnySchema
-    min_length: int
-    max_length: int
+    items_schema: CoreSchema  # default: AnySchema
+    min_items: int
+    max_items: int
     strict: bool
     ref: str
 
@@ -115,15 +115,15 @@ class LiteralSchema(TypedDict):
 class NewClassSchema(TypedDict):
     type: Literal['new-class']
     class_type: type
-    schema: Schema
+    schema: CoreSchema
     call_after_init: NotRequired[str]
     strict: NotRequired[bool]
     ref: NotRequired[str]
-    config: NotRequired[Config]
+    config: NotRequired[CoreConfig]
 
 
 class TypedDictField(TypedDict, total=False):
-    schema: Required[Schema]
+    schema: Required[CoreSchema]
     required: bool
     alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
     frozen: bool
@@ -133,7 +133,7 @@ class TypedDictSchema(TypedDict, total=False):
     type: Required[Literal['typed-dict']]
     fields: Required[Dict[str, TypedDictField]]
     strict: bool
-    extra_validator: Schema
+    extra_validator: CoreSchema
     return_fields_set: bool
     ref: str
     # all these values can be set via config, equivalent fields have `typed_dict_` prefix
@@ -150,7 +150,7 @@ class NoneSchema(TypedDict):
 
 class NullableSchema(TypedDict, total=False):
     type: Required[Literal['nullable']]
-    schema: Required[Schema]
+    schema: Required[CoreSchema]
     strict: bool
     ref: str
 
@@ -162,18 +162,18 @@ class RecursiveReferenceSchema(TypedDict):
 
 class SetSchema(TypedDict, total=False):
     type: Required[Literal['set']]
-    items_schema: Schema  # default: AnySchema
-    min_length: int
-    max_length: int
+    items_schema: CoreSchema  # default: AnySchema
+    min_items: int
+    max_items: int
     strict: bool
     ref: str
 
 
 class FrozenSetSchema(TypedDict, total=False):
     type: Required[Literal['frozenset']]
-    items_schema: Schema  # default: AnySchema
-    min_length: int
-    max_length: int
+    items_schema: CoreSchema  # default: AnySchema
+    min_items: int
+    max_items: int
     strict: bool
     ref: str
 
@@ -192,14 +192,14 @@ class StringSchema(TypedDict, total=False):
 
 class UnionSchema(TypedDict, total=False):
     type: Required[Literal['union']]
-    choices: Required[List[Schema]]
+    choices: Required[List[CoreSchema]]
     strict: bool
     ref: str
 
 
 class TaggedUnionSchema(TypedDict):
     type: Literal['tagged-union']
-    choices: Dict[str, Schema]
+    choices: Dict[str, CoreSchema]
     discriminator: Union[str, List[Union[str, int]], List[List[Union[str, int]]], Callable[[Any], Optional[str]]]
     strict: NotRequired[bool]
     ref: NotRequired[str]
@@ -256,8 +256,8 @@ class TimedeltaSchema(TypedDict, total=False):
 class TuplePositionalSchema(TypedDict, total=False):
     type: Required[Literal['tuple']]
     mode: Required[Literal['positional']]
-    items_schema: Required[List[Schema]]
-    extra_schema: Schema
+    items_schema: Required[List[CoreSchema]]
+    extra_schema: CoreSchema
     strict: bool
     ref: str
 
@@ -265,9 +265,9 @@ class TuplePositionalSchema(TypedDict, total=False):
 class TupleVariableSchema(TypedDict, total=False):
     type: Required[Literal['tuple']]
     mode: Literal['variable']
-    items_schema: Schema
-    min_length: int
-    max_length: int
+    items_schema: CoreSchema
+    min_items: int
+    max_items: int
     strict: bool
     ref: str
 
@@ -284,7 +284,7 @@ class CallableSchema(TypedDict):
 class Parameter(TypedDict, total=False):
     name: Required[str]
     mode: Literal['positional_only', 'positional_or_keyword', 'keyword_only']  # default positional_or_keyword
-    schema: Required[Schema]
+    schema: Required[CoreSchema]
     alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
 
 
@@ -292,22 +292,22 @@ class ArgumentsSchema(TypedDict, total=False):
     type: Required[Literal['arguments']]
     arguments_schema: Required[List[Parameter]]
     populate_by_name: bool
-    var_args_schema: Schema
-    var_kwargs_schema: Schema
+    var_args_schema: CoreSchema
+    var_kwargs_schema: CoreSchema
     ref: str
 
 
 class CallSchema(TypedDict):
     type: Literal['call']
     function: Callable[..., Any]
-    arguments_schema: Schema
-    return_schema: NotRequired[Schema]
+    arguments_schema: CoreSchema
+    return_schema: NotRequired[CoreSchema]
     ref: NotRequired[str]
 
 
 class WithDefaultSchema(TypedDict, total=False):
     type: Required[Literal['default']]
-    schema: Required[Schema]
+    schema: Required[CoreSchema]
     default: Any
     default_factory: Callable[[], Any]
     on_error: Literal['raise', 'omit', 'default']  # default: 'raise'
@@ -315,33 +315,13 @@ class WithDefaultSchema(TypedDict, total=False):
     ref: str
 
 
-# pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
-# 'int' is equivalent to {'type': 'int'}, this only applies to schema types which do not have other required fields
-BareType = Literal[
-    'any',
-    'none',
-    'str',
-    'bytes',
-    'dict',
-    'int',
-    'bool',
-    'float',
-    'dict',
-    'list',
-    'tuple',
-    'set',
-    'frozenset',
-    'date',
-    'time',
-    'datetime',
-    'timedelta',
-    'callable',
-]
+class ChainSchema(TypedDict):
+    type: Literal['chain']
+    steps: List[CoreSchema]
+    ref: NotRequired[str]
 
-# generate_self_schema.py is hard coded to convert this Union[BareType, Union[...rest]] where the second union is tagged
-# so `BareType` MUST come first
-Schema = Union[
-    BareType,
+
+CoreSchema = Union[
     AnySchema,
     BoolSchema,
     BytesSchema,
@@ -373,4 +353,5 @@ Schema = Union[
     ArgumentsSchema,
     CallSchema,
     WithDefaultSchema,
+    ChainSchema,
 ]
