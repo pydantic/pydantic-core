@@ -109,6 +109,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+#    - run: echo '${{ github.event.commits[0].message }}'
+    - run: echo '${{ toJson(github.event) }}'
 
     - name: install rust
       uses: actions-rs/toolchain@v1
