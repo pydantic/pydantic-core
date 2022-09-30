@@ -547,7 +547,7 @@ def _custom_error(kind: str | None, message: str | None) -> CustomError | None:
         return None
     else:
         # let schema validation raise the error
-        return CustomError(kind=kind, message=message)
+        return CustomError(kind=kind, message=message)  # type: ignore
 
 
 class UnionSchema(TypedDict, total=False):
