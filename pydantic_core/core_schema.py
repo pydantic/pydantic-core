@@ -348,7 +348,7 @@ class TupleVariableSchema(TypedDict, total=False):
 
 
 def tuple_variable_schema(
-    items_schema: CoreSchema,
+    items_schema: CoreSchema | None = None,
     *,
     min_length: int | None = None,
     max_length: int | None = None,
@@ -426,9 +426,9 @@ class DictSchema(TypedDict, total=False):
 
 
 def dict_schema(
-    *,
     keys_schema: CoreSchema | None = None,
     values_schema: CoreSchema | None = None,
+    *,
     min_length: int | None = None,
     max_length: int | None = None,
     strict: bool | None = None,
@@ -691,8 +691,7 @@ class ArgumentsSchema(TypedDict, total=False):
 
 
 def arguments_schema(
-    arguments_schema: List[ArgumentsParameter],
-    *,
+    *arguments: ArgumentsParameter,
     populate_by_name: bool | None = None,
     var_args_schema: CoreSchema | None = None,
     var_kwargs_schema: CoreSchema | None = None,
@@ -700,7 +699,7 @@ def arguments_schema(
 ) -> ArgumentsSchema:
     return dict_not_none(
         type='arguments',
-        arguments_schema=arguments_schema,
+        arguments_schema=arguments,
         populate_by_name=populate_by_name,
         var_args_schema=var_args_schema,
         var_kwargs_schema=var_kwargs_schema,
@@ -710,21 +709,21 @@ def arguments_schema(
 
 class CallSchema(TypedDict):
     type: Literal['call']
-    function: Callable[..., Any]
     arguments_schema: CoreSchema
+    function: Callable[..., Any]
     return_schema: NotRequired[CoreSchema]
     ref: NotRequired[str]
 
 
 def call_schema(
+    arguments: CoreSchema,
     function: Callable[..., Any],
-    arguments_schema: CoreSchema,
     *,
     return_schema: CoreSchema | None = None,
     ref: str | None = None,
 ) -> CallSchema:
     return dict_not_none(
-        type='call', function=function, arguments_schema=arguments_schema, return_schema=return_schema, ref=ref
+        type='call', arguments_schema=arguments, function=function, return_schema=return_schema, ref=ref
     )
 
 

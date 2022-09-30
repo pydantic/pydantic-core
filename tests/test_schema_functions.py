@@ -17,15 +17,7 @@ def ids_function(val):
     if callable(val):
         return val.__name__
     elif isinstance(val, tuple) and len(val) == 2:
-        r = '('
-        if val[0]:
-            r += ', '.join(map(repr, val[0]))
-        if val[1]:
-            if len(r) > 1:
-                r += ', '
-            r += ', '.join(f'{k}={v!r}' for k, v in val[1].items())
-        r += ')'
-        return r
+        return '({})'.format(', '.join([repr(a) for a in val[0]] + [f'{k}={v!r}' for k, v in val[1].items()]))
     else:
         return repr(val)
 
@@ -90,7 +82,7 @@ def args(*args, **kwargs):
         [core_schema.dict_schema, args(), {'type': 'dict'}],
         [
             core_schema.dict_schema,
-            args(keys_schema={'type': 'str'}, values_schema={'type': 'int'}),
+            args({'type': 'str'}, {'type': 'int'}),
             {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'int'}},
         ],
         [
@@ -156,18 +148,27 @@ def args(*args, **kwargs):
         [core_schema.arguments_parameter, args('foo', {'type': 'int'}), {'name': 'foo', 'schema': {'type': 'int'}}],
         [
             core_schema.arguments_schema,
-            args([core_schema.arguments_parameter('foo', {'type': 'int'})]),
-            {'type': 'arguments', 'arguments_schema': [{'name': 'foo', 'schema': {'type': 'int'}}]},
+            args(
+                core_schema.arguments_parameter('foo', {'type': 'int'}),
+                core_schema.arguments_parameter('bar', {'type': 'str'}),
+            ),
+            {
+                'type': 'arguments',
+                'arguments_schema': (
+                    {'name': 'foo', 'schema': {'type': 'int'}},
+                    {'name': 'bar', 'schema': {'type': 'str'}},
+                ),
+            },
         ],
         [
             core_schema.call_schema,
-            args(val_function, core_schema.arguments_schema([core_schema.arguments_parameter('foo', {'type': 'int'})])),
+            args(core_schema.arguments_schema(core_schema.arguments_parameter('foo', {'type': 'int'})), val_function),
             {
                 'type': 'call',
                 'function': val_function,
                 'arguments_schema': {
                     'type': 'arguments',
-                    'arguments_schema': [{'name': 'foo', 'schema': {'type': 'int'}}],
+                    'arguments_schema': ({'name': 'foo', 'schema': {'type': 'int'}},),
                 },
             },
         ],
