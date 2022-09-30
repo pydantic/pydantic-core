@@ -519,13 +519,7 @@ def with_default_schema(
     ref: str | None = None,
 ) -> WithDefaultSchema:
     s = dict_not_none(
-        type='default',
-        schema=schema,
-        default=default,
-        default_factory=default_factory,
-        on_error=on_error,
-        strict=strict,
-        ref=ref,
+        type='default', schema=schema, default_factory=default_factory, on_error=on_error, strict=strict, ref=ref
     )
     if default is not Omitted:
         s['default'] = default
@@ -548,6 +542,15 @@ class CustomError(TypedDict):
     message: str
 
 
+def _custom_error(kind: str | None, message: str | None) -> CustomError | None:
+    if kind is None and message is None:
+        return None
+    elif kind is not None and message is not None:
+        return CustomError(kind=kind, message=message)
+    else:
+        raise TypeError('CustomError kind and message must both be None or both not None')
+
+
 class UnionSchema(TypedDict, total=False):
     type: Required[Literal['union']]
     choices: Required[List[CoreSchema]]
@@ -556,8 +559,20 @@ class UnionSchema(TypedDict, total=False):
     ref: str
 
 
-def union_schema(*choices: CoreSchema, strict: bool | None = None, ref: str | None = None) -> UnionSchema:
-    return dict_not_none(type='union', choices=choices, strict=strict, ref=ref)
+def union_schema(
+    *choices: CoreSchema,
+    strict: bool | None = None,
+    custom_error_kind: str | None = None,
+    custom_error_message: str | None = None,
+    ref: str | None = None,
+) -> UnionSchema:
+    return dict_not_none(
+        type='union',
+        choices=choices,
+        custom_error=_custom_error(custom_error_kind, custom_error_message),
+        strict=strict,
+        ref=ref,
+    )
 
 
 class TaggedUnionSchema(TypedDict):
@@ -573,10 +588,19 @@ def tagged_union_schema(
     choices: Dict[str, CoreSchema],
     discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], str | None],
     *,
+    custom_error_kind: str | None = None,
+    custom_error_message: str | None = None,
     strict: bool | None = None,
     ref: str | None = None,
 ) -> TaggedUnionSchema:
-    return dict_not_none(type='tagged-union', choices=choices, discriminator=discriminator, strict=strict, ref=ref)
+    return dict_not_none(
+        type='tagged-union',
+        choices=choices,
+        discriminator=discriminator,
+        custom_error=_custom_error(custom_error_kind, custom_error_message),
+        strict=strict,
+        ref=ref,
+    )
 
 
 class ChainSchema(TypedDict):

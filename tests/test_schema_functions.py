@@ -9,6 +9,10 @@ def val_function(x, **kwargs):
     return x
 
 
+def make_5():
+    return 5
+
+
 class MyModel:
     __slots__ = '__dict__', '__fields_set__'
 
@@ -115,11 +119,25 @@ def args(*args, **kwargs):
             args({'type': 'int'}, default=None),
             {'type': 'default', 'schema': {'type': 'int'}, 'default': None},
         ],
+        [
+            core_schema.with_default_schema,
+            args({'type': 'int'}, default_factory=make_5),
+            {'type': 'default', 'schema': {'type': 'int'}, 'default_factory': make_5},
+        ],
         [core_schema.nullable_schema, args({'type': 'int'}), {'type': 'nullable', 'schema': {'type': 'int'}}],
         [
             core_schema.union_schema,
             args({'type': 'int'}, {'type': 'str'}),
             {'type': 'union', 'choices': ({'type': 'int'}, {'type': 'str'})},
+        ],
+        [
+            core_schema.union_schema,
+            args({'type': 'int'}, {'type': 'str'}, custom_error_kind='foobar', custom_error_message='This is Foobar'),
+            {
+                'type': 'union',
+                'choices': ({'type': 'int'}, {'type': 'str'}),
+                'custom_error': {'kind': 'foobar', 'message': 'This is Foobar'},
+            },
         ],
         [
             core_schema.tagged_union_schema,
@@ -191,3 +209,8 @@ def test_schema_functions(function, args_kwargs, expected_schema):
             v.validate_python('foobar')
         except ValidationError:
             pass
+
+
+def test_invalid_custom_error():
+    with pytest.raises(TypeError, match='CustomError kind and message must both be None or both not None'):
+        core_schema.union_schema({'type': 'int'}, {'type': 'str'}, custom_error_kind='foobar')
