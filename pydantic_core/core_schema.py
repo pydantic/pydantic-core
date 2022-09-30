@@ -506,16 +506,19 @@ class WithDefaultSchema(TypedDict, total=False):
     ref: str
 
 
+Omitted = object()
+
+
 def with_default_schema(
     schema: CoreSchema,
     *,
-    default: Any | None = None,
+    default: Any = Omitted,
     default_factory: Callable[[], Any] | None = None,
     on_error: Literal['raise', 'omit', 'default'] | None = None,
     strict: bool | None = None,
     ref: str | None = None,
 ) -> WithDefaultSchema:
-    return dict_not_none(
+    s = dict_not_none(
         type='default',
         schema=schema,
         default=default,
@@ -524,6 +527,9 @@ def with_default_schema(
         strict=strict,
         ref=ref,
     )
+    if default is not Omitted:
+        s['default'] = default
+    return s
 
 
 class NullableSchema(TypedDict, total=False):

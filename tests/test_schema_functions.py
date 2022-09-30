@@ -110,6 +110,11 @@ def args(*args, **kwargs):
             args({'type': 'int'}, default=5),
             {'type': 'default', 'schema': {'type': 'int'}, 'default': 5},
         ],
+        [
+            core_schema.with_default_schema,
+            args({'type': 'int'}, default=None),
+            {'type': 'default', 'schema': {'type': 'int'}, 'default': None},
+        ],
         [core_schema.nullable_schema, args({'type': 'int'}), {'type': 'nullable', 'schema': {'type': 'int'}}],
         [
             core_schema.union_schema,
