@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError, core_schema
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
 
 def val_function(x, **kwargs):
@@ -212,5 +212,6 @@ def test_schema_functions(function, args_kwargs, expected_schema):
 
 
 def test_invalid_custom_error():
-    with pytest.raises(TypeError, match='CustomError kind and message must both be None or both not None'):
-        core_schema.union_schema({'type': 'int'}, {'type': 'str'}, custom_error_kind='foobar')
+    s = core_schema.union_schema({'type': 'int'}, {'type': 'str'}, custom_error_kind='foobar')
+    with pytest.raises(SchemaError, match=r'custom_error \-> message\s+Input should be a valid string'):
+        SchemaValidator(s)

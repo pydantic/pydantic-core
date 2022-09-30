@@ -2,7 +2,7 @@ from __future__ import annotations as _annotations
 
 import sys
 from datetime import date, datetime, time, timedelta
-from typing import Any, Callable, Dict, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union, overload
 
 if sys.version_info < (3, 11):
     from typing_extensions import NotRequired, Required
@@ -545,10 +545,9 @@ class CustomError(TypedDict):
 def _custom_error(kind: str | None, message: str | None) -> CustomError | None:
     if kind is None and message is None:
         return None
-    elif kind is not None and message is not None:
-        return CustomError(kind=kind, message=message)
     else:
-        raise TypeError('CustomError kind and message must both be None or both not None')
+        # let schema validation raise the error
+        return CustomError(kind=kind, message=message)
 
 
 class UnionSchema(TypedDict, total=False):
@@ -559,11 +558,27 @@ class UnionSchema(TypedDict, total=False):
     ref: str
 
 
+@overload
 def union_schema(
     *choices: CoreSchema,
+    custom_error_kind: str,
+    custom_error_message: str,
     strict: bool | None = None,
+    ref: str | None = None,
+) -> UnionSchema:
+    ...
+
+
+@overload
+def union_schema(*choices: CoreSchema, strict: bool | None = None, ref: str | None = None) -> UnionSchema:
+    ...
+
+
+def union_schema(
+    *choices: CoreSchema,
     custom_error_kind: str | None = None,
     custom_error_message: str | None = None,
+    strict: bool | None = None,
     ref: str | None = None,
 ) -> UnionSchema:
     return dict_not_none(
@@ -582,6 +597,30 @@ class TaggedUnionSchema(TypedDict):
     custom_error: NotRequired[CustomError]
     strict: NotRequired[bool]
     ref: NotRequired[str]
+
+
+@overload
+def tagged_union_schema(
+    choices: Dict[str, CoreSchema],
+    discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], str | None],
+    *,
+    custom_error_kind: str,
+    custom_error_message: str,
+    strict: bool | None = None,
+    ref: str | None = None,
+) -> TaggedUnionSchema:
+    ...
+
+
+@overload
+def tagged_union_schema(
+    choices: Dict[str, CoreSchema],
+    discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], str | None],
+    *,
+    strict: bool | None = None,
+    ref: str | None = None,
+) -> TaggedUnionSchema:
+    ...
 
 
 def tagged_union_schema(
