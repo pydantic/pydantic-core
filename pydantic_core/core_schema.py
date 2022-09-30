@@ -275,7 +275,7 @@ class LiteralSchema(TypedDict):
 
 
 def literal_schema(*expected: Any, ref: str | None = None) -> LiteralSchema:
-    return dict_not_none(type='literal', expected=list(expected), ref=ref)
+    return dict_not_none(type='literal', expected=expected, ref=ref)
 
 
 class IsInstanceSchema(TypedDict):
@@ -327,8 +327,7 @@ class TuplePositionalSchema(TypedDict, total=False):
 
 
 def tuple_positional_schema(
-    items_schema: List[CoreSchema],
-    *,
+    *items_schema: CoreSchema,
     extra_schema: CoreSchema | None = None,
     strict: bool | None = None,
     ref: str | None = None,
@@ -456,16 +455,27 @@ class FunctionSchema(TypedDict):
     ref: NotRequired[str]
 
 
-def function_schema(
-    mode: Literal['before', 'after', 'wrap'],
-    function: Callable[..., Any],
-    schema: CoreSchema,
-    *,
-    validator_instance: Any | None = None,
-    ref: str | None = None,
+def function_before_schema(
+    function: Callable[..., Any], schema: CoreSchema, *, validator_instance: Any | None = None, ref: str | None = None
 ) -> FunctionSchema:
     return dict_not_none(
-        type='function', mode=mode, function=function, schema=schema, validator_instance=validator_instance, ref=ref
+        type='function', mode='before', function=function, schema=schema, validator_instance=validator_instance, ref=ref
+    )
+
+
+def function_after_schema(
+    function: Callable[..., Any], schema: CoreSchema, *, validator_instance: Any | None = None, ref: str | None = None
+) -> FunctionSchema:
+    return dict_not_none(
+        type='function', mode='after', function=function, schema=schema, validator_instance=validator_instance, ref=ref
+    )
+
+
+def function_wrap_schema(
+    function: Callable[..., Any], schema: CoreSchema, *, validator_instance: Any | None = None, ref: str | None = None
+) -> FunctionSchema:
+    return dict_not_none(
+        type='function', mode='wrap', function=function, schema=schema, validator_instance=validator_instance, ref=ref
     )
 
 
@@ -540,7 +550,7 @@ class UnionSchema(TypedDict, total=False):
     ref: str
 
 
-def union_schema(choices: List[CoreSchema], *, strict: bool | None = None, ref: str | None = None) -> UnionSchema:
+def union_schema(*choices: CoreSchema, strict: bool | None = None, ref: str | None = None) -> UnionSchema:
     return dict_not_none(type='union', choices=choices, strict=strict, ref=ref)
 
 
@@ -569,7 +579,7 @@ class ChainSchema(TypedDict):
     ref: NotRequired[str]
 
 
-def chain_schema(steps: List[CoreSchema], *, ref: str | None = None) -> ChainSchema:
+def chain_schema(*steps: CoreSchema, ref: str | None = None) -> ChainSchema:
     return dict_not_none(type='chain', steps=steps, ref=ref)
 
 
