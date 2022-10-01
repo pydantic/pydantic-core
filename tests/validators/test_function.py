@@ -5,7 +5,7 @@ from typing import Type
 
 import pytest
 
-from pydantic_core import PydanticValueError, SchemaError, SchemaValidator, ValidationError
+from pydantic_core import PydanticCustomError, SchemaError, SchemaValidator, ValidationError
 
 from ..conftest import plain_repr
 
@@ -357,7 +357,7 @@ def test_raise_type_error():
 
 
 def test_pydantic_value_error():
-    e = PydanticValueError(
+    e = PydanticCustomError(
         'my_error', 'this is a custom error {missed} {foo} {bar} {spam}', {'foo': 'X', 'bar': 42, 'spam': []}
     )
     assert e.message() == 'this is a custom error {missed} X 42 []'
@@ -371,7 +371,7 @@ def test_pydantic_value_error():
 
 
 def test_pydantic_value_error_none():
-    e = PydanticValueError('my_error', 'this is a custom error {missed}')
+    e = PydanticCustomError('my_error', 'this is a custom error {missed}')
     assert e.message() == 'this is a custom error {missed}'
     assert e.message_template == 'this is a custom error {missed}'
     assert e.kind == 'my_error'
@@ -382,7 +382,7 @@ def test_pydantic_value_error_none():
 
 def test_pydantic_value_error_usage():
     def f(input_value, **kwargs):
-        raise PydanticValueError('my_error', 'this is a custom error {foo} {bar}', {'foo': 'FOOBAR', 'bar': 42})
+        raise PydanticCustomError('my_error', 'this is a custom error {foo} {bar}', {'foo': 'FOOBAR', 'bar': 42})
 
     v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': f})
 
@@ -402,7 +402,7 @@ def test_pydantic_value_error_usage():
 
 def test_pydantic_value_error_invalid_dict():
     def f(input_value, **kwargs):
-        raise PydanticValueError('my_error', 'this is a custom error {foo}', {(): 'foobar'})
+        raise PydanticCustomError('my_error', 'this is a custom error {foo}', {(): 'foobar'})
 
     v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': f})
 
@@ -420,7 +420,7 @@ def test_pydantic_value_error_invalid_dict():
 
 def test_pydantic_value_error_invalid_type():
     def f(input_value, **kwargs):
-        raise PydanticValueError('my_error', 'this is a custom error {foo}', [('foo', 123)])
+        raise PydanticCustomError('my_error', 'this is a custom error {foo}', [('foo', 123)])
 
     v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': f})
 

@@ -10,7 +10,7 @@ from typing import Dict, FrozenSet, List, Optional, Set, Union
 
 import pytest
 
-from pydantic_core import PydanticValueError, SchemaValidator, ValidationError, ValidationError as CoreValidationError
+from pydantic_core import PydanticCustomError, SchemaValidator, ValidationError, ValidationError as CoreValidationError
 
 if os.getenv('BENCHMARK_VS_PYDANTIC'):
     try:
@@ -805,7 +805,7 @@ def test_raise_error_value_error(benchmark):
 @pytest.mark.benchmark(group='raise-error')
 def test_raise_error_custom(benchmark):
     def f(input_value, **kwargs):
-        raise PydanticValueError('my_error', 'this is a custom error {foo}', {'foo': 'FOOBAR'})
+        raise PydanticCustomError('my_error', 'this is a custom error {foo}', {'foo': 'FOOBAR'})
 
     v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': f})
 

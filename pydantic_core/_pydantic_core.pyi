@@ -8,7 +8,7 @@ if sys.version_info < (3, 11):
 else:
     from typing import NotRequired
 
-__all__ = '__version__', 'SchemaValidator', 'SchemaError', 'ValidationError', 'PydanticValueError'
+__all__ = '__version__', 'SchemaValidator', 'SchemaError', 'ValidationError', 'PydanticCustomError'
 __version__: str
 build_profile: str
 
@@ -43,7 +43,7 @@ class ValidationError(ValueError):
     def error_count(self) -> int: ...
     def errors(self) -> 'list[ErrorDetails]': ...
 
-class PydanticValueError(ValueError):
+class PydanticCustomError(ValueError):
     kind: str
     message_template: str
     context: 'dict[str, str | int] | None'

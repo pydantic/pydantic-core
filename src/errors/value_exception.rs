@@ -8,14 +8,14 @@ use super::{ErrorKind, ValError};
 
 #[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
-pub struct PydanticValueError {
+pub struct PydanticCustomError {
     kind: String,
     message_template: String,
     context: Option<Py<PyDict>>,
 }
 
 #[pymethods]
-impl PydanticValueError {
+impl PydanticCustomError {
     #[new]
     pub fn py_new(py: Python, kind: String, message_template: String, context: Option<&PyDict>) -> Self {
         Self {
@@ -71,7 +71,7 @@ impl PydanticValueError {
     }
 }
 
-impl PydanticValueError {
+impl PydanticCustomError {
     pub fn into_val_error<'a>(self, input: &'a impl Input<'a>) -> ValError<'a> {
         let kind = ErrorKind::CustomError { value_error: self };
         ValError::new(kind, input)

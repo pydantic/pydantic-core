@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use strum::{Display, EnumMessage};
 
-use super::PydanticValueError;
+use super::PydanticCustomError;
 
 /// Definite each validation error.
 /// NOTE: if an error has parameters:
@@ -187,7 +187,7 @@ pub enum ErrorKind {
     #[strum(message = "Input should be a valid number, unable to parse string as an number")]
     FloatParsing,
     #[strum(message = "Input should be a finite number")]
-    FloatFiniteNumber,
+    FiniteNumber,
     #[strum(serialize = "multiple_of", message = "Input should be a multiple of {multiple_of}")]
     FloatMultipleOf {
         multiple_of: f64,
@@ -238,7 +238,7 @@ pub enum ErrorKind {
     },
     // Note: strum message and serialize are not used here
     CustomError {
-        value_error: PydanticValueError,
+        value_error: PydanticCustomError,
     },
     // ---------------------
     // literals
