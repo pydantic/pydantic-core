@@ -25,14 +25,14 @@ def test_frozenset_ints_both(py_and_json: PyAndJson, input_value, expected):
     [([], frozenset()), ([1, '2', b'3'], {1, '2', b'3'}), (frozenset([1, '2', b'3']), {1, '2', b'3'})],
 )
 def test_frozenset_any(input_value, expected):
-    v = SchemaValidator('frozenset')
+    v = SchemaValidator({'type': 'frozenset'})
     output = v.validate_python(input_value)
     assert output == expected
     assert isinstance(output, frozenset)
 
 
 def test_no_copy():
-    v = SchemaValidator('frozenset')
+    v = SchemaValidator({'type': 'frozenset'})
     input_value = frozenset([1, 2, 3])
     output = v.validate_python(input_value)
     assert output == input_value
@@ -143,10 +143,10 @@ def test_frozenset_multiple_errors():
         ({'strict': True}, (1, 2, 3), Err('Input should be a valid frozenset [kind=frozen_set_type,')),
         ({'strict': True}, {1, 2, 3}, Err('Input should be a valid frozenset [kind=frozen_set_type,')),
         ({'strict': True}, 'abc', Err('Input should be a valid frozenset [kind=frozen_set_type,')),
-        ({'min_items': 3}, {1, 2, 3}, {1, 2, 3}),
-        ({'min_items': 3}, {1, 2}, Err('Input should have at least 3 items, got 2 items [kind=too_short,')),
-        ({'max_items': 3}, {1, 2, 3}, {1, 2, 3}),
-        ({'max_items': 3}, {1, 2, 3, 4}, Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
+        ({'min_length': 3}, {1, 2, 3}, {1, 2, 3}),
+        ({'min_length': 3}, {1, 2}, Err('Input should have at least 3 items, got 2 items [kind=too_short,')),
+        ({'max_length': 3}, {1, 2, 3}, {1, 2, 3}),
+        ({'max_length': 3}, {1, 2, 3, 4}, Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
     ],
 )
 def test_frozenset_kwargs_python(kwargs: Dict[str, Any], input_value, expected):
@@ -220,19 +220,19 @@ def test_union_frozenset_int_frozenset_str(input_value, expected):
 
 
 def test_frozenset_as_dict_keys(py_and_json: PyAndJson):
-    v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'frozenset'}, 'values_schema': 'int'})
+    v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'frozenset'}, 'values_schema': {'type': 'int'}})
     with pytest.raises(ValidationError, match=re.escape('Input should be a valid frozenset')):
         v.validate_test({'foo': 'bar'})
 
 
 def test_repr():
-    v = SchemaValidator({'type': 'frozenset', 'strict': True, 'min_items': 42})
+    v = SchemaValidator({'type': 'frozenset', 'strict': True, 'min_length': 42})
     assert plain_repr(v) == (
         'SchemaValidator('
         'name="frozenset[any]",'
         'validator=FrozenSet(FrozenSetValidator{'
         'strict:true,item_validator:None,size_range:Some((Some(42),None)),name:"frozenset[any]"'
-        '}))'
+        '}),slots=[])'
     )
 
 
@@ -244,7 +244,7 @@ def test_generator_error():
             raise RuntimeError('error')
         yield 3
 
-    v = SchemaValidator({'type': 'frozenset', 'items_schema': 'int'})
+    v = SchemaValidator({'type': 'frozenset', 'items_schema': {'type': 'int'}})
     r = v.validate_python(gen(False))
     assert r == {1, 2, 3}
     assert isinstance(r, frozenset)
@@ -269,7 +269,7 @@ def test_generator_error():
             frozenset(((1, 10), (2, 20), (3, 30))),
             id='Tuple[int, int]',
         ),
-        pytest.param({1: 10, 2: 20, '3': '30'}.items(), 'any', {(1, 10), (2, 20), ('3', '30')}, id='Any'),
+        pytest.param({1: 10, 2: 20, '3': '30'}.items(), {'type': 'any'}, {(1, 10), (2, 20), ('3', '30')}, id='Any'),
     ],
 )
 def test_frozenset_from_dict_items(input_value, items_schema, expected):

@@ -84,7 +84,7 @@ def test_list_int(input_value, expected):
     ],
 )
 def test_list_any(input_value, expected):
-    v = SchemaValidator('list')
+    v = SchemaValidator({'type': 'list'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -113,12 +113,12 @@ def test_list_error(input_value, index):
     'kwargs,input_value,expected',
     [
         ({}, [1, 2, 3, 4], [1, 2, 3, 4]),
-        ({'min_items': 3}, [1, 2, 3, 4], [1, 2, 3, 4]),
-        ({'min_items': 3}, [1, 2], Err('Input should have at least 3 items, got 2 items [kind=too_short,')),
-        ({'min_items': 1}, [], Err('Input should have at least 1 item, got 0 items [kind=too_short,')),
-        ({'max_items': 4}, [1, 2, 3, 4], [1, 2, 3, 4]),
-        ({'max_items': 3}, [1, 2, 3, 4], Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
-        ({'max_items': 1}, [1, 2], Err('Input should have at most 1 item, got 2 items [kind=too_long,')),
+        ({'min_length': 3}, [1, 2, 3, 4], [1, 2, 3, 4]),
+        ({'min_length': 3}, [1, 2], Err('Input should have at least 3 items, got 2 items [kind=too_short,')),
+        ({'min_length': 1}, [], Err('Input should have at least 1 item, got 0 items [kind=too_short,')),
+        ({'max_length': 4}, [1, 2, 3, 4], [1, 2, 3, 4]),
+        ({'max_length': 3}, [1, 2, 3, 4], Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
+        ({'max_length': 1}, [1, 2], Err('Input should have at most 1 item, got 2 items [kind=too_long,')),
     ],
 )
 def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
@@ -131,7 +131,7 @@ def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
 
 
 def test_length_ctx():
-    v = SchemaValidator({'type': 'list', 'min_items': 2, 'max_items': 3})
+    v = SchemaValidator({'type': 'list', 'min_length': 2, 'max_length': 3})
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1])
     assert exc_info.value.errors() == [
@@ -212,7 +212,7 @@ def test_generator_error():
             raise RuntimeError('error')
         yield 3
 
-    v = SchemaValidator({'type': 'list', 'items_schema': 'int'})
+    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
     assert v.validate_python(gen(False)) == [1, 2, 3]
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(gen(True))
@@ -242,7 +242,7 @@ def test_generator_error():
             [(1, 10), (2, 20), (3, 30)],
             id='Tuple[int, int]',
         ),
-        pytest.param({1: 10, 2: 20, '3': '30'}.items(), 'any', [(1, 10), (2, 20), ('3', '30')], id='Any'),
+        pytest.param({1: 10, 2: 20, '3': '30'}.items(), {'type': 'any'}, [(1, 10), (2, 20), ('3', '30')], id='Any'),
     ],
 )
 def test_list_from_dict_items(input_value, items_schema, expected):

@@ -145,9 +145,9 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
         {
             'type': 'arguments',
             'arguments_schema': [
-                {'name': 'a', 'mode': 'positional_only', 'schema': 'int'},
-                {'name': 'b', 'mode': 'positional_only', 'schema': 'str'},
-                {'name': 'c', 'mode': 'positional_only', 'schema': 'bool'},
+                {'name': 'a', 'mode': 'positional_only', 'schema': {'type': 'int'}},
+                {'name': 'b', 'mode': 'positional_only', 'schema': {'type': 'str'}},
+                {'name': 'c', 'mode': 'positional_only', 'schema': {'type': 'bool'}},
             ],
         }
     )
@@ -255,9 +255,9 @@ def test_keyword_args(py_and_json: PyAndJson, input_value, expected):
         {
             'type': 'arguments',
             'arguments_schema': [
-                {'name': 'a', 'mode': 'keyword_only', 'schema': 'int'},
-                {'name': 'b', 'mode': 'keyword_only', 'schema': 'str'},
-                {'name': 'c', 'mode': 'keyword_only', 'schema': 'bool'},
+                {'name': 'a', 'mode': 'keyword_only', 'schema': {'type': 'int'}},
+                {'name': 'b', 'mode': 'keyword_only', 'schema': {'type': 'str'}},
+                {'name': 'c', 'mode': 'keyword_only', 'schema': {'type': 'bool'}},
             ],
         }
     )
@@ -339,9 +339,9 @@ def test_positional_or_keyword(py_and_json: PyAndJson, input_value, expected):
         {
             'type': 'arguments',
             'arguments_schema': [
-                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int'},
-                {'name': 'b', 'schema': 'str'},  # default mode is positional_or_keyword
-                {'name': 'c', 'mode': 'keyword_only', 'schema': 'bool'},
+                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': {'type': 'int'}},
+                {'name': 'b', 'schema': {'type': 'str'}},  # default mode is positional_or_keyword
+                {'name': 'c', 'mode': 'keyword_only', 'schema': {'type': 'bool'}},
             ],
         }
     )
@@ -360,7 +360,13 @@ def test_positional_optional(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
-            'arguments_schema': [{'name': 'a', 'mode': 'positional_only', 'schema': 'int', 'default': 42}],
+            'arguments_schema': [
+                {
+                    'name': 'a',
+                    'mode': 'positional_only',
+                    'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default': 42},
+                }
+            ],
         }
     )
     if isinstance(expected, Err):
@@ -387,7 +393,13 @@ def test_p_or_k_optional(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
-            'arguments_schema': [{'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int', 'default': 1}],
+            'arguments_schema': [
+                {
+                    'name': 'a',
+                    'mode': 'positional_or_keyword',
+                    'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default': 1},
+                }
+            ],
         }
     )
     if isinstance(expected, Err):
@@ -412,7 +424,7 @@ def test_p_or_k_optional(py_and_json: PyAndJson, input_value, expected):
     ids=repr,
 )
 def test_var_args_only(py_and_json: PyAndJson, input_value, expected):
-    v = py_and_json({'type': 'arguments', 'arguments_schema': [], 'var_args_schema': 'int'})
+    v = py_and_json({'type': 'arguments', 'arguments_schema': [], 'var_args_schema': {'type': 'int'}})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
@@ -472,8 +484,8 @@ def test_args_var_args_only(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
-            'arguments_schema': [{'name': 'a', 'mode': 'positional_only', 'schema': 'int'}],
-            'var_args_schema': 'int',
+            'arguments_schema': [{'name': 'a', 'mode': 'positional_only', 'schema': {'type': 'int'}}],
+            'var_args_schema': {'type': 'int'},
         }
     )
     if isinstance(expected, Err):
@@ -519,11 +531,11 @@ def test_both(py_and_json: PyAndJson, input_value, expected):
         {
             'type': 'arguments',
             'arguments_schema': [
-                {'name': '1', 'mode': 'positional_only', 'schema': 'int'},
-                {'name': '2', 'mode': 'positional_only', 'schema': 'str'},
-                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'bool'},
-                {'name': 'b', 'mode': 'keyword_only', 'schema': 'str'},
-                {'name': 'c', 'mode': 'keyword_only', 'schema': 'int'},
+                {'name': '1', 'mode': 'positional_only', 'schema': {'type': 'int'}},
+                {'name': '2', 'mode': 'positional_only', 'schema': {'type': 'str'}},
+                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': {'type': 'bool'}},
+                {'name': 'b', 'mode': 'keyword_only', 'schema': {'type': 'str'}},
+                {'name': 'c', 'mode': 'keyword_only', 'schema': {'type': 'int'}},
             ],
         }
     )
@@ -591,7 +603,7 @@ def test_internal_error(py_and_json: PyAndJson):
         {
             'type': 'arguments',
             'arguments_schema': [
-                {'name': 'a', 'mode': 'positional_only', 'schema': 'int'},
+                {'name': 'a', 'mode': 'positional_only', 'schema': {'type': 'int'}},
                 {
                     'name': 'b',
                     'mode': 'positional_only',
@@ -620,8 +632,12 @@ def test_default_factory(py_and_json: PyAndJson, input_value, expected):
         {
             'type': 'arguments',
             'arguments_schema': [
-                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int'},
-                {'name': 'b', 'mode': 'positional_or_keyword', 'schema': 'int', 'default_factory': lambda: 42},
+                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': {'type': 'int'}},
+                {
+                    'name': 'b',
+                    'mode': 'positional_or_keyword',
+                    'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default_factory': lambda: 42},
+                },
             ],
         }
     )
@@ -633,8 +649,12 @@ def test_repr():
         {
             'type': 'arguments',
             'arguments_schema': [
-                {'name': 'b', 'mode': 'positional_or_keyword', 'schema': 'int'},
-                {'name': 'a', 'mode': 'keyword_only', 'schema': 'int', 'default_factory': lambda: 42},
+                {'name': 'b', 'mode': 'positional_or_keyword', 'schema': {'type': 'int'}},
+                {
+                    'name': 'a',
+                    'mode': 'keyword_only',
+                    'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default_factory': lambda: 42},
+                },
             ],
         }
     )
@@ -642,20 +662,7 @@ def test_repr():
 
 
 def test_build_non_default_follows():
-    with pytest.raises(SchemaError, match='Non-default argument follows default argument'):
-        SchemaValidator(
-            {
-                'type': 'arguments',
-                'arguments_schema': [
-                    {'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int', 'default_factory': lambda: 42},
-                    {'name': 'b', 'mode': 'positional_or_keyword', 'schema': 'int'},
-                ],
-            }
-        )
-
-
-def test_build_default_and_default_factory():
-    with pytest.raises(SchemaError, match="'default' and 'default_factory' cannot be used together"):
+    with pytest.raises(SchemaError, match="Non-default argument 'b' follows default argument"):
         SchemaValidator(
             {
                 'type': 'arguments',
@@ -663,10 +670,9 @@ def test_build_default_and_default_factory():
                     {
                         'name': 'a',
                         'mode': 'positional_or_keyword',
-                        'schema': 'int',
-                        'default_factory': lambda: 1,
-                        'default': 2,
-                    }
+                        'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default_factory': lambda: 42},
+                    },
+                    {'name': 'b', 'mode': 'positional_or_keyword', 'schema': {'type': 'int'}},
                 ],
             }
         )
@@ -686,10 +692,10 @@ def test_kwargs(py_and_json: PyAndJson, input_value, expected):
         {
             'type': 'arguments',
             'arguments_schema': [
-                {'name': 'a', 'mode': 'positional_only', 'schema': 'int'},
-                {'name': 'b', 'mode': 'positional_or_keyword', 'schema': 'int'},
+                {'name': 'a', 'mode': 'positional_only', 'schema': {'type': 'int'}},
+                {'name': 'b', 'mode': 'positional_or_keyword', 'schema': {'type': 'int'}},
             ],
-            'var_kwargs_schema': 'str',
+            'var_kwargs_schema': {'type': 'str'},
         }
     )
     if isinstance(expected, Err):
@@ -712,7 +718,9 @@ def test_alias(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
-            'arguments_schema': [{'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int', 'alias': 'Foo'}],
+            'arguments_schema': [
+                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': {'type': 'int'}, 'alias': 'Foo'}
+            ],
         }
     )
     if isinstance(expected, Err):
@@ -737,7 +745,9 @@ def test_alias_populate_by_name(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
-            'arguments_schema': [{'name': 'a', 'mode': 'positional_or_keyword', 'schema': 'int', 'alias': 'Foo'}],
+            'arguments_schema': [
+                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': {'type': 'int'}, 'alias': 'Foo'}
+            ],
             'populate_by_name': True,
         }
     )
@@ -771,15 +781,15 @@ def validate(function):
 
         assert annotation in (bool, int, float, str, Any), f'schema for {annotation} not implemented'
         if annotation in (bool, int, float, str):
-            arg_schema = annotation.__name__
+            arg_schema = {'type': annotation.__name__}
         else:
             assert annotation is Any
-            arg_schema = 'any'
+            arg_schema = {'type': 'any'}
 
         if p.kind in mode_lookup:
-            s = {'name': name, 'mode': mode_lookup[p.kind], 'schema': arg_schema}
             if p.default is not p.empty:
-                s['default'] = p.default
+                arg_schema = {'type': 'default', 'schema': arg_schema, 'default': p.default}
+            s = {'name': name, 'mode': mode_lookup[p.kind], 'schema': arg_schema}
             arguments_schema.append(s)
         elif p.kind == Parameter.VAR_POSITIONAL:
             schema['var_args_schema'] = arg_schema
@@ -939,3 +949,24 @@ def test_function_args_kwargs():
     assert foobar(1, 2, 3) == ((1, 2, 3), {})
     assert foobar(a=1, b=2, c=3) == ((), {'a': 1, 'b': 2, 'c': 3})
     assert foobar() == ((), {})
+
+
+def test_invalid_schema():
+    with pytest.raises(SchemaError, match="'default' and 'default_factory' cannot be used together"):
+        SchemaValidator(
+            {
+                'type': 'arguments',
+                'arguments_schema': [
+                    {
+                        'name': 'a',
+                        'mode': 'positional_or_keyword',
+                        'schema': {
+                            'type': 'default',
+                            'schema': {'type': 'int'},
+                            'default': 1,
+                            'default_factory': lambda: 2,
+                        },
+                    }
+                ],
+            }
+        )

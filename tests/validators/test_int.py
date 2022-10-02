@@ -189,9 +189,9 @@ def test_union_int_simple(py_and_json: PyAndJson):
 
 def test_int_repr():
     v = SchemaValidator({'type': 'int'})
-    assert plain_repr(v) == 'SchemaValidator(name="int",validator=Int(IntValidator{strict:false}))'
+    assert plain_repr(v) == 'SchemaValidator(name="int",validator=Int(IntValidator{strict:false}),slots=[])'
     v = SchemaValidator({'type': 'int', 'strict': True})
-    assert plain_repr(v) == 'SchemaValidator(name="int",validator=Int(IntValidator{strict:true}))'
+    assert plain_repr(v) == 'SchemaValidator(name="int",validator=Int(IntValidator{strict:true}),slots=[])'
     v = SchemaValidator({'type': 'int', 'multiple_of': 7})
     assert plain_repr(v).startswith('SchemaValidator(name="constrained-int",validator=ConstrainedInt(')
 
@@ -230,7 +230,7 @@ def test_int_nan(py_and_json: PyAndJson):
 
 
 def test_int_key(py_and_json: PyAndJson):
-    v = py_and_json({'type': 'dict', 'keys_schema': 'int', 'values_schema': 'int'})
+    v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
     assert v.validate_test({'1': 1, '2': 2}) == {1: 1, 2: 2}
     with pytest.raises(ValidationError, match='Input should be a valid integer'):
         v.validate_test({'1': 1, '2': 2}, strict=True)

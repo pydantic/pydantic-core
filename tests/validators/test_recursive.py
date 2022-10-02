@@ -1,11 +1,11 @@
 from typing import Optional
 
 import pytest
-from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict, IsStr
+from dirty_equals import AnyThing, HasAttributes, IsInstance, IsList, IsPartialDict, IsStr
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
-from ..conftest import Err
+from ..conftest import Err, plain_repr
 from .test_typed_dict import Cls
 
 
@@ -18,16 +18,19 @@ def test_branch_nullable():
                 'name': {'schema': {'type': 'str'}},
                 'sub_branch': {
                     'schema': {
-                        'type': 'union',
-                        'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'schema_ref': 'Branch'}],
-                    },
-                    'default': None,
+                        'type': 'default',
+                        'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                        'default': None,
+                    }
                 },
             },
         }
     )
+    assert 'return_fields_set:false' in plain_repr(v)
 
     assert v.validate_python({'name': 'root'}) == {'name': 'root', 'sub_branch': None}
+    assert plain_repr(v).startswith('SchemaValidator(name="typed-dict",validator=RecursiveRef(RecursiveRefValidator{')
+    assert ',slots=[TypedDict(TypedDictValidator{' in plain_repr(v)
 
     assert v.validate_python({'name': 'root', 'sub_branch': {'name': 'b1'}}) == (
         {'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': None}}
@@ -37,19 +40,34 @@ def test_branch_nullable():
     )
 
 
+def test_unused_ref():
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'ref': 'Branch',
+            'fields': {'name': {'schema': {'type': 'str'}}, 'other': {'schema': {'type': 'int'}}},
+        }
+    )
+    assert plain_repr(v).startswith('SchemaValidator(name="typed-dict",validator=TypedDict(TypedDictValidator')
+    assert v.validate_python({'name': 'root', 'other': '4'}) == {'name': 'root', 'other': 4}
+
+
 def test_nullable_error():
     v = SchemaValidator(
         {
             'ref': 'Branch',
             'type': 'typed-dict',
             'fields': {
-                'width': {'schema': 'int'},
+                'width': {'schema': {'type': 'int'}},
                 'sub_branch': {
                     'schema': {
-                        'type': 'union',
-                        'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'schema_ref': 'Branch'}],
-                    },
-                    'default': None,
+                        'type': 'default',
+                        'schema': {
+                            'type': 'union',
+                            'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'schema_ref': 'Branch'}],
+                        },
+                        'default': None,
+                    }
                 },
             },
         }
@@ -81,10 +99,16 @@ def test_list():
             'type': 'typed-dict',
             'ref': 'BranchList',
             'fields': {
-                'width': {'schema': 'int'},
+                'width': {'schema': {'type': 'int'}},
                 'branches': {
-                    'schema': {'type': 'list', 'items_schema': {'type': 'recursive-ref', 'schema_ref': 'BranchList'}},
-                    'default': None,
+                    'schema': {
+                        'type': 'default',
+                        'schema': {
+                            'type': 'list',
+                            'items_schema': {'type': 'recursive-ref', 'schema_ref': 'BranchList'},
+                        },
+                        'default': None,
+                    }
                 },
             },
         }
@@ -115,26 +139,32 @@ def test_multiple_intertwined():
             'ref': 'Foo',
             'type': 'typed-dict',
             'fields': {
-                'height': {'schema': 'int'},
+                'height': {'schema': {'type': 'int'}},
                 'bar': {
                     'schema': {
                         'ref': 'Bar',
                         'type': 'typed-dict',
                         'fields': {
-                            'width': {'schema': 'int'},
+                            'width': {'schema': {'type': 'int'}},
                             'bars': {
                                 'schema': {
-                                    'type': 'list',
-                                    'items_schema': {'type': 'recursive-ref', 'schema_ref': 'Bar'},
-                                },
-                                'default': None,
+                                    'type': 'default',
+                                    'schema': {
+                                        'type': 'list',
+                                        'items_schema': {'type': 'recursive-ref', 'schema_ref': 'Bar'},
+                                    },
+                                    'default': None,
+                                }
                             },
                             'foo': {
                                 'schema': {
-                                    'type': 'union',
-                                    'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'schema_ref': 'Foo'}],
-                                },
-                                'default': None,
+                                    'type': 'default',
+                                    'schema': {
+                                        'type': 'union',
+                                        'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'schema_ref': 'Foo'}],
+                                    },
+                                    'default': None,
+                                }
                             },
                         },
                     }
@@ -166,18 +196,21 @@ def test_model_class():
         {
             'type': 'new-class',
             'ref': 'Branch',
-            'class_type': Branch,
+            'cls': Branch,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
                 'fields': {
-                    'width': {'schema': 'int'},
+                    'width': {'schema': {'type': 'int'}},
                     'branch': {
                         'schema': {
-                            'type': 'union',
-                            'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'schema_ref': 'Branch'}],
-                        },
-                        'default': None,
+                            'type': 'default',
+                            'schema': {
+                                'type': 'union',
+                                'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'schema_ref': 'Branch'}],
+                            },
+                            'default': None,
+                        }
                     },
                 },
             },
@@ -209,8 +242,14 @@ def test_invalid_schema():
                     'fields': {
                         'width': {'schema': {'type': 'int'}},
                         'branch': {
-                            'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
-                            'default': None,
+                            'schema': {
+                                'type': 'default',
+                                'schema': {
+                                    'type': 'nullable',
+                                    'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'},
+                                },
+                                'default': None,
+                            }
                         },
                     },
                 },
@@ -227,7 +266,7 @@ def test_outside_parent():
                     'schema': {
                         'type': 'tuple',
                         'mode': 'positional',
-                        'items_schema': ['int', 'int', 'str'],
+                        'items_schema': [{'type': 'int'}, {'type': 'int'}, {'type': 'str'}],
                         'ref': 'tuple-iis',
                     }
                 },
@@ -250,8 +289,11 @@ def test_recursion_branch():
             'fields': {
                 'name': {'schema': {'type': 'str'}},
                 'branch': {
-                    'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
-                    'default': None,
+                    'schema': {
+                        'type': 'default',
+                        'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                        'default': None,
+                    }
                 },
             },
         },
@@ -335,8 +377,11 @@ def multiple_tuple_schema() -> SchemaValidator:
                     }
                 },
                 'f2': {
-                    'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 't'}},
-                    'default': None,
+                    'schema': {
+                        'type': 'default',
+                        'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 't'}},
+                        'default': None,
+                    }
                 },
             },
         }
@@ -556,7 +601,7 @@ def test_function_name():
                     'function': f,
                     'schema': {'schema_ref': 'root-schema', 'type': 'recursive-ref'},
                 },
-                'int',
+                {'type': 'int'},
             ],
             'ref': 'root-schema',
             'type': 'union',
@@ -647,3 +692,72 @@ def test_many_uses_of_ref():
 
     long_input = {'name': 'Anne', 'other_names': [f'p-{i}' for i in range(300)]}
     assert v.validate_python(long_input) == long_input
+
+
+def test_error_inside_recursive_wrapper():
+    with pytest.raises(SchemaError) as exc_info:
+        SchemaValidator(
+            {
+                'type': 'typed-dict',
+                'ref': 'Branch',
+                'fields': {
+                    'sub_branch': {
+                        'schema': {
+                            'type': 'default',
+                            'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                            'default': None,
+                            'default_factory': lambda x: 'foobar',
+                        }
+                    }
+                },
+            }
+        )
+    assert str(exc_info.value) == (
+        'Field "sub_branch":\n'
+        '  SchemaError: Error building "default" validator:\n'
+        "  SchemaError: 'default' and 'default_factory' cannot be used together"
+    )
+
+
+def test_new_class_td_recursive():
+    class Foobar:
+        __slots__ = '__dict__', '__fields_set__'
+
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'ref': '__main__.Foobar',
+            'return_fields_set': True,
+            'fields': {
+                'x': {'schema': {'type': 'int'}, 'required': True},
+                'y': {
+                    'schema': {
+                        'type': 'default',
+                        'schema': {
+                            'type': 'union',
+                            'choices': [
+                                {
+                                    'type': 'new-class',
+                                    'cls': Foobar,
+                                    'schema': {'type': 'recursive-ref', 'schema_ref': '__main__.Foobar'},
+                                },
+                                {'type': 'none'},
+                            ],
+                        },
+                        'default': None,
+                    },
+                    'required': False,
+                },
+            },
+        }
+    )
+    assert 'return_fields_set:true' in plain_repr(v)
+    d, fields_set = v.validate_python(dict(x=1, y={'x': 2}))
+    assert d == {'x': 1, 'y': IsInstance(Foobar)}
+    assert fields_set == {'y', 'x'}
+
+    f = d['y']
+    assert isinstance(f, Foobar)
+    assert f.x == 2
+    assert f.y is None
+    assert f.__fields_set__ == {'x'}

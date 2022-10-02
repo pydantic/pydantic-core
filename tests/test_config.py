@@ -4,7 +4,7 @@ import re
 import pytest
 from dirty_equals import FunctionCheck, HasAttributes, IsInstance
 
-from pydantic_core import Config, SchemaValidator, ValidationError
+from pydantic_core import CoreConfig, SchemaValidator, ValidationError
 
 from .conftest import Err, plain_repr
 
@@ -42,9 +42,9 @@ def test_on_model_class():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'config': {'str_max_length': 5},
-            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': 'str'}}},
+            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': {'type': 'str'}}}},
         }
     )
     assert 'max_length:Some(5)' in plain_repr(v)
@@ -56,7 +56,7 @@ def test_field_priority_model():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'config': {'str_max_length': 10},
             'schema': {
                 'type': 'typed-dict',
@@ -74,8 +74,8 @@ def test_parent_priority():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
-            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': 'str'}}},
+            'cls': MyModel,
+            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': {'type': 'str'}}}},
             'config': {'str_min_length': 2, 'str_max_length': 10},
         },
         {'str_max_length': 5, 'config_choose_priority': 1},
@@ -92,8 +92,8 @@ def test_child_priority():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
-            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': 'str'}}},
+            'cls': MyModel,
+            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': {'type': 'str'}}}},
             'config': {'str_max_length': 5, 'config_choose_priority': 1},
         },
         {'str_min_length': 2, 'str_max_length': 10},
@@ -110,8 +110,8 @@ def test_merge_child_wins():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
-            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': 'str'}}},
+            'cls': MyModel,
+            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': {'type': 'str'}}}},
             'config': {'str_max_length': 5},
         },
         {'str_min_length': 2, 'str_max_length': 10},
@@ -128,8 +128,8 @@ def test_merge_parent_wins():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
-            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': 'str'}}},
+            'cls': MyModel,
+            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': {'type': 'str'}}}},
             'config': {'str_max_length': 5},
         },
         {'str_min_length': 2, 'str_max_length': 10, 'config_merge_priority': 1},
@@ -148,20 +148,20 @@ def test_sub_model_merge():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
                 'fields': {
-                    'f': {'schema': 'str'},
+                    'f': {'schema': {'type': 'str'}},
                     'sub_model': {
                         'schema': {
                             'type': 'new-class',
-                            'class_type': MyModel,
+                            'cls': MyModel,
                             'schema': {
                                 'type': 'typed-dict',
                                 'return_fields_set': True,
-                                'fields': {'f': {'schema': 'str'}},
+                                'fields': {'f': {'schema': {'type': 'str'}}},
                             },
                             'config': {'str_max_length': 6, 'str_to_upper': True},
                         }
@@ -227,11 +227,11 @@ def test_sub_model_merge():
     ],
     ids=repr,
 )
-def test_allow_inf_nan(config: Config, float_field_schema, input_value, expected):
+def test_allow_inf_nan(config: CoreConfig, float_field_schema, input_value, expected):
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {'type': 'typed-dict', 'fields': {'x': {'schema': float_field_schema}}},
             'config': config,
         }
@@ -259,14 +259,14 @@ def test_allow_inf_nan(config: Config, float_field_schema, input_value, expected
         ),
     ],
 )
-def test_frozen(config: Config, field_schema, expected):
+def test_frozen(config: CoreConfig, field_schema, expected):
     class MyModel:
         __slots__ = {'__dict__'}
 
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'config': config,
             'schema': {'type': 'typed-dict', 'fields': {'f': field_schema}},
         }

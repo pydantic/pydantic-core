@@ -6,6 +6,7 @@ use pyo3::types::{PyAny, PyDict};
 use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorKind, PydanticValueError, ValError, ValResult, ValidationError};
 use crate::input::Input;
+use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
 
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -96,7 +97,7 @@ impl Validator for FunctionBeforeValidator {
         &self.name
     }
 
-    fn ask(&self, question: &str) -> bool {
+    fn ask(&self, question: &Question) -> bool {
         self.validator.ask(question)
     }
 
@@ -133,7 +134,7 @@ impl Validator for FunctionAfterValidator {
         &self.name
     }
 
-    fn ask(&self, question: &str) -> bool {
+    fn ask(&self, question: &Question) -> bool {
         self.validator.ask(question)
     }
 
@@ -226,7 +227,7 @@ impl Validator for FunctionWrapValidator {
         &self.name
     }
 
-    fn ask(&self, question: &str) -> bool {
+    fn ask(&self, question: &Question) -> bool {
         self.validator.ask(question)
     }
 
@@ -288,9 +289,9 @@ macro_rules! py_err_string {
     };
 }
 
-fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> ValError<'a> {
-    // Only ValueError and AssertionError are considered as validation errors,
-    // TypeError is now considered as a runtime error to catch errors in function signatures
+/// Only `ValueError` (including `PydanticValueError` and `ValidationError`) and `AssertionError` are considered
+/// as validation errors, `TypeError` is now considered as a runtime error to catch errors in function signatures
+pub fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> ValError<'a> {
     if err.is_instance_of::<PyValueError>(py) {
         if let Ok(pydantic_value_error) = err.value(py).extract::<PydanticValueError>() {
             pydantic_value_error.into_val_error(input)

@@ -1,7 +1,7 @@
 import sys
 from typing import Any, TypedDict
 
-from pydantic_core._types import Config, Schema
+from pydantic_core.core_schema import CoreConfig, CoreSchema
 
 if sys.version_info < (3, 11):
     from typing_extensions import NotRequired
@@ -10,9 +10,11 @@ else:
 
 __all__ = '__version__', 'SchemaValidator', 'SchemaError', 'ValidationError', 'PydanticValueError'
 __version__: str
+build_profile: str
 
 class SchemaValidator:
-    def __init__(self, schema: Schema, config: 'Config | None' = None) -> None: ...
+    title: str
+    def __init__(self, schema: CoreSchema, config: 'CoreConfig | None' = None) -> None: ...
     def validate_python(self, input: Any, strict: 'bool | None' = None, context: Any = None) -> Any: ...
     def isinstance_python(self, input: Any, strict: 'bool | None' = None, context: Any = None) -> bool: ...
     def validate_json(

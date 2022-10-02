@@ -17,7 +17,7 @@ def test_model_class():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
@@ -54,7 +54,7 @@ def test_model_class_setattr():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
@@ -84,7 +84,7 @@ def test_model_class_root_validator():
             'function': f,
             'schema': {
                 'type': 'new-class',
-                'class_type': MyModel,
+                'cls': MyModel,
                 'schema': {
                     'type': 'typed-dict',
                     'return_fields_set': True,
@@ -111,7 +111,7 @@ def test_function_ask(mode, return_fields_set):
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'function',
                 'mode': mode,
@@ -136,7 +136,7 @@ def test_function_plain_ask():
         return input_value
 
     v = SchemaValidator(
-        {'type': 'new-class', 'class_type': MyModel, 'schema': {'type': 'function', 'mode': 'plain', 'function': f}}
+        {'type': 'new-class', 'cls': MyModel, 'schema': {'type': 'function', 'mode': 'plain', 'function': f}}
     )
     assert 'expect_fields_set:false' in plain_repr(v)
     m = v.validate_python({'field_a': 'test'})
@@ -152,12 +152,12 @@ def test_union_sub_schema():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'union',
                 'choices': [
-                    {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'foo': {'schema': 'int'}}},
-                    {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'bar': {'schema': 'int'}}},
+                    {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'foo': {'schema': {'type': 'int'}}}},
+                    {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'bar': {'schema': {'type': 'int'}}}},
                 ],
             },
         }
@@ -180,18 +180,21 @@ def test_tagged_union_sub_schema():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'tagged-union',
                 'discriminator': 'foo',
                 'choices': {
-                    'apple': {'type': 'typed-dict', 'fields': {'foo': {'schema': 'str'}, 'bar': {'schema': 'int'}}},
+                    'apple': {
+                        'type': 'typed-dict',
+                        'fields': {'foo': {'schema': {'type': 'str'}}, 'bar': {'schema': {'type': 'int'}}},
+                    },
                     'banana': {
                         'type': 'typed-dict',
                         'return_fields_set': True,
                         'fields': {
-                            'foo': {'schema': 'str'},
-                            'spam': {'schema': {'type': 'list', 'items_schema': 'int'}},
+                            'foo': {'schema': {'type': 'str'}},
+                            'spam': {'schema': {'type': 'list', 'items_schema': {'type': 'int'}}},
                         },
                     },
                 },
@@ -213,7 +216,7 @@ def test_bad_sub_schema():
     class MyModel:
         pass
 
-    v = SchemaValidator({'type': 'new-class', 'class_type': MyModel, 'schema': 'int'})
+    v = SchemaValidator({'type': 'new-class', 'cls': MyModel, 'schema': {'type': 'int'}})
     assert 'expect_fields_set:false' in plain_repr(v)
     with pytest.raises(TypeError):
         v.validate_python(123)
@@ -230,7 +233,7 @@ def test_model_class_function_after():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'function',
                 'mode': 'after',
@@ -254,8 +257,12 @@ def test_model_class_not_type():
         SchemaValidator(
             {
                 'type': 'new-class',
-                'class_type': 123,
-                'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'field_a': {'schema': 'str'}}},
+                'cls': 123,
+                'schema': {
+                    'type': 'typed-dict',
+                    'return_fields_set': True,
+                    'fields': {'field_a': {'schema': {'type': 'str'}}},
+                },
             }
         )
 
@@ -267,8 +274,8 @@ def test_not_return_fields_set():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
-            'schema': {'type': 'typed-dict', 'fields': {'field_a': {'schema': 'str'}}},
+            'cls': MyModel,
+            'schema': {'type': 'typed-dict', 'fields': {'field_a': {'schema': {'type': 'str'}}}},
         }
     )
     assert 'expect_fields_set:false' in plain_repr(v)
@@ -290,7 +297,7 @@ def test_model_class_instance_direct():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
@@ -327,7 +334,7 @@ def test_model_class_instance_subclass():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
@@ -355,7 +362,7 @@ def test_model_class_strict():
         {
             'type': 'new-class',
             'strict': True,
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
@@ -389,8 +396,8 @@ def test_internal_error():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': int,
-            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': 'int'}}},
+            'cls': int,
+            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': {'type': 'int'}}}},
         }
     )
     with pytest.raises(AttributeError, match=re.escape("'int' object has no attribute '__dict__'")):
@@ -410,7 +417,7 @@ def test_revalidate():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
@@ -464,7 +471,7 @@ def test_revalidate_extra():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
@@ -487,3 +494,129 @@ def test_revalidate_extra():
     assert m3 is not m2
     assert m3.__dict__ == {'field_a': 'x', 'field_b': 42, 'another': 42.5}
     assert m3.__fields_set__ == {'field_a', 'field_b', 'another'}
+
+
+def test_call_after_init():
+    call_count = 0
+
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+        field_a: str
+        field_b: int
+
+        def call_me_baby(self, context, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            assert context is None
+            assert kwargs == {}
+            assert self.field_a == 'test'
+            assert self.field_b == 12
+            assert self.__fields_set__ == {'field_a', 'field_b'}
+
+    v = SchemaValidator(
+        {
+            'type': 'new-class',
+            'cls': MyModel,
+            'call_after_init': 'call_me_baby',
+            'schema': {
+                'type': 'typed-dict',
+                'return_fields_set': True,
+                'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
+            },
+        }
+    )
+    m = v.validate_python({'field_a': 'test', 'field_b': 12})
+    assert isinstance(m, MyModel)
+    assert call_count == 1
+
+
+def test_call_after_init_validation_error():
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+        field_a: str
+
+        def call_me_baby(self, context, **kwargs):
+            if context and 'error' in context:
+                raise ValueError(f'this is broken: {self.field_a}')
+
+    v = SchemaValidator(
+        {
+            'type': 'new-class',
+            'cls': MyModel,
+            'call_after_init': 'call_me_baby',
+            'schema': {
+                'type': 'typed-dict',
+                'return_fields_set': True,
+                'fields': {'field_a': {'schema': {'type': 'str'}}},
+            },
+        }
+    )
+    m = v.validate_python({'field_a': 'test'})
+    assert isinstance(m, MyModel)
+    assert m.field_a == 'test'
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python({'field_a': 'test'}, None, {'error': 1})
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'value_error',
+            'loc': [],
+            'message': 'Value error, this is broken: test',
+            'input_value': {'field_a': 'test'},
+            'context': {'error': 'this is broken: test'},
+        }
+    ]
+
+
+def test_call_after_init_internal_error():
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+        field_a: str
+
+        def wrong_signature(self):
+            pass
+
+    v = SchemaValidator(
+        {
+            'type': 'new-class',
+            'cls': MyModel,
+            'call_after_init': 'wrong_signature',
+            'schema': {
+                'type': 'typed-dict',
+                'return_fields_set': True,
+                'fields': {'field_a': {'schema': {'type': 'str'}}},
+            },
+        }
+    )
+    with pytest.raises(TypeError, match=r"wrong_signature\(\) got an unexpected keyword argument 'context'"):
+        v.validate_python({'field_a': 'test'})
+
+
+def test_call_after_init_mutate():
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+        field_a: str
+        field_b: int
+
+        def call_me_baby(self, context, **kwargs):
+            self.field_a *= 2
+            self.__fields_set__ = {'field_a'}
+
+    v = SchemaValidator(
+        {
+            'type': 'new-class',
+            'cls': MyModel,
+            'call_after_init': 'call_me_baby',
+            'schema': {
+                'type': 'typed-dict',
+                'return_fields_set': True,
+                'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
+            },
+        }
+    )
+    m = v.validate_python({'field_a': 'test', 'field_b': 12})
+    assert isinstance(m, MyModel)
+    assert m.field_a == 'testtest'
+    assert m.field_b == 12
+    assert m.__fields_set__ == {'field_a'}
+    assert m.__dict__ == {'field_a': 'testtest', 'field_b': 12}

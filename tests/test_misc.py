@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from pydantic_core._pydantic_core import SchemaError, SchemaValidator, ValidationError, __version__
+from pydantic_core._pydantic_core import SchemaError, SchemaValidator, ValidationError, __version__, build_profile
 
 
 @pytest.mark.parametrize('obj', [ValidationError, SchemaValidator, SchemaError])
@@ -17,6 +17,10 @@ def test_version():
     assert '.' in __version__
 
 
+def test_build_profile():
+    assert build_profile in ('debug', 'release')
+
+
 def test_schema_error():
     err = SchemaError('test')
     assert isinstance(err, Exception)
@@ -25,7 +29,7 @@ def test_schema_error():
 
 
 def test_validation_error():
-    v = SchemaValidator('int')
+    v = SchemaValidator({'type': 'int'})
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(1.5)
 
@@ -43,7 +47,7 @@ def test_validation_error_multiple():
     v = SchemaValidator(
         {
             'type': 'new-class',
-            'class_type': MyModel,
+            'cls': MyModel,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,

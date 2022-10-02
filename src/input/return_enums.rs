@@ -55,6 +55,7 @@ fn validate_iter_to_vec<'a, 's>(
             Err(ValError::LineErrors(line_errors)) => {
                 errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
             }
+            Err(ValError::Omit) => (),
             Err(err) => return Err(err),
         }
     }
@@ -83,9 +84,9 @@ impl<'a> GenericCollection<'a> {
         input: &'data impl Input<'data>,
     ) -> ValResult<'data, Option<usize>> {
         let mut length: Option<usize> = None;
-        if let Some((min_items, max_items)) = size_range {
+        if let Some((min_length, max_length)) = size_range {
             let input_length = self.generic_len();
-            if let Some(min_length) = min_items {
+            if let Some(min_length) = min_length {
                 if input_length < min_length {
                     return Err(ValError::new(
                         ErrorKind::TooShort {
@@ -96,7 +97,7 @@ impl<'a> GenericCollection<'a> {
                     ));
                 }
             }
-            if let Some(max_length) = max_items {
+            if let Some(max_length) = max_length {
                 if input_length > max_length {
                     return Err(ValError::new(
                         ErrorKind::TooLong {

@@ -58,7 +58,7 @@ class TestModelClass:
                 'choices': [
                     {
                         'type': 'new-class',
-                        'class_type': self.ModelA,
+                        'cls': self.ModelA,
                         'schema': {
                             'type': 'typed-dict',
                             'return_fields_set': True,
@@ -67,7 +67,7 @@ class TestModelClass:
                     },
                     {
                         'type': 'new-class',
-                        'class_type': self.ModelB,
+                        'cls': self.ModelB,
                         'schema': {
                             'type': 'typed-dict',
                             'return_fields_set': True,
@@ -122,7 +122,7 @@ class TestModelClassSimilar:
                 'choices': [
                     {
                         'type': 'new-class',
-                        'class_type': self.ModelA,
+                        'cls': self.ModelA,
                         'schema': {
                             'type': 'typed-dict',
                             'return_fields_set': True,
@@ -131,14 +131,14 @@ class TestModelClassSimilar:
                     },
                     {
                         'type': 'new-class',
-                        'class_type': self.ModelB,
+                        'cls': self.ModelB,
                         'schema': {
                             'type': 'typed-dict',
                             'return_fields_set': True,
                             'fields': {
                                 'a': {'schema': {'type': 'int'}},
                                 'b': {'schema': {'type': 'str'}},
-                                'c': {'schema': {'type': 'float'}, 'default': 1.0},
+                                'c': {'schema': {'type': 'default', 'schema': {'type': 'float'}, 'default': 1.0}},
                             },
                         },
                     },
@@ -243,4 +243,22 @@ def test_strict_union():
     assert exc_info.value.errors() == [
         {'kind': 'bool_type', 'loc': ['bool'], 'message': 'Input should be a valid boolean', 'input_value': '123'},
         {'kind': 'int_type', 'loc': ['int'], 'message': 'Input should be a valid integer', 'input_value': '123'},
+    ]
+
+
+def test_custom_error():
+    v = SchemaValidator(
+        {
+            'type': 'union',
+            'choices': [{'type': 'str'}, {'type': 'bytes'}],
+            'custom_error': {'kind': 'my_error', 'message': 'Input should be a string or bytes'},
+        }
+    )
+    assert v.validate_python('hello') == 'hello'
+    assert v.validate_python(b'hello') == b'hello'
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(123)
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {'kind': 'my_error', 'loc': [], 'message': 'Input should be a string or bytes', 'input_value': 123}
     ]

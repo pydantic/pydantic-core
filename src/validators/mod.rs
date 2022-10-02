@@ -2,15 +2,18 @@ use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
 
+use ahash::AHashSet;
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyByteArray, PyBytes, PyDict, PyString};
 
+use crate::build_context::{extract_used_refs, BuildContext};
 use crate::build_tools::{py_error, SchemaDict, SchemaError};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult, ValidationError};
 use crate::input::{Input, JsonInput};
+use crate::questions::{Answers, Question};
 use crate::recursion_guard::RecursionGuard;
 
 mod any;
@@ -19,6 +22,7 @@ mod bool;
 mod bytes;
 mod call;
 mod callable;
+mod chain;
 mod date;
 mod datetime;
 mod dict;
@@ -40,6 +44,7 @@ mod timedelta;
 mod tuple;
 mod typed_dict;
 mod union;
+mod with_default;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
@@ -47,6 +52,7 @@ pub struct SchemaValidator {
     validator: CombinedValidator,
     slots: Vec<CombinedValidator>,
     schema: PyObject,
+    #[pyo3(get)]
     title: PyObject,
 }
 
@@ -68,7 +74,10 @@ impl SchemaValidator {
             .map_err(|e| SchemaError::from_val_error(py, e))?;
         let schema = schema_obj.as_ref(py);
 
-        let mut build_context = BuildContext::default();
+        let mut used_refs = AHashSet::new();
+        extract_used_refs(schema, &mut used_refs)?;
+        let mut build_context = BuildContext::new(used_refs);
+
         let mut validator = build_validator(schema, config, &mut build_context)?;
         validator.complete(&build_context)?;
         let slots = build_context.into_slots()?;
@@ -196,11 +205,12 @@ impl SchemaValidator {
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
-    pub fn __repr__(&self) -> String {
+    pub fn __repr__(&self, py: Python) -> String {
         format!(
-            "SchemaValidator(name={:?}, validator={:#?})",
-            self.validator.get_name(),
-            self.validator
+            "SchemaValidator(name={:?}, validator={:#?}, slots={:#?})",
+            self.title.extract::<&str>(py).unwrap(),
+            self.validator,
+            self.slots,
         )
     }
 }
@@ -218,7 +228,12 @@ impl SchemaValidator {
         py.run(code, None, Some(locals))?;
         let self_schema: &PyDict = locals.get_as_req(intern!(py, "self_schema"))?;
 
-        let mut build_context = BuildContext::default();
+        let mut used_refs = AHashSet::new();
+        // NOTE: we don't call `extract_used_refs` for performance reasons, if more recursive references
+        // are used, they would need to be manually added here.
+        used_refs.insert("root-schema".to_string());
+        let mut build_context = BuildContext::new(used_refs);
+
         let validator = match build_validator(self_schema, None, &mut build_context) {
             Ok(v) => v,
             Err(err) => return Err(SchemaError::new_err(format!("Error building self-schema:\n  {}", err))),
@@ -259,26 +274,30 @@ pub trait BuildValidator: Sized {
         -> PyResult<CombinedValidator>;
 }
 
-fn build_single_validator<'a, T: BuildValidator>(
+/// Logic to create a particular validator, called in the `validator_match` macro, then in turn by `build_validator`
+fn build_specific_validator<'a, T: BuildValidator>(
     val_type: &str,
     schema_dict: &'a PyDict,
     config: Option<&'a PyDict>,
     build_context: &mut BuildContext,
 ) -> PyResult<CombinedValidator> {
     let py = schema_dict.py();
-    let val: CombinedValidator = if let Some(schema_ref) = schema_dict.get_as::<String>(intern!(py, "ref"))? {
-        let slot_id = build_context.prepare_slot(schema_ref)?;
-        let inner_val = T::build(schema_dict, config, build_context)
-            .map_err(|err| SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", val_type, err)))?;
-        let name = inner_val.get_name().to_string();
-        build_context.complete_slot(slot_id, inner_val)?;
-        recursive::RecursiveContainerValidator::create(slot_id, name)
-    } else {
-        T::build(schema_dict, config, build_context)
-            .map_err(|err| SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", val_type, err)))?
-    };
+    if let Some(schema_ref) = schema_dict.get_as::<String>(intern!(py, "ref"))? {
+        // we only want to use a RecursiveContainerValidator if the ref is actually used,
+        // this means refs can always be set without having an effect on the validator which is generated
+        // unless it's used/referenced
+        if build_context.ref_used(&schema_ref) {
+            let answers = Answers::new(schema_dict)?;
+            let slot_id = build_context.prepare_slot(schema_ref, answers.clone())?;
+            let inner_val = T::build(schema_dict, config, build_context)?;
+            let name = inner_val.get_name().to_string();
+            build_context.complete_slot(slot_id, inner_val)?;
+            return Ok(recursive::RecursiveRefValidator::from_id(slot_id, name, answers));
+        }
+    }
 
-    Ok(val)
+    T::build(schema_dict, config, build_context)
+        .map_err(|err| SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", val_type, err)))
 }
 
 // macro to build the match statement for validator selection
@@ -286,7 +305,7 @@ macro_rules! validator_match {
     ($type:ident, $dict:ident, $config:ident, $build_context:ident, $($validator:path,)+) => {
         match $type {
             $(
-                <$validator>::EXPECTED_TYPE => build_single_validator::<$validator>($type, $dict, $config, $build_context),
+                <$validator>::EXPECTED_TYPE => build_specific_validator::<$validator>($type, $dict, $config, $build_context),
             )+
             _ => {
                 return py_error!(r#"Unknown schema type: "{}""#, $type)
@@ -300,16 +319,8 @@ pub fn build_validator<'a>(
     config: Option<&'a PyDict>,
     build_context: &mut BuildContext,
 ) -> PyResult<CombinedValidator> {
-    let py = schema.py();
-    let dict: &PyDict = match schema.cast_as() {
-        Ok(s) => s,
-        Err(_) => {
-            let dict = PyDict::new(py);
-            dict.set_item("type", schema)?;
-            dict
-        }
-    };
-    let type_: &str = dict.get_as_req(intern!(py, "type"))?;
+    let dict: &PyDict = schema.cast_as()?;
+    let type_: &str = dict.get_as_req(intern!(schema.py(), "type"))?;
     validator_match!(
         type_,
         dict,
@@ -369,6 +380,10 @@ pub fn build_validator<'a>(
         callable::CallableValidator,
         // arguments
         arguments::ArgumentsValidator,
+        // default value
+        with_default::WithDefaultValidator,
+        // chain validators
+        chain::ChainValidator,
     )
 }
 
@@ -450,7 +465,6 @@ pub enum CombinedValidator {
     // function call - validation around a function call
     FunctionCall(call::CallValidator),
     // recursive (self-referencing) models
-    Recursive(recursive::RecursiveContainerValidator),
     RecursiveRef(recursive::RecursiveRefValidator),
     // literals
     LiteralSingleString(literal::LiteralSingleStringValidator),
@@ -478,6 +492,10 @@ pub enum CombinedValidator {
     Callable(callable::CallableValidator),
     // arguments
     Arguments(arguments::ArgumentsValidator),
+    // default value
+    WithDefault(with_default::WithDefaultValidator),
+    // chain validators
+    Chain(chain::ChainValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
@@ -502,7 +520,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
     /// to do more, validators which don't know the question and have sub-validators
     /// should return the result them in an `...iter().all(|v| v.ask(question))` way, ONLY
     /// if they return the value of the sub-validator, e.g. functions, unions
-    fn ask(&self, _question: &str) -> bool {
+    fn ask(&self, _question: &Question) -> bool {
         false
     }
 
@@ -510,72 +528,5 @@ pub trait Validator: Send + Sync + Clone + Debug {
     /// it is used by `RecursiveRefValidator` to set its name
     fn complete(&mut self, _build_context: &BuildContext) -> PyResult<()> {
         Ok(())
-    }
-}
-
-/// `BuildContext` is used to store extra information while building validators,
-/// currently it just holds a vec "slots" which holds validators need to be accessed from multiple other validators
-/// and therefore can't be owned by them directly.
-#[derive(Default, Clone)]
-pub struct BuildContext {
-    slots: Vec<(String, Option<CombinedValidator>)>,
-}
-
-impl BuildContext {
-    /// First of two part process to add a new validator slot, we add the `slot_ref` to the array, but not the
-    /// actual `validator`, we can't add the validator until it's build.
-    /// We need the `id` to build the validator, hence this two-step process.
-    pub fn prepare_slot(&mut self, slot_ref: String) -> PyResult<usize> {
-        let id = self.slots.len();
-        self.slots.push((slot_ref, None));
-        Ok(id)
-    }
-
-    /// Second part of adding a validator - we update the slot to include a validator
-    pub fn complete_slot(&mut self, slot_id: usize, validator: CombinedValidator) -> PyResult<()> {
-        match self.slots.get(slot_id) {
-            Some((val_ref, _)) => {
-                self.slots[slot_id] = (val_ref.clone(), Some(validator));
-                Ok(())
-            }
-            None => py_error!("Slots Error: slot {} not found", slot_id),
-        }
-    }
-
-    /// find a slot by `slot_ref` - iterate over the slots until we find a matching reference - return the index
-    pub fn find_slot_id(&self, slot_ref: &str) -> PyResult<usize> {
-        let is_match = |(match_sr, _): &(String, Option<CombinedValidator>)| match_sr == slot_ref;
-        match self.slots.iter().position(is_match) {
-            Some(id) => Ok(id),
-            None => py_error!("Slots Error: ref '{}' not found", slot_ref),
-        }
-    }
-
-    /// find a validator by `slot_id` - this used in `Validator.complete`, specifically `RecursiveRefValidator`
-    /// to set its name
-    pub fn find_validator(&self, slot_id: usize) -> PyResult<&CombinedValidator> {
-        match self.slots.get(slot_id) {
-            Some((_, op_validator)) => match op_validator {
-                Some(ref validator) => Ok(validator),
-                None => py_error!("Slots Error: slot {} not yet filled", slot_id),
-            },
-            None => py_error!("Slots Error: slot {} not found", slot_id),
-        }
-    }
-
-    /// Move validators into a new vec which maintains the order of slots, `complete` is called on each validator
-    /// at the same time.
-    pub fn into_slots(self) -> PyResult<Vec<CombinedValidator>> {
-        let self_clone = self.clone();
-        self.slots
-            .into_iter()
-            .map(|(_, opt_validator)| match opt_validator {
-                Some(mut validator) => {
-                    validator.complete(&self_clone)?;
-                    Ok(validator)
-                }
-                None => py_error!("Slots Error: slot not yet filled"),
-            })
-            .collect()
     }
 }

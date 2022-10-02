@@ -7,10 +7,12 @@ use pyo3::prelude::*;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+mod build_context;
 mod build_tools;
 mod errors;
 mod input;
 mod lookup_key;
+mod questions;
 mod recursion_guard;
 mod validators;
 
@@ -32,6 +34,7 @@ pub fn get_version() -> String {
 #[pymodule]
 fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", get_version())?;
+    m.add("build_profile", env!("PROFILE"))?;
     m.add_class::<SchemaValidator>()?;
     m.add_class::<ValidationError>()?;
     m.add_class::<SchemaError>()?;

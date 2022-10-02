@@ -1,11 +1,29 @@
 [package]
 name = "pydantic-core"
-version = "0.1.0"
+version = "0.3.1"
 edition = "2021"
 license = "MIT"
 homepage = "https://github.com/pydantic/pydantic-core"
 repository = "https://github.com/pydantic/pydantic-core.git"
 readme = "README.md"
+include = [
+    "/pyproject.toml",
+    "/README.md",
+    "/LICENSE",
+    "/Makefile",
+    "/build.rs",
+    "/generate_self_schema.py",
+    "/rust-toolchain",
+    "/src",
+    "!/src/self_schema.py",
+    "/pydantic_core",
+    "/tests",
+    "/.cargo",
+    "!__pycache__",
+    "!tests/.hypothesis",
+    "!tests/.pytest_cache",
+    "!*.so",
+]
 
 [dependencies]
 pyo3 = "0.17.1"
@@ -17,8 +35,8 @@ enum_dispatch = "0.3.8"
 serde = "1.0.137"
 indexmap = "1.8.1"
 mimalloc = { version = "0.1.29", default-features = false, optional = true }
-speedate = "0.6.0"
-ahash = "0.7.6"
+speedate = "0.7.0"
+ahash = "0.8.0"
 nohash-hasher = "0.2.0"
 
 [lib]
