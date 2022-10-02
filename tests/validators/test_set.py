@@ -130,6 +130,8 @@ def test_set_multiple_errors():
         ({'min_length': 3}, {1, 2}, Err('Input should have at least 3 items, got 2 items [kind=too_short,')),
         ({'max_length': 3}, {1, 2, 3}, {1, 2, 3}),
         ({'max_length': 3}, {1, 2, 3, 4}, Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
+        ({'max_length': 3}, [1, 2, 3, 2, 3], {1, 2, 3}),
+        ({'max_length': 3}, [1, 2, 3, 2, 3, 4], Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
     ],
 )
 def test_set_kwargs(kwargs: Dict[str, Any], input_value, expected):

@@ -33,16 +33,20 @@ impl Validator for SetValidator {
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_set(extra.strict.unwrap_or(self.strict))?;
 
-        let length = seq.check_len(self.size_range, input, seq.generic_len())?;
-
         let output = match self.item_validator {
-            Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
+            Some(ref v) => seq.validate_to_vec(py, None, v, extra, slots, recursion_guard)?,
             None => match seq {
-                GenericCollection::Set(set) => return Ok(set.into_py(py)),
+                GenericCollection::Set(set) => {
+                    seq.check_len(self.size_range, input, set.len())?;
+                    return Ok(set.into_py(py));
+                }
                 _ => seq.to_vec(py),
             },
         };
-        Ok(PySet::new(py, &output)?.into_py(py))
+
+        let output_set = PySet::new(py, &output)?;
+        seq.check_len(self.size_range, input, output_set.len())?;
+        Ok(output_set.into_py(py))
     }
 
     fn get_name(&self) -> &str {

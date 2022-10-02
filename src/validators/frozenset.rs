@@ -33,16 +33,20 @@ impl Validator for FrozenSetValidator {
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_frozenset(extra.strict.unwrap_or(self.strict))?;
 
-        let length = seq.check_len(self.size_range, input, seq.generic_len())?;
-
         let output = match self.item_validator {
-            Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
+            Some(ref v) => seq.validate_to_vec(py, None, v, extra, slots, recursion_guard)?,
             None => match seq {
-                GenericCollection::FrozenSet(f_set) => return Ok(f_set.into_py(py)),
+                GenericCollection::FrozenSet(f_set) => {
+                    seq.check_len(self.size_range, input, f_set.len())?;
+                    return Ok(f_set.into_py(py));
+                }
                 _ => seq.to_vec(py),
             },
         };
-        Ok(PyFrozenSet::new(py, &output)?.into_py(py))
+
+        let output_frozen = PyFrozenSet::new(py, &output)?;
+        seq.check_len(self.size_range, input, output_frozen.len())?;
+        Ok(output_frozen.into_py(py))
     }
 
     fn get_name(&self) -> &str {
