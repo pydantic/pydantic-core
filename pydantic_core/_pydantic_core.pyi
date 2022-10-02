@@ -53,4 +53,4 @@ class PydanticCustomError(ValueError):
 
 class PydanticErrorKind(ValueError):
     kind: str
-    contect: 'dict[str | int]'
+    contect: 'dict[str, str | int] | None'
