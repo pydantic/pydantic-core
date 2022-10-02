@@ -66,7 +66,7 @@ impl Validator for ListValidator {
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_list(extra.strict.unwrap_or(self.strict))?;
 
-        let length = seq.check_len(self.size_range, input)?;
+        let length = seq.check_len(self.size_range, input, seq.generic_len())?;
 
         let output = match self.item_validator {
             Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
