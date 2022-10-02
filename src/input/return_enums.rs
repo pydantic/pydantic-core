@@ -82,33 +82,33 @@ impl<'a> GenericCollection<'a> {
         &'s self,
         size_range: Option<(Option<usize>, Option<usize>)>,
         input: &'data impl Input<'data>,
-        input_length: usize,
+        data_length: usize,
     ) -> ValResult<'data, Option<usize>> {
         let mut length: Option<usize> = None;
         if let Some((min_length, max_length)) = size_range {
             if let Some(min_length) = min_length {
-                if input_length < min_length {
+                if data_length < min_length {
                     return Err(ValError::new(
                         ErrorKind::TooShort {
                             min_length,
-                            input_length,
+                            input_length: data_length,
                         },
                         input,
                     ));
                 }
             }
             if let Some(max_length) = max_length {
-                if input_length > max_length {
+                if data_length > max_length {
                     return Err(ValError::new(
                         ErrorKind::TooLong {
                             max_length,
-                            input_length,
+                            input_length: data_length,
                         },
                         input,
                     ));
                 }
             }
-            length = Some(input_length);
+            length = Some(data_length);
         }
         Ok(length)
     }
