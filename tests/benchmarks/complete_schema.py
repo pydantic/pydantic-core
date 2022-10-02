@@ -217,16 +217,16 @@ def pydantic_model():
         field_datetime_con: datetime  # todo ge='2000-01-01T06:00:00', lt='2020-01-02T12:13:14'
         field_list_any: list
         field_list_str: list[str]
-        field_list_str_con: conlist(str, min_items=3, max_items=42)
+        field_list_str_con: conlist(str, min_length=3, max_length=42)
         field_set_any: set
         field_set_int: set[int]
-        field_set_int_con: conset(int, min_items=3, max_items=42)
+        field_set_int_con: conset(int, min_length=3, max_length=42)
         field_frozenset_any: frozenset
         field_frozenset_bytes: frozenset[bytes]
-        field_frozenset_bytes_con: confrozenset(bytes, min_items=3, max_items=42)
+        field_frozenset_bytes_con: confrozenset(bytes, min_length=3, max_length=42)
         field_tuple_var_len_any: tuple[Any, ...]
         field_tuple_var_len_float: tuple[float, ...]
-        field_tuple_var_len_float_con: tuple[float, ...]  # todo min_items=3, max_items=42
+        field_tuple_var_len_float_con: tuple[float, ...]  # todo min_length=3, max_length=42
         field_tuple_fix_len: tuple[str, int, float, bool]
         field_dict_any: dict
         field_dict_str_float: dict[str, float]
