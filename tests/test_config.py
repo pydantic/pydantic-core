@@ -249,13 +249,13 @@ def test_allow_inf_nan(config: CoreConfig, float_field_schema, input_value, expe
     [
         ({}, {'schema': {'type': 'str'}}, None),
         ({'frozen': False}, {'schema': {'type': 'str'}}, None),
-        ({'frozen': True}, {'schema': {'type': 'str'}}, Err("Field is frozen [kind=frozen, input_value='y',")),
+        ({'frozen': True}, {'schema': {'type': 'str'}}, Err("Model is frozen [kind=frozen_model, input_value='y',")),
         # field `frozen` (if set) should have priority over global config
         ({'frozen': True}, {'schema': {'type': 'str'}, 'frozen': False}, None),
         (
             {'frozen': False},
             {'schema': {'type': 'str'}, 'frozen': True},
-            Err("Field is frozen [kind=frozen, input_value='y',"),
+            Err("Field is frozen [kind=frozen_field, input_value='y',"),
         ),
     ],
 )

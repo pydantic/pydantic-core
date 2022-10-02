@@ -25,7 +25,7 @@ struct TypedDictField {
     name_pystring: Py<PyString>,
     required: bool,
     validator: CombinedValidator,
-    frozen: bool,
+    frozen: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -35,6 +35,7 @@ pub struct TypedDictValidator {
     forbid_extra: bool,
     extra_validator: Option<Box<CombinedValidator>>,
     strict: bool,
+    frozen: bool,
     from_attributes: bool,
     return_fields_set: bool,
 }
@@ -140,7 +141,7 @@ impl BuildValidator for TypedDictValidator {
                 name_pystring: PyString::intern(py, field_name).into(),
                 validator,
                 required,
-                frozen: schema_or_config_same(field_info, config, intern!(py, "frozen"))?.unwrap_or(false),
+                frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?,
             });
         }
 
@@ -150,6 +151,7 @@ impl BuildValidator for TypedDictValidator {
             forbid_extra,
             extra_validator,
             strict,
+            frozen: config.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
             from_attributes,
             return_fields_set,
         }
@@ -383,10 +385,20 @@ impl TypedDictValidator {
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field) {
-            if field.frozen {
-                Err(ValError::new_with_loc(ErrorKind::Frozen, input, field.name.to_string()))
-            } else {
-                prepare_result(field.validator.validate(py, input, extra, slots, recursion_guard))
+            match (field.frozen, self.frozen) {
+                // if frozen is set on a field, it takes priority on model frozen value
+                (Some(true), _) => Err(ValError::new_with_loc(
+                    ErrorKind::FrozenField,
+                    input,
+                    field.name.to_string(),
+                )),
+                // if frozen is not set on a field, model frozen value is used
+                (None, true) => Err(ValError::new_with_loc(
+                    ErrorKind::FrozenModel,
+                    input,
+                    field.name.to_string(),
+                )),
+                _ => prepare_result(field.validator.validate(py, input, extra, slots, recursion_guard)),
             }
         } else if self.check_extra && !self.forbid_extra {
             // this is the "allow" case of extra_behavior
