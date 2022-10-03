@@ -39,7 +39,7 @@ impl Validator for SetValidator {
             Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
             None => match seq {
                 GenericCollection::Set(set) => return Ok(set.into_py(py)),
-                _ => seq.to_vec(py),
+                _ => seq.to_vec(py)?,
             },
         };
         Ok(PySet::new(py, &output)?.into_py(py))

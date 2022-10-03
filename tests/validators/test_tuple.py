@@ -1,5 +1,6 @@
 import platform
 import re
+from collections import deque
 from typing import Any, Dict, Type
 
 import pytest
@@ -106,6 +107,7 @@ def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
     [
         ((1, 2, '3'), (1, 2, 3)),
         ([1, 2, '3'], (1, 2, 3)),
+        (deque((1, 2, '3')), (1, 2, 3)),
         pytest.param(
             {1: 10, 2: 20, '3': '30'}.keys(),
             (1, 2, 3),
@@ -124,6 +126,7 @@ def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
         ({1, 2, '3'}, Err('Input should be a valid tuple [kind=tuple_type,')),
         (frozenset([1, 2, '3']), Err('Input should be a valid tuple [kind=tuple_type,')),
     ],
+    ids=repr,
 )
 def test_tuple_validate(input_value, expected, mode, items):
     v = SchemaValidator({'type': 'tuple', 'mode': mode, 'items_schema': items})
@@ -373,7 +376,24 @@ def test_tuple_fix_error():
     assert exc_info.value.errors() == [{'kind': 'missing', 'loc': [1], 'message': 'Field required', 'input_value': [1]}]
 
 
-def test_tuple_fix_extra():
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ([1, 'a'], (1, 'a')),
+        ((1, 'a'), (1, 'a')),
+        ((1, 'a', 'b'), (1, 'a', 'b')),
+        ([1, 'a', 'b', 'c', 'd'], (1, 'a', 'b', 'c', 'd')),
+        (deque([1, 'a', 'b', 'c', 'd']), (1, 'a', 'b', 'c', 'd')),
+        (
+            [1],
+            Err(
+                'kind=missing',
+                errors=[{'kind': 'missing', 'loc': [1], 'message': 'Field required', 'input_value': [1]}],
+            ),
+        ),
+    ],
+)
+def test_tuple_fix_extra(input_value, expected, cache):
     v = SchemaValidator(
         {
             'type': 'tuple',
@@ -382,13 +402,13 @@ def test_tuple_fix_extra():
             'extra_schema': {'type': 'str'},
         }
     )
-    assert v.validate_python([1, 'a']) == (1, 'a')
-    assert v.validate_python((1, 'a')) == (1, 'a')
-    assert v.validate_python((1, 'a', 'b')) == (1, 'a', 'b')
-    assert v.validate_python([1, 'a', 'b', 'c', 'd']) == (1, 'a', 'b', 'c', 'd')
-    with pytest.raises(ValidationError) as exc_info:
-        v.validate_python([1])
-    assert exc_info.value.errors() == [{'kind': 'missing', 'loc': [1], 'message': 'Field required', 'input_value': [1]}]
+
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_python(input_value)
+        assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_python(input_value) == expected
 
 
 def test_tuple_fix_extra_any():

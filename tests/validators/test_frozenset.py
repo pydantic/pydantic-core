@@ -1,5 +1,6 @@
 import platform
 import re
+from collections import deque
 from typing import Any, Dict
 
 import pytest
@@ -69,6 +70,7 @@ def test_frozenset_no_validators_both(py_and_json: PyAndJson, input_value, expec
         ([1, 2, 3, 2, 3], frozenset({1, 2, 3})),
         ([], frozenset()),
         ((1, 2, 3, 2, 3), frozenset({1, 2, 3})),
+        (deque((1, 2, '3')), frozenset({1, 2, 3})),
         ((), frozenset()),
         (frozenset([1, 2, 3, 2, 3]), frozenset({1, 2, 3})),
         pytest.param(

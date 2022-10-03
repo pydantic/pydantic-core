@@ -1,5 +1,6 @@
 import platform
 import re
+from collections import deque
 from typing import Any, Dict
 
 import pytest
@@ -43,6 +44,7 @@ def test_list_strict():
     [
         ([1, 2, '3'], [1, 2, 3]),
         ((1, 2, '3'), [1, 2, 3]),
+        (deque((1, 2, '3')), [1, 2, 3]),
         ({1, 2, '3'}, Err('Input should be a valid list/array [kind=list_type,')),
         (frozenset({1, 2, '3'}), Err('Input should be a valid list/array [kind=list_type,')),
         pytest.param(

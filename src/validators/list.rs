@@ -72,7 +72,7 @@ impl Validator for ListValidator {
             Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
             None => match seq {
                 GenericCollection::List(list) => return Ok(list.into_py(py)),
-                _ => seq.to_vec(py),
+                _ => seq.to_vec(py)?,
             },
         };
         Ok(output.into_py(py))

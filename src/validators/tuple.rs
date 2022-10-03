@@ -58,7 +58,7 @@ impl Validator for TupleVariableValidator {
             Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
             None => match seq {
                 GenericCollection::Tuple(tuple) => return Ok(tuple.into_py(py)),
-                _ => seq.to_vec(py),
+                _ => seq.to_vec(py)?,
             },
         };
         Ok(PyTuple::new(py, &output).into_py(py))
@@ -126,10 +126,9 @@ impl Validator for TuplePositionalValidator {
         let mut output: Vec<PyObject> = Vec::with_capacity(expected_length);
         let mut errors: Vec<ValLineError> = Vec::new();
         macro_rules! iter {
-            ($collection:expr) => {{
-                let mut iter = $collection.iter();
+            ($collection_iter:expr) => {{
                 for (index, validator) in self.items_validators.iter().enumerate() {
-                    match iter.next() {
+                    match $collection_iter.next() {
                         Some(item) => match validator.validate(py, item, extra, slots, recursion_guard) {
                             Ok(item) => output.push(item),
                             Err(ValError::LineErrors(line_errors)) => {
@@ -150,7 +149,7 @@ impl Validator for TuplePositionalValidator {
                         }
                     }
                 }
-                for (index, item) in iter.enumerate() {
+                for (index, item) in $collection_iter.enumerate() {
                     match self.extra_validator {
                         Some(ref extra_validator) => {
                             match extra_validator.validate(py, item, extra, slots, recursion_guard) {
@@ -170,7 +169,7 @@ impl Validator for TuplePositionalValidator {
                             errors.push(ValLineError::new(
                                 ErrorKind::TooLong {
                                     max_length: expected_length,
-                                    input_length: collection.generic_len(),
+                                    input_length: collection.generic_len()?,
                                 },
                                 input,
                             ));
@@ -182,9 +181,23 @@ impl Validator for TuplePositionalValidator {
             }};
         }
         match collection {
-            GenericCollection::List(collection) => iter!(collection),
-            GenericCollection::Tuple(collection) => iter!(collection),
-            GenericCollection::JsonArray(collection) => iter!(collection),
+            GenericCollection::List(collection) => {
+                let mut iter = collection.iter();
+                iter!(iter)
+            }
+            GenericCollection::Tuple(collection) => {
+                let mut iter = collection.iter();
+                iter!(iter)
+            }
+            GenericCollection::PyAny(collection) => {
+                let vec: Vec<&PyAny> = collection.iter()?.collect::<PyResult<_>>()?;
+                let mut iter = vec.into_iter();
+                iter!(iter)
+            }
+            GenericCollection::JsonArray(collection) => {
+                let mut iter = collection.iter();
+                iter!(iter)
+            }
             _ => unreachable!(),
         }
         if errors.is_empty() {

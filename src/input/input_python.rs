@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::str::from_utf8;
 
 use pyo3::exceptions::PyAttributeError;
+use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList, PyMapping,
@@ -293,6 +294,8 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Some(list) = extract_gen_dict!(PyList, self) {
             Ok(list.into())
+        } else if is_deque(self) {
+            Ok(self.into())
         } else {
             Err(ValError::new(ErrorKind::ListType, self))
         }
@@ -309,6 +312,8 @@ impl<'a> Input<'a> for PyAny {
                 .collect::<PyResult<Vec<_>>>()
                 .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
             Ok(PyList::new(self.py(), vec).into())
+        } else if is_deque(self) {
+            Ok(self.into())
         } else {
             Err(ValError::new(ErrorKind::ListType, self))
         }
@@ -330,6 +335,8 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Some(tuple) = extract_gen_dict!(PyTuple, self) {
             Ok(tuple.into())
+        } else if is_deque(self) {
+            Ok(self.into())
         } else {
             Err(ValError::new(ErrorKind::TupleType, self))
         }
@@ -346,6 +353,8 @@ impl<'a> Input<'a> for PyAny {
                 .collect::<PyResult<Vec<_>>>()
                 .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
             Ok(PyTuple::new(self.py(), vec).into())
+        } else if is_deque(self) {
+            Ok(self.into())
         } else {
             Err(ValError::new(ErrorKind::TupleType, self))
         }
@@ -371,6 +380,8 @@ impl<'a> Input<'a> for PyAny {
             Ok(frozen_set.into())
         } else if let Some(tuple) = extract_gen_dict!(PyTuple, self) {
             Ok(tuple.into())
+        } else if is_deque(self) {
+            Ok(self.into())
         } else {
             Err(ValError::new(ErrorKind::SetType, self))
         }
@@ -391,6 +402,8 @@ impl<'a> Input<'a> for PyAny {
                 .collect::<PyResult<Vec<_>>>()
                 .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
             Ok(PyTuple::new(self.py(), vec).into())
+        } else if is_deque(self) {
+            Ok(self.into())
         } else {
             Err(ValError::new(ErrorKind::SetType, self))
         }
@@ -416,6 +429,8 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Some(tuple) = extract_gen_dict!(PyTuple, self) {
             Ok(tuple.into())
+        } else if is_deque(self) {
+            Ok(self.into())
         } else {
             Err(ValError::new(ErrorKind::FrozenSetType, self))
         }
@@ -436,6 +451,8 @@ impl<'a> Input<'a> for PyAny {
                 .collect::<PyResult<Vec<_>>>()
                 .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
             Ok(PyTuple::new(self.py(), vec).into())
+        } else if is_deque(self) {
+            Ok(self.into())
         } else {
             Err(ValError::new(ErrorKind::FrozenSetType, self))
         }
@@ -622,4 +639,18 @@ fn maybe_as_string(v: &PyAny, unicode_error: ErrorKind) -> ValResult<Option<Cow<
     } else {
         Ok(None)
     }
+}
+
+static DEQUE_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+
+fn is_deque(v: &PyAny) -> bool {
+    let py = v.py();
+    let deque_type = DEQUE_TYPE.get_or_init(py, || get_deque_type(py).unwrap()).as_ref(py);
+    v.is_instance(deque_type).unwrap_or(false)
+}
+
+fn get_deque_type(py: Python) -> PyResult<Py<PyType>> {
+    let deque_obj = py.import("collections")?.getattr("deque")?;
+    let deque_type: &PyType = deque_obj.cast_as()?;
+    Ok(deque_type.into())
 }

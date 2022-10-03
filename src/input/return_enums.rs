@@ -19,6 +19,7 @@ pub enum GenericCollection<'a> {
     Tuple(&'a PyTuple),
     Set(&'a PySet),
     FrozenSet(&'a PyFrozenSet),
+    PyAny(&'a PyAny),
     JsonArray(&'a [JsonInput]),
 }
 
@@ -35,6 +36,7 @@ derive_from!(GenericCollection, List, PyList);
 derive_from!(GenericCollection, Tuple, PyTuple);
 derive_from!(GenericCollection, Set, PySet);
 derive_from!(GenericCollection, FrozenSet, PyFrozenSet);
+derive_from!(GenericCollection, PyAny, PyAny);
 derive_from!(GenericCollection, JsonArray, JsonArray);
 derive_from!(GenericCollection, JsonArray, [JsonInput]);
 
@@ -68,13 +70,14 @@ fn validate_iter_to_vec<'a, 's>(
 }
 
 impl<'a> GenericCollection<'a> {
-    pub fn generic_len(&self) -> usize {
+    pub fn generic_len(&self) -> PyResult<usize> {
         match self {
-            Self::List(v) => v.len(),
-            Self::Tuple(v) => v.len(),
-            Self::Set(v) => v.len(),
-            Self::FrozenSet(v) => v.len(),
-            Self::JsonArray(v) => v.len(),
+            Self::List(v) => Ok(v.len()),
+            Self::Tuple(v) => Ok(v.len()),
+            Self::Set(v) => Ok(v.len()),
+            Self::FrozenSet(v) => Ok(v.len()),
+            Self::PyAny(v) => v.len(),
+            Self::JsonArray(v) => Ok(v.len()),
         }
     }
 
@@ -85,7 +88,7 @@ impl<'a> GenericCollection<'a> {
     ) -> ValResult<'data, Option<usize>> {
         let mut length: Option<usize> = None;
         if let Some((min_length, max_length)) = size_range {
-            let input_length = self.generic_len();
+            let input_length = self.generic_len()?;
             if let Some(min_length) = min_length {
                 if input_length < min_length {
                     return Err(ValError::new(
@@ -122,7 +125,10 @@ impl<'a> GenericCollection<'a> {
         slots: &'a [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'a, Vec<PyObject>> {
-        let length = length.unwrap_or_else(|| self.generic_len());
+        let length = match length {
+            Some(length) => length,
+            None => self.generic_len()?,
+        };
         match self {
             Self::List(collection) => {
                 validate_iter_to_vec(py, collection.iter(), length, validator, extra, slots, recursion_guard)
@@ -136,19 +142,41 @@ impl<'a> GenericCollection<'a> {
             Self::FrozenSet(collection) => {
                 validate_iter_to_vec(py, collection.iter(), length, validator, extra, slots, recursion_guard)
             }
+            Self::PyAny(collection) => {
+                let iter = collection.iter()?;
+                let mut output: Vec<PyObject> = Vec::with_capacity(length);
+                let mut errors: Vec<ValLineError> = Vec::new();
+                for (index, item) in iter.enumerate() {
+                    match validator.validate(py, item?, extra, slots, recursion_guard) {
+                        Ok(item) => output.push(item),
+                        Err(ValError::LineErrors(line_errors)) => {
+                            errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
+                        }
+                        Err(ValError::Omit) => (),
+                        Err(err) => return Err(err),
+                    }
+                }
+
+                if errors.is_empty() {
+                    Ok(output)
+                } else {
+                    Err(ValError::LineErrors(errors))
+                }
+            }
             Self::JsonArray(collection) => {
                 validate_iter_to_vec(py, collection.iter(), length, validator, extra, slots, recursion_guard)
             }
         }
     }
 
-    pub fn to_vec(&self, py: Python) -> Vec<PyObject> {
+    pub fn to_vec(&self, py: Python) -> PyResult<Vec<PyObject>> {
         match self {
-            Self::List(collection) => collection.iter().map(|i| i.to_object(py)).collect(),
-            Self::Tuple(collection) => collection.iter().map(|i| i.to_object(py)).collect(),
-            Self::Set(collection) => collection.iter().map(|i| i.to_object(py)).collect(),
-            Self::FrozenSet(collection) => collection.iter().map(|i| i.to_object(py)).collect(),
-            Self::JsonArray(collection) => collection.iter().map(|i| i.to_object(py)).collect(),
+            Self::List(collection) => Ok(collection.iter().map(|i| i.to_object(py)).collect()),
+            Self::Tuple(collection) => Ok(collection.iter().map(|i| i.to_object(py)).collect()),
+            Self::Set(collection) => Ok(collection.iter().map(|i| i.to_object(py)).collect()),
+            Self::FrozenSet(collection) => Ok(collection.iter().map(|i| i.to_object(py)).collect()),
+            Self::PyAny(collection) => collection.iter()?.map(|i| Ok(i?.to_object(py))).collect(),
+            Self::JsonArray(collection) => Ok(collection.iter().map(|i| i.to_object(py)).collect()),
         }
     }
 }

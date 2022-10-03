@@ -39,7 +39,7 @@ impl Validator for FrozenSetValidator {
             Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
             None => match seq {
                 GenericCollection::FrozenSet(f_set) => return Ok(f_set.into_py(py)),
-                _ => seq.to_vec(py),
+                _ => seq.to_vec(py)?,
             },
         };
         Ok(PyFrozenSet::new(py, &output)?.into_py(py))
