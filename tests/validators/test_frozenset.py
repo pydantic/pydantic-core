@@ -228,7 +228,7 @@ def test_frozenset_as_dict_keys(py_and_json: PyAndJson):
 
 
 def test_repr():
-    v = SchemaValidator({'type': 'frozenset', 'strict': True, 'min_items': 42})
+    v = SchemaValidator({'type': 'frozenset', 'strict': True, 'min_length': 42})
     assert plain_repr(v) == (
         'SchemaValidator('
         'name="frozenset[any]",'

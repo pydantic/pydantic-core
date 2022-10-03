@@ -46,7 +46,6 @@ Source = 'https://github.com/pydantic/pydantic-core'
 
 [tool.maturin]
 bindings = 'pyo3'
-sdist-include = ['src/self_schema.py']
 
 [tool.pytest.ini_options]
 testpaths = 'tests'
@@ -71,7 +70,6 @@ precision = 2
 exclude_lines = [
     'pragma: no cover',
     'raise NotImplementedError',
-    'raise NotImplemented',
     'if TYPE_CHECKING:',
     '@overload',
 ]
