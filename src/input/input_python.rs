@@ -636,12 +636,13 @@ static DEQUE_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 
 fn is_deque(v: &PyAny) -> bool {
     let py = v.py();
-    let deque_type = DEQUE_TYPE.get_or_init(py, || get_deque_type(py).unwrap()).as_ref(py);
+    let deque_type = DEQUE_TYPE
+        .get_or_init(py, || import_type(py, "collections", "deque").unwrap())
+        .as_ref(py);
     v.is_instance(deque_type).unwrap_or(false)
 }
 
-fn get_deque_type(py: Python) -> PyResult<Py<PyType>> {
-    let deque_obj = py.import("collections")?.getattr("deque")?;
-    let deque_type: &PyType = deque_obj.cast_as()?;
-    Ok(deque_type.into())
+fn import_type(py: Python, module: &str, attr: &str) -> PyResult<Py<PyType>> {
+    let obj = py.import(module)?.getattr(attr)?;
+    Ok(obj.cast_as::<PyType>()?.into())
 }

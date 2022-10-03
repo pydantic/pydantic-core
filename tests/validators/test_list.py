@@ -20,6 +20,7 @@ from ..conftest import Err, PyAndJson
         (5, Err('Input should be a valid list/array [kind=list_type, input_value=5, input_type=int]')),
         ('5', Err("Input should be a valid list/array [kind=list_type, input_value='5', input_type=str]")),
     ],
+    ids=repr,
 )
 def test_list_json(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json({'type': 'list', 'items_schema': {'type': 'int'}})
@@ -71,7 +72,10 @@ def gen_ints():
         ),
         ({1: 10, 2: 20, '3': '30'}, Err('Input should be a valid list/array [kind=list_type,')),
         ((x for x in [1, 2, '3']), [1, 2, 3]),
+        ('456', Err("Input should be a valid list/array [kind=list_type, input_value='456', input_type=str]")),
+        (b'789', Err("Input should be a valid list/array [kind=list_type, input_value=b'789', input_type=bytes]")),
     ],
+    ids=repr,
 )
 def test_list_int(input_value, expected):
     v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
