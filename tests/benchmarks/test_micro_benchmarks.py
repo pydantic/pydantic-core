@@ -10,8 +10,13 @@ from typing import Dict, FrozenSet, List, Optional, Set, Union
 
 import pytest
 
-from generate_self_schema import core_schema
-from pydantic_core import PydanticValueError, SchemaValidator, ValidationError, ValidationError as CoreValidationError
+from pydantic_core import (
+    PydanticValueError,
+    SchemaValidator,
+    ValidationError,
+    ValidationError as CoreValidationError,
+    core_schema,
+)
 
 if os.getenv('BENCHMARK_VS_PYDANTIC'):
     try:
