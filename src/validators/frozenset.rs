@@ -46,9 +46,9 @@ impl Validator for FrozenSetValidator {
             },
         };
         let final_set = PyFrozenSet::new(py, &output)?;
-        if let Some((min_items, max_items)) = self.size_range {
+        if let Some((min_length, max_length)) = self.size_range {
             let input_length = final_set.len();
-            if let Some(min_length) = min_items {
+            if let Some(min_length) = min_length {
                 if input_length < min_length {
                     return Err(ValError::new(
                         ErrorKind::TooShort {
@@ -59,7 +59,7 @@ impl Validator for FrozenSetValidator {
                     ));
                 }
             }
-            if let Some(max_length) = max_items {
+            if let Some(max_length) = max_length {
                 if input_length > max_length {
                     return Err(ValError::new(
                         ErrorKind::TooLong {
