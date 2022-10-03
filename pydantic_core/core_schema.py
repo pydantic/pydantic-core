@@ -301,7 +301,7 @@ class ListSchema(TypedDict, total=False):
     min_length: int
     max_length: int
     strict: bool
-    allow_iter: bool
+    allow_any_iter: bool
     ref: str
 
 

@@ -300,8 +300,8 @@ def test_sequence(MySequence):
     ]
 
 
-def test_sequence_allow_iter(MySequence):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_iter': True})
+def test_sequence_allow_any_iter(MySequence):
+    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_any_iter': True})
     assert v.validate_python([1, 2, 3]) == [1, 2, 3]
     assert v.validate_python((1, 2, 3)) == [1, 2, 3]
     assert v.validate_python(MySequence()) == [1, 2, 3]
@@ -331,7 +331,7 @@ def test_bad_iter():
             else:
                 raise RuntimeError('broken')
 
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_iter': True})
+    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_any_iter': True})
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(BadIter())
     # insert_assert(exc_info.value.errors())

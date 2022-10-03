@@ -149,7 +149,7 @@ impl<'a> Input<'a> for JsonInput {
         self.validate_dict(false)
     }
 
-    fn validate_list(&'a self, _strict: bool, _allow_iter: bool) -> ValResult<GenericCollection<'a>> {
+    fn validate_list(&'a self, _strict: bool, _allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
         match self {
             JsonInput::Array(a) => Ok(a.into()),
             _ => Err(ValError::new(ErrorKind::ListType, self)),
@@ -328,7 +328,7 @@ impl<'a> Input<'a> for String {
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validate_list(&'a self, _strict: bool, _allow_iter: bool) -> ValResult<GenericCollection<'a>> {
+    fn validate_list(&'a self, _strict: bool, _allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
         Err(ValError::new(ErrorKind::ListType, self))
     }
     #[cfg_attr(has_no_coverage, no_coverage)]

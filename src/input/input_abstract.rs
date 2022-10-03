@@ -126,16 +126,16 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         self.validate_dict(strict)
     }
 
-    fn validate_list(&'a self, strict: bool, allow_iter: bool) -> ValResult<GenericCollection<'a>> {
-        if strict && !allow_iter {
+    fn validate_list(&'a self, strict: bool, allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
+        if strict && !allow_any_iter {
             self.strict_list()
         } else {
-            self.lax_list(allow_iter)
+            self.lax_list(allow_any_iter)
         }
     }
     fn strict_list(&'a self) -> ValResult<GenericCollection<'a>>;
     #[cfg_attr(has_no_coverage, no_coverage)]
-    fn lax_list(&'a self, _allow_iter: bool) -> ValResult<GenericCollection<'a>> {
+    fn lax_list(&'a self, _allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
         self.strict_list()
     }
 

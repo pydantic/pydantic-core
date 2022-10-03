@@ -11,7 +11,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 #[derive(Debug, Clone)]
 pub struct ListValidator {
     strict: bool,
-    allow_iter: bool,
+    allow_any_iter: bool,
     item_validator: Option<Box<CombinedValidator>>,
     size_range: Option<(Option<usize>, Option<usize>)>,
     name: String,
@@ -70,7 +70,7 @@ impl BuildValidator for ListValidator {
         let max_length = schema.get_as(pyo3::intern!(py, "max_length"))?;
         Ok(Self {
             strict: crate::build_tools::is_strict(schema, config)?,
-            allow_iter: schema.get_as(pyo3::intern!(py, "allow_iter"))?.unwrap_or(false),
+            allow_any_iter: schema.get_as(pyo3::intern!(py, "allow_any_iter"))?.unwrap_or(false),
             item_validator,
             size_range: match min_length.is_some() || max_length.is_some() {
                 true => Some((min_length, max_length)),
@@ -91,7 +91,7 @@ impl Validator for ListValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let seq = input.validate_list(extra.strict.unwrap_or(self.strict), self.allow_iter)?;
+        let seq = input.validate_list(extra.strict.unwrap_or(self.strict), self.allow_any_iter)?;
 
         let length = seq.check_len(self.size_range, input)?;
 
