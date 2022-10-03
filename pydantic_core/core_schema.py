@@ -415,6 +415,12 @@ def frozen_set_schema(
     )
 
 
+class GeneratorSchema(TypedDict, total=False):
+    type: Required[Literal['generator']]
+    items_schema: CoreSchema  # default: AnySchema
+    ref: str
+
+
 class DictSchema(TypedDict, total=False):
     type: Required[Literal['dict']]
     keys_schema: CoreSchema  # default: AnySchema
@@ -865,6 +871,7 @@ CoreSchema = Union[
     TupleVariableSchema,
     SetSchema,
     FrozenSetSchema,
+    GeneratorSchema,
     DictSchema,
     FunctionSchema,
     FunctionWrapSchema,

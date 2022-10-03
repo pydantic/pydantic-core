@@ -137,6 +137,10 @@ pub enum ErrorKind {
     #[strum(message = "Input should be a valid set")]
     SetType,
     // ---------------------
+    // set errors
+    #[strum(message = "Input should be iterable")]
+    IterableType,
+    // ---------------------
     // bool errors
     #[strum(message = "Input should be a valid boolean")]
     BoolType,

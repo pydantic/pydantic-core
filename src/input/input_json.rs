@@ -1,4 +1,5 @@
 use crate::errors::{ErrorKind, InputValue, LocItem, ValError, ValResult};
+use crate::input::GenericIterator;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
@@ -196,6 +197,13 @@ impl<'a> Input<'a> for JsonInput {
         self.validate_frozenset(false)
     }
 
+    fn validate_iter(&self) -> ValResult<GenericIterator> {
+        match self {
+            JsonInput::Array(a) => Ok(a.clone().into()),
+            _ => Err(ValError::new(ErrorKind::IterableType, self)),
+        }
+    }
+
     fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
         match self {
             JsonInput::String(v) => bytes_as_date(self, v.as_bytes()),
@@ -361,6 +369,10 @@ impl<'a> Input<'a> for String {
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
         self.validate_frozenset(false)
+    }
+    fn validate_iter(&self) -> ValResult<GenericIterator> {
+        // TODO allow strings?
+        Err(ValError::new(ErrorKind::IterableType, self))
     }
 
     fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {

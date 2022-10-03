@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTuple};
+use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyIterator, PyList, PySet, PyString, PyTuple};
 
 use crate::errors::{ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::recursion_guard::RecursionGuard;
@@ -163,6 +163,24 @@ pub enum GenericMapping<'a> {
 derive_from!(GenericMapping, PyDict, PyDict);
 derive_from!(GenericMapping, PyGetAttr, PyAny);
 derive_from!(GenericMapping, JsonObject, JsonObject);
+
+#[derive(Debug, Clone)]
+pub enum GenericIterator {
+    PyIterator(Py<PyIterator>),
+    JsonArray(JsonArray),
+}
+
+impl From<Py<PyIterator>> for GenericIterator {
+    fn from(s: Py<PyIterator>) -> Self {
+        Self::PyIterator(s)
+    }
+}
+
+impl From<JsonArray> for GenericIterator {
+    fn from(s: JsonArray) -> Self {
+        Self::JsonArray(s)
+    }
+}
 
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PyArgs<'a> {
