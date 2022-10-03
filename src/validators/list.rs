@@ -11,6 +11,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 #[derive(Debug, Clone)]
 pub struct ListValidator {
     strict: bool,
+    allow_iter: bool,
     item_validator: Option<Box<CombinedValidator>>,
     size_range: Option<(Option<usize>, Option<usize>)>,
     name: String,
@@ -52,7 +53,33 @@ pub(crate) use generic_collection_build;
 
 impl BuildValidator for ListValidator {
     const EXPECTED_TYPE: &'static str = "list";
-    generic_collection_build!();
+
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext,
+    ) -> PyResult<CombinedValidator> {
+        let py = schema.py();
+        let item_validator = match schema.get_item(pyo3::intern!(py, "items_schema")) {
+            Some(d) => Some(Box::new(build_validator(d, config, build_context)?)),
+            None => None,
+        };
+        let inner_name = item_validator.as_ref().map(|v| v.get_name()).unwrap_or("any");
+        let name = format!("{}[{}]", Self::EXPECTED_TYPE, inner_name);
+        let min_length = schema.get_as(pyo3::intern!(py, "min_length"))?;
+        let max_length = schema.get_as(pyo3::intern!(py, "max_length"))?;
+        Ok(Self {
+            strict: crate::build_tools::is_strict(schema, config)?,
+            allow_iter: schema.get_as(pyo3::intern!(py, "allow_iter"))?.unwrap_or(false),
+            item_validator,
+            size_range: match min_length.is_some() || max_length.is_some() {
+                true => Some((min_length, max_length)),
+                false => None,
+            },
+            name,
+        }
+        .into())
+    }
 }
 
 impl Validator for ListValidator {
@@ -64,7 +91,7 @@ impl Validator for ListValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let seq = input.validate_list(extra.strict.unwrap_or(self.strict))?;
+        let seq = input.validate_list(extra.strict.unwrap_or(self.strict), self.allow_iter)?;
 
         let length = seq.check_len(self.size_range, input)?;
 

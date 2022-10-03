@@ -266,7 +266,8 @@ def test_list_from_dict_items(input_value, items_schema, expected):
     assert output == expected
 
 
-def test_sequence():
+@pytest.fixture(scope='session', name='MySequence')
+def my_sequence():
     class MySequence(Sequence):
         def __init__(self):
             self._data = [1, 2, 3]
@@ -281,7 +282,10 @@ def test_sequence():
             return self._data.count(value)
 
     assert isinstance(MySequence(), Sequence)
+    return MySequence
 
+
+def test_sequence(MySequence):
     v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(MySequence())
@@ -292,5 +296,50 @@ def test_sequence():
             'loc': [],
             'message': 'Input should be a valid list/array',
             'input_value': IsInstance(MySequence),
+        }
+    ]
+
+
+def test_sequence_allow_iter(MySequence):
+    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_iter': True})
+    assert v.validate_python([1, 2, 3]) == [1, 2, 3]
+    assert v.validate_python((1, 2, 3)) == [1, 2, 3]
+    assert v.validate_python(MySequence()) == [1, 2, 3]
+    assert v.validate_python(gen_ints()) == [1, 2, 3]
+    assert v.validate_python({1: 2, 3: 4}) == [1, 3]
+    assert v.validate_python('123') == [1, 2, 3]
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(123)
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {'kind': 'list_type', 'loc': [], 'message': 'Input should be a valid list/array', 'input_value': 123}
+    ]
+
+
+def test_bad_iter():
+    class BadIter:
+        def __init__(self):
+            self._index = 0
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            self._index += 1
+            if self._index == 1:
+                return 1
+            else:
+                raise RuntimeError('broken')
+
+    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_iter': True})
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(BadIter())
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'iteration_error',
+            'loc': [],
+            'message': 'Error iterating over object',
+            'input_value': IsInstance(BadIter),
         }
     ]

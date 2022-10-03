@@ -298,28 +298,32 @@ impl<'a> Input<'a> for PyAny {
     }
 
     #[cfg(not(PyPy))]
-    fn lax_list(&'a self) -> ValResult<GenericCollection<'a>> {
+    fn lax_list(&'a self, allow_iter: bool) -> ValResult<GenericCollection<'a>> {
         if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
-        } else if let Some(collection) = extract_shared_iter!(PyList, self) {
-            Ok(collection)
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
+        } else if let Some(collection) = extract_shared_iter!(PyList, self) {
+            Ok(collection)
+        } else if allow_iter && self.iter().is_ok() {
+            Ok(self.into())
         } else {
             Err(ValError::new(ErrorKind::ListType, self))
         }
     }
 
     #[cfg(PyPy)]
-    fn lax_list(&'a self) -> ValResult<GenericCollection<'a>> {
+    fn lax_list(&'a self, allow_iter: bool) -> ValResult<GenericCollection<'a>> {
         if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
         } else if let Some(collection) = extract_shared_iter!(PyList, self) {
             Ok(collection)
+        } else if allow_iter && self.iter().is_ok() {
+            Ok(self.into())
         } else {
             Err(ValError::new(ErrorKind::ListType, self))
         }
@@ -339,9 +343,9 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
-        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
-            Ok(collection)
         } else if let Some(collection) = extract_dict_iter!(self) {
+            Ok(collection)
+        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
             Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::TupleType, self))
@@ -379,9 +383,9 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
             Ok(frozen_set.into())
-        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
-            Ok(collection)
         } else if let Some(collection) = extract_dict_iter!(self) {
+            Ok(collection)
+        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
             Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::SetType, self))
@@ -423,9 +427,9 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
-        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
-            Ok(collection)
         } else if let Some(collection) = extract_dict_iter!(self) {
+            Ok(collection)
+        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
             Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::FrozenSetType, self))

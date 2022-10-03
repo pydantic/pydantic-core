@@ -146,8 +146,12 @@ impl<'a> GenericCollection<'a> {
                 let iter = collection.iter()?;
                 let mut output: Vec<PyObject> = Vec::with_capacity(length);
                 let mut errors: Vec<ValLineError> = Vec::new();
-                for (index, item) in iter.enumerate() {
-                    match validator.validate(py, item?, extra, slots, recursion_guard) {
+                for (index, item_result) in iter.enumerate() {
+                    let item = match item_result {
+                        Ok(item) => item,
+                        Err(_) => return Err(ValError::new_with_loc(ErrorKind::IterationError, *collection, index)),
+                    };
+                    match validator.validate(py, item, extra, slots, recursion_guard) {
                         Ok(item) => output.push(item),
                         Err(ValError::LineErrors(line_errors)) => {
                             errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
