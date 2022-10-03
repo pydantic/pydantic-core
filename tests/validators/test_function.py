@@ -145,6 +145,38 @@ def test_wrap_error():
     ]
 
 
+def test_function_wrap_location():
+    def f(input_value, *, validator, **kwargs):
+        return validator(input_value, 'foo') + 2
+
+    v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': {'type': 'int'}})
+
+    assert v.validate_python(4) == 6
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python('wrong')
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'int_parsing',
+            'loc': ['foo'],
+            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'input_value': 'wrong',
+        }
+    ]
+
+
+def test_function_wrap_invalid_location():
+    def f(input_value, *, validator, **kwargs):
+        return validator(input_value, ('4',)) + 2
+
+    v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': {'type': 'int'}})
+
+    with pytest.raises(TypeError) as exc_info:
+        v.validate_python(4)
+    # insert_assert(str(exc_info.value))
+    assert str(exc_info.value) == 'ValidatorCallable outer_location must be a str or int'
+
+
 def test_wrong_mode():
     with pytest.raises(SchemaError, match='function -> mode\n  Input should be one of'):
         SchemaValidator({'type': 'function', 'mode': 'foobar', 'schema': {'type': 'str'}})

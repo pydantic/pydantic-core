@@ -1,10 +1,10 @@
-use pyo3::exceptions::{PyAssertionError, PyValueError};
+use pyo3::exceptions::{PyAssertionError, PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
-use crate::build_tools::SchemaDict;
-use crate::errors::{ErrorKind, PydanticValueError, ValError, ValResult, ValidationError};
+use crate::build_tools::{py_error, SchemaDict};
+use crate::errors::{ErrorKind, LocItem, PydanticValueError, ValError, ValResult, ValidationError};
 use crate::input::Input;
 use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
@@ -250,7 +250,14 @@ struct ValidatorCallable {
 
 #[pymethods]
 impl ValidatorCallable {
-    fn __call__(&mut self, py: Python, arg: &PyAny) -> PyResult<PyObject> {
+    fn __call__(&mut self, py: Python, arg: &PyAny, outer_location: Option<&PyAny>) -> PyResult<PyObject> {
+        let outer_location = match outer_location {
+            Some(ol) => match LocItem::try_from(ol) {
+                Ok(ol) => Some(ol),
+                Err(_) => return py_error!(PyTypeError; "ValidatorCallable outer_location must be a str or int"),
+            },
+            None => None,
+        };
         let extra = Extra {
             data: self.data.as_ref().map(|data| data.as_ref(py)),
             field: self.field.as_deref(),
@@ -259,7 +266,7 @@ impl ValidatorCallable {
         };
         self.validator
             .validate(py, arg, &extra, &self.slots, &mut self.recursion_guard)
-            .map_err(|e| ValidationError::from_val_error(py, "Model".to_object(py), e))
+            .map_err(|e| ValidationError::from_val_error(py, "Model".to_object(py), e, outer_location))
     }
 
     fn __repr__(&self) -> String {
