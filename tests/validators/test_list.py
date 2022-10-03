@@ -1,10 +1,11 @@
 import platform
 import re
 from collections import deque
+from collections.abc import Sequence
 from typing import Any, Dict
 
 import pytest
-from dirty_equals import HasRepr, IsStr
+from dirty_equals import HasRepr, IsInstance, IsStr
 
 from pydantic_core import SchemaValidator, ValidationError
 
@@ -39,6 +40,12 @@ def test_list_strict():
     ]
 
 
+def gen_ints():
+    yield 1
+    yield 2
+    yield '3'
+
+
 @pytest.mark.parametrize(
     'input_value,expected',
     [
@@ -46,6 +53,7 @@ def test_list_strict():
         ((1, 2, '3'), [1, 2, 3]),
         (deque((1, 2, '3')), [1, 2, 3]),
         ({1, 2, '3'}, Err('Input should be a valid list/array [kind=list_type,')),
+        (gen_ints(), [1, 2, 3]),
         (frozenset({1, 2, '3'}), Err('Input should be a valid list/array [kind=list_type,')),
         pytest.param(
             {1: 10, 2: 20, '3': '30'}.keys(),
@@ -252,3 +260,33 @@ def test_list_from_dict_items(input_value, items_schema, expected):
     output = v.validate_python(input_value)
     assert isinstance(output, list)
     assert output == expected
+
+
+def test_sequence():
+    class MySequence(Sequence):
+        def __init__(self):
+            self._data = [1, 2, 3]
+
+        def __getitem__(self, index):
+            return self._data[index]
+
+        def __len__(self):
+            return len(self._data)
+
+        def count(self, value):
+            return self._data.count(value)
+
+    assert isinstance(MySequence(), Sequence)
+
+    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(MySequence())
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'list_type',
+            'loc': [],
+            'message': 'Input should be a valid list/array',
+            'input_value': IsInstance(MySequence),
+        }
+    ]

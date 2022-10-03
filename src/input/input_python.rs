@@ -25,26 +25,37 @@ use super::{
     GenericMapping, Input, PyArgs,
 };
 
-#[cfg(not(PyPy))]
-macro_rules! extract_gen_dict {
-    ($type:ty, $obj:ident) => {{
-        let map_err = |_| ValError::new(ErrorKind::IterationError, $obj);
+/// Extract generators and deques into a `GenericCollection`
+/// TODO if we moved length checks to the end to after validation, we could avoid creating an intermediate collection
+macro_rules! extract_shared_iter {
+    ($type:ty, $obj:ident) => {
         if let Ok(iterator) = $obj.cast_as::<PyIterator>() {
-            let vec = iterator.collect::<PyResult<Vec<_>>>().map_err(map_err)?;
-            Some(<$type>::new($obj.py(), vec))
-        } else if let Ok(dict_keys) = $obj.cast_as::<PyDictKeys>() {
-            let vec = dict_keys.iter()?.collect::<PyResult<Vec<_>>>().map_err(map_err)?;
-            Some(<$type>::new($obj.py(), vec))
-        } else if let Ok(dict_values) = $obj.cast_as::<PyDictValues>() {
-            let vec = dict_values.iter()?.collect::<PyResult<Vec<_>>>().map_err(map_err)?;
-            Some(<$type>::new($obj.py(), vec))
-        } else if let Ok(dict_items) = $obj.cast_as::<PyDictItems>() {
-            let vec = dict_items.iter()?.collect::<PyResult<Vec<_>>>().map_err(map_err)?;
-            Some(<$type>::new($obj.py(), vec))
+            let vec = iterator
+                .collect::<PyResult<Vec<_>>>()
+                .map_err(|_| ValError::new(ErrorKind::IterationError, $obj))?;
+            Some(<$type>::new($obj.py(), vec).into())
+        } else if is_deque($obj) {
+            Some($obj.into())
         } else {
             None
         }
-    }};
+    };
+}
+
+/// Extract dict keys, values and items into a `GenericCollection`, not available on PyPy
+#[cfg(not(PyPy))]
+macro_rules! extract_dict_iter {
+    ($obj:ident) => {
+        if $obj.is_instance_of::<PyDictKeys>().unwrap_or(false) {
+            Some($obj.into())
+        } else if $obj.is_instance_of::<PyDictValues>().unwrap_or(false) {
+            Some($obj.into())
+        } else if $obj.is_instance_of::<PyDictItems>().unwrap_or(false) {
+            Some($obj.into())
+        } else {
+            None
+        }
+    };
 }
 
 impl<'a> Input<'a> for PyAny {
@@ -292,10 +303,10 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
-        } else if let Some(list) = extract_gen_dict!(PyList, self) {
-            Ok(list.into())
-        } else if is_deque(self) {
-            Ok(self.into())
+        } else if let Some(collection) = extract_shared_iter!(PyList, self) {
+            Ok(collection)
+        } else if let Some(collection) = extract_dict_iter!(self) {
+            Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::ListType, self))
         }
@@ -307,13 +318,8 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
-        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
-            let vec = iterator
-                .collect::<PyResult<Vec<_>>>()
-                .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
-            Ok(PyList::new(self.py(), vec).into())
-        } else if is_deque(self) {
-            Ok(self.into())
+        } else if let Some(collection) = extract_shared_iter!(PyList, self) {
+            Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::ListType, self))
         }
@@ -333,10 +339,10 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
-        } else if let Some(tuple) = extract_gen_dict!(PyTuple, self) {
-            Ok(tuple.into())
-        } else if is_deque(self) {
-            Ok(self.into())
+        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
+            Ok(collection)
+        } else if let Some(collection) = extract_dict_iter!(self) {
+            Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::TupleType, self))
         }
@@ -348,13 +354,8 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Ok(list) = self.cast_as::<PyList>() {
             Ok(list.into())
-        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
-            let vec = iterator
-                .collect::<PyResult<Vec<_>>>()
-                .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
-            Ok(PyTuple::new(self.py(), vec).into())
-        } else if is_deque(self) {
-            Ok(self.into())
+        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
+            Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::TupleType, self))
         }
@@ -378,10 +379,10 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
             Ok(frozen_set.into())
-        } else if let Some(tuple) = extract_gen_dict!(PyTuple, self) {
-            Ok(tuple.into())
-        } else if is_deque(self) {
-            Ok(self.into())
+        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
+            Ok(collection)
+        } else if let Some(collection) = extract_dict_iter!(self) {
+            Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::SetType, self))
         }
@@ -397,13 +398,8 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
             Ok(frozen_set.into())
-        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
-            let vec = iterator
-                .collect::<PyResult<Vec<_>>>()
-                .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
-            Ok(PyTuple::new(self.py(), vec).into())
-        } else if is_deque(self) {
-            Ok(self.into())
+        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
+            Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::SetType, self))
         }
@@ -427,10 +423,10 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
-        } else if let Some(tuple) = extract_gen_dict!(PyTuple, self) {
-            Ok(tuple.into())
-        } else if is_deque(self) {
-            Ok(self.into())
+        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
+            Ok(collection)
+        } else if let Some(collection) = extract_dict_iter!(self) {
+            Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::FrozenSetType, self))
         }
@@ -446,13 +442,8 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
-        } else if let Ok(iterator) = self.cast_as::<PyIterator>() {
-            let vec = iterator
-                .collect::<PyResult<Vec<_>>>()
-                .map_err(|_| ValError::new(ErrorKind::IterationError, self))?;
-            Ok(PyTuple::new(self.py(), vec).into())
-        } else if is_deque(self) {
-            Ok(self.into())
+        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
+            Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::FrozenSetType, self))
         }
