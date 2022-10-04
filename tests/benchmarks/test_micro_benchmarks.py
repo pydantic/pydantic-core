@@ -954,12 +954,3 @@ def test_chain_nested_functions(benchmark):
     assert validator.validate_python('42.42') == Decimal('84.84')
 
     benchmark(validator.validate_python, '42.42')
-
-
-@pytest.mark.benchmark(group='dict-values')
-def test_dict_values(benchmark):
-    validator = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
-    d = {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8, 'i': 9, 'j': 10}
-    assert validator.validate_python(d.values()) == list(range(1, 11))
-
-    benchmark(validator.validate_python, d.values())
