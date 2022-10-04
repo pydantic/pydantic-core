@@ -199,7 +199,7 @@ impl JsonIterator {
         }
     }
 
-    /// This is not `Iterator` since we want to return `Option<&JsonInput>` instead of `Option<JsonInput>`.
+    /// This is not implementing `Iterator` since we want to return `Option<&JsonInput>` instead of `Option<JsonInput>`.
     /// Not sure if this could be done while implementing `Iterator`?
     pub fn next(&mut self) -> Option<&JsonInput> {
         if self.index < self.length {

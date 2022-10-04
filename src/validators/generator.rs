@@ -8,7 +8,8 @@ use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
 use crate::ValidationError;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::list::get_items_schema;
+use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct GeneratorValidator {
@@ -24,11 +25,7 @@ impl BuildValidator for GeneratorValidator {
         config: Option<&PyDict>,
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
-        let py = schema.py();
-        let item_validator = match schema.get_item(pyo3::intern!(py, "items_schema")) {
-            Some(d) => Some(Box::new(build_validator(d, config, build_context)?)),
-            None => None,
-        };
+        let item_validator = get_items_schema(schema, config, build_context)?;
         let name = match item_validator {
             Some(ref v) => format!("{}[{}]", Self::EXPECTED_TYPE, v.get_name()),
             None => format!("{}[any]", Self::EXPECTED_TYPE),

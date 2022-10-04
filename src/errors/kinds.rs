@@ -121,7 +121,9 @@ pub enum ErrorKind {
         error: String,
     },
     // ---------------------
-    // generic list-list errors
+    // generic collection and iteration errors
+    #[strum(message = "Input should be iterable")]
+    IterableType,
     #[strum(message = "Error iterating over object")]
     IterationError,
     // ---------------------
@@ -136,10 +138,6 @@ pub enum ErrorKind {
     // set errors
     #[strum(message = "Input should be a valid set")]
     SetType,
-    // ---------------------
-    // set errors
-    #[strum(message = "Input should be iterable")]
-    IterableType,
     // ---------------------
     // bool errors
     #[strum(message = "Input should be a valid boolean")]
