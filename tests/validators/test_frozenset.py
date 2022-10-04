@@ -243,7 +243,7 @@ def test_generator_error():
         yield 1
         yield 2
         if error:
-            raise RuntimeError('error')
+            raise RuntimeError('my error')
         yield 3
 
     v = SchemaValidator({'type': 'frozenset', 'items_schema': {'type': 'int'}})
@@ -251,7 +251,8 @@ def test_generator_error():
     assert r == {1, 2, 3}
     assert isinstance(r, frozenset)
 
-    with pytest.raises(ValidationError, match=r'Error iterating over object \[kind=iteration_error,'):
+    msg = r'Error iterating over object, error: RuntimeError: my error \[kind=iteration_error,'
+    with pytest.raises(ValidationError, match=msg):
         v.validate_python(gen(True))
 
 

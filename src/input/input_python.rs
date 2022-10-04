@@ -26,13 +26,18 @@ use super::{
 };
 
 /// Extract generators and deques into a `GenericCollection`
-/// TODO if we moved length checks to the end to after validation, we could avoid creating an intermediate collection
+/// TODO if we moved length checks to after validation, we could avoid creating an intermediate collection
 macro_rules! extract_shared_iter {
     ($type:ty, $obj:ident) => {
         if let Ok(iterator) = $obj.cast_as::<PyIterator>() {
-            let vec = iterator
-                .collect::<PyResult<Vec<_>>>()
-                .map_err(|_| ValError::new(ErrorKind::IterationError, $obj))?;
+            let vec = iterator.collect::<PyResult<Vec<_>>>().map_err(|err| {
+                ValError::new(
+                    ErrorKind::IterationError {
+                        error: py_err_string($obj.py(), err),
+                    },
+                    $obj,
+                )
+            })?;
             Some(<$type>::new($obj.py(), vec).into())
         } else if is_deque($obj) {
             Some($obj.into())
@@ -305,10 +310,10 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
-        } else if let Some(collection) = extract_shared_iter!(PyList, self) {
-            Ok(collection)
         } else if allow_any_iter && self.iter().is_ok() {
             Ok(self.into())
+        } else if let Some(collection) = extract_shared_iter!(PyList, self) {
+            Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::ListType, self))
         }
@@ -320,10 +325,10 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(tuple.into())
-        } else if let Some(collection) = extract_shared_iter!(PyList, self) {
-            Ok(collection)
         } else if allow_any_iter && self.iter().is_ok() {
             Ok(self.into())
+        } else if let Some(collection) = extract_shared_iter!(PyList, self) {
+            Ok(collection)
         } else {
             Err(ValError::new(ErrorKind::ListType, self))
         }

@@ -122,8 +122,10 @@ pub enum ErrorKind {
     },
     // ---------------------
     // generic list-list errors
-    #[strum(message = "Error iterating over object")]
-    IterationError,
+    #[strum(message = "Error iterating over object, error: {error}")]
+    IterationError {
+        error: String,
+    },
     // ---------------------
     // list errors
     #[strum(message = "Input should be a valid list/array")]
@@ -417,6 +419,7 @@ impl ErrorKind {
             Self::StrTooLong { max_length } => to_string_render!(self, max_length),
             Self::StrPatternMismatch { pattern } => render!(self, pattern),
             Self::DictFromMapping { error } => render!(self, error),
+            Self::IterationError { error } => render!(self, error),
             Self::IntNan { nan_value } => render!(self, nan_value),
             Self::IntMultipleOf { multiple_of } => to_string_render!(self, multiple_of),
             Self::IntGreaterThan { gt } => to_string_render!(self, gt),
@@ -473,6 +476,7 @@ impl ErrorKind {
             Self::StrTooLong { max_length } => py_dict!(py, max_length),
             Self::StrPatternMismatch { pattern } => py_dict!(py, pattern),
             Self::DictFromMapping { error } => py_dict!(py, error),
+            Self::IterationError { error } => py_dict!(py, error),
             Self::IntNan { nan_value } => py_dict!(py, nan_value),
             Self::IntMultipleOf { multiple_of } => py_dict!(py, multiple_of),
             Self::IntGreaterThan { gt } => py_dict!(py, gt),

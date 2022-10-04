@@ -435,7 +435,8 @@ def test_generator_error():
     v = SchemaValidator({'type': 'tuple', 'items_schema': {'type': 'int'}})
     assert v.validate_python(gen(False)) == (1, 2, 3)
 
-    with pytest.raises(ValidationError, match=r'Error iterating over object \[kind=iteration_error,'):
+    msg = r'Error iterating over object, error: RuntimeError: error \[kind=iteration_error,'
+    with pytest.raises(ValidationError, match=msg):
         v.validate_python(gen(True))
 
 

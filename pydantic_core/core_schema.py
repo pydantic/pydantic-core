@@ -311,10 +311,17 @@ def list_schema(
     min_length: int | None = None,
     max_length: int | None = None,
     strict: bool | None = None,
+    allow_any_iter: bool | None = None,
     ref: str | None = None,
 ) -> ListSchema:
     return dict_not_none(
-        type='list', items_schema=items_schema, min_length=min_length, max_length=max_length, strict=strict, ref=ref
+        type='list',
+        items_schema=items_schema,
+        min_length=min_length,
+        max_length=max_length,
+        strict=strict,
+        allow_any_iter=allow_any_iter,
+        ref=ref,
     )
 
 

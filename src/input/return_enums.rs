@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTuple};
 
-use crate::errors::{ErrorKind, InputValue, ValError, ValLineError, ValResult};
+use crate::errors::{py_err_string, ErrorKind, InputValue, ValError, ValLineError, ValResult};
 use crate::recursion_guard::RecursionGuard;
 use crate::validators::{CombinedValidator, Extra, Validator};
 
@@ -69,6 +69,16 @@ fn validate_iter_to_vec<'a, 's>(
     }
 }
 
+fn any_next_error(err: PyErr, collection: &PyAny, index: usize) -> ValError {
+    ValError::new_with_loc(
+        ErrorKind::IterationError {
+            error: py_err_string(collection.py(), err),
+        },
+        collection,
+        index,
+    )
+}
+
 impl<'a> GenericCollection<'a> {
     pub fn generic_len(&self) -> PyResult<usize> {
         match self {
@@ -117,7 +127,7 @@ impl<'a> GenericCollection<'a> {
     }
 
     pub fn validate_to_vec<'s>(
-        &self,
+        &'s self,
         py: Python<'a>,
         length: Option<usize>,
         validator: &'s CombinedValidator,
@@ -147,10 +157,7 @@ impl<'a> GenericCollection<'a> {
                 let mut output: Vec<PyObject> = Vec::with_capacity(length);
                 let mut errors: Vec<ValLineError> = Vec::new();
                 for (index, item_result) in iter.enumerate() {
-                    let item = match item_result {
-                        Ok(item) => item,
-                        Err(_) => return Err(ValError::new_with_loc(ErrorKind::IterationError, *collection, index)),
-                    };
+                    let item = item_result.map_err(|e| any_next_error(e, collection, index))?;
                     match validator.validate(py, item, extra, slots, recursion_guard) {
                         Ok(item) => output.push(item),
                         Err(ValError::LineErrors(line_errors)) => {
@@ -173,13 +180,20 @@ impl<'a> GenericCollection<'a> {
         }
     }
 
-    pub fn to_vec(&self, py: Python) -> PyResult<Vec<PyObject>> {
+    pub fn to_vec<'s>(&'s self, py: Python<'a>) -> ValResult<'a, Vec<PyObject>> {
         match self {
             Self::List(collection) => Ok(collection.iter().map(|i| i.to_object(py)).collect()),
             Self::Tuple(collection) => Ok(collection.iter().map(|i| i.to_object(py)).collect()),
             Self::Set(collection) => Ok(collection.iter().map(|i| i.to_object(py)).collect()),
             Self::FrozenSet(collection) => Ok(collection.iter().map(|i| i.to_object(py)).collect()),
-            Self::PyAny(collection) => collection.iter()?.map(|i| Ok(i?.to_object(py))).collect(),
+            Self::PyAny(collection) => collection
+                .iter()?
+                .enumerate()
+                .map(|(index, item_result)| {
+                    let item = item_result.map_err(|e| any_next_error(e, collection, index))?;
+                    Ok(item.to_object(py))
+                })
+                .collect(),
             Self::JsonArray(collection) => Ok(collection.iter().map(|i| i.to_object(py)).collect()),
         }
     }
