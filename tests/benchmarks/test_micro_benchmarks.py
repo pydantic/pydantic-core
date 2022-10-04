@@ -6,17 +6,11 @@ import os
 import platform
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Dict, FrozenSet, List, Optional, Sequence, Set, Union
+from typing import Dict, FrozenSet, List, Optional, Set, Union
 
 import pytest
 
-from pydantic_core import (
-    PydanticValueError,
-    SchemaValidator,
-    ValidationError,
-    ValidationError as CoreValidationError,
-    core_schema,
-)
+from pydantic_core import PydanticValueError, SchemaValidator, ValidationError, ValidationError as CoreValidationError
 
 if os.getenv('BENCHMARK_VS_PYDANTIC'):
     try:
@@ -960,77 +954,3 @@ def test_chain_nested_functions(benchmark):
     assert validator.validate_python('42.42') == Decimal('84.84')
 
     benchmark(validator.validate_python, '42.42')
-
-
-@pytest.mark.benchmark(group='tuple-vs-list')
-def test_100_tuple_to_tuple(benchmark):
-    v = SchemaValidator({'type': 'tuple', 'items_schema': {'type': 'int'}})
-    input_value = tuple(range(100))
-    assert v.validate_python(input_value) == input_value
-    benchmark(v.validate_python, input_value)
-
-
-@pytest.mark.benchmark(group='tuple-vs-list')
-def test_100_list_to_tuple(benchmark):
-    v = SchemaValidator({'type': 'tuple', 'items_schema': {'type': 'int'}})
-    input_value = list(range(100))
-    assert v.validate_python(input_value) == tuple(input_value)
-    benchmark(v.validate_python, input_value)
-
-
-@pytest.mark.benchmark(group='tuple-vs-list')
-def test_100_list_to_list(benchmark):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
-    input_value = list(range(100))
-    assert v.validate_python(input_value) == input_value
-    benchmark(v.validate_python, input_value)
-
-
-@pytest.mark.benchmark(group='tuple-vs-list')
-def test_100_tuple_to_list(benchmark):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
-    input_value = tuple(range(100))
-    assert v.validate_python(input_value) == list(input_value)
-    benchmark(v.validate_python, input_value)
-
-
-def validate_yield(iterable, validator):
-    for item in iterable:
-        yield validator(item)
-
-
-def sequence_validator1(v, *, validator, **_kwargs):
-    if isinstance(v, Sequence):
-        return list(validate_yield(v, validator))
-    else:
-        raise PydanticValueError('iterable_type', 'Input should be a valid sequence')
-
-
-@pytest.mark.benchmark(group='sequence')
-def test_sequence_gen(benchmark):
-    schema = core_schema.function_wrap_schema(sequence_validator1, {'type': 'int'})
-    v = SchemaValidator(schema)
-    input_value = tuple(range(100))
-
-    assert v.validate_python(input_value) == list(input_value)
-
-    benchmark(v.validate_python, input_value)
-
-
-def sequence_validator2(v, *, validator, **_kwargs):
-    # in the actual implementation, `list` would be taken from the `__init__` argument
-    if isinstance(v, Sequence):
-        return list(validator(v))
-    else:
-        raise PydanticValueError('iterable_type', 'Input should be a valid sequence')
-
-
-@pytest.mark.benchmark(group='sequence')
-def test_sequence_list(benchmark):
-    schema = core_schema.function_wrap_schema(sequence_validator2, {'type': 'list', 'items_schema': {'type': 'int'}})
-    v = SchemaValidator(schema)
-    input_value = tuple(range(100))
-
-    assert v.validate_python(input_value) == list(input_value)
-
-    benchmark(v.validate_python, input_value)

@@ -92,7 +92,7 @@ def test_function_before_error_model():
 
 def test_function_wrap():
     def f(input_value, *, validator, **kwargs):
-        return validator(input_value) + ' Changed'
+        return validator(input_value=input_value) + ' Changed'
 
     v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': {'type': 'str'}})
 
@@ -119,10 +119,10 @@ def test_function_wrap_str():
 
 
 def test_function_wrap_not_callable():
-    with pytest.raises(SchemaError, match='function -> function\n  Input should be callable'):
+    with pytest.raises(SchemaError, match='function-wrap -> function\n  Input should be callable'):
         SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': [], 'schema': {'type': 'str'}})
 
-    with pytest.raises(SchemaError, match='function -> function\n  Field required'):
+    with pytest.raises(SchemaError, match='function-wrap -> function\n  Field required'):
         SchemaValidator({'type': 'function', 'mode': 'wrap', 'schema': {'type': 'str'}})
 
 
@@ -147,7 +147,7 @@ def test_wrap_error():
 
 def test_function_wrap_location():
     def f(input_value, *, validator, **kwargs):
-        return validator(input_value, 'foo') + 2
+        return validator(input_value, outer_location='foo') + 2
 
     v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': {'type': 'int'}})
 

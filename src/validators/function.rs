@@ -250,7 +250,7 @@ struct ValidatorCallable {
 
 #[pymethods]
 impl ValidatorCallable {
-    fn __call__(&mut self, py: Python, arg: &PyAny, outer_location: Option<&PyAny>) -> PyResult<PyObject> {
+    fn __call__(&mut self, py: Python, input_value: &PyAny, outer_location: Option<&PyAny>) -> PyResult<PyObject> {
         let outer_location = match outer_location {
             Some(ol) => match LocItem::try_from(ol) {
                 Ok(ol) => Some(ol),
@@ -265,7 +265,7 @@ impl ValidatorCallable {
             context: self.context.as_ref().map(|data| data.as_ref(py)),
         };
         self.validator
-            .validate(py, arg, &extra, &self.slots, &mut self.recursion_guard)
+            .validate(py, input_value, &extra, &self.slots, &mut self.recursion_guard)
             .map_err(|e| ValidationError::from_val_error(py, "Model".to_object(py), e, outer_location))
     }
 

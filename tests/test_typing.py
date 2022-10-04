@@ -1,7 +1,10 @@
 from datetime import date, datetime, time
+from typing import Any
+
+import pytest
 
 from pydantic_core import SchemaError, SchemaValidator
-from pydantic_core.core_schema import CoreSchema
+from pydantic_core.core_schema import CoreConfig, CoreSchema, function_plain_schema
 
 
 class Foo:
@@ -135,3 +138,20 @@ def test_schema_validator_wrong() -> None:
         pass
     else:
         raise AssertionError('SchemaValidator did not raise SchemaError')
+
+
+def test_correct_function_signature() -> None:
+    def my_validator(value: Any, *, data: Any, config: CoreConfig | None, context: Any, **future_kwargs: Any) -> str:
+        return str(value)
+
+    v = SchemaValidator(function_plain_schema(my_validator))
+    assert v.validate_python(1) == '1'
+
+
+def test_wrong_function_signature() -> None:
+    def wrong_validator(value: Any) -> Any:
+        return value
+
+    v = SchemaValidator(function_plain_schema(wrong_validator))  # type: ignore
+    with pytest.raises(TypeError, match='got an unexpected keyword argument'):
+        v.validate_python(1)
