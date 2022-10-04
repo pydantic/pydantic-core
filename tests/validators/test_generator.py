@@ -65,6 +65,8 @@ def test_error_index(py_and_json: PyAndJson):
         next(gen)
     assert gen.index == 1
     # insert_assert(exc_info.value.errors())
+    assert exc_info.value.title == 'ValidatorIterator'
+    assert str(exc_info.value).startswith('1 validation error for ValidatorIterator\n')
     assert exc_info.value.errors() == [
         {
             'kind': 'int_parsing',

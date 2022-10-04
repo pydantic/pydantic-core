@@ -204,7 +204,7 @@ impl Validator for FunctionWrapValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let validator_kwarg = ValidatorCallable {
-            validator: InternalValidator::new(py, &self.validator, slots, extra, recursion_guard),
+            validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
         };
         let kwargs = kwargs!(
             py,

@@ -55,7 +55,7 @@ impl Validator for GeneratorValidator {
         let validator = self
             .item_validator
             .as_ref()
-            .map(|v| InternalValidator::new(py, v, slots, extra, recursion_guard));
+            .map(|v| InternalValidator::new(py, "ValidatorIterator", v, slots, extra, recursion_guard));
 
         let v_iterator = ValidatorIterator {
             iterator,
@@ -161,6 +161,7 @@ impl ValidatorIterator {
 /// mid-validation
 #[derive(Clone)]
 pub struct InternalValidator {
+    name: String,
     validator: CombinedValidator,
     slots: Vec<CombinedValidator>,
     // TODO, do we need data?
@@ -180,12 +181,14 @@ impl fmt::Debug for InternalValidator {
 impl InternalValidator {
     pub fn new(
         py: Python,
+        name: &str,
         validator: &CombinedValidator,
         slots: &[CombinedValidator],
         extra: &Extra,
         recursion_guard: &RecursionGuard,
     ) -> Self {
         Self {
+            name: name.to_string(),
             validator: validator.clone(),
             slots: slots.to_vec(),
             data: extra.data.map(|d| d.into_py(py)),
@@ -213,6 +216,6 @@ impl InternalValidator {
         };
         self.validator
             .validate(py, input, &extra, &self.slots, &mut self.recursion_guard)
-            .map_err(|e| ValidationError::from_val_error(py, "ValidatorIterator".to_object(py), e, outer_location))
+            .map_err(|e| ValidationError::from_val_error(py, self.name.to_object(py), e, outer_location))
     }
 }
