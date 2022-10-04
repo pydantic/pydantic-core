@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from typing import Any
 
-import pytest
+import pytest  # type: ignore
 
 from pydantic_core import SchemaError, SchemaValidator
 from pydantic_core.core_schema import CoreConfig, CoreSchema, function_plain_schema
@@ -12,6 +12,10 @@ class Foo:
 
 
 def foo(bar: str) -> None:
+    ...
+
+
+def validator(value: Any, **kwargs: Any) -> None:
     ...
 
 
@@ -75,9 +79,9 @@ def test_schema_typing() -> None:
         },
     }
     SchemaValidator(schema)
-    schema: CoreSchema = {'type': 'function', 'mode': 'wrap', 'function': foo, 'schema': {'type': 'str'}}
+    schema: CoreSchema = {'type': 'function', 'mode': 'wrap', 'function': validator, 'schema': {'type': 'str'}}
     SchemaValidator(schema)
-    schema: CoreSchema = {'type': 'function', 'mode': 'plain', 'function': foo}
+    schema: CoreSchema = {'type': 'function', 'mode': 'plain', 'function': validator}
     SchemaValidator(schema)
     schema: CoreSchema = {
         'ref': 'Branch',
@@ -131,13 +135,8 @@ def test_schema_validator() -> None:
 
 
 def test_schema_validator_wrong() -> None:
-    # use this instead of pytest.raises since pyright complains about input when pytest isn't installed
-    try:
+    with pytest.raises(SchemaError):
         SchemaValidator({'type': 'bad'})  # type: ignore
-    except SchemaError:
-        pass
-    else:
-        raise AssertionError('SchemaValidator did not raise SchemaError')
 
 
 def test_correct_function_signature() -> None:
