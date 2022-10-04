@@ -443,9 +443,8 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn validate_iter(&self) -> ValResult<GenericIterator> {
-        if let Ok(iterator) = self.iter() {
-            let py_iterator: Py<PyIterator> = iterator.into_py(self.py());
-            Ok(py_iterator.into())
+        if self.iter().is_ok() {
+            Ok(self.into())
         } else {
             Err(ValError::new(ErrorKind::IterableType, self))
         }

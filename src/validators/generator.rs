@@ -1,8 +1,10 @@
+use std::fmt;
+
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use std::borrow::Cow;
 
-use crate::errors::ValResult;
+use crate::build_tools::SchemaDict;
+use crate::errors::{ErrorKind, LocItem, ValError, ValResult};
 use crate::input::{GenericIterator, Input};
 use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
@@ -14,6 +16,7 @@ use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 #[derive(Debug, Clone)]
 pub struct GeneratorValidator {
     item_validator: Option<Box<CombinedValidator>>,
+    max_length: Option<usize>,
     name: String,
 }
 
@@ -30,7 +33,12 @@ impl BuildValidator for GeneratorValidator {
             Some(ref v) => format!("{}[{}]", Self::EXPECTED_TYPE, v.get_name()),
             None => format!("{}[any]", Self::EXPECTED_TYPE),
         };
-        Ok(Self { item_validator, name }.into())
+        Ok(Self {
+            item_validator,
+            name,
+            max_length: schema.get_as(pyo3::intern!(schema.py(), "max_length"))?,
+        }
+        .into())
     }
 }
 
@@ -52,7 +60,7 @@ impl Validator for GeneratorValidator {
         let v_iterator = ValidatorIterator {
             iterator,
             validator,
-            index: 0,
+            max_length: self.max_length,
         };
         Ok(v_iterator.into_py(py))
     }
@@ -76,13 +84,12 @@ impl Validator for GeneratorValidator {
     }
 }
 
-#[pyclass]
+#[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
 struct ValidatorIterator {
     iterator: GenericIterator,
     validator: Option<InternalValidator>,
-    // index is only used for python iterators, otherwise JsonIterator.index is used
-    index: usize,
+    max_length: Option<usize>,
 }
 
 #[pymethods]
@@ -92,44 +99,57 @@ impl ValidatorIterator {
     }
 
     fn __next__(mut slf: PyRefMut<'_, Self>, py: Python) -> PyResult<Option<PyObject>> {
+        let max_length = slf.max_length;
         let Self {
             validator, iterator, ..
         } = &mut *slf;
-        match iterator {
-            GenericIterator::PyIterator(ref mut iter) => match iter.as_ref(py).next() {
-                Some(next_result) => {
-                    let next = next_result?;
-                    match validator {
+        macro_rules! next {
+            ($iter:ident) => {
+                match $iter.next(py)? {
+                    Some((next, index)) => match validator {
                         Some(validator) => {
-                            let r = validator.validate(py, next).map(Some);
-                            slf.index += 1;
-                            r
+                            if let Some(max_length) = max_length {
+                                if index >= max_length {
+                                    let val_error = ValError::new(
+                                        ErrorKind::TooLong {
+                                            max_length,
+                                            input_length: index + 1,
+                                        },
+                                        $iter.input(py),
+                                    );
+                                    return Err(ValidationError::from_val_error(
+                                        py,
+                                        "ValidatorIterator".to_object(py),
+                                        val_error,
+                                        None,
+                                    ));
+                                }
+                            }
+                            validator.validate(py, next, Some(index.into())).map(Some)
                         }
                         None => Ok(Some(next.to_object(py))),
-                    }
+                    },
+                    None => Ok(None),
                 }
-                None => Ok(None),
-            },
-            GenericIterator::JsonArray(ref mut iter) => match iter.next() {
-                Some(next) => match validator {
-                    Some(validator) => validator.validate(py, next).map(Some),
-                    None => Ok(Some(next.to_object(py))),
-                },
-                None => Ok(None),
-            },
+            };
+        }
+
+        match iterator {
+            GenericIterator::PyIterator(ref mut iter) => next!(iter),
+            GenericIterator::JsonArray(ref mut iter) => next!(iter),
+        }
+    }
+
+    #[getter]
+    fn index(&self) -> usize {
+        match self.iterator {
+            GenericIterator::PyIterator(ref iter) => iter.index(),
+            GenericIterator::JsonArray(ref iter) => iter.index(),
         }
     }
 
     fn __repr__(&self) -> String {
-        let schema = match self.validator {
-            Some(ref v) => Cow::Owned(format!("{:?}", v.validator)),
-            None => Cow::Borrowed("any"),
-        };
-        let index = match self.iterator {
-            GenericIterator::PyIterator(_) => self.index,
-            GenericIterator::JsonArray(ref iter) => iter.index(),
-        };
-        format!("ValidatorIterator(index={}, schema={})", index, schema)
+        format!("ValidatorIterator(index={}, schema={:?})", self.index(), self.validator)
     }
 
     fn __str__(&self) -> String {
@@ -138,8 +158,8 @@ impl ValidatorIterator {
 }
 
 /// Cloneable validator wrapper for use in generators in functions, this can be passed back to python
-/// mid-validatoin
-#[derive(Debug, Clone)]
+/// mid-validation
+#[derive(Clone)]
 pub struct InternalValidator {
     validator: CombinedValidator,
     slots: Vec<CombinedValidator>,
@@ -151,8 +171,14 @@ pub struct InternalValidator {
     recursion_guard: RecursionGuard,
 }
 
+impl fmt::Debug for InternalValidator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.validator)
+    }
+}
+
 impl InternalValidator {
-    fn new(
+    pub fn new(
         py: Python,
         validator: &CombinedValidator,
         slots: &[CombinedValidator],
@@ -170,7 +196,12 @@ impl InternalValidator {
         }
     }
 
-    fn validate<'s, 'data>(&'s mut self, py: Python<'data>, input: &'data impl Input<'data>) -> PyResult<PyObject>
+    pub fn validate<'s, 'data>(
+        &'s mut self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        outer_location: Option<LocItem>,
+    ) -> PyResult<PyObject>
     where
         's: 'data,
     {
@@ -182,6 +213,6 @@ impl InternalValidator {
         };
         self.validator
             .validate(py, input, &extra, &self.slots, &mut self.recursion_guard)
-            .map_err(|e| ValidationError::from_val_error(py, "ValidatorIterator".to_object(py), e))
+            .map_err(|e| ValidationError::from_val_error(py, "ValidatorIterator".to_object(py), e, outer_location))
     }
 }

@@ -55,3 +55,60 @@ def test_generator_json_any(py_and_json: PyAndJson, input_value, expected):
 
     else:
         assert list(v.validate_test(input_value)) == expected
+
+
+def test_error_index(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'generator', 'items_schema': {'type': 'int'}})
+    gen = v.validate_test(['wrong'])
+    assert gen.index == 0
+    with pytest.raises(ValidationError) as exc_info:
+        next(gen)
+    assert gen.index == 1
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'int_parsing',
+            'loc': [0],
+            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'input_value': 'wrong',
+        }
+    ]
+    gen = v.validate_test([1, 2, 3, 'wrong', 4])
+    assert gen.index == 0
+    assert next(gen) == 1
+    assert gen.index == 1
+    assert next(gen) == 2
+    assert gen.index == 2
+    assert next(gen) == 3
+    assert gen.index == 3
+    with pytest.raises(ValidationError) as exc_info:
+        next(gen)
+    assert gen.index == 4
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'int_parsing',
+            'loc': [3],
+            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'input_value': 'wrong',
+        }
+    ]
+    assert next(gen) == 4
+    assert gen.index == 5
+
+
+def test_too_long(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'generator', 'items_schema': {'type': 'int'}, 'max_length': 2})
+    assert list(v.validate_test([1])) == [1]
+    assert list(v.validate_test([1, 2])) == [1, 2]
+    with pytest.raises(ValidationError) as exc_info:
+        list(v.validate_test([1, 2, 3]))
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'too_long',
+            'loc': [],
+            'message': 'Input should have at most 2 items, got 3 items',
+            'input_value': [1, 2, 3],
+            'context': {'max_length': 2, 'input_length': 3},
+        }
+    ]

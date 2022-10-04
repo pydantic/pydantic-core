@@ -166,49 +166,84 @@ derive_from!(GenericMapping, JsonObject, JsonObject);
 
 #[derive(Debug, Clone)]
 pub enum GenericIterator {
-    PyIterator(Py<PyIterator>),
-    JsonArray(JsonIterator),
-}
-
-impl From<Py<PyIterator>> for GenericIterator {
-    fn from(s: Py<PyIterator>) -> Self {
-        Self::PyIterator(s)
-    }
+    PyIterator(GenericPyIterator),
+    JsonArray(GenericJsonIterator),
 }
 
 impl From<JsonArray> for GenericIterator {
     fn from(array: JsonArray) -> Self {
-        Self::JsonArray(JsonIterator::new(array))
+        let length = array.len();
+        let json_iter = GenericJsonIterator {
+            array,
+            length,
+            index: 0,
+        };
+        Self::JsonArray(json_iter)
+    }
+}
+
+impl From<&PyAny> for GenericIterator {
+    fn from(obj: &PyAny) -> Self {
+        let py_iter = GenericPyIterator {
+            obj: obj.to_object(obj.py()),
+            iter: obj.iter().unwrap().into_py(obj.py()),
+            index: 0,
+        };
+        Self::PyIterator(py_iter)
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct JsonIterator {
+pub struct GenericPyIterator {
+    obj: PyObject,
+    iter: Py<PyIterator>,
+    index: usize,
+}
+
+impl GenericPyIterator {
+    pub fn next<'a>(&'a mut self, py: Python<'a>) -> PyResult<Option<(&'a PyAny, usize)>> {
+        match self.iter.as_ref(py).next() {
+            Some(Ok(next)) => {
+                let a = (next, self.index);
+                self.index += 1;
+                Ok(Some(a))
+            }
+            Some(Err(err)) => Err(err),
+            None => Ok(None),
+        }
+    }
+
+    pub fn input<'a>(&'a self, py: Python<'a>) -> &'a PyAny {
+        self.obj.as_ref(py)
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GenericJsonIterator {
     array: JsonArray,
     length: usize,
     index: usize,
 }
 
-impl JsonIterator {
-    fn new(array: JsonArray) -> Self {
-        let length = array.len();
-        Self {
-            array,
-            length,
-            index: 0,
+impl GenericJsonIterator {
+    pub fn next(&mut self, _py: Python) -> PyResult<Option<(&JsonInput, usize)>> {
+        if self.index < self.length {
+            let next = unsafe { self.array.get_unchecked(self.index) };
+            let a = (next, self.index);
+            self.index += 1;
+            Ok(Some(a))
+        } else {
+            Ok(None)
         }
     }
 
-    /// This is not implementing `Iterator` since we want to return `Option<&JsonInput>` instead of `Option<JsonInput>`.
-    /// Not sure if this could be done while implementing `Iterator`?
-    pub fn next(&mut self) -> Option<&JsonInput> {
-        if self.index < self.length {
-            let item = unsafe { self.array.get_unchecked(self.index) };
-            self.index += 1;
-            Some(item)
-        } else {
-            None
-        }
+    pub fn input<'a>(&'a self, py: Python<'a>) -> &'a PyAny {
+        let input = JsonInput::Array(self.array.clone());
+        input.to_object(py).into_ref(py)
     }
 
     pub fn index(&self) -> usize {

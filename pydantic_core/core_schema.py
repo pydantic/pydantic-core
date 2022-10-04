@@ -418,11 +418,14 @@ def frozenset_schema(
 class GeneratorSchema(TypedDict, total=False):
     type: Required[Literal['generator']]
     items_schema: CoreSchema
+    max_length: int
     ref: str
 
 
-def generator_schema(items_schema: CoreSchema | None = None, *, ref: str | None = None) -> GeneratorSchema:
-    return dict_not_none(type='generator', items_schema=items_schema, ref=ref)
+def generator_schema(
+    items_schema: CoreSchema | None = None, *, max_length: int | None = None, ref: str | None = None
+) -> GeneratorSchema:
+    return dict_not_none(type='generator', items_schema=items_schema, max_length=max_length, ref=ref)
 
 
 class DictSchema(TypedDict, total=False):
