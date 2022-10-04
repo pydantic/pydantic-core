@@ -162,6 +162,6 @@ def test_wrong_function_signature() -> None:
     try:
         v.validate_python(1)
     except TypeError as exc:
-        assert 'got an unexpected keyword argument' in str(exc)
+        assert 'unexpected keyword argument' in str(exc)
     else:
         raise AssertionError('v.validate_python(1) did not raise TypeError')
