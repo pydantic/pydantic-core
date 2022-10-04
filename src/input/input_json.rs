@@ -1,14 +1,14 @@
 use crate::errors::{ErrorKind, InputValue, LocItem, ValError, ValResult};
-use crate::input::GenericIterator;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
     float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
+use super::parse_json::JsonArray;
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 use super::{
-    EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericCollection, GenericMapping, Input, JsonArgs,
-    JsonInput,
+    EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericCollection, GenericIterator, GenericMapping,
+    Input, JsonArgs, JsonInput,
 };
 
 impl<'a> Input<'a> for JsonInput {
@@ -200,6 +200,12 @@ impl<'a> Input<'a> for JsonInput {
     fn validate_iter(&self) -> ValResult<GenericIterator> {
         match self {
             JsonInput::Array(a) => Ok(a.clone().into()),
+            JsonInput::String(s) => Ok(string_to_vec(s).into()),
+            JsonInput::Object(object) => {
+                // return keys iterator to match python's behavior
+                let keys: Vec<JsonInput> = object.keys().map(|k| JsonInput::String(k.clone())).collect();
+                Ok(keys.into())
+            }
             _ => Err(ValError::new(ErrorKind::IterableType, self)),
         }
     }
@@ -370,9 +376,9 @@ impl<'a> Input<'a> for String {
     fn strict_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
         self.validate_frozenset(false)
     }
+
     fn validate_iter(&self) -> ValResult<GenericIterator> {
-        // TODO allow strings?
-        Err(ValError::new(ErrorKind::IterableType, self))
+        Ok(string_to_vec(self).into())
     }
 
     fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
@@ -406,4 +412,8 @@ impl<'a> Input<'a> for String {
     fn strict_timedelta(&self) -> ValResult<EitherTimedelta> {
         self.validate_timedelta(false)
     }
+}
+
+fn string_to_vec(s: &str) -> JsonArray {
+    s.chars().map(|c| JsonInput::String(c.to_string())).collect()
 }

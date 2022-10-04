@@ -167,7 +167,7 @@ derive_from!(GenericMapping, JsonObject, JsonObject);
 #[derive(Debug, Clone)]
 pub enum GenericIterator {
     PyIterator(Py<PyIterator>),
-    JsonArray(JsonArray),
+    JsonArray(JsonIterator),
 }
 
 impl From<Py<PyIterator>> for GenericIterator {
@@ -177,8 +177,42 @@ impl From<Py<PyIterator>> for GenericIterator {
 }
 
 impl From<JsonArray> for GenericIterator {
-    fn from(s: JsonArray) -> Self {
-        Self::JsonArray(s)
+    fn from(array: JsonArray) -> Self {
+        Self::JsonArray(JsonIterator::new(array))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct JsonIterator {
+    array: JsonArray,
+    length: usize,
+    index: usize,
+}
+
+impl JsonIterator {
+    fn new(array: JsonArray) -> Self {
+        let length = array.len();
+        Self {
+            array,
+            length,
+            index: 0,
+        }
+    }
+
+    /// This is not `Iterator` since we want to return `Option<&JsonInput>` instead of `Option<JsonInput>`.
+    /// Not sure if this could be done while implementing `Iterator`?
+    pub fn next(&mut self) -> Option<&JsonInput> {
+        if self.index < self.length {
+            let item = unsafe { self.array.get_unchecked(self.index) };
+            self.index += 1;
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
     }
 }
 

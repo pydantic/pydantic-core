@@ -1,8 +1,7 @@
-use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::borrow::Cow;
 
-use crate::build_tools::SchemaDict;
 use crate::errors::ValResult;
 use crate::input::{GenericIterator, Input};
 use crate::questions::Question;
@@ -13,7 +12,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 
 #[derive(Debug, Clone)]
 pub struct GeneratorValidator {
-    validator: Box<CombinedValidator>,
+    item_validator: Option<Box<CombinedValidator>>,
     name: String,
 }
 
@@ -25,10 +24,16 @@ impl BuildValidator for GeneratorValidator {
         config: Option<&PyDict>,
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
-        let schema: &PyAny = schema.get_as_req(intern!(schema.py(), "items_schema"))?;
-        let validator = Box::new(build_validator(schema, config, build_context)?);
-        let name = format!("{}[{}]", Self::EXPECTED_TYPE, validator.get_name());
-        Ok(Self { validator, name }.into())
+        let py = schema.py();
+        let item_validator = match schema.get_item(pyo3::intern!(py, "items_schema")) {
+            Some(d) => Some(Box::new(build_validator(d, config, build_context)?)),
+            None => None,
+        };
+        let name = match item_validator {
+            Some(ref v) => format!("{}[{}]", Self::EXPECTED_TYPE, v.get_name()),
+            None => format!("{}[any]", Self::EXPECTED_TYPE),
+        };
+        Ok(Self { item_validator, name }.into())
     }
 }
 
@@ -42,16 +47,16 @@ impl Validator for GeneratorValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let iterator = input.validate_iter()?;
-        let validator = InternalValidator {
-            validator: self.validator.clone(),
-            slots: slots.to_vec(),
-            data: extra.data.map(|d| d.into_py(py)),
-            field: extra.field.map(|f| f.to_string()),
-            strict: extra.strict,
-            context: extra.context.map(|d| d.into_py(py)),
-            recursion_guard: recursion_guard.clone(),
+        let validator = self
+            .item_validator
+            .as_ref()
+            .map(|v| InternalValidator::new(py, v, slots, extra, recursion_guard));
+
+        let v_iterator = ValidatorIterator {
+            iterator,
+            validator,
+            index: 0,
         };
-        let v_iterator = ValidatorIterator { iterator, validator };
         Ok(v_iterator.into_py(py))
     }
 
@@ -60,11 +65,17 @@ impl Validator for GeneratorValidator {
     }
 
     fn ask(&self, question: &Question) -> bool {
-        self.validator.ask(question)
+        match self.item_validator {
+            Some(ref v) => v.ask(question),
+            None => false,
+        }
     }
 
     fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
-        self.validator.complete(build_context)
+        match self.item_validator {
+            Some(ref mut v) => v.complete(build_context),
+            None => Ok(()),
+        }
     }
 }
 
@@ -72,7 +83,9 @@ impl Validator for GeneratorValidator {
 #[derive(Debug, Clone)]
 struct ValidatorIterator {
     iterator: GenericIterator,
-    validator: InternalValidator,
+    validator: Option<InternalValidator>,
+    // index is only used for python iterators, otherwise JsonIterator.index is used
+    index: usize,
 }
 
 #[pymethods]
@@ -81,27 +94,45 @@ impl ValidatorIterator {
         slf
     }
 
-    fn __next__(mut slf: PyRefMut<'_, Self>, py: Python) -> Option<PyObject> {
-        let validator_clone = &mut slf.validator.clone();
-        match slf.iterator {
-            GenericIterator::PyIterator(ref mut iter) => {
-                match iter.as_ref(py).next() {
-                    Some(next) => {
-                        match next {
-                            Ok(next) => Some(validator_clone.validate(py, next).unwrap()),
-                            // Err(e) => Some(Err(e)),
-                            Err(_) => None,
+    fn __next__(mut slf: PyRefMut<'_, Self>, py: Python) -> PyResult<Option<PyObject>> {
+        let Self {
+            validator, iterator, ..
+        } = &mut *slf;
+        match iterator {
+            GenericIterator::PyIterator(ref mut iter) => match iter.as_ref(py).next() {
+                Some(next_result) => {
+                    let next = next_result?;
+                    match validator {
+                        Some(validator) => {
+                            let r = validator.validate(py, next).map(Some);
+                            slf.index += 1;
+                            r
                         }
+                        None => Ok(Some(next.to_object(py))),
                     }
-                    None => None,
                 }
-            }
-            _ => todo!(),
+                None => Ok(None),
+            },
+            GenericIterator::JsonArray(ref mut iter) => match iter.next() {
+                Some(next) => match validator {
+                    Some(validator) => validator.validate(py, next).map(Some),
+                    None => Ok(Some(next.to_object(py))),
+                },
+                None => Ok(None),
+            },
         }
     }
 
     fn __repr__(&self) -> String {
-        format!("ValidatorIter({:?})", self.validator.validator)
+        let schema = match self.validator {
+            Some(ref v) => Cow::Owned(format!("{:?}", v.validator)),
+            None => Cow::Borrowed("any"),
+        };
+        let index = match self.iterator {
+            GenericIterator::PyIterator(_) => self.index,
+            GenericIterator::JsonArray(ref iter) => iter.index(),
+        };
+        format!("ValidatorIterator(index={}, schema={})", index, schema)
     }
 
     fn __str__(&self) -> String {
@@ -109,10 +140,13 @@ impl ValidatorIterator {
     }
 }
 
+/// Cloneable validator wrapper for use in generators in functions, this can be passed back to python
+/// mid-validatoin
 #[derive(Debug, Clone)]
 pub struct InternalValidator {
-    validator: Box<CombinedValidator>,
+    validator: CombinedValidator,
     slots: Vec<CombinedValidator>,
+    // TODO, do we need data?
     data: Option<Py<PyDict>>,
     field: Option<String>,
     strict: Option<bool>,
@@ -121,6 +155,24 @@ pub struct InternalValidator {
 }
 
 impl InternalValidator {
+    fn new(
+        py: Python,
+        validator: &CombinedValidator,
+        slots: &[CombinedValidator],
+        extra: &Extra,
+        recursion_guard: &RecursionGuard,
+    ) -> Self {
+        Self {
+            validator: validator.clone(),
+            slots: slots.to_vec(),
+            data: extra.data.map(|d| d.into_py(py)),
+            field: extra.field.map(|f| f.to_string()),
+            strict: extra.strict,
+            context: extra.context.map(|d| d.into_py(py)),
+            recursion_guard: recursion_guard.clone(),
+        }
+    }
+
     fn validate<'s, 'data>(&'s mut self, py: Python<'data>, input: &'data impl Input<'data>) -> PyResult<PyObject>
     where
         's: 'data,
