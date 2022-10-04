@@ -171,10 +171,8 @@ def test_function_wrap_invalid_location():
 
     v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': {'type': 'int'}})
 
-    with pytest.raises(TypeError) as exc_info:
+    with pytest.raises(TypeError, match='^ValidatorCallable outer_location must be a str or int$'):
         v.validate_python(4)
-    # insert_assert(str(exc_info.value))
-    assert str(exc_info.value) == 'ValidatorCallable outer_location must be a str or int'
 
 
 def test_wrong_mode():
