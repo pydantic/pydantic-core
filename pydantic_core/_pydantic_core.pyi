@@ -53,4 +53,8 @@ class PydanticCustomError(ValueError):
 
 class PydanticErrorKind(ValueError):
     kind: str
-    contect: 'dict[str, str | int] | None'
+    message_template: str
+    context: 'dict[str, str | int] | None'
+
+    def __init__(self, kind: str, context: 'dict[str, str | int] | None' = None) -> None: ...
+    def message(self) -> str: ...

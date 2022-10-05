@@ -1,19 +1,19 @@
-use pyo3::exceptions::PyValueError;
+use ahash::AHashMap;
+use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::PyDict;
 
-use strum::{Display, EnumMessage};
+use strum::{Display, EnumMessage, IntoEnumIterator};
+use strum_macros::EnumIter;
 
-use crate::input::Input;
-
-use super::{PydanticCustomError, ValError};
+use super::PydanticCustomError;
 
 /// Definite each validation error.
 /// NOTE: if an error has parameters:
 /// * the variables in the message need to match the enum struct
 /// * you need to add an entry to the `render` enum to render the error message as a template
 /// * you need to add an entry to the `py_dict` enum to generate `ctx` for error messages
-#[derive(Display, EnumMessage, Clone)]
+#[derive(Clone, Display, EnumMessage, EnumIter)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 #[strum(serialize_all = "snake_case")]
 pub enum ErrorKind {
@@ -155,7 +155,7 @@ pub enum ErrorKind {
     IntFromFloat,
     #[strum(message = "Input should be a valid integer, got {nan_value}")]
     IntNan {
-        nan_value: &'static str,
+        nan_value: String,
     },
     #[strum(serialize = "multiple_of", message = "Input should be a multiple of {multiple_of}")]
     IntMultipleOf {
@@ -243,9 +243,6 @@ pub enum ErrorKind {
     CustomError {
         value_error: PydanticCustomError,
     },
-    PydanticError {
-        value_error: PydanticErrorKind,
-    },
     // ---------------------
     // literals
     #[strum(serialize = "literal_error", message = "Input should be {expected}")]
@@ -262,7 +259,7 @@ pub enum ErrorKind {
     DateType,
     #[strum(message = "Input should be a valid date in the format YYYY-MM-DD, {error}")]
     DateParsing {
-        error: &'static str,
+        error: String,
     },
     #[strum(message = "Input should be a valid date or datetime, {error}")]
     DateFromDatetimeParsing {
@@ -276,7 +273,7 @@ pub enum ErrorKind {
     TimeType,
     #[strum(message = "Input should be in a valid time format, {error}")]
     TimeParsing {
-        error: &'static str,
+        error: String,
     },
     // ---------------------
     // datetime errors
@@ -287,7 +284,7 @@ pub enum ErrorKind {
         message = "Input should be a valid datetime, {error}"
     )]
     DateTimeParsing {
-        error: &'static str,
+        error: String,
     },
     #[strum(
         serialize = "datetime_object_invalid",
@@ -302,7 +299,7 @@ pub enum ErrorKind {
     TimeDeltaType,
     #[strum(message = "Input should be a valid timedelta, {error}")]
     TimeDeltaParsing {
-        error: &'static str,
+        error: String,
     },
     // ---------------------
     // frozenset errors
@@ -349,7 +346,7 @@ pub enum ErrorKind {
 macro_rules! render {
     ($error_kind:ident, $($value:ident),* $(,)?) => {
         Ok(
-            $error_kind.get_message().expect("ErrorKind with no strum message")
+            $error_kind.message_template()
             $(
                 .replace(concat!("{", stringify!($value), "}"), $value)
             )*
@@ -360,7 +357,7 @@ macro_rules! render {
 macro_rules! to_string_render {
     ($error_kind:ident, $($value:ident),* $(,)?) => {
         Ok(
-            $error_kind.get_message().expect("ErrorKind with no strum message")
+            $error_kind.message_template()
             $(
                 .replace(concat!("{", stringify!($value), "}"), &$value.to_string())
             )*
@@ -378,6 +375,27 @@ macro_rules! py_dict {
     }};
 }
 
+macro_rules! extract_context {
+    ($kind:ident, $context:ident, $($key:ident: $type_:ty),* $(,)?) => {{
+        let context = match $context {
+            Some(context) => context,
+            None => {
+                let context_parts = [$(format!("{}: {}", stringify!($key), stringify!($type_)),)*];
+                return Err(format!("{} requires context: {{{}}}", stringify!($kind), context_parts.join(", ")));
+            }
+        };
+        Ok(Self::$kind{
+            $(
+                $key: context
+                  .get_item(stringify!($key))
+                  .ok_or(format!("{}: '{}' required in context", stringify!($kind), stringify!($key)))?
+                  .extract::<$type_>()
+                  .map_err(|_| format!("{}: '{}' context value must be a {}", stringify!($kind), stringify!($key), stringify!($type_)))?,
+            )*
+        })
+    }};
+}
+
 fn plural_s(value: &usize) -> &'static str {
     if *value == 1 {
         ""
@@ -386,7 +404,85 @@ fn plural_s(value: &usize) -> &'static str {
     }
 }
 
+static ERROR_KIND_LOOKUP: GILOnceCell<AHashMap<String, ErrorKind>> = GILOnceCell::new();
+
 impl ErrorKind {
+    pub fn new(py: Python, value: &str, ctx: Option<&PyDict>) -> Result<Self, String> {
+        let lookup = ERROR_KIND_LOOKUP.get_or_init(py, Self::build_lookup);
+        let error_kind = match lookup.get(value) {
+            Some(error_kind) => error_kind.clone(),
+            None => return Err(format!("Invalid error kind: '{}'", value)),
+        };
+        match error_kind {
+            Self::InvalidJson { .. } => extract_context!(InvalidJson, ctx, error: String),
+            Self::GetAttributeError { .. } => extract_context!(GetAttributeError, ctx, error: String),
+            Self::ModelClassType { .. } => extract_context!(ModelClassType, ctx, class_name: String),
+            Self::GreaterThan { .. } => extract_context!(GreaterThan, ctx, gt: String),
+            Self::GreaterThanEqual { .. } => extract_context!(GreaterThanEqual, ctx, ge: String),
+            Self::LessThan { .. } => extract_context!(LessThan, ctx, lt: String),
+            Self::LessThanEqual { .. } => extract_context!(LessThanEqual, ctx, le: String),
+            Self::TooShort { .. } => extract_context!(TooShort, ctx, min_length: usize, input_length: usize),
+            Self::TooLong { .. } => extract_context!(TooLong, ctx, max_length: usize, input_length: usize),
+            Self::StrTooShort { .. } => extract_context!(StrTooShort, ctx, min_length: usize),
+            Self::StrTooLong { .. } => extract_context!(StrTooLong, ctx, max_length: usize),
+            Self::StrPatternMismatch { .. } => extract_context!(StrPatternMismatch, ctx, pattern: String),
+            Self::DictFromMapping { .. } => extract_context!(DictFromMapping, ctx, error: String),
+            Self::IntNan { .. } => extract_context!(IntNan, ctx, nan_value: String),
+            Self::IntMultipleOf { .. } => extract_context!(IntMultipleOf, ctx, multiple_of: i64),
+            Self::IntGreaterThan { .. } => extract_context!(IntGreaterThan, ctx, gt: i64),
+            Self::IntGreaterThanEqual { .. } => extract_context!(IntGreaterThanEqual, ctx, ge: i64),
+            Self::IntLessThan { .. } => extract_context!(IntLessThan, ctx, lt: i64),
+            Self::IntLessThanEqual { .. } => extract_context!(IntLessThanEqual, ctx, le: i64),
+            Self::FloatMultipleOf { .. } => extract_context!(FloatMultipleOf, ctx, multiple_of: f64),
+            Self::FloatGreaterThan { .. } => extract_context!(FloatGreaterThan, ctx, gt: f64),
+            Self::FloatGreaterThanEqual { .. } => extract_context!(FloatGreaterThanEqual, ctx, ge: f64),
+            Self::FloatLessThan { .. } => extract_context!(FloatLessThan, ctx, lt: f64),
+            Self::FloatLessThanEqual { .. } => extract_context!(FloatLessThanEqual, ctx, le: f64),
+            Self::BytesTooShort { .. } => extract_context!(BytesTooShort, ctx, min_length: usize),
+            Self::BytesTooLong { .. } => extract_context!(BytesTooLong, ctx, max_length: usize),
+            Self::ValueError { .. } => extract_context!(ValueError, ctx, error: String),
+            Self::AssertionError { .. } => extract_context!(AssertionError, ctx, error: String),
+            Self::LiteralSingleError { .. } => extract_context!(LiteralSingleError, ctx, expected: String),
+            Self::LiteralMultipleError { .. } => extract_context!(LiteralMultipleError, ctx, expected: String),
+            Self::DateParsing { .. } => extract_context!(DateParsing, ctx, error: String),
+            Self::DateFromDatetimeParsing { .. } => extract_context!(DateFromDatetimeParsing, ctx, error: String),
+            Self::TimeParsing { .. } => extract_context!(TimeParsing, ctx, error: String),
+            Self::DateTimeParsing { .. } => extract_context!(DateTimeParsing, ctx, error: String),
+            Self::DateTimeObjectInvalid { .. } => extract_context!(DateTimeObjectInvalid, ctx, error: String),
+            Self::TimeDeltaParsing { .. } => extract_context!(TimeDeltaParsing, ctx, error: String),
+            Self::IsInstanceOf { .. } => extract_context!(IsInstanceOf, ctx, class: String),
+            Self::UnionTagInvalid { .. } => extract_context!(
+                UnionTagInvalid,
+                ctx,
+                discriminator: String,
+                tag: String,
+                expected_tags: String
+            ),
+            Self::UnionTagNotFound { .. } => extract_context!(UnionTagNotFound, ctx, discriminator: String),
+            _ => {
+                if ctx.is_some() {
+                    Err(format!("'{}' errors do not require context", value))
+                } else {
+                    Ok(error_kind)
+                }
+            }
+        }
+    }
+
+    fn build_lookup() -> AHashMap<String, Self> {
+        let mut lookup = AHashMap::new();
+        for error_kind in Self::iter() {
+            if !matches!(error_kind, Self::CustomError { .. }) {
+                lookup.insert(error_kind.to_string(), error_kind);
+            }
+        }
+        lookup
+    }
+
+    pub fn message_template(&self) -> &'static str {
+        self.get_message().expect("ErrorKind with no strum message")
+    }
+
     pub fn kind(&self) -> String {
         match self {
             Self::CustomError { value_error } => value_error.kind(),
@@ -454,7 +550,7 @@ impl ErrorKind {
                 expected_tags,
             } => render!(self, discriminator, tag, expected_tags),
             Self::UnionTagNotFound { discriminator } => render!(self, discriminator),
-            _ => Ok(self.get_message().expect("ErrorKind with no strum message").to_string()),
+            _ => Ok(self.message_template().to_string()),
         }
     }
 
@@ -512,77 +608,5 @@ impl ErrorKind {
             Self::UnionTagNotFound { discriminator } => py_dict!(py, discriminator),
             _ => Ok(None),
         }
-    }
-}
-
-#[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
-#[derive(Debug, Clone)]
-pub struct PydanticErrorKind {
-    kind: String,
-    message_template: String,
-    context: Option<Py<PyDict>>,
-}
-
-#[pymethods]
-impl PydanticErrorKind {
-    #[new]
-    pub fn py_new(py: Python, kind: String, message_template: String, context: Option<&PyDict>) -> Self {
-        Self {
-            kind,
-            message_template,
-            context: context.map(|c| c.into_py(py)),
-        }
-    }
-
-    #[getter]
-    pub fn kind(&self) -> String {
-        self.kind.clone()
-    }
-
-    #[getter]
-    pub fn message_template(&self) -> String {
-        self.message_template.clone()
-    }
-
-    #[getter]
-    pub fn context(&self, py: Python) -> Option<Py<PyDict>> {
-        self.context.as_ref().map(|c| c.clone_ref(py))
-    }
-
-    pub fn message(&self, py: Python) -> PyResult<String> {
-        let mut message = self.message_template.clone();
-        if let Some(ref context) = self.context {
-            for item in context.as_ref(py).items().iter() {
-                let (key, value): (&PyString, &PyAny) = item.extract()?;
-                if let Ok(py_str) = value.cast_as::<PyString>() {
-                    message = message.replace(&format!("{{{}}}", key.to_str()?), py_str.to_str()?);
-                } else if let Ok(value_int) = value.extract::<i64>() {
-                    message = message.replace(&format!("{{{}}}", key.to_str()?), &value_int.to_string());
-                } else {
-                    // fallback for anything else just in case
-                    message = message.replace(&format!("{{{}}}", key.to_str()?), &value.to_string());
-                }
-            }
-        }
-        Ok(message)
-    }
-
-    fn __str__(&self, py: Python) -> PyResult<String> {
-        self.message(py)
-    }
-
-    fn __repr__(&self, py: Python) -> PyResult<String> {
-        let msg = self.message(py)?;
-        match { self.context.as_ref() } {
-            Some(ctx) => Ok(format!("{} [kind={}, context={}]", msg, self.kind, ctx.as_ref(py))),
-            None => Ok(format!("{} [kind={}, context=None]", msg, self.kind)),
-        }
-    }
-}
-
-impl PydanticErrorKind {
-    pub fn into_val_error<'a>(self, input: &'a impl Input<'a>) -> ValError<'a> {
-        let kind = ErrorKind::PydanticError { value_error: self };
-        ValError::new(kind, input)
     }
 }
