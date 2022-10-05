@@ -170,6 +170,13 @@ def test_is_instance_dict():
     assert v.isinstance_json('{"foo": {"a": 1}}') is True
 
 
+def test_is_instance_dict_not_str():
+    v = SchemaValidator(core_schema.dict_schema(keys_schema=core_schema.is_instance_schema(int, json_types={'int'})))
+    assert v.isinstance_python({1: 1}) is True
+    assert v.isinstance_python({'foo': 1}) is False
+    assert v.isinstance_json('{"foo": 1}') is False
+
+
 def test_json_mask():
     assert 'json_types:128' in plain_repr(SchemaValidator(core_schema.is_instance_schema(str, json_types={'null'})))
     assert 'json_types:0' in plain_repr(SchemaValidator(core_schema.is_instance_schema(str)))
