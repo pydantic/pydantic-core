@@ -34,8 +34,10 @@ impl<'a> Input<'a> for JsonInput {
         matches!(self, JsonInput::Null)
     }
 
-    fn is_instance(&self, _class: &PyType, json_mask: Option<u8>) -> PyResult<bool> {
-        if let Some(mask) = json_mask {
+    fn is_instance(&self, _class: &PyType, json_mask: u8) -> PyResult<bool> {
+        if json_mask == 0 {
+            Ok(false)
+        } else {
             let json_type: JsonType = match self {
                 JsonInput::Null => JsonType::Null,
                 JsonInput::Bool(_) => JsonType::Bool,
@@ -45,9 +47,7 @@ impl<'a> Input<'a> for JsonInput {
                 JsonInput::Array(_) => JsonType::Array,
                 JsonInput::Object(_) => JsonType::Object,
             };
-            Ok(json_type.matches(mask))
-        } else {
-            Ok(false)
+            Ok(json_type.matches(json_mask))
         }
     }
 
@@ -305,11 +305,11 @@ impl<'a> Input<'a> for String {
         false
     }
 
-    fn is_instance(&self, _class: &PyType, json_mask: Option<u8>) -> PyResult<bool> {
-        if let Some(mask) = json_mask {
-            Ok(JsonType::String.matches(mask))
-        } else {
+    fn is_instance(&self, _class: &PyType, json_mask: u8) -> PyResult<bool> {
+        if json_mask == 0 {
             Ok(false)
+        } else {
+            Ok(JsonType::String.matches(json_mask))
         }
     }
 

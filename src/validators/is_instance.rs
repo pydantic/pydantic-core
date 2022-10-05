@@ -12,7 +12,7 @@ use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 #[derive(Debug, Clone)]
 pub struct IsInstanceValidator {
     class: Py<PyType>,
-    json_types: Option<u8>,
+    json_types: u8,
     class_repr: String,
     name: String,
 }
@@ -29,8 +29,8 @@ impl BuildValidator for IsInstanceValidator {
         let class_repr = class.name()?.to_string();
         let name = format!("{}[{}]", Self::EXPECTED_TYPE, class_repr);
         let json_types = match schema.get_as::<&PySet>(intern!(schema.py(), "json_types"))? {
-            Some(s) => Some(JsonType::combine(s)?),
-            None => None,
+            Some(s) => JsonType::combine(s)?,
+            None => 0,
         };
         Ok(Self {
             class: class.into(),

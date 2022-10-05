@@ -171,7 +171,8 @@ def test_is_instance_dict():
 
 
 def test_json_mask():
-    v = SchemaValidator(core_schema.is_instance_schema(str, json_types={'null'}))
-    assert 'json_types:Some(128)' in plain_repr(v)
+    assert 'json_types:128' in plain_repr(SchemaValidator(core_schema.is_instance_schema(str, json_types={'null'})))
+    assert 'json_types:0' in plain_repr(SchemaValidator(core_schema.is_instance_schema(str)))
+    assert 'json_types:0' in plain_repr(SchemaValidator(core_schema.is_instance_schema(str, json_types=set())))
     v = SchemaValidator(core_schema.is_instance_schema(str, json_types={'list', 'dict'}))
-    assert 'json_types:Some(6)' in plain_repr(v)  # 2 + 4
+    assert 'json_types:6' in plain_repr(v)  # 2 + 4
