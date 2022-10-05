@@ -152,7 +152,7 @@ def test_is_instance_json_string_bool(input_val, expected):
     ],
 )
 def test_is_instance_json_list(input_val, expected):
-    v = SchemaValidator(core_schema.is_instance_schema(Foo, json_types={'list'}))
+    v = SchemaValidator(core_schema.is_instance_schema(Foo, json_types=('list',)))
     assert v.isinstance_json(input_val) == expected
 
 
