@@ -962,7 +962,6 @@ def test_chain_nested_functions(benchmark):
     benchmark(validator.validate_python, '42.42')
 
 
-<<<<<<< HEAD
 def validate_yield(iterable, validator):
     for item in iterable:
         yield validator(item)
