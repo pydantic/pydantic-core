@@ -9,6 +9,8 @@ on:
       - '.github/workflows/benchmarks.yml'
     branches:
       - main
+  pull_request:
+
 
 permissions:
   deployments: write
@@ -52,14 +54,7 @@ jobs:
       # this is required so that pytest uses the installed package
       - run: rm tests/__init__.py
 
-      - run: >
-          pytest tests/benchmarks/
-          --benchmark-enable
-          --benchmark-json output.json
-
-      - uses: benchmark-action/github-action-benchmark@v1
+      - uses: art049/avalanche-action@master
         with:
-          tool: pytest
-          output-file-path: output.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          run: pytest tests/benchmarks/ --benchmark
