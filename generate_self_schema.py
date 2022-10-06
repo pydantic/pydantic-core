@@ -11,16 +11,19 @@ import re
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, ForwardRef, List, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, ForwardRef, List, Set, Type, Union
 
-from typing_extensions import get_args, is_typeddict
+from typing_extensions import get_args, get_origin, is_typeddict
+
+TypingUnionType = Type[Union[str, int]]
 
 try:
-    from typing import get_origin
-except ImportError:
+    from types import UnionType as TypesUnionType
 
-    def get_origin(t):
-        return getattr(t, '__origin__', None)
+    UnionType = Union[TypingUnionType, TypesUnionType]
+
+except ImportError:
+    UnionType = TypingUnionType
 
 
 THIS_DIR = Path(__file__).parent
@@ -49,6 +52,8 @@ def get_schema(obj) -> core_schema.CoreSchema:
         return type_dict_schema(obj)
     elif obj == Any or obj == type:
         return {'type': 'any'}
+    if isinstance(obj, type) and issubclass(obj, core_schema.Protocol):
+        return {'type': 'callable'}
 
     origin = get_origin(obj)
     assert origin is not None, f'origin cannot be None, obj={obj}, you probably need to fix generate_self_schema.py'
@@ -62,6 +67,8 @@ def get_schema(obj) -> core_schema.CoreSchema:
         return {'type': 'literal', 'expected': expected}
     elif issubclass(origin, List):
         return {'type': 'list', 'items_schema': get_schema(obj.__args__[0])}
+    elif issubclass(origin, Set):
+        return {'type': 'set', 'items_schema': get_schema(obj.__args__[0])}
     elif issubclass(origin, Dict):
         return {
             'type': 'dict',
@@ -120,7 +127,7 @@ def type_dict_schema(typed_dict) -> dict[str, Any]:
     return {'type': 'typed-dict', 'fields': fields, 'extra_behavior': 'forbid'}
 
 
-def union_schema(union_type: type[Union]) -> core_schema.UnionSchema:
+def union_schema(union_type: UnionType) -> core_schema.UnionSchema:
     return {'type': 'union', 'choices': [get_schema(arg) for arg in union_type.__args__]}
 
 
@@ -151,8 +158,12 @@ def main() -> None:
         assert m, f'Unknown schema type: {type_}'
         key = m.group(1)
         value = get_schema(s)
-        if key == 'function' and value['fields']['mode']['schema']['expected'] == ['plain']:
-            key = 'function-plain'
+        if key == 'function':
+            mode = value['fields']['mode']['schema']['expected']
+            if mode == ['plain']:
+                key = 'function-plain'
+            elif mode == ['wrap']:
+                key = 'function-wrap'
         elif key == 'tuple':
             if value['fields']['mode']['schema']['expected'] == ['positional']:
                 key = 'tuple-positional'

@@ -1,13 +1,18 @@
+use pyo3::prelude::*;
+use pyo3::types::PyType;
+
 use crate::errors::{ErrorKind, InputValue, LocItem, ValError, ValResult};
+use crate::input::JsonType;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
     float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
+use super::parse_json::JsonArray;
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_int};
 use super::{
-    EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericCollection, GenericMapping, Input, JsonArgs,
-    JsonInput,
+    EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericCollection, GenericIterator, GenericMapping,
+    Input, JsonArgs, JsonInput,
 };
 
 impl<'a> Input<'a> for JsonInput {
@@ -27,6 +32,23 @@ impl<'a> Input<'a> for JsonInput {
 
     fn is_none(&self) -> bool {
         matches!(self, JsonInput::Null)
+    }
+
+    fn is_instance(&self, _class: &PyType, json_mask: u8) -> PyResult<bool> {
+        if json_mask == 0 {
+            Ok(false)
+        } else {
+            let json_type: JsonType = match self {
+                JsonInput::Null => JsonType::Null,
+                JsonInput::Bool(_) => JsonType::Bool,
+                JsonInput::Int(_) => JsonType::Int,
+                JsonInput::Float(_) => JsonType::Float,
+                JsonInput::String(_) => JsonType::String,
+                JsonInput::Array(_) => JsonType::Array,
+                JsonInput::Object(_) => JsonType::Object,
+            };
+            Ok(json_type.matches(json_mask))
+        }
     }
 
     fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
@@ -196,6 +218,19 @@ impl<'a> Input<'a> for JsonInput {
         self.validate_frozenset(false)
     }
 
+    fn validate_iter(&self) -> ValResult<GenericIterator> {
+        match self {
+            JsonInput::Array(a) => Ok(a.clone().into()),
+            JsonInput::String(s) => Ok(string_to_vec(s).into()),
+            JsonInput::Object(object) => {
+                // return keys iterator to match python's behavior
+                let keys: Vec<JsonInput> = object.keys().map(|k| JsonInput::String(k.clone())).collect();
+                Ok(keys.into())
+            }
+            _ => Err(ValError::new(ErrorKind::IterableType, self)),
+        }
+    }
+
     fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
         match self {
             JsonInput::String(v) => bytes_as_date(self, v.as_bytes()),
@@ -268,6 +303,14 @@ impl<'a> Input<'a> for String {
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn is_none(&self) -> bool {
         false
+    }
+
+    fn is_instance(&self, _class: &PyType, json_mask: u8) -> PyResult<bool> {
+        if json_mask == 0 {
+            Ok(false)
+        } else {
+            Ok(JsonType::String.matches(json_mask))
+        }
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
@@ -363,6 +406,10 @@ impl<'a> Input<'a> for String {
         self.validate_frozenset(false)
     }
 
+    fn validate_iter(&self) -> ValResult<GenericIterator> {
+        Ok(string_to_vec(self).into())
+    }
+
     fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
         bytes_as_date(self, self.as_bytes())
     }
@@ -394,4 +441,8 @@ impl<'a> Input<'a> for String {
     fn strict_timedelta(&self) -> ValResult<EitherTimedelta> {
         self.validate_timedelta(false)
     }
+}
+
+fn string_to_vec(s: &str) -> JsonArray {
+    s.chars().map(|c| JsonInput::String(c.to_string())).collect()
 }
