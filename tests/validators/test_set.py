@@ -132,13 +132,18 @@ def test_set_multiple_errors():
         ({'min_length': 3}, {1, 2}, Err('Input should have at least 3 items, got 2 items [kind=too_short,')),
         ({'max_length': 3}, {1, 2, 3}, {1, 2, 3}),
         ({'max_length': 3}, {1, 2, 3, 4}, Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
+        ({'max_length': 3}, [1, 2, 3, 4], Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
+        ({'max_length': 3, 'items_schema': {'type': 'int'}}, {1, 2, 3, 4}, Err('kind=too_long,')),
+        ({'max_length': 3, 'items_schema': {'type': 'int'}}, [1, 2, 3, 4], Err('kind=too_long,')),
     ],
+    ids=repr,
 )
 def test_set_kwargs(kwargs: Dict[str, Any], input_value, expected):
     v = SchemaValidator({'type': 'set', **kwargs})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
-            v.validate_python(input_value)
+            r = v.validate_python(input_value)
+            print(f'unexpected result: {r!r}')
     else:
         assert v.validate_python(input_value) == expected
 

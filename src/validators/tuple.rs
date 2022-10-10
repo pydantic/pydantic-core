@@ -33,7 +33,7 @@ impl BuildValidator for TupleBuilder {
 pub struct TupleVariableValidator {
     strict: bool,
     item_validator: Option<Box<CombinedValidator>>,
-    size_range: Option<(Option<usize>, Option<usize>)>,
+    size_range: (Option<usize>, Option<usize>),
     name: String,
 }
 
@@ -52,13 +52,15 @@ impl Validator for TupleVariableValidator {
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
 
-        let length = seq.check_len(self.size_range, input)?;
+        let (capacity, check_max_length) = seq.pre_check(self.size_range, input, false)?;
 
         let output = match self.item_validator {
-            Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
+            Some(ref v) => {
+                seq.validate_to_vec(py, input, capacity, check_max_length, v, extra, slots, recursion_guard)?
+            }
             None => match seq {
                 GenericCollection::Tuple(tuple) => return Ok(tuple.into_py(py)),
-                _ => seq.to_vec(py)?,
+                _ => seq.to_vec(py, input, check_max_length)?,
             },
         };
         Ok(PyTuple::new(py, &output).into_py(py))

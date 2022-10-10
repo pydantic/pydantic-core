@@ -13,7 +13,7 @@ pub struct ListValidator {
     strict: bool,
     allow_any_iter: bool,
     item_validator: Option<Box<CombinedValidator>>,
-    size_range: Option<(Option<usize>, Option<usize>)>,
+    size_range: (Option<usize>, Option<usize>),
     name: String,
 }
 
@@ -53,10 +53,7 @@ macro_rules! generic_collection_build {
             Ok(Self {
                 strict: crate::build_tools::is_strict(schema, config)?,
                 item_validator,
-                size_range: match min_length.is_some() || max_length.is_some() {
-                    true => Some((min_length, max_length)),
-                    false => None,
-                },
+                size_range: (min_length, max_length),
                 name,
             }
             .into())
@@ -83,10 +80,7 @@ impl BuildValidator for ListValidator {
             strict: crate::build_tools::is_strict(schema, config)?,
             allow_any_iter: schema.get_as(pyo3::intern!(py, "allow_any_iter"))?.unwrap_or(false),
             item_validator,
-            size_range: match min_length.is_some() || max_length.is_some() {
-                true => Some((min_length, max_length)),
-                false => None,
-            },
+            size_range: (min_length, max_length),
             name,
         }
         .into())
@@ -104,13 +98,15 @@ impl Validator for ListValidator {
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_list(extra.strict.unwrap_or(self.strict), self.allow_any_iter)?;
 
-        let length = seq.check_len(self.size_range, input)?;
+        let (capacity, check_max_length) = seq.pre_check(self.size_range, input, false)?;
 
         let output = match self.item_validator {
-            Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
+            Some(ref v) => {
+                seq.validate_to_vec(py, input, capacity, check_max_length, v, extra, slots, recursion_guard)?
+            }
             None => match seq {
                 GenericCollection::List(list) => return Ok(list.into_py(py)),
-                _ => seq.to_vec(py)?,
+                _ => seq.to_vec(py, input, check_max_length)?,
             },
         };
         Ok(output.into_py(py))

@@ -233,7 +233,7 @@ def test_repr():
         'SchemaValidator('
         'name="frozenset[any]",'
         'validator=FrozenSet(FrozenSetValidator{'
-        'strict:true,item_validator:None,size_range:Some((Some(42),None)),name:"frozenset[any]"'
+        'strict:true,item_validator:None,size_range:(Some(42),None),name:"frozenset[any]"'
         '}),slots=[])'
     )
 

@@ -3,7 +3,7 @@ use pyo3::types::{PyDict, PyFrozenSet};
 
 use crate::build_tools::SchemaDict;
 use crate::errors::ValResult;
-use crate::input::{GenericCollection, Input};
+use crate::input::{too_long_check, GenericCollection, Input};
 use crate::recursion_guard::RecursionGuard;
 
 use super::list::generic_collection_build;
@@ -13,7 +13,7 @@ use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 pub struct FrozenSetValidator {
     strict: bool,
     item_validator: Option<Box<CombinedValidator>>,
-    size_range: Option<(Option<usize>, Option<usize>)>,
+    size_range: (Option<usize>, Option<usize>),
     name: String,
 }
 
@@ -33,16 +33,22 @@ impl Validator for FrozenSetValidator {
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_frozenset(extra.strict.unwrap_or(self.strict))?;
 
-        let length = seq.check_len(self.size_range, input)?;
+        let (capacity, check_max_length) = seq.pre_check(self.size_range, input, true)?;
 
-        let output = match self.item_validator {
-            Some(ref v) => seq.validate_to_vec(py, length, v, extra, slots, recursion_guard)?,
+        let f_set = match self.item_validator {
+            Some(ref v) => PyFrozenSet::new(
+                py,
+                &seq.validate_to_vec(py, input, capacity, check_max_length, v, extra, slots, recursion_guard)?,
+            )?,
             None => match seq {
-                GenericCollection::FrozenSet(f_set) => return Ok(f_set.into_py(py)),
-                _ => seq.to_vec(py)?,
+                GenericCollection::FrozenSet(f_set) => f_set,
+                _ => PyFrozenSet::new(py, &seq.to_vec(py, input, check_max_length)?)?,
             },
         };
-        Ok(PyFrozenSet::new(py, &output)?.into_py(py))
+        if self.size_range.1.is_some() {
+            too_long_check(input, f_set.len(), self.size_range.1)?;
+        }
+        Ok(f_set.into_py(py))
     }
 
     fn get_name(&self) -> &str {

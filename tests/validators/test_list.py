@@ -310,21 +310,36 @@ def test_sequence(MySequence):
     ]
 
 
-@pytest.mark.xfail(reason='Length needs to be moved to after checks')
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ([1, 2, 3], [1, 2, 3]),
+        ((1, 2, 3), [1, 2, 3]),
+        (gen_ints(), [1, 2, 3]),
+        ({1: 2, 3: 4}, [1, 3]),
+        ('123', [1, 2, 3]),
+        (
+            123,
+            Err(
+                '1 validation error for list[int]',
+                [{'kind': 'list_type', 'loc': [], 'message': 'Input should be a valid list/array', 'input_value': 123}],
+            ),
+        ),
+    ],
+)
+def test_allow_any_iter(input_value, expected):
+    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_any_iter': True})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_python(input_value)
+        assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_python(input_value) == expected
+
+
 def test_sequence_allow_any_iter(MySequence):
     v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_any_iter': True})
-    assert v.validate_python([1, 2, 3]) == [1, 2, 3]
-    assert v.validate_python((1, 2, 3)) == [1, 2, 3]
     assert v.validate_python(MySequence()) == [1, 2, 3]
-    assert v.validate_python(gen_ints()) == [1, 2, 3]
-    assert v.validate_python({1: 2, 3: 4}) == [1, 3]
-    assert v.validate_python('123') == [1, 2, 3]
-    with pytest.raises(ValidationError) as exc_info:
-        v.validate_python(123)
-    # insert_assert(exc_info.value.errors())
-    assert exc_info.value.errors() == [
-        {'kind': 'list_type', 'loc': [], 'message': 'Input should be a valid list/array', 'input_value': 123}
-    ]
 
 
 @pytest.mark.parametrize('items_schema', ['int', 'any'])
