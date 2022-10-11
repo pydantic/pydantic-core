@@ -196,7 +196,7 @@ def test_length_ctx():
             'loc': [],
             'message': 'List should have at least 2 items after validation, not 1',
             'input_value': [1],
-            'context': {'field_type': 'List', 'min_length': 2, 'actual_length': 1, 'expected_plural': 's'},
+            'context': {'field_type': 'List', 'min_length': 2, 'actual_length': 1},
         }
     ]
 
@@ -210,7 +210,7 @@ def test_length_ctx():
             'loc': [],
             'message': 'List should have at most 3 items after validation, not 4',
             'input_value': [1, 2, 3, 4],
-            'context': {'field_type': 'List', 'max_length': 3, 'actual_length': 4, 'expected_plural': 's'},
+            'context': {'field_type': 'List', 'max_length': 3, 'actual_length': 4},
         }
     ]
 
@@ -349,6 +349,7 @@ def test_sequence(MySequence):
     [
         ([1, 2, 3], [1, 2, 3]),
         ((1, 2, 3), [1, 2, 3]),
+        (range(3), [0, 1, 2]),
         (gen_ints(), [1, 2, 3]),
         ({1: 2, 3: 4}, [1, 3]),
         ('123', [1, 2, 3]),

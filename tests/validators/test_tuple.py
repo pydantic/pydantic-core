@@ -250,7 +250,7 @@ def test_extra_arguments(py_and_json: PyAndJson):
             'loc': [],
             'message': 'Tuple should have at most 2 items after validation, not 4',
             'input_value': [1, 2, 3, 4],
-            'context': {'field_type': 'Tuple', 'max_length': 2, 'actual_length': 4, 'expected_plural': 's'},
+            'context': {'field_type': 'Tuple', 'max_length': 2, 'actual_length': 4},
         }
     ]
 

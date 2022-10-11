@@ -472,18 +472,12 @@ impl ErrorKind {
                 field_type,
                 min_length,
                 actual_length,
-            } => {
-                let expected_plural = plural_s(min_length);
-                py_dict!(py, field_type, min_length, actual_length, expected_plural)
-            }
+            } => py_dict!(py, field_type, min_length, actual_length),
             Self::TooLong {
                 field_type,
                 max_length,
                 actual_length,
-            } => {
-                let expected_plural = plural_s(max_length);
-                py_dict!(py, field_type, max_length, actual_length, expected_plural)
-            }
+            } => py_dict!(py, field_type, max_length, actual_length),
             Self::IterationError { error } => py_dict!(py, error),
             Self::StrTooShort { min_length } => py_dict!(py, min_length),
             Self::StrTooLong { max_length } => py_dict!(py, max_length),
