@@ -2,12 +2,12 @@ from __future__ import annotations as _annotations
 
 import sys
 from datetime import date, datetime, time, timedelta
-from typing import Any, Callable, Dict, List, Optional, Type, Union, overload
+from typing import Any, Callable, Dict, List, Optional, Set, Type, Union, overload
 
 if sys.version_info < (3, 11):
-    from typing_extensions import NotRequired, Required
+    from typing_extensions import NotRequired, Protocol, Required
 else:
-    from typing import NotRequired, Required
+    from typing import NotRequired, Protocol, Required
 
 if sys.version_info < (3, 9):
     from typing_extensions import Literal, TypedDict
@@ -278,13 +278,21 @@ def literal_schema(*expected: Any, ref: str | None = None) -> LiteralSchema:
     return dict_not_none(type='literal', expected=expected, ref=ref)
 
 
-class IsInstanceSchema(TypedDict):
-    type: Literal['is-instance']
-    cls: Type[Any]
+# must match input/parse_json.rs::JsonType::try_from
+JsonType = Literal['null', 'bool', 'int', 'float', 'str', 'list', 'dict']
 
 
-def is_instance_schema(cls: Type[Any]) -> IsInstanceSchema:
-    return dict_not_none(type='is-instance', cls=cls)
+class IsInstanceSchema(TypedDict, total=False):
+    type: Required[Literal['is-instance']]
+    cls: Required[Type[Any]]
+    json_types: Set[JsonType]
+    ref: str
+
+
+def is_instance_schema(
+    cls: Type[Any], *, json_types: Set[JsonType] | None = None, ref: str | None = None
+) -> IsInstanceSchema:
+    return dict_not_none(type='is-instance', cls=cls, json_types=json_types, ref=ref)
 
 
 class CallableSchema(TypedDict):
@@ -297,7 +305,7 @@ def callable_schema() -> CallableSchema:
 
 class ListSchema(TypedDict, total=False):
     type: Required[Literal['list']]
-    items_schema: CoreSchema  # default: AnySchema
+    items_schema: CoreSchema
     min_length: int
     max_length: int
     strict: bool
@@ -368,7 +376,7 @@ def tuple_variable_schema(
 
 class SetSchema(TypedDict, total=False):
     type: Required[Literal['set']]
-    items_schema: CoreSchema  # default: AnySchema
+    items_schema: CoreSchema
     min_length: int
     max_length: int
     strict: bool
@@ -390,14 +398,14 @@ def set_schema(
 
 class FrozenSetSchema(TypedDict, total=False):
     type: Required[Literal['frozenset']]
-    items_schema: CoreSchema  # default: AnySchema
+    items_schema: CoreSchema
     min_length: int
     max_length: int
     strict: bool
     ref: str
 
 
-def frozen_set_schema(
+def frozenset_schema(
     items_schema: CoreSchema | None = None,
     *,
     min_length: int | None = None,
@@ -413,6 +421,19 @@ def frozen_set_schema(
         strict=strict,
         ref=ref,
     )
+
+
+class GeneratorSchema(TypedDict, total=False):
+    type: Required[Literal['generator']]
+    items_schema: CoreSchema
+    max_length: int
+    ref: str
+
+
+def generator_schema(
+    items_schema: CoreSchema | None = None, *, max_length: int | None = None, ref: str | None = None
+) -> GeneratorSchema:
+    return dict_not_none(type='generator', items_schema=items_schema, max_length=max_length, ref=ref)
 
 
 class DictSchema(TypedDict, total=False):
@@ -445,10 +466,17 @@ def dict_schema(
     )
 
 
+class ValidatorFunction(Protocol):
+    def __call__(
+        self, __input_value: Any, *, data: Any, config: CoreConfig | None, context: Any, **future_kwargs: Any
+    ) -> Any:
+        ...
+
+
 class FunctionSchema(TypedDict):
     type: Literal['function']
-    mode: Literal['before', 'after', 'wrap']
-    function: Callable[..., Any]
+    mode: Literal['before', 'after']
+    function: ValidatorFunction
     schema: CoreSchema
     # validator_instance is used by pydantic for progressively preparing the function, ignored by pydantic-core
     validator_instance: NotRequired[Any]
@@ -456,7 +484,7 @@ class FunctionSchema(TypedDict):
 
 
 def function_before_schema(
-    function: Callable[..., Any], schema: CoreSchema, *, validator_instance: Any | None = None, ref: str | None = None
+    function: ValidatorFunction, schema: CoreSchema, *, validator_instance: Any | None = None, ref: str | None = None
 ) -> FunctionSchema:
     return dict_not_none(
         type='function', mode='before', function=function, schema=schema, validator_instance=validator_instance, ref=ref
@@ -464,16 +492,49 @@ def function_before_schema(
 
 
 def function_after_schema(
-    function: Callable[..., Any], schema: CoreSchema, *, validator_instance: Any | None = None, ref: str | None = None
+    function: ValidatorFunction, schema: CoreSchema, *, validator_instance: Any | None = None, ref: str | None = None
 ) -> FunctionSchema:
     return dict_not_none(
         type='function', mode='after', function=function, schema=schema, validator_instance=validator_instance, ref=ref
     )
 
 
+class CallableValidator(Protocol):
+    def __call__(self, input_value: Any, outer_location: str | int | None = None) -> Any:
+        ...
+
+
+class WrapValidatorFunction(Protocol):
+    def __call__(
+        self,
+        __input_value: Any,
+        *,
+        validator: CallableValidator,
+        data: Any,
+        config: CoreConfig | None,
+        context: Any,
+        **future_kwargs: Any,
+    ) -> Any:
+        ...
+
+
+class FunctionWrapSchema(TypedDict):
+    type: Literal['function']
+    mode: Literal['wrap']
+    function: WrapValidatorFunction
+    schema: CoreSchema
+    # validator_instance is used by pydantic for progressively preparing the function, ignored by pydantic-core
+    validator_instance: NotRequired[Any]
+    ref: NotRequired[str]
+
+
 def function_wrap_schema(
-    function: Callable[..., Any], schema: CoreSchema, *, validator_instance: Any | None = None, ref: str | None = None
-) -> FunctionSchema:
+    function: WrapValidatorFunction,
+    schema: CoreSchema,
+    *,
+    validator_instance: Any | None = None,
+    ref: str | None = None,
+) -> FunctionWrapSchema:
     return dict_not_none(
         type='function', mode='wrap', function=function, schema=schema, validator_instance=validator_instance, ref=ref
     )
@@ -482,14 +543,14 @@ def function_wrap_schema(
 class FunctionPlainSchema(TypedDict):
     type: Literal['function']
     mode: Literal['plain']
-    function: Callable[..., Any]
+    function: ValidatorFunction
     # validator_instance is used by pydantic for progressively preparing the function, ignored by pydantic-core
     validator_instance: NotRequired[Any]
     ref: NotRequired[str]
 
 
 def function_plain_schema(
-    function: Callable[..., Any], *, validator_instance: Any | None = None, ref: str | None = None
+    function: ValidatorFunction, *, validator_instance: Any | None = None, ref: str | None = None
 ) -> FunctionPlainSchema:
     return dict_not_none(
         type='function', mode='plain', function=function, validator_instance=validator_instance, ref=ref
@@ -825,8 +886,10 @@ CoreSchema = Union[
     TupleVariableSchema,
     SetSchema,
     FrozenSetSchema,
+    GeneratorSchema,
     DictSchema,
     FunctionSchema,
+    FunctionWrapSchema,
     FunctionPlainSchema,
     WithDefaultSchema,
     NullableSchema,

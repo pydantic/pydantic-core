@@ -29,6 +29,7 @@ mod dict;
 mod float;
 mod frozenset;
 mod function;
+mod generator;
 mod int;
 mod is_instance;
 mod list;
@@ -247,7 +248,7 @@ impl SchemaValidator {
     }
 
     fn prepare_validation_err(&self, py: Python, error: ValError) -> PyErr {
-        ValidationError::from_val_error(py, self.title.clone_ref(py), error)
+        ValidationError::from_val_error(py, self.title.clone_ref(py), error, None)
     }
 }
 
@@ -384,11 +385,13 @@ pub fn build_validator<'a>(
         with_default::WithDefaultValidator,
         // chain validators
         chain::ChainValidator,
+        // generator validators
+        generator::GeneratorValidator,
     )
 }
 
 /// More (mostly immutable) data to pass between validators, should probably be class `Context`,
-/// but that would confuse it with context as per samuelcolvin/pydantic#1549
+/// but that would confuse it with context as per pydantic/pydantic#1549
 #[derive(Debug, Default)]
 pub struct Extra<'a> {
     /// This is used as the `data` kwargs to validator functions, it also represents the current model
@@ -496,6 +499,8 @@ pub enum CombinedValidator {
     WithDefault(with_default::WithDefaultValidator),
     // chain validators
     Chain(chain::ChainValidator),
+    // generator validators
+    Generator(generator::GeneratorValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

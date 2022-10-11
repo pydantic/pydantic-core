@@ -1,14 +1,15 @@
-use pyo3::exceptions::{PyAssertionError, PyValueError};
+use pyo3::exceptions::{PyAssertionError, PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
-use crate::build_tools::SchemaDict;
-use crate::errors::{ErrorKind, PydanticCustomError, PydanticErrorKind, ValError, ValResult, ValidationError};
+use crate::build_tools::{py_error, SchemaDict};
+use crate::errors::{ErrorKind, LocItem, PydanticCustomError, PydanticErrorKind, ValError, ValResult, ValidationError};
 use crate::input::Input;
 use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
 
+use super::generator::InternalValidator;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 pub struct FunctionBuilder;
@@ -203,13 +204,7 @@ impl Validator for FunctionWrapValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let validator_kwarg = ValidatorCallable {
-            validator: self.validator.clone(),
-            slots: slots.to_vec(),
-            data: extra.data.map(|d| d.into_py(py)),
-            field: extra.field.map(|f| f.to_string()),
-            strict: extra.strict,
-            context: extra.context.map(|d| d.into_py(py)),
-            recursion_guard: recursion_guard.clone(),
+            validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
         };
         let kwargs = kwargs!(
             py,
@@ -236,30 +231,23 @@ impl Validator for FunctionWrapValidator {
     }
 }
 
-#[pyclass]
+#[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
 struct ValidatorCallable {
-    validator: Box<CombinedValidator>,
-    slots: Vec<CombinedValidator>,
-    data: Option<Py<PyDict>>,
-    field: Option<String>,
-    strict: Option<bool>,
-    context: Option<PyObject>,
-    recursion_guard: RecursionGuard,
+    validator: InternalValidator,
 }
 
 #[pymethods]
 impl ValidatorCallable {
-    fn __call__(&mut self, py: Python, arg: &PyAny) -> PyResult<PyObject> {
-        let extra = Extra {
-            data: self.data.as_ref().map(|data| data.as_ref(py)),
-            field: self.field.as_deref(),
-            strict: self.strict,
-            context: self.context.as_ref().map(|data| data.as_ref(py)),
+    fn __call__(&mut self, py: Python, input_value: &PyAny, outer_location: Option<&PyAny>) -> PyResult<PyObject> {
+        let outer_location = match outer_location {
+            Some(ol) => match LocItem::try_from(ol) {
+                Ok(ol) => Some(ol),
+                Err(_) => return py_error!(PyTypeError; "ValidatorCallable outer_location must be a str or int"),
+            },
+            None => None,
         };
-        self.validator
-            .validate(py, arg, &extra, &self.slots, &mut self.recursion_guard)
-            .map_err(|e| ValidationError::from_val_error(py, "Model".to_object(py), e))
+        self.validator.validate(py, input_value, outer_location)
     }
 
     fn __repr__(&self) -> String {
