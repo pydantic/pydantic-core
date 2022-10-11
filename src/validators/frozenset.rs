@@ -3,23 +3,26 @@ use pyo3::types::{PyDict, PyFrozenSet};
 
 use crate::build_tools::SchemaDict;
 use crate::errors::ValResult;
-use crate::input::{too_long_check, GenericCollection, Input};
+use crate::input::{GenericCollection, Input};
 use crate::recursion_guard::RecursionGuard;
 
-use super::list::generic_collection_build;
+use super::list::{get_items_schema, length_check};
+use super::set::set_build;
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct FrozenSetValidator {
     strict: bool,
     item_validator: Option<Box<CombinedValidator>>,
-    size_range: (Option<usize>, Option<usize>),
+    min_length: Option<usize>,
+    max_length: Option<usize>,
+    generator_max_length: Option<usize>,
     name: String,
 }
 
 impl BuildValidator for FrozenSetValidator {
     const EXPECTED_TYPE: &'static str = "frozenset";
-    generic_collection_build!();
+    set_build!();
 }
 
 impl Validator for FrozenSetValidator {
@@ -33,21 +36,27 @@ impl Validator for FrozenSetValidator {
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_frozenset(extra.strict.unwrap_or(self.strict))?;
 
-        let (capacity, check_max_length) = seq.pre_check(self.size_range, input, true)?;
-
         let f_set = match self.item_validator {
             Some(ref v) => PyFrozenSet::new(
                 py,
-                &seq.validate_to_vec(py, input, capacity, check_max_length, v, extra, slots, recursion_guard)?,
+                &seq.validate_to_vec(
+                    py,
+                    input,
+                    self.max_length,
+                    "Frozenset",
+                    self.generator_max_length,
+                    v,
+                    extra,
+                    slots,
+                    recursion_guard,
+                )?,
             )?,
             None => match seq {
                 GenericCollection::FrozenSet(f_set) => f_set,
-                _ => PyFrozenSet::new(py, &seq.to_vec(py, input, check_max_length)?)?,
+                _ => PyFrozenSet::new(py, &seq.to_vec(py, input, "Frozenset", self.generator_max_length)?)?,
             },
         };
-        if self.size_range.1.is_some() {
-            too_long_check(input, f_set.len(), self.size_range.1)?;
-        }
+        length_check!(input, "Frozenset", self.min_length, self.max_length, f_set);
         Ok(f_set.into_py(py))
     }
 

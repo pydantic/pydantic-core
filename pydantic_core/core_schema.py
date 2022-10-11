@@ -387,6 +387,7 @@ class SetSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    generator_max_length: int
     strict: bool
     ref: str
 
@@ -396,11 +397,18 @@ def set_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    generator_max_length: int | None = None,
     strict: bool | None = None,
     ref: str | None = None,
 ) -> SetSchema:
     return dict_not_none(
-        type='set', items_schema=items_schema, min_length=min_length, max_length=max_length, strict=strict, ref=ref
+        type='set',
+        items_schema=items_schema,
+        min_length=min_length,
+        max_length=max_length,
+        generator_max_length=generator_max_length,
+        strict=strict,
+        ref=ref,
     )
 
 
@@ -409,6 +417,7 @@ class FrozenSetSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    generator_max_length: int
     strict: bool
     ref: str
 
@@ -418,6 +427,7 @@ def frozenset_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    generator_max_length: int | None = None,
     strict: bool | None = None,
     ref: str | None = None,
 ) -> FrozenSetSchema:
@@ -426,6 +436,7 @@ def frozenset_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        generator_max_length=generator_max_length,
         strict=strict,
         ref=ref,
     )

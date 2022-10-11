@@ -7,7 +7,7 @@ import pytest
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err, PyAndJson
+from ..conftest import Err, PyAndJson, infinite_generator
 
 
 @pytest.mark.parametrize(
@@ -117,6 +117,12 @@ def test_set_multiple_errors():
     ]
 
 
+def generate_repeats():
+    for i in 1, 2, 3:
+        yield i
+        yield i
+
+
 @pytest.mark.parametrize(
     'kwargs,input_value,expected',
     [
@@ -129,12 +135,33 @@ def test_set_multiple_errors():
         ({'strict': True}, frozenset([1, 2, 3]), Err('Input should be a valid set [kind=set_type,')),
         ({'strict': True}, 'abc', Err('Input should be a valid set [kind=set_type,')),
         ({'min_length': 3}, {1, 2, 3}, {1, 2, 3}),
-        ({'min_length': 3}, {1, 2}, Err('Input should have at least 3 items, got 2 items [kind=too_short,')),
-        ({'max_length': 3}, {1, 2, 3}, {1, 2, 3}),
-        ({'max_length': 3}, {1, 2, 3, 4}, Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
-        ({'max_length': 3}, [1, 2, 3, 4], Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
+        ({'min_length': 3}, {1, 2}, Err('Set should have at least 3 items after validation, not 2 [kind=too_short,')),
+        (
+            {'max_length': 3},
+            {1, 2, 3, 4},
+            Err('Set should have at most 3 items after validation, not 4 [kind=too_long,'),
+        ),
+        (
+            {'max_length': 3},
+            [1, 2, 3, 4],
+            Err('Set should have at most 3 items after validation, not 4 [kind=too_long,'),
+        ),
         ({'max_length': 3, 'items_schema': {'type': 'int'}}, {1, 2, 3, 4}, Err('kind=too_long,')),
         ({'max_length': 3, 'items_schema': {'type': 'int'}}, [1, 2, 3, 4], Err('kind=too_long,')),
+        # length check after set creation
+        ({'max_length': 3}, [1, 1, 2, 2, 3, 3], {1, 2, 3}),
+        ({'max_length': 3}, generate_repeats(), {1, 2, 3}),
+        # because of default max_length * 10
+        (
+            {'max_length': 3},
+            infinite_generator(),
+            Err('Set should have at most 30 items after validation, not 31 [kind=too_long,'),
+        ),
+        (
+            {'max_length': 3, 'generator_max_length': 3},
+            infinite_generator(),
+            Err('Set should have at most 3 items after validation, not 4 [kind=too_long,'),
+        ),
     ],
     ids=repr,
 )

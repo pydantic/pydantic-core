@@ -27,19 +27,10 @@ use super::{
 };
 
 /// Extract generators and deques into a `GenericCollection`
-/// TODO if we moved length checks to after validation, we could avoid creating an intermediate collection
 macro_rules! extract_shared_iter {
     ($type:ty, $obj:ident) => {
-        if let Ok(iterator) = $obj.cast_as::<PyIterator>() {
-            let vec = iterator.collect::<PyResult<Vec<_>>>().map_err(|err| {
-                ValError::new(
-                    ErrorKind::IterationError {
-                        error: py_err_string($obj.py(), err),
-                    },
-                    $obj,
-                )
-            })?;
-            Some(<$type>::new($obj.py(), vec).into())
+        if $obj.cast_as::<PyIterator>().is_ok() {
+            Some($obj.into())
         } else if is_deque($obj) {
             Some($obj.into())
         } else {

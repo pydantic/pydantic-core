@@ -8,7 +8,7 @@ from dirty_equals import IsNonNegative
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err, PyAndJson
+from ..conftest import Err, PyAndJson, infinite_generator
 
 
 @pytest.mark.parametrize(
@@ -85,10 +85,25 @@ def test_tuple_strict_fails_without_tuple(wrong_coll_type: Type[Any], mode, item
     [
         ({}, (1, 2, 3, 4), (1, 2, 3, 4)),
         ({'min_length': 3}, (1, 2, 3, 4), (1, 2, 3, 4)),
-        ({'min_length': 3}, (1, 2), Err('Input should have at least 3 items, got 2 items [kind=too_short,')),
+        ({'min_length': 3}, (1, 2), Err('Tuple should have at least 3 items after validation, not 2 [kind=too_short,')),
         ({'max_length': 4}, (1, 2, 3, 4), (1, 2, 3, 4)),
-        ({'max_length': 3}, (1, 2, 3, 4), Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
+        (
+            {'max_length': 3},
+            (1, 2, 3, 4),
+            Err('Tuple should have at most 3 items after validation, not 4 [kind=too_long,'),
+        ),
+        (
+            {'max_length': 3},
+            [1, 2, 3, 4],
+            Err('Tuple should have at most 3 items after validation, not 4 [kind=too_long,'),
+        ),
+        (
+            {'max_length': 3},
+            infinite_generator(),
+            Err('Tuple should have at most 3 items after validation, not 4 [kind=too_long,'),
+        ),
     ],
+    ids=repr,
 )
 def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
     v = SchemaValidator({'type': 'tuple', 'mode': 'variable', **kwargs})
@@ -228,13 +243,14 @@ def test_extra_arguments(py_and_json: PyAndJson):
     assert v.validate_test([1, 2]) == (1, 2)
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1, 2, 3, 4])
+    # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
             'kind': 'too_long',
             'loc': [],
-            'message': 'Input should have at most 2 items, got 4 items',
+            'message': 'Tuple should have at most 2 items after validation, not 4',
             'input_value': [1, 2, 3, 4],
-            'context': {'max_length': 2, 'input_length': 4},
+            'context': {'field_type': 'Tuple', 'max_length': 2, 'actual_length': 4, 'expected_plural': 's'},
         }
     ]
 
@@ -464,3 +480,26 @@ def test_frozenset_from_dict_items(input_value, items_schema, expected):
     output = v.validate_python(input_value)
     assert isinstance(output, tuple)
     assert output == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ([1, 2, 3, 4], (1, 2, 3, 4)),
+        ([1, 2, 3, 4, 5], Err('Tuple should have at most 4 items after validation, not 5 [kind=too_long,')),
+        ([1, 2, 3, 'x', 4], (1, 2, 3, 4)),
+    ],
+)
+def test_length_constraints_omit(input_value, expected):
+    v = SchemaValidator(
+        {
+            'type': 'tuple',
+            'items_schema': {'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'omit'},
+            'max_length': 4,
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected

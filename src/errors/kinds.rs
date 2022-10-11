@@ -75,18 +75,28 @@ pub enum ErrorKind {
     // ---------------------
     // generic length errors - used for everything with a length except strings and bytes which need custom messages
     #[strum(
-        message = "Input should have at least {min_length} item{expected_plural}, got {input_length} item{input_plural}"
+        message = "{field_type} should have at least {min_length} item{expected_plural} after validation, not {actual_length}"
     )]
     TooShort {
+        field_type: String,
         min_length: usize,
-        input_length: usize,
+        actual_length: usize,
     },
     #[strum(
-        message = "Input should have at most {max_length} item{expected_plural}, got {input_length} item{input_plural}"
+        message = "{field_type} should have at most {max_length} item{expected_plural} after validation, not {actual_length}"
     )]
     TooLong {
+        field_type: String,
         max_length: usize,
-        input_length: usize,
+        actual_length: usize,
+    },
+    // ---------------------
+    // generic collection and iteration errors
+    #[strum(message = "Input should be iterable")]
+    IterableType,
+    #[strum(message = "Error iterating over object, error: {error}")]
+    IterationError {
+        error: String,
     },
     // ---------------------
     // string errors
@@ -118,14 +128,6 @@ pub enum ErrorKind {
     DictType,
     #[strum(message = "Unable to convert mapping to a dictionary, error: {error}")]
     DictFromMapping {
-        error: String,
-    },
-    // ---------------------
-    // generic collection and iteration errors
-    #[strum(message = "Input should be iterable")]
-    IterableType,
-    #[strum(message = "Error iterating over object, error: {error}")]
-    IterationError {
         error: String,
     },
     // ---------------------
@@ -402,26 +404,26 @@ impl ErrorKind {
             Self::LessThan { lt } => render!(self, lt),
             Self::LessThanEqual { le } => render!(self, le),
             Self::TooShort {
+                field_type,
                 min_length,
-                input_length,
+                actual_length,
             } => {
                 let expected_plural = plural_s(min_length);
-                let input_plural = plural_s(input_length);
-                to_string_render!(self, min_length, input_length, expected_plural, input_plural)
+                to_string_render!(self, field_type, min_length, actual_length, expected_plural)
             }
             Self::TooLong {
+                field_type,
                 max_length,
-                input_length,
+                actual_length,
             } => {
                 let expected_plural = plural_s(max_length);
-                let input_plural = plural_s(input_length);
-                to_string_render!(self, max_length, input_length, expected_plural, input_plural)
+                to_string_render!(self, field_type, max_length, actual_length, expected_plural)
             }
+            Self::IterationError { error } => render!(self, error),
             Self::StrTooShort { min_length } => to_string_render!(self, min_length),
             Self::StrTooLong { max_length } => to_string_render!(self, max_length),
             Self::StrPatternMismatch { pattern } => render!(self, pattern),
             Self::DictFromMapping { error } => render!(self, error),
-            Self::IterationError { error } => render!(self, error),
             Self::IntNan { nan_value } => render!(self, nan_value),
             Self::IntMultipleOf { multiple_of } => to_string_render!(self, multiple_of),
             Self::IntGreaterThan { gt } => to_string_render!(self, gt),
@@ -467,18 +469,26 @@ impl ErrorKind {
             Self::LessThan { lt } => py_dict!(py, lt),
             Self::LessThanEqual { le } => py_dict!(py, le),
             Self::TooShort {
+                field_type,
                 min_length,
-                input_length,
-            } => py_dict!(py, min_length, input_length),
+                actual_length,
+            } => {
+                let expected_plural = plural_s(min_length);
+                py_dict!(py, field_type, min_length, actual_length, expected_plural)
+            }
             Self::TooLong {
+                field_type,
                 max_length,
-                input_length,
-            } => py_dict!(py, max_length, input_length),
+                actual_length,
+            } => {
+                let expected_plural = plural_s(max_length);
+                py_dict!(py, field_type, max_length, actual_length, expected_plural)
+            }
+            Self::IterationError { error } => py_dict!(py, error),
             Self::StrTooShort { min_length } => py_dict!(py, min_length),
             Self::StrTooLong { max_length } => py_dict!(py, max_length),
             Self::StrPatternMismatch { pattern } => py_dict!(py, pattern),
             Self::DictFromMapping { error } => py_dict!(py, error),
-            Self::IterationError { error } => py_dict!(py, error),
             Self::IntNan { nan_value } => py_dict!(py, nan_value),
             Self::IntMultipleOf { multiple_of } => py_dict!(py, multiple_of),
             Self::IntGreaterThan { gt } => py_dict!(py, gt),

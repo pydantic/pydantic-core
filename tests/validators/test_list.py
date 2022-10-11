@@ -9,7 +9,7 @@ from dirty_equals import HasRepr, IsInstance, IsStr
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err, PyAndJson
+from ..conftest import Err, PyAndJson, infinite_generator
 
 
 @pytest.mark.parametrize(
@@ -137,11 +137,20 @@ def test_list_error(input_value, index):
     [
         ({}, [1, 2, 3, 4], [1, 2, 3, 4]),
         ({'min_length': 3}, [1, 2, 3, 4], [1, 2, 3, 4]),
-        ({'min_length': 3}, [1, 2], Err('Input should have at least 3 items, got 2 items [kind=too_short,')),
-        ({'min_length': 1}, [], Err('Input should have at least 1 item, got 0 items [kind=too_short,')),
+        ({'min_length': 3}, [1, 2], Err('List should have at least 3 items after validation, not 2 [kind=too_short,')),
+        ({'min_length': 1}, [], Err('List should have at least 1 item after validation, not 0 [kind=too_short,')),
         ({'max_length': 4}, [1, 2, 3, 4], [1, 2, 3, 4]),
-        ({'max_length': 3}, [1, 2, 3, 4], Err('Input should have at most 3 items, got 4 items [kind=too_long,')),
-        ({'max_length': 1}, [1, 2], Err('Input should have at most 1 item, got 2 items [kind=too_long,')),
+        (
+            {'max_length': 3},
+            [1, 2, 3, 4],
+            Err('List should have at most 3 items after validation, not 4 [kind=too_long,'),
+        ),
+        ({'max_length': 1}, [1, 2], Err('List should have at most 1 item after validation, not 2 [kind=too_long,')),
+        (
+            {'max_length': 44},
+            infinite_generator(),
+            Err('List should have at most 44 items after validation, not 45 [kind=too_long,'),
+        ),
     ],
 )
 def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
@@ -153,30 +162,55 @@ def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
         assert v.validate_python(input_value) == expected
 
 
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ([1, 2, 3, 4], [1, 2, 3, 4]),
+        ([1, 2, 3, 4, 5], Err('List should have at most 4 items after validation, not 5 [kind=too_long,')),
+        ([1, 2, 3, 'x', 4], [1, 2, 3, 4]),
+    ],
+)
+def test_list_length_constraints_omit(input_value, expected):
+    v = SchemaValidator(
+        {
+            'type': 'list',
+            'items_schema': {'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'omit'},
+            'max_length': 4,
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected
+
+
 def test_length_ctx():
     v = SchemaValidator({'type': 'list', 'min_length': 2, 'max_length': 3})
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1])
+    # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
             'kind': 'too_short',
             'loc': [],
-            'message': 'Input should have at least 2 items, got 1 item',
+            'message': 'List should have at least 2 items after validation, not 1',
             'input_value': [1],
-            'context': {'min_length': 2, 'input_length': 1},
+            'context': {'field_type': 'List', 'min_length': 2, 'actual_length': 1, 'expected_plural': 's'},
         }
     ]
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1, 2, 3, 4])
 
+    # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
             'kind': 'too_long',
             'loc': [],
-            'message': 'Input should have at most 3 items, got 4 items',
+            'message': 'List should have at most 3 items after validation, not 4',
             'input_value': [1, 2, 3, 4],
-            'context': {'max_length': 3, 'input_length': 4},
+            'context': {'field_type': 'List', 'max_length': 3, 'actual_length': 4, 'expected_plural': 's'},
         }
     ]
 
@@ -242,7 +276,7 @@ def test_generator_error():
     assert exc_info.value.errors() == [
         {
             'kind': 'iteration_error',
-            'loc': [],
+            'loc': [2],
             'message': 'Error iterating over object, error: RuntimeError: error',
             'input_value': HasRepr(IsStr(regex='<generator object test_generator_error.<locals>.gen at 0x[0-9a-f]+>')),
             'context': {'error': 'RuntimeError: error'},
