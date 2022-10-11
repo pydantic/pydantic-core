@@ -64,7 +64,6 @@ impl Validator for SetValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        println!("set validate");
         let seq = input.validate_set(extra.strict.unwrap_or(self.strict))?;
 
         let set = match self.item_validator {
