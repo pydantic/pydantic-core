@@ -644,6 +644,15 @@ def test_error_kind(kind, message, context):
     assert e.context == context
 
 
+def test_pydantic_value_error_plain(py_and_json: PyAndJson):
+    def f(input_value, **kwargs):
+        raise PydanticCustomError
+
+    v = py_and_json({'type': 'function', 'mode': 'plain', 'function': f})
+    with pytest.raises(TypeError, match='missing 2 required positional arguments'):
+        v.validate_test('4')
+
+
 @pytest.mark.parametrize('exception', [PydanticOmit(), PydanticOmit])
 def test_list_omit_exception(py_and_json: PyAndJson, exception):
     def f(input_value, **kwargs):
