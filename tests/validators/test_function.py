@@ -512,7 +512,41 @@ def test_pydantic_error_kind():
     assert e.kind == 'invalid_json'
     assert e.context == {'error': 'Test'}
     assert str(e) == 'Invalid JSON: Test'
-    assert repr(e) == ("Invalid JSON: Test [kind=invalid_json, context={'error': 'Test'}]")
+    assert repr(e) == "Invalid JSON: Test [kind=invalid_json, context={'error': 'Test'}]"
+
+
+def test_pydantic_error_kind_raise_no_ctx():
+    def f(input_value, **kwargs):
+        raise PydanticErrorKind('finite_number')
+
+    v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'int'}})
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(4)
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {'kind': 'finite_number', 'loc': [], 'message': 'Input should be a finite number', 'input_value': 4}
+    ]
+
+
+def test_pydantic_error_kind_raise_ctx():
+    def f(input_value, **kwargs):
+        raise PydanticErrorKind('greater_than', {'gt': 42})
+
+    v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'int'}})
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(4)
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'greater_than',
+            'loc': [],
+            'message': 'Input should be greater than 42',
+            'input_value': 4,
+            'context': {'gt': 42.0},
+        }
+    ]
 
 
 @pytest.mark.parametrize(
