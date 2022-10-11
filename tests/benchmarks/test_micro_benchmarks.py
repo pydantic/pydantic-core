@@ -971,7 +971,7 @@ def generator_gen_python(v, *, validator, **_kwargs):
     try:
         iterable = iter(v)
     except TypeError:
-        raise PydanticValueError('iterable_type', 'Input should be a valid iterable')
+        raise PydanticCustomError('iterable_type', 'Input should be a valid iterable')
     return validate_yield(iterable, validator)
 
 
@@ -990,7 +990,7 @@ def generator_gen_rust(v, *, validator, **_kwargs):
     try:
         generator = iter(v)
     except TypeError:
-        raise PydanticValueError('generator_type', 'Input should be a valid generator')
+        raise PydanticCustomError('generator_type', 'Input should be a valid generator')
     return validator.iter(generator)
 
 

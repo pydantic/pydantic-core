@@ -13,8 +13,7 @@ use super::PydanticCustomError;
 /// * the variables in the message need to match the enum struct
 /// * you need to add an entry to the `render` enum to render the error message as a template
 /// * you need to add an entry to the `py_dict` enum to generate `ctx` for error messages
-#[derive(Clone, Display, EnumMessage, EnumIter)]
-#[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(Clone, Debug, Display, EnumMessage, EnumIter)]
 #[strum(serialize_all = "snake_case")]
 pub enum ErrorKind {
     #[strum(message = "Invalid input")]
