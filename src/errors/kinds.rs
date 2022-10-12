@@ -5,13 +5,29 @@ use ahash::AHashMap;
 use pyo3::exceptions::PyTypeError;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::py_error;
 use strum::{Display, EnumMessage, IntoEnumIterator};
 use strum_macros::EnumIter;
 
 use super::PydanticCustomError;
+
+#[pyfunction]
+pub fn list_all_errors(py: Python) -> PyResult<&PyList> {
+    let mut errors: Vec<&PyDict> = Vec::with_capacity(100);
+    for error_kind in ErrorKind::iter() {
+        if !matches!(error_kind, ErrorKind::CustomError { .. }) {
+            let d = PyDict::new(py);
+            d.set_item("kind", error_kind.to_string())?;
+            d.set_item("message_template", error_kind.message_template())?;
+            d.set_item("example_message", error_kind.render_message(py)?)?;
+            d.set_item("example_context", error_kind.py_dict(py)?)?;
+            errors.push(d);
+        }
+    }
+    Ok(PyList::new(py, errors))
+}
 
 /// Definite each validation error.
 /// NOTE: if an error has parameters:
@@ -21,8 +37,6 @@ use super::PydanticCustomError;
 #[derive(Clone, Debug, Display, EnumMessage, EnumIter)]
 #[strum(serialize_all = "snake_case")]
 pub enum ErrorKind {
-    #[strum(message = "Invalid input")]
-    InvalidInput,
     #[strum(message = "Invalid JSON: {error}")]
     InvalidJson {
         error: String,

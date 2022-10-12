@@ -559,7 +559,6 @@ def test_pydantic_error_kind_raise_ctx():
 @pytest.mark.parametrize(
     'kind, message, context',
     [
-        ('invalid_input', 'Invalid input', None),
         ('invalid_json', 'Invalid JSON: foobar', {'error': 'foobar'}),
         ('recursion_loop', 'Recursion error - cyclic reference detected', None),
         ('dict_attributes_type', 'Input should be a valid dictionary or instance to extract fields from', None),
