@@ -281,7 +281,7 @@ pub fn bytes_as_datetime<'a, 'b>(input: &'a impl Input<'a>, bytes: &'b [u8]) -> 
     match DateTime::parse_bytes(bytes) {
         Ok(dt) => Ok(dt.into()),
         Err(err) => Err(ValError::new(
-            ErrorKind::DateTimeParsing {
+            ErrorKind::DatetimeParsing {
                 error: Cow::Borrowed(err.get_documentation().unwrap_or_default()),
             },
             input,
@@ -297,7 +297,7 @@ pub fn int_as_datetime<'a>(
     match DateTime::from_timestamp(timestamp, timestamp_microseconds) {
         Ok(dt) => Ok(dt.into()),
         Err(err) => Err(ValError::new(
-            ErrorKind::DateTimeParsing {
+            ErrorKind::DatetimeParsing {
                 error: Cow::Borrowed(err.get_documentation().unwrap_or_default()),
             },
             input,
