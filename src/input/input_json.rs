@@ -78,13 +78,13 @@ impl<'a> Input<'a> for JsonInput {
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
         match self {
             JsonInput::String(s) => Ok(s.as_str().into()),
-            _ => Err(ValError::new(ErrorKind::StrType, self)),
+            _ => Err(ValError::new(ErrorKind::StringType, self)),
         }
     }
     fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
         match self {
             JsonInput::String(s) => Ok(s.as_str().into()),
-            _ => Err(ValError::new(ErrorKind::StrType, self)),
+            _ => Err(ValError::new(ErrorKind::StringType, self)),
         }
     }
 

@@ -127,7 +127,7 @@ impl<'a> Input<'a> for PyAny {
         if let Ok(py_str) = self.cast_as::<PyString>() {
             Ok(py_str.into())
         } else {
-            Err(ValError::new(ErrorKind::StrType, self))
+            Err(ValError::new(ErrorKind::StringType, self))
         }
     }
 
@@ -137,17 +137,17 @@ impl<'a> Input<'a> for PyAny {
         } else if let Ok(bytes) = self.cast_as::<PyBytes>() {
             let str = match from_utf8(bytes.as_bytes()) {
                 Ok(s) => s,
-                Err(_) => return Err(ValError::new(ErrorKind::StrUnicode, self)),
+                Err(_) => return Err(ValError::new(ErrorKind::StringUnicode, self)),
             };
             Ok(str.into())
         } else if let Ok(py_byte_array) = self.cast_as::<PyByteArray>() {
             let str = match from_utf8(unsafe { py_byte_array.as_bytes() }) {
                 Ok(s) => s,
-                Err(_) => return Err(ValError::new(ErrorKind::StrUnicode, self)),
+                Err(_) => return Err(ValError::new(ErrorKind::StringUnicode, self)),
             };
             Ok(str.into())
         } else {
-            Err(ValError::new(ErrorKind::StrType, self))
+            Err(ValError::new(ErrorKind::StringType, self))
         }
     }
 
