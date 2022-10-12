@@ -266,7 +266,7 @@ def test_custom_error():
 
 def test_custom_error_kind():
     v = SchemaValidator(
-        {'type': 'union', 'choices': [{'type': 'str'}, {'type': 'bytes'}], 'custom_error': {'kind': 'str_type'}}
+        {'type': 'union', 'choices': [{'type': 'str'}, {'type': 'bytes'}], 'custom_error': {'kind': 'string_type'}}
     )
     assert v.validate_python('hello') == 'hello'
     assert v.validate_python(b'hello') == b'hello'
@@ -274,7 +274,7 @@ def test_custom_error_kind():
         v.validate_python(123)
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
-        {'kind': 'str_type', 'loc': [], 'message': 'Input should be a valid string', 'input_value': 123}
+        {'kind': 'string_type', 'loc': [], 'message': 'Input should be a valid string', 'input_value': 123}
     ]
 
 
