@@ -19,16 +19,15 @@ pub enum CustomError {
 impl CustomError {
     pub fn build(schema: &PyDict) -> PyResult<Option<Self>> {
         let py = schema.py();
-        let custom_error: &PyDict = match schema.get_as(intern!(py, "custom_error"))? {
-            Some(ce) => ce,
+        let kind: String = match schema.get_as(intern!(py, "custom_error_kind"))? {
+            Some(kind) => kind,
             None => return Ok(None),
         };
-        let kind: String = custom_error.get_as_req(intern!(py, "kind"))?;
-        let context: Option<&PyDict> = custom_error.get_as(intern!(py, "context"))?;
+        let context: Option<&PyDict> = schema.get_as(intern!(py, "custom_error_context"))?;
 
         if ErrorKind::valid_kind(py, &kind) {
-            if custom_error.contains(intern!(py, "message"))? {
-                py_err!("custom_error.message should not be provided if kind matches a known error")
+            if schema.contains(intern!(py, "custom_error_message"))? {
+                py_err!("custom_error_message should not be provided if kind matches a known error")
             } else {
                 let error = PydanticKindError::py_new(py, &kind, context)?;
                 Ok(Some(Self::Kind(error)))
@@ -37,7 +36,7 @@ impl CustomError {
             let error = PydanticCustomError::py_new(
                 py,
                 kind,
-                custom_error.get_as_req::<String>(intern!(py, "message"))?,
+                schema.get_as_req::<String>(intern!(py, "custom_error_message"))?,
                 context,
             );
             Ok(Some(Self::Custom(error)))
