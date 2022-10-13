@@ -10,7 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyByteArray, PyBytes, PyDict, PyString};
 
 use crate::build_context::{extract_used_refs, BuildContext};
-use crate::build_tools::{py_error, SchemaDict, SchemaError};
+use crate::build_tools::{py_err, SchemaDict, SchemaError};
 use crate::errors::{ErrorKind, ValError, ValResult, ValidationError};
 use crate::input::{Input, JsonInput};
 use crate::questions::{Answers, Question};
@@ -268,7 +268,7 @@ fn parse_json(input: &PyAny) -> PyResult<serde_json::Result<JsonInput>> {
         Ok(serde_json::from_slice(unsafe { py_byte_array.as_bytes() }))
     } else {
         let input_type = input.get_type().name().unwrap_or("unknown");
-        py_error!(PyTypeError; "JSON input should be str, bytes or bytearray, not {}", input_type)
+        py_err!(PyTypeError; "JSON input should be str, bytes or bytearray, not {}", input_type)
     }
 }
 
@@ -315,7 +315,7 @@ macro_rules! validator_match {
                 <$validator>::EXPECTED_TYPE => build_specific_validator::<$validator>($type, $dict, $config, $build_context),
             )+
             _ => {
-                return py_error!(r#"Unknown schema type: "{}""#, $type)
+                return py_err!(r#"Unknown schema type: "{}""#, $type)
             },
         }
     };
