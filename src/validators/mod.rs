@@ -10,7 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyByteArray, PyBytes, PyDict, PyString};
 
 use crate::build_context::{extract_used_refs, BuildContext};
-use crate::build_tools::{py_err, SchemaDict, SchemaError};
+use crate::build_tools::{py_err, py_error_type, SchemaDict, SchemaError};
 use crate::errors::{ErrorKind, ValError, ValResult, ValidationError};
 use crate::input::{Input, JsonInput};
 use crate::questions::{Answers, Question};
@@ -243,7 +243,7 @@ impl SchemaValidator {
 
         let validator = match build_validator(self_schema, None, &mut build_context) {
             Ok(v) => v,
-            Err(err) => return Err(SchemaError::new_err(format!("Error building self-schema:\n  {}", err))),
+            Err(err) => return py_err!("Error building self-schema:\n  {}", err),
         };
         Ok(Self {
             validator,
@@ -304,7 +304,7 @@ fn build_specific_validator<'a, T: BuildValidator>(
     }
 
     T::build(schema_dict, config, build_context)
-        .map_err(|err| SchemaError::new_err(format!("Error building \"{}\" validator:\n  {}", val_type, err)))
+        .map_err(|err| py_error_type!("Error building \"{}\" validator:\n  {}", val_type, err))
 }
 
 // macro to build the match statement for validator selection
