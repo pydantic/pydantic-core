@@ -929,6 +929,7 @@ CoreSchema = Union[
 ]
 
 # used in _pydantic_core.pyi::PydanticKindError
+# to update this, call `pytest -k test_all_errors` and copy the output
 ErrorKind = Literal[
     'invalid_json',
     'recursion_loop',
