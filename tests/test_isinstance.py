@@ -39,7 +39,7 @@ def test_isinstance_json():
 
     assert v.isinstance_json('"foo"') is False
 
-    with pytest.raises(ValidationError, match=r'Invalid JSON: expected value at line 1 column 1 \[kind=invalid_json,'):
+    with pytest.raises(ValidationError, match=r'Invalid JSON: expected value at line 1 column 1 \[kind=json_invalid,'):
         v.validate_json('x')
 
     # invalid json returns False, not an error!

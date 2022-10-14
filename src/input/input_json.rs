@@ -78,7 +78,7 @@ impl<'a> Input<'a> for JsonInput {
     fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
         match self {
             JsonInput::String(s) => serde_json::from_str(s.as_str()).map_err(|e| map_json_err(self, e)),
-            _ => Err(ValError::new(ErrorKind::StringType, self)),
+            _ => Err(ValError::new(ErrorKind::JsonType, self)),
         }
     }
 

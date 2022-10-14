@@ -162,7 +162,7 @@ impl SchemaValidator {
                 r.map_err(|e| self.prepare_validation_err(py, e))
             }
             Err(e) => {
-                let err = ValError::new(ErrorKind::InvalidJson { error: e.to_string() }, input);
+                let err = ValError::new(ErrorKind::JsonInvalid { error: e.to_string() }, input);
                 Err(self.prepare_validation_err(py, err))
             }
         }

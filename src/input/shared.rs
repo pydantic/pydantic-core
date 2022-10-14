@@ -4,7 +4,7 @@ use super::Input;
 
 pub fn map_json_err<'a>(input: &'a impl Input<'a>, error: serde_json::Error) -> ValError<'a> {
     ValError::new(
-        ErrorKind::InvalidJson {
+        ErrorKind::JsonInvalid {
             error: error.to_string(),
         },
         input,

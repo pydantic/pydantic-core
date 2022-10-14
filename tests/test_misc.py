@@ -155,7 +155,7 @@ def test_all_errors():
     assert len(errors) == len(set(e['kind'] for e in errors)), 'error kinds are not unique'
     assert errors[:3] == [
         {
-            'kind': 'invalid_json',
+            'kind': 'json_invalid',
             'message_template': 'Invalid JSON: {error}',
             'example_message': 'Invalid JSON: ',
             'example_context': {'error': ''},
