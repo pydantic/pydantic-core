@@ -389,7 +389,13 @@ def tuple_positional_schema(
     extra: Any = None,
 ) -> TuplePositionalSchema:
     return dict_not_none(
-        type='tuple', mode='positional', items_schema=items_schema, extra_schema=extra_schema, strict=strict, ref=ref
+        type='tuple',
+        mode='positional',
+        items_schema=items_schema,
+        extra_schema=extra_schema,
+        strict=strict,
+        ref=ref,
+        extra=extra,
     )
 
 
@@ -550,36 +556,20 @@ class FunctionSchema(TypedDict):
     mode: Literal['before', 'after']
     function: ValidatorFunction
     schema: CoreSchema
-    # validator_instance is used by pydantic for progressively preparing the function, ignored by pydantic-core
-    validator_instance: NotRequired[Any]
     ref: NotRequired[str]
     extra: NotRequired[Any]
 
 
 def function_before_schema(
-    function: ValidatorFunction,
-    schema: CoreSchema,
-    *,
-    validator_instance: Any | None = None,
-    ref: str | None = None,
-    extra: Any = None,
+    function: ValidatorFunction, schema: CoreSchema, *, ref: str | None = None, extra: Any = None
 ) -> FunctionSchema:
-    return dict_not_none(
-        type='function', mode='before', function=function, schema=schema, validator_instance=validator_instance, ref=ref
-    )
+    return dict_not_none(type='function', mode='before', function=function, schema=schema, ref=ref, extra=extra)
 
 
 def function_after_schema(
-    function: ValidatorFunction,
-    schema: CoreSchema,
-    *,
-    validator_instance: Any | None = None,
-    ref: str | None = None,
-    extra: Any = None,
+    schema: CoreSchema, function: ValidatorFunction, *, ref: str | None = None, extra: Any = None
 ) -> FunctionSchema:
-    return dict_not_none(
-        type='function', mode='after', function=function, schema=schema, validator_instance=validator_instance, ref=ref
-    )
+    return dict_not_none(type='function', mode='after', function=function, schema=schema, ref=ref, extra=extra)
 
 
 class CallableValidator(Protocol):
@@ -606,41 +596,28 @@ class FunctionWrapSchema(TypedDict):
     mode: Literal['wrap']
     function: WrapValidatorFunction
     schema: CoreSchema
-    # validator_instance is used by pydantic for progressively preparing the function, ignored by pydantic-core
-    validator_instance: NotRequired[Any]
     ref: NotRequired[str]
     extra: NotRequired[Any]
 
 
 def function_wrap_schema(
-    function: WrapValidatorFunction,
-    schema: CoreSchema,
-    *,
-    validator_instance: Any | None = None,
-    ref: str | None = None,
-    extra: Any = None,
+    function: WrapValidatorFunction, schema: CoreSchema, *, ref: str | None = None, extra: Any = None
 ) -> FunctionWrapSchema:
-    return dict_not_none(
-        type='function', mode='wrap', function=function, schema=schema, validator_instance=validator_instance, ref=ref
-    )
+    return dict_not_none(type='function', mode='wrap', function=function, schema=schema, ref=ref, extra=extra)
 
 
 class FunctionPlainSchema(TypedDict):
     type: Literal['function']
     mode: Literal['plain']
     function: ValidatorFunction
-    # validator_instance is used by pydantic for progressively preparing the function, ignored by pydantic-core
-    validator_instance: NotRequired[Any]
     ref: NotRequired[str]
     extra: NotRequired[Any]
 
 
 def function_plain_schema(
-    function: ValidatorFunction, *, validator_instance: Any | None = None, ref: str | None = None, extra: Any = None
+    function: ValidatorFunction, *, ref: str | None = None, extra: Any = None
 ) -> FunctionPlainSchema:
-    return dict_not_none(
-        type='function', mode='plain', function=function, validator_instance=validator_instance, ref=ref
-    )
+    return dict_not_none(type='function', mode='plain', function=function, ref=ref, extra=extra)
 
 
 class WithDefaultSchema(TypedDict, total=False):
@@ -668,7 +645,13 @@ def with_default_schema(
     extra: Any = None,
 ) -> WithDefaultSchema:
     s = dict_not_none(
-        type='default', schema=schema, default_factory=default_factory, on_error=on_error, strict=strict, ref=ref
+        type='default',
+        schema=schema,
+        default_factory=default_factory,
+        on_error=on_error,
+        strict=strict,
+        ref=ref,
+        extra=extra,
     )
     if default is not Omitted:
         s['default'] = default
@@ -924,7 +907,7 @@ def call_schema(
     extra: Any = None,
 ) -> CallSchema:
     return dict_not_none(
-        type='call', arguments_schema=arguments, function=function, return_schema=return_schema, ref=ref
+        type='call', arguments_schema=arguments, function=function, return_schema=return_schema, ref=ref, extra=extra
     )
 
 

@@ -99,7 +99,7 @@ def args(*args, **kwargs):
         ],
         [
             core_schema.function_after_schema,
-            args(val_function, {'type': 'int'}),
+            args({'type': 'int'}, val_function),
             {'type': 'function', 'mode': 'after', 'function': val_function, 'schema': {'type': 'int'}},
         ],
         [
