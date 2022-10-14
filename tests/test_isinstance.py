@@ -1,6 +1,8 @@
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import PydanticOmit, SchemaError, SchemaValidator, ValidationError, core_schema
+
+from .conftest import PyAndJson
 
 
 def test_isinstance():
@@ -65,3 +67,21 @@ def test_internal_error():
 
     with pytest.raises(AttributeError, match="'int' object has no attribute '__dict__'"):
         v.isinstance_json('{"f": 123}')
+
+
+def test_omit(py_and_json: PyAndJson):
+    def omit(v, **kwargs):
+        if v == 'omit':
+            raise PydanticOmit
+        elif v == 'error':
+            raise ValueError('error')
+        else:
+            return v
+
+    v = py_and_json(core_schema.function_plain_schema(omit))
+    assert v.validate_test('foo') == 'foo'
+    assert v.isinstance_test('foo') is True
+
+    assert v.isinstance_test('error') is False
+    with pytest.raises(SchemaError, match='Uncaught Omit error, please check your usage of `default` validators.'):
+        v.validate_test('omit')
