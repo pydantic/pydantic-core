@@ -66,10 +66,7 @@ impl BuildValidator for CustomErrorValidator {
         config: Option<&PyDict>,
         build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
-        let custom_error = match CustomError::build(schema)? {
-            Some(ce) => ce,
-            None => return py_err!("custom_error validator must have a custom_error set"),
-        };
+        let custom_error = CustomError::build(schema)?.unwrap();
         let schema: &PyAny = schema.get_as_req(intern!(schema.py(), "schema"))?;
         let validator = Box::new(build_validator(schema, config, build_context)?);
         let name = format!("{}[{}]", Self::EXPECTED_TYPE, validator.get_name());

@@ -1,6 +1,6 @@
 import pytest
 
-from pydantic_core import ValidationError, core_schema
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import PyAndJson
 
@@ -32,3 +32,15 @@ def test_custom_error_kind(py_and_json: PyAndJson):
             'input_value': 'X',
         }
     ]
+
+
+def test_custom_error_error():
+    with pytest.raises(SchemaError, match=r'custom_error_kind\s+Field required \[kind=missing'):
+        SchemaValidator({'type': 'custom_error', 'schema': {'type': 'int'}})
+
+
+def test_custom_error_invalid():
+    with pytest.raises(SchemaError, match='custom_error_message should not be provided if kind matches a known error'):
+        SchemaValidator(
+            core_schema.custom_error_schema(core_schema.int_schema(), 'recursion_loop', custom_error_message='xxx')
+        )
