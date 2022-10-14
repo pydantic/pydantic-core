@@ -48,6 +48,44 @@ def test_any(py_and_json: PyAndJson, input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
+        ('{"a": 1}', {'a': 1}),
+        (b'{"a": 1}', {'a': 1}),
+        (bytearray(b'{"a": 1}'), {'a': 1}),
+        (
+            'xx',
+            Err(
+                'Invalid JSON: expected value at line 1 column 1 '
+                "[kind=json_invalid, input_value='xx', input_type=str"
+            ),
+        ),
+        (
+            b'xx',
+            Err(
+                'Invalid JSON: expected value at line 1 column 1 '
+                "[kind=json_invalid, input_value=b'xx', input_type=bytes"
+            ),
+        ),
+        (
+            bytearray(b'xx'),
+            Err(
+                'Invalid JSON: expected value at line 1 column 1 '
+                "[kind=json_invalid, input_value=bytearray(b'xx'), input_type=bytearray"
+            ),
+        ),
+    ],
+)
+def test_any_python(input_value, expected):
+    v = SchemaValidator(core_schema.json_schema())
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
         ('[1]', [1]),
         ('[1, 2, 3, "4"]', [1, 2, 3, 4]),
         ('44', Err('Input should be a valid list/array [kind=list_type, input_value=44, input_type=int')),
