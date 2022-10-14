@@ -5,6 +5,7 @@ use pyo3::types::{PyString, PyType};
 
 use crate::errors::{InputValue, LocItem, ValResult};
 use crate::input::datetime::EitherTime;
+use crate::input::JsonInput;
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTimedelta};
 use super::return_enums::{EitherBytes, EitherString};
@@ -41,6 +42,8 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
     }
 
     fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>>;
+
+    fn parse_json(&'a self) -> ValResult<'a, JsonInput>;
 
     fn validate_str(&'a self, strict: bool) -> ValResult<EitherString<'a>> {
         if strict {

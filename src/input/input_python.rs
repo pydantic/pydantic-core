@@ -13,7 +13,8 @@ use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{intern, AsPyPointer};
 
 use crate::errors::{py_err_string, ErrorKind, InputValue, LocItem, ValError, ValResult};
-use crate::input::GenericIterator;
+use crate::input::shared::map_json_err;
+use crate::input::{GenericIterator, JsonInput};
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, date_as_datetime, float_as_datetime,
@@ -120,6 +121,19 @@ impl<'a> Input<'a> for PyAny {
             Ok(PyArgs::new(args, kwargs).into())
         } else {
             Err(ValError::new(ErrorKind::ArgumentsType, self))
+        }
+    }
+
+    fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
+        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+            serde_json::from_slice(py_bytes.as_bytes()).map_err(|e| map_json_err(self, e))
+        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+            let str = py_str.to_str()?;
+            serde_json::from_str(str).map_err(|e| map_json_err(self, e))
+        } else if let Ok(py_byte_array) = self.cast_as::<PyByteArray>() {
+            serde_json::from_slice(unsafe { py_byte_array.as_bytes() }).map_err(|e| map_json_err(self, e))
+        } else {
+            Err(ValError::new(ErrorKind::JsonType, self))
         }
     }
 

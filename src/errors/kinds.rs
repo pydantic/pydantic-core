@@ -41,6 +41,8 @@ pub enum ErrorKind {
     InvalidJson {
         error: String,
     },
+    #[strum(message = "JSON input should be str, bytes or bytearray")]
+    JsonType,
     // ---------------------
     // recursion error
     #[strum(message = "Recursion error - cyclic reference detected")]

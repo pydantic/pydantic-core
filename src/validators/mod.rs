@@ -33,6 +33,7 @@ mod function;
 mod generator;
 mod int;
 mod is_instance;
+mod json;
 mod list;
 mod literal;
 mod new_class;
@@ -396,6 +397,8 @@ pub fn build_validator<'a>(
         generator::GeneratorValidator,
         // custom error
         custom_error::CustomErrorValidator,
+        // json data
+        json::JsonValidator,
     )
 }
 
@@ -512,6 +515,8 @@ pub enum CombinedValidator {
     Generator(generator::GeneratorValidator),
     // custom error
     CustomError(custom_error::CustomErrorValidator),
+    // json data
+    Json(json::JsonValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
