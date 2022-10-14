@@ -34,10 +34,12 @@ def args(*args, **kwargs):
     'function,args_kwargs,expected_schema',
     [
         [core_schema.any_schema, args(), {'type': 'any'}],
+        [core_schema.any_schema, args(extra=['foot', 'spa']), {'type': 'any', 'extra': ['foot', 'spa']}],
         [core_schema.none_schema, args(), {'type': 'none'}],
         [core_schema.bool_schema, args(), {'type': 'bool'}],
         [core_schema.bool_schema, args(strict=True), {'type': 'bool', 'strict': True}],
         [core_schema.int_schema, args(), {'type': 'int'}],
+        [core_schema.int_schema, args(extra={'fred'}), {'type': 'int', 'extra': {'fred'}}],
         [
             core_schema.int_schema,
             args(multiple_of=5, gt=10, lt=20),
