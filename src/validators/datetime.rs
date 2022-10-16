@@ -145,7 +145,7 @@ impl NowOp {
     pub fn compare(&self, ordering: Ordering) -> bool {
         match ordering {
             Ordering::Less => matches!(self, Self::Past),
-            Ordering::Equal => true,
+            Ordering::Equal => false,
             Ordering::Greater => matches!(self, Self::Future),
         }
     }

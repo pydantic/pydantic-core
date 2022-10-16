@@ -270,12 +270,12 @@ def test_date_future(py_and_json: PyAndJson, input_value, expected):
 def test_date_past_future_today():
     v = SchemaValidator(core_schema.date_schema(now_op='past', now_utc_offset=0))
     today = datetime.utcnow().replace(tzinfo=timezone.utc).date()
-    assert v.isinstance_python(today) is True
+    assert v.isinstance_python(today) is False
     assert v.isinstance_python(today - timedelta(days=1)) is True
     assert v.isinstance_python(today + timedelta(days=1)) is False
 
     v = SchemaValidator(core_schema.date_schema(now_op='future', now_utc_offset=0))
-    assert v.isinstance_python(today) is True
+    assert v.isinstance_python(today) is False
     assert v.isinstance_python(today - timedelta(days=1)) is False
     assert v.isinstance_python(today + timedelta(days=1)) is True
 

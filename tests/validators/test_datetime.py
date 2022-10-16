@@ -287,7 +287,7 @@ def test_datetime_past(py_and_json: PyAndJson, input_value, expected):
 
 def test_datetime_past_timezone():
     v = SchemaValidator(core_schema.datetime_schema(now_utc_offset=0, now_op='past'))
-    now_utc = datetime.utcnow().replace(tzinfo=timezone.utc)
+    now_utc = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(seconds=1)
     assert v.isinstance_python(now_utc)
     # "later" in the day
     assert v.isinstance_python(now_utc.astimezone(pytz.timezone('Europe/Istanbul')))
