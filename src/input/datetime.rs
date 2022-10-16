@@ -306,6 +306,14 @@ pub fn int_as_datetime<'a>(
 }
 
 pub fn float_as_datetime<'a>(input: &'a impl Input<'a>, timestamp: f64) -> ValResult<EitherDateTime> {
+    if timestamp.is_nan() {
+        return Err(ValError::new(
+            ErrorKind::DatetimeParsing {
+                error: Cow::Borrowed("NaN values not permitted"),
+            },
+            input,
+        ));
+    }
     let microseconds = timestamp.fract().abs() * 1_000_000.0;
     // checking for extra digits in microseconds is unreliable with large floats,
     // so we just round to the nearest microsecond

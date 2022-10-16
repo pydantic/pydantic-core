@@ -35,13 +35,35 @@ from ..conftest import Err, PyAndJson
         ),
         pytest.param(True, Err('Input should be a valid date'), id='bool'),
         pytest.param(time(1, 2, 3), Err('Input should be a valid date [kind=date_type'), id='time'),
+        pytest.param(
+            float('nan'),
+            Err('Input should be a valid date or datetime, NaN values not permitted [kind=date_from_datetime_parsing,'),
+            id='nan',
+        ),
+        pytest.param(
+            float('inf'),
+            Err(
+                'Input should be a valid date or datetime, dates after 9999 are not supported as unix timestamps '
+                '[kind=date_from_datetime_parsing,'
+            ),
+            id='inf',
+        ),
+        pytest.param(
+            float('-inf'),
+            Err(
+                'Input should be a valid date or datetime, dates before 1600 are not supported as unix timestamps '
+                '[kind=date_from_datetime_parsing,'
+            ),
+            id='-inf',
+        ),
     ],
 )
 def test_date(input_value, expected):
     v = SchemaValidator({'type': 'date'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
-            v.validate_python(input_value)
+            result = v.validate_python(input_value)
+            print(f'{input_value=} {result=}')
         assert v.isinstance_python(input_value) is False
     else:
         output = v.validate_python(input_value)
@@ -212,7 +234,8 @@ def test_union():
     ],
 )
 def test_date_past(py_and_json: PyAndJson, input_value, expected):
-    v = py_and_json(core_schema.date_schema(today_op='past'))
+    # today_utc_offset must be set for all these tests to allow mocking in test_datetime.py!
+    v = py_and_json(core_schema.date_schema(today_op='past', today_utc_offset=0))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -233,7 +256,7 @@ def test_date_past(py_and_json: PyAndJson, input_value, expected):
     ],
 )
 def test_date_future(py_and_json: PyAndJson, input_value, expected):
-    v = py_and_json(core_schema.date_schema(today_op='future'))
+    v = py_and_json(core_schema.date_schema(today_op='future', today_utc_offset=0))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -251,7 +274,7 @@ def test_date_past_future_today():
     assert v.isinstance_python(today - timedelta(days=1)) is True
     assert v.isinstance_python(today + timedelta(days=1)) is False
 
-    v = SchemaValidator(core_schema.date_schema(today_op='future'))
+    v = SchemaValidator(core_schema.date_schema(today_op='future', today_utc_offset=0))
     assert v.isinstance_python(today) is True
     assert v.isinstance_python(today - timedelta(days=1)) is False
     assert v.isinstance_python(today + timedelta(days=1)) is True

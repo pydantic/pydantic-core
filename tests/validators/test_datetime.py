@@ -28,13 +28,17 @@ from ..conftest import Err, PyAndJson
         (Decimal('1654646400.1234568'), datetime(2022, 6, 8, 0, 0, 0, 123457)),
         (253_402_300_800_000, Err('should be a valid datetime, dates after 9999 are not supported as unix timestamps')),
         (-20_000_000_000, Err('should be a valid datetime, dates before 1600 are not supported as unix timestamps')),
+        (float('nan'), Err('Input should be a valid datetime, NaN values not permitted [kind=datetime_parsing,')),
+        (float('inf'), Err('Input should be a valid datetime, dates after 9999')),
+        (float('-inf'), Err('Input should be a valid datetime, dates before 1600')),
     ],
 )
 def test_datetime(input_value, expected):
     v = SchemaValidator({'type': 'datetime'})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
-            v.validate_python(input_value)
+            result = v.validate_python(input_value)
+            print(f'{input_value=} {result=}')
     else:
         output = v.validate_python(input_value)
         assert output == expected
