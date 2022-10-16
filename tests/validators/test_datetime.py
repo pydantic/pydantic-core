@@ -357,3 +357,8 @@ def test_mock_utc_offset_8_hours(mocker):
 
     future = datetime.utcnow() + timedelta(hours=7, minutes=59)
     assert not v.isinstance_python(future)
+
+
+def test_offset_too_large():
+    with pytest.raises(SchemaError, match=r'Input should be greater than -86400 \[kind=greater_than,'):
+        SchemaValidator(core_schema.datetime_schema(now_op='past', now_utc_offset=-24 * 3600))

@@ -116,6 +116,8 @@ def type_dict_schema(typed_dict) -> dict[str, Any]:
 
             schema = get_schema(field_type)
 
+        if field_name.endswith('_utc_offset'):
+            schema.update(gt=-24 * 60 * 60, lt=24 * 60 * 60)
         fields[field_name] = {'schema': schema, 'required': required}
 
     return {'type': 'typed-dict', 'fields': fields, 'extra_behavior': 'forbid'}

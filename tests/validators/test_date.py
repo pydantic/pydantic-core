@@ -245,7 +245,7 @@ def test_date_future(py_and_json: PyAndJson, input_value, expected):
 
 
 def test_date_past_future_today():
-    v = SchemaValidator(core_schema.date_schema(today_op='past'))
+    v = SchemaValidator(core_schema.date_schema(today_op='past', today_utc_offset=0))
     today = datetime.utcnow().replace(tzinfo=timezone.utc).date()
     assert v.isinstance_python(today) is True
     assert v.isinstance_python(today - timedelta(days=1)) is True
@@ -255,3 +255,8 @@ def test_date_past_future_today():
     assert v.isinstance_python(today) is True
     assert v.isinstance_python(today - timedelta(days=1)) is False
     assert v.isinstance_python(today + timedelta(days=1)) is True
+
+
+def test_offset_too_large():
+    with pytest.raises(SchemaError, match=r'Input should be less than 86400 \[kind=less_than,'):
+        SchemaValidator(core_schema.date_schema(today_op='past', today_utc_offset=24 * 3600))

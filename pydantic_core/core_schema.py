@@ -211,7 +211,9 @@ class DateSchema(TypedDict, total=False):
     lt: date
     gt: date
     today_op: Literal['past', 'future']
-    today_utc_offset: int  # defaults to current local utc offset from `time.localtime().tm_gmtoff` if omited
+    # defaults to current local utc offset from `time.localtime().tm_gmtoff`
+    # value is restricted to 86400 < offset < 86400 by bounds in generate_self_schema.py
+    today_utc_offset: int
     ref: str
     extra: Any
 
@@ -274,7 +276,9 @@ class DatetimeSchema(TypedDict, total=False):
     lt: datetime
     gt: datetime
     now_op: Literal['past', 'future']
-    now_utc_offset: int  # defaults to current local utc offset from `time.localtime().tm_gmtoff` if omited
+    # defaults to current local utc offset from `time.localtime().tm_gmtoff`
+    # value is restricted to 86400 < offset < 86400 by bounds in generate_self_schema.py
+    now_utc_offset: int
     ref: str
     extra: Any
 
