@@ -1,11 +1,11 @@
 import re
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict
 
 import pytest
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -200,3 +200,58 @@ def test_union():
     v = SchemaValidator({'type': 'union', 'choices': [{'type': 'date'}, {'type': 'str'}]})
     assert v.validate_python('2022-01-02') == '2022-01-02'
     assert v.validate_python(date(2022, 1, 2)) == date(2022, 1, 2)
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ('2022-06-08', date(2022, 6, 8)),
+        (1654646400, date(2022, 6, 8)),
+        ('2068-06-08', Err('Input date value should be in the past [kind=date_past,')),
+        (3105734400, Err('Input date value should be in the past [kind=date_past,')),
+    ],
+)
+def test_date_past(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(core_schema.date_schema(today_op='past'))
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_test(input_value)
+        assert v.isinstance_test(input_value) is False
+    else:
+        output = v.validate_test(input_value)
+        assert output == expected
+        assert v.isinstance_test(input_value) is True
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ('2022-06-08', Err('Input date value should be in the future [kind=date_future,')),
+        (1654646400, Err('Input date value should be in the future [kind=date_future,')),
+        ('2068-06-08', date(2068, 6, 8)),
+        (3105734400, date(2068, 6, 1)),
+    ],
+)
+def test_date_future(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(core_schema.date_schema(today_op='future'))
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_test(input_value)
+        assert v.isinstance_test(input_value) is False
+    else:
+        output = v.validate_test(input_value)
+        assert output == expected
+        assert v.isinstance_test(input_value) is True
+
+
+def test_date_past_future_today():
+    v = SchemaValidator(core_schema.date_schema(today_op='past'))
+    today = datetime.utcnow().replace(tzinfo=timezone.utc).date()
+    assert v.isinstance_python(today) is True
+    assert v.isinstance_python(today - timedelta(days=1)) is True
+    assert v.isinstance_python(today + timedelta(days=1)) is False
+
+    v = SchemaValidator(core_schema.date_schema(today_op='future'))
+    assert v.isinstance_python(today) is True
+    assert v.isinstance_python(today - timedelta(days=1)) is False
+    assert v.isinstance_python(today + timedelta(days=1)) is True
