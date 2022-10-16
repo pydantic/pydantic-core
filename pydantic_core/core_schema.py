@@ -210,10 +210,10 @@ class DateSchema(TypedDict, total=False):
     ge: date
     lt: date
     gt: date
-    today_op: Literal['past', 'future']
+    now_op: Literal['past', 'future']
     # defaults to current local utc offset from `time.localtime().tm_gmtoff`
     # value is restricted to 86400 < offset < 86400 by bounds in generate_self_schema.py
-    today_utc_offset: int
+    now_utc_offset: int
     ref: str
     extra: Any
 
@@ -226,8 +226,8 @@ def date_schema(
     lt: date | None = None,
     gt: date | None = None,
     ref: str | None = None,
-    today_op: Literal['past', 'future'] | None = None,
-    today_utc_offset: int | None = None,
+    now_op: Literal['past', 'future'] | None = None,
+    now_utc_offset: int | None = None,
     extra: Any = None,
 ) -> DateSchema:
     return dict_not_none(
@@ -237,8 +237,8 @@ def date_schema(
         ge=ge,
         lt=lt,
         gt=gt,
-        today_op=today_op,
-        today_utc_offset=today_utc_offset,
+        now_op=now_op,
+        now_utc_offset=now_utc_offset,
         ref=ref,
         extra=extra,
     )

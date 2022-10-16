@@ -165,7 +165,7 @@ impl DateConstraints {
             lt: convert_pydate(schema, intern!(py, "lt"))?,
             ge: convert_pydate(schema, intern!(py, "ge"))?,
             gt: convert_pydate(schema, intern!(py, "gt"))?,
-            today: NowConstraint::from_py(schema, "today_op", "today_utc_offset")?,
+            today: NowConstraint::from_py(schema)?,
         };
         if c.le.is_some() || c.lt.is_some() || c.ge.is_some() || c.gt.is_some() || c.today.is_some() {
             Ok(Some(c))

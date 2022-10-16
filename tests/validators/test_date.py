@@ -234,8 +234,8 @@ def test_union():
     ],
 )
 def test_date_past(py_and_json: PyAndJson, input_value, expected):
-    # today_utc_offset must be set for all these tests to allow mocking in test_datetime.py!
-    v = py_and_json(core_schema.date_schema(today_op='past', today_utc_offset=0))
+    # now_utc_offset must be set for all these tests to allow mocking in test_datetime.py!
+    v = py_and_json(core_schema.date_schema(now_op='past', now_utc_offset=0))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -256,7 +256,7 @@ def test_date_past(py_and_json: PyAndJson, input_value, expected):
     ],
 )
 def test_date_future(py_and_json: PyAndJson, input_value, expected):
-    v = py_and_json(core_schema.date_schema(today_op='future', today_utc_offset=0))
+    v = py_and_json(core_schema.date_schema(now_op='future', now_utc_offset=0))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -268,13 +268,13 @@ def test_date_future(py_and_json: PyAndJson, input_value, expected):
 
 
 def test_date_past_future_today():
-    v = SchemaValidator(core_schema.date_schema(today_op='past', today_utc_offset=0))
+    v = SchemaValidator(core_schema.date_schema(now_op='past', now_utc_offset=0))
     today = datetime.utcnow().replace(tzinfo=timezone.utc).date()
     assert v.isinstance_python(today) is True
     assert v.isinstance_python(today - timedelta(days=1)) is True
     assert v.isinstance_python(today + timedelta(days=1)) is False
 
-    v = SchemaValidator(core_schema.date_schema(today_op='future', today_utc_offset=0))
+    v = SchemaValidator(core_schema.date_schema(now_op='future', now_utc_offset=0))
     assert v.isinstance_python(today) is True
     assert v.isinstance_python(today - timedelta(days=1)) is False
     assert v.isinstance_python(today + timedelta(days=1)) is True
@@ -282,4 +282,4 @@ def test_date_past_future_today():
 
 def test_offset_too_large():
     with pytest.raises(SchemaError, match=r'Input should be less than 86400 \[kind=less_than,'):
-        SchemaValidator(core_schema.date_schema(today_op='past', today_utc_offset=24 * 3600))
+        SchemaValidator(core_schema.date_schema(now_op='past', now_utc_offset=24 * 3600))

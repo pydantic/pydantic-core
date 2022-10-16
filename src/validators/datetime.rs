@@ -118,7 +118,7 @@ impl DateTimeConstraints {
             lt: py_datetime_as_datetime(schema, intern!(py, "lt"))?,
             ge: py_datetime_as_datetime(schema, intern!(py, "ge"))?,
             gt: py_datetime_as_datetime(schema, intern!(py, "gt"))?,
-            now: NowConstraint::from_py(schema, "now_op", "now_utc_offset")?,
+            now: NowConstraint::from_py(schema)?,
         };
         if c.le.is_some() || c.lt.is_some() || c.ge.is_some() || c.gt.is_some() || c.now.is_some() {
             Ok(Some(c))
@@ -188,12 +188,12 @@ impl NowConstraint {
         }
     }
 
-    pub fn from_py(schema: &PyDict, op_key: &str, offset_key: &str) -> PyResult<Option<Self>> {
+    pub fn from_py(schema: &PyDict) -> PyResult<Option<Self>> {
         let py = schema.py();
-        match schema.get_as(PyString::new(py, op_key))? {
+        match schema.get_as(intern!(py, "now_op"))? {
             Some(op) => Ok(Some(Self {
                 op: NowOp::from_str(op)?,
-                utc_offset: schema.get_as(PyString::new(py, offset_key))?,
+                utc_offset: schema.get_as(intern!(py, "now_utc_offset"))?,
             })),
             None => Ok(None),
         }
