@@ -199,8 +199,9 @@ def fruit_enum_fixture():
     return FruitEnum
 
 
-def test_strict_subclass(FruitEnum):
-    v = SchemaValidator(core_schema.string_schema(strict=True))
+@pytest.mark.parametrize('kwargs', [{}, {'to_lower': True}], ids=repr)
+def test_strict_subclass(FruitEnum, kwargs):
+    v = SchemaValidator(core_schema.string_schema(strict=True, **kwargs))
     assert v.validate_python('foobar') == 'foobar'
     with pytest.raises(ValidationError, match='kind=string_type,'):
         v.validate_python(b'foobar')
