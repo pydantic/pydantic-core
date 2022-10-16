@@ -142,7 +142,11 @@ impl<'a> Input<'a> for PyAny {
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
         if let Ok(py_str) = self.cast_as::<PyString>() {
-            Ok(py_str.into())
+            if py_str.get_type().is(intern!(self.py(), "s").get_type()) {
+                Ok(py_str.into())
+            } else {
+                Err(ValError::new(ErrorKind::StringSubType, self))
+            }
         } else {
             Err(ValError::new(ErrorKind::StringType, self))
         }

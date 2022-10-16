@@ -186,3 +186,23 @@ def test_regex_error():
 def test_default_validator():
     v = SchemaValidator(core_schema.string_schema(strict=True, to_lower=False), {'str_strip_whitespace': False})
     assert plain_repr(v) == 'SchemaValidator(name="str",validator=Str(StrValidator{strict:true}),slots=[])'
+
+
+@pytest.fixture(scope='session', name='FruitEnum')
+def fruit_enum_fixture():
+    from enum import Enum
+
+    class FruitEnum(str, Enum):
+        pear = 'pear'
+        banana = 'banana'
+
+    return FruitEnum
+
+
+def test_strict_subclass(FruitEnum):
+    v = SchemaValidator(core_schema.string_schema(strict=True))
+    assert v.validate_python('foobar') == 'foobar'
+    with pytest.raises(ValidationError, match='kind=string_type,'):
+        v.validate_python(b'foobar')
+    with pytest.raises(ValidationError, match='kind=string_type,'):
+        v.validate_python(FruitEnum.pear)
