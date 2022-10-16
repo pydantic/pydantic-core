@@ -63,7 +63,7 @@ def test_date(input_value, expected):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             result = v.validate_python(input_value)
-            print(f'{input_value=} {result=}')
+            print(f'input_value={input_value} result={result}')
         assert v.isinstance_python(input_value) is False
     else:
         output = v.validate_python(input_value)
