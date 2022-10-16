@@ -229,8 +229,8 @@ def test_union():
     [
         ('2022-06-08', date(2022, 6, 8)),
         (1654646400, date(2022, 6, 8)),
-        ('2068-06-08', Err('Input date value should be in the past [kind=date_past,')),
-        (3105734400, Err('Input date value should be in the past [kind=date_past,')),
+        ('2068-06-08', Err('Date should be in the past [kind=date_past,')),
+        (3105734400, Err('Date should be in the past [kind=date_past,')),
     ],
 )
 def test_date_past(py_and_json: PyAndJson, input_value, expected):
@@ -249,8 +249,8 @@ def test_date_past(py_and_json: PyAndJson, input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        ('2022-06-08', Err('Input date value should be in the future [kind=date_future,')),
-        (1654646400, Err('Input date value should be in the future [kind=date_future,')),
+        ('2022-06-08', Err('Date should be in the future [kind=date_future,')),
+        (1654646400, Err('Date should be in the future [kind=date_future,')),
         ('2068-06-08', date(2068, 6, 8)),
         (3105734400, date(2068, 6, 1)),
     ],

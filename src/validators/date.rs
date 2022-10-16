@@ -82,7 +82,7 @@ impl Validator for DateValidator {
                 let today = Date::today(offset).map_err(|e| {
                     py_error_type!("Date::today() error: {}", e.get_documentation().unwrap_or("unknown"))
                 })?;
-                // Some(c) to match behaviour of gt/lt/le/ge
+                // `if let Some(c)` to match behaviour of gt/lt/le/ge
                 if let Some(c) = raw_date.partial_cmp(&today) {
                     let date_compliant = today_constraint.op.compare(c);
                     if !date_compliant {

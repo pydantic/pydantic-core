@@ -561,7 +561,6 @@ impl<'a> Input<'a> for PyAny {
         } else if let Ok(int) = self.extract::<i64>() {
             int_as_datetime(self, int, 0)
         } else if let Ok(float) = self.extract::<f64>() {
-            dbg!(float);
             float_as_datetime(self, float)
         } else if let Ok(date) = self.cast_as::<PyDate>() {
             Ok(date_as_datetime(date)?)

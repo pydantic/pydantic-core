@@ -271,8 +271,8 @@ def test_invalid_constraint():
         ('2022-06-08T12:13:14', datetime(2022, 6, 8, 12, 13, 14)),
         ('2022-06-08T12:13:14Z', datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone.utc)),
         (1655205632, datetime(2022, 6, 14, 11, 20, 32)),
-        ('2068-06-08T12:13:14', Err('Input datetime value should be in the past [kind=datetime_past,')),
-        (3105730800, Err('Input datetime value should be in the past [kind=datetime_past,')),
+        ('2068-06-08T12:13:14', Err('Datetime should be in the past [kind=datetime_past,')),
+        (3105730800, Err('Datetime should be in the past [kind=datetime_past,')),
     ],
 )
 def test_datetime_past(py_and_json: PyAndJson, input_value, expected):
@@ -314,8 +314,8 @@ def test_datetime_past_timezone():
         ('2068-06-08T12:13:14', datetime(2068, 6, 8, 12, 13, 14)),
         ('2068-06-08T12:13:14Z', datetime(2068, 6, 8, 12, 13, 14, tzinfo=timezone.utc)),
         (3105730800, datetime(2068, 5, 31, 23, 0)),
-        ('2022-06-08T12:13:14', Err('Input datetime value should be in the future [kind=datetime_future,')),
-        (1655205632, Err('Input datetime value should be in the future [kind=datetime_future,')),
+        ('2022-06-08T12:13:14', Err('Datetime should be in the future [kind=datetime_future,')),
+        (1655205632, Err('Datetime should be in the future [kind=datetime_future,')),
     ],
 )
 def test_datetime_future(py_and_json: PyAndJson, input_value, expected):
