@@ -156,9 +156,7 @@ impl LiteralMultipleStringsValidator {
                 return None;
             }
         }
-        let last_repr = repr_args.pop().unwrap();
-        let expected_repr = format!("{} or {}", repr_args.join(", "), last_repr);
-        let name = format!("literal[{}]", expected_repr);
+        let (expected_repr, name) = expected_repr_name(repr_args);
         Some(Self {
             expected,
             expected_repr,
@@ -213,9 +211,7 @@ impl LiteralMultipleIntsValidator {
                 return None;
             }
         }
-        let last_repr = repr_args.pop().unwrap();
-        let expected_repr = format!("{} or {}", repr_args.join(", "), last_repr);
-        let name = format!("literal[{}]", expected_repr);
+        let (expected_repr, name) = expected_repr_name(repr_args);
         Some(Self {
             expected,
             expected_repr,
@@ -277,9 +273,7 @@ impl LiteralGeneralValidator {
                 expected_py.append(item)?;
             }
         }
-        let last_repr = repr_args.pop().unwrap();
-        let expected_repr = format!("{} or {}", repr_args.join(", "), last_repr);
-        let name = format!("literal[{}]", expected_repr);
+        let (expected_repr, name) = expected_repr_name(repr_args);
         Ok(Self {
             expected_int,
             expected_str,
@@ -332,4 +326,11 @@ impl Validator for LiteralGeneralValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
+}
+
+fn expected_repr_name(mut repr_args: Vec<String>) -> (String, String) {
+    let name = format!("literal[{}]", repr_args.join(","));
+    // unwrap is okay since we check the length in build at the top of this file
+    let last_repr = repr_args.pop().unwrap();
+    (format!("{} or {}", repr_args.join(", "), last_repr), name)
 }

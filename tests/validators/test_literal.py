@@ -146,3 +146,27 @@ def test_literal_none():
     assert v.isinstance_json('null') is True
     assert v.isinstance_json('""') is False
     assert plain_repr(v) == 'SchemaValidator(name="none",validator=None(NoneValidator),slots=[])'
+
+
+def test_union():
+    v = SchemaValidator(core_schema.union_schema(core_schema.literal_schema('a', 'b'), core_schema.int_schema()))
+    assert v.validate_python('a') == 'a'
+    assert v.validate_python(4) == 4
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python('c')
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'kind': 'literal_error',
+            'loc': ["literal['a','b']"],
+            'message': "Input should be 'a' or 'b'",
+            'input_value': 'c',
+            'context': {'expected': "'a' or 'b'"},
+        },
+        {
+            'kind': 'int_parsing',
+            'loc': ['int'],
+            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'input_value': 'c',
+        },
+    ]
