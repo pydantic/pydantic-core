@@ -350,7 +350,7 @@ JsonType = Literal['null', 'bool', 'int', 'float', 'str', 'list', 'dict']
 
 class IsInstanceSchema(TypedDict, total=False):
     type: Required[Literal['is-instance']]
-    cls: Required[Type[Any]]
+    cls: Required[Any]
     json_types: Set[JsonType]
     json_function: Callable[[Any], Any]
     ref: str
@@ -358,7 +358,7 @@ class IsInstanceSchema(TypedDict, total=False):
 
 
 def is_instance_schema(
-    cls: Type[Any],
+    cls: Any,
     *,
     json_types: Set[JsonType] | None = None,
     json_function: Callable[[Any], Any] | None = None,

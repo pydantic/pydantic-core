@@ -30,14 +30,17 @@ impl BuildValidator for IsInstanceValidator {
         let py = schema.py();
         let cls_key = intern!(py, "cls");
         let class: &PyAny = schema.get_as_req(cls_key)?;
-        let class_repr = match class.extract::<&PyType>() {
-            Ok(t) => t.name()?.to_string(),
-            Err(_) => class.repr()?.extract()?,
-        };
+
+        // test that class works with isinstance to avoid errors at call time
         let test_value: &PyAny = cls_key.as_ref();
         if test_value.input_is_instance(class, 0).is_err() {
             return py_err!("'cls' must be valid as the first argument to 'isinstance'");
         }
+
+        let class_repr = match class.extract::<&PyType>() {
+            Ok(t) => t.name()?.to_string(),
+            Err(_) => class.repr()?.extract()?,
+        };
         let name = format!("{}[{}]", Self::EXPECTED_TYPE, class_repr);
         let json_types = match schema.get_as::<&PySet>(intern!(py, "json_types"))? {
             Some(s) => JsonType::combine(s)?,

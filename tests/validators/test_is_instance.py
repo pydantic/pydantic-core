@@ -1,3 +1,4 @@
+import typing
 from collections import deque
 
 import pytest
@@ -200,15 +201,18 @@ def test_json_function():
 
 
 def test_is_instance_sequence():
-    import typing
-
-    v = SchemaValidator({'type': 'is-instance', 'cls': typing.Sequence})
+    v = SchemaValidator(core_schema.is_instance_schema(typing.Sequence))
     assert v.isinstance_python(1) is False
     assert v.isinstance_python([1]) is True
 
+    with pytest.raises(ValidationError, match=r'Input should be an instance of typing.Sequence \[kind=is_instance_of,'):
+        v.validate_python(1)
+
 
 def test_is_instance_tuple():
-    v = SchemaValidator({'type': 'is-instance', 'cls': (int, str)})
+    v = SchemaValidator(core_schema.is_instance_schema((int, str)))
     assert v.isinstance_python(1) is True
     assert v.isinstance_python('foobar') is True
     assert v.isinstance_python([1]) is False
+    with pytest.raises(ValidationError, match=r"Input should be an instance of \(<class 'int'>, <class 'str'>\)"):
+        v.validate_python([1])
