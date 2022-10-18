@@ -35,7 +35,7 @@ impl BuildValidator for IsInstanceValidator {
             Err(_) => class.repr()?.extract()?,
         };
         let test_value: &PyAny = cls_key.as_ref();
-        if test_value.is_instance_input(class, 0).is_err() {
+        if test_value.input_is_instance(class, 0).is_err() {
             return py_err!("'cls' must be valid as the first argument to 'isinstance'");
         }
         let name = format!("{}[{}]", Self::EXPECTED_TYPE, class_repr);
@@ -63,7 +63,7 @@ impl Validator for IsInstanceValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        match input.is_instance_input(self.class.as_ref(py), self.json_types)? {
+        match input.input_is_instance(self.class.as_ref(py), self.json_types)? {
             true => {
                 if input.get_type().is_json() {
                     if let Some(ref json_function) = self.json_function {

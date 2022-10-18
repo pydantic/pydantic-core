@@ -37,7 +37,7 @@ impl<'a> Input<'a> for JsonInput {
         matches!(self, JsonInput::Null)
     }
 
-    fn is_instance_input(&self, _class: &PyAny, json_mask: u8) -> PyResult<bool> {
+    fn input_is_instance(&self, _class: &PyAny, json_mask: u8) -> PyResult<bool> {
         if json_mask == 0 {
             Ok(false)
         } else {
@@ -319,7 +319,7 @@ impl<'a> Input<'a> for String {
         false
     }
 
-    fn is_instance_input(&self, _class: &PyAny, json_mask: u8) -> PyResult<bool> {
+    fn input_is_instance(&self, _class: &PyAny, json_mask: u8) -> PyResult<bool> {
         if json_mask == 0 {
             Ok(false)
         } else {

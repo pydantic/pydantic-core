@@ -93,8 +93,8 @@ impl<'a> Input<'a> for PyAny {
         self.getattr(name).ok()
     }
 
-    fn is_instance_input(&self, class: &PyAny, _json_mask: u8) -> PyResult<bool> {
-        // See https://github.com/PyO3/pyo3/issues/2694 - we can't use `is_instance` here since it requires PyType,
+    fn input_is_instance(&self, class: &PyAny, _json_mask: u8) -> PyResult<bool> {
+        // See PyO3/pyo3#2694 - we can't use `is_instance` here since it requires PyType,
         // and some check objects are not types, this logic is lifted from `is_instance` in PyO3
         let result = unsafe { ffi::PyObject_IsInstance(self.as_ptr(), class.as_ptr()) };
         py_error_on_minusone(self.py(), result)?;
