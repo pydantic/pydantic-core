@@ -52,15 +52,19 @@ impl BuildValidator for LiteralBuilder {
 #[derive(Debug, Clone)]
 pub struct LiteralSingleStringValidator {
     expected: String,
-    repr: String,
+    expected_repr: String,
     name: String,
 }
 
 impl LiteralSingleStringValidator {
     fn new(expected: String) -> Self {
-        let repr = format!("'{}'", expected);
-        let name = format!("literal[{}]", repr);
-        Self { expected, repr, name }
+        let expected_repr = format!("'{}'", expected);
+        let name = format!("literal[{}]", expected_repr);
+        Self {
+            expected,
+            expected_repr,
+            name,
+        }
     }
 }
 
@@ -78,8 +82,8 @@ impl Validator for LiteralSingleStringValidator {
             Ok(input.to_object(py))
         } else {
             Err(ValError::new(
-                ErrorKind::LiteralSingleError {
-                    expected: self.repr.clone(),
+                ErrorKind::LiteralError {
+                    expected: self.expected_repr.clone(),
                 },
                 input,
             ))
@@ -120,7 +124,7 @@ impl Validator for LiteralSingleIntValidator {
             Ok(input.to_object(py))
         } else {
             Err(ValError::new(
-                ErrorKind::LiteralSingleError {
+                ErrorKind::LiteralError {
                     expected: self.expected.to_string(),
                 },
                 input,
@@ -136,7 +140,7 @@ impl Validator for LiteralSingleIntValidator {
 #[derive(Debug, Clone)]
 pub struct LiteralMultipleStringsValidator {
     expected: AHashSet<String>,
-    repr: String,
+    expected_repr: String,
     name: String,
 }
 
@@ -152,9 +156,14 @@ impl LiteralMultipleStringsValidator {
                 return None;
             }
         }
-        let repr = repr_args.join(", ");
-        let name = format!("literal[{}]", repr);
-        Some(Self { expected, repr, name })
+        let last_repr = repr_args.pop().unwrap();
+        let expected_repr = format!("{} or {}", repr_args.join(", "), last_repr);
+        let name = format!("literal[{}]", expected_repr);
+        Some(Self {
+            expected,
+            expected_repr,
+            name,
+        })
     }
 }
 
@@ -172,8 +181,8 @@ impl Validator for LiteralMultipleStringsValidator {
             Ok(input.to_object(py))
         } else {
             Err(ValError::new(
-                ErrorKind::LiteralMultipleError {
-                    expected: self.repr.clone(),
+                ErrorKind::LiteralError {
+                    expected: self.expected_repr.clone(),
                 },
                 input,
             ))
@@ -188,7 +197,7 @@ impl Validator for LiteralMultipleStringsValidator {
 #[derive(Debug, Clone)]
 pub struct LiteralMultipleIntsValidator {
     expected: NoHashSet<i64>,
-    repr: String,
+    expected_repr: String,
     name: String,
 }
 
@@ -204,9 +213,14 @@ impl LiteralMultipleIntsValidator {
                 return None;
             }
         }
-        let repr = repr_args.join(", ");
-        let name = format!("literal[{}]", repr);
-        Some(Self { expected, repr, name })
+        let last_repr = repr_args.pop().unwrap();
+        let expected_repr = format!("{} or {}", repr_args.join(", "), last_repr);
+        let name = format!("literal[{}]", expected_repr);
+        Some(Self {
+            expected,
+            expected_repr,
+            name,
+        })
     }
 }
 
@@ -224,8 +238,8 @@ impl Validator for LiteralMultipleIntsValidator {
             Ok(input.to_object(py))
         } else {
             Err(ValError::new(
-                ErrorKind::LiteralMultipleError {
-                    expected: self.repr.clone(),
+                ErrorKind::LiteralError {
+                    expected: self.expected_repr.clone(),
                 },
                 input,
             ))
@@ -242,7 +256,7 @@ pub struct LiteralGeneralValidator {
     expected_int: AHashSet<i64>,
     expected_str: AHashSet<String>,
     expected_py: Py<PyList>,
-    repr: String,
+    expected_repr: String,
     name: String,
 }
 
@@ -263,13 +277,14 @@ impl LiteralGeneralValidator {
                 expected_py.append(item)?;
             }
         }
-        let repr = repr_args.join(", ");
-        let name = format!("literal[{}]", repr);
+        let last_repr = repr_args.pop().unwrap();
+        let expected_repr = format!("{} or {}", repr_args.join(", "), last_repr);
+        let name = format!("literal[{}]", expected_repr);
         Ok(Self {
             expected_int,
             expected_str,
             expected_py: expected_py.into_py(py),
-            repr,
+            expected_repr,
             name,
         })
     }
@@ -307,8 +322,8 @@ impl Validator for LiteralGeneralValidator {
         }
 
         Err(ValError::new(
-            ErrorKind::LiteralMultipleError {
-                expected: self.repr.clone(),
+            ErrorKind::LiteralError {
+                expected: self.expected_repr.clone(),
             },
             input,
         ))
