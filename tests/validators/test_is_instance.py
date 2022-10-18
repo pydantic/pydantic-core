@@ -216,3 +216,10 @@ def test_is_instance_tuple():
     assert v.isinstance_python([1]) is False
     with pytest.raises(ValidationError, match=r"Input should be an instance of \(<class 'int'>, <class 'str'>\)"):
         v.validate_python([1])
+
+
+def test_class_repr():
+    v = SchemaValidator(core_schema.is_instance_schema(int, cls_repr='Foobar'))
+    assert v.validate_python(1) == 1
+    with pytest.raises(ValidationError, match=r'Input should be an instance of Foobar \[kind=is_instance_of,'):
+        v.validate_python('1')
