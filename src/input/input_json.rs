@@ -1,17 +1,17 @@
 use pyo3::prelude::*;
 
 use crate::errors::{ErrorKind, InputValue, LocItem, ValError, ValResult};
+use crate::json::{JsonArray, JsonInput, JsonType};
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
     float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
 use super::input_abstract::InputType;
-use super::parse_json::JsonArray;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
     EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericCollection, GenericIterator, GenericMapping,
-    Input, JsonArgs, JsonInput, JsonType,
+    Input, JsonArgs,
 };
 
 impl<'a> Input<'a> for JsonInput {

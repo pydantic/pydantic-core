@@ -5,6 +5,7 @@ use pyo3::types::PyDict;
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValResult};
 use crate::input::Input;
+use crate::json::{json_object, JsonObject};
 use crate::recursion_guard::RecursionGuard;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -52,6 +53,10 @@ impl Validator for BytesValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
+
+    fn details_attributes(&self) -> Option<JsonObject> {
+        json_object!(strict: self.strict)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -89,6 +94,10 @@ impl Validator for BytesConstrainedValidator {
 
     fn get_name(&self) -> &str {
         "constrained-bytes"
+    }
+
+    fn details_attributes(&self) -> Option<JsonObject> {
+        json_object!(strict: self.strict, max_length: self.max_length, min_length: self.min_length)
     }
 }
 

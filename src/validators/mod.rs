@@ -12,6 +12,7 @@ use crate::build_context::{extract_used_refs, BuildContext};
 use crate::build_tools::{py_err, py_error_type, SchemaDict, SchemaError};
 use crate::errors::{ValError, ValResult, ValidationError};
 use crate::input::Input;
+use crate::json::{JsonInput, JsonObject};
 use crate::questions::{Answers, Question};
 use crate::recursion_guard::RecursionGuard;
 
@@ -536,5 +537,18 @@ pub trait Validator: Send + Sync + Clone + Debug {
     /// it is used by `RecursiveRefValidator` to set its name
     fn complete(&mut self, _build_context: &BuildContext) -> PyResult<()> {
         Ok(())
+    }
+
+    fn details_attributes(&self) -> Option<JsonObject> {
+        None
+    }
+
+    fn details(&self) -> JsonInput {
+        let mut obj = indexmap::IndexMap::new();
+        obj.insert("name".to_string(), self.get_name().into());
+        if let Some(attributes) = self.details_attributes() {
+            obj.insert("properties".to_string(), JsonInput::Object(attributes));
+        }
+        JsonInput::Object(obj)
     }
 }

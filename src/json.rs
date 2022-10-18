@@ -60,6 +60,61 @@ pub enum JsonInput {
 pub type JsonArray = Vec<JsonInput>;
 pub type JsonObject = IndexMap<String, JsonInput>;
 
+impl From<String> for JsonInput {
+    fn from(s: String) -> Self {
+        Self::String(s)
+    }
+}
+
+impl From<&str> for JsonInput {
+    fn from(s: &str) -> Self {
+        Self::String(s.to_string())
+    }
+}
+
+impl From<usize> for JsonInput {
+    fn from(i: usize) -> Self {
+        Self::Int(i as i64)
+    }
+}
+
+impl From<bool> for JsonInput {
+    fn from(b: bool) -> Self {
+        Self::Bool(b)
+    }
+}
+
+impl From<f64> for JsonInput {
+    fn from(f: f64) -> Self {
+        Self::Float(f)
+    }
+}
+
+impl From<Option<usize>> for JsonInput {
+    fn from(op: Option<usize>) -> Self {
+        if let Some(i) = op {
+            Self::Int(i as i64)
+        } else {
+            Self::Null
+        }
+    }
+}
+
+macro_rules! json_object {
+    () => {
+        Some(indexmap::IndexMap::new())
+    };
+
+    ($($key:ident: $value:expr ),+ ) => {{
+        let mut obj: crate::json::JsonObject = indexmap::IndexMap::new();
+        $(
+            obj.insert(stringify!($key).to_string(), $value.into());
+        )*
+        Some(obj)
+    }};
+}
+pub(crate) use json_object;
+
 impl ToPyObject for JsonInput {
     fn to_object(&self, py: Python<'_>) -> PyObject {
         match self {

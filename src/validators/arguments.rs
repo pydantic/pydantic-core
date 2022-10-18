@@ -6,6 +6,7 @@ use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 use crate::build_tools::{py_err, schema_or_config_same, SchemaDict};
 use crate::errors::{ErrorKind, ValError, ValLineError, ValResult};
 use crate::input::{GenericArguments, Input};
+use crate::json::{json_object, JsonObject};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 
@@ -316,5 +317,9 @@ impl Validator for ArgumentsValidator {
 
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
+    }
+
+    fn details_attributes(&self) -> Option<JsonObject> {
+        json_object!()
     }
 }

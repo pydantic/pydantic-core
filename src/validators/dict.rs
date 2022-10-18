@@ -4,7 +4,8 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input, JsonObject};
+use crate::input::{GenericMapping, Input};
+use crate::json::JsonObject;
 use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;

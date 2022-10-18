@@ -2,7 +2,8 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::PyDowncastError;
 
-use crate::input::{Input, JsonInput};
+use crate::input::Input;
+use crate::json::JsonInput;
 
 use super::kinds::ErrorKind;
 use super::location::{LocItem, Location};

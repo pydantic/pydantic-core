@@ -4,10 +4,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyIterator, PyList, PySet, PyString, PyTuple};
 
 use crate::errors::{py_err_string, ErrorKind, InputValue, ValError, ValLineError, ValResult};
+use crate::json::{JsonArray, JsonInput, JsonObject};
 use crate::recursion_guard::RecursionGuard;
 use crate::validators::{CombinedValidator, Extra, Validator};
 
-use super::parse_json::{JsonArray, JsonInput, JsonObject};
 use super::Input;
 
 /// Container for all the collections (sized iterable containers) types, which
