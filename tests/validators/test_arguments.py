@@ -721,6 +721,27 @@ def test_kwargs(py_and_json: PyAndJson, input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
+        [{'__args__': [1, 2]}, ((), {'__args__': [1, 2]})],
+        [{'__kwargs__': {'x': 'abc'}}, ((), {'__kwargs__': {'x': 'abc'}})],
+        [
+            {'__args__': [1, 2], '__kwargs__': {'x': 'abc'}, 'more': 'hello'},
+            ((), {'__args__': [1, 2], '__kwargs__': {'x': 'abc'}, 'more': 'hello'}),
+        ],
+    ],
+    ids=repr,
+)
+def test_var_kwargs(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json({'type': 'arguments', 'arguments_schema': [], 'var_kwargs_schema': {'type': 'any'}})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_test(input_value)
+    else:
+        assert v.validate_test(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
         [{'__args__': (1,), '__kwargs__': None}, ((1,), {})],
         [{'__args__': None, '__kwargs__': {'Foo': 1}}, ((), {'a': 1})],
         [
