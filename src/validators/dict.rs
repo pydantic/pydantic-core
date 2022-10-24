@@ -70,10 +70,14 @@ impl Validator for DictValidator {
         let dict = input.validate_dict(extra.strict.unwrap_or(self.strict))?;
         match dict {
             GenericMapping::PyDict(py_dict) => self.validate_dict(py, input, py_dict, extra, slots, recursion_guard),
+<<<<<<< HEAD
             GenericMapping::PyMapping(mapping) => {
                 self.validate_mapping(py, input, mapping, extra, slots, recursion_guard)
             }
             GenericMapping::PyGetAttr(_) => unreachable!(),
+=======
+            GenericMapping::PyGetAttr(_, _) => unreachable!(),
+>>>>>>> fdac378 (draft impl based on issue directions)
             GenericMapping::JsonObject(json_object) => {
                 self.validate_json_object(py, input, json_object, extra, slots, recursion_guard)
             }

@@ -773,6 +773,7 @@ class MyDataclass:
         (ClassWithAttributes(), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
         (MyDataclass(), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
         (Cls(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
+        (Cls(a=1, b=2, c='ham', d='bacon'), ({'a': 1, 'b': 2, 'c': 'ham', 'd': 'bacon'}, {'a', 'b', 'c', 'd'})),
         (dict(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
         (Map(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
         # using type gives `__module__ == 'builtins'`
