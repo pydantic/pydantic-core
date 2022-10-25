@@ -85,13 +85,8 @@ impl PydanticCustomError {
     fn __repr__(&self, py: Python) -> PyResult<String> {
         let msg = self.message(py)?;
         match { self.context.as_ref() } {
-            Some(ctx) => Ok(format!(
-                "{} [type={}, context={}]",
-                msg,
-                self.error_type,
-                ctx.as_ref(py)
-            )),
-            None => Ok(format!("{} [type={}, context=None]", msg, self.error_type)),
+            Some(ctx) => Ok(format!("{msg} [type={}, context={}]", self.error_type, ctx.as_ref(py))),
+            None => Ok(format!("{msg} [type={}, context=None]", self.error_type)),
         }
     }
 }
@@ -144,12 +139,11 @@ impl PydanticKnownError {
         let msg = self.message(py)?;
         match { self.context(py)?.as_ref() } {
             Some(ctx) => Ok(format!(
-                "{} [type={}, context={}]",
-                msg,
+                "{msg} [type={}, context={}]",
                 self.error_type(),
                 ctx.as_ref(py)
             )),
-            None => Ok(format!("{} [type={}, context=None]", msg, self.error_type())),
+            None => Ok(format!("{msg} [type={}, context=None]", self.error_type())),
         }
     }
 }
