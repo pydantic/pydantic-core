@@ -30,7 +30,7 @@ def test_function_before_raise():
     # debug(str(exc_info.value))
     assert exc_info.value.errors() == [
         {
-            'kind': 'value_error',
+            'type': 'value_error',
             'loc': [],
             'message': 'Value error, foobar',
             'input_value': 'input value',
@@ -52,7 +52,7 @@ def test_function_before_error():
         v.validate_python('12345')
     assert exc_info.value.errors() == [
         {
-            'kind': 'string_too_long',
+            'type': 'string_too_long',
             'loc': [],
             'message': 'String should have at most 5 characters',
             'input_value': '12345x',
@@ -82,7 +82,7 @@ def test_function_before_error_model():
         v.validate_python({'my_field': '12345'})
     assert exc_info.value.errors() == [
         {
-            'kind': 'string_too_long',
+            'type': 'string_too_long',
             'loc': ['my_field'],
             'message': 'String should have at most 5 characters',
             'input_value': '12345x',
@@ -143,7 +143,7 @@ def test_wrap_error():
         v.validate_python('wrong')
     assert exc_info.value.errors() == [
         {
-            'kind': 'int_parsing',
+            'type': 'int_parsing',
             'loc': [],
             'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
@@ -163,7 +163,7 @@ def test_function_wrap_location():
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
-            'kind': 'int_parsing',
+            'type': 'int_parsing',
             'loc': ['foo'],
             'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
@@ -323,7 +323,7 @@ def test_class_with_validator():
         v.validate_python(True)
 
     assert exc_info.value.errors() == [
-        {'kind': 'string_type', 'loc': [], 'message': 'Input should be a valid string', 'input_value': True}
+        {'type': 'string_type', 'loc': [], 'message': 'Input should be a valid string', 'input_value': True}
     ]
 
 
@@ -338,7 +338,7 @@ def test_raise_assertion_error():
 
     assert exc_info.value.errors() == [
         {
-            'kind': 'assertion_error',
+            'type': 'assertion_error',
             'loc': [],
             'message': 'Assertion failed, foobar',
             'input_value': 'input value',
@@ -358,7 +358,7 @@ def test_raise_assertion_error_plain():
 
     assert exc_info.value.errors() == [
         {
-            'kind': 'assertion_error',
+            'type': 'assertion_error',
             'loc': [],
             'message': 'Assertion failed, Unknown error',
             'input_value': 'input value',

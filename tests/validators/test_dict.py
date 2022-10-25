@@ -27,13 +27,13 @@ def test_dict(py_and_json: PyAndJson):
         ({'1': b'1', '2': b'2'}, {'1': '1', '2': '2'}),
         (OrderedDict(a=b'1', b='2'), {'a': '1', 'b': '2'}),
         ({}, {}),
-        ('foobar', Err("Input should be a valid dictionary [kind=dict_type, input_value='foobar', input_type=str]")),
-        ([], Err('Input should be a valid dictionary [kind=dict_type,')),
-        ([('x', 'y')], Err('Input should be a valid dictionary [kind=dict_type,')),
-        ([('x', 'y'), ('z', 'z')], Err('Input should be a valid dictionary [kind=dict_type,')),
-        ((), Err('Input should be a valid dictionary [kind=dict_type,')),
-        ((('x', 'y'),), Err('Input should be a valid dictionary [kind=dict_type,')),
-        ((type('Foobar', (), {'x': 1})()), Err('Input should be a valid dictionary [kind=dict_type,')),
+        ('foobar', Err("Input should be a valid dictionary [type=dict_type, input_value='foobar', input_type=str]")),
+        ([], Err('Input should be a valid dictionary [type=dict_type,')),
+        ([('x', 'y')], Err('Input should be a valid dictionary [type=dict_type,')),
+        ([('x', 'y'), ('z', 'z')], Err('Input should be a valid dictionary [type=dict_type,')),
+        ((), Err('Input should be a valid dictionary [type=dict_type,')),
+        ((('x', 'y'),), Err('Input should be a valid dictionary [type=dict_type,')),
+        ((type('Foobar', (), {'x': 1})()), Err('Input should be a valid dictionary [type=dict_type,')),
     ],
     ids=repr,
 )
@@ -53,7 +53,7 @@ def test_dict_value_error(py_and_json: PyAndJson):
         v.validate_test({'a': 2, 'b': 'wrong'})
     assert exc_info.value.errors() == [
         {
-            'kind': 'int_parsing',
+            'type': 'int_parsing',
             'loc': ['b'],
             'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
@@ -67,7 +67,7 @@ def test_dict_error_key_int():
         v.validate_python({1: 2, 3: 'wrong'})
     assert exc_info.value.errors() == [
         {
-            'kind': 'int_parsing',
+            'type': 'int_parsing',
             'loc': [3],
             'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
@@ -81,7 +81,7 @@ def test_dict_error_key_other():
         v.validate_python({1: 2, (1, 2): 'wrong'})
     assert exc_info.value.errors() == [
         {
-            'kind': 'int_parsing',
+            'type': 'int_parsing',
             'loc': ['(1, 2)'],
             'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
@@ -125,7 +125,7 @@ def test_key_error():
         v.validate_python({'x': 1})
     assert exc_info.value.errors() == [
         {
-            'kind': 'int_parsing',
+            'type': 'int_parsing',
             'loc': ['x', '[key]'],
             'message': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'x',
@@ -150,7 +150,7 @@ def test_mapping_error():
 
     assert exc_info.value.errors() == [
         {
-            'kind': 'dict_from_mapping',
+            'type': 'dict_from_mapping',
             'loc': [],
             'message': 'Unable to convert mapping to a dictionary, error: RuntimeError: intentional error',
             'input_value': HasRepr(IsStr(regex='.+BadMapping object at.+')),
@@ -179,7 +179,7 @@ def test_mapping_error_yield_1():
 
     assert exc_info.value.errors() == [
         {
-            'kind': 'dict_from_mapping',
+            'type': 'dict_from_mapping',
             'loc': [],
             'message': (
                 'Unable to convert mapping to a dictionary, error: '
@@ -203,13 +203,13 @@ def test_mapping_error_yield_1():
         (
             {'min_length': 3},
             {1: '2', 3: '4'},
-            Err('Dictionary should have at least 3 items after validation, not 2 [kind=too_short,'),
+            Err('Dictionary should have at least 3 items after validation, not 2 [type=too_short,'),
         ),
         ({'max_length': 4}, {'1': 1, '2': 2, '3': 3.0}, {'1': 1, '2': 2, '3': 3.0}),
         (
             {'max_length': 3},
             {'1': 1, '2': 2, '3': 3.0, '4': [1, 2, 3, 4]},
-            Err('Dictionary should have at most 3 items after validation, not 4 [kind=too_long,'),
+            Err('Dictionary should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
     ],
 )

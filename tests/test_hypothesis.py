@@ -43,7 +43,7 @@ def test_datetime_binary(datetime_schema, data):
     except ValidationError as exc:
         assert exc.errors() == [
             {
-                'kind': 'datetime_parsing',
+                'type': 'datetime_parsing',
                 'loc': [],
                 'message': IsStr(regex='Input should be a valid datetime, .+'),
                 'input_value': IsBytes(),
@@ -107,7 +107,7 @@ def test_recursive_cycles(recursive_schema, data):
     except ValidationError as exc:
         assert exc.errors() == [
             {
-                'kind': 'recursion_loop',
+                'type': 'recursion_loop',
                 'loc': IsList(length=(1, None)),
                 'message': 'Recursion error - cyclic reference detected',
                 'input_value': AnyThing(),

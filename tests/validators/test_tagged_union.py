@@ -17,7 +17,7 @@ from .test_typed_dict import Cls
                 'Input should be a valid integer',
                 [
                     {
-                        'kind': 'int_parsing',
+                        'type': 'int_parsing',
                         'loc': ['apple', 'bar'],
                         'message': 'Input should be a valid integer, unable to parse string as an integer',
                         'input_value': 'wrong',
@@ -31,7 +31,7 @@ from .test_typed_dict import Cls
                 'Field required',
                 [
                     {
-                        'kind': 'missing',
+                        'type': 'missing',
                         'loc': ['banana', 'spam'],
                         'message': 'Field required',
                         'input_value': {'foo': 'banana'},
@@ -45,7 +45,7 @@ from .test_typed_dict import Cls
                 'union_tag_invalid',
                 [
                     {
-                        'kind': 'union_tag_invalid',
+                        'type': 'union_tag_invalid',
                         'loc': [],
                         'message': (
                             "Input tag 'other' found using 'foo' does not match any "
@@ -63,7 +63,7 @@ from .test_typed_dict import Cls
                 'union_tag_not_found',
                 [
                     {
-                        'kind': 'union_tag_not_found',
+                        'type': 'union_tag_not_found',
                         'loc': [],
                         'message': "Unable to extract tag using discriminator 'foo'",
                         'input_value': {},
@@ -78,7 +78,7 @@ from .test_typed_dict import Cls
                 'dict_type',
                 [
                     {
-                        'kind': 'dict_type',
+                        'type': 'dict_type',
                         'loc': [],
                         'message': 'Input should be a valid dictionary',
                         'input_value': 'not a dict',
@@ -145,7 +145,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
         v.validate_test({})
     assert exc_info.value.errors() == [
         {
-            'kind': 'union_tag_not_found',
+            'type': 'union_tag_not_found',
             'loc': [],
             'message': "Unable to extract tag using discriminator 'food' | 'menu'.1",
             'input_value': {},
@@ -165,7 +165,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
                 'literal_error',
                 [
                     {
-                        'kind': 'literal_error',
+                        'type': 'literal_error',
                         'loc': ['str'],
                         'message': "Input should be 'foo' or 'bar'",
                         'input_value': 'baz',
@@ -180,7 +180,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
                 'union_tag_not_found',
                 [
                     {
-                        'kind': 'union_tag_not_found',
+                        'type': 'union_tag_not_found',
                         'loc': [],
                         'message': 'Unable to extract tag using discriminator discriminator_function()',
                         'input_value': None,
@@ -195,7 +195,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
                 'union_tag_invalid',
                 [
                     {
-                        'kind': 'union_tag_invalid',
+                        'type': 'union_tag_invalid',
                         'loc': [],
                         'message': (
                             "Input tag 'other' found using discriminator_function() "
@@ -294,7 +294,7 @@ def test_custom_error():
         {
             'type': 'tagged-union',
             'discriminator': 'foo',
-            'custom_error_kind': 'snap',
+            'custom_error_type': 'snap',
             'custom_error_message': 'Input should be a foo or bar',
             'choices': {
                 'apple': {
@@ -317,7 +317,7 @@ def test_custom_error():
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
-            'kind': 'snap',
+            'type': 'snap',
             'loc': [],
             'message': 'Input should be a foo or bar',
             'input_value': {'spam': 'apple', 'bar': 'Bar'},
@@ -327,7 +327,7 @@ def test_custom_error():
         v.validate_python({'foo': 'other', 'bar': 'Bar'})
     assert exc_info.value.errors() == [
         {
-            'kind': 'snap',
+            'type': 'snap',
             'loc': [],
             'message': 'Input should be a foo or bar',
             'input_value': {'foo': 'other', 'bar': 'Bar'},
@@ -335,12 +335,12 @@ def test_custom_error():
     ]
 
 
-def test_custom_error_kind():
+def test_custom_error_type():
     v = SchemaValidator(
         {
             'type': 'tagged-union',
             'discriminator': 'foo',
-            'custom_error_kind': 'finite_number',
+            'custom_error_type': 'finite_number',
             'choices': {
                 'apple': {
                     'type': 'typed-dict',
@@ -362,7 +362,7 @@ def test_custom_error_kind():
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
-            'kind': 'finite_number',
+            'type': 'finite_number',
             'loc': [],
             'message': 'Input should be a finite number',
             'input_value': {'spam': 'apple', 'bar': 'Bar'},
@@ -372,7 +372,7 @@ def test_custom_error_kind():
         v.validate_python({'foo': 'other', 'bar': 'Bar'})
     assert exc_info.value.errors() == [
         {
-            'kind': 'finite_number',
+            'type': 'finite_number',
             'loc': [],
             'message': 'Input should be a finite number',
             'input_value': {'foo': 'other', 'bar': 'Bar'},
