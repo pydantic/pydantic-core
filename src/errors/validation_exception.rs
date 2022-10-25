@@ -158,7 +158,7 @@ impl PyLineError {
         dict.set_item("type", self.error_type.type_string())?;
         dict.set_item("loc", self.location.to_object(py))?;
         dict.set_item("msg", self.error_type.render_message(py)?)?;
-        dict.set_item("input_value", &self.input_value)?;
+        dict.set_item("input", &self.input_value)?;
         if include_context.unwrap_or(true) {
             if let Some(context) = self.error_type.py_dict(py)? {
                 dict.set_item("ctx", context)?;

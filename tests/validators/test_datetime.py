@@ -228,7 +228,7 @@ def test_custom_invalid_tz():
             'type': 'datetime_object_invalid',
             'loc': [],
             'msg': f'Invalid datetime object, got {error_message}',
-            'input_value': dt,
+            'input': dt,
             'ctx': {'error': error_message},
         }
     ]

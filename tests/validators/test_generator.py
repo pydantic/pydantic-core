@@ -72,7 +72,7 @@ def test_error_index(py_and_json: PyAndJson):
             'type': 'int_parsing',
             'loc': [0],
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
-            'input_value': 'wrong',
+            'input': 'wrong',
         }
     ]
     gen = v.validate_test([1, 2, 3, 'wrong', 4])
@@ -91,7 +91,7 @@ def test_error_index(py_and_json: PyAndJson):
             'type': 'int_parsing',
             'loc': [3],
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
-            'input_value': 'wrong',
+            'input': 'wrong',
         }
     ]
     assert next(gen) == 4
@@ -110,7 +110,7 @@ def test_too_long(py_and_json: PyAndJson):
             'type': 'too_long',
             'loc': [],
             'msg': 'Generator should have at most 2 items after validation, not 3',
-            'input_value': [1, 2, 3],
+            'input': [1, 2, 3],
             'ctx': {'field_type': 'Generator', 'max_length': 2, 'actual_length': 3},
         }
     ]

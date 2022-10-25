@@ -161,7 +161,7 @@ def test_date_strict_json_ctx():
             'type': 'date_parsing',
             'loc': [],
             'msg': 'Input should be a valid date in the format YYYY-MM-DD, input is too short',
-            'input_value': 'foobar',
+            'input': 'foobar',
             'ctx': {'error': 'input is too short'},
         }
     ]

@@ -56,7 +56,7 @@ def test_dict_value_error(py_and_json: PyAndJson):
             'type': 'int_parsing',
             'loc': ['b'],
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
-            'input_value': 'wrong',
+            'input': 'wrong',
         }
     ]
 
@@ -70,7 +70,7 @@ def test_dict_error_key_int():
             'type': 'int_parsing',
             'loc': [3],
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
-            'input_value': 'wrong',
+            'input': 'wrong',
         }
     ]
 
@@ -84,7 +84,7 @@ def test_dict_error_key_other():
             'type': 'int_parsing',
             'loc': ['(1, 2)'],
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
-            'input_value': 'wrong',
+            'input': 'wrong',
         }
     ]
 
@@ -128,7 +128,7 @@ def test_key_error():
             'type': 'int_parsing',
             'loc': ['x', '[key]'],
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
-            'input_value': 'x',
+            'input': 'x',
         }
     ]
 
@@ -153,7 +153,7 @@ def test_mapping_error():
             'type': 'dict_from_mapping',
             'loc': [],
             'msg': 'Unable to convert mapping to a dictionary, error: RuntimeError: intentional error',
-            'input_value': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+            'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
             'ctx': {'error': 'RuntimeError: intentional error'},
         }
     ]
@@ -185,7 +185,7 @@ def test_mapping_error_yield_1():
                 'Unable to convert mapping to a dictionary, error: '
                 'ValueError: expected tuple of length 2, but got tuple of length 1'
             ),
-            'input_value': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+            'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
             'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 1'},
         }
     ]

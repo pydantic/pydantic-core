@@ -37,7 +37,7 @@ def test_is_instance():
             'type': 'is_instance_of',
             'loc': [],
             'msg': 'Input should be an instance of Foo',
-            'input_value': s,
+            'input': s,
             'ctx': {'class': 'Foo'},
         }
     ]

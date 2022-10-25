@@ -23,7 +23,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                         'type': 'json_invalid',
                         'loc': [],
                         'msg': 'Invalid JSON: key must be a string at line 1 column 2',
-                        'input_value': '{1: 2}',
+                        'input': '{1: 2}',
                         'ctx': {'error': 'key must be a string at line 1 column 2'},
                     }
                 ],
@@ -99,7 +99,7 @@ def test_any_python(input_value, expected):
                         'type': 'int_parsing',
                         'loc': [3],
                         'msg': 'Input should be a valid integer, unable to parse string as an integer',
-                        'input_value': 'err',
+                        'input': 'err',
                     }
                 ],
             ),
@@ -135,7 +135,7 @@ def test_dict_key(py_and_json: PyAndJson):
             'type': 'json_invalid',
             'loc': ['x', '[key]'],
             'msg': 'Invalid JSON: expected value at line 1 column 1',
-            'input_value': 'x',
+            'input': 'x',
             'ctx': {'error': 'expected value at line 1 column 1'},
         }
     ]
@@ -173,14 +173,9 @@ def test_ask():
         v.validate_python('{"field_c": "wrong"}')
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
-        {'type': 'missing', 'loc': ['field_a'], 'msg': 'Field required', 'input_value': {'field_c': 'wrong'}},
-        {'type': 'missing', 'loc': ['field_b'], 'msg': 'Field required', 'input_value': {'field_c': 'wrong'}},
-        {
-            'type': 'extra_forbidden',
-            'loc': ['field_c'],
-            'msg': 'Extra inputs are not permitted',
-            'input_value': 'wrong',
-        },
+        {'type': 'missing', 'loc': ['field_a'], 'msg': 'Field required', 'input': {'field_c': 'wrong'}},
+        {'type': 'missing', 'loc': ['field_b'], 'msg': 'Field required', 'input': {'field_c': 'wrong'}},
+        {'type': 'extra_forbidden', 'loc': ['field_c'], 'msg': 'Extra inputs are not permitted', 'input': 'wrong'},
     ]
 
 

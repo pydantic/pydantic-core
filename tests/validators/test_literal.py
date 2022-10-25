@@ -22,7 +22,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                         'type': 'literal_error',
                         'loc': [],
                         'msg': 'Input should be 1',
-                        'input_value': 2,
+                        'input': 2,
                         'ctx': {'expected': '1'},
                     }
                 ],
@@ -40,7 +40,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                         'type': 'literal_error',
                         'loc': [],
                         'msg': "Input should be 'foo'",
-                        'input_value': 'bar',
+                        'input': 'bar',
                         'ctx': {'expected': "'foo'"},
                     }
                 ],
@@ -66,7 +66,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                         'type': 'literal_error',
                         'loc': [],
                         'msg': 'Input should be 1, 2, 3 or 4',
-                        'input_value': 5,
+                        'input': 5,
                         'ctx': {'expected': '1, 2, 3 or 4'},
                     }
                 ],
@@ -92,7 +92,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                         'type': 'literal_error',
                         'loc': [],
                         'msg': "Input should be 1 or '1'",
-                        'input_value': '2',
+                        'input': '2',
                         'ctx': {'expected': "1 or '1'"},
                     }
                 ],
@@ -136,7 +136,7 @@ def test_literal_py_and_json(py_and_json: PyAndJson, kwarg_expected, input_value
                         'type': 'literal_error',
                         'loc': [],
                         'msg': "Input should be 1 or '1'",
-                        'input_value': '2',
+                        'input': '2',
                         'ctx': {'expected': "1 or '1'"},
                     }
                 ],
@@ -183,14 +183,14 @@ def test_union():
             'type': 'literal_error',
             'loc': ["literal['a','b']"],
             'msg': "Input should be 'a' or 'b'",
-            'input_value': 'c',
+            'input': 'c',
             'ctx': {'expected': "'a' or 'b'"},
         },
         {
             'type': 'int_parsing',
             'loc': ['int'],
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
-            'input_value': 'c',
+            'input': 'c',
         },
     ]
 
@@ -209,7 +209,7 @@ def test_enum():
             'type': 'literal_error',
             'loc': [],
             'msg': "Input should be <FooEnum.foo: 'foo_value'>",
-            'input_value': 'foo_value',
+            'input': 'foo_value',
             'ctx': {'expected': "<FooEnum.foo: 'foo_value'>"},
         }
     ]

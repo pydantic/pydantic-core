@@ -46,7 +46,7 @@ def test_datetime_binary(datetime_schema, data):
                 'type': 'datetime_parsing',
                 'loc': [],
                 'msg': IsStr(regex='Input should be a valid datetime, .+'),
-                'input_value': IsBytes(),
+                'input': IsBytes(),
                 'ctx': {'error': IsStr()},
             }
         ]
@@ -110,7 +110,7 @@ def test_recursive_cycles(recursive_schema, data):
                 'type': 'recursion_loop',
                 'loc': IsList(length=(1, None)),
                 'msg': 'Recursion error - cyclic reference detected',
-                'input_value': AnyThing(),
+                'input': AnyThing(),
             }
         ]
 

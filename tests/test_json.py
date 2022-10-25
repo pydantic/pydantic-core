@@ -129,7 +129,7 @@ def test_error_loc():
             'type': 'int_parsing',
             'loc': ['field_a', 2],
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
-            'input_value': 'wrong',
+            'input': 'wrong',
         }
     ]
 
@@ -154,7 +154,7 @@ def test_json_invalid():
             'type': 'json_invalid',
             'loc': [],
             'msg': 'Invalid JSON: EOF while parsing a string at line 1 column 7',
-            'input_value': '"foobar',
+            'input': '"foobar',
             'ctx': {'error': 'EOF while parsing a string at line 1 column 7'},
         }
     ]
@@ -165,7 +165,7 @@ def test_json_invalid():
             'type': 'json_invalid',
             'loc': [],
             'msg': 'Invalid JSON: trailing comma at line 3 column 3',
-            'input_value': '[1,\n2,\n3,]',
+            'input': '[1,\n2,\n3,]',
             'ctx': {'error': 'trailing comma at line 3 column 3'},
         }
     ]

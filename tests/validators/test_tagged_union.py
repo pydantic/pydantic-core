@@ -20,7 +20,7 @@ from .test_typed_dict import Cls
                         'type': 'int_parsing',
                         'loc': ['apple', 'bar'],
                         'msg': 'Input should be a valid integer, unable to parse string as an integer',
-                        'input_value': 'wrong',
+                        'input': 'wrong',
                     }
                 ],
             ),
@@ -29,14 +29,7 @@ from .test_typed_dict import Cls
             {'foo': 'banana'},
             Err(
                 'Field required',
-                [
-                    {
-                        'type': 'missing',
-                        'loc': ['banana', 'spam'],
-                        'msg': 'Field required',
-                        'input_value': {'foo': 'banana'},
-                    }
-                ],
+                [{'type': 'missing', 'loc': ['banana', 'spam'], 'msg': 'Field required', 'input': {'foo': 'banana'}}],
             ),
         ),
         (
@@ -51,7 +44,7 @@ from .test_typed_dict import Cls
                             "Input tag 'other' found using 'foo' does not match any "
                             "of the expected tags: 'apple', 'banana'"
                         ),
-                        'input_value': {'foo': 'other'},
+                        'input': {'foo': 'other'},
                         'ctx': {'discriminator': "'foo'", 'tag': 'other', 'expected_tags': "'apple', 'banana'"},
                     }
                 ],
@@ -66,7 +59,7 @@ from .test_typed_dict import Cls
                         'type': 'union_tag_not_found',
                         'loc': [],
                         'msg': "Unable to extract tag using discriminator 'foo'",
-                        'input_value': {},
+                        'input': {},
                         'ctx': {'discriminator': "'foo'"},
                     }
                 ],
@@ -76,14 +69,7 @@ from .test_typed_dict import Cls
             'not a dict',
             Err(
                 'dict_type',
-                [
-                    {
-                        'type': 'dict_type',
-                        'loc': [],
-                        'msg': 'Input should be a valid dictionary',
-                        'input_value': 'not a dict',
-                    }
-                ],
+                [{'type': 'dict_type', 'loc': [], 'msg': 'Input should be a valid dictionary', 'input': 'not a dict'}],
             ),
         ),
     ],
@@ -148,7 +134,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
             'type': 'union_tag_not_found',
             'loc': [],
             'msg': "Unable to extract tag using discriminator 'food' | 'menu'.1",
-            'input_value': {},
+            'input': {},
             'ctx': {'discriminator': "'food' | 'menu'.1"},
         }
     ]
@@ -168,7 +154,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
                         'type': 'literal_error',
                         'loc': ['str'],
                         'msg': "Input should be 'foo' or 'bar'",
-                        'input_value': 'baz',
+                        'input': 'baz',
                         'ctx': {'expected': "'foo' or 'bar'"},
                     }
                 ],
@@ -183,7 +169,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
                         'type': 'union_tag_not_found',
                         'loc': [],
                         'msg': 'Unable to extract tag using discriminator discriminator_function()',
-                        'input_value': None,
+                        'input': None,
                         'ctx': {'discriminator': 'discriminator_function()'},
                     }
                 ],
@@ -201,7 +187,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
                             "Input tag 'other' found using discriminator_function() "
                             "does not match any of the expected tags: 'str', 'int'"
                         ),
-                        'input_value': ['wrong type'],
+                        'input': ['wrong type'],
                         'ctx': {
                             'discriminator': 'discriminator_function()',
                             'tag': 'other',
@@ -316,22 +302,12 @@ def test_custom_error():
         v.validate_python({'spam': 'apple', 'bar': 'Bar'})
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
-        {
-            'type': 'snap',
-            'loc': [],
-            'msg': 'Input should be a foo or bar',
-            'input_value': {'spam': 'apple', 'bar': 'Bar'},
-        }
+        {'type': 'snap', 'loc': [], 'msg': 'Input should be a foo or bar', 'input': {'spam': 'apple', 'bar': 'Bar'}}
     ]
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python({'foo': 'other', 'bar': 'Bar'})
     assert exc_info.value.errors() == [
-        {
-            'type': 'snap',
-            'loc': [],
-            'msg': 'Input should be a foo or bar',
-            'input_value': {'foo': 'other', 'bar': 'Bar'},
-        }
+        {'type': 'snap', 'loc': [], 'msg': 'Input should be a foo or bar', 'input': {'foo': 'other', 'bar': 'Bar'}}
     ]
 
 
@@ -365,7 +341,7 @@ def test_custom_error_type():
             'type': 'finite_number',
             'loc': [],
             'msg': 'Input should be a finite number',
-            'input_value': {'spam': 'apple', 'bar': 'Bar'},
+            'input': {'spam': 'apple', 'bar': 'Bar'},
         }
     ]
     with pytest.raises(ValidationError) as exc_info:
@@ -375,6 +351,6 @@ def test_custom_error_type():
             'type': 'finite_number',
             'loc': [],
             'msg': 'Input should be a finite number',
-            'input_value': {'foo': 'other', 'bar': 'Bar'},
+            'input': {'foo': 'other', 'bar': 'Bar'},
         }
     ]
