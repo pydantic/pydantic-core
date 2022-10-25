@@ -128,7 +128,7 @@ def test_unicode_error():
         {
             'type': 'string_unicode',
             'loc': [],
-            'message': 'Input should be a valid string, unable to parse raw data as a unicode string',
+            'msg': 'Input should be a valid string, unable to parse raw data as a unicode string',
             'input_value': '🐈 Hello \ud800World',
         }
     ]
@@ -176,7 +176,7 @@ def test_regex_error():
         {
             'type': 'string_pattern_mismatch',
             'loc': [],
-            'message': "String should match pattern '11'",
+            'msg': "String should match pattern '11'",
             'input_value': '12',
             'context': {'pattern': '11'},
         }
@@ -212,7 +212,7 @@ def test_strict_subclass(FruitEnum, kwargs):
         {
             'type': 'string_sub_type',
             'loc': [],
-            'message': 'Input should be a string, not an instance of a subclass of str',
+            'msg': 'Input should be a string, not an instance of a subclass of str',
             'input_value': FruitEnum.pear,
         }
     ]

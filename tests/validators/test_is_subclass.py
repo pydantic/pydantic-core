@@ -25,7 +25,7 @@ def test_is_subclass_basic():
         {
             'type': 'is_subclass_of',
             'loc': [],
-            'message': 'Input should be a subclass of Foo',
+            'msg': 'Input should be a subclass of Foo',
             'input_value': Bar,
             'context': {'class': 'Foo'},
         }
@@ -72,7 +72,7 @@ def test_custom_repr():
         {
             'type': 'is_subclass_of',
             'loc': [],
-            'message': 'Input should be a subclass of Spam',
+            'msg': 'Input should be a subclass of Spam',
             'input_value': Bar,
             'context': {'class': 'Spam'},
         }

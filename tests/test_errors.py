@@ -45,7 +45,7 @@ def test_pydantic_value_error_usage():
         {
             'type': 'my_error',
             'loc': [],
-            'message': 'this is a custom error FOOBAR 42',
+            'msg': 'this is a custom error FOOBAR 42',
             'input_value': 42,
             'context': {'foo': 'FOOBAR', 'bar': 42},
         }
@@ -142,7 +142,7 @@ def test_pydantic_error_type_raise_no_ctx():
         v.validate_python(4)
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
-        {'type': 'finite_number', 'loc': [], 'message': 'Input should be a finite number', 'input_value': 4}
+        {'type': 'finite_number', 'loc': [], 'msg': 'Input should be a finite number', 'input_value': 4}
     ]
 
 
@@ -159,7 +159,7 @@ def test_pydantic_error_type_raise_ctx():
         {
             'type': 'greater_than',
             'loc': [],
-            'message': 'Input should be greater than 42',
+            'msg': 'Input should be greater than 42',
             'input_value': 4,
             'context': {'gt': 42.0},
         }

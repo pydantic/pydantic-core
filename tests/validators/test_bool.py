@@ -68,7 +68,7 @@ def test_bool_error():
         {
             'type': 'bool_parsing',
             'loc': [],
-            'message': 'Input should be a valid boolean, unable to interpret input',
+            'msg': 'Input should be a valid boolean, unable to interpret input',
             'input_value': 'wrong',
         }
     ]

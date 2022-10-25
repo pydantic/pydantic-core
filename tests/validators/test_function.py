@@ -32,7 +32,7 @@ def test_function_before_raise():
         {
             'type': 'value_error',
             'loc': [],
-            'message': 'Value error, foobar',
+            'msg': 'Value error, foobar',
             'input_value': 'input value',
             'context': {'error': 'foobar'},
         }
@@ -54,7 +54,7 @@ def test_function_before_error():
         {
             'type': 'string_too_long',
             'loc': [],
-            'message': 'String should have at most 5 characters',
+            'msg': 'String should have at most 5 characters',
             'input_value': '12345x',
             'context': {'max_length': 5},
         }
@@ -84,7 +84,7 @@ def test_function_before_error_model():
         {
             'type': 'string_too_long',
             'loc': ['my_field'],
-            'message': 'String should have at most 5 characters',
+            'msg': 'String should have at most 5 characters',
             'input_value': '12345x',
             'context': {'max_length': 5},
         }
@@ -145,7 +145,7 @@ def test_wrap_error():
         {
             'type': 'int_parsing',
             'loc': [],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         }
     ]
@@ -165,7 +165,7 @@ def test_function_wrap_location():
         {
             'type': 'int_parsing',
             'loc': ['foo'],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         }
     ]
@@ -323,7 +323,7 @@ def test_class_with_validator():
         v.validate_python(True)
 
     assert exc_info.value.errors() == [
-        {'type': 'string_type', 'loc': [], 'message': 'Input should be a valid string', 'input_value': True}
+        {'type': 'string_type', 'loc': [], 'msg': 'Input should be a valid string', 'input_value': True}
     ]
 
 
@@ -340,7 +340,7 @@ def test_raise_assertion_error():
         {
             'type': 'assertion_error',
             'loc': [],
-            'message': 'Assertion failed, foobar',
+            'msg': 'Assertion failed, foobar',
             'input_value': 'input value',
             'context': {'error': 'foobar'},
         }
@@ -360,7 +360,7 @@ def test_raise_assertion_error_plain():
         {
             'type': 'assertion_error',
             'loc': [],
-            'message': 'Assertion failed, Unknown error',
+            'msg': 'Assertion failed, Unknown error',
             'input_value': 'input value',
             'context': {'error': 'Unknown error'},
         }

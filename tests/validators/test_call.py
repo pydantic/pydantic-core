@@ -115,7 +115,7 @@ def test_in_union():
         {
             'type': 'unexpected_positional_argument',
             'loc': ['call[my_function]', 'arguments', 1],
-            'message': 'Unexpected positional argument',
+            'msg': 'Unexpected positional argument',
             'input_value': 2,
         }
     ]

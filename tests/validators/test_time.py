@@ -167,7 +167,7 @@ def test_time_bound_ctx():
         {
             'type': 'greater_than',
             'loc': [],
-            'message': 'Input should be greater than 12:13:14.123456',
+            'msg': 'Input should be greater than 12:13:14.123456',
             'input_value': '12:13',
             'context': {'gt': '12:13:14.123456'},
         }

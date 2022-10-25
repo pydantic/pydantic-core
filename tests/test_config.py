@@ -181,14 +181,14 @@ def test_sub_model_merge():
         {
             'type': 'string_too_long',
             'loc': ['f'],
-            'message': 'String should have at most 4 characters',
+            'msg': 'String should have at most 4 characters',
             'input_value': 'tests',
             'context': {'max_length': 4},
         },
         {
             'type': 'string_too_short',
             'loc': ['sub_model', 'f'],
-            'message': 'String should have at least 1 characters',
+            'msg': 'String should have at least 1 characters',
             'input_value': '',
             'context': {'min_length': 1},
         },

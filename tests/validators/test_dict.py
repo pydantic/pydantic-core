@@ -55,7 +55,7 @@ def test_dict_value_error(py_and_json: PyAndJson):
         {
             'type': 'int_parsing',
             'loc': ['b'],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         }
     ]
@@ -69,7 +69,7 @@ def test_dict_error_key_int():
         {
             'type': 'int_parsing',
             'loc': [3],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         }
     ]
@@ -83,7 +83,7 @@ def test_dict_error_key_other():
         {
             'type': 'int_parsing',
             'loc': ['(1, 2)'],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         }
     ]
@@ -127,7 +127,7 @@ def test_key_error():
         {
             'type': 'int_parsing',
             'loc': ['x', '[key]'],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'x',
         }
     ]
@@ -152,7 +152,7 @@ def test_mapping_error():
         {
             'type': 'dict_from_mapping',
             'loc': [],
-            'message': 'Unable to convert mapping to a dictionary, error: RuntimeError: intentional error',
+            'msg': 'Unable to convert mapping to a dictionary, error: RuntimeError: intentional error',
             'input_value': HasRepr(IsStr(regex='.+BadMapping object at.+')),
             'context': {'error': 'RuntimeError: intentional error'},
         }
@@ -181,7 +181,7 @@ def test_mapping_error_yield_1():
         {
             'type': 'dict_from_mapping',
             'loc': [],
-            'message': (
+            'msg': (
                 'Unable to convert mapping to a dictionary, error: '
                 'ValueError: expected tuple of length 2, but got tuple of length 1'
             ),

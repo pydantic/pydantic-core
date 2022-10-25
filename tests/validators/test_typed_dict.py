@@ -64,8 +64,8 @@ def test_strict():
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python({'field_a': 123, 'field_b': '123'})
     assert exc_info.value.errors() == [
-        {'type': 'string_type', 'loc': ['field_a'], 'message': 'Input should be a valid string', 'input_value': 123},
-        {'type': 'int_type', 'loc': ['field_b'], 'message': 'Input should be a valid integer', 'input_value': '123'},
+        {'type': 'string_type', 'loc': ['field_a'], 'msg': 'Input should be a valid string', 'input_value': 123},
+        {'type': 'int_type', 'loc': ['field_b'], 'msg': 'Input should be a valid integer', 'input_value': '123'},
     ]
 
 
@@ -176,7 +176,7 @@ def test_forbid_extra():
         v.validate_python({'field_a': 'abc', 'field_b': 1})
 
     assert exc_info.value.errors() == [
-        {'type': 'extra_forbidden', 'loc': ['field_b'], 'message': 'Extra inputs are not permitted', 'input_value': 1}
+        {'type': 'extra_forbidden', 'loc': ['field_b'], 'msg': 'Extra inputs are not permitted', 'input_value': 1}
     ]
 
 
@@ -218,7 +218,7 @@ def test_allow_extra_validate():
         {
             'type': 'int_from_float',
             'loc': ['other_value'],
-            'message': 'Input should be a valid integer, got a number with a fractional part',
+            'msg': 'Input should be a valid integer, got a number with a fractional part',
             'input_value': 12.5,
         }
     ]
@@ -270,7 +270,7 @@ def test_validate_assignment_strict_field():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_assignment('field_a', b'abc', {'field_a': 'test'})
     assert exc_info.value.errors() == [
-        {'input_value': b'abc', 'type': 'string_type', 'loc': ['field_a'], 'message': 'Input should be a valid string'}
+        {'input_value': b'abc', 'type': 'string_type', 'loc': ['field_a'], 'msg': 'Input should be a valid string'}
     ]
 
 
@@ -326,12 +326,7 @@ def test_validate_assignment_ignore_extra():
         v.validate_assignment('other_field', 456, {'field_a': 'test'})
 
     assert exc_info.value.errors() == [
-        {
-            'type': 'extra_forbidden',
-            'loc': ['other_field'],
-            'message': 'Extra inputs are not permitted',
-            'input_value': 456,
-        }
+        {'type': 'extra_forbidden', 'loc': ['other_field'], 'msg': 'Extra inputs are not permitted', 'input_value': 456}
     ]
 
 
@@ -363,7 +358,7 @@ def test_validate_assignment_allow_extra_validate():
         {
             'type': 'int_parsing',
             'loc': ['other_field'],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'xyz',
         }
     ]
@@ -383,7 +378,7 @@ def test_validate_assignment_with_strict():
         v.validate_assignment('y', '124', r, True)
 
     assert exc_info.value.errors() == [
-        {'type': 'int_type', 'loc': ['y'], 'message': 'Input should be a valid integer', 'input_value': '124'}
+        {'type': 'int_type', 'loc': ['y'], 'msg': 'Input should be a valid integer', 'input_value': '124'}
     ]
 
 
@@ -398,7 +393,7 @@ def test_json_error():
         {
             'type': 'int_parsing',
             'loc': ['field_a', 1],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'wrong',
         }
     ]
@@ -421,7 +416,7 @@ def test_fields_required_by_default():
         assert v.validate_python({'x': 'pika'})
 
     assert exc_info.value.errors() == [
-        {'type': 'missing', 'loc': ['y'], 'message': 'Field required', 'input_value': {'x': 'pika'}}
+        {'type': 'missing', 'loc': ['y'], 'msg': 'Field required', 'input_value': {'x': 'pika'}}
     ]
 
 
@@ -473,7 +468,7 @@ def test_all_optional_fields():
         assert v.validate_python({'x': 123})
 
     assert exc_info.value.errors() == [
-        {'type': 'string_type', 'loc': ['x'], 'message': 'Input should be a valid string', 'input_value': 123}
+        {'type': 'string_type', 'loc': ['x'], 'msg': 'Input should be a valid string', 'input_value': 123}
     ]
 
 
@@ -497,7 +492,7 @@ def test_all_optional_fields_with_required_fields():
         assert v.validate_python({'y': 'chu'}) == ({'y': 'chu'}, {'y'})
 
     assert exc_info.value.errors() == [
-        {'type': 'missing', 'loc': ['x'], 'message': 'Field required', 'input_value': {'y': 'chu'}}
+        {'type': 'missing', 'loc': ['x'], 'msg': 'Field required', 'input_value': {'y': 'chu'}}
     ]
 
 
@@ -719,7 +714,7 @@ def test_model_deep():
         {
             'type': 'int_parsing',
             'loc': ['field_b', 'field_d', 'field_f'],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'xx',
         }
     ]
@@ -802,7 +797,7 @@ def test_from_attributes_type_error():
         {
             'type': 'dict_attributes_type',
             'loc': [],
-            'message': 'Input should be a valid dictionary or instance to extract fields from',
+            'msg': 'Input should be a valid dictionary or instance to extract fields from',
             'input_value': '123',
         }
     ]
@@ -847,7 +842,7 @@ def test_from_attributes_missing():
         {
             'type': 'missing',
             'loc': ['c'],
-            'message': 'Field required',
+            'msg': 'Field required',
             'input_value': HasRepr(IsStr(regex='.+Foobar object at.+')),
         }
     ]
@@ -877,7 +872,7 @@ def test_from_attributes_error():
         {
             'type': 'get_attribute_error',
             'loc': ['b'],
-            'message': 'Error extracting attribute: RuntimeError: intentional error',
+            'msg': 'Error extracting attribute: RuntimeError: intentional error',
             'input_value': HasRepr(IsStr(regex='.+Foobar object at.+')),
             'context': {'error': 'RuntimeError: intentional error'},
         }
@@ -984,7 +979,7 @@ def test_from_attributes_error_error():
         {
             'type': 'get_attribute_error',
             'loc': ['x'],
-            'message': IsStr(regex=r'Error extracting attribute: \S+\.<locals>\.BadError: <exception str\(\) failed>'),
+            'msg': IsStr(regex=r'Error extracting attribute: \S+\.<locals>\.BadError: <exception str\(\) failed>'),
             'input_value': HasRepr(IsStr(regex='.+Foobar object at.+')),
             'context': {'error': IsStr(regex=r'\S+\.<locals>\.BadError: <exception str\(\) failed>')},
         }
@@ -1002,7 +997,7 @@ def test_from_attributes_error_error():
         {
             'type': 'get_attribute_error',
             'loc': ['x'],
-            'message': 'Error extracting attribute: RuntimeError',
+            'msg': 'Error extracting attribute: RuntimeError',
             'input_value': HasRepr(IsStr(regex='.+UnInitError object at.+')),
             'context': {'error': 'RuntimeError'},
         }
@@ -1064,7 +1059,7 @@ def test_from_attributes_path_error():
         {
             'type': 'get_attribute_error',
             'loc': ['my_field'],
-            'message': 'Error extracting attribute: RuntimeError: intentional error',
+            'msg': 'Error extracting attribute: RuntimeError: intentional error',
             'input_value': HasRepr(IsStr(regex='.+PropertyError object at.+')),
             'context': {'error': 'RuntimeError: intentional error'},
         }
@@ -1090,7 +1085,7 @@ def test_alias_extra(py_and_json: PyAndJson):
         {
             'type': 'int_parsing',
             'loc': ['field_a'],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': '...',
         }
     ]
@@ -1222,7 +1217,7 @@ class TestOnError:
         with pytest.raises(ValidationError) as exc_info:
             v.validate_test({'x': ['foo']})
         assert exc_info.value.errors() == [
-            {'input_value': ['foo'], 'type': 'string_type', 'loc': ['x'], 'message': 'Input should be a valid string'}
+            {'input_value': ['foo'], 'type': 'string_type', 'loc': ['x'], 'msg': 'Input should be a valid string'}
         ]
 
     def test_on_error_raise_explicit(self, py_and_json: PyAndJson):
@@ -1236,7 +1231,7 @@ class TestOnError:
         with pytest.raises(ValidationError) as exc_info:
             v.validate_test({'x': ['foo']})
         assert exc_info.value.errors() == [
-            {'input_value': ['foo'], 'type': 'string_type', 'loc': ['x'], 'message': 'Input should be a valid string'}
+            {'input_value': ['foo'], 'type': 'string_type', 'loc': ['x'], 'msg': 'Input should be a valid string'}
         ]
 
     def test_on_error_omit(self, py_and_json: PyAndJson):
@@ -1365,5 +1360,5 @@ def test_frozen_field():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_assignment('is_developer', False, r2)
     assert exc_info.value.errors() == [
-        {'type': 'frozen', 'loc': ['is_developer'], 'message': 'Field is frozen', 'input_value': False}
+        {'type': 'frozen', 'loc': ['is_developer'], 'msg': 'Field is frozen', 'input_value': False}
     ]

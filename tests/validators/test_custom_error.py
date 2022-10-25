@@ -14,7 +14,7 @@ def test_custom_error(py_and_json: PyAndJson):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test('foobar')
     # insert_assert(exc_info.value.errors())
-    assert exc_info.value.errors() == [{'type': 'foobar', 'loc': [], 'message': 'Hello there', 'input_value': 'foobar'}]
+    assert exc_info.value.errors() == [{'type': 'foobar', 'loc': [], 'msg': 'Hello there', 'input_value': 'foobar'}]
 
 
 def test_custom_error_type(py_and_json: PyAndJson):
@@ -25,12 +25,7 @@ def test_custom_error_type(py_and_json: PyAndJson):
         v.validate_test('X')
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
-        {
-            'type': 'recursion_loop',
-            'loc': [],
-            'message': 'Recursion error - cyclic reference detected',
-            'input_value': 'X',
-        }
+        {'type': 'recursion_loop', 'loc': [], 'msg': 'Recursion error - cyclic reference detected', 'input_value': 'X'}
     ]
 
 
@@ -80,5 +75,5 @@ def test_ask():
         v.validate_python({'field_a': 'test'})
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
-        {'type': 'foobar', 'loc': [], 'message': 'Hello there', 'input_value': {'field_a': 'test'}}
+        {'type': 'foobar', 'loc': [], 'msg': 'Hello there', 'input_value': {'field_a': 'test'}}
     ]

@@ -52,7 +52,7 @@ def test_chain_error():
         {
             'type': 'int_parsing',
             'loc': [],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input_value': 'abc',
         }
     ]

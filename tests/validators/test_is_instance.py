@@ -36,7 +36,7 @@ def test_is_instance():
         {
             'type': 'is_instance_of',
             'loc': [],
-            'message': 'Input should be an instance of Foo',
+            'msg': 'Input should be an instance of Foo',
             'input_value': s,
             'context': {'class': 'Foo'},
         }
