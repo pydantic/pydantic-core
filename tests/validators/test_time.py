@@ -152,7 +152,7 @@ def test_time_kwargs(kwargs: Dict[str, Any], input_value, expected):
         assert len(errors) == 1
         if len(kwargs) == 1:
             key = list(kwargs.keys())[0]
-            assert key in errors[0]['context']
+            assert key in errors[0]['ctx']
     else:
         output = v.validate_python(input_value)
         assert output == expected
@@ -169,7 +169,7 @@ def test_time_bound_ctx():
             'loc': [],
             'msg': 'Input should be greater than 12:13:14.123456',
             'input_value': '12:13',
-            'context': {'gt': '12:13:14.123456'},
+            'ctx': {'gt': '12:13:14.123456'},
         }
     ]
 

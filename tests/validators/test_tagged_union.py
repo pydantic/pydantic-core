@@ -52,7 +52,7 @@ from .test_typed_dict import Cls
                             "of the expected tags: 'apple', 'banana'"
                         ),
                         'input_value': {'foo': 'other'},
-                        'context': {'discriminator': "'foo'", 'tag': 'other', 'expected_tags': "'apple', 'banana'"},
+                        'ctx': {'discriminator': "'foo'", 'tag': 'other', 'expected_tags': "'apple', 'banana'"},
                     }
                 ],
             ),
@@ -67,7 +67,7 @@ from .test_typed_dict import Cls
                         'loc': [],
                         'msg': "Unable to extract tag using discriminator 'foo'",
                         'input_value': {},
-                        'context': {'discriminator': "'foo'"},
+                        'ctx': {'discriminator': "'foo'"},
                     }
                 ],
             ),
@@ -149,7 +149,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
             'loc': [],
             'msg': "Unable to extract tag using discriminator 'food' | 'menu'.1",
             'input_value': {},
-            'context': {'discriminator': "'food' | 'menu'.1"},
+            'ctx': {'discriminator': "'food' | 'menu'.1"},
         }
     ]
 
@@ -169,7 +169,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
                         'loc': ['str'],
                         'msg': "Input should be 'foo' or 'bar'",
                         'input_value': 'baz',
-                        'context': {'expected': "'foo' or 'bar'"},
+                        'ctx': {'expected': "'foo' or 'bar'"},
                     }
                 ],
             ),
@@ -184,7 +184,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
                         'loc': [],
                         'msg': 'Unable to extract tag using discriminator discriminator_function()',
                         'input_value': None,
-                        'context': {'discriminator': 'discriminator_function()'},
+                        'ctx': {'discriminator': 'discriminator_function()'},
                     }
                 ],
             ),
@@ -202,7 +202,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
                             "does not match any of the expected tags: 'str', 'int'"
                         ),
                         'input_value': ['wrong type'],
-                        'context': {
+                        'ctx': {
                             'discriminator': 'discriminator_function()',
                             'tag': 'other',
                             'expected_tags': "'str', 'int'",

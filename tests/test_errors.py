@@ -47,7 +47,7 @@ def test_pydantic_value_error_usage():
             'loc': [],
             'msg': 'this is a custom error FOOBAR 42',
             'input_value': 42,
-            'context': {'foo': 'FOOBAR', 'bar': 42},
+            'ctx': {'foo': 'FOOBAR', 'bar': 42},
         }
     ]
 
@@ -161,7 +161,7 @@ def test_pydantic_error_type_raise_ctx():
             'loc': [],
             'msg': 'Input should be greater than 42',
             'input_value': 4,
-            'context': {'gt': 42.0},
+            'ctx': {'gt': 42.0},
         }
     ]
 

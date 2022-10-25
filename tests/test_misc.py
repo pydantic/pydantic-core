@@ -71,7 +71,7 @@ def test_validation_error_include_context():
             'loc': [],
             'msg': 'List should have at most 2 items after validation, not 3',
             'input_value': [1, 2, 3],
-            'context': {'field_type': 'List', 'max_length': 2, 'actual_length': 3},
+            'ctx': {'field_type': 'List', 'max_length': 2, 'actual_length': 3},
         }
     ]
     # insert_assert(exc_info.value.errors(include_context=False))

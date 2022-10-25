@@ -196,7 +196,7 @@ def test_length_ctx():
             'loc': [],
             'msg': 'List should have at least 2 items after validation, not 1',
             'input_value': [1],
-            'context': {'field_type': 'List', 'min_length': 2, 'actual_length': 1},
+            'ctx': {'field_type': 'List', 'min_length': 2, 'actual_length': 1},
         }
     ]
 
@@ -210,7 +210,7 @@ def test_length_ctx():
             'loc': [],
             'msg': 'List should have at most 3 items after validation, not 4',
             'input_value': [1, 2, 3, 4],
-            'context': {'field_type': 'List', 'max_length': 3, 'actual_length': 4},
+            'ctx': {'field_type': 'List', 'max_length': 3, 'actual_length': 4},
         }
     ]
 
@@ -238,14 +238,14 @@ def test_list_function_val_error():
             'loc': [0],
             'msg': 'Value error, error 1',
             'input_value': 1,
-            'context': {'error': 'error 1'},
+            'ctx': {'error': 'error 1'},
         },
         {
             'type': 'value_error',
             'loc': [1],
             'msg': 'Value error, error 2',
             'input_value': 2,
-            'context': {'error': 'error 2'},
+            'ctx': {'error': 'error 2'},
         },
     ]
 
@@ -279,7 +279,7 @@ def test_generator_error():
             'loc': [2],
             'msg': 'Error iterating over object, error: RuntimeError: error',
             'input_value': HasRepr(IsStr(regex='<generator object test_generator_error.<locals>.gen at 0x[0-9a-f]+>')),
-            'context': {'error': 'RuntimeError: error'},
+            'ctx': {'error': 'RuntimeError: error'},
         }
     ]
 
@@ -410,6 +410,6 @@ def test_bad_iter(items_schema):
             'loc': [1],
             'msg': 'Error iterating over object, error: RuntimeError: broken',
             'input_value': IsInstance(BadIter),
-            'context': {'error': 'RuntimeError: broken'},
+            'ctx': {'error': 'RuntimeError: broken'},
         }
     ]

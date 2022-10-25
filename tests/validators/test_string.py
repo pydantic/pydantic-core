@@ -178,7 +178,7 @@ def test_regex_error():
             'loc': [],
             'msg': "String should match pattern '11'",
             'input_value': '12',
-            'context': {'pattern': '11'},
+            'ctx': {'pattern': '11'},
         }
     ]
 

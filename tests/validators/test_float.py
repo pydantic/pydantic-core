@@ -146,7 +146,7 @@ def test_union_float(py_and_json: PyAndJson):
             'loc': ['constrained-float'],
             'msg': 'Input should be a multiple of 7',
             'input_value': '5',
-            'context': {'multiple_of': 7.0},
+            'ctx': {'multiple_of': 7.0},
         },
     ]
 

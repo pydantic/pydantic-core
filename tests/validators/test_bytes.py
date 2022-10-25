@@ -105,7 +105,7 @@ def test_length_ctx():
             'loc': [],
             'msg': 'Data should have at least 2 bytes',
             'input_value': b'1',
-            'context': {'min_length': 2},
+            'ctx': {'min_length': 2},
         }
     ]
 
@@ -118,6 +118,6 @@ def test_length_ctx():
             'loc': [],
             'msg': 'Data should have at most 3 bytes',
             'input_value': b'1234',
-            'context': {'max_length': 3},
+            'ctx': {'max_length': 3},
         }
     ]

@@ -38,7 +38,7 @@ def test_is_instance():
             'loc': [],
             'msg': 'Input should be an instance of Foo',
             'input_value': s,
-            'context': {'class': 'Foo'},
+            'ctx': {'class': 'Foo'},
         }
     ]
     with pytest.raises(ValidationError, match='type=is_instance_of'):

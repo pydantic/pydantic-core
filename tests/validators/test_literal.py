@@ -23,7 +23,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                         'loc': [],
                         'msg': 'Input should be 1',
                         'input_value': 2,
-                        'context': {'expected': '1'},
+                        'ctx': {'expected': '1'},
                     }
                 ],
             ),
@@ -41,7 +41,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                         'loc': [],
                         'msg': "Input should be 'foo'",
                         'input_value': 'bar',
-                        'context': {'expected': "'foo'"},
+                        'ctx': {'expected': "'foo'"},
                     }
                 ],
             ),
@@ -67,7 +67,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                         'loc': [],
                         'msg': 'Input should be 1, 2, 3 or 4',
                         'input_value': 5,
-                        'context': {'expected': '1, 2, 3 or 4'},
+                        'ctx': {'expected': '1, 2, 3 or 4'},
                     }
                 ],
             ),
@@ -93,7 +93,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                         'loc': [],
                         'msg': "Input should be 1 or '1'",
                         'input_value': '2',
-                        'context': {'expected': "1 or '1'"},
+                        'ctx': {'expected': "1 or '1'"},
                     }
                 ],
             ),
@@ -137,7 +137,7 @@ def test_literal_py_and_json(py_and_json: PyAndJson, kwarg_expected, input_value
                         'loc': [],
                         'msg': "Input should be 1 or '1'",
                         'input_value': '2',
-                        'context': {'expected': "1 or '1'"},
+                        'ctx': {'expected': "1 or '1'"},
                     }
                 ],
             ),
@@ -184,7 +184,7 @@ def test_union():
             'loc': ["literal['a','b']"],
             'msg': "Input should be 'a' or 'b'",
             'input_value': 'c',
-            'context': {'expected': "'a' or 'b'"},
+            'ctx': {'expected': "'a' or 'b'"},
         },
         {
             'type': 'int_parsing',
@@ -210,6 +210,6 @@ def test_enum():
             'loc': [],
             'msg': "Input should be <FooEnum.foo: 'foo_value'>",
             'input_value': 'foo_value',
-            'context': {'expected': "<FooEnum.foo: 'foo_value'>"},
+            'ctx': {'expected': "<FooEnum.foo: 'foo_value'>"},
         }
     ]

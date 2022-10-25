@@ -144,8 +144,8 @@ def test_int_kwargs(py_and_json: PyAndJson, kwargs: Dict[str, Any], input_value,
 
         errors = exc_info.value.errors()
         assert len(errors) == 1
-        if 'context' in errors[0]:
-            assert errors[0]['context'] == kwargs
+        if 'ctx' in errors[0]:
+            assert errors[0]['ctx'] == kwargs
     else:
         output = v.validate_test(input_value)
         assert output == expected
@@ -166,7 +166,7 @@ def test_union_int(py_and_json: PyAndJson):
             'loc': ['constrained-int'],
             'msg': 'Input should be a multiple of 7',
             'input_value': '5',
-            'context': {'multiple_of': 7},
+            'ctx': {'multiple_of': 7},
         },
     ]
 

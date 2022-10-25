@@ -386,7 +386,7 @@ def test_model_class_strict():
             'loc': [],
             'msg': 'Input should be an instance of MyModel',
             'input_value': {'field_a': 'test', 'field_b': 12},
-            'context': {'class_name': 'MyModel'},
+            'ctx': {'class_name': 'MyModel'},
         }
     ]
     assert str(exc_info.value).startswith('1 validation error for MyModel\n')
@@ -563,7 +563,7 @@ def test_call_after_init_validation_error():
             'loc': [],
             'msg': 'Value error, this is broken: test',
             'input_value': {'field_a': 'test'},
-            'context': {'error': 'this is broken: test'},
+            'ctx': {'error': 'this is broken: test'},
         }
     ]
 

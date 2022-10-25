@@ -874,7 +874,7 @@ def test_from_attributes_error():
             'loc': ['b'],
             'msg': 'Error extracting attribute: RuntimeError: intentional error',
             'input_value': HasRepr(IsStr(regex='.+Foobar object at.+')),
-            'context': {'error': 'RuntimeError: intentional error'},
+            'ctx': {'error': 'RuntimeError: intentional error'},
         }
     ]
 
@@ -981,7 +981,7 @@ def test_from_attributes_error_error():
             'loc': ['x'],
             'msg': IsStr(regex=r'Error extracting attribute: \S+\.<locals>\.BadError: <exception str\(\) failed>'),
             'input_value': HasRepr(IsStr(regex='.+Foobar object at.+')),
-            'context': {'error': IsStr(regex=r'\S+\.<locals>\.BadError: <exception str\(\) failed>')},
+            'ctx': {'error': IsStr(regex=r'\S+\.<locals>\.BadError: <exception str\(\) failed>')},
         }
     ]
 
@@ -999,7 +999,7 @@ def test_from_attributes_error_error():
             'loc': ['x'],
             'msg': 'Error extracting attribute: RuntimeError',
             'input_value': HasRepr(IsStr(regex='.+UnInitError object at.+')),
-            'context': {'error': 'RuntimeError'},
+            'ctx': {'error': 'RuntimeError'},
         }
     ]
 
@@ -1061,7 +1061,7 @@ def test_from_attributes_path_error():
             'loc': ['my_field'],
             'msg': 'Error extracting attribute: RuntimeError: intentional error',
             'input_value': HasRepr(IsStr(regex='.+PropertyError object at.+')),
-            'context': {'error': 'RuntimeError: intentional error'},
+            'ctx': {'error': 'RuntimeError: intentional error'},
         }
     ]
 

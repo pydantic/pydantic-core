@@ -294,11 +294,5 @@ def test_custom_error_type_context():
         v.validate_python(123)
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
-        {
-            'type': 'less_than',
-            'loc': [],
-            'msg': 'Input should be less than 42',
-            'input_value': 123,
-            'context': {'lt': 42.0},
-        }
+        {'type': 'less_than', 'loc': [], 'msg': 'Input should be less than 42', 'input_value': 123, 'ctx': {'lt': 42.0}}
     ]

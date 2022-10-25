@@ -24,7 +24,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                         'loc': [],
                         'msg': 'Invalid JSON: key must be a string at line 1 column 2',
                         'input_value': '{1: 2}',
-                        'context': {'error': 'key must be a string at line 1 column 2'},
+                        'ctx': {'error': 'key must be a string at line 1 column 2'},
                     }
                 ],
             ),
@@ -136,7 +136,7 @@ def test_dict_key(py_and_json: PyAndJson):
             'loc': ['x', '[key]'],
             'msg': 'Invalid JSON: expected value at line 1 column 1',
             'input_value': 'x',
-            'context': {'error': 'expected value at line 1 column 1'},
+            'ctx': {'error': 'expected value at line 1 column 1'},
         }
     ]
 

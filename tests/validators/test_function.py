@@ -34,7 +34,7 @@ def test_function_before_raise():
             'loc': [],
             'msg': 'Value error, foobar',
             'input_value': 'input value',
-            'context': {'error': 'foobar'},
+            'ctx': {'error': 'foobar'},
         }
     ]
 
@@ -56,7 +56,7 @@ def test_function_before_error():
             'loc': [],
             'msg': 'String should have at most 5 characters',
             'input_value': '12345x',
-            'context': {'max_length': 5},
+            'ctx': {'max_length': 5},
         }
     ]
     assert repr(exc_info.value).startswith('1 validation error for function-before[my_function(), constrained-str]\n')
@@ -86,7 +86,7 @@ def test_function_before_error_model():
             'loc': ['my_field'],
             'msg': 'String should have at most 5 characters',
             'input_value': '12345x',
-            'context': {'max_length': 5},
+            'ctx': {'max_length': 5},
         }
     ]
 
@@ -342,7 +342,7 @@ def test_raise_assertion_error():
             'loc': [],
             'msg': 'Assertion failed, foobar',
             'input_value': 'input value',
-            'context': {'error': 'foobar'},
+            'ctx': {'error': 'foobar'},
         }
     ]
 
@@ -362,7 +362,7 @@ def test_raise_assertion_error_plain():
             'loc': [],
             'msg': 'Assertion failed, Unknown error',
             'input_value': 'input value',
-            'context': {'error': 'Unknown error'},
+            'ctx': {'error': 'Unknown error'},
         }
     ]
 
