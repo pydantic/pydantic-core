@@ -124,12 +124,12 @@ def test_frozenset_multiple_errors():
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': [0],
+            'loc': (0,),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'a',
         },
-        {'type': 'int_type', 'loc': [1], 'msg': 'Input should be a valid integer', 'input': (1, 2)},
-        {'type': 'int_type', 'loc': [2], 'msg': 'Input should be a valid integer', 'input': []},
+        {'type': 'int_type', 'loc': (1,), 'msg': 'Input should be a valid integer', 'input': (1, 2)},
+        {'type': 'int_type', 'loc': (2,), 'msg': 'Input should be a valid integer', 'input': []},
     ]
 
 
@@ -212,14 +212,14 @@ def test_union_frozenset_list(input_value, expected):
                 errors=[
                     {
                         'type': 'int_type',
-                        'loc': ['frozenset[int]', 1],
+                        'loc': ('frozenset[int]', 1),
                         'msg': 'Input should be a valid integer',
                         'input': 'a',
                     },
                     # second because validation on the string choice comes second
                     {
                         'type': 'string_type',
-                        'loc': ['frozenset[str]', 0],
+                        'loc': ('frozenset[str]', 0),
                         'msg': 'Input should be a valid string',
                         'input': 1,
                     },

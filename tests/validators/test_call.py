@@ -114,7 +114,7 @@ def test_in_union():
     assert exc_info.value.errors() == [
         {
             'type': 'unexpected_positional_argument',
-            'loc': ['call[my_function]', 'arguments', 1],
+            'loc': ('call[my_function]', 'arguments', 1),
             'msg': 'Unexpected positional argument',
             'input': 2,
         }

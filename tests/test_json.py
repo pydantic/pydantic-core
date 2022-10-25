@@ -127,7 +127,7 @@ def test_error_loc():
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': ['field_a', 2],
+            'loc': ('field_a', 2),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'wrong',
         }
@@ -152,7 +152,7 @@ def test_json_invalid():
     assert exc_info.value.errors() == [
         {
             'type': 'json_invalid',
-            'loc': [],
+            'loc': (),
             'msg': 'Invalid JSON: EOF while parsing a string at line 1 column 7',
             'input': '"foobar',
             'ctx': {'error': 'EOF while parsing a string at line 1 column 7'},
@@ -163,7 +163,7 @@ def test_json_invalid():
     assert exc_info.value.errors() == [
         {
             'type': 'json_invalid',
-            'loc': [],
+            'loc': (),
             'msg': 'Invalid JSON: trailing comma at line 3 column 3',
             'input': '[1,\n2,\n3,]',
             'ctx': {'error': 'trailing comma at line 3 column 3'},

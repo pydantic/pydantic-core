@@ -383,7 +383,7 @@ def test_model_class_strict():
     assert exc_info.value.errors() == [
         {
             'type': 'model_class_type',
-            'loc': [],
+            'loc': (),
             'msg': 'Input should be an instance of MyModel',
             'input': {'field_a': 'test', 'field_b': 12},
             'ctx': {'class_name': 'MyModel'},
@@ -447,7 +447,7 @@ def test_revalidate():
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': ['field_b'],
+            'loc': ('field_b',),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'not int',
         }
@@ -560,7 +560,7 @@ def test_call_after_init_validation_error():
     assert exc_info.value.errors() == [
         {
             'type': 'value_error',
-            'loc': [],
+            'loc': (),
             'msg': 'Value error, this is broken: test',
             'input': {'field_a': 'test'},
             'ctx': {'error': 'this is broken: test'},

@@ -1,7 +1,7 @@
 from typing import Optional
 
 import pytest
-from dirty_equals import AnyThing, HasAttributes, IsInstance, IsList, IsPartialDict, IsStr
+from dirty_equals import AnyThing, HasAttributes, IsInstance, IsList, IsPartialDict, IsStr, IsTuple
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
 
@@ -80,13 +80,13 @@ def test_nullable_error():
     assert exc_info.value.errors() == [
         {
             'type': 'none_required',
-            'loc': ['sub_branch', 'none'],
+            'loc': ('sub_branch', 'none'),
             'msg': 'Input should be None/null',
             'input': {'width': 'wrong'},
         },
         {
             'type': 'int_parsing',
-            'loc': ['sub_branch', 'typed-dict', 'width'],
+            'loc': ('sub_branch', 'typed-dict', 'width'),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'wrong',
         },
@@ -317,7 +317,7 @@ def test_recursion_branch():
     assert exc_info.value.errors() == [
         {
             'type': 'recursion_loop',
-            'loc': ['branch'],
+            'loc': ('branch',),
             'msg': 'Recursion error - cyclic reference detected',
             'input': {'name': 'recursive', 'branch': IsPartialDict(name='recursive')},
         }
@@ -330,7 +330,7 @@ def test_recursion_branch():
     assert exc_info.value.errors() == [
         {
             'type': 'recursion_loop',
-            'loc': ['branch'],
+            'loc': ('branch',),
             'msg': 'Recursion error - cyclic reference detected',
             'input': HasAttributes(name='root', branch=AnyThing()),
         }
@@ -352,7 +352,7 @@ def test_recursive_list():
     assert exc_info.value.errors() == [
         {
             'type': 'recursion_loop',
-            'loc': [0],
+            'loc': (0,),
             'msg': 'Recursion error - cyclic reference detected',
             'input': [IsList(length=1)],
         }
@@ -430,13 +430,13 @@ def test_multiple_tuple_recursion(multiple_tuple_schema: SchemaValidator):
     assert exc_info.value.errors() == [
         {
             'type': 'recursion_loop',
-            'loc': ['f1', 1],
+            'loc': ('f1', 1),
             'msg': 'Recursion error - cyclic reference detected',
             'input': [1, IsList(length=2)],
         },
         {
             'type': 'recursion_loop',
-            'loc': ['f2', 1],
+            'loc': ('f2', 1),
             'msg': 'Recursion error - cyclic reference detected',
             'input': [1, IsList(length=2)],
         },
@@ -452,13 +452,13 @@ def test_multiple_tuple_recursion_once(multiple_tuple_schema: SchemaValidator):
     assert exc_info.value.errors() == [
         {
             'type': 'recursion_loop',
-            'loc': ['f1', 1],
+            'loc': ('f1', 1),
             'msg': 'Recursion error - cyclic reference detected',
             'input': [1, IsList(length=2)],
         },
         {
             'type': 'recursion_loop',
-            'loc': ['f2', 1],
+            'loc': ('f2', 1),
             'msg': 'Recursion error - cyclic reference detected',
             'input': [1, IsList(length=2)],
         },
@@ -494,7 +494,7 @@ def test_recursive_wrap():
     assert exc_info.value.errors() == [
         {
             'type': 'recursion_loop',
-            'loc': [1],
+            'loc': (1,),
             'msg': 'Recursion error - cyclic reference detected',
             'input': IsList(positions={0: 1}, length=2),
         }
@@ -523,8 +523,8 @@ def test_union_ref_strictness():
         v.validate_python({'a': 1, 'b': []})
 
     assert exc_info.value.errors() == [
-        {'type': 'int_type', 'loc': ['b', 'int'], 'msg': 'Input should be a valid integer', 'input': []},
-        {'type': 'string_type', 'loc': ['b', 'str'], 'msg': 'Input should be a valid string', 'input': []},
+        {'type': 'int_type', 'loc': ('b', 'int'), 'msg': 'Input should be a valid integer', 'input': []},
+        {'type': 'string_type', 'loc': ('b', 'str'), 'msg': 'Input should be a valid string', 'input': []},
     ]
 
 
@@ -545,8 +545,8 @@ def test_union_container_strictness():
         v.validate_python({'a': 1, 'b': []})
 
     assert exc_info.value.errors() == [
-        {'type': 'int_type', 'loc': ['b', 'int'], 'msg': 'Input should be a valid integer', 'input': []},
-        {'type': 'string_type', 'loc': ['b', 'str'], 'msg': 'Input should be a valid string', 'input': []},
+        {'type': 'int_type', 'loc': ('b', 'int'), 'msg': 'Input should be a valid integer', 'input': []},
+        {'type': 'string_type', 'loc': ('b', 'str'), 'msg': 'Input should be a valid string', 'input': []},
     ]
 
 
@@ -581,7 +581,7 @@ def test_union_cycle(strict: bool):
     assert exc_info.value.errors() == [
         {
             'type': 'recursion_loop',
-            'loc': ['typed-dict', 'foobar', 0],
+            'loc': ('typed-dict', 'foobar', 0),
             'msg': 'Recursion error - cyclic reference detected',
             'input': {'foobar': [{'foobar': IsList(length=1)}]},
         }
@@ -616,13 +616,13 @@ def test_function_name():
     assert exc_info.value.errors() == [
         {
             'type': 'recursion_loop',
-            'loc': ['function-after[f(), ...]'],
+            'loc': ('function-after[f(), ...]',),
             'msg': 'Recursion error - cyclic reference detected',
             'input': 'input value',
         },
         {
             'type': 'int_parsing',
-            'loc': ['int'],
+            'loc': ('int',),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'input value',
         },
@@ -657,7 +657,7 @@ def test_function_change_id(strict: bool):
     assert exc_info.value.errors() == [
         {
             'type': 'recursion_loop',
-            'loc': IsList(length=(1, 255)),
+            'loc': IsTuple(length=(1, 255)),
             'msg': 'Recursion error - cyclic reference detected',
             'input': IsStr(regex=r'f-\d+'),
         }

@@ -67,7 +67,7 @@ def test_bool_error():
     assert exc_info.value.errors() == [
         {
             'type': 'bool_parsing',
-            'loc': [],
+            'loc': (),
             'msg': 'Input should be a valid boolean, unable to interpret input',
             'input': 'wrong',
         }

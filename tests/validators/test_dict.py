@@ -54,7 +54,7 @@ def test_dict_value_error(py_and_json: PyAndJson):
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': ['b'],
+            'loc': ('b',),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'wrong',
         }
@@ -68,7 +68,7 @@ def test_dict_error_key_int():
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': [3],
+            'loc': (3,),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'wrong',
         }
@@ -82,7 +82,7 @@ def test_dict_error_key_other():
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': ['(1, 2)'],
+            'loc': ('(1, 2)',),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'wrong',
         }
@@ -126,7 +126,7 @@ def test_key_error():
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': ['x', '[key]'],
+            'loc': ('x', '[key]'),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'x',
         }
@@ -151,7 +151,7 @@ def test_mapping_error():
     assert exc_info.value.errors() == [
         {
             'type': 'dict_from_mapping',
-            'loc': [],
+            'loc': (),
             'msg': 'Unable to convert mapping to a dictionary, error: RuntimeError: intentional error',
             'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
             'ctx': {'error': 'RuntimeError: intentional error'},
@@ -180,7 +180,7 @@ def test_mapping_error_yield_1():
     assert exc_info.value.errors() == [
         {
             'type': 'dict_from_mapping',
-            'loc': [],
+            'loc': (),
             'msg': (
                 'Unable to convert mapping to a dictionary, error: '
                 'ValueError: expected tuple of length 2, but got tuple of length 1'

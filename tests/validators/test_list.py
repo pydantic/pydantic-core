@@ -37,7 +37,7 @@ def test_list_strict():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python((1, 2, '33'))
     assert exc_info.value.errors() == [
-        {'type': 'list_type', 'loc': [], 'msg': 'Input should be a valid list/array', 'input': (1, 2, '33')}
+        {'type': 'list_type', 'loc': (), 'msg': 'Input should be a valid list/array', 'input': (1, 2, '33')}
     ]
 
 
@@ -125,7 +125,7 @@ def test_list_error(input_value, index):
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': [index],
+            'loc': (index,),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'wrong',
         }
@@ -193,7 +193,7 @@ def test_length_ctx():
     assert exc_info.value.errors() == [
         {
             'type': 'too_short',
-            'loc': [],
+            'loc': (),
             'msg': 'List should have at least 2 items after validation, not 1',
             'input': [1],
             'ctx': {'field_type': 'List', 'min_length': 2, 'actual_length': 1},
@@ -207,7 +207,7 @@ def test_length_ctx():
     assert exc_info.value.errors() == [
         {
             'type': 'too_long',
-            'loc': [],
+            'loc': (),
             'msg': 'List should have at most 3 items after validation, not 4',
             'input': [1, 2, 3, 4],
             'ctx': {'field_type': 'List', 'max_length': 3, 'actual_length': 4},
@@ -233,8 +233,8 @@ def test_list_function_val_error():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1, 2])
     assert exc_info.value.errors() == [
-        {'type': 'value_error', 'loc': [0], 'msg': 'Value error, error 1', 'input': 1, 'ctx': {'error': 'error 1'}},
-        {'type': 'value_error', 'loc': [1], 'msg': 'Value error, error 2', 'input': 2, 'ctx': {'error': 'error 2'}},
+        {'type': 'value_error', 'loc': (0,), 'msg': 'Value error, error 1', 'input': 1, 'ctx': {'error': 'error 1'}},
+        {'type': 'value_error', 'loc': (1,), 'msg': 'Value error, error 2', 'input': 2, 'ctx': {'error': 'error 2'}},
     ]
 
 
@@ -264,7 +264,7 @@ def test_generator_error():
     assert exc_info.value.errors() == [
         {
             'type': 'iteration_error',
-            'loc': [2],
+            'loc': (2,),
             'msg': 'Error iterating over object, error: RuntimeError: error',
             'input': HasRepr(IsStr(regex='<generator object test_generator_error.<locals>.gen at 0x[0-9a-f]+>')),
             'ctx': {'error': 'RuntimeError: error'},
@@ -323,7 +323,7 @@ def test_sequence(MySequence):
         v.validate_python(MySequence())
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
-        {'type': 'list_type', 'loc': [], 'msg': 'Input should be a valid list/array', 'input': IsInstance(MySequence)}
+        {'type': 'list_type', 'loc': (), 'msg': 'Input should be a valid list/array', 'input': IsInstance(MySequence)}
     ]
 
 
@@ -340,7 +340,7 @@ def test_sequence(MySequence):
             123,
             Err(
                 '1 validation error for list[int]',
-                [{'type': 'list_type', 'loc': [], 'msg': 'Input should be a valid list/array', 'input': 123}],
+                [{'type': 'list_type', 'loc': (), 'msg': 'Input should be a valid list/array', 'input': 123}],
             ),
         ),
     ],
@@ -390,7 +390,7 @@ def test_bad_iter(items_schema):
     assert exc_info.value.errors() == [
         {
             'type': 'iteration_error',
-            'loc': [1],
+            'loc': (1,),
             'msg': 'Error iterating over object, error: RuntimeError: broken',
             'input': IsInstance(BadIter),
             'ctx': {'error': 'RuntimeError: broken'},

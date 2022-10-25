@@ -160,10 +160,10 @@ def test_union_int(py_and_json: PyAndJson):
         v.validate_test('5')
 
     assert exc_info.value.errors() == [
-        {'type': 'int_type', 'loc': ['int'], 'msg': 'Input should be a valid integer', 'input': '5'},
+        {'type': 'int_type', 'loc': ('int',), 'msg': 'Input should be a valid integer', 'input': '5'},
         {
             'type': 'multiple_of',
-            'loc': ['constrained-int'],
+            'loc': ('constrained-int',),
             'msg': 'Input should be a multiple of 7',
             'input': '5',
             'ctx': {'multiple_of': 7},
@@ -180,7 +180,7 @@ def test_union_int_simple(py_and_json: PyAndJson):
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': ['int'],
+            'loc': ('int',),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'xxx',
         }
@@ -203,7 +203,7 @@ def test_long_int(py_and_json: PyAndJson):
         v.validate_test('1' * 400)
 
     assert exc_info.value.errors() == [
-        {'type': 'finite_number', 'loc': [], 'msg': 'Input should be a finite number', 'input': '1' * 400}
+        {'type': 'finite_number', 'loc': (), 'msg': 'Input should be a finite number', 'input': '1' * 400}
     ]
     assert repr(exc_info.value) == (
         '1 validation error for int\n'

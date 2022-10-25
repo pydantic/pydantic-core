@@ -13,7 +13,7 @@ def test_nullable():
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': [],
+            'loc': (),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'hello',
         }

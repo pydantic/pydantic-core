@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import pytest
-from dirty_equals import AnyThing, IsBytes, IsList, IsStr
+from dirty_equals import AnyThing, IsBytes, IsStr, IsTuple
 from hypothesis import given, strategies
 from typing_extensions import TypedDict
 
@@ -44,7 +44,7 @@ def test_datetime_binary(datetime_schema, data):
         assert exc.errors() == [
             {
                 'type': 'datetime_parsing',
-                'loc': [],
+                'loc': (),
                 'msg': IsStr(regex='Input should be a valid datetime, .+'),
                 'input': IsBytes(),
                 'ctx': {'error': IsStr()},
@@ -108,7 +108,7 @@ def test_recursive_cycles(recursive_schema, data):
         assert exc.errors() == [
             {
                 'type': 'recursion_loop',
-                'loc': IsList(length=(1, None)),
+                'loc': IsTuple(length=(1, None)),
                 'msg': 'Recursion error - cyclic reference detected',
                 'input': AnyThing(),
             }

@@ -108,12 +108,12 @@ def test_set_multiple_errors():
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': [0],
+            'loc': (0,),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'a',
         },
-        {'type': 'int_type', 'loc': [1], 'msg': 'Input should be a valid integer', 'input': (1, 2)},
-        {'type': 'int_type', 'loc': [2], 'msg': 'Input should be a valid integer', 'input': []},
+        {'type': 'int_type', 'loc': (1,), 'msg': 'Input should be a valid integer', 'input': (1, 2)},
+        {'type': 'int_type', 'loc': (2,), 'msg': 'Input should be a valid integer', 'input': []},
     ]
 
 
@@ -197,14 +197,14 @@ def test_union_set_list(input_value, expected):
                 errors=[
                     {
                         'type': 'int_type',
-                        'loc': ['set[int]', 1],
+                        'loc': ('set[int]', 1),
                         'msg': 'Input should be a valid integer',
                         'input': 'a',
                     },
                     # second because validation on the string choice comes second
                     {
                         'type': 'string_type',
-                        'loc': ['set[str]', 0],
+                        'loc': ('set[str]', 0),
                         'msg': 'Input should be a valid string',
                         'input': 1,
                     },

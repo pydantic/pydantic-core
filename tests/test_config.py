@@ -180,14 +180,14 @@ def test_sub_model_merge():
     assert exc_info.value.errors() == [
         {
             'type': 'string_too_long',
-            'loc': ['f'],
+            'loc': ('f',),
             'msg': 'String should have at most 4 characters',
             'input': 'tests',
             'ctx': {'max_length': 4},
         },
         {
             'type': 'string_too_short',
-            'loc': ['sub_model', 'f'],
+            'loc': ('sub_model', 'f'),
             'msg': 'String should have at least 1 characters',
             'input': '',
             'ctx': {'min_length': 1},

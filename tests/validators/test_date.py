@@ -159,7 +159,7 @@ def test_date_strict_json_ctx():
     assert exc_info.value.errors() == [
         {
             'type': 'date_parsing',
-            'loc': [],
+            'loc': (),
             'msg': 'Input should be a valid date in the format YYYY-MM-DD, input is too short',
             'input': 'foobar',
             'ctx': {'error': 'input is too short'},

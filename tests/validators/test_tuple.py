@@ -73,7 +73,7 @@ def test_tuple_strict_fails_without_tuple(wrong_coll_type: Type[Any], mode, item
     assert exc_info.value.errors() == [
         {
             'type': 'tuple_type',
-            'loc': [],
+            'loc': (),
             'msg': 'Input should be a valid tuple',
             'input': wrong_coll_type([1, 2, '33']),
         }
@@ -180,7 +180,7 @@ def test_tuple_var_len_errors(input_value, index):
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': [index],
+            'loc': (index,),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'wrong',
         }
@@ -208,7 +208,7 @@ def test_tuple_fix_len_errors(input_value, items, index):
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': [index],
+            'loc': (index,),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'wrong',
         }
@@ -227,13 +227,13 @@ def test_multiple_missing(py_and_json: PyAndJson):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1])
     assert exc_info.value.errors() == [
-        {'type': 'missing', 'loc': [1], 'msg': 'Field required', 'input': [1]},
-        {'type': 'missing', 'loc': [2], 'msg': 'Field required', 'input': [1]},
-        {'type': 'missing', 'loc': [3], 'msg': 'Field required', 'input': [1]},
+        {'type': 'missing', 'loc': (1,), 'msg': 'Field required', 'input': [1]},
+        {'type': 'missing', 'loc': (2,), 'msg': 'Field required', 'input': [1]},
+        {'type': 'missing', 'loc': (3,), 'msg': 'Field required', 'input': [1]},
     ]
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1, 2, 3])
-    assert exc_info.value.errors() == [{'type': 'missing', 'loc': [3], 'msg': 'Field required', 'input': [1, 2, 3]}]
+    assert exc_info.value.errors() == [{'type': 'missing', 'loc': (3,), 'msg': 'Field required', 'input': [1, 2, 3]}]
 
 
 def test_extra_arguments(py_and_json: PyAndJson):
@@ -245,7 +245,7 @@ def test_extra_arguments(py_and_json: PyAndJson):
     assert exc_info.value.errors() == [
         {
             'type': 'too_long',
-            'loc': [],
+            'loc': (),
             'msg': 'Tuple should have at most 2 items after validation, not 4',
             'input': [1, 2, 3, 4],
             'ctx': {'field_type': 'Tuple', 'max_length': 2, 'actual_length': 4},
@@ -289,14 +289,14 @@ def test_union_tuple_list(input_value, expected):
                     {
                         # first of all, not a tuple of ints ..
                         'type': 'tuple_type',
-                        'loc': ['tuple[int, ...]'],
+                        'loc': ('tuple[int, ...]',),
                         'msg': 'Input should be a valid tuple',
                         'input': [5],
                     },
                     # .. and not a tuple of strings, either
                     {
                         'type': 'tuple_type',
-                        'loc': ['tuple[str, ...]'],
+                        'loc': ('tuple[str, ...]',),
                         'msg': 'Input should be a valid tuple',
                         'input': [5],
                     },
@@ -337,13 +337,13 @@ def test_union_tuple_var_len(input_value, expected):
                 errors=[
                     {
                         'type': 'tuple_type',
-                        'loc': ['tuple[int, int, int]'],
+                        'loc': ('tuple[int, int, int]',),
                         'msg': 'Input should be a valid tuple',
                         'input': [5, '1', 1],
                     },
                     {
                         'type': 'tuple_type',
-                        'loc': ['tuple[str, str, str]'],
+                        'loc': ('tuple[str, str, str]',),
                         'msg': 'Input should be a valid tuple',
                         'input': [5, '1', 1],
                     },
@@ -387,7 +387,7 @@ def test_tuple_fix_error():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1])
 
-    assert exc_info.value.errors() == [{'type': 'missing', 'loc': [1], 'msg': 'Field required', 'input': [1]}]
+    assert exc_info.value.errors() == [{'type': 'missing', 'loc': (1,), 'msg': 'Field required', 'input': [1]}]
 
 
 @pytest.mark.parametrize(
@@ -398,7 +398,7 @@ def test_tuple_fix_error():
         ((1, 'a', 'b'), (1, 'a', 'b')),
         ([1, 'a', 'b', 'c', 'd'], (1, 'a', 'b', 'c', 'd')),
         (deque([1, 'a', 'b', 'c', 'd']), (1, 'a', 'b', 'c', 'd')),
-        ([1], Err('type=missing', errors=[{'type': 'missing', 'loc': [1], 'msg': 'Field required', 'input': [1]}])),
+        ([1], Err('type=missing', errors=[{'type': 'missing', 'loc': (1,), 'msg': 'Field required', 'input': [1]}])),
     ],
 )
 def test_tuple_fix_extra(input_value, expected, cache):
@@ -429,7 +429,7 @@ def test_tuple_fix_extra_any():
     assert v.validate_python([b'1', 2, b'3']) == ('1', 2, b'3')
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([])
-    assert exc_info.value.errors() == [{'type': 'missing', 'loc': [0], 'msg': 'Field required', 'input': []}]
+    assert exc_info.value.errors() == [{'type': 'missing', 'loc': (0,), 'msg': 'Field required', 'input': []}]
 
 
 def test_generator_error():

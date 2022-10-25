@@ -226,7 +226,7 @@ def test_custom_invalid_tz():
     assert excinfo.value.errors() == [
         {
             'type': 'datetime_object_invalid',
-            'loc': [],
+            'loc': (),
             'msg': f'Invalid datetime object, got {error_message}',
             'input': dt,
             'ctx': {'error': error_message},

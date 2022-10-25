@@ -166,7 +166,7 @@ def test_time_bound_ctx():
     assert exc_info.value.errors() == [
         {
             'type': 'greater_than',
-            'loc': [],
+            'loc': (),
             'msg': 'Input should be greater than 12:13:14.123456',
             'input': '12:13',
             'ctx': {'gt': '12:13:14.123456'},

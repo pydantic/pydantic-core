@@ -37,7 +37,7 @@ def test_lax_bytes_validator():
     assert exc_info.value.errors() == [
         {
             'type': 'string_unicode',
-            'loc': [],
+            'loc': (),
             'msg': 'Input should be a valid string, unable to parse raw data as a unicode string',
             'input': '🐈 Hello \ud800World',
         }
@@ -102,7 +102,7 @@ def test_length_ctx():
     assert exc_info.value.errors() == [
         {
             'type': 'bytes_too_short',
-            'loc': [],
+            'loc': (),
             'msg': 'Data should have at least 2 bytes',
             'input': b'1',
             'ctx': {'min_length': 2},
@@ -115,7 +115,7 @@ def test_length_ctx():
     assert exc_info.value.errors() == [
         {
             'type': 'bytes_too_long',
-            'loc': [],
+            'loc': (),
             'msg': 'Data should have at most 3 bytes',
             'input': b'1234',
             'ctx': {'max_length': 3},

@@ -35,7 +35,7 @@ def test_is_instance():
     assert exc_info.value.errors() == [
         {
             'type': 'is_instance_of',
-            'loc': [],
+            'loc': (),
             'msg': 'Input should be an instance of Foo',
             'input': s,
             'ctx': {'class': 'Foo'},

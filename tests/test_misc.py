@@ -49,7 +49,7 @@ def test_validation_error():
         == [
             {
                 'type': 'int_from_float',
-                'loc': [],
+                'loc': (),
                 'msg': 'Input should be a valid integer, got a number with a fractional part',
                 'input': 1.5,
             }
@@ -68,7 +68,7 @@ def test_validation_error_include_context():
     assert exc_info.value.errors() == [
         {
             'type': 'too_long',
-            'loc': [],
+            'loc': (),
             'msg': 'List should have at most 2 items after validation, not 3',
             'input': [1, 2, 3],
             'ctx': {'field_type': 'List', 'max_length': 2, 'actual_length': 3},
@@ -78,7 +78,7 @@ def test_validation_error_include_context():
     assert exc_info.value.errors(include_context=False) == [
         {
             'type': 'too_long',
-            'loc': [],
+            'loc': (),
             'msg': 'List should have at most 2 items after validation, not 3',
             'input': [1, 2, 3],
         }
@@ -119,13 +119,13 @@ def test_validation_error_multiple():
     assert exc_info.value.errors() == [
         {
             'type': 'float_parsing',
-            'loc': ['x'],
+            'loc': ('x',),
             'msg': 'Input should be a valid number, unable to parse string as an number',
             'input': 'x' * 60,
         },
         {
             'type': 'int_parsing',
-            'loc': ['y'],
+            'loc': ('y',),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'y',
         },

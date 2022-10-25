@@ -20,7 +20,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                 [
                     {
                         'type': 'literal_error',
-                        'loc': [],
+                        'loc': (),
                         'msg': 'Input should be 1',
                         'input': 2,
                         'ctx': {'expected': '1'},
@@ -38,7 +38,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                 [
                     {
                         'type': 'literal_error',
-                        'loc': [],
+                        'loc': (),
                         'msg': "Input should be 'foo'",
                         'input': 'bar',
                         'ctx': {'expected': "'foo'"},
@@ -64,7 +64,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                 [
                     {
                         'type': 'literal_error',
-                        'loc': [],
+                        'loc': (),
                         'msg': 'Input should be 1, 2, 3 or 4',
                         'input': 5,
                         'ctx': {'expected': '1, 2, 3 or 4'},
@@ -90,7 +90,7 @@ from ..conftest import Err, PyAndJson, plain_repr
                 [
                     {
                         'type': 'literal_error',
-                        'loc': [],
+                        'loc': (),
                         'msg': "Input should be 1 or '1'",
                         'input': '2',
                         'ctx': {'expected': "1 or '1'"},
@@ -134,7 +134,7 @@ def test_literal_py_and_json(py_and_json: PyAndJson, kwarg_expected, input_value
                 [
                     {
                         'type': 'literal_error',
-                        'loc': [],
+                        'loc': (),
                         'msg': "Input should be 1 or '1'",
                         'input': '2',
                         'ctx': {'expected': "1 or '1'"},
@@ -181,14 +181,14 @@ def test_union():
     assert exc_info.value.errors() == [
         {
             'type': 'literal_error',
-            'loc': ["literal['a','b']"],
+            'loc': ("literal['a','b']",),
             'msg': "Input should be 'a' or 'b'",
             'input': 'c',
             'ctx': {'expected': "'a' or 'b'"},
         },
         {
             'type': 'int_parsing',
-            'loc': ['int'],
+            'loc': ('int',),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'c',
         },
@@ -207,7 +207,7 @@ def test_enum():
     assert exc_info.value.errors() == [
         {
             'type': 'literal_error',
-            'loc': [],
+            'loc': (),
             'msg': "Input should be <FooEnum.foo: 'foo_value'>",
             'input': 'foo_value',
             'ctx': {'expected': "<FooEnum.foo: 'foo_value'>"},

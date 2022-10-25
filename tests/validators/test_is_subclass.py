@@ -24,7 +24,7 @@ def test_is_subclass_basic():
     assert exc_info.value.errors() == [
         {
             'type': 'is_subclass_of',
-            'loc': [],
+            'loc': (),
             'msg': 'Input should be a subclass of Foo',
             'input': Bar,
             'ctx': {'class': 'Foo'},
@@ -71,7 +71,7 @@ def test_custom_repr():
     assert exc_info.value.errors() == [
         {
             'type': 'is_subclass_of',
-            'loc': [],
+            'loc': (),
             'msg': 'Input should be a subclass of Spam',
             'input': Bar,
             'ctx': {'class': 'Spam'},
