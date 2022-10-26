@@ -671,10 +671,10 @@ def test_alias_error_loc():
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
-            'kind': 'int_parsing',
-            'loc': ['field_a'],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
-            'input_value': 'not_int',
+            'type': 'int_parsing',
+            'loc': ('field_a',),
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'not_int',
         }
     ]
     with pytest.raises(ValidationError) as exc_info:
@@ -682,10 +682,10 @@ def test_alias_error_loc():
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
-            'kind': 'int_parsing',
-            'loc': ['field_a'],
-            'message': 'Input should be a valid integer, unable to parse string as an integer',
-            'input_value': 'not_int',
+            'type': 'int_parsing',
+            'loc': ('field_a',),
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'not_int',
         }
     ]
 
