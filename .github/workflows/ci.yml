@@ -234,7 +234,7 @@ jobs:
           jobs: ${{ toJSON(needs) }}
 
   build:
-    name: build on ${{ matrix.os }} ${{ matrix.target }} py-${{ matrix.interpreter }} ${{ matrix.manylinux }}
+    name: build on ${{ matrix.os }} ${{ matrix.target }} py-${{ matrix.interpreter | 'all' }} ${{ matrix.manylinux | 'auto' }}
     # only run on push to main and on release
     if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'Full Build'))"
     strategy:
@@ -323,20 +323,20 @@ jobs:
 
       - name: build wheels custom interpreter
         uses: messense/maturin-action@v1
-        if: ${{ matrix.interpreter != 'all' }}
+        if: ${{ matrix.interpreter | 'all' != 'all' }}
         with:
           target: ${{ matrix.target }}
-          manylinux: ${{ matrix.manylinux }}
+          manylinux: ${{ matrix.manylinux | 'all' }}
           container: ${{ matrix.container }}
           args: --release --out dist --interpreter ${{ matrix.interpreter }}
           rust-toolchain: stable
 
       - name: build wheels all interpreters
         uses: messense/maturin-action@v1
-        if: ${{ matrix.interpreter == 'all' }}
+        if: ${{ matrix.interpreter | 'all' == 'all' }}
         with:
           target: ${{ matrix.target }}
-          manylinux: ${{ matrix.manylinux }}
+          manylinux: ${{ matrix.manylinux | 'all' }}
           container: ${{ matrix.container }}
           args: --release --out dist --interpreter 3.7 3.8 3.9 3.10 3.11 pypy3.7 pypy3.8 pypy3.9
           rust-toolchain: stable
