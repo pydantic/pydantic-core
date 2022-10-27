@@ -234,7 +234,7 @@ jobs:
           jobs: ${{ toJSON(needs) }}
 
   build:
-    name: build on ${{ matrix.platform || matrix.os }} (${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
+    name: build on ${{ matrix.os }} (${{ matrix.target }} - ${{ matrix.interpreter || 'all' }} ${{ matrix.manylinux || '' }})
     # only run on push to main and on release
     if: "success() && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'Full Build'))"
     strategy:
@@ -242,38 +242,40 @@ jobs:
       matrix:
         os: [ubuntu, macos, windows]
         target: [x86_64, aarch64]
-        manylinux: [auto]
         include:
           - os: ubuntu
-            platform: linux
           - os: windows
             ls: dir
-            interpreter: 3.7 3.8 3.9 3.10 3.11
+            interpreter: 3.7 3.8 3.9 3.10
+          - os: windows
+            ls: dir
+            interpreter: '3.11'
           - os: windows
             ls: dir
             target: i686
             python-architecture: x86
-            interpreter: 3.7 3.8 3.9 3.10 3.11
+            interpreter: 3.7 3.8 3.9 3.10
+          - os: windows
+            ls: dir
+            target: i686
+            python-architecture: x86
+            interpreter: '3.11'
           - os: macos
             target: aarch64
             interpreter: 3.7 3.8 3.9 3.10 3.11
           - os: ubuntu
-            platform: linux
             target: i686
           # GCC 4.8.5 in manylinux2014 container doesn't support c11 atomic
           # we use manylinux_2_24 container for aarch64 and armv7 targets instead,
           - os: ubuntu
-            platform: linux
             target: aarch64
             container: messense/manylinux_2_24-cross:aarch64
           - os: ubuntu
-            platform: linux
             target: armv7
             container: messense/manylinux_2_24-cross:armv7
             interpreter: 3.7 3.8 3.9 3.10 3.11
           # musllinux
           - os: ubuntu
-            platform: linux
             target: x86_64
             manylinux: musllinux_1_1
           - os: ubuntu
@@ -295,9 +297,10 @@ jobs:
           python-version: '3.10'
           architecture: ${{ matrix.python-architecture || 'x64' }}
 
-      # required on windows, see https://github.com/PyO3/maturin/issues/1221
-      - name: setup python 3.11
-        if: ${{ matrix.os == 'windows' }}
+      # required separately on windows, see https://github.com/PyO3/maturin/issues/1221
+      - name: set up python 3.11
+        # we install 3.11 explicitly ONLY if we're build for just 3.11
+        if: ${{ matrix.interpreter == '3.11' }}
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
