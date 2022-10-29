@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyIterator, PyList, PySet, PyString, PyTuple};
+use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyIterator, PyList, PyMapping, PySet, PyString, PyTuple};
 
 use crate::errors::{py_err_string, ErrorType, InputValue, ValError, ValLineError, ValResult};
 use crate::recursion_guard::RecursionGuard;
@@ -234,6 +234,7 @@ impl<'a> GenericCollection<'a> {
 pub enum GenericMapping<'a> {
     PyDict(&'a PyDict),
     PyGetAttr(&'a PyAny),
+    PyMapping(&'a PyMapping),
     JsonObject(&'a JsonObject),
 }
 

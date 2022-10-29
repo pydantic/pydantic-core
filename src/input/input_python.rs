@@ -1,18 +1,17 @@
 use std::borrow::Cow;
 use std::str::from_utf8;
 
-use pyo3::exceptions::PyAttributeError;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{
-    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList, PyMapping,
+    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList,
     PySequence, PySet, PyString, PyTime, PyTuple, PyType,
 };
 #[cfg(not(PyPy))]
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
-use crate::errors::{py_err_string, ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
+use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, date_as_datetime, float_as_datetime,
@@ -637,35 +636,14 @@ impl<'a> Input<'a> for PyAny {
     }
 }
 
-/// return None if obj is not a mapping (cast_as::<PyMapping> fails or mapping.items returns an AttributeError)
+/// return None if obj is not a mapping (cast_as::<PyMapping> fails)
 /// otherwise try to covert the mapping to a dict and return an Some(error) if it fails
 fn mapping_as_dict(obj: &PyAny) -> Option<ValResult<GenericMapping>> {
-    let mapping: &PyMapping = match obj.cast_as() {
+    let mapping = match obj.cast_as() {
         Ok(mapping) => mapping,
         Err(_) => return None,
     };
-    // see https://github.com/PyO3/pyo3/issues/2072 - the cast_as::<PyMapping> is not entirely accurate
-    // and returns some things which are definitely not mappings (e.g. str) as mapping,
-    // hence we also require that the object as `items` to consider it a mapping
-    let result_dict = match mapping.items() {
-        Ok(seq) => mapping_seq_as_dict(seq),
-        Err(err) => {
-            if matches!(err.get_type(obj.py()).is_subclass_of::<PyAttributeError>(), Ok(true)) {
-                return None;
-            } else {
-                Err(err)
-            }
-        }
-    };
-    match result_dict {
-        Ok(dict) => Some(Ok(dict.into())),
-        Err(err) => Some(Err(ValError::new(
-            ErrorType::DictFromMapping {
-                error: py_err_string(obj.py(), err),
-            },
-            obj,
-        ))),
-    }
+    Some(Ok(GenericMapping::PyMapping(mapping)))
 }
 
 // creating a temporary dict is slow, we could perhaps use an indexmap instead
