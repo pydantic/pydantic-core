@@ -1,6 +1,7 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use pyo3::types::PyMapping;
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ValError, ValLineError, ValResult};
@@ -69,6 +70,7 @@ impl Validator for DictValidator {
         match dict {
             GenericMapping::PyDict(py_dict) => self.validate_dict(py, input, py_dict, extra, slots, recursion_guard),
             GenericMapping::PyGetAttr(_) => unreachable!(),
+            GenericMapping::PyMapping(mapping) => self.validate_mapping(py, input, mapping, extra, slots, recursion_guard),
             GenericMapping::JsonObject(json_object) => {
                 self.validate_json_object(py, input, json_object, extra, slots, recursion_guard)
             }
@@ -146,5 +148,6 @@ macro_rules! build_validate {
 
 impl DictValidator {
     build_validate!(validate_dict, PyDict);
+    build_validate!(validate_mapping, PyMapping);
     build_validate!(validate_json_object, JsonObject);
 }

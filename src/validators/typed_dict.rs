@@ -306,8 +306,9 @@ impl Validator for TypedDictValidator {
             }};
         }
         match dict {
-            GenericMapping::PyDict(d) => process!(d, py_get_item, iter),
+            GenericMapping::PyDict(d) => process!(d, py_get_dict_item, iter),
             GenericMapping::PyGetAttr(d) => process!(d, py_get_attr, iter_attrs),
+            GenericMapping::PyMapping(d) => process!(d, py_get_mapping_item, iter),
             GenericMapping::JsonObject(d) => process!(d, json_get, iter),
         }
 
