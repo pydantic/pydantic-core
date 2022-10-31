@@ -44,6 +44,7 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+          override: true
 
       - name: cache rust
         uses: Swatinem/rust-cache@v1
