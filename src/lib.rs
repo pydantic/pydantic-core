@@ -14,11 +14,13 @@ mod input;
 mod lookup_key;
 mod questions;
 mod recursion_guard;
+mod url_type;
 mod validators;
 
 // required for benchmarks
 pub use build_tools::SchemaError;
 pub use errors::{list_all_errors, PydanticCustomError, PydanticKnownError, PydanticOmit, ValidationError};
+pub use url_type::Url;
 pub use validators::SchemaValidator;
 
 pub fn get_version() -> String {
@@ -41,6 +43,7 @@ fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PydanticCustomError>()?;
     m.add_class::<PydanticKnownError>()?;
     m.add_class::<PydanticOmit>()?;
+    m.add_class::<Url>()?;
     m.add_function(wrap_pyfunction!(list_all_errors, m)?)?;
     Ok(())
 }

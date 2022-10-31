@@ -39,6 +39,8 @@ speedate = "0.7.0"
 ahash = "0.8.0"
 nohash-hasher = "0.2.0"
 
+url = "2.3.1"
+
 [lib]
 name = "_pydantic_core"
 crate-type = ["cdylib", "rlib"]

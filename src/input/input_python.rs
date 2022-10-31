@@ -124,7 +124,7 @@ impl<'a> Input<'a> for PyAny {
                         } else if args.is_none() {
                             Ok(None)
                         } else if let Ok(list) = args.cast_as::<PyList>() {
-                            // remove `collect` when we have https://github.com/PyO3/pyo3/pull/2676
+                            // TODO remove `collect` when we have https://github.com/PyO3/pyo3/pull/2676
                             Ok(Some(PyTuple::new(self.py(), list.iter().collect::<Vec<_>>())))
                         } else {
                             Err(ValLineError::new_with_loc(
@@ -161,7 +161,7 @@ impl<'a> Input<'a> for PyAny {
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(PyArgs::new(Some(tuple), None).into())
         } else if let Ok(list) = self.cast_as::<PyList>() {
-            // remove `collect` when we have https://github.com/PyO3/pyo3/pull/2676
+            // TODO remove `collect` when we have https://github.com/PyO3/pyo3/pull/2676
             let tuple = PyTuple::new(self.py(), list.iter().collect::<Vec<_>>());
             Ok(PyArgs::new(Some(tuple), None).into())
         } else {
