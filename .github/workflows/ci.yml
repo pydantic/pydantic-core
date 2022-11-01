@@ -248,14 +248,12 @@ jobs:
             platform: linux
           - os: windows
             ls: dir
-            # TODO add 3.11 https://github.com/pydantic/pydantic-core/issues/260
-            interpreter: 3.7 3.8 3.9 3.10
+            interpreter: 3.7 3.8 3.9 3.10 3.11
           - os: windows
             ls: dir
             target: i686
             python-architecture: x86
-            # TODO add 3.11 https://github.com/pydantic/pydantic-core/issues/260
-            interpreter: 3.7 3.8 3.9 3.10
+            interpreter: 3.7 3.8 3.9 3.10 3.11
           - os: macos
             target: aarch64
             interpreter: 3.7 3.8 3.9 3.10 3.11
