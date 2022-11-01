@@ -1,7 +1,6 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use pyo3::types::PyMapping;
+use pyo3::types::{PyDict, PyMapping};
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ValError, ValLineError, ValResult};
@@ -70,7 +69,9 @@ impl Validator for DictValidator {
         match dict {
             GenericMapping::PyDict(py_dict) => self.validate_dict(py, input, py_dict, extra, slots, recursion_guard),
             GenericMapping::PyGetAttr(_) => unreachable!(),
-            GenericMapping::PyMapping(mapping) => self.validate_mapping(py, input, mapping, extra, slots, recursion_guard),
+            GenericMapping::PyMapping(mapping) => {
+                self.validate_mapping(py, input, mapping, extra, slots, recursion_guard)
+            }
             GenericMapping::JsonObject(json_object) => {
                 self.validate_json_object(py, input, json_object, extra, slots, recursion_guard)
             }
@@ -148,6 +149,60 @@ macro_rules! build_validate {
 
 impl DictValidator {
     build_validate!(validate_dict, PyDict);
-    build_validate!(validate_mapping, PyMapping);
     build_validate!(validate_json_object, JsonObject);
+
+    fn validate_mapping<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        dict: &'data PyMapping,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        let output = PyDict::new(py);
+        let mut errors: Vec<ValLineError> = Vec::new();
+
+        let key_validator = self.key_validator.as_ref();
+        let value_validator = self.value_validator.as_ref();
+
+        for (key, value) in dict.iter() {
+            let output_key = match key_validator.validate(py, key, extra, slots, recursion_guard) {
+                Ok(value) => Some(value),
+                Err(ValError::LineErrors(line_errors)) => {
+                    for err in line_errors {
+                        // these are added in reverse order so [key] is shunted along by the second call
+                        errors.push(
+                            err.with_outer_location("[key]".into())
+                                .with_outer_location(key.as_loc_item()),
+                        );
+                    }
+                    None
+                }
+                Err(ValError::Omit) => continue,
+                Err(err) => return Err(err),
+            };
+            let output_value = match value_validator.validate(py, value, extra, slots, recursion_guard) {
+                Ok(value) => Some(value),
+                Err(ValError::LineErrors(line_errors)) => {
+                    for err in line_errors {
+                        errors.push(err.with_outer_location(key.as_loc_item()));
+                    }
+                    None
+                }
+                Err(ValError::Omit) => continue,
+                Err(err) => return Err(err),
+            };
+            if let (Some(key), Some(value)) = (output_key, output_value) {
+                output.set_item(key, value)?;
+            }
+        }
+
+        if errors.is_empty() {
+            length_check!(input, "Dictionary", self.min_length, self.max_length, output);
+            Ok(output.into())
+        } else {
+            Err(ValError::LineErrors(errors))
+        }
+    }
 }
