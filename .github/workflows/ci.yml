@@ -37,6 +37,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - run: rm rust-toolchain
+
     - name: install rust nightly
       if: matrix.rust-toolchain == 'nightly'
       uses: dtolnay/rust-toolchain@nightly
@@ -103,13 +105,14 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - run: rm rust-toolchain
     - name: install rust
       uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt, clippy
 
     - name: cache rust
-      uses: Swatinem/rust-cache@v1
+      uses: Swatinem/rust-cache@v2
 
     - uses: actions/setup-python@v4
       with:
@@ -152,11 +155,12 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - run: rm rust-toolchain
     - name: install rust
       uses: dtolnay/rust-toolchain@stable
 
     - name: cache rust
-      uses: Swatinem/rust-cache@v1
+      uses: Swatinem/rust-cache@v2
 
     - uses: actions/setup-python@v4
       with:
@@ -182,7 +186,7 @@ jobs:
           targets: wasm32-unknown-emscripten
 
       - name: cache rust
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
 
       - uses: mymindstorm/setup-emsdk@v11
         with:
