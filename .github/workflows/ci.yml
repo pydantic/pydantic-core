@@ -157,7 +157,7 @@ jobs:
 
     - run: rm rust-toolchain
     - name: install rust
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@nightly
 
     - name: cache rust
       uses: Swatinem/rust-cache@v2
