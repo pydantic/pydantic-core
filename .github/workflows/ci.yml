@@ -263,7 +263,7 @@ jobs:
             interpreter: '3.11'
           - os: macos
             target: aarch64
-            interpreter: 3.7 3.8 3.9 3.10 3.11
+            interpreter: 3.8 3.9 3.10 3.11
           - os: ubuntu
             target: i686
           # GCC 4.8.5 in manylinux2014 container doesn't support c11 atomic
