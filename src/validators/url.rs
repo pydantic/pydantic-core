@@ -2,17 +2,20 @@ use ahash::AHashSet;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use url::Url;
 
-use crate::build_tools::{py_err, SchemaDict};
+use crate::build_tools::{is_strict, py_err, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
+use crate::PyUrl;
 
 use super::literal::expected_repr_name;
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct UrlValidator {
+    strict: bool,
     host_required: bool,
     max_length: Option<usize>,
     allowed_schemes: Option<AHashSet<String>>,
@@ -25,7 +28,7 @@ impl BuildValidator for UrlValidator {
 
     fn build(
         schema: &PyDict,
-        _config: Option<&PyDict>,
+        config: Option<&PyDict>,
         _build_context: &mut BuildContext,
     ) -> PyResult<CombinedValidator> {
         let (allowed_schemes, expected_repr, name): (Option<AHashSet<String>>, Option<String>, String) =
@@ -49,6 +52,7 @@ impl BuildValidator for UrlValidator {
             };
 
         Ok(Self {
+            strict: is_strict(schema, config)?,
             host_required: schema.get_as(intern!(schema.py(), "host_required"))?.unwrap_or(false),
             max_length: schema.get_as(intern!(schema.py(), "max_length"))?,
             allowed_schemes,
@@ -68,19 +72,7 @@ impl Validator for UrlValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_str = input.validate_str(extra.strict.unwrap_or(false))?;
-
-        let cow = either_str.as_cow()?;
-        let str = cow.as_ref();
-
-        if let Some(max_length) = self.max_length {
-            if str.len() > max_length {
-                return Err(ValError::new(ErrorType::UrlTooLong { max_length }, input));
-            }
-        }
-
-        let lib_url = url::Url::parse(str)
-            .map_err(move |e| ValError::new(ErrorType::UrlError { error: e.to_string() }, input))?;
+        let lib_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
 
         if let Some(ref allowed_schemes) = self.allowed_schemes {
             if !allowed_schemes.contains(lib_url.scheme()) {
@@ -91,7 +83,7 @@ impl Validator for UrlValidator {
         if self.host_required && !lib_url.has_host() {
             return Err(ValError::new(ErrorType::UrlHostRequired, input));
         }
-        Ok(Url { lib_url }.into_py(py))
+        Ok(PyUrl::new(lib_url).into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -99,86 +91,33 @@ impl Validator for UrlValidator {
     }
 }
 
-#[pyclass(module = "pydantic_core._pydantic_core")]
-#[derive(Clone)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-pub struct Url {
-    lib_url: url::Url,
-}
+impl UrlValidator {
+    fn get_url<'s, 'data>(&'s self, input: &'data impl Input<'data>, strict: bool) -> ValResult<'data, Url> {
+        match input.validate_str(strict) {
+            Ok(either_str) => {
+                let cow = either_str.as_cow()?;
+                let str = cow.as_ref();
 
-#[pymethods]
-impl Url {
-    #[getter]
-    pub fn scheme(&self) -> &str {
-        self.lib_url.scheme()
-    }
+                if let Some(max_length) = self.max_length {
+                    if str.len() > max_length {
+                        return Err(ValError::new(ErrorType::UrlTooLong { max_length }, input));
+                    }
+                }
 
-    #[getter]
-    pub fn username(&self) -> Option<&str> {
-        match self.lib_url.username() {
-            "" => None,
-            user => Some(user),
+                Url::parse(str).map_err(move |e| ValError::new(ErrorType::UrlError { error: e.to_string() }, input))
+            }
+            Err(e) => {
+                let lib_url = match input.input_as_url() {
+                    Some(url) => url.into_url(),
+                    None => return Err(e),
+                };
+                if let Some(max_length) = self.max_length {
+                    if lib_url.as_str().len() > max_length {
+                        return Err(ValError::new(ErrorType::UrlTooLong { max_length }, input));
+                    }
+                }
+                Ok(lib_url)
+            }
         }
-    }
-
-    #[getter]
-    pub fn password(&self) -> Option<&str> {
-        self.lib_url.password()
-    }
-
-    #[getter]
-    pub fn host(&self) -> Option<&str> {
-        self.lib_url.host_str()
-    }
-
-    #[getter]
-    pub fn host_type(&self) -> Option<&'static str> {
-        match self.lib_url.host() {
-            Some(url::Host::Domain(domain)) if domain.starts_with("xn--") => Some("international_domain"),
-            Some(url::Host::Domain(_)) => Some("domain"),
-            Some(url::Host::Ipv4(_)) => Some("ipv4"),
-            Some(url::Host::Ipv6(_)) => Some("ipv6"),
-            None => None,
-        }
-    }
-
-    #[getter]
-    pub fn port(&self) -> Option<u16> {
-        self.lib_url.port()
-    }
-
-    #[getter]
-    pub fn path(&self) -> Option<&str> {
-        match self.lib_url.path() {
-            "" => None,
-            path => Some(path),
-        }
-    }
-
-    #[getter]
-    pub fn query(&self) -> Option<&str> {
-        self.lib_url.query()
-    }
-
-    pub fn query_params(&self, py: Python) -> PyObject {
-        // TODO remove `collect` when we have https://github.com/PyO3/pyo3/pull/2676
-        self.lib_url
-            .query_pairs()
-            .map(|(key, value)| (key, value).into_py(py))
-            .collect::<Vec<PyObject>>()
-            .into_py(py)
-    }
-
-    #[getter]
-    pub fn fragment(&self) -> Option<&str> {
-        self.lib_url.fragment()
-    }
-
-    pub fn __str__(&self) -> String {
-        self.lib_url.to_string()
-    }
-
-    pub fn __repr__(&self) -> String {
-        format!("Url('{}')", self.lib_url)
     }
 }

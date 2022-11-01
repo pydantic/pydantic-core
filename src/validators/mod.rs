@@ -50,8 +50,6 @@ mod union;
 mod url;
 mod with_default;
 
-pub use self::url::Url;
-
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {

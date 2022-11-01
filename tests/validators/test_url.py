@@ -1,4 +1,5 @@
 import pytest
+from dirty_equals import HasRepr, IsInstance
 
 from pydantic_core import SchemaValidator, Url, ValidationError, core_schema
 
@@ -50,6 +51,8 @@ def test_url_error(py_and_json: PyAndJson, url, error):
     'input_value,expected,host_type',
     [
         ('http://example.com', 'http://example.com/', 'domain'),
+        # works since we're in lax mode
+        (b'http://example.com', 'http://example.com/', 'domain'),
         ('https://£££.com', 'https://xn--9aaa.com/', 'international_domain'),
         ('https://xn--9aaa.com/', 'https://xn--9aaa.com/', 'international_domain'),
         ('http://à.א̈.com', 'http://xn--0ca.xn--ssa73l.com/', 'international_domain'),
@@ -83,6 +86,23 @@ def test_no_host():
     assert url.host is None
     assert url.scheme == 'data'
     assert url.path == 'text/plain,Stuff'
+
+
+def test_max_length():
+    v = SchemaValidator(core_schema.url_schema(max_length=25))
+    assert str(v.validate_python('https://example.com')) == 'https://example.com/'
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python('https://example.com/foo/bar')
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'type': 'url_too_long',
+            'loc': (),
+            'msg': 'URL should have at most 25 characters',
+            'input': 'https://example.com/foo/bar',
+            'ctx': {'max_length': 25},
+        }
+    ]
 
 
 def test_allowed_schemes_ok():
@@ -131,3 +151,70 @@ def test_url_query_repeat():
     url: Url = v.validate_python('https://example.com/foo/bar?a=1&a=2')
     assert str(url) == 'https://example.com/foo/bar?a=1&a=2'
     assert url.query_params() == [('a', '1'), ('a', '2')]
+
+
+def test_url_to_url():
+    v = SchemaValidator(core_schema.url_schema())
+    url: Url = v.validate_python('https://example.com')
+    assert str(url) == 'https://example.com/'
+    url2 = v.validate_python(url)
+    assert str(url2) == 'https://example.com/'
+    assert url is not url2
+
+
+def test_url_to_constraint():
+    v1 = SchemaValidator(core_schema.url_schema())
+    url: Url = v1.validate_python('http://example.com/foobar/bar')
+    assert str(url) == 'http://example.com/foobar/bar'
+
+    v2 = SchemaValidator(core_schema.url_schema(max_length=25))
+
+    with pytest.raises(ValidationError) as exc_info:
+        v2.validate_python(url)
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'type': 'url_too_long',
+            'loc': (),
+            'msg': 'URL should have at most 25 characters',
+            'input': IsInstance(Url) & HasRepr("Url('http://example.com/foobar/bar')"),
+            'ctx': {'max_length': 25},
+        }
+    ]
+
+    v3 = SchemaValidator(core_schema.url_schema(allowed_schemes=['https']))
+
+    with pytest.raises(ValidationError) as exc_info:
+        v3.validate_python(url)
+    assert exc_info.value.errors() == [
+        {
+            'type': 'url_schema',
+            'loc': (),
+            'msg': "URL schema should be 'https'",
+            'input': IsInstance(Url) & HasRepr("Url('http://example.com/foobar/bar')"),
+            'ctx': {'expected_schemas': "'https'"},
+        }
+    ]
+
+
+def test_wrong_type_lax():
+    v = SchemaValidator(core_schema.url_schema())
+    assert str(v.validate_python('http://example.com/foobar/bar')) == 'http://example.com/foobar/bar'
+    assert str(v.validate_python(b'http://example.com/foobar/bar')) == 'http://example.com/foobar/bar'
+    with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
+        v.validate_python(123)
+
+    # runtime strict
+    with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
+        v.validate_python(b'http://example.com/foobar/bar', strict=True)
+
+
+def test_wrong_type_strict():
+    v = SchemaValidator(core_schema.url_schema(), {'strict': True})
+    url = v.validate_python('http://example.com/foobar/bar')
+    assert str(url) == 'http://example.com/foobar/bar'
+    assert str(v.validate_python(url)) == 'http://example.com/foobar/bar'
+    with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
+        v.validate_python(b'http://example.com/foobar/bar')
+    with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
+        v.validate_python(123)

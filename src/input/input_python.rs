@@ -13,6 +13,7 @@ use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
 use crate::errors::{py_err_string, ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
+use crate::PyUrl;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, date_as_datetime, float_as_datetime,
@@ -102,11 +103,14 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn input_is_subclass(&self, class: &PyType) -> PyResult<bool> {
-        if let Ok(py_type) = self.cast_as::<PyType>() {
-            py_type.is_subclass(class)
-        } else {
-            Ok(false)
+        match self.cast_as::<PyType>() {
+            Ok(py_type) => py_type.is_subclass(class),
+            Err(_) => Ok(false),
         }
+    }
+
+    fn input_as_url(&self) -> Option<PyUrl> {
+        self.extract::<PyUrl>().ok()
     }
 
     fn callable(&self) -> bool {
