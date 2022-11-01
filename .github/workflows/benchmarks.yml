@@ -40,8 +40,8 @@ jobs:
         if: steps.cache-py.outputs.cache-hit != 'true'
 
       - run: rm rust-toolchain
-      - name: install rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: install rust nightly
+        uses: dtolnay/rust-toolchain@nightly
 
       - name: cache rust
         uses: Swatinem/rust-cache@v1
