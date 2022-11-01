@@ -40,11 +40,7 @@ jobs:
         if: steps.cache-py.outputs.cache-hit != 'true'
 
       - name: install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+        uses: dtolnay/rust-toolchain@stable
 
       - name: cache rust
         uses: Swatinem/rust-cache@v1

@@ -39,18 +39,11 @@ jobs:
 
     - name: install rust nightly
       if: matrix.rust-toolchain == 'nightly'
-      uses: actions-rs/toolchain@v1
-      with:
-        # use the default version from the "rust-toolchain" file in case rust is pinned there
-        profile: minimal
+      uses: dtolnay/rust-toolchain@nightly
 
     - name: install rust stable
       if: matrix.rust-toolchain != 'nightly'
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: ${{ matrix.rust-toolchain }}
-        override: true
+      uses: dtolnay/rust-toolchain@stable
 
     - id: cache-rust
       name: cache rust
@@ -111,10 +104,8 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: install rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        profile: minimal
-        override: true
         components: rustfmt, clippy
 
     - name: cache rust
@@ -162,9 +153,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: install rust
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
+      uses: dtolnay/rust-toolchain@stable
 
     - name: cache rust
       uses: Swatinem/rust-cache@v1
@@ -187,11 +176,10 @@ jobs:
         with:
           python-version: '3.10'
 
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           components: rust-src
-          target: wasm32-unknown-emscripten
+          targets: wasm32-unknown-emscripten
 
       - name: cache rust
         uses: Swatinem/rust-cache@v1
