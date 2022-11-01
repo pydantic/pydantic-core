@@ -176,7 +176,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
           targets: wasm32-unknown-emscripten
