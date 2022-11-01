@@ -47,7 +47,10 @@ mod timedelta;
 mod tuple;
 mod typed_dict;
 mod union;
+mod url;
 mod with_default;
+
+pub use self::url::Url;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
@@ -385,6 +388,8 @@ pub fn build_validator<'a>(
         custom_error::CustomErrorValidator,
         // json data
         json::JsonValidator,
+        // url type
+        url::UrlValidator,
     )
 }
 
@@ -504,6 +509,8 @@ pub enum CombinedValidator {
     CustomError(custom_error::CustomErrorValidator),
     // json data
     Json(json::JsonValidator),
+    // url type
+    Url(url::UrlValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
