@@ -53,9 +53,10 @@ def test_url_error(py_and_json: PyAndJson, url, error):
         ('http://example.com', 'http://example.com/', 'domain'),
         # works since we're in lax mode
         (b'http://example.com', 'http://example.com/', 'domain'),
-        ('https://£££.com', 'https://xn--9aaa.com/', 'international_domain'),
-        ('https://xn--9aaa.com/', 'https://xn--9aaa.com/', 'international_domain'),
-        ('http://à.א̈.com', 'http://xn--0ca.xn--ssa73l.com/', 'international_domain'),
+        ('https://£££.com', 'https://xn--9aaa.com/', 'punycode_domain'),
+        ('https://xn--9aaa.com/', 'https://xn--9aaa.com/', 'punycode_domain'),
+        ('https://münchen/', 'https://xn--mnchen-3ya/', 'punycode_domain'),
+        ('http://à.א̈.com', 'http://xn--0ca.xn--ssa73l.com/', 'punycode_domain'),
         ('ftp://127.0.0.1', 'ftp://127.0.0.1/', 'ipv4'),
         ('wss://1.1.1.1', 'wss://1.1.1.1/', 'ipv4'),
         ('ftp://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]', 'ftp://[2001:db8:85a3::8a2e:370:7334]/', 'ipv6'),

@@ -44,7 +44,7 @@ class Url:
     username: 'str | None'
     password: 'str | None'
     host: 'str | None'
-    host_type: Literal['domain', 'international_domain', 'ipv4', 'ipv6', None]
+    host_type: Literal['domain', 'punycode_domain', 'ipv4', 'ipv6', None]
     port: 'int | None'
     path: 'str | None'
     query: 'str | None'

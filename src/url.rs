@@ -45,7 +45,7 @@ impl PyUrl {
     #[getter]
     pub fn host_type(&self) -> Option<&'static str> {
         match self.lib_url.host() {
-            Some(url::Host::Domain(domain)) if domain.starts_with("xn--") => Some("international_domain"),
+            Some(url::Host::Domain(domain)) if domain.starts_with("xn--") => Some("punycode_domain"),
             Some(url::Host::Domain(_)) => Some("domain"),
             Some(url::Host::Ipv4(_)) => Some("ipv4"),
             Some(url::Host::Ipv6(_)) => Some("ipv6"),
