@@ -12,8 +12,10 @@ def test_url_ok(py_and_json: PyAndJson):
     assert isinstance(url, Url)
     assert str(url) == 'https://example.com/foo/bar?baz=qux#quux'
     assert repr(url) == "Url('https://example.com/foo/bar?baz=qux#quux')"
+    assert url.unicode_string() == 'https://example.com/foo/bar?baz=qux#quux'
     assert url.scheme == 'https'
     assert url.host == 'example.com'
+    assert url.unicode_host() == 'example.com'
     assert url.path == '/foo/bar'
     assert url.query == 'baz=qux'
     assert url.query_params() == [('baz', 'qux')]
@@ -35,6 +37,7 @@ def test_url_ok(py_and_json: PyAndJson):
         ('https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334[', 'invalid IPv6 address'),
         ('https://[', 'invalid IPv6 address'),
         ('https://example com', 'invalid domain character'),
+        ('http://exam%ple.com', 'invalid domain character'),
         ('/more', 'relative URL without a base'),
     ],
 )
@@ -51,25 +54,81 @@ def test_url_error(py_and_json: PyAndJson, url, error):
     'input_value,expected,host_type',
     [
         ('http://example.com', 'http://example.com/', 'domain'),
+        ('http://example.com./foobar', 'http://example.com./foobar', 'domain'),
         # works since we're in lax mode
         (b'http://example.com', 'http://example.com/', 'domain'),
         ('https://£££.com', 'https://xn--9aaa.com/', 'punycode_domain'),
+        ('https://foobar.£££.com', 'https://foobar.xn--9aaa.com/', 'punycode_domain'),
+        ('https://foo.£$.money.com', 'https://foo.xn--$-9ba.money.com/', 'punycode_domain'),
         ('https://xn--9aaa.com/', 'https://xn--9aaa.com/', 'punycode_domain'),
         ('https://münchen/', 'https://xn--mnchen-3ya/', 'punycode_domain'),
+        ('ssh://xn--9aaa.com/', 'ssh://xn--9aaa.com/', 'domain'),
+        ('ssh://münchen.com/', 'ssh://m%C3%BCnchen.com/', 'domain'),
+        ('ssh://example/', 'ssh://example/', 'domain'),
+        ('ssh://£££/', 'ssh://%C2%A3%C2%A3%C2%A3/', 'domain'),
+        ('ssh://%C2%A3%C2%A3%C2%A3/', 'ssh://%C2%A3%C2%A3%C2%A3/', 'domain'),
         ('http://à.א̈.com', 'http://xn--0ca.xn--ssa73l.com/', 'punycode_domain'),
         ('ftp://127.0.0.1', 'ftp://127.0.0.1/', 'ipv4'),
         ('wss://1.1.1.1', 'wss://1.1.1.1/', 'ipv4'),
         ('ftp://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]', 'ftp://[2001:db8:85a3::8a2e:370:7334]/', 'ipv6'),
         ('https:/more', 'https://more/', 'domain'),
         ('https:more', 'https://more/', 'domain'),
+        ('file:///foobar', 'file:///foobar', None),
     ],
 )
-def test_hosts(input_value, expected, host_type):
+def test_host_types(input_value, expected, host_type):
     v = SchemaValidator(core_schema.url_schema())
     url: Url = v.validate_python(input_value)
     assert isinstance(url, Url)
     assert str(url) == expected
     assert url.host_type == host_type
+
+
+@pytest.mark.parametrize(
+    'input_value,host,unicode_host',
+    [
+        ('http://example.com', 'example.com', 'example.com'),
+        ('http://example.com.', 'example.com.', 'example.com.'),
+        (b'http://example.com', 'example.com', 'example.com'),
+        ('https://£££.com', 'xn--9aaa.com', '£££.com'),
+        ('https://£££.com.', 'xn--9aaa.com.', '£££.com.'),
+        ('https://xn--9aaa.com/', 'xn--9aaa.com', '£££.com'),
+        ('https://münchen/', 'xn--mnchen-3ya', 'münchen'),
+        ('http://à.א̈.com', 'xn--0ca.xn--ssa73l.com', 'à.א̈.com'),
+        ('ftp://xn--0ca.xn--ssa73l.com', 'xn--0ca.xn--ssa73l.com', 'à.א̈.com'),
+        ('https://foobar.£££.com/', 'foobar.xn--9aaa.com', 'foobar.£££.com'),
+        ('wss://1.1.1.1', '1.1.1.1', '1.1.1.1'),
+        (
+            'ftp://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]',
+            '[2001:db8:85a3::8a2e:370:7334]',
+            '[2001:db8:85a3::8a2e:370:7334]',
+        ),
+        ('file:///foobar', None, None),
+    ],
+)
+def test_unicode_hosts(input_value, host, unicode_host):
+    v = SchemaValidator(core_schema.url_schema())
+    url: Url = v.validate_python(input_value)
+    assert isinstance(url, Url)
+    assert url.host == host
+    assert url.unicode_host() == unicode_host
+
+
+@pytest.mark.parametrize(
+    'input_value,unicode_string',
+    [
+        ('http://example.com', 'http://example.com/'),
+        ('https://£££.com', 'https://£££.com/'),
+        ('https://xn--9aaa.com/', 'https://£££.com/'),
+        ('https://münchen/', 'https://münchen/'),
+        ('wss://1.1.1.1', 'wss://1.1.1.1/'),
+        ('file:///foobar', 'file:///foobar'),
+    ],
+)
+def test_unicode_domain(input_value, unicode_string):
+    v = SchemaValidator(core_schema.url_schema())
+    url: Url = v.validate_python(input_value)
+    assert url.unicode_string() == unicode_string
 
 
 def test_host_required():
@@ -219,3 +278,21 @@ def test_wrong_type_strict():
         v.validate_python(b'http://example.com/foobar/bar')
     with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
         v.validate_python(123)
+
+
+@pytest.mark.parametrize(
+    'input_value,expected,username,password',
+    [
+        ('https://apple:pie@example.com/foo', 'https://apple:pie@example.com/foo', 'apple', 'pie'),
+        ('https://apple:@example.com/foo', 'https://apple@example.com/foo', 'apple', None),
+        ('https://app$le:pie@example.com/foo', 'https://app$le:pie@example.com/foo', 'app$le', 'pie'),
+        ('https://app le:pie@example.com/foo', 'https://app%20le:pie@example.com/foo', 'app%20le', 'pie'),
+    ],
+)
+def test_username(input_value, expected, username, password):
+    v = SchemaValidator(core_schema.url_schema())
+    url: Url = v.validate_python(input_value)
+    assert isinstance(url, Url)
+    assert str(url) == expected
+    assert url.username == username
+    assert url.password == password

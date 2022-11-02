@@ -224,10 +224,11 @@ dependencies = [
 
 [[package]]
 name = "pydantic-core"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "ahash",
  "enum_dispatch",
+ "idna",
  "indexmap",
  "mimalloc",
  "nohash-hasher",
