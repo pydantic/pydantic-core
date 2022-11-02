@@ -1,6 +1,6 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyMapping};
+use pyo3::types::{PyDict, PyMapping, PyTuple};
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ValError, ValLineError, ValResult};
@@ -165,8 +165,10 @@ impl DictValidator {
 
         let key_validator = self.key_validator.as_ref();
         let value_validator = self.value_validator.as_ref();
-
-        for (key, value) in dict.iter() {
+        for elem in dict.iter()? {
+            let elem_t = elem.unwrap().downcast::<PyTuple>()?;
+            let key = unsafe { elem_t.get_item_unchecked(0) };
+            let value = unsafe { elem_t.get_item_unchecked(1) };
             let output_key = match key_validator.validate(py, key, extra, slots, recursion_guard) {
                 Ok(value) => Some(value),
                 Err(ValError::LineErrors(line_errors)) => {
