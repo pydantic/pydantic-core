@@ -1,8 +1,11 @@
-use ahash::AHashSet;
+use std::cell::RefCell;
+
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use url::Url;
+
+use ahash::AHashSet;
+use url::{SyntaxViolation, Url};
 
 use crate::build_tools::{is_strict, py_err, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValResult};
@@ -104,7 +107,34 @@ impl UrlValidator {
                     }
                 }
 
-                Url::parse(str).map_err(move |e| ValError::new(ErrorType::UrlError { error: e.to_string() }, input))
+                // if we're in strict mode, we collect consider a syntax violation as an error
+                if strict {
+                    // we could build a vec of syntax violations and return them all, but that seems like overkill
+                    // and unlike other parser style validators
+                    let vios: RefCell<Option<SyntaxViolation>> = RefCell::new(None);
+                    let r = Url::options()
+                        .syntax_violation_callback(Some(&|v| *vios.borrow_mut() = Some(v)))
+                        .parse(str);
+
+                    match r {
+                        Ok(url) => {
+                            if let Some(vio) = vios.into_inner() {
+                                Err(ValError::new(
+                                    ErrorType::UrlSyntaxViolation {
+                                        error: vio.description().into(),
+                                    },
+                                    input,
+                                ))
+                            } else {
+                                Ok(url)
+                            }
+                        }
+                        Err(e) => Err(ValError::new(ErrorType::UrlParsing { error: e.to_string() }, input)),
+                    }
+                } else {
+                    Url::parse(str)
+                        .map_err(move |e| ValError::new(ErrorType::UrlParsing { error: e.to_string() }, input))
+                }
             }
             Err(e) => {
                 let lib_url = match input.input_as_url() {

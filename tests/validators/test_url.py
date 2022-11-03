@@ -34,7 +34,16 @@ def url_validator_fixture():
 @pytest.mark.parametrize(
     'url,expected',
     [
-        ('http://example.com', {'str()': 'http://example.com/', 'host_type': 'domain', 'host': 'example.com'}),
+        (
+            'http://example.com',
+            {
+                'str()': 'http://example.com/',
+                'host_type': 'domain',
+                'host': 'example.com',
+                'unicode_host()': 'example.com',
+                'unicode_string()': 'http://example.com/',
+            },
+        ),
         ('http://exa\nmple.com', {'str()': 'http://example.com/', 'host_type': 'domain', 'host': 'example.com'}),
         ('xxx', Err('relative URL without a base')),
         ('http://', Err('empty host')),
@@ -47,10 +56,12 @@ def url_validator_fixture():
         ('http://exam%ple.com', Err('invalid domain character')),
         ('http:// /', Err('invalid domain character')),
         ('/more', Err('relative URL without a base')),
-        ('http://example.com', {'str()': 'http://example.com/', 'host_type': 'domain'}),
         ('http://example.com./foobar', {'str()': 'http://example.com./foobar', 'host_type': 'domain'}),
         # works since we're in lax mode
-        (b'http://example.com', {'str()': 'http://example.com/', 'host_type': 'domain'}),
+        (
+            b'http://example.com',
+            {'str()': 'http://example.com/', 'host_type': 'domain', 'unicode_host()': 'example.com'},
+        ),
         ('http:/foo', {'str()': 'http://foo/', 'host_type': 'domain'}),
         ('http:///foo', {'str()': 'http://foo/', 'host_type': 'domain'}),
         ('http://exam_ple.com', {'str()': 'http://exam_ple.com/', 'host_type': 'domain'}),
@@ -88,9 +99,7 @@ def url_validator_fixture():
         ('file://:80', Err('invalid domain character')),
         ('foobar://:80', Err('empty host')),
         ('mongodb+srv://server.example.com/', 'mongodb+srv://server.example.com/'),
-        ('http://example.com', {'host': 'example.com', 'unicode_host()': 'example.com'}),
         ('http://example.com.', {'host': 'example.com.', 'unicode_host()': 'example.com.'}),
-        (b'http://example.com', {'host': 'example.com', 'unicode_host()': 'example.com'}),
         ('http:/example.com', {'host': 'example.com', 'unicode_host()': 'example.com'}),
         ('http:/foo', {'host': 'foo', 'unicode_host()': 'foo'}),
         ('http://foo', {'host': 'foo', 'unicode_host()': 'foo'}),
@@ -105,7 +114,6 @@ def url_validator_fixture():
         ('http://à.א̈.com', {'host': 'xn--0ca.xn--ssa73l.com', 'unicode_host()': 'à.א̈.com'}),
         ('ftp://xn--0ca.xn--ssa73l.com', {'host': 'xn--0ca.xn--ssa73l.com', 'unicode_host()': 'à.א̈.com'}),
         ('https://foobar.£££.com/', {'host': 'foobar.xn--9aaa.com', 'unicode_host()': 'foobar.£££.com'}),
-        ('http://example.com', {'unicode_string()': 'http://example.com/'}),
         ('https://£££.com', {'unicode_string()': 'https://£££.com/'}),
         ('https://xn--9aaa.com/', {'unicode_string()': 'https://£££.com/'}),
         ('https://münchen/', {'unicode_string()': 'https://münchen/'}),
@@ -118,9 +126,61 @@ def test_url_error(url_validator, url, expected):
         with pytest.raises(ValidationError) as exc_info:
             url_validator.validate_python(url)
         assert exc_info.value.error_count() == 1
-        assert exc_info.value.errors()[0]['ctx']['error'] == expected.message
+        error = exc_info.value.errors()[0]
+        assert error['type'] == 'url_parsing'
+        assert error['ctx']['error'] == expected.message
     else:
         output_url = url_validator.validate_python(url)
+        assert isinstance(output_url, Url)
+        if isinstance(expected, str):
+            assert str(output_url) == expected
+        else:
+            assert isinstance(expected, dict)
+            output_parts = {}
+            for key in expected:
+                if key == 'str()':
+                    output_parts[key] = str(output_url)
+                elif key.endswith('()'):
+                    output_parts[key] = getattr(output_url, key[:-2])()
+                else:
+                    output_parts[key] = getattr(output_url, key)
+            assert output_parts == expected
+
+
+@pytest.fixture(scope='module', name='strict_url_validator')
+def strict_url_validator_fixture():
+    return SchemaValidator(core_schema.url_schema(), {'strict': True})
+
+
+@pytest.mark.parametrize(
+    'url,expected',
+    [
+        ('http://example.com', {'str()': 'http://example.com/', 'host_type': 'domain', 'host': 'example.com'}),
+        ('http://exa\nmple.com', Err('tabs or newlines are ignored in URLs', 'url_syntax_violation')),
+        ('xxx', Err('relative URL without a base', 'url_parsing')),
+        ('http:/foo', Err('expected //', 'url_syntax_violation')),
+        ('http:///foo', Err('expected //', 'url_syntax_violation')),
+        ('http:////foo', Err('expected //', 'url_syntax_violation')),
+        ('http://exam_ple.com', {'str()': 'http://exam_ple.com/', 'host_type': 'domain'}),
+        ('https:/more', Err('expected //', 'url_syntax_violation')),
+        ('https:more', Err('expected //', 'url_syntax_violation')),
+        ('file:///foobar', {'str()': 'file:///foobar', 'host_type': None, 'host': None, 'unicode_host()': None}),
+        ('file://:80', Err('invalid domain character', 'url_parsing')),
+        ('file:/xx', Err('expected // after file:', 'url_syntax_violation')),
+        ('foobar://:80', Err('empty host', 'url_parsing')),
+        ('mongodb+srv://server.example.com/', 'mongodb+srv://server.example.com/'),
+    ],
+)
+def test_url_error_strict(strict_url_validator, url, expected):
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError) as exc_info:
+            strict_url_validator.validate_python(url)
+        assert exc_info.value.error_count() == 1
+        error = exc_info.value.errors()[0]
+        assert error['ctx']['error'] == expected.message
+        assert error['type'] == expected.errors
+    else:
+        output_url = strict_url_validator.validate_python(url)
         assert isinstance(output_url, Url)
         if isinstance(expected, str):
             assert str(output_url) == expected
@@ -271,15 +331,14 @@ def test_wrong_type_lax(url_validator):
         url_validator.validate_python(b'http://example.com/foobar/bar', strict=True)
 
 
-def test_wrong_type_strict():
-    v = SchemaValidator(core_schema.url_schema(), {'strict': True})
-    url = v.validate_python('http://example.com/foobar/bar')
+def test_wrong_type_strict(strict_url_validator):
+    url = strict_url_validator.validate_python('http://example.com/foobar/bar')
     assert str(url) == 'http://example.com/foobar/bar'
-    assert str(v.validate_python(url)) == 'http://example.com/foobar/bar'
+    assert str(strict_url_validator.validate_python(url)) == 'http://example.com/foobar/bar'
     with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
-        v.validate_python(b'http://example.com/foobar/bar')
+        strict_url_validator.validate_python(b'http://example.com/foobar/bar')
     with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
-        v.validate_python(123)
+        strict_url_validator.validate_python(123)
 
 
 @pytest.mark.parametrize(
