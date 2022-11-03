@@ -18,7 +18,7 @@ from pydantic_core import SchemaValidator
 __all__ = 'Err', 'PyAndJson', 'plain_repr', 'infinite_generator'
 
 hypothesis.settings.register_profile('fast', max_examples=2)
-hypothesis.settings.register_profile('slow', max_examples=5_000)
+hypothesis.settings.register_profile('slow', max_examples=1_000)
 hypothesis.settings.load_profile(os.getenv('HYPOTHESIS_PROFILE', 'fast'))
 
 
