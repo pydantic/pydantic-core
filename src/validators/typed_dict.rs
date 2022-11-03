@@ -2,6 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 #[cfg(not(PyPy))]
 use pyo3::types::PyFunction;
+use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PyList, PySet, PyString};
 #[cfg(not(PyPy))]
 use pyo3::PyTypeInfo;
@@ -308,7 +309,119 @@ impl Validator for TypedDictValidator {
         match dict {
             GenericMapping::PyDict(d) => process!(d, py_get_dict_item, iter),
             GenericMapping::PyGetAttr(d) => process!(d, py_get_attr, iter_attrs),
-            GenericMapping::PyMapping(d) => process!(d, py_get_mapping_item, iter),
+            GenericMapping::PyMapping(d) => {
+                for field in &self.fields {
+                    let op_key_value = match field.lookup_key.py_get_mapping_item(d) {
+                        Ok(v) => v,
+                        Err(err) => {
+                            errors.push(ValLineError::new_with_loc(
+                                ErrorType::GetAttributeError {
+                                    error: py_err_string(py, err),
+                                },
+                                input,
+                                field.name.clone(),
+                            ));
+                            continue;
+                        }
+                    };
+                    if let Some((used_key, value)) = op_key_value {
+                        if let Some(ref mut used_keys) = used_keys {
+                            // key is "used" whether or not validation passes, since we want to skip this key in
+                            // extra logic either way
+                            used_keys.insert(used_key);
+                        }
+                        match field.validator.validate(py, value, &extra, slots, recursion_guard) {
+                            Ok(value) => {
+                                output_dict.set_item(&field.name_pystring, value)?;
+                                if let Some(ref mut fs) = fields_set_vec {
+                                    fs.push(field.name_pystring.clone_ref(py));
+                                }
+                            }
+                            Err(ValError::Omit) => continue,
+                            Err(ValError::LineErrors(line_errors)) => {
+                                for err in line_errors {
+                                    errors.push(err.with_outer_location(field.name.clone().into()));
+                                }
+                            }
+                            Err(err) => return Err(err),
+                        }
+                        continue;
+                    } else if let Some(value) = get_default(py, &field.validator)? {
+                        output_dict.set_item(&field.name_pystring, value.as_ref())?;
+                    } else if field.required {
+                        errors.push(ValLineError::new_with_loc(
+                            ErrorType::Missing,
+                            input,
+                            field.name.clone(),
+                        ));
+                    }
+                }
+
+                if self.check_extra {
+                    let used_keys = match used_keys {
+                        Some(v) => v,
+                        None => unreachable!(),
+                    };
+                    for elem in d.iter()? {
+                        let elem_t = elem.unwrap().downcast::<PyTuple>()?;
+                        let raw_key = unsafe { elem_t.get_item_unchecked(0) };
+                        let value = unsafe { elem_t.get_item_unchecked(1) };
+                        let either_str = match raw_key.strict_str() {
+                            Ok(k) => k,
+                            Err(ValError::LineErrors(line_errors)) => {
+                                for err in line_errors {
+                                    errors.push(
+                                        err.with_outer_location(raw_key.as_loc_item())
+                                            .with_type(ErrorType::InvalidKey),
+                                    );
+                                }
+                                continue;
+                            }
+                            Err(err) => return Err(err),
+                        };
+                        if used_keys.contains(either_str.as_cow()?.as_ref()) {
+                            continue;
+                        }
+
+                        if self.forbid_extra {
+                            errors.push(ValLineError::new_with_loc(
+                                ErrorType::ExtraForbidden,
+                                value,
+                                raw_key.as_loc_item(),
+                            ));
+                            continue;
+                        }
+
+                        let py_key = either_str.as_py_string(py);
+                        if let Some(ref mut fs) = fields_set_vec {
+                            fs.push(py_key.into_py(py));
+                        }
+
+                        if let Some(ref validator) = self.extra_validator {
+                            match validator.validate(py, value, &extra, slots, recursion_guard) {
+                                Ok(value) => {
+                                    output_dict.set_item(py_key, value)?;
+                                    if let Some(ref mut fs) = fields_set_vec {
+                                        fs.push(py_key.into_py(py));
+                                    }
+                                }
+                                Err(ValError::LineErrors(line_errors)) => {
+                                    for err in line_errors {
+                                        errors.push(err.with_outer_location(raw_key.as_loc_item()));
+                                    }
+                                }
+                                Err(err) => return Err(err),
+                            }
+                        } else {
+                            output_dict.set_item(py_key, value.to_object(py))?;
+                            if let Some(ref mut fs) = fields_set_vec {
+                                fs.push(py_key.into_py(py));
+                            }
+                        }
+                    }
+                }
+            }
+
             GenericMapping::JsonObject(d) => process!(d, json_get, iter),
         }
 
