@@ -360,8 +360,8 @@ impl Validator for TypedDictValidator {
                     };
                     for elem in d.items()?.iter()? {
                         let elem_t = elem.unwrap().downcast::<PyTuple>()?;
-                        let raw_key = unsafe { elem_t.get_item_unchecked(0) };
-                        let value = unsafe { elem_t.get_item_unchecked(1) };
+                        let raw_key = elem_t.get_item(0)?;
+                        let value = elem_t.get_item(1)?;
                         let either_str = match raw_key.strict_str() {
                             Ok(k) => k,
                             Err(ValError::LineErrors(line_errors)) => {

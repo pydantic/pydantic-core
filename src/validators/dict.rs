@@ -167,8 +167,8 @@ impl DictValidator {
         let value_validator = self.value_validator.as_ref();
         for elem in dict.items()?.iter()? {
             let elem_t = elem.unwrap().downcast::<PyTuple>()?;
-            let key = unsafe { elem_t.get_item_unchecked(0) };
-            let value = unsafe { elem_t.get_item_unchecked(1) };
+            let key = elem_t.get_item(0)?;
+            let value = elem_t.get_item(1)?;
             let output_key = match key_validator.validate(py, key, extra, slots, recursion_guard) {
                 Ok(value) => Some(value),
                 Err(ValError::LineErrors(line_errors)) => {
