@@ -11,7 +11,8 @@ use pyo3::types::{
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
-use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
+use crate::errors::{py_err_string, ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
+use crate::PyUrl;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, date_as_datetime, float_as_datetime,
@@ -101,11 +102,14 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn input_is_subclass(&self, class: &PyType) -> PyResult<bool> {
-        if let Ok(py_type) = self.cast_as::<PyType>() {
-            py_type.is_subclass(class)
-        } else {
-            Ok(false)
+        match self.cast_as::<PyType>() {
+            Ok(py_type) => py_type.is_subclass(class),
+            Err(_) => Ok(false),
         }
+    }
+
+    fn input_as_url(&self) -> Option<PyUrl> {
+        self.extract::<PyUrl>().ok()
     }
 
     fn callable(&self) -> bool {
@@ -123,7 +127,7 @@ impl<'a> Input<'a> for PyAny {
                         } else if args.is_none() {
                             Ok(None)
                         } else if let Ok(list) = args.cast_as::<PyList>() {
-                            // remove `collect` when we have https://github.com/PyO3/pyo3/pull/2676
+                            // TODO remove `collect` when we have https://github.com/PyO3/pyo3/pull/2676
                             Ok(Some(PyTuple::new(self.py(), list.iter().collect::<Vec<_>>())))
                         } else {
                             Err(ValLineError::new_with_loc(
@@ -160,7 +164,7 @@ impl<'a> Input<'a> for PyAny {
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(PyArgs::new(Some(tuple), None).into())
         } else if let Ok(list) = self.cast_as::<PyList>() {
-            // remove `collect` when we have https://github.com/PyO3/pyo3/pull/2676
+            // TODO remove `collect` when we have https://github.com/PyO3/pyo3/pull/2676
             let tuple = PyTuple::new(self.py(), list.iter().collect::<Vec<_>>());
             Ok(PyArgs::new(Some(tuple), None).into())
         } else {
@@ -281,7 +285,7 @@ impl<'a> Input<'a> for PyAny {
             Ok(int)
         } else if let Some(cow_str) = maybe_as_string(self, ErrorType::IntParsing)? {
             str_as_int(self, &cow_str)
-        } else if let Ok(float) = self.lax_float() {
+        } else if let Ok(float) = self.extract::<f64>() {
             float_as_int(self, float)
         } else {
             Err(ValError::new(ErrorType::IntType, self))
