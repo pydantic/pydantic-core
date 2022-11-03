@@ -17,10 +17,9 @@ from pydantic_core import SchemaValidator
 
 __all__ = 'Err', 'PyAndJson', 'plain_repr', 'infinite_generator'
 
-# 2 as default so hypothesis runs fast, this is customised on CI
-hyp_max_examples = os.getenv('HYPOTHESIS_MAX_EXAMPLES', '2')
-hypothesis.settings.register_profile('set_max_examples', max_examples=int(hyp_max_examples))
-hypothesis.settings.load_profile('set_max_examples')
+hypothesis.settings.register_profile('fast', max_examples=2)
+hypothesis.settings.register_profile('slow', max_examples=5_000)
+hypothesis.settings.load_profile(os.getenv('HYPOTHESIS_PROFILE', 'fast'))
 
 
 def plain_repr(obj):
