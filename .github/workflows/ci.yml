@@ -85,6 +85,7 @@ jobs:
       - run: make test
         env:
           BENCHMARK_VS_PYDANTIC: 1
+          HYPOTHESIS_MAX_EXAMPLES: 5000
 
       - run: ls -lha
       - run: coverage xml
