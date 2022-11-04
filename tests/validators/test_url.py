@@ -323,11 +323,11 @@ def test_url_to_constraint():
 def test_wrong_type_lax(url_validator):
     assert str(url_validator.validate_python('http://example.com/foobar/bar')) == 'http://example.com/foobar/bar'
     assert str(url_validator.validate_python(b'http://example.com/foobar/bar')) == 'http://example.com/foobar/bar'
-    with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
+    with pytest.raises(ValidationError, match=r'URL input should be a string or URL \[type=url_type,'):
         url_validator.validate_python(123)
 
     # runtime strict
-    with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
+    with pytest.raises(ValidationError, match=r'URL input should be a string or URL \[type=url_type,'):
         url_validator.validate_python(b'http://example.com/foobar/bar', strict=True)
 
 
@@ -335,9 +335,9 @@ def test_wrong_type_strict(strict_url_validator):
     url = strict_url_validator.validate_python('http://example.com/foobar/bar')
     assert str(url) == 'http://example.com/foobar/bar'
     assert str(strict_url_validator.validate_python(url)) == 'http://example.com/foobar/bar'
-    with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
+    with pytest.raises(ValidationError, match=r'URL input should be a string or URL \[type=url_type,'):
         strict_url_validator.validate_python(b'http://example.com/foobar/bar')
-    with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
+    with pytest.raises(ValidationError, match=r'URL input should be a string or URL \[type=url_type,'):
         strict_url_validator.validate_python(123)
 
 
@@ -356,3 +356,11 @@ def test_username(url_validator, input_value, expected, username, password):
     assert str(url) == expected
     assert url.username == username
     assert url.password == password
+
+
+def test_strict_not_strict(url_validator, strict_url_validator):
+    url = url_validator.validate_python('http:/example.com/foobar/bar')
+    assert str(url) == 'http://example.com/foobar/bar'
+
+    url2 = strict_url_validator.validate_python(url)
+    assert str(url2) == 'http://example.com/foobar/bar'

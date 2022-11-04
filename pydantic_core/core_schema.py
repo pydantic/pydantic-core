@@ -1167,6 +1167,7 @@ ErrorType = Literal[
     'unexpected_positional_argument',
     'missing_positional_argument',
     'multiple_argument_values',
+    'url_type',
     'url_parsing',
     'url_syntax_violation',
     'url_too_long',

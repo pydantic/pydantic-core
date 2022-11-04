@@ -162,7 +162,7 @@ def test_pydantic_error_type_raise_ctx():
 
 all_errors = [
     ('json_invalid', 'Invalid JSON: foobar', {'error': 'foobar'}),
-    ('json_type', 'JSON input should be str, bytes or bytearray', None),
+    ('json_type', 'JSON input should be string, bytes or bytearray', None),
     ('recursion_loop', 'Recursion error - cyclic reference detected', None),
     ('dict_attributes_type', 'Input should be a valid dictionary or instance to extract fields from', None),
     ('missing', 'Field required', None),
@@ -255,6 +255,7 @@ all_errors = [
     ('unexpected_positional_argument', 'Unexpected positional argument', None),
     ('missing_positional_argument', 'Missing required positional argument', None),
     ('multiple_argument_values', 'Got multiple values for argument', None),
+    ('url_type', 'URL input should be a string or URL', None),
     ('url_parsing', 'Input should be a valid URL, Foobar', {'error': 'Foobar'}),
     ('url_syntax_violation', 'Input violated URL syntax rules, Foobar', {'error': 'Foobar'}),
     ('url_too_long', 'URL should have at most 42 characters', {'max_length': 42}),

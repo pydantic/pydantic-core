@@ -41,7 +41,7 @@ pub enum ErrorType {
     JsonInvalid {
         error: String,
     },
-    #[strum(message = "JSON input should be str, bytes or bytearray")]
+    #[strum(message = "JSON input should be string, bytes or bytearray")]
     JsonType,
     // ---------------------
     // recursion error
@@ -319,6 +319,8 @@ pub enum ErrorType {
     MultipleArgumentValues,
     // ---------------------
     // URL errors
+    #[strum(message = "URL input should be a string or URL")]
+    UrlType,
     #[strum(message = "Input should be a valid URL, {error}")]
     UrlParsing {
         // would be great if this could be a static cow, waiting for https://github.com/servo/rust-url/issues/801
