@@ -326,7 +326,7 @@ pub enum ErrorType {
         // would be great if this could be a static cow, waiting for https://github.com/servo/rust-url/issues/801
         error: String,
     },
-    #[strum(message = "Input violated URL syntax rules, {error}")]
+    #[strum(message = "Input violated strict URL syntax rules, {error}")]
     UrlSyntaxViolation {
         error: Cow<'static, str>,
     },
