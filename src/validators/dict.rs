@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyMapping, PyTuple};
 
 use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{ValError, ValLineError, ValResult};
+use crate::errors::{ValError, ValLineError, ValResult, ErrorType};
 use crate::input::{GenericMapping, Input, JsonObject};
 use crate::recursion_guard::RecursionGuard;
 
@@ -167,6 +167,10 @@ impl DictValidator {
         let value_validator = self.value_validator.as_ref();
         for elem in dict.items()?.iter()? {
             let elem_t = elem.unwrap().downcast::<PyTuple>()?;
+            if elem_t.len() != 2{
+                errors.push(ValLineError::new(ErrorType::DictType, input));
+                break;
+            }
             let key = elem_t.get_item(0)?;
             let value = elem_t.get_item(1)?;
             let output_key = match key_validator.validate(py, key, extra, slots, recursion_guard) {
