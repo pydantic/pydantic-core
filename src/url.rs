@@ -153,7 +153,7 @@ impl PyMultiHostUrl {
         if let Some(extra_urls) = &self.extra_urls {
             let mut hosts = Vec::with_capacity(extra_urls.len() + 1);
             for url in extra_urls {
-                hosts.push(host_to_dict(py, &url)?);
+                hosts.push(host_to_dict(py, url)?);
             }
             hosts.push(host_to_dict(py, &self.ref_url.lib_url)?);
             Ok(hosts)
@@ -191,6 +191,7 @@ impl PyMultiHostUrl {
 
             // special urls will have had a trailing slash asked, non-special urls will not
             // hence we need to remove the last char if the schema is special
+            #[allow(clippy::bool_to_int_with_if)]
             let sub = if schema_is_special(schema) { 1 } else { 0 };
 
             // all extra urls have no path (except a `/`), so we can just have a slice up to -1

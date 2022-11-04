@@ -18,12 +18,14 @@ use crate::url::{schema_is_special, PyMultiHostUrl, PyUrl};
 use super::literal::expected_repr_name;
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
+type AllowedSchemas = Option<(AHashSet<String>, String)>;
+
 #[derive(Debug, Clone)]
 pub struct UrlValidator {
     strict: bool,
     host_required: bool,
     max_length: Option<usize>,
-    allowed_schemes: Option<(AHashSet<String>, String)>,
+    allowed_schemes: AllowedSchemas,
     name: String,
 }
 
@@ -120,7 +122,7 @@ impl UrlValidator {
 pub struct MultiHostUrlValidator {
     strict: bool,
     max_length: Option<usize>,
-    allowed_schemes: Option<(AHashSet<String>, String)>,
+    allowed_schemes: AllowedSchemas,
     name: String,
 }
 
@@ -257,7 +259,7 @@ fn parse_multihost_url<'url, 'input>(
     let mut start = chars.index;
     while let Some(c) = chars.next() {
         match c {
-            '\\' if schema_is_special(&schema) => break,
+            '\\' if schema_is_special(schema) => break,
             '/' | '?' | '#' => break,
             ',' => {
                 let end = chars.index - 1;
@@ -276,7 +278,7 @@ fn parse_multihost_url<'url, 'input>(
         return parsing_err!(ParseError::EmptyHost);
     }
     let rest = &url_str[chars.index - 1..];
-    let reconstructed_url = format!("{}://{}{}", schema, &url_str[start..end], rest);
+    let reconstructed_url = format!("{schema}://{}{rest}", &url_str[start..end]);
     let ref_url = parse_url(&reconstructed_url, input, strict)?;
     if !ref_url.has_host() {
         return parsing_err!(ParseError::EmptyHost);
@@ -289,7 +291,7 @@ fn parse_multihost_url<'url, 'input>(
         let extra_urls: Vec<Url> = hosts
             .iter()
             .map(|host| {
-                let reconstructed_url = format!("{}://{}", schema, host);
+                let reconstructed_url = format!("{schema}://{host}");
                 parse_url(&reconstructed_url, input, strict)
             })
             .collect::<ValResult<_>>()?;
@@ -336,7 +338,7 @@ fn parse_url<'url, 'input>(
     }
 }
 
-fn get_allowed_schemas(schema: &PyDict, name: &'static str) -> PyResult<(Option<(AHashSet<String>, String)>, String)> {
+fn get_allowed_schemas(schema: &PyDict, name: &'static str) -> PyResult<(AllowedSchemas, String)> {
     match schema.get_as::<&PyList>(intern!(schema.py(), "allowed_schemes"))? {
         Some(list) => {
             if list.is_empty() {

@@ -525,6 +525,13 @@ def multi_host_url_validator_fixture():
                 'hosts()': [{'host': 'localhost', 'password': 'pass', 'port': 5432, 'username': 'user'}],
             },
         ),
+        ('http://foo#bar', 'http://foo/#bar'),
+        ('mongodb://foo#bar', 'mongodb://foo#bar'),
+        ('http://foo,bar#spam', 'http://foo,bar/#spam'),
+        ('mongodb://foo,bar#spam', 'mongodb://foo,bar#spam'),
+        ('http://foo,bar?x=y', 'http://foo,bar/?x=y'),
+        ('mongodb://foo,bar?x=y', 'mongodb://foo,bar?x=y'),
+        ('foo://foo,bar?x=y', 'foo://foo,bar?x=y'),
     ],
 )
 def test_multi_url_cases(multi_host_url_validator, url, expected):
