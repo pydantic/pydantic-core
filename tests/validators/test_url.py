@@ -1,7 +1,7 @@
 import pytest
 from dirty_equals import HasRepr, IsInstance
 
-from pydantic_core import MultiHostUrl, SchemaValidator, Url, ValidationError, core_schema
+from pydantic_core import MultiHostUrl, SchemaError, SchemaValidator, Url, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -86,6 +86,7 @@ def url_validator_fixture():
             'wss://1.1.1.1',
             {'str()': 'wss://1.1.1.1/', 'host_type': 'ipv4', 'host': '1.1.1.1', 'unicode_host()': '1.1.1.1'},
         ),
+        ('snap://[::1]', {'str()': 'snap://[::1]', 'host_type': 'ipv6', 'host': '[::1]', 'unicode_host()': '[::1]'}),
         (
             'ftp://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]',
             {
@@ -596,6 +597,7 @@ def multi_host_url_validator_fixture():
         ('http://foo,\n', Err('empty host')),
         ('http://foo,', Err('empty host')),
         ('http://,foo', Err('empty host')),
+        ('http@foobar', Err('relative URL without a base')),
         (
             'mongodb://foo\n,b\nar,\nspam/xxx',
             {
@@ -653,7 +655,7 @@ def multi_host_url_validator_fixture():
         ),
         # with bashslashes
         (
-            'file:\\\\foo,bar\\more',
+            'FILE:\\\\foo,bar\\more',
             {
                 'str()': 'file://foo,bar/more',
                 'path': '/more',
@@ -692,6 +694,17 @@ def multi_host_url_validator_fixture():
                 'hosts()': [
                     {'host': 'whatever', 'password': 'x%40y', 'port': None, 'username': 'foo%2Cbar'},
                     {'host': 'snap', 'password': None, 'port': None, 'username': None},
+                ],
+            },
+        ),
+        (
+            'mongodb://x:y@[::1],1.1.1.1:888/xxx',
+            {
+                'str()': 'mongodb://x:y@[::1],1.1.1.1:888/xxx',
+                'scheme': 'mongodb',
+                'hosts()': [
+                    {'host': '[::1]', 'password': 'y', 'port': None, 'username': 'x'},
+                    {'host': '1.1.1.1', 'password': None, 'port': 888, 'username': None},
                 ],
             },
         ),
@@ -792,3 +805,40 @@ def test_url_to_multi_url(url_validator, multi_host_url_validator):
     assert isinstance(url3, MultiHostUrl)
     assert str(url3) == 'https://example.com/'
     assert url2 is not url3
+
+
+def test_multi_wrong_type(multi_host_url_validator):
+    assert str(multi_host_url_validator.validate_python('http://example.com')) == 'http://example.com/'
+    with pytest.raises(ValidationError, match=r'URL input should be a string or URL \[type=url_type,'):
+        multi_host_url_validator.validate_python(42)
+
+
+def test_multi_allowed_schemas():
+    v = SchemaValidator(core_schema.multi_host_url_schema(allowed_schemes=['http', 'foo']))
+    assert str(v.validate_python('http://example.com')) == 'http://example.com/'
+    assert str(v.validate_python('foo://example.com')) == 'foo://example.com'
+    with pytest.raises(ValidationError, match=r"URL schema should be 'http' or 'foo' \[type=url_schema,"):
+        v.validate_python('https://example.com')
+
+
+def test_multi_max_length(url_validator):
+    v = SchemaValidator(core_schema.multi_host_url_schema(max_length=25))
+    assert str(v.validate_python('http://example.com')) == 'http://example.com/'
+    with pytest.raises(ValidationError, match=r'URL should have at most 25 characters \[type=url_too_long,'):
+        v.validate_python('https://example.com/this-is-too-long')
+
+    url = v.validate_python('http://example.com')
+    assert str(v.validate_python(url)) == 'http://example.com/'
+
+    simple_url = url_validator.validate_python('http://example.com')
+    assert isinstance(simple_url, Url)
+    assert str(v.validate_python(simple_url)) == 'http://example.com/'
+
+    long_simple_url = url_validator.validate_python('http://example.com/this-is-too-long')
+    with pytest.raises(ValidationError, match=r'URL should have at most 25 characters \[type=url_too_long,'):
+        v.validate_python(long_simple_url)
+
+
+def test_zero_schemas():
+    with pytest.raises(SchemaError, match='"allowed_schemes" should have length > 0'):
+        SchemaValidator(core_schema.multi_host_url_schema(allowed_schemes=[]))

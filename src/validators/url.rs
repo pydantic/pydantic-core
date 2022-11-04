@@ -255,7 +255,7 @@ fn parse_multihost_url<'url, 'input>(
             _ => return parsing_err!(ParseError::RelativeUrlWithoutBase),
         }
     }
-    let schema = &url_str[schema_start..chars.index - 1];
+    let schema = url_str[schema_start..chars.index - 1].to_ascii_lowercase();
 
     // consume the double slash, or any number of slashes, including backslashes, taken from `parse_with_scheme`
     // https://github.com/servo/rust-url/blob/v2.3.1/url/src/parser.rs#L413-L456
@@ -276,7 +276,7 @@ fn parse_multihost_url<'url, 'input>(
     let mut start = chars.index;
     while let Some(c) = chars.next() {
         match c {
-            '\\' if schema_is_special(schema) => break,
+            '\\' if schema_is_special(&schema) => break,
             '/' | '?' | '#' => break,
             ',' => {
                 let end = chars.index - 1;
