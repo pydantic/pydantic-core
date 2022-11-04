@@ -1026,6 +1026,7 @@ class UrlSchema(TypedDict, total=False):
     host_required: bool  # default False
     max_length: int
     allowed_schemes: List[str]
+    strict: bool
     ref: str
     extra: Any
 
@@ -1035,6 +1036,7 @@ def url_schema(
     host_required: bool | None = None,
     max_length: int | None = None,
     allowed_schemes: list[str] | None = None,
+    strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
 ) -> UrlSchema:
@@ -1043,6 +1045,7 @@ def url_schema(
         host_required=host_required,
         max_length=max_length,
         allowed_schemes=allowed_schemes,
+        strict=strict,
         ref=ref,
         extra=extra,
     )
@@ -1052,6 +1055,7 @@ class MultiHostUrlSchema(TypedDict, total=False):
     type: Required[Literal['multi-host-url']]
     max_length: int
     allowed_schemes: List[str]
+    strict: bool
     ref: str
     extra: Any
 
@@ -1060,11 +1064,17 @@ def multi_host_url_schema(
     *,
     max_length: int | None = None,
     allowed_schemes: list[str] | None = None,
+    strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
 ) -> MultiHostUrlSchema:
     return dict_not_none(
-        type='multi-host-url', max_length=max_length, allowed_schemes=allowed_schemes, ref=ref, extra=extra
+        type='multi-host-url',
+        max_length=max_length,
+        allowed_schemes=allowed_schemes,
+        strict=strict,
+        ref=ref,
+        extra=extra,
     )
 
 

@@ -81,7 +81,7 @@ def url_validator_fixture():
         ('ssh://example/', 'ssh://example/'),
         ('ssh://£££/', 'ssh://%C2%A3%C2%A3%C2%A3/'),
         ('ssh://%C2%A3%C2%A3%C2%A3/', 'ssh://%C2%A3%C2%A3%C2%A3/'),
-        ('ftp://127.0.0.1', {'str()': 'ftp://127.0.0.1/', 'host_type': 'ipv4'}),
+        ('ftp://127.0.0.1', {'str()': 'ftp://127.0.0.1/', 'host_type': 'ipv4', 'path': '/'}),
         (
             'wss://1.1.1.1',
             {'str()': 'wss://1.1.1.1/', 'host_type': 'ipv4', 'host': '1.1.1.1', 'unicode_host()': '1.1.1.1'},
@@ -94,6 +94,20 @@ def url_validator_fixture():
                 'host': '[2001:db8:85a3::8a2e:370:7334]',
                 'unicode_host()': '[2001:db8:85a3::8a2e:370:7334]',
             },
+        ),
+        # see https://github.com/servo/rust-url/issues/803
+        pytest.param(
+            'foobar://127.0.0.1',
+            {'str()': 'foobar://127.0.0.1', 'host_type': 'ipv4', 'path': None},
+            marks=pytest.mark.xfail,
+        ),
+        (
+            'mysql://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]',
+            {'str()': 'mysql://[2001:db8:85a3::8a2e:370:7334]', 'host_type': 'ipv6', 'path': None},
+        ),
+        (
+            'mysql://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]/thing',
+            {'str()': 'mysql://[2001:db8:85a3::8a2e:370:7334]/thing', 'host_type': 'ipv6', 'path': '/thing'},
         ),
         ('https:/more', {'str()': 'https://more/', 'host': 'more'}),
         ('https:more', {'str()': 'https://more/', 'host': 'more'}),
@@ -339,12 +353,30 @@ def test_url_query_repeat(url_validator):
     assert url.query_params() == [('a', '1'), ('a', '2')]
 
 
-def test_url_to_url(url_validator):
+def test_url_to_url(url_validator, multi_host_url_validator):
     url: Url = url_validator.validate_python('https://example.com')
+    assert isinstance(url, Url)
     assert str(url) == 'https://example.com/'
+
     url2 = url_validator.validate_python(url)
+    assert isinstance(url2, Url)
     assert str(url2) == 'https://example.com/'
     assert url is not url2
+
+    multi_url = multi_host_url_validator.validate_python('https://example.com')
+    assert isinstance(multi_url, MultiHostUrl)
+
+    url3 = url_validator.validate_python(multi_url)
+    assert isinstance(url3, Url)
+    assert str(url3) == 'https://example.com/'
+
+    multi_url2 = multi_host_url_validator.validate_python('foobar://x:y@foo,x:y@bar.com')
+    assert isinstance(multi_url2, MultiHostUrl)
+
+    url4 = url_validator.validate_python(multi_url2)
+    assert isinstance(url4, Url)
+    assert str(url4) == 'foobar://x:y%40foo,x%3Ay@bar.com'
+    assert url4.host == 'bar.com'
 
 
 def test_url_to_constraint():
@@ -420,12 +452,25 @@ def test_username(url_validator, input_value, expected, username, password):
     assert url.password == password
 
 
-def test_strict_not_strict(url_validator, strict_url_validator):
+def test_strict_not_strict(url_validator, strict_url_validator, multi_host_url_validator):
     url = url_validator.validate_python('http:/example.com/foobar/bar')
     assert str(url) == 'http://example.com/foobar/bar'
 
     url2 = strict_url_validator.validate_python(url)
     assert str(url2) == 'http://example.com/foobar/bar'
+
+    multi_url = multi_host_url_validator.validate_python('https://example.com')
+    assert isinstance(multi_url, MultiHostUrl)
+
+    url3 = strict_url_validator.validate_python(multi_url)
+    assert isinstance(url3, Url)
+    assert str(url3) == 'https://example.com/'
+
+    multi_url2 = multi_host_url_validator.validate_python('foobar://x:y@foo,x:y@bar.com')
+    assert isinstance(multi_url2, MultiHostUrl)
+
+    with pytest.raises(ValidationError, match=r'unencoded @ sign in username or password \[type=url_syntax_violation'):
+        strict_url_validator.validate_python(multi_url2)
 
 
 def test_multi_host_url_ok_single(py_and_json: PyAndJson):
@@ -630,6 +675,26 @@ def multi_host_url_validator_fixture():
             },
         ),
         ('mongo:\\\\foo,bar\\more', Err('empty host')),
+        (
+            'foobar://foo[]bar:x@y@whatever,foo[]bar:x@y@whichever',
+            {
+                'str()': 'foobar://foo%5B%5Dbar:x%40y@whatever,foo%5B%5Dbar:x%40y@whichever',
+                'hosts()': [
+                    {'host': 'whatever', 'password': 'x%40y', 'port': None, 'username': 'foo%5B%5Dbar'},
+                    {'host': 'whichever', 'password': 'x%40y', 'port': None, 'username': 'foo%5B%5Dbar'},
+                ],
+            },
+        ),
+        (
+            'foobar://foo%2Cbar:x@y@whatever,snap',
+            {
+                'str()': 'foobar://foo%2Cbar:x%40y@whatever,snap',
+                'hosts()': [
+                    {'host': 'whatever', 'password': 'x%40y', 'port': None, 'username': 'foo%2Cbar'},
+                    {'host': 'snap', 'password': None, 'port': None, 'username': None},
+                ],
+            },
+        ),
     ],
 )
 def test_multi_url_cases(multi_host_url_validator, url, expected):
@@ -656,3 +721,74 @@ def test_multi_url_cases(multi_host_url_validator, url, expected):
                 else:
                     output_parts[key] = getattr(output_url, key)
             assert output_parts == expected
+
+
+@pytest.fixture(scope='module', name='strict_multi_host_url_validator')
+def strict_multi_host_url_validator_fixture():
+    return SchemaValidator(core_schema.multi_host_url_schema(strict=True))
+
+
+@pytest.mark.parametrize(
+    'url,expected',
+    [
+        ('http://example.com', 'http://example.com/'),
+        (
+            '  mongodb://foo,bar,spam/xxx  ',
+            Err('leading or trailing control or space character are ignored in URLs', 'url_syntax_violation'),
+        ),
+        (
+            ' \n\r\t mongodb://foo,bar,spam/xxx',
+            Err('leading or trailing control or space character are ignored in URLs', 'url_syntax_violation'),
+        ),
+        # with bashslashes
+        ('file:\\\\foo,bar\\more', Err('backslash', 'url_syntax_violation')),
+        ('http:\\\\foo,bar\\more', Err('backslash', 'url_syntax_violation')),
+        ('mongo:\\\\foo,bar\\more', Err('non-URL code point', 'url_syntax_violation')),
+        ('foobar://foo[]bar:x@y@whatever,foo[]bar:x@y@whichever', Err('non-URL code point', 'url_syntax_violation')),
+        (
+            'foobar://foo%2Cbar:x@y@whatever,snap',
+            Err('unencoded @ sign in username or password', 'url_syntax_violation'),
+        ),
+        ('foobar://foo%2Cbar:x%40y@whatever,snap', 'foobar://foo%2Cbar:x%40y@whatever,snap'),
+    ],
+)
+def test_multi_url_cases_strict(strict_multi_host_url_validator, url, expected):
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError) as exc_info:
+            strict_multi_host_url_validator.validate_python(url)
+        assert exc_info.value.error_count() == 1
+        error = exc_info.value.errors()[0]
+        assert error['type'] == expected.errors
+        assert error['ctx']['error'] == expected.message
+    else:
+        output_url = strict_multi_host_url_validator.validate_python(url)
+        assert isinstance(output_url, MultiHostUrl)
+        if isinstance(expected, str):
+            assert str(output_url) == expected
+        else:
+            assert isinstance(expected, dict)
+            output_parts = {}
+            for key in expected:
+                if key == 'str()':
+                    output_parts[key] = str(output_url)
+                elif key.endswith('()'):
+                    output_parts[key] = getattr(output_url, key[:-2])()
+                else:
+                    output_parts[key] = getattr(output_url, key)
+            assert output_parts == expected
+
+
+def test_url_to_multi_url(url_validator, multi_host_url_validator):
+    url: Url = url_validator.validate_python('https://example.com')
+    assert isinstance(url, Url)
+    assert str(url) == 'https://example.com/'
+
+    url2 = multi_host_url_validator.validate_python(url)
+    assert isinstance(url2, MultiHostUrl)
+    assert str(url2) == 'https://example.com/'
+    assert url is not url2
+
+    url3 = multi_host_url_validator.validate_python(url2)
+    assert isinstance(url3, MultiHostUrl)
+    assert str(url3) == 'https://example.com/'
+    assert url2 is not url3
