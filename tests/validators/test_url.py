@@ -101,6 +101,10 @@ def url_validator_fixture():
         ('file:///:80', {'str()': 'file:///:80', 'host_type': None}),
         ('file://:80', Err('invalid domain character')),
         ('foobar://:80', Err('empty host')),
+        # with bashslashes
+        ('file:\\\\foobar\\more', {'str()': 'file://foobar/more', 'host': 'foobar', 'path': '/more'}),
+        ('http:\\\\foobar\\more', {'str()': 'http://foobar/more', 'host': 'foobar', 'path': '/more'}),
+        ('mongo:\\\\foobar\\more', {'str()': 'mongo:\\\\foobar\\more', 'host': None, 'path': '\\\\foobar\\more'}),
         ('mongodb+srv://server.example.com/', 'mongodb+srv://server.example.com/'),
         ('http://example.com.', {'host': 'example.com.', 'unicode_host()': 'example.com.'}),
         ('http:/example.com', {'host': 'example.com', 'unicode_host()': 'example.com'}),
@@ -124,9 +128,53 @@ def url_validator_fixture():
         ('file:///foobar', {'unicode_string()': 'file:///foobar'}),
         (
             'postgresql+py-postgresql://user:pass@localhost:5432/app',
-            {'str()': 'postgresql+py-postgresql://user:pass@localhost:5432/app'},
+            {
+                'str()': 'postgresql+py-postgresql://user:pass@localhost:5432/app',
+                'username': 'user',
+                'password': 'pass',
+            },
         ),
         ('https://https/', {'host': 'https', 'unicode_host()': 'https'}),
+        ('http://user:@example.org', {'str()': 'http://user@example.org/', 'username': 'user', 'password': None}),
+        (
+            'http://us@er:p[ass@example.org',
+            {'str()': 'http://us%40er:p%5Bass@example.org/', 'username': 'us%40er', 'password': 'p%5Bass'},
+        ),
+        (
+            'http://us%40er:p%5Bass@example.org',
+            {'str()': 'http://us%40er:p%5Bass@example.org/', 'username': 'us%40er', 'password': 'p%5Bass'},
+        ),
+        (
+            'http://us[]er:p,ass@example.org',
+            {'str()': 'http://us%5B%5Der:p,ass@example.org/', 'username': 'us%5B%5Der', 'password': 'p,ass'},
+        ),
+        ('http://%2F:@example.org', {'str()': 'http://%2F@example.org/', 'username': '%2F', 'password': None}),
+        ('foo://user:@example.org', {'str()': 'foo://user@example.org', 'username': 'user', 'password': None}),
+        (
+            'foo://us@er:p[ass@example.org',
+            {'str()': 'foo://us%40er:p%5Bass@example.org', 'username': 'us%40er', 'password': 'p%5Bass'},
+        ),
+        (
+            'foo://us%40er:p%5Bass@example.org',
+            {'str()': 'foo://us%40er:p%5Bass@example.org', 'username': 'us%40er', 'password': 'p%5Bass'},
+        ),
+        (
+            'foo://us[]er:p,ass@example.org',
+            {'str()': 'foo://us%5B%5Der:p,ass@example.org', 'username': 'us%5B%5Der', 'password': 'p,ass'},
+        ),
+        ('foo://%2F:@example.org', {'str()': 'foo://%2F@example.org', 'username': '%2F', 'password': None}),
+        ('HTTP://EXAMPLE.ORG', {'str()': 'http://example.org/'}),
+        ('HTTP://EXAMPLE.org', {'str()': 'http://example.org/'}),
+        ('POSTGRES://EXAMPLE.ORG', {'str()': 'postgres://EXAMPLE.ORG'}),
+        ('https://twitter.com/@handle', {'str()': 'https://twitter.com/@handle', 'path': '/@handle'}),
+        ('  https://www.example.com \n', 'https://www.example.com/'),
+        # https://www.xudongz.com/blog/2017/idn-phishing/ accepted but converted
+        ('https://www.аррӏе.com/', 'https://www.xn--80ak6aa92e.com/'),
+        ('https://exampl£e.org', 'https://xn--example-gia.org/'),
+        ('https://example.珠宝', 'https://example.xn--pbt977c/'),
+        ('https://example.vermögensberatung', 'https://example.xn--vermgensberatung-pwb/'),
+        ('https://example.рф', 'https://example.xn--p1ai/'),
+        ('https://exampl£e.珠宝', 'https://xn--example-gia.xn--pbt977c/'),
     ],
 )
 def test_url_cases(url_validator, url, expected):
@@ -177,9 +225,15 @@ def strict_url_validator_fixture():
         ('file:/xx', Err('expected // after file:', 'url_syntax_violation')),
         ('foobar://:80', Err('empty host', 'url_parsing')),
         ('mongodb+srv://server.example.com/', 'mongodb+srv://server.example.com/'),
+        ('http://user:@example.org', 'http://user@example.org/'),
+        ('http://us[er:@example.org', Err('non-URL code point', 'url_syntax_violation')),
+        ('http://us%5Ber:bar@example.org', 'http://us%5Ber:bar@example.org/'),
+        ('http://user:@example.org', 'http://user@example.org/'),
+        ('mongodb://us%5Ber:bar@example.org', 'mongodb://us%5Ber:bar@example.org'),
+        ('mongodb://us@er@example.org', Err('unencoded @ sign in username or password', 'url_syntax_violation')),
     ],
 )
-def test_url_error_strict(strict_url_validator, url, expected):
+def test_url_error(strict_url_validator, url, expected):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError) as exc_info:
             strict_url_validator.validate_python(url)
@@ -445,6 +499,8 @@ def multi_host_url_validator_fixture():
                 ],
             },
         ),
+        ('  mongodb://foo,bar,spam/xxx  ', 'mongodb://foo,bar,spam/xxx'),
+        (' \n\r\t mongodb://foo,bar,spam/xxx', 'mongodb://foo,bar,spam/xxx'),
         (
             'mongodb+srv://foo,bar,spam/xxx',
             {
@@ -533,6 +589,47 @@ def multi_host_url_validator_fixture():
         ('http://foo,bar?x=y', 'http://foo,bar/?x=y'),
         ('mongodb://foo,bar?x=y', 'mongodb://foo,bar?x=y'),
         ('foo://foo,bar?x=y', 'foo://foo,bar?x=y'),
+        (
+            (
+                'mongodb://mongodb1.example.com:27317,mongodb2.example.com:27017/'
+                'mydatabase?replicaSet=mySet&authSource=authDB'
+            ),
+            {
+                'str()': (
+                    'mongodb://mongodb1.example.com:27317,mongodb2.example.com:27017/'
+                    'mydatabase?replicaSet=mySet&authSource=authDB'
+                ),
+                'hosts()': [
+                    {'host': 'mongodb1.example.com', 'password': None, 'port': 27317, 'username': None},
+                    {'host': 'mongodb2.example.com', 'password': None, 'port': 27017, 'username': None},
+                ],
+                'query_params()': [('replicaSet', 'mySet'), ('authSource', 'authDB')],
+            },
+        ),
+        # with bashslashes
+        (
+            'file:\\\\foo,bar\\more',
+            {
+                'str()': 'file://foo,bar/more',
+                'path': '/more',
+                'hosts()': [
+                    {'host': 'foo', 'password': None, 'port': None, 'username': None},
+                    {'host': 'bar', 'password': None, 'port': None, 'username': None},
+                ],
+            },
+        ),
+        (
+            'http:\\\\foo,bar\\more',
+            {
+                'str()': 'http://foo,bar/more',
+                'path': '/more',
+                'hosts()': [
+                    {'host': 'foo', 'password': None, 'port': None, 'username': None},
+                    {'host': 'bar', 'password': None, 'port': None, 'username': None},
+                ],
+            },
+        ),
+        ('mongo:\\\\foo,bar\\more', Err('empty host')),
     ],
 )
 def test_multi_url_cases(multi_host_url_validator, url, expected):

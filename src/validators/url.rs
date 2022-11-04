@@ -218,7 +218,21 @@ fn parse_multihost_url<'url, 'input>(
     strict: bool,
 ) -> ValResult<'input, PyMultiHostUrl> {
     let mut chars = PositionedPeekable::new(url_str);
-    // TODO consume whitespace
+    // consume whitespace, taken from `with_log`
+    // https://github.com/servo/rust-url/blob/v2.3.1/url/src/parser.rs#L213-L226
+    loop {
+        let peek = chars.peek();
+        if let Some(c) = peek {
+            match c {
+                '\t' | '\n' | '\r' => (),
+                c if c <= &' ' => (),
+                _ => break,
+            };
+            chars.next();
+        } else {
+            break;
+        }
+    }
 
     macro_rules! parsing_err {
         ($parse_error:expr) => {
@@ -233,6 +247,7 @@ fn parse_multihost_url<'url, 'input>(
 
     // consume the url schema, taken from `parse_scheme`
     // https://github.com/servo/rust-url/blob/v2.3.1/url/src/parser.rs#L387-L411
+    let schema_start = chars.index;
     while let Some(c) = chars.next() {
         match c {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '.' => (),
@@ -240,18 +255,20 @@ fn parse_multihost_url<'url, 'input>(
             _ => return parsing_err!(ParseError::RelativeUrlWithoutBase),
         }
     }
-    let schema = &url_str[..chars.index - 1];
+    let schema = &url_str[schema_start..chars.index - 1];
 
     // consume the double slash, or any number of slashes, including backslashes, taken from `parse_with_scheme`
     // https://github.com/servo/rust-url/blob/v2.3.1/url/src/parser.rs#L413-L456
     loop {
         let peek = chars.peek();
-        if peek == Some(&'/') || peek == Some(&'\\') {
-            chars.next();
-        } else {
-            break;
+        match peek {
+            Some(&'/') | Some(&'\\') => {
+                chars.next();
+            }
+            _ => break,
         }
     }
+    let prefix = &url_str[..chars.index];
 
     // process host and port, splitting based on `,`, some logic taken from `parse_host`
     // https://github.com/servo/rust-url/blob/v2.3.1/url/src/parser.rs#L971-L1026
@@ -278,7 +295,7 @@ fn parse_multihost_url<'url, 'input>(
         return parsing_err!(ParseError::EmptyHost);
     }
     let rest = &url_str[chars.index - 1..];
-    let reconstructed_url = format!("{schema}://{}{rest}", &url_str[start..end]);
+    let reconstructed_url = format!("{prefix}{}{rest}", &url_str[start..end]);
     let ref_url = parse_url(&reconstructed_url, input, strict)?;
     if !ref_url.has_host() {
         return parsing_err!(ParseError::EmptyHost);
@@ -291,7 +308,7 @@ fn parse_multihost_url<'url, 'input>(
         let extra_urls: Vec<Url> = hosts
             .iter()
             .map(|host| {
-                let reconstructed_url = format!("{schema}://{host}");
+                let reconstructed_url = format!("{prefix}{host}");
                 parse_url(&reconstructed_url, input, strict)
             })
             .collect::<ValResult<_>>()?;
@@ -315,7 +332,13 @@ fn parse_url<'url, 'input>(
         // and unlike other parser style validators
         let vios: RefCell<Option<SyntaxViolation>> = RefCell::new(None);
         let r = Url::options()
-            .syntax_violation_callback(Some(&|v| *vios.borrow_mut() = Some(v)))
+            .syntax_violation_callback(Some(&|v| {
+                match v {
+                    // telling users offer about credentials in URLs doesn't really make sense in this context
+                    SyntaxViolation::EmbeddedCredentials => (),
+                    _ => *vios.borrow_mut() = Some(v),
+                }
+            }))
             .parse(url_str);
 
         match r {
