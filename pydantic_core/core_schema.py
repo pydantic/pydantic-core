@@ -1048,6 +1048,26 @@ def url_schema(
     )
 
 
+class MultiHostUrlSchema(TypedDict, total=False):
+    type: Required[Literal['multi-host-url']]
+    max_length: int
+    allowed_schemes: List[str]
+    ref: str
+    extra: Any
+
+
+def multi_host_url_schema(
+    *,
+    max_length: int | None = None,
+    allowed_schemes: list[str] | None = None,
+    ref: str | None = None,
+    extra: Any = None,
+) -> MultiHostUrlSchema:
+    return dict_not_none(
+        type='multi-host-url', max_length=max_length, allowed_schemes=allowed_schemes, ref=ref, extra=extra
+    )
+
+
 CoreSchema = Union[
     AnySchema,
     NoneSchema,
@@ -1087,6 +1107,7 @@ CoreSchema = Union[
     CustomErrorSchema,
     JsonSchema,
     UrlSchema,
+    MultiHostUrlSchema,
 ]
 
 # used in _pydantic_core.pyi::PydanticKnownError

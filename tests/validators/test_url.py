@@ -1,7 +1,7 @@
 import pytest
 from dirty_equals import HasRepr, IsInstance
 
-from pydantic_core import SchemaValidator, Url, ValidationError, core_schema
+from pydantic_core import MultiHostUrl, SchemaValidator, Url, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -48,6 +48,9 @@ def url_validator_fixture():
         ('xxx', Err('relative URL without a base')),
         ('http://', Err('empty host')),
         ('https://xn---', Err('invalid international domain name')),
+        ('http://example.com:65535', 'http://example.com:65535/'),
+        ('http:\\\\example.com', 'http://example.com/'),
+        ('http:example.com', 'http://example.com/'),
         ('http://example.com:65536', Err('invalid port number')),
         ('http://1...1', Err('invalid IPv4 address')),
         ('https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334[', Err('invalid IPv6 address')),
@@ -119,9 +122,13 @@ def url_validator_fixture():
         ('https://münchen/', {'unicode_string()': 'https://münchen/'}),
         ('wss://1.1.1.1', {'unicode_string()': 'wss://1.1.1.1/'}),
         ('file:///foobar', {'unicode_string()': 'file:///foobar'}),
+        (
+            'postgresql+py-postgresql://user:pass@localhost:5432/app',
+            {'str()': 'postgresql+py-postgresql://user:pass@localhost:5432/app'},
+        ),
     ],
 )
-def test_url_error(url_validator, url, expected):
+def test_url_cases(url_validator, url, expected):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError) as exc_info:
             url_validator.validate_python(url)
@@ -364,3 +371,183 @@ def test_strict_not_strict(url_validator, strict_url_validator):
 
     url2 = strict_url_validator.validate_python(url)
     assert str(url2) == 'http://example.com/foobar/bar'
+
+
+def test_multi_host_url_ok_single(py_and_json: PyAndJson):
+    v = py_and_json(core_schema.multi_host_url_schema())
+    url: MultiHostUrl = v.validate_test('https://example.com/foo/bar?a=b')
+    assert isinstance(url, MultiHostUrl)
+    assert str(url) == 'https://example.com/foo/bar?a=b'
+    assert repr(url) == "Url('https://example.com/foo/bar?a=b')"
+    assert url.scheme == 'https'
+    assert url.path == '/foo/bar'
+    assert url.query == 'a=b'
+    assert url.query_params() == [('a', 'b')]
+    assert url.fragment is None
+    # insert_assert(url.hosts())
+    assert url.hosts() == [{'username': None, 'password': None, 'host': 'example.com', 'port': None}]
+
+    url: MultiHostUrl = v.validate_test('postgres://foo:bar@example.com:1234')
+    assert isinstance(url, MultiHostUrl)
+    assert str(url) == 'postgres://foo:bar@example.com:1234'
+    assert url.scheme == 'postgres'
+    # insert_assert(url.hosts())
+    assert url.hosts() == [{'username': 'foo', 'password': 'bar', 'host': 'example.com', 'port': 1234}]
+
+
+def test_multi_host_url_ok_2(py_and_json: PyAndJson):
+    v = py_and_json(core_schema.multi_host_url_schema())
+    url: MultiHostUrl = v.validate_test('https://foo.com,bar.com/path')
+    assert isinstance(url, MultiHostUrl)
+    assert str(url) == 'https://foo.com,bar.com/path'
+    assert url.scheme == 'https'
+    assert url.path == '/path'
+    # insert_assert(url.hosts())
+    assert url.hosts() == [
+        {'username': None, 'password': None, 'host': 'foo.com', 'port': None},
+        {'username': None, 'password': None, 'host': 'bar.com', 'port': None},
+    ]
+
+
+@pytest.fixture(scope='module', name='multi_host_url_validator')
+def multi_host_url_validator_fixture():
+    return SchemaValidator(core_schema.multi_host_url_schema())
+
+
+@pytest.mark.parametrize(
+    'url,expected',
+    [
+        (
+            'http://example.com',
+            {
+                'str()': 'http://example.com/',
+                'hosts()': [{'host': 'example.com', 'password': None, 'port': None, 'username': None}],
+            },
+        ),
+        (
+            'postgres://example.com',
+            {
+                'str()': 'postgres://example.com',
+                'scheme': 'postgres',
+                'hosts()': [{'host': 'example.com', 'password': None, 'port': None, 'username': None}],
+            },
+        ),
+        (
+            'mongodb://foo,bar,spam/xxx',
+            {
+                'str()': 'mongodb://foo,bar,spam/xxx',
+                'scheme': 'mongodb',
+                'hosts()': [
+                    {'host': 'foo', 'password': None, 'port': None, 'username': None},
+                    {'host': 'bar', 'password': None, 'port': None, 'username': None},
+                    {'host': 'spam', 'password': None, 'port': None, 'username': None},
+                ],
+            },
+        ),
+        (
+            'mongodb+srv://foo,bar,spam/xxx',
+            {
+                'str()': 'mongodb+srv://foo,bar,spam/xxx',
+                'scheme': 'mongodb+srv',
+                'hosts()': [
+                    {'host': 'foo', 'password': None, 'port': None, 'username': None},
+                    {'host': 'bar', 'password': None, 'port': None, 'username': None},
+                    {'host': 'spam', 'password': None, 'port': None, 'username': None},
+                ],
+            },
+        ),
+        (
+            'http://foo:bar@example.com,fo%20o:bar@example.com',
+            {
+                'str()': 'http://foo:bar@example.com,fo%20o:bar@example.com/',
+                'scheme': 'http',
+                'hosts()': [
+                    {'host': 'example.com', 'password': 'bar', 'port': None, 'username': 'foo'},
+                    {'host': 'example.com', 'password': 'bar', 'port': None, 'username': 'fo%20o'},
+                ],
+            },
+        ),
+        (
+            'postgres://foo:bar@example.com,fo%20o:bar@example.com',
+            {
+                'str()': 'postgres://foo:bar@example.com,fo%20o:bar@example.com',
+                'scheme': 'postgres',
+                'hosts()': [
+                    {'host': 'example.com', 'password': 'bar', 'port': None, 'username': 'foo'},
+                    {'host': 'example.com', 'password': 'bar', 'port': None, 'username': 'fo%20o'},
+                ],
+            },
+        ),
+        ('postgres://', Err('empty host')),
+        ('postgres://,', Err('empty host')),
+        ('postgres://,,', Err('empty host')),
+        ('postgres://foo,\n,bar', Err('empty host')),
+        ('postgres://\n,bar', Err('empty host')),
+        ('postgres://foo,\n', Err('empty host')),
+        ('postgres://foo,', Err('empty host')),
+        ('postgres://,foo', Err('empty host')),
+        ('http://', Err('empty host')),
+        ('http://,', Err('empty host')),
+        ('http://,,', Err('empty host')),
+        ('http://foo,\n,bar', Err('empty host')),
+        ('http://\n,bar', Err('empty host')),
+        ('http://foo,\n', Err('empty host')),
+        ('http://foo,', Err('empty host')),
+        ('http://,foo', Err('empty host')),
+        (
+            'mongodb://foo\n,b\nar,\nspam/xxx',
+            {
+                'str()': 'mongodb://foo,bar,spam/xxx',
+                'scheme': 'mongodb',
+                'hosts()': [
+                    {'host': 'foo', 'password': None, 'port': None, 'username': None},
+                    {'host': 'bar', 'password': None, 'port': None, 'username': None},
+                    {'host': 'spam', 'password': None, 'port': None, 'username': None},
+                ],
+            },
+        ),
+        (
+            'postgres://user:pass@host1.db.net:4321,host2.db.net:6432/app',
+            {
+                'str()': 'postgres://user:pass@host1.db.net:4321,host2.db.net:6432/app',
+                'scheme': 'postgres',
+                'hosts()': [
+                    {'host': 'host1.db.net', 'password': 'pass', 'port': 4321, 'username': 'user'},
+                    {'host': 'host2.db.net', 'password': None, 'port': 6432, 'username': None},
+                ],
+                'path': '/app',
+            },
+        ),
+        (
+            'postgresql+py-postgresql://user:pass@localhost:5432/app',
+            {
+                'str()': 'postgresql+py-postgresql://user:pass@localhost:5432/app',
+                'hosts()': [{'host': 'localhost', 'password': 'pass', 'port': 5432, 'username': 'user'}],
+            },
+        ),
+    ],
+)
+def test_multi_url_cases(multi_host_url_validator, url, expected):
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError) as exc_info:
+            multi_host_url_validator.validate_python(url)
+        assert exc_info.value.error_count() == 1
+        error = exc_info.value.errors()[0]
+        assert error['type'] == 'url_parsing'
+        assert error['ctx']['error'] == expected.message
+    else:
+        output_url = multi_host_url_validator.validate_python(url)
+        assert isinstance(output_url, MultiHostUrl)
+        if isinstance(expected, str):
+            assert str(output_url) == expected
+        else:
+            assert isinstance(expected, dict)
+            output_parts = {}
+            for key in expected:
+                if key == 'str()':
+                    output_parts[key] = str(output_url)
+                elif key.endswith('()'):
+                    output_parts[key] = getattr(output_url, key[:-2])()
+                else:
+                    output_parts[key] = getattr(output_url, key)
+            assert output_parts == expected
