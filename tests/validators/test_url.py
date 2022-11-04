@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from dirty_equals import HasRepr, IsInstance
 
@@ -842,3 +844,127 @@ def test_multi_max_length(url_validator):
 def test_zero_schemas():
     with pytest.raises(SchemaError, match='"allowed_schemes" should have length > 0'):
         SchemaValidator(core_schema.multi_host_url_schema(allowed_schemes=[]))
+
+
+@pytest.mark.parametrize(
+    'url,expected',
+    [
+        # urlparse doesn't follow RFC 3986 Section 3.2
+        (
+            'http://google.com#@evil.com/',
+            dict(
+                scheme='http',
+                host='google.com',
+                # path='', CHANGED
+                path='/',
+                fragment='@evil.com/',
+            ),
+        ),
+        # CVE-2016-5699
+        (
+            'http://127.0.0.1%0d%0aConnection%3a%20keep-alive',
+            # dict(scheme='http', host='127.0.0.1%0d%0aconnection%3a%20keep-alive'), CHANGED
+            Err('Input should be a valid URL, invalid domain character [type=url_parsing,'),
+        ),
+        # NodeJS unicode -> double dot
+        ('http://google.com/\uff2e\uff2e/abc', dict(scheme='http', host='google.com', path='/%EF%BC%AE%EF%BC%AE/abc')),
+        # Scheme without ://
+        (
+            "javascript:a='@google.com:12345/';alert(0)",
+            dict(scheme='javascript', path="a='@google.com:12345/';alert(0)"),
+        ),
+        (
+            '//google.com/a/b/c',
+            # dict(host='google.com', path='/a/b/c'),
+            Err('Input should be a valid URL, relative URL without a base [type=url_parsing,'),
+        ),
+        # International URLs
+        (
+            'http://ヒ:キ@ヒ.abc.ニ/ヒ?キ#ワ',
+            dict(
+                scheme='http',
+                host='xn--pdk.abc.xn--idk',
+                auth='%E3%83%92:%E3%82%AD',
+                path='/%E3%83%92',
+                query='%E3%82%AD',
+                fragment='%E3%83%AF',
+            ),
+        ),
+        # Injected headers (CVE-2016-5699, CVE-2019-9740, CVE-2019-9947)
+        (
+            '10.251.0.83:7777?a=1 HTTP/1.1\r\nX-injected: header',
+            # dict( CHANGED
+            #     host='10.251.0.83',
+            #     port=7777,
+            #     path='',
+            #     query='a=1%20HTTP/1.1%0D%0AX-injected:%20header',
+            # ),
+            Err('Input should be a valid URL, relative URL without a base [type=url_parsing,'),
+        ),
+        # ADDED, similar to the above with scheme added
+        (
+            'http://10.251.0.83:7777?a=1 HTTP/1.1\r\nX-injected: header',
+            dict(
+                host='10.251.0.83',
+                port=7777,
+                path='/',
+                # query='a=1%20HTTP/1.1%0D%0AX-injected:%20header', CHANGED
+                query='a=1%20HTTP/1.1X-injected:%20header',
+            ),
+        ),
+        (
+            'http://127.0.0.1:6379?\r\nSET test failure12\r\n:8080/test/?test=a',
+            dict(
+                scheme='http',
+                host='127.0.0.1',
+                port=6379,
+                # path='',
+                path='/',
+                # query='%0D%0ASET%20test%20failure12%0D%0A:8080/test/?test=a', CHANGED
+                query='SET%20test%20failure12:8080/test/?test=a',
+            ),
+        ),
+        # See https://bugs.xdavidhu.me/google/2020/03/08/the-unexpected-google-wide-domain-check-bypass/
+        (
+            'https://user:pass@xdavidhu.me\\test.corp.google.com:8080/path/to/something?param=value#hash',
+            dict(
+                scheme='https',
+                auth='user:pass',
+                host='xdavidhu.me',
+                # path='/%5Ctest.corp.google.com:8080/path/to/something', CHANGED
+                path='/test.corp.google.com:8080/path/to/something',
+                query='param=value',
+                fragment='hash',
+            ),
+        ),
+        # # Tons of '@' causing backtracking
+        (
+            'https://' + ('@' * 10000) + '[',
+            # False, CHANGED
+            Err('Input should be a valid URL, invalid IPv6 address [type=url_parsing,'),
+        ),
+        (
+            'https://user:' + ('@' * 10000) + 'example.com',
+            dict(scheme='https', auth='user:' + ('%40' * 9999), host='example.com'),
+        ),
+    ],
+)
+def test_url_vulnerabilities(url_validator, url, expected):
+    """
+    Test cases from
+    https://github.com/urllib3/urllib3/blob/7ef7444fd0fc22a825be6624af85343cefa36fef/test/test_util.py#L422
+    """
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            url_validator.validate_python(url)
+    else:
+        output_url = url_validator.validate_python(url)
+        assert isinstance(output_url, Url)
+        output_parts = {}
+        for key in expected:
+            # one tweak required to match urllib3 logic
+            if key == 'auth':
+                output_parts[key] = f'{output_url.username}:{output_url.password}'
+            else:
+                output_parts[key] = getattr(output_url, key)
+        assert output_parts == expected
