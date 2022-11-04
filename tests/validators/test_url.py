@@ -126,6 +126,7 @@ def url_validator_fixture():
             'postgresql+py-postgresql://user:pass@localhost:5432/app',
             {'str()': 'postgresql+py-postgresql://user:pass@localhost:5432/app'},
         ),
+        ('https://https/', {'host': 'https', 'unicode_host()': 'https'}),
     ],
 )
 def test_url_cases(url_validator, url, expected):

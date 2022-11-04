@@ -98,19 +98,16 @@ impl PyUrl {
 
     // string representation of the URL, with punycode decoded when appropriate
     pub fn unicode_string(&self) -> String {
-        let s = self.lib_url.to_string();
+        let mut s = self.lib_url.to_string();
 
         match self.lib_url.host() {
             Some(url::Host::Domain(domain)) if is_punnycode_domain(&self.lib_url, domain) => {
-                // we know here that we have a punycode domain, so we simply replace the first instance
-                // of the punycode domain with the decoded domain
-                // this is ugly, but since `slice()`, `host_start` and `host_end` are all private to `Url`,
-                // we have no better option, since the `schema` has to be `https`, `http` etc, (see `is_special` above),
-                // we can safely assume that the first match for the domain, is the domain
-                match decode_punycode(domain) {
-                    Some(decoded) => s.replacen(domain, &decoded, 1),
-                    None => s,
+                if let Some(decoded) = decode_punycode(domain) {
+                    // replace the range containing the punycode domain with the decoded domain
+                    let start = self.lib_url.scheme().len() + 3;
+                    s.replace_range(start..start + domain.len(), &decoded)
                 }
+                s
             }
             _ => s,
         }
