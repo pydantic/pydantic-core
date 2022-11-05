@@ -179,10 +179,10 @@ def test_mapping_error_yield_1():
 
     assert exc_info.value.errors() == [
         {
-            'type': 'dict_from_mapping',
+            'type': 'mapping_type',
             'loc': (),
             'msg': (
-                'Unable to convert mapping to a dictionary, error: '
+                'Input should be a valid mapping, error: '
                 'ValueError: expected tuple of length 2, but got tuple of length 1'
             ),
             'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),

@@ -361,7 +361,7 @@ impl Validator for TypedDictValidator {
                     for elem in d.items()?.iter()? {
                         let elem_t = elem.unwrap().downcast::<PyTuple>()?;
                         if elem_t.len() != 2{
-                            errors.push(ValLineError::new(ErrorType::DictType, input));
+                            errors.push(ValLineError::new(ErrorType::MappingType, input));
                             break;
                         }
                         let raw_key = unsafe { elem_t.get_item_unchecked(0) };

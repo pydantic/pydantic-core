@@ -168,7 +168,7 @@ impl DictValidator {
         for elem in dict.items()?.iter()? {
             let elem_t = elem.unwrap().downcast::<PyTuple>()?;
             if elem_t.len() != 2 {
-                errors.push(ValLineError::new(ErrorType::DictType, input));
+                errors.push(ValLineError::new(ErrorType::MappingType, input));
                 break;
             }
             let key = unsafe { elem_t.get_item_unchecked(0) };

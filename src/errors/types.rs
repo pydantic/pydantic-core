@@ -155,6 +155,8 @@ pub enum ErrorType {
     DictFromMapping {
         error: String,
     },
+    #[strum(message = "Input should be a valid mapping, error: {error}")]
+    MappingType,
     // ---------------------
     // list errors
     #[strum(message = "Input should be a valid list/array")]
