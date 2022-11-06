@@ -151,7 +151,7 @@ pub enum ErrorType {
     // dict errors
     #[strum(message = "Input should be a valid dictionary")]
     DictType,
-    #[strum(message = "Input should be a valid dictionary, error: {error}")]
+    #[strum(message = "Input should be a valid mapping, error: {error}")]
     MappingType {
         error: String,
     },
