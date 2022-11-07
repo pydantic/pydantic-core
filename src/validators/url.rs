@@ -191,7 +191,7 @@ impl Validator for MultiHostUrlValidator {
             }
         }
         match check_sub_defaults(
-            &mut multi_url.ref_url.lib_url,
+            multi_url.mut_lib_url(),
             self.host_required,
             &self.default_host,
             self.default_port,

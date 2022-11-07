@@ -7,7 +7,7 @@ use url::Url;
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PyUrl {
-    pub lib_url: Url,
+    lib_url: Url,
 }
 
 impl PyUrl {
@@ -103,7 +103,7 @@ impl PyUrl {
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PyMultiHostUrl {
-    pub ref_url: PyUrl,
+    ref_url: PyUrl,
     extra_urls: Option<Vec<Url>>,
 }
 
@@ -113,6 +113,10 @@ impl PyMultiHostUrl {
             ref_url: PyUrl::new(ref_url),
             extra_urls,
         }
+    }
+
+    pub fn mut_lib_url(&mut self) -> &mut Url {
+        &mut self.ref_url.lib_url
     }
 }
 
