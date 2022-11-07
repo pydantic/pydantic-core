@@ -23,9 +23,12 @@ type AllowedSchemas = Option<(AHashSet<String>, String)>;
 #[derive(Debug, Clone)]
 pub struct UrlValidator {
     strict: bool,
-    host_required: bool,
     max_length: Option<usize>,
     allowed_schemes: AllowedSchemas,
+    host_required: bool,
+    default_host: Option<String>,
+    default_port: Option<u16>,
+    default_path: Option<String>,
     name: String,
 }
 
@@ -41,8 +44,11 @@ impl BuildValidator for UrlValidator {
 
         Ok(Self {
             strict: is_strict(schema, config)?,
-            host_required: schema.get_as(intern!(schema.py(), "host_required"))?.unwrap_or(false),
             max_length: schema.get_as(intern!(schema.py(), "max_length"))?,
+            host_required: schema.get_as(intern!(schema.py(), "host_required"))?.unwrap_or(false),
+            default_host: schema.get_as(intern!(schema.py(), "default_host"))?,
+            default_port: schema.get_as(intern!(schema.py(), "default_port"))?,
+            default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
             allowed_schemes,
             name,
         }
@@ -59,7 +65,7 @@ impl Validator for UrlValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let lib_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
+        let mut lib_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemas_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(lib_url.scheme()) {
@@ -67,10 +73,17 @@ impl Validator for UrlValidator {
                 return Err(ValError::new(ErrorType::UrlSchema { expected_schemas }, input));
             }
         }
-        if self.host_required && !lib_url.has_host() {
-            return Err(ValError::new(ErrorType::UrlHostRequired, input));
+
+        match check_sub_defaults(
+            &mut lib_url,
+            self.host_required,
+            &self.default_host,
+            self.default_port,
+            &self.default_path,
+        ) {
+            Ok(()) => Ok(PyUrl::new(lib_url).into_py(py)),
+            Err(error_type) => return Err(ValError::new(error_type, input)),
         }
-        Ok(PyUrl::new(lib_url).into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -123,6 +136,10 @@ pub struct MultiHostUrlValidator {
     strict: bool,
     max_length: Option<usize>,
     allowed_schemes: AllowedSchemas,
+    host_required: bool,
+    default_host: Option<String>,
+    default_port: Option<u16>,
+    default_path: Option<String>,
     name: String,
 }
 
@@ -136,10 +153,20 @@ impl BuildValidator for MultiHostUrlValidator {
     ) -> PyResult<CombinedValidator> {
         let (allowed_schemes, name) = get_allowed_schemas(schema, Self::EXPECTED_TYPE)?;
 
+        let default_host: Option<String> = schema.get_as(intern!(schema.py(), "default_host"))?;
+        if let Some(ref default_host) = default_host {
+            if default_host.contains(',') {
+                return py_err!("default_host cannot contain a comma, see pydantic-core#326");
+            }
+        }
         Ok(Self {
             strict: is_strict(schema, config)?,
             max_length: schema.get_as(intern!(schema.py(), "max_length"))?,
             allowed_schemes,
+            host_required: schema.get_as(intern!(schema.py(), "host_required"))?.unwrap_or(false),
+            default_host,
+            default_port: schema.get_as(intern!(schema.py(), "default_port"))?,
+            default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
             name,
         }
         .into())
@@ -155,7 +182,7 @@ impl Validator for MultiHostUrlValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let multi_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
+        let mut multi_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemas_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(multi_url.scheme()) {
@@ -163,7 +190,16 @@ impl Validator for MultiHostUrlValidator {
                 return Err(ValError::new(ErrorType::UrlSchema { expected_schemas }, input));
             }
         }
-        Ok(multi_url.into_py(py))
+        match check_sub_defaults(
+            &mut multi_url.ref_url.lib_url,
+            self.host_required,
+            &self.default_host,
+            self.default_port,
+            &self.default_path,
+        ) {
+            Ok(()) => Ok(multi_url.into_py(py)),
+            Err(error_type) => return Err(ValError::new(error_type, input)),
+        }
     }
 
     fn get_name(&self) -> &str {
@@ -290,20 +326,19 @@ fn parse_multihost_url<'url, 'input>(
             _ => (),
         }
     }
+    // with just one host, for consistent behaviour, we parse the URL the same as with multiple hosts
 
-    if start == chars.position - chars.last_len {
-        return parsing_err!(ParseError::EmptyHost);
-    }
     let reconstructed_url = format!("{prefix}{}", &url_str[start..]);
     let ref_url = parse_url(&reconstructed_url, input, strict)?;
-    if !ref_url.has_host() {
-        return parsing_err!(ParseError::EmptyHost);
-    }
 
     if hosts.is_empty() {
-        // just one host, for consistent behaviour, we parse the URL the same as multiple below
+        // if there's no one host (e.g. no `,`), we allow it to be empty to allow for default hosts
         Ok(PyMultiHostUrl::new(ref_url, None))
     } else {
+        // with more than one host, none of them can be empty
+        if !ref_url.has_host() {
+            return parsing_err!(ParseError::EmptyHost);
+        }
         let extra_urls: Vec<Url> = hosts
             .iter()
             .map(|host| {
@@ -358,6 +393,40 @@ fn parse_url<'url, 'input>(
     } else {
         Url::parse(url_str).map_err(move |e| ValError::new(ErrorType::UrlParsing { error: e.to_string() }, input))
     }
+}
+
+/// check host_required and substitute `default_host`, `default_port` & `default_path` if they aren't set
+fn check_sub_defaults(
+    lib_url: &mut Url,
+    host_required: bool,
+    default_host: &Option<String>,
+    default_port: Option<u16>,
+    default_path: &Option<String>,
+) -> Result<(), ErrorType> {
+    let map_parse_err = |e: ParseError| ErrorType::UrlParsing { error: e.to_string() };
+    if !lib_url.has_host() {
+        if let Some(ref default_host) = default_host {
+            lib_url.set_host(Some(default_host)).map_err(map_parse_err)?;
+        } else if host_required {
+            return Err(ErrorType::UrlParsing {
+                error: ParseError::EmptyHost.to_string(),
+            });
+        }
+    }
+    if lib_url.port().is_none() {
+        if let Some(default_port) = default_port {
+            lib_url
+                .set_port(Some(default_port))
+                .map_err(|_| map_parse_err(ParseError::EmptyHost))?;
+        }
+    }
+    if let Some(ref default_path) = default_path {
+        let path = lib_url.path();
+        if path.is_empty() || path == "/" {
+            lib_url.set_path(default_path);
+        }
+    }
+    Ok(())
 }
 
 fn get_allowed_schemas(schema: &PyDict, name: &'static str) -> PyResult<(AllowedSchemas, String)> {

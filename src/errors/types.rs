@@ -338,8 +338,6 @@ pub enum ErrorType {
     UrlSchema {
         expected_schemas: String,
     },
-    #[strum(message = "URL host required")]
-    UrlHostRequired,
 }
 
 macro_rules! render {

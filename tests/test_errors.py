@@ -260,7 +260,6 @@ all_errors = [
     ('url_syntax_violation', 'Input violated strict URL syntax rules, Foobar', {'error': 'Foobar'}),
     ('url_too_long', 'URL should have at most 42 characters', {'max_length': 42}),
     ('url_schema', 'URL schema should be "foo", "bar" or "spam"', {'expected_schemas': '"foo", "bar" or "spam"'}),
-    ('url_host_required', 'URL host required', None),
 ]
 
 

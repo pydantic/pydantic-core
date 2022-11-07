@@ -207,7 +207,7 @@ def test_url_cases(url_validator, url, expected):
         assert error['ctx']['error'] == expected.message
     else:
         output_url = url_validator.validate_python(url)
-        assert isinstance(output_url, Url)
+        assert isinstance(output_url, (Url, MultiHostUrl))
         if isinstance(expected, str):
             assert str(output_url) == expected
         else:
@@ -221,6 +221,83 @@ def test_url_cases(url_validator, url, expected):
                 else:
                     output_parts[key] = getattr(output_url, key)
             assert output_parts == expected
+
+
+@pytest.mark.parametrize(
+    'validator_kwargs,url,expected',
+    [
+        (
+            dict(default_port=1234, default_path='/baz'),
+            'http://example.org',
+            {'str()': 'http://example.org:1234/baz', 'path': '/baz'},
+        ),
+        (dict(default_port=1234, default_path='/baz'), 'http://example.org/', 'http://example.org:1234/baz'),
+        (dict(default_port=1234, default_path='/baz'), 'http://example.org/bang', 'http://example.org:1234/bang'),
+        (dict(default_port=1234, default_path='/baz'), 'http://example.org:1111', 'http://example.org:1111/baz'),
+        (dict(default_port=1234, default_path='/baz'), 'foobar://example.org', 'foobar://example.org:1234/baz'),
+        (dict(default_host='localhost'), 'redis:///foobar', 'redis://localhost/foobar'),
+        (dict(default_host='localhost'), 'redis://', 'redis://localhost'),
+        (dict(default_host='localhost', default_path='/baz'), 'redis://', 'redis://localhost/baz'),
+        (dict(default_host='localhost'), 'redis://xxx/foobar', 'redis://xxx/foobar'),
+        (dict(host_required=True), 'redis://', Err('empty host')),
+    ],
+)
+@pytest.mark.parametrize('validator_type', ['Url', 'MultiHostUrl'])
+def test_url_defaults(validator_type, validator_kwargs, url, expected):
+    if validator_type == 'Url':
+        schema = core_schema.url_schema(**validator_kwargs)
+    else:
+        schema = core_schema.multi_host_url_schema(**validator_kwargs)
+    s = SchemaValidator(schema)
+    test_url_cases(s, url, expected)
+
+
+@pytest.mark.parametrize(
+    'validator_kwargs,url,expected',
+    [
+        (
+            dict(default_port=1234, default_path='/baz'),
+            'http://example.org',
+            {'str()': 'http://example.org:1234/baz', 'host': 'example.org', 'port': 1234, 'path': '/baz'},
+        ),
+        (dict(default_host='localhost'), 'redis://', {'str()': 'redis://localhost', 'host': 'localhost'}),
+    ],
+)
+def test_url_defaults_single_url(validator_kwargs, url, expected):
+    s = SchemaValidator(core_schema.url_schema(**validator_kwargs))
+    test_url_cases(s, url, expected)
+
+
+@pytest.mark.parametrize(
+    'validator_kwargs,url,expected',
+    [
+        (
+            dict(default_port=1234, default_path='/baz'),
+            'http://example.org',
+            {
+                'str()': 'http://example.org:1234/baz',
+                'hosts()': [{'host': 'example.org', 'password': None, 'port': 1234, 'username': None}],
+                'path': '/baz',
+            },
+        ),
+        (
+            dict(default_host='localhost'),
+            'redis://',
+            {
+                'str()': 'redis://localhost',
+                'hosts()': [{'host': 'localhost', 'password': None, 'port': None, 'username': None}],
+            },
+        ),
+    ],
+)
+def test_url_defaults_multi_host_url(validator_kwargs, url, expected):
+    s = SchemaValidator(core_schema.multi_host_url_schema(**validator_kwargs))
+    test_url_cases(s, url, expected)
+
+
+def test_multi_host_default_host_no_comma():
+    with pytest.raises(SchemaError, match='default_host cannot contain a comma, see pydantic-core#326'):
+        SchemaValidator(core_schema.multi_host_url_schema(default_host='foo,bar'))
 
 
 @pytest.fixture(scope='module', name='strict_url_validator')
@@ -277,14 +354,6 @@ def test_url_error(strict_url_validator, url, expected):
                 else:
                     output_parts[key] = getattr(output_url, key)
             assert output_parts == expected
-
-
-def test_host_required():
-    v = SchemaValidator(core_schema.url_schema(host_required=True))
-    url = v.validate_python('http://example.com')
-    assert url.host == 'example.com'
-    with pytest.raises(ValidationError, match=r'URL host required \[type=url_host_required,'):
-        v.validate_python('unix:/run/foo.socket')
 
 
 def test_no_host(url_validator):
@@ -517,7 +586,7 @@ def test_multi_host_url_ok_2(py_and_json: PyAndJson):
 
 @pytest.fixture(scope='module', name='multi_host_url_validator')
 def multi_host_url_validator_fixture():
-    return SchemaValidator(core_schema.multi_host_url_schema())
+    return SchemaValidator(core_schema.multi_host_url_schema(host_required=True))
 
 
 @pytest.mark.parametrize(
