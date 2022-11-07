@@ -288,6 +288,7 @@ def test_url_defaults_single_url(validator_kwargs, url, expected):
                 'hosts()': [{'host': 'localhost', 'password': None, 'port': None, 'username': None}],
             },
         ),
+        ({}, 'redis://', {'str()': 'redis://', 'hosts()': []}),
     ],
 )
 def test_url_defaults_multi_host_url(validator_kwargs, url, expected):
@@ -586,7 +587,7 @@ def test_multi_host_url_ok_2(py_and_json: PyAndJson):
 
 @pytest.fixture(scope='module', name='multi_host_url_validator')
 def multi_host_url_validator_fixture():
-    return SchemaValidator(core_schema.multi_host_url_schema(host_required=True))
+    return SchemaValidator(core_schema.multi_host_url_schema())
 
 
 @pytest.mark.parametrize(
@@ -656,7 +657,7 @@ def multi_host_url_validator_fixture():
                 ],
             },
         ),
-        ('postgres://', Err('empty host')),
+        ('postgres://', {'str()': 'postgres://', 'scheme': 'postgres', 'hosts()': []}),
         ('postgres://,', Err('empty host')),
         ('postgres://,,', Err('empty host')),
         ('postgres://foo,\n,bar', Err('empty host')),

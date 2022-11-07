@@ -131,8 +131,10 @@ impl PyMultiHostUrl {
             }
             hosts.push(host_to_dict(py, &self.ref_url.lib_url)?);
             Ok(hosts)
-        } else {
+        } else if self.ref_url.lib_url.has_host() {
             Ok(vec![host_to_dict(py, &self.ref_url.lib_url)?])
+        } else {
+            Ok(vec![])
         }
     }
 
