@@ -247,7 +247,7 @@ fn parse_multihost_url<'url, 'input>(
 
     // consume the url schema, taken from `parse_scheme`
     // https://github.com/servo/rust-url/blob/v2.3.1/url/src/parser.rs#L387-L411
-    let schema_start = chars.index;
+    let schema_start = chars.position;
     while let Some(c) = chars.next() {
         match c {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '.' => (),
@@ -255,7 +255,7 @@ fn parse_multihost_url<'url, 'input>(
             _ => return parsing_err!(ParseError::RelativeUrlWithoutBase),
         }
     }
-    let schema = url_str[schema_start..chars.index - 1].to_ascii_lowercase();
+    let schema = url_str[schema_start..chars.position - 1].to_ascii_lowercase();
 
     // consume the double slash, or any number of slashes, including backslashes, taken from `parse_with_scheme`
     // https://github.com/servo/rust-url/blob/v2.3.1/url/src/parser.rs#L413-L456
@@ -268,34 +268,33 @@ fn parse_multihost_url<'url, 'input>(
             _ => break,
         }
     }
-    let prefix = &url_str[..chars.index];
+    let prefix = &url_str[..chars.position];
 
     // process host and port, splitting based on `,`, some logic taken from `parse_host`
     // https://github.com/servo/rust-url/blob/v2.3.1/url/src/parser.rs#L971-L1026
     let mut hosts: Vec<&str> = Vec::with_capacity(3);
-    let mut start = chars.index;
+    let mut start = chars.position;
     while let Some(c) = chars.next() {
         match c {
             '\\' if schema_is_special(&schema) => break,
             '/' | '?' | '#' => break,
             ',' => {
-                let end = chars.index - 1;
+                // minus 1, not `chars.last_len` because we know that the last char was a `,` with length 1
+                let end = chars.position - 1;
                 if start == end {
                     return parsing_err!(ParseError::EmptyHost);
                 }
                 hosts.push(&url_str[start..end]);
-                start = chars.index;
+                start = chars.position;
             }
             _ => (),
         }
     }
 
-    let end = chars.index - 1;
-    if start == end {
+    if start == chars.position - chars.last_len {
         return parsing_err!(ParseError::EmptyHost);
     }
-    let rest = &url_str[chars.index - 1..];
-    let reconstructed_url = format!("{prefix}{}{rest}", &url_str[start..end]);
+    let reconstructed_url = format!("{prefix}{}", &url_str[start..]);
     let ref_url = parse_url(&reconstructed_url, input, strict)?;
     if !ref_url.has_host() {
         return parsing_err!(ParseError::EmptyHost);
@@ -382,22 +381,33 @@ fn get_allowed_schemas(schema: &PyDict, name: &'static str) -> PyResult<(Allowed
     }
 }
 
+#[cfg_attr(debug_assertions, derive(Debug))]
 struct PositionedPeekable<'a> {
     peekable: Peekable<Chars<'a>>,
-    index: usize,
+    position: usize,
+    last_len: usize,
 }
 
 impl<'a> PositionedPeekable<'a> {
     fn new(input: &'a str) -> Self {
         Self {
             peekable: input.chars().peekable(),
-            index: 0,
+            position: 0,
+            last_len: 0,
         }
     }
 
     fn next(&mut self) -> Option<char> {
-        self.index += 1;
-        self.peekable.next()
+        let c = self.peekable.next();
+        if let Some(c) = c {
+            self.last_len = c.len_utf8();
+            self.position += self.last_len;
+        } else {
+            // needs to be zero here so if you do `position - last_len` after the last char, you get the
+            // correct position
+            self.last_len = 0;
+        }
+        c
     }
 
     fn peek(&mut self) -> Option<&char> {

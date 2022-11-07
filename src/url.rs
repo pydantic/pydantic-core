@@ -87,19 +87,7 @@ impl PyUrl {
 
     // string representation of the URL, with punycode decoded when appropriate
     pub fn unicode_string(&self) -> String {
-        let mut s = self.lib_url.to_string();
-
-        match self.lib_url.host() {
-            Some(url::Host::Domain(domain)) if is_punnycode_domain(&self.lib_url, domain) => {
-                if let Some(decoded) = decode_punycode(domain) {
-                    // replace the range containing the punycode domain with the decoded domain
-                    let start = self.lib_url.scheme().len() + 3;
-                    s.replace_range(start..start + domain.len(), &decoded)
-                }
-                s
-            }
-            _ => s,
-        }
+        unicode_url(&self.lib_url)
     }
 
     pub fn __str__(&self) -> &str {
@@ -167,6 +155,35 @@ impl PyMultiHostUrl {
         self.ref_url.fragment()
     }
 
+    // string representation of the URL, with punycode decoded when appropriate
+    pub fn unicode_string(&self) -> String {
+        if let Some(extra_urls) = &self.extra_urls {
+            let schema = self.ref_url.lib_url.scheme();
+            let host_offset = schema.len() + 3;
+
+            let mut full_url = self.ref_url.unicode_string();
+            full_url.insert(host_offset, ',');
+
+            // special urls will have had a trailing slash added, non-special urls will not
+            // hence we need to remove the last char if the schema is special
+            #[allow(clippy::bool_to_int_with_if)]
+            let sub = if schema_is_special(schema) { 1 } else { 0 };
+
+            let hosts = extra_urls
+                .iter()
+                .map(|url| {
+                    let str = unicode_url(url);
+                    str[host_offset..str.len() - sub].to_string()
+                })
+                .collect::<Vec<String>>()
+                .join(",");
+            full_url.insert_str(host_offset, &hosts);
+            full_url
+        } else {
+            self.ref_url.unicode_string()
+        }
+    }
+
     pub fn __str__(&self) -> String {
         if let Some(extra_urls) = &self.extra_urls {
             let schema = self.ref_url.lib_url.scheme();
@@ -175,12 +192,11 @@ impl PyMultiHostUrl {
             let mut full_url = self.ref_url.lib_url.to_string();
             full_url.insert(host_offset, ',');
 
-            // special urls will have had a trailing slash asked, non-special urls will not
+            // special urls will have had a trailing slash added, non-special urls will not
             // hence we need to remove the last char if the schema is special
             #[allow(clippy::bool_to_int_with_if)]
             let sub = if schema_is_special(schema) { 1 } else { 0 };
 
-            // all extra urls have no path (except a `/`), so we can just have a slice up to -1
             let hosts = extra_urls
                 .iter()
                 .map(|url| {
@@ -215,6 +231,22 @@ fn host_to_dict<'a, 'b>(py: Python<'a>, lib_url: &'b Url) -> PyResult<&'a PyDict
     dict.set_item("port", lib_url.port())?;
 
     Ok(dict)
+}
+
+fn unicode_url(lib_url: &Url) -> String {
+    let mut s = lib_url.to_string();
+
+    match lib_url.host() {
+        Some(url::Host::Domain(domain)) if is_punnycode_domain(lib_url, domain) => {
+            if let Some(decoded) = decode_punycode(domain) {
+                // replace the range containing the punycode domain with the decoded domain
+                let start = lib_url.scheme().len() + 3;
+                s.replace_range(start..start + domain.len(), &decoded)
+            }
+            s
+        }
+        _ => s,
+    }
 }
 
 fn decode_punycode(domain: &str) -> Option<String> {

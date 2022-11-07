@@ -120,13 +120,15 @@ def url_validator_fixture():
         ('https://£££.com', {'host': 'xn--9aaa.com', 'unicode_host()': '£££.com'}),
         ('https://£££.com.', {'host': 'xn--9aaa.com.', 'unicode_host()': '£££.com.'}),
         ('https://xn--9aaa.com/', {'host': 'xn--9aaa.com', 'unicode_host()': '£££.com'}),
-        ('https://münchen/', {'host': 'xn--mnchen-3ya', 'unicode_host()': 'münchen'}),
+        (
+            'https://münchen/',
+            {'host': 'xn--mnchen-3ya', 'unicode_host()': 'münchen', 'unicode_string()': 'https://münchen/'},
+        ),
         ('http://à.א̈.com', {'host': 'xn--0ca.xn--ssa73l.com', 'unicode_host()': 'à.א̈.com'}),
         ('ftp://xn--0ca.xn--ssa73l.com', {'host': 'xn--0ca.xn--ssa73l.com', 'unicode_host()': 'à.א̈.com'}),
         ('https://foobar.£££.com/', {'host': 'foobar.xn--9aaa.com', 'unicode_host()': 'foobar.£££.com'}),
         ('https://£££.com', {'unicode_string()': 'https://£££.com/'}),
         ('https://xn--9aaa.com/', {'unicode_string()': 'https://£££.com/'}),
-        ('https://münchen/', {'unicode_string()': 'https://münchen/'}),
         ('wss://1.1.1.1', {'unicode_string()': 'wss://1.1.1.1/'}),
         ('file:///foobar', {'unicode_string()': 'file:///foobar'}),
         (
@@ -178,6 +180,21 @@ def url_validator_fixture():
         ('https://example.vermögensberatung', 'https://example.xn--vermgensberatung-pwb/'),
         ('https://example.рф', 'https://example.xn--p1ai/'),
         ('https://exampl£e.珠宝', 'https://xn--example-gia.xn--pbt977c/'),
+        ('ht💣tp://example.org', Err('relative URL without a base')),
+        (
+            'http://usßer:pasℝs@a💣b.com:123/c?d=e&d=f#g',
+            {
+                'str()': 'http://us%C3%9Fer:pas%E2%84%9Ds@xn--ab-qt72a.com:123/c?d=e&d=f#g',
+                'username': 'us%C3%9Fer',
+                'password': 'pas%E2%84%9Ds',
+                'host': 'xn--ab-qt72a.com',
+                'port': 123,
+                'path': '/c',
+                'query': 'd=e&d=f',
+                'query_params()': [('d', 'e'), ('d', 'f')],
+                'fragment': 'g',
+            },
+        ),
     ],
 )
 def test_url_cases(url_validator, url, expected):
@@ -511,6 +528,7 @@ def multi_host_url_validator_fixture():
             {
                 'str()': 'http://example.com/',
                 'hosts()': [{'host': 'example.com', 'password': None, 'port': None, 'username': None}],
+                'unicode_string()': 'http://example.com/',
             },
         ),
         (
@@ -696,6 +714,48 @@ def multi_host_url_validator_fixture():
                 ],
             },
         ),
+        (
+            'http://foo.co.uk,bar.spam.things.com',
+            {
+                'str()': 'http://foo.co.uk,bar.spam.things.com/',
+                'hosts()': [
+                    {'host': 'foo.co.uk', 'password': None, 'port': None, 'username': None},
+                    {'host': 'bar.spam.things.com', 'password': None, 'port': None, 'username': None},
+                ],
+            },
+        ),
+        ('ht💣tp://example.com', Err('relative URL without a base')),
+        # punycode ß
+        (
+            'http://£££.com',
+            {
+                'str()': 'http://xn--9aaa.com/',
+                'hosts()': [{'host': 'xn--9aaa.com', 'password': None, 'port': None, 'username': None}],
+                'unicode_string()': 'http://£££.com/',
+            },
+        ),
+        (
+            'http://£££.co.uk,münchen.com/foo?bar=baz#qux',
+            {
+                'str()': 'http://xn--9aaa.co.uk,xn--mnchen-3ya.com/foo?bar=baz#qux',
+                'hosts()': [
+                    {'host': 'xn--9aaa.co.uk', 'password': None, 'port': None, 'username': None},
+                    {'host': 'xn--mnchen-3ya.com', 'password': None, 'port': None, 'username': None},
+                ],
+                'unicode_string()': 'http://£££.co.uk,münchen.com/foo?bar=baz#qux',
+            },
+        ),
+        (
+            'postgres://£££.co.uk,münchen.com/foo?bar=baz#qux',
+            {
+                'str()': 'postgres://%C2%A3%C2%A3%C2%A3.co.uk,m%C3%BCnchen.com/foo?bar=baz#qux',
+                'hosts()': [
+                    {'host': '%C2%A3%C2%A3%C2%A3.co.uk', 'password': None, 'port': None, 'username': None},
+                    {'host': 'm%C3%BCnchen.com', 'password': None, 'port': None, 'username': None},
+                ],
+                'unicode_string()': 'postgres://%C2%A3%C2%A3%C2%A3.co.uk,m%C3%BCnchen.com/foo?bar=baz#qux',
+            },
+        ),
     ],
 )
 def test_multi_url_cases(multi_host_url_validator, url, expected):
@@ -721,6 +781,7 @@ def test_multi_url_cases(multi_host_url_validator, url, expected):
                     output_parts[key] = getattr(output_url, key[:-2])()
                 else:
                     output_parts[key] = getattr(output_url, key)
+            # debug(output_parts)
             assert output_parts == expected
 
 
