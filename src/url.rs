@@ -54,17 +54,6 @@ impl PyUrl {
     }
 
     #[getter]
-    pub fn host_type(&self) -> Option<&'static str> {
-        match self.lib_url.host() {
-            Some(url::Host::Domain(domain)) if is_punnycode_domain(&self.lib_url, domain) => Some("punycode_domain"),
-            Some(url::Host::Domain(_)) => Some("domain"),
-            Some(url::Host::Ipv4(_)) => Some("ipv4"),
-            Some(url::Host::Ipv6(_)) => Some("ipv6"),
-            None => None,
-        }
-    }
-
-    #[getter]
     pub fn port(&self) -> Option<u16> {
         self.lib_url.port()
     }
