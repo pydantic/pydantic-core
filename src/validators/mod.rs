@@ -64,19 +64,19 @@ pub struct SchemaValidator {
 impl SchemaValidator {
     #[new]
     pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
-        let self_schema = Self::get_self_schema(py);
-
-        let schema_obj = self_schema
-            .validator
-            .validate(
-                py,
-                schema,
-                &Extra::default(),
-                &self_schema.slots,
-                &mut RecursionGuard::default(),
-            )
-            .map_err(|e| SchemaError::from_val_error(py, e))?;
-        let schema = schema_obj.as_ref(py);
+        // let self_schema = Self::get_self_schema(py);
+        //
+        // let schema_obj = self_schema
+        //     .validator
+        //     .validate(
+        //         py,
+        //         schema,
+        //         &Extra::default(),
+        //         &self_schema.slots,
+        //         &mut RecursionGuard::default(),
+        //     )
+        //     .map_err(|e| SchemaError::from_val_error(py, e))?;
+        // let schema = schema_obj.as_ref(py);
 
         let mut used_refs = AHashSet::new();
         extract_used_refs(schema, &mut used_refs)?;
@@ -386,8 +386,9 @@ pub fn build_validator<'a>(
         custom_error::CustomErrorValidator,
         // json data
         json::JsonValidator,
-        // url type
+        // url types
         url::UrlValidator,
+        url::MultiHostUrlValidator,
     )
 }
 
@@ -507,8 +508,9 @@ pub enum CombinedValidator {
     CustomError(custom_error::CustomErrorValidator),
     // json data
     Json(json::JsonValidator),
-    // url type
+    // url types
     Url(url::UrlValidator),
+    MultiHostUrl(url::MultiHostUrlValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

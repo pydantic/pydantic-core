@@ -2,6 +2,7 @@
 #![allow(clippy::borrow_deref_ref)]
 
 use pyo3::prelude::*;
+use pyo3::types::PyMapping;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -10,6 +11,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 mod build_context;
 mod build_tools;
 mod errors;
+mod fast_dict;
 mod input;
 mod lookup_key;
 mod questions;
@@ -18,7 +20,7 @@ mod url;
 mod validators;
 
 // required for benchmarks
-pub use self::url::PyUrl;
+pub use self::url::{PyMultiHostUrl, PyUrl};
 pub use build_tools::SchemaError;
 pub use errors::{list_all_errors, PydanticCustomError, PydanticKnownError, PydanticOmit, ValidationError};
 pub use validators::SchemaValidator;
@@ -34,7 +36,7 @@ pub fn get_version() -> String {
 }
 
 #[pymodule]
-fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
+fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", get_version())?;
     m.add("build_profile", env!("PROFILE"))?;
     m.add_class::<SchemaValidator>()?;
@@ -44,6 +46,11 @@ fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PydanticKnownError>()?;
     m.add_class::<PydanticOmit>()?;
     m.add_class::<self::url::PyUrl>()?;
+    m.add_class::<self::url::PyMultiHostUrl>()?;
+
+    m.add_class::<fast_dict::FastDict>()?;
+    PyMapping::register::<fast_dict::FastDict>(py).unwrap();
+
     m.add_function(wrap_pyfunction!(list_all_errors, m)?)?;
     Ok(())
 }

@@ -10,6 +10,7 @@ use ahash::AHashSet;
 
 use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same, SchemaDict};
 use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
+use crate::fast_dict::FastDict;
 use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::questions::Question;
@@ -170,7 +171,7 @@ impl Validator for TypedDictValidator {
         let strict = extra.strict.unwrap_or(self.strict);
         let dict = input.validate_typed_dict(strict, self.from_attributes)?;
 
-        let output_dict = PyDict::new(py);
+        let mut output_dict = FastDict::with_capacity(self.fields.len());
         let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
         let mut fields_set_vec: Option<Vec<Py<PyString>>> = match self.return_fields_set {
             true => Some(Vec::with_capacity(self.fields.len())),
@@ -185,7 +186,8 @@ impl Validator for TypedDictValidator {
         };
 
         let extra = Extra {
-            data: Some(output_dict),
+            // data: Some(output_dict),
+            data: None,
             field: None,
             strict: extra.strict,
             context: extra.context,
@@ -218,7 +220,7 @@ impl Validator for TypedDictValidator {
                             .validate(py, value, &extra, slots, recursion_guard)
                         {
                             Ok(value) => {
-                                output_dict.set_item(&field.name_pystring, value)?;
+                                output_dict.set_item(field.name_pystring.as_ref(py), value)?;
                                 if let Some(ref mut fs) = fields_set_vec {
                                     fs.push(field.name_pystring.clone_ref(py));
                                 }
@@ -233,7 +235,7 @@ impl Validator for TypedDictValidator {
                         }
                         continue;
                     } else if let Some(value) = get_default(py, &field.validator)? {
-                        output_dict.set_item(&field.name_pystring, value.as_ref())?;
+                        output_dict.set_item(field.name_pystring.as_ref(py), value.as_ref())?;
                     } else if field.required {
                         errors.push(ValLineError::new_with_loc(
                             ErrorType::Missing,
@@ -311,9 +313,10 @@ impl Validator for TypedDictValidator {
             Err(ValError::LineErrors(errors))
         } else if let Some(fs) = fields_set_vec {
             let fields_set = PySet::new(py, &fs)?;
+            let output_dict = output_dict.into_py(py);
             Ok((output_dict, fields_set).to_object(py))
         } else {
-            Ok(output_dict.to_object(py))
+            Ok(output_dict.into_py(py))
         }
     }
 
