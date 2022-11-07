@@ -67,10 +67,10 @@ impl Validator for UrlValidator {
     ) -> ValResult<'data, PyObject> {
         let mut lib_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
 
-        if let Some((ref allowed_schemes, ref expected_schemas_repr)) = self.allowed_schemes {
+        if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(lib_url.scheme()) {
-                let expected_schemas = expected_schemas_repr.clone();
-                return Err(ValError::new(ErrorType::UrlSchema { expected_schemas }, input));
+                let expected_schemes = expected_schemes_repr.clone();
+                return Err(ValError::new(ErrorType::UrlScheme { expected_schemes }, input));
             }
         }
 
@@ -184,10 +184,10 @@ impl Validator for MultiHostUrlValidator {
     ) -> ValResult<'data, PyObject> {
         let mut multi_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
 
-        if let Some((ref allowed_schemes, ref expected_schemas_repr)) = self.allowed_schemes {
+        if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(multi_url.scheme()) {
-                let expected_schemas = expected_schemas_repr.clone();
-                return Err(ValError::new(ErrorType::UrlSchema { expected_schemas }, input));
+                let expected_schemes = expected_schemes_repr.clone();
+                return Err(ValError::new(ErrorType::UrlScheme { expected_schemes }, input));
             }
         }
         match check_sub_defaults(

@@ -24,7 +24,7 @@ def test_url_ok(py_and_json: PyAndJson):
     assert url.fragment == 'quux'
     assert url.username is None
     assert url.password is None
-    assert url.port is None
+    assert url.port == 443
 
 
 @pytest.fixture(scope='module', name='url_validator')
@@ -397,11 +397,11 @@ def test_allowed_schemes_error():
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
-            'type': 'url_schema',
+            'type': 'url_scheme',
             'loc': (),
-            'msg': "URL schema should be 'http' or 'https'",
+            'msg': "URL scheme should be 'http' or 'https'",
             'input': 'unix:/run/foo.socket',
-            'ctx': {'expected_schemas': "'http' or 'https'"},
+            'ctx': {'expected_schemes': "'http' or 'https'"},
         }
     ]
 
@@ -413,11 +413,11 @@ def test_allowed_schemes_errors():
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
-            'type': 'url_schema',
+            'type': 'url_scheme',
             'loc': (),
-            'msg': "URL schema should be 'a', 'b' or 'c'",
+            'msg': "URL scheme should be 'a', 'b' or 'c'",
             'input': 'unix:/run/foo.socket',
-            'ctx': {'expected_schemas': "'a', 'b' or 'c'"},
+            'ctx': {'expected_schemes': "'a', 'b' or 'c'"},
         }
     ]
 
@@ -480,11 +480,11 @@ def test_url_to_constraint():
         v3.validate_python(url)
     assert exc_info.value.errors() == [
         {
-            'type': 'url_schema',
+            'type': 'url_scheme',
             'loc': (),
-            'msg': "URL schema should be 'https'",
+            'msg': "URL scheme should be 'https'",
             'input': IsInstance(Url) & HasRepr("Url('http://example.com/foobar/bar')"),
-            'ctx': {'expected_schemas': "'https'"},
+            'ctx': {'expected_schemes': "'https'"},
         }
     ]
 
@@ -560,7 +560,7 @@ def test_multi_host_url_ok_single(py_and_json: PyAndJson):
     assert url.query_params() == [('a', 'b')]
     assert url.fragment is None
     # insert_assert(url.hosts())
-    assert url.hosts() == [{'username': None, 'password': None, 'host': 'example.com', 'port': None}]
+    assert url.hosts() == [{'username': None, 'password': None, 'host': 'example.com', 'port': 443}]
 
     url: MultiHostUrl = v.validate_test('postgres://foo:bar@example.com:1234')
     assert isinstance(url, MultiHostUrl)
@@ -579,8 +579,8 @@ def test_multi_host_url_ok_2(py_and_json: PyAndJson):
     assert url.path == '/path'
     # insert_assert(url.hosts())
     assert url.hosts() == [
-        {'username': None, 'password': None, 'host': 'foo.com', 'port': None},
-        {'username': None, 'password': None, 'host': 'bar.com', 'port': None},
+        {'username': None, 'password': None, 'host': 'foo.com', 'port': 443},
+        {'username': None, 'password': None, 'host': 'bar.com', 'port': 443},
     ]
 
 
@@ -596,7 +596,7 @@ def multi_host_url_validator_fixture():
             'http://example.com',
             {
                 'str()': 'http://example.com/',
-                'hosts()': [{'host': 'example.com', 'password': None, 'port': None, 'username': None}],
+                'hosts()': [{'host': 'example.com', 'password': None, 'port': 80, 'username': None}],
                 'unicode_string()': 'http://example.com/',
             },
         ),
@@ -635,13 +635,13 @@ def multi_host_url_validator_fixture():
             },
         ),
         (
-            'http://foo:bar@example.com,fo%20o:bar@example.com',
+            'https://foo:bar@example.com,fo%20o:bar@example.com',
             {
-                'str()': 'http://foo:bar@example.com,fo%20o:bar@example.com/',
-                'scheme': 'http',
+                'str()': 'https://foo:bar@example.com,fo%20o:bar@example.com/',
+                'scheme': 'https',
                 'hosts()': [
-                    {'host': 'example.com', 'password': 'bar', 'port': None, 'username': 'foo'},
-                    {'host': 'example.com', 'password': 'bar', 'port': None, 'username': 'fo%20o'},
+                    {'host': 'example.com', 'password': 'bar', 'port': 443, 'username': 'foo'},
+                    {'host': 'example.com', 'password': 'bar', 'port': 443, 'username': 'fo%20o'},
                 ],
             },
         ),
@@ -746,8 +746,8 @@ def multi_host_url_validator_fixture():
                 'str()': 'http://foo,bar/more',
                 'path': '/more',
                 'hosts()': [
-                    {'host': 'foo', 'password': None, 'port': None, 'username': None},
-                    {'host': 'bar', 'password': None, 'port': None, 'username': None},
+                    {'host': 'foo', 'password': None, 'port': 80, 'username': None},
+                    {'host': 'bar', 'password': None, 'port': 80, 'username': None},
                 ],
             },
         ),
@@ -788,8 +788,8 @@ def multi_host_url_validator_fixture():
             {
                 'str()': 'http://foo.co.uk,bar.spam.things.com/',
                 'hosts()': [
-                    {'host': 'foo.co.uk', 'password': None, 'port': None, 'username': None},
-                    {'host': 'bar.spam.things.com', 'password': None, 'port': None, 'username': None},
+                    {'host': 'foo.co.uk', 'password': None, 'port': 80, 'username': None},
+                    {'host': 'bar.spam.things.com', 'password': None, 'port': 80, 'username': None},
                 ],
             },
         ),
@@ -799,7 +799,7 @@ def multi_host_url_validator_fixture():
             'http://£££.com',
             {
                 'str()': 'http://xn--9aaa.com/',
-                'hosts()': [{'host': 'xn--9aaa.com', 'password': None, 'port': None, 'username': None}],
+                'hosts()': [{'host': 'xn--9aaa.com', 'password': None, 'port': 80, 'username': None}],
                 'unicode_string()': 'http://£££.com/',
             },
         ),
@@ -808,8 +808,8 @@ def multi_host_url_validator_fixture():
             {
                 'str()': 'http://xn--9aaa.co.uk,xn--mnchen-3ya.com/foo?bar=baz#qux',
                 'hosts()': [
-                    {'host': 'xn--9aaa.co.uk', 'password': None, 'port': None, 'username': None},
-                    {'host': 'xn--mnchen-3ya.com', 'password': None, 'port': None, 'username': None},
+                    {'host': 'xn--9aaa.co.uk', 'password': None, 'port': 80, 'username': None},
+                    {'host': 'xn--mnchen-3ya.com', 'password': None, 'port': 80, 'username': None},
                 ],
                 'unicode_string()': 'http://£££.co.uk,münchen.com/foo?bar=baz#qux',
             },
@@ -935,7 +935,7 @@ def test_multi_allowed_schemas():
     v = SchemaValidator(core_schema.multi_host_url_schema(allowed_schemes=['http', 'foo']))
     assert str(v.validate_python('http://example.com')) == 'http://example.com/'
     assert str(v.validate_python('foo://example.com')) == 'foo://example.com'
-    with pytest.raises(ValidationError, match=r"URL schema should be 'http' or 'foo' \[type=url_schema,"):
+    with pytest.raises(ValidationError, match=r"URL scheme should be 'http' or 'foo' \[type=url_scheme,"):
         v.validate_python('https://example.com')
 
 

@@ -55,7 +55,7 @@ impl PyUrl {
 
     #[getter]
     pub fn port(&self) -> Option<u16> {
-        self.lib_url.port()
+        self.lib_url.port_or_known_default()
     }
 
     #[getter]
@@ -228,7 +228,7 @@ fn host_to_dict<'a, 'b>(py: Python<'a>, lib_url: &'b Url) -> PyResult<&'a PyDict
     )?;
     dict.set_item("password", lib_url.password())?;
     dict.set_item("host", lib_url.host_str())?;
-    dict.set_item("port", lib_url.port())?;
+    dict.set_item("port", lib_url.port_or_known_default())?;
 
     Ok(dict)
 }

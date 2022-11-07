@@ -1223,5 +1223,5 @@ ErrorType = Literal[
     'url_parsing',
     'url_syntax_violation',
     'url_too_long',
-    'url_schema',
+    'url_scheme',
 ]
