@@ -2,7 +2,7 @@ use std::fmt;
 
 use pyo3::exceptions::{PyAttributeError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyString, PyMapping};
+use pyo3::types::{PyDict, PyList, PyMapping, PyString};
 
 use crate::build_tools::py_err;
 use crate::input::{JsonInput, JsonObject};
@@ -123,9 +123,11 @@ impl LookupKey {
             }
         }
     }
-    
 
-    pub fn py_get_mapping_item<'data, 's>(&'s self, dict: &'data PyMapping) -> PyResult<Option<(&'s str, &'data PyAny)>> {
+    pub fn py_get_mapping_item<'data, 's>(
+        &'s self,
+        dict: &'data PyMapping,
+    ) -> PyResult<Option<(&'s str, &'data PyAny)>> {
         match self {
             LookupKey::Simple(key, py_key) => match dict.get_item(py_key) {
                 Ok(value) => Ok(Some((key, value))),

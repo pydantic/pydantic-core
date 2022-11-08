@@ -2,8 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 #[cfg(not(PyPy))]
 use pyo3::types::PyFunction;
-use pyo3::types::PyTuple;
-use pyo3::types::{PyDict, PyList, PySet, PyString};
+use pyo3::types::{PyDict, PyList, PySet, PyString, PyTuple};
 #[cfg(not(PyPy))]
 use pyo3::PyTypeInfo;
 
