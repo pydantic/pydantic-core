@@ -4,8 +4,8 @@ use std::str::from_utf8;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{
-    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList,
-    PySet, PyString, PyTime, PyTuple, PyType,
+    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList, PySet,
+    PyString, PyTime, PyTuple, PyType,
 };
 #[cfg(not(PyPy))]
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
