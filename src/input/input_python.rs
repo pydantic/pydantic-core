@@ -11,8 +11,8 @@ use pyo3::types::{
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
-use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
-use crate::PyUrl;
+use crate::errors::{py_err_string, ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
+use crate::{PyMultiHostUrl, PyUrl};
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, date_as_datetime, float_as_datetime,
@@ -112,6 +112,10 @@ impl<'a> Input<'a> for PyAny {
         self.extract::<PyUrl>().ok()
     }
 
+    fn input_as_multi_host_url(&self) -> Option<PyMultiHostUrl> {
+        self.extract::<PyMultiHostUrl>().ok()
+    }
+
     fn callable(&self) -> bool {
         self.is_callable()
     }
@@ -127,8 +131,7 @@ impl<'a> Input<'a> for PyAny {
                         } else if args.is_none() {
                             Ok(None)
                         } else if let Ok(list) = args.cast_as::<PyList>() {
-                            // TODO remove `collect` when we have https://github.com/PyO3/pyo3/pull/2676
-                            Ok(Some(PyTuple::new(self.py(), list.iter().collect::<Vec<_>>())))
+                            Ok(Some(PyTuple::new(self.py(), list.iter())))
                         } else {
                             Err(ValLineError::new_with_loc(
                                 ErrorType::PositionalArgumentsType,
@@ -164,8 +167,7 @@ impl<'a> Input<'a> for PyAny {
         } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
             Ok(PyArgs::new(Some(tuple), None).into())
         } else if let Ok(list) = self.cast_as::<PyList>() {
-            // TODO remove `collect` when we have https://github.com/PyO3/pyo3/pull/2676
-            let tuple = PyTuple::new(self.py(), list.iter().collect::<Vec<_>>());
+            let tuple = PyTuple::new(self.py(), list.iter());
             Ok(PyArgs::new(Some(tuple), None).into())
         } else {
             Err(ValError::new(ErrorType::ArgumentsType, self))
