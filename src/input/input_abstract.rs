@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyString, PyType};
 
 use crate::errors::{InputValue, LocItem, ValResult};
-use crate::json::JsonInput;
+use crate::json::JsonValue;
 use crate::{PyMultiHostUrl, PyUrl};
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
@@ -70,7 +70,7 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>>;
 
-    fn parse_json(&'a self) -> ValResult<'a, JsonInput>;
+    fn parse_json(&'a self) -> ValResult<'a, JsonValue>;
 
     fn validate_str(&'a self, strict: bool) -> ValResult<EitherString<'a>> {
         if strict {

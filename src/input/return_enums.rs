@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyIterator, PyList, PySet, PyString, PyTuple};
 
 use crate::errors::{py_err_string, ErrorType, InputValue, ValError, ValLineError, ValResult};
-use crate::json::{JsonArray, JsonInput, JsonObject};
+use crate::json::{JsonArray, JsonObject, JsonValue};
 use crate::recursion_guard::RecursionGuard;
 use crate::validators::{CombinedValidator, Extra, Validator};
 
@@ -20,7 +20,7 @@ pub enum GenericCollection<'a> {
     Set(&'a PySet),
     FrozenSet(&'a PyFrozenSet),
     PyAny(&'a PyAny),
-    JsonArray(&'a [JsonInput]),
+    JsonArray(&'a [JsonValue]),
 }
 
 macro_rules! derive_from {
@@ -38,7 +38,7 @@ derive_from!(GenericCollection, Set, PySet);
 derive_from!(GenericCollection, FrozenSet, PyFrozenSet);
 derive_from!(GenericCollection, PyAny, PyAny);
 derive_from!(GenericCollection, JsonArray, JsonArray);
-derive_from!(GenericCollection, JsonArray, [JsonInput]);
+derive_from!(GenericCollection, JsonArray, [JsonValue]);
 
 fn validate_iter_to_vec<'a, 's>(
     py: Python<'a>,
@@ -307,7 +307,7 @@ pub struct GenericJsonIterator {
 }
 
 impl GenericJsonIterator {
-    pub fn next(&mut self, _py: Python) -> PyResult<Option<(&JsonInput, usize)>> {
+    pub fn next(&mut self, _py: Python) -> PyResult<Option<(&JsonValue, usize)>> {
         if self.index < self.length {
             let next = unsafe { self.array.get_unchecked(self.index) };
             let a = (next, self.index);
@@ -319,7 +319,7 @@ impl GenericJsonIterator {
     }
 
     pub fn input<'a>(&'a self, py: Python<'a>) -> &'a PyAny {
-        let input = JsonInput::Array(self.array.clone());
+        let input = JsonValue::Array(self.array.clone());
         input.to_object(py).into_ref(py)
     }
 
@@ -342,12 +342,12 @@ impl<'a> PyArgs<'a> {
 
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct JsonArgs<'a> {
-    pub args: Option<&'a [JsonInput]>,
+    pub args: Option<&'a [JsonValue]>,
     pub kwargs: Option<&'a JsonObject>,
 }
 
 impl<'a> JsonArgs<'a> {
-    pub fn new(args: Option<&'a [JsonInput]>, kwargs: Option<&'a JsonObject>) -> Self {
+    pub fn new(args: Option<&'a [JsonValue]>, kwargs: Option<&'a JsonObject>) -> Self {
         Self { args, kwargs }
     }
 }

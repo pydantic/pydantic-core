@@ -13,7 +13,7 @@ use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
 use crate::errors::{py_err_string, ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
-use crate::json::JsonInput;
+use crate::json::JsonValue;
 use crate::{PyMultiHostUrl, PyUrl};
 
 use super::datetime::{
@@ -176,7 +176,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
+    fn parse_json(&'a self) -> ValResult<'a, JsonValue> {
         if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
             serde_json::from_slice(py_bytes.as_bytes()).map_err(|e| map_json_err(self, e))
         } else if let Ok(py_str) = self.cast_as::<PyString>() {

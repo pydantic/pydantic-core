@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::PyDowncastError;
 
 use crate::input::Input;
-use crate::json::JsonInput;
+use crate::json::JsonValue;
 
 use super::location::{LocItem, Location};
 use super::types::ErrorType;
@@ -139,7 +139,7 @@ impl<'a> ValLineError<'a> {
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub enum InputValue<'a> {
     PyAny(&'a PyAny),
-    JsonInput(&'a JsonInput),
+    JsonInput(&'a JsonValue),
     String(&'a str),
     PyObject(PyObject),
 }

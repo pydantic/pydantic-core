@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 
 use crate::build_tools::py_err;
-use crate::json::{JsonInput, JsonObject};
+use crate::json::{JsonObject, JsonValue};
 
 /// Used got getting items from python dicts, python objects, or JSON objects, in different ways
 #[derive(Debug, Clone)]
@@ -161,7 +161,7 @@ impl LookupKey {
         }
     }
 
-    pub fn json_get<'data, 's>(&'s self, dict: &'data JsonObject) -> PyResult<Option<(&'s str, &'data JsonInput)>> {
+    pub fn json_get<'data, 's>(&'s self, dict: &'data JsonObject) -> PyResult<Option<(&'s str, &'data JsonValue)>> {
         match self {
             LookupKey::Simple(key, _) => match dict.get(key) {
                 Some(value) => Ok(Some((key, value))),
@@ -180,7 +180,7 @@ impl LookupKey {
 
                     // first step is different from the rest as we already know dict is JsonObject
                     // because of above checks, we know that path should have at least one element, hence unwrap
-                    let v: &JsonInput = match path_iter.next().unwrap().json_obj_get(dict) {
+                    let v: &JsonValue = match path_iter.next().unwrap().json_obj_get(dict) {
                         Some(v) => v,
                         None => continue,
                     };
@@ -281,10 +281,10 @@ impl PathItem {
         }
     }
 
-    pub fn json_get<'a>(&self, any_json: &'a JsonInput) -> Option<&'a JsonInput> {
+    pub fn json_get<'a>(&self, any_json: &'a JsonValue) -> Option<&'a JsonValue> {
         match any_json {
-            JsonInput::Object(v_obj) => self.json_obj_get(v_obj),
-            JsonInput::Array(v_array) => match self {
+            JsonValue::Object(v_obj) => self.json_obj_get(v_obj),
+            JsonValue::Array(v_array) => match self {
                 Self::I(index) => v_array.get(*index),
                 _ => None,
             },
@@ -292,7 +292,7 @@ impl PathItem {
         }
     }
 
-    pub fn json_obj_get<'a>(&self, json_obj: &'a JsonObject) -> Option<&'a JsonInput> {
+    pub fn json_obj_get<'a>(&self, json_obj: &'a JsonObject) -> Option<&'a JsonValue> {
         match self {
             Self::S(key, _) => json_obj.get(key),
             _ => None,
