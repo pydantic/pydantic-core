@@ -650,16 +650,6 @@ fn mapping_as_dict(obj: &PyAny) -> Option<ValResult<GenericMapping>> {
     Some(Ok(GenericMapping::PyMapping(mapping)))
 }
 
-// creating a temporary dict is slow, we could perhaps use an indexmap instead
-fn mapping_seq_as_dict(seq: &PySequence) -> PyResult<&PyDict> {
-    let dict = PyDict::new(seq.py());
-    for r in seq.iter()? {
-        let (key, value): (&PyAny, &PyAny) = r?.extract()?;
-        dict.set_item(key, value)?;
-    }
-    Ok(dict)
-}
-
 /// Best effort check of whether it's likely to make sense to inspect obj for attributes and iterate over it
 /// with `obj.dir()`
 fn from_attributes_applicable(obj: &PyAny) -> bool {
