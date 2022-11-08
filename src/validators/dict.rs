@@ -175,10 +175,10 @@ impl DictValidator {
             if elem_t.len() != 2 {
                 errors.push(ValLineError::new(
                     ErrorType::MappingType {
-                        error: String::from(format!(
+                        error: format!(
                             "ValueError: expected tuple of length 2, but got tuple of length {}",
                             elem_t.len()
-                        )),
+                        ),
                     },
                     input,
                 ));

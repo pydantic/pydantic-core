@@ -11,7 +11,7 @@ use pyo3::types::{
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
-use crate::errors::{py_err_string, ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
+use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
 use crate::PyUrl;
 
 use super::datetime::{

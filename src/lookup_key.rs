@@ -131,13 +131,13 @@ impl LookupKey {
         match self {
             LookupKey::Simple(key, py_key) => match dict.get_item(py_key) {
                 Ok(value) => Ok(Some((key, value))),
-                PyErr => Ok(None),
+                _PyErr => Ok(None),
             },
             LookupKey::Choice(key1, key2, py_key1, py_key2) => match dict.get_item(py_key1) {
                 Ok(value) => Ok(Some((key1, value))),
-                PyErr => match dict.get_item(py_key2) {
+                _PyErr => match dict.get_item(py_key2) {
                     Ok(value) => Ok(Some((key2, value))),
-                    PyErr => Ok(None),
+                    _PyErr => Ok(None),
                 },
             },
             LookupKey::PathChoices(path_choices) => {
