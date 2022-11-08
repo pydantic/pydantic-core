@@ -13,6 +13,7 @@ use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
 use crate::errors::{py_err_string, ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
+use crate::json::JsonInput;
 use crate::{PyMultiHostUrl, PyUrl};
 
 use super::datetime::{
@@ -24,7 +25,7 @@ use super::input_abstract::InputType;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
     py_error_on_minusone, py_string_str, repr_string, EitherBytes, EitherString, EitherTimedelta, GenericArguments,
-    GenericCollection, GenericIterator, GenericMapping, Input, JsonInput, PyArgs,
+    GenericCollection, GenericIterator, GenericMapping, Input, PyArgs,
 };
 
 /// Extract generators and deques into a `GenericCollection`

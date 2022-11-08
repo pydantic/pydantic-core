@@ -4,7 +4,8 @@ use pyo3::types::{PyDict, PySet, PyType};
 
 use crate::build_tools::{py_err, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValResult};
-use crate::input::{Input, JsonType};
+use crate::input::Input;
+use crate::json::JsonType;
 use crate::recursion_guard::RecursionGuard;
 
 use super::function::convert_err;

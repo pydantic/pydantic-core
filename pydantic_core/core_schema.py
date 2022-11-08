@@ -344,7 +344,7 @@ def literal_schema(*expected: Any, ref: str | None = None, extra: Any = None) ->
     return dict_not_none(type='literal', expected=expected, ref=ref, extra=extra)
 
 
-# must match input/parse_json.rs::JsonType::try_from
+# must match input/json::JsonType::try_from
 JsonType = Literal['null', 'bool', 'int', 'float', 'str', 'list', 'dict']
 
 

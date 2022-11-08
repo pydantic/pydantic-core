@@ -4,11 +4,12 @@ use pyo3::prelude::*;
 use pyo3::types::{PyString, PyType};
 
 use crate::errors::{InputValue, LocItem, ValResult};
+use crate::json::JsonInput;
 use crate::{PyMultiHostUrl, PyUrl};
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
 use super::return_enums::{EitherBytes, EitherString};
-use super::{GenericArguments, GenericCollection, GenericIterator, GenericMapping, JsonInput};
+use super::{GenericArguments, GenericCollection, GenericIterator, GenericMapping};
 
 pub enum InputType {
     Python,

@@ -7,12 +7,12 @@ use super::datetime::{
     float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
 use super::input_abstract::InputType;
-use super::parse_json::JsonArray;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
     EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericCollection, GenericIterator, GenericMapping,
-    Input, JsonArgs, JsonInput, JsonType,
+    Input, JsonArgs,
 };
+use crate::json::{JsonArray, JsonInput, JsonType};
 
 impl<'a> Input<'a> for JsonInput {
     fn get_type(&self) -> &'static InputType {

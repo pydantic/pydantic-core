@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 
 use crate::build_tools::py_err;
-use crate::input::{JsonInput, JsonObject};
+use crate::json::{JsonInput, JsonObject};
 
 /// Used got getting items from python dicts, python objects, or JSON objects, in different ways
 #[derive(Debug, Clone)]

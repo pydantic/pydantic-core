@@ -11,6 +11,7 @@ mod build_context;
 mod build_tools;
 mod errors;
 mod input;
+mod json;
 mod lookup_key;
 mod questions;
 mod recursion_guard;

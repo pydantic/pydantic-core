@@ -11,9 +11,9 @@ use pyo3::types::{PyDict, PyList};
 use crate::build_tools::py_error_type;
 use crate::input::repr_string;
 
-use super::line_error::ValLineError;
 use super::location::Location;
 use super::types::ErrorType;
+use super::val_error::ValLineError;
 use super::ValError;
 
 #[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
