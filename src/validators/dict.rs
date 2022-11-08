@@ -165,7 +165,12 @@ impl DictValidator {
 
         let key_validator = self.key_validator.as_ref();
         let value_validator = self.value_validator.as_ref();
-        for elem in dict.items()?.iter()? {
+
+        let items = match dict.items() {
+            Ok(items) => items,
+            Err(err) => return Err(ValError::new(ErrorType::MappingType { error: err.to_string() }, input)),
+        };
+        for elem in items.iter()? {
             let elem_t = elem.unwrap().downcast::<PyTuple>()?;
             if elem_t.len() != 2 {
                 errors.push(ValLineError::new(

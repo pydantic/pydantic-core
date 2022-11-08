@@ -150,9 +150,9 @@ def test_mapping_error():
 
     assert exc_info.value.errors() == [
         {
-            'type': 'dict_from_mapping',
+            'type': 'mapping_type',
             'loc': (),
-            'msg': 'Unable to convert mapping to a dictionary, error: RuntimeError: intentional error',
+            'msg': 'Input should be a valid mapping, error: RuntimeError: intentional error',
             'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
             'ctx': {'error': 'RuntimeError: intentional error'},
         }

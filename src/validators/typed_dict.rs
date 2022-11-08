@@ -360,18 +360,6 @@ impl Validator for TypedDictValidator {
                     };
                     for elem in d.items()?.iter()? {
                         let elem_t = elem.unwrap().downcast::<PyTuple>()?;
-                        if elem_t.len() != 2 {
-                            errors.push(ValLineError::new(
-                                ErrorType::MappingType {
-                                    error: String::from(format!(
-                                        "ValueError: expected tuple of length 2, but got tuple of length {}",
-                                        elem_t.len()
-                                    )),
-                                },
-                                input,
-                            ));
-                            break;
-                        }
                         let raw_key = unsafe { elem_t.get_item_unchecked(0) };
                         let value = unsafe { elem_t.get_item_unchecked(1) };
                         let either_str = match raw_key.strict_str() {
