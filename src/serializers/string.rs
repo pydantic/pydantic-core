@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyString};
 
 use super::{py_err_to_serde, BuildSerializer, CombinedSerializer, Serializer};
 
@@ -23,7 +23,8 @@ impl Serializer for StrSerializer {
     where
         S: serde::ser::Serializer,
     {
-        let s: &str = value.extract().map_err(py_err_to_serde)?;
+        let py_str: &PyString = value.cast_as().map_err(py_err_to_serde)?;
+        let s = py_str.to_str().map_err(py_err_to_serde)?;
         serializer.serialize_str(s)
     }
 }

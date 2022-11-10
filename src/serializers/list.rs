@@ -1,5 +1,5 @@
 use crate::build_tools::SchemaDict;
-use crate::serializers::SerializeCombinedSerializer;
+use crate::serializers::PydanticSerializer;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use serde::ser::SerializeSeq;
@@ -39,11 +39,8 @@ impl Serializer for ListSerializer {
 
         let mut seq = serializer.serialize_seq(Some(list.len()))?;
         for value in list.iter() {
-            let scs = SerializeCombinedSerializer {
-                value,
-                serializer: &self.item_serializer,
-            };
-            seq.serialize_element(&scs)?;
+            let item_serialize = PydanticSerializer::new(value, &self.item_serializer);
+            seq.serialize_element(&item_serialize)?;
         }
         seq.end()
     }

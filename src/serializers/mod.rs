@@ -39,23 +39,22 @@ impl SchemaSerializer {
     pub fn to_json(&mut self, py: Python, value: &PyAny, indent: Option<usize>) -> PyResult<PyObject> {
         let writer: Vec<u8> = Vec::with_capacity(self.json_size);
 
-        let scs = SerializeCombinedSerializer {
-            value,
-            serializer: &self.serializer,
-        };
+        let serializer = PydanticSerializer::new(value, &self.serializer);
 
         let bytes = match indent {
             Some(indent_size) => {
                 let indent = vec![b' '; indent_size];
                 let formatter = PrettyFormatter::with_indent(&indent);
                 let mut ser = serde_json::Serializer::with_formatter(writer, formatter);
-                scs.serialize(&mut ser)
+                serializer
+                    .serialize(&mut ser)
                     .map_err(PydanticSerializationError::json_error)?;
                 ser.into_inner()
             }
             None => {
                 let mut ser = serde_json::Serializer::new(writer);
-                scs.serialize(&mut ser)
+                serializer
+                    .serialize(&mut ser)
                     .map_err(PydanticSerializationError::json_error)?;
                 ser.into_inner()
             }
@@ -131,12 +130,18 @@ pub trait Serializer: Send + Sync + Clone + Debug {
         S: serde::ser::Serializer;
 }
 
-struct SerializeCombinedSerializer<'py> {
+struct PydanticSerializer<'py> {
     value: &'py PyAny,
     serializer: &'py CombinedSerializer,
 }
 
-impl<'py> serde::ser::Serialize for SerializeCombinedSerializer<'py> {
+impl<'py> PydanticSerializer<'py> {
+    fn new(value: &'py PyAny, serializer: &'py CombinedSerializer) -> Self {
+        Self { value, serializer }
+    }
+}
+
+impl<'py> serde::ser::Serialize for PydanticSerializer<'py> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
