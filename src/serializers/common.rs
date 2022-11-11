@@ -20,10 +20,6 @@ impl CommonSerializer {
 }
 
 impl TypeSerializer for CommonSerializer {
-    fn to_python(&self, py: Python, value: &PyAny, _format: Option<&str>) -> PyResult<PyObject> {
-        Ok(value.into_py(py))
-    }
-
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,
         value: &PyAny,

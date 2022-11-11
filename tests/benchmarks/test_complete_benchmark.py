@@ -10,7 +10,7 @@ import pytest
 from pydantic_core import SchemaValidator, ValidationError
 
 from .complete_schema import input_data_lax, input_data_strict, input_data_wrong, pydantic_model, schema
-from .test_micro_benchmarks import skip_pydantic
+from .test_validation_micro import skip_pydantic
 
 pytestmark = pytest.mark.skipif(sys.version_info < (3, 10), reason='requires python3.10 or higher')
 

@@ -18,6 +18,7 @@ mod common;
 mod int;
 mod list;
 mod string;
+mod tuple;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
@@ -40,7 +41,11 @@ impl SchemaSerializer {
     }
 
     pub fn to_python(&self, py: Python, value: &PyAny, format: Option<&str>) -> PyResult<PyObject> {
-        self.comb_serializer.to_python(py, value, format)
+        if format == Some("json") {
+            self.comb_serializer.to_python_json(py, value)
+        } else {
+            self.comb_serializer.to_python(py, value, format)
+        }
     }
 
     pub fn to_json(&mut self, py: Python, value: &PyAny, indent: Option<usize>) -> PyResult<PyObject> {
@@ -94,12 +99,12 @@ fn build_specific_serializer<'a, T: BuildSerializer>(
 
 // macro to build the match statement for validator selection
 macro_rules! serializer_match {
-    ($type:ident, $dict:ident, $config:ident, $($validator:path,)+) => {
-        match $type {
+    ($type_:ident, $dict:ident, $config:ident, $($validator:path,)+) => {
+        match $type_ {
             $(
-                <$validator>::EXPECTED_TYPE => build_specific_serializer::<$validator>($type, $dict, $config),
+                <$validator>::EXPECTED_TYPE => build_specific_serializer::<$validator>($type_, $dict, $config),
             )+
-            _ => common::CommonSerializer::build($type),
+            _ => common::CommonSerializer::build($type_),
         }
     };
 }
@@ -114,6 +119,7 @@ pub fn build_serializer<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> Py
         string::StrSerializer,
         int::IntSerializer,
         list::ListSerializer,
+        tuple::TupleSerializer,
         any::AnySerializer,
     )
 }
@@ -124,6 +130,7 @@ pub enum CombinedSerializer {
     Str(string::StrSerializer),
     Int(int::IntSerializer),
     List(list::ListSerializer),
+    Tuple(tuple::TupleSerializer),
     Any(any::AnySerializer),
     Common(common::CommonSerializer),
 }
@@ -134,8 +141,18 @@ pub trait TypeSerializer: Send + Sync + Clone + Debug {
         &self,
         py: Python,
         value: &PyAny,
-        format: Option<&str>, // TODO "exclude" arguments
-    ) -> PyResult<PyObject>;
+        _format: Option<&str>, // TODO "exclude" arguments
+    ) -> PyResult<PyObject> {
+        Ok(value.into_py(py))
+    }
+
+    fn to_python_json(
+        &self,
+        py: Python,
+        value: &PyAny, // TODO "exclude" arguments
+    ) -> PyResult<PyObject> {
+        self.to_python(py, value, Some("json"))
+    }
 
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,

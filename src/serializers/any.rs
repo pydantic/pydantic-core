@@ -23,10 +23,6 @@ impl BuildSerializer for AnySerializer {
 }
 
 impl TypeSerializer for AnySerializer {
-    fn to_python(&self, py: Python, value: &PyAny, _format: Option<&str>) -> PyResult<PyObject> {
-        Ok(value.into_py(py))
-    }
-
     fn serde_serialize<S: Serializer>(
         &self,
         value: &PyAny,
@@ -37,7 +33,7 @@ impl TypeSerializer for AnySerializer {
     }
 }
 
-struct SerializeInfer<'py> {
+pub struct SerializeInfer<'py> {
     obj: &'py PyAny,
     ob_type_lookup: &'py ObTypeLookup,
 }
@@ -105,12 +101,8 @@ pub fn common_serialize<S: Serializer>(
             }
             map.end()
         }
-        ObType::List => {
-            serialize_seq!(&PyList)
-        }
-        ObType::Tuple => {
-            serialize_seq!(&PyTuple)
-        }
+        ObType::List => super::list::serialize_list_any(obj, serializer, ob_type_lookup),
+        ObType::Tuple => super::tuple::serialize_tuple_any(obj, serializer, ob_type_lookup),
         ObType::Set => {
             serialize_seq!(&PySet)
         }
