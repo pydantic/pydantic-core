@@ -15,7 +15,7 @@ impl BuildSerializer for ListSerializer {
     const EXPECTED_TYPE: &'static str = "list";
 
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
-        let item_serializer: &PyDict = schema.get_as_req(pyo3::intern!(schema.py(), "item_serializer"))?;
+        let item_serializer: &PyDict = schema.get_as_req(pyo3::intern!(schema.py(), "items_schema"))?;
         let item_serializer = Box::new(build_serializer(item_serializer, config)?);
         Ok(Self { item_serializer }.into())
     }

@@ -4,6 +4,8 @@ use pyo3::types::{
     PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTime, PyTuple,
 };
 
+use strum_macros::EnumString;
+
 use crate::url::{PyMultiHostUrl, PyUrl};
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 
@@ -48,12 +50,18 @@ impl<'py> SerializeInfer<'py> {
 
 impl<'py> Serialize for SerializeInfer<'py> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        default_serialize(self.obj, serializer, self.ob_type_lookup)
+        common_serialize(
+            self.obj,
+            &self.ob_type_lookup.get_type(self.obj),
+            serializer,
+            self.ob_type_lookup,
+        )
     }
 }
 
-pub fn default_serialize<S: Serializer>(
+pub fn common_serialize<S: Serializer>(
     obj: &PyAny,
+    ob_type: &ObType,
     serializer: S,
     ob_type_lookup: &ObTypeLookup,
 ) -> Result<S::Ok, S::Error> {
@@ -77,12 +85,12 @@ pub fn default_serialize<S: Serializer>(
         }};
     }
 
-    match ob_type_lookup.get_type(obj) {
+    match ob_type {
         ObType::None => serializer.serialize_none(),
         ObType::Int => serialize!(i64),
         ObType::Bool => serialize!(bool),
         ObType::Float => serialize!(f64),
-        ObType::Str => serialize!(String),
+        ObType::Str => super::string::serialize_str(obj, serializer),
         ObType::Bytes | ObType::Bytearray => serialize!(&[u8]),
         ObType::Dict => {
             let py_dict: &PyDict = obj.cast_as().map_err(py_err_se_err)?;
@@ -257,8 +265,9 @@ impl ObTypeLookup {
     }
 }
 
-#[cfg_attr(debug_assertions, derive(Debug))]
-enum ObType {
+#[derive(Debug, Clone, EnumString)]
+#[strum(serialize_all = "snake_case")]
+pub enum ObType {
     None,
     // numeric types
     Int,
