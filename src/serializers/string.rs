@@ -1,7 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
-use super::{py_err_to_serde, BuildSerializer, CombinedSerializer, Serializer};
+use super::any::ObTypeLookup;
+use super::{py_err_to_serde, BuildSerializer, CombinedSerializer, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct StrSerializer;
@@ -14,12 +15,17 @@ impl BuildSerializer for StrSerializer {
     }
 }
 
-impl Serializer for StrSerializer {
+impl TypeSerializer for StrSerializer {
     fn to_python(&self, py: Python, value: &PyAny, _format: Option<&str>) -> PyResult<PyObject> {
         Ok(value.into_py(py))
     }
 
-    fn serde_serialize<S>(&self, value: &PyAny, serializer: S) -> Result<S::Ok, S::Error>
+    fn serde_serialize<S>(
+        &self,
+        value: &PyAny,
+        serializer: S,
+        _ob_type_lookup: &ObTypeLookup,
+    ) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {

@@ -4,7 +4,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use serde::ser::SerializeSeq;
 
-use super::{build_serializer, py_err_to_serde, BuildSerializer, CombinedSerializer, Serializer};
+use super::any::ObTypeLookup;
+use super::{build_serializer, py_err_to_serde, BuildSerializer, CombinedSerializer, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct ListSerializer {
@@ -21,7 +22,7 @@ impl BuildSerializer for ListSerializer {
     }
 }
 
-impl Serializer for ListSerializer {
+impl TypeSerializer for ListSerializer {
     fn to_python(&self, py: Python, value: &PyAny, format: Option<&str>) -> PyResult<PyObject> {
         let list: &PyList = value.cast_as()?;
         let items = list
@@ -31,7 +32,7 @@ impl Serializer for ListSerializer {
         Ok(items.into_py(py))
     }
 
-    fn serde_serialize<S>(&self, value: &PyAny, serializer: S) -> Result<S::Ok, S::Error>
+    fn serde_serialize<S>(&self, value: &PyAny, serializer: S, ob_type_lookup: &ObTypeLookup) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {
@@ -39,7 +40,7 @@ impl Serializer for ListSerializer {
 
         let mut seq = serializer.serialize_seq(Some(list.len()))?;
         for value in list.iter() {
-            let item_serialize = PydanticSerializer::new(value, &self.item_serializer);
+            let item_serialize = PydanticSerializer::new(value, &self.item_serializer, ob_type_lookup);
             seq.serialize_element(&item_serialize)?;
         }
         seq.end()
