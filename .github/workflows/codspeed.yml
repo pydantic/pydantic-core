@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
@@ -35,11 +35,11 @@ jobs:
         if: steps.cache-py.outputs.cache-hit != 'true'
 
       - run: rm rust-toolchain
-      - name: install rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+      - name: install rust stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: cache rust
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
 
       - run: pip install . -v
 
