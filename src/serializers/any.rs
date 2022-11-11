@@ -1,10 +1,13 @@
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
-use pyo3::types::{PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyList, PyString, PyTime, PyTuple};
+use pyo3::types::{
+    PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTime, PyTuple,
+};
 
+use crate::url::{PyMultiHostUrl, PyUrl};
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 
-use super::{py_err_to_serde, BuildSerializer, CombinedSerializer, TypeSerializer};
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct AnySerializer;
@@ -22,72 +25,123 @@ impl TypeSerializer for AnySerializer {
         Ok(value.into_py(py))
     }
 
-    fn serde_serialize<S>(&self, value: &PyAny, serializer: S, ob_type_lookup: &ObTypeLookup) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = SerializeAny::new(value, ob_type_lookup);
-        s.serialize(serializer)
+    fn serde_serialize<S: Serializer>(
+        &self,
+        value: &PyAny,
+        serializer: S,
+        ob_type_lookup: &ObTypeLookup,
+    ) -> Result<S::Ok, S::Error> {
+        SerializeInfer::new(value, ob_type_lookup).serialize(serializer)
     }
 }
 
-struct SerializeAny<'py> {
+struct SerializeInfer<'py> {
     obj: &'py PyAny,
     ob_type_lookup: &'py ObTypeLookup,
 }
 
-impl<'py> SerializeAny<'py> {
+impl<'py> SerializeInfer<'py> {
     pub fn new(obj: &'py PyAny, ob_type_lookup: &'py ObTypeLookup) -> Self {
         Self { obj, ob_type_lookup }
     }
+}
 
-    fn with_obj(&self, obj: &'py PyAny) -> Self {
-        Self {
-            obj,
-            ob_type_lookup: self.ob_type_lookup,
-        }
+impl<'py> Serialize for SerializeInfer<'py> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        default_serialize(self.obj, serializer, self.ob_type_lookup)
     }
 }
 
-impl<'py> Serialize for SerializeAny<'py> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        macro_rules! serialize {
-            ($t:ty) => {
-                match self.obj.extract::<$t>() {
-                    Ok(v) => v.serialize(serializer),
-                    Err(e) => Err(py_err_to_serde(e)),
-                }
-            };
-        }
+pub fn default_serialize<S: Serializer>(
+    obj: &PyAny,
+    serializer: S,
+    ob_type_lookup: &ObTypeLookup,
+) -> Result<S::Ok, S::Error> {
+    macro_rules! serialize {
+        ($t:ty) => {
+            match obj.extract::<$t>() {
+                Ok(v) => v.serialize(serializer),
+                Err(e) => Err(py_err_se_err(e)),
+            }
+        };
+    }
 
-        match self.ob_type_lookup.get_type(self.obj) {
-            ObType::None => serializer.serialize_none(),
-            ObType::Int => serialize!(i64),
-            ObType::Bool => serialize!(bool),
-            ObType::Float => serialize!(f64),
-            ObType::Str => serialize!(String),
-            ObType::Bytes | ObType::Bytearray => serialize!(&[u8]),
-            ObType::List => {
-                let py_list: &PyList = self.obj.cast_as().map_err(py_err_to_serde)?;
-                let mut seq = serializer.serialize_seq(Some(py_list.len()))?;
-                for element in py_list {
-                    seq.serialize_element(&self.with_obj(element))?
-                }
-                seq.end()
+    macro_rules! serialize_seq {
+        ($t:ty) => {{
+            let py_seq: $t = obj.cast_as().map_err(py_err_se_err)?;
+            let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
+            for element in py_seq {
+                seq.serialize_element(&SerializeInfer::new(element, ob_type_lookup))?
             }
-            ObType::Tuple => {
-                let py_list: &PyTuple = self.obj.cast_as().map_err(py_err_to_serde)?;
-                let mut seq = serializer.serialize_seq(Some(py_list.len()))?;
-                for element in py_list {
-                    seq.serialize_element(&self.with_obj(element))?
-                }
-                seq.end()
+            seq.end()
+        }};
+    }
+
+    match ob_type_lookup.get_type(obj) {
+        ObType::None => serializer.serialize_none(),
+        ObType::Int => serialize!(i64),
+        ObType::Bool => serialize!(bool),
+        ObType::Float => serialize!(f64),
+        ObType::Str => serialize!(String),
+        ObType::Bytes | ObType::Bytearray => serialize!(&[u8]),
+        ObType::Dict => {
+            let py_dict: &PyDict = obj.cast_as().map_err(py_err_se_err)?;
+
+            let len = py_dict.len();
+            let mut map = serializer.serialize_map(Some(len))?;
+            for (k, v) in py_dict {
+                map.serialize_entry(
+                    &SerializeInfer::new(k, ob_type_lookup),
+                    &SerializeInfer::new(v, ob_type_lookup),
+                )?;
             }
-            _ => todo!(),
+            map.end()
         }
+        ObType::List => {
+            serialize_seq!(&PyList)
+        }
+        ObType::Tuple => {
+            serialize_seq!(&PyTuple)
+        }
+        ObType::Set => {
+            serialize_seq!(&PySet)
+        }
+        ObType::FrozenSet => {
+            serialize_seq!(&PyFrozenSet)
+        }
+        ObType::DateTime => {
+            let dt_str = obj
+                .cast_as::<PyDateTime>()
+                .map_err(py_err_se_err)?
+                .str()
+                .map_err(py_err_se_err)?
+                .to_str()
+                .map_err(py_err_se_err)?;
+            if dt_str.ends_with("+00:00") {
+                let mut is_dt = dt_str.to_string();
+                is_dt.replace_range(dt_str.len() - 5.., "Z");
+                serializer.serialize_str(&is_dt)
+            } else {
+                serializer.serialize_str(dt_str)
+            }
+        }
+        ObType::Date => serializer.serialize_str(
+            obj.cast_as::<PyDate>()
+                .map_err(py_err_se_err)?
+                .str()
+                .map_err(py_err_se_err)?
+                .to_str()
+                .map_err(py_err_se_err)?,
+        ),
+        ObType::Time => serializer.serialize_str(
+            obj.cast_as::<PyTime>()
+                .map_err(py_err_se_err)?
+                .str()
+                .map_err(py_err_se_err)?
+                .to_str()
+                .map_err(py_err_se_err)?,
+        ),
+        _ => todo!(),
     }
 }
 
@@ -102,22 +156,28 @@ pub struct ObTypeLookup {
     string: usize,
     bytes: usize,
     bytearray: usize,
+    // mapping types
+    dict: usize,
     // sequence types
     list: usize,
     tuple: usize,
-    // mapping types
-    dict: usize,
+    set: usize,
+    frozenset: usize,
     // datetime types
     datetime: usize,
     date: usize,
     time: usize,
     timedelta: usize,
+    // types from this package
+    url: usize,
+    multihost_url: usize,
 }
 
 static TYPE_LOOKUP: GILOnceCell<ObTypeLookup> = GILOnceCell::new();
 
 impl ObTypeLookup {
     fn new(py: Python) -> Self {
+        let lib_url = url::Url::parse("https://example.com").unwrap();
         Self {
             none: py.None().as_ref(py).get_type_ptr() as usize,
             // numeric types
@@ -131,6 +191,8 @@ impl ObTypeLookup {
             // sequence types
             list: PyList::empty(py).get_type_ptr() as usize,
             tuple: PyTuple::empty(py).get_type_ptr() as usize,
+            set: PySet::empty(py).unwrap().get_type_ptr() as usize,
+            frozenset: PyFrozenSet::empty(py).unwrap().get_type_ptr() as usize,
             // mapping types
             dict: PyDict::new(py).get_type_ptr() as usize,
             // datetime types
@@ -140,6 +202,9 @@ impl ObTypeLookup {
             date: PyDate::new(py, 2000, 1, 1).unwrap().get_type_ptr() as usize,
             time: PyTime::new(py, 0, 0, 0, 0, None).unwrap().get_type_ptr() as usize,
             timedelta: PyDelta::new(py, 0, 0, 0, false).unwrap().get_type_ptr() as usize,
+            // types from this package
+            url: PyUrl::new(lib_url.clone()).into_py(py).as_ref(py).get_type_ptr() as usize,
+            multihost_url: PyMultiHostUrl::new(lib_url, None).into_py(py).as_ref(py).get_type_ptr() as usize,
         }
     }
 
@@ -149,6 +214,7 @@ impl ObTypeLookup {
 
     fn get_type(&self, obj: &PyAny) -> ObType {
         let ob_type = obj.get_type_ptr() as usize;
+        // this should be pretty fast, but still order is a bit important, so the most common types should come first
         if ob_type == self.none {
             ObType::None
         } else if ob_type == self.int {
@@ -163,20 +229,28 @@ impl ObTypeLookup {
             ObType::Bytes
         } else if ob_type == self.bytearray {
             ObType::Bytearray
+        } else if ob_type == self.dict {
+            ObType::Dict
         } else if ob_type == self.list {
             ObType::List
         } else if ob_type == self.tuple {
             ObType::Tuple
-        } else if ob_type == self.dict {
-            ObType::Dict
+        } else if ob_type == self.set {
+            ObType::Set
+        } else if ob_type == self.frozenset {
+            ObType::FrozenSet
         } else if ob_type == self.datetime {
-            ObType::Datetime
+            ObType::DateTime
         } else if ob_type == self.date {
             ObType::Date
         } else if ob_type == self.time {
             ObType::Time
         } else if ob_type == self.timedelta {
             ObType::Timedelta
+        } else if ob_type == self.url {
+            ObType::Url
+        } else if ob_type == self.multihost_url {
+            ObType::MultiHostUrl
         } else {
             ObType::Unknown
         }
@@ -197,13 +271,18 @@ enum ObType {
     // sequence types
     List,
     Tuple,
+    Set,
+    FrozenSet,
     // mapping types
     Dict,
     // datetime types
-    Datetime,
+    DateTime,
     Date,
     Time,
     Timedelta,
+    // types from this package
+    Url,
+    MultiHostUrl,
     // unknown type
     Unknown,
 }

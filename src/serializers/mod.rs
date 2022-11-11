@@ -133,42 +133,37 @@ pub trait TypeSerializer: Send + Sync + Clone + Debug {
         format: Option<&str>, // TODO "exclude" arguments
     ) -> PyResult<PyObject>;
 
-    fn serde_serialize<S>(
+    fn serde_serialize<S: serde::ser::Serializer>(
         &self,
         value: &PyAny,
         serializer: S,
         ob_type_lookup: &ObTypeLookup,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer;
+    ) -> Result<S::Ok, S::Error>;
 }
 
 struct PydanticSerializer<'py> {
     value: &'py PyAny,
-    serializer: &'py CombinedSerializer,
+    com_serializer: &'py CombinedSerializer,
     ob_type_lookup: &'py ObTypeLookup,
 }
 
 impl<'py> PydanticSerializer<'py> {
-    fn new(value: &'py PyAny, serializer: &'py CombinedSerializer, ob_type_lookup: &'py ObTypeLookup) -> Self {
+    fn new(value: &'py PyAny, com_serializer: &'py CombinedSerializer, ob_type_lookup: &'py ObTypeLookup) -> Self {
         Self {
             value,
-            serializer,
+            com_serializer,
             ob_type_lookup,
         }
     }
 }
 
 impl<'py> Serialize for PydanticSerializer<'py> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        self.serializer
+    fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.com_serializer
             .serde_serialize(self.value, serializer, self.ob_type_lookup)
     }
 }
 
-fn py_err_to_serde<T: serde::ser::Error, E: fmt::Display>(py_error: E) -> T {
+fn py_err_se_err<T: serde::ser::Error, E: fmt::Display>(py_error: E) -> T {
     T::custom(py_error.to_string())
 }

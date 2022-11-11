@@ -1,11 +1,10 @@
 use crate::build_tools::SchemaDict;
-use crate::serializers::PydanticSerializer;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use serde::ser::SerializeSeq;
 
 use super::any::ObTypeLookup;
-use super::{build_serializer, py_err_to_serde, BuildSerializer, CombinedSerializer, TypeSerializer};
+use super::{build_serializer, py_err_se_err, BuildSerializer, CombinedSerializer, PydanticSerializer, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct ListSerializer {
@@ -32,11 +31,13 @@ impl TypeSerializer for ListSerializer {
         Ok(items.into_py(py))
     }
 
-    fn serde_serialize<S>(&self, value: &PyAny, serializer: S, ob_type_lookup: &ObTypeLookup) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        let list: &PyList = value.cast_as().map_err(py_err_to_serde)?;
+    fn serde_serialize<S: serde::ser::Serializer>(
+        &self,
+        value: &PyAny,
+        serializer: S,
+        ob_type_lookup: &ObTypeLookup,
+    ) -> Result<S::Ok, S::Error> {
+        let list: &PyList = value.cast_as().map_err(py_err_se_err)?;
 
         let mut seq = serializer.serialize_seq(Some(list.len()))?;
         for value in list.iter() {
