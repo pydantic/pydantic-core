@@ -18,7 +18,6 @@ mod common;
 mod int;
 mod list;
 mod string;
-// mod tuple;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
@@ -133,7 +132,7 @@ pub fn build_serializer<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> Py
         string::StrSerializer,
         int::IntSerializer,
         list::ListSerializer,
-        // tuple::TupleSerializer,
+        list::TupleSerializer,
         any::AnySerializer,
     )
 }
@@ -144,7 +143,7 @@ pub enum CombinedSerializer {
     Str(string::StrSerializer),
     Int(int::IntSerializer),
     List(list::ListSerializer),
-    // Tuple(tuple::TupleSerializer),
+    Tuple(list::TupleSerializer),
     Any(any::AnySerializer),
     Common(common::CommonSerializer),
 }
