@@ -184,8 +184,14 @@ impl DictValidator {
                 ));
                 break;
             }
+            #[cfg(PyPy)]
             let key = elem_t.get_item(0)?;
+            #[cfg(PyPy)]
             let value = elem_t.get_item(1)?;
+            #[cfg(not(PyPy))]
+            let key = unsafe { elem_t.get_item_unchecked(0) };
+            #[cfg(not(PyPy))]
+            let value = unsafe { elem_t.get_item_unchecked(1) };
             let output_key = match key_validator.validate(py, key, extra, slots, recursion_guard) {
                 Ok(value) => Some(value),
                 Err(ValError::LineErrors(line_errors)) => {
