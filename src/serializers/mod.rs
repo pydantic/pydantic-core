@@ -10,11 +10,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 
 use self::any::ObTypeLookup;
-use crate::build_tools::{py_error_type, SchemaDict};
+use crate::build_tools::{py_err, py_error_type, SchemaDict};
 use crate::PydanticSerializationError;
 
 mod any;
-mod common;
 mod int;
 mod list;
 mod string;
@@ -117,7 +116,7 @@ macro_rules! serializer_match {
             $(
                 <$validator>::EXPECTED_TYPE => build_specific_serializer::<$validator>($type_, $dict, $config),
             )+
-            _ => common::CommonSerializer::build($type_),
+            _ => return py_err!(r#"Unknown serialization schema type: "{}""#, $type_),
         }
     };
 }
@@ -145,7 +144,6 @@ pub enum CombinedSerializer {
     List(list::ListSerializer),
     Tuple(list::TupleSerializer),
     Any(any::AnySerializer),
-    Common(common::CommonSerializer),
 }
 
 #[enum_dispatch(CombinedSerializer)]

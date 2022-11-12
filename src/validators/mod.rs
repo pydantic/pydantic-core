@@ -303,9 +303,7 @@ macro_rules! validator_match {
             $(
                 <$validator>::EXPECTED_TYPE => build_specific_validator::<$validator>($type, $dict, $config, $build_context),
             )+
-            _ => {
-                return py_err!(r#"Unknown schema type: "{}""#, $type)
-            },
+            _ => return py_err!(r#"Unknown schema type: "{}""#, $type),
         }
     };
 }
