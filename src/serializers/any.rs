@@ -28,6 +28,8 @@ impl TypeSerializer for AnySerializer {
         value: &PyAny,
         serializer: S,
         ob_type_lookup: &ObTypeLookup,
+        _include: Option<&PyAny>,
+        _exclude: Option<&PyAny>,
     ) -> Result<S::Ok, S::Error> {
         SerializeInfer::new(value, ob_type_lookup).serialize(serializer)
     }
@@ -101,14 +103,10 @@ pub fn common_serialize<S: Serializer>(
             }
             map.end()
         }
-        ObType::List => super::list::serialize_list_any(obj, serializer, ob_type_lookup),
-        ObType::Tuple => super::tuple::serialize_tuple_any(obj, serializer, ob_type_lookup),
-        ObType::Set => {
-            serialize_seq!(&PySet)
-        }
-        ObType::FrozenSet => {
-            serialize_seq!(&PyFrozenSet)
-        }
+        ObType::List => serialize_seq!(&PyList),
+        ObType::Tuple => serialize_seq!(&PyTuple),
+        ObType::Set => serialize_seq!(&PySet),
+        ObType::FrozenSet => serialize_seq!(&PyFrozenSet),
         ObType::DateTime => {
             let dt_str = obj
                 .cast_as::<PyDateTime>()

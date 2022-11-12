@@ -18,7 +18,7 @@ mod common;
 mod int;
 mod list;
 mod string;
-mod tuple;
+// mod tuple;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
@@ -40,18 +40,32 @@ impl SchemaSerializer {
         })
     }
 
-    pub fn to_python(&self, py: Python, value: &PyAny, format: Option<&str>) -> PyResult<PyObject> {
+    pub fn to_python(
+        &self,
+        py: Python,
+        value: &PyAny,
+        format: Option<&str>,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
+    ) -> PyResult<PyObject> {
         if format == Some("json") {
-            self.comb_serializer.to_python_json(py, value)
+            self.comb_serializer.to_python_json(py, value, include, exclude)
         } else {
-            self.comb_serializer.to_python(py, value, format)
+            self.comb_serializer.to_python(py, value, format, include, exclude)
         }
     }
 
-    pub fn to_json(&mut self, py: Python, value: &PyAny, indent: Option<usize>) -> PyResult<PyObject> {
+    pub fn to_json(
+        &mut self,
+        py: Python,
+        value: &PyAny,
+        indent: Option<usize>,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
+    ) -> PyResult<PyObject> {
         let writer: Vec<u8> = Vec::with_capacity(self.json_size);
 
-        let serializer = PydanticSerializer::new(value, &self.comb_serializer, &self.ob_type_lookup);
+        let serializer = PydanticSerializer::new(value, &self.comb_serializer, &self.ob_type_lookup, include, exclude);
 
         let bytes = match indent {
             Some(indent_size) => {
@@ -119,7 +133,7 @@ pub fn build_serializer<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> Py
         string::StrSerializer,
         int::IntSerializer,
         list::ListSerializer,
-        tuple::TupleSerializer,
+        // tuple::TupleSerializer,
         any::AnySerializer,
     )
 }
@@ -130,7 +144,7 @@ pub enum CombinedSerializer {
     Str(string::StrSerializer),
     Int(int::IntSerializer),
     List(list::ListSerializer),
-    Tuple(tuple::TupleSerializer),
+    // Tuple(tuple::TupleSerializer),
     Any(any::AnySerializer),
     Common(common::CommonSerializer),
 }
@@ -141,7 +155,9 @@ pub trait TypeSerializer: Send + Sync + Clone + Debug {
         &self,
         py: Python,
         value: &PyAny,
-        _format: Option<&str>, // TODO "exclude" arguments
+        _format: Option<&str>,
+        _include: Option<&PyAny>,
+        _exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         Ok(value.into_py(py))
     }
@@ -149,9 +165,11 @@ pub trait TypeSerializer: Send + Sync + Clone + Debug {
     fn to_python_json(
         &self,
         py: Python,
-        value: &PyAny, // TODO "exclude" arguments
+        value: &PyAny,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        self.to_python(py, value, Some("json"))
+        self.to_python(py, value, Some("json"), include, exclude)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -159,6 +177,8 @@ pub trait TypeSerializer: Send + Sync + Clone + Debug {
         value: &PyAny,
         serializer: S,
         ob_type_lookup: &ObTypeLookup,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
     ) -> Result<S::Ok, S::Error>;
 }
 
@@ -166,14 +186,24 @@ struct PydanticSerializer<'py> {
     value: &'py PyAny,
     com_serializer: &'py CombinedSerializer,
     ob_type_lookup: &'py ObTypeLookup,
+    include: Option<&'py PyAny>,
+    exclude: Option<&'py PyAny>,
 }
 
 impl<'py> PydanticSerializer<'py> {
-    fn new(value: &'py PyAny, com_serializer: &'py CombinedSerializer, ob_type_lookup: &'py ObTypeLookup) -> Self {
+    fn new(
+        value: &'py PyAny,
+        com_serializer: &'py CombinedSerializer,
+        ob_type_lookup: &'py ObTypeLookup,
+        include: Option<&'py PyAny>,
+        exclude: Option<&'py PyAny>,
+    ) -> Self {
         Self {
             value,
             com_serializer,
             ob_type_lookup,
+            include,
+            exclude,
         }
     }
 }
@@ -181,7 +211,7 @@ impl<'py> PydanticSerializer<'py> {
 impl<'py> Serialize for PydanticSerializer<'py> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.com_serializer
-            .serde_serialize(self.value, serializer, self.ob_type_lookup)
+            .serde_serialize(self.value, serializer, self.ob_type_lookup, self.include, self.exclude)
     }
 }
 

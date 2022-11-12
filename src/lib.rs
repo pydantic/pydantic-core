@@ -48,8 +48,8 @@ fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PydanticKnownError>()?;
     m.add_class::<PydanticOmit>()?;
     m.add_class::<PydanticSerializationError>()?;
-    m.add_class::<self::url::PyUrl>()?;
-    m.add_class::<self::url::PyMultiHostUrl>()?;
+    m.add_class::<PyUrl>()?;
+    m.add_class::<PyMultiHostUrl>()?;
     m.add_class::<SchemaSerializer>()?;
     m.add_function(wrap_pyfunction!(list_all_errors, m)?)?;
     Ok(())

@@ -25,6 +25,8 @@ impl TypeSerializer for CommonSerializer {
         value: &PyAny,
         serializer: S,
         ob_type_lookup: &ObTypeLookup,
+        _include: Option<&PyAny>,
+        _exclude: Option<&PyAny>,
     ) -> Result<S::Ok, S::Error> {
         common_serialize(value, &self.ob_type, serializer, ob_type_lookup)
     }

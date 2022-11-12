@@ -8,15 +8,22 @@ use super::list::build_sequence_serializer;
 build_sequence_serializer!(TupleSerializer, "tuple", &PyTuple, serialize_tuple_any);
 
 impl super::TypeSerializer for TupleSerializer {
-    fn to_python(&self, py: Python, value: &PyAny, format: Option<&str>) -> PyResult<PyObject> {
+    fn to_python(
+        &self,
+        py: Python,
+        value: &PyAny,
+        format: Option<&str>,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
+    ) -> PyResult<PyObject> {
         match self.item_serializer {
             Some(ref item_serializer) => {
                 let py_seq: &PyTuple = value.cast_as()?;
                 let items = py_seq
                     .iter()
-                    .map(|item| item_serializer.to_python(py, item, format))
+                    .map(|item| item_serializer.to_python(py, item, format, include, exclude))
                     .collect::<PyResult<Vec<_>>>()?;
-                Ok(items.into_py(py))
+                Ok(PyTuple::new(py, items).into_py(py))
             }
             None => Ok(value.into_py(py)),
         }
@@ -25,14 +32,16 @@ impl super::TypeSerializer for TupleSerializer {
     fn to_python_json(
         &self,
         py: Python,
-        value: &PyAny, // TODO "exclude" arguments
+        value: &PyAny,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         let py_tuple: &PyTuple = value.cast_as()?;
         match self.item_serializer {
             Some(ref item_serializer) => {
                 let items = py_tuple
                     .iter()
-                    .map(|item| item_serializer.to_python_json(py, item))
+                    .map(|item| item_serializer.to_python_json(py, item, include, exclude))
                     .collect::<PyResult<Vec<_>>>()?;
                 Ok(items.into_py(py))
             }
@@ -45,6 +54,8 @@ impl super::TypeSerializer for TupleSerializer {
         value: &PyAny,
         serializer: S,
         ob_type_lookup: &super::any::ObTypeLookup,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
     ) -> Result<S::Ok, S::Error> {
         match self.item_serializer {
             Some(ref item_serializer) => {
@@ -52,7 +63,8 @@ impl super::TypeSerializer for TupleSerializer {
 
                 let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
                 for value in py_seq.iter() {
-                    let item_serialize = super::PydanticSerializer::new(value, item_serializer, ob_type_lookup);
+                    let item_serialize =
+                        super::PydanticSerializer::new(value, item_serializer, ob_type_lookup, include, exclude);
                     seq.serialize_element(&item_serialize)?;
                 }
                 seq.end()

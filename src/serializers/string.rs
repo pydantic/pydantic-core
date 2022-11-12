@@ -21,6 +21,8 @@ impl TypeSerializer for StrSerializer {
         value: &PyAny,
         serializer: S,
         _ob_type_lookup: &ObTypeLookup,
+        _include: Option<&PyAny>,
+        _exclude: Option<&PyAny>,
     ) -> Result<S::Ok, S::Error> {
         serialize_str(value, serializer)
     }
