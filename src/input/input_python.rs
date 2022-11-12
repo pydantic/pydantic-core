@@ -328,7 +328,7 @@ impl<'a> Input<'a> for PyAny {
     fn lax_dict(&'a self) -> ValResult<GenericMapping<'a>> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
             Ok(dict.into())
-        } else if let Some(generic_mapping) = mapping_as_dict(self) {
+        } else if let Some(generic_mapping) = cast_as_mapping(self) {
             generic_mapping
         } else {
             Err(ValError::new(ErrorType::DictType, self))
@@ -342,7 +342,7 @@ impl<'a> Input<'a> for PyAny {
                 return Ok(dict.into());
             } else if !strict {
                 // we can't do this in one set of if/else because we need to check from_mapping before doing this
-                if let Some(generic_mapping) = mapping_as_dict(self) {
+                if let Some(generic_mapping) = cast_as_mapping(self) {
                     return generic_mapping;
                 }
             }
@@ -643,8 +643,7 @@ impl<'a> Input<'a> for PyAny {
 }
 
 /// return None if obj is not a mapping (cast_as::<PyMapping> fails)
-/// otherwise try to covert the mapping to a dict and return an Some(error) if it fails
-fn mapping_as_dict(obj: &PyAny) -> Option<ValResult<GenericMapping>> {
+fn cast_as_mapping(obj: &PyAny) -> Option<ValResult<GenericMapping>> {
     let mapping = match obj.cast_as() {
         Ok(mapping) => mapping,
         Err(_) => return None,
