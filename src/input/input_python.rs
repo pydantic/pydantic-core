@@ -215,6 +215,8 @@ impl<'a> Input<'a> for PyAny {
             };
             Ok(str.into())
         } else if let Ok(py_byte_array) = self.cast_as::<PyByteArray>() {
+            // see https://docs.rs/pyo3/latest/pyo3/types/struct.PyByteArray.html#method.as_bytes
+            // for why this is marked unsafe
             let str = match from_utf8(unsafe { py_byte_array.as_bytes() }) {
                 Ok(s) => s,
                 Err(_) => return Err(ValError::new(ErrorType::StringUnicode, self)),

@@ -11,7 +11,7 @@ pub struct IntSerializer;
 impl BuildSerializer for IntSerializer {
     const EXPECTED_TYPE: &'static str = "int";
 
-    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build_combined(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
         Ok(Self {}.into())
     }
 }

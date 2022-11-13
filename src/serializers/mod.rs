@@ -10,7 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 
 use self::any::ObTypeLookup;
-use crate::build_tools::{py_err, py_error_type, SchemaDict};
+use crate::build_tools::{py_error_type, SchemaDict};
 use crate::PydanticSerializationError;
 
 mod any;
@@ -23,18 +23,16 @@ mod string;
 pub struct SchemaSerializer {
     comb_serializer: CombinedSerializer,
     json_size: usize,
-    ob_type_lookup: ObTypeLookup,
 }
 
 #[pymethods]
 impl SchemaSerializer {
     #[new]
-    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
+    pub fn py_new(schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
         let serializer = build_serializer(schema, config)?;
         Ok(Self {
             comb_serializer: serializer,
             json_size: 1024,
-            ob_type_lookup: ObTypeLookup::cached(py).clone(),
         })
     }
 
@@ -47,9 +45,11 @@ impl SchemaSerializer {
         exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         if format == Some("json") {
-            self.comb_serializer.to_python_json(py, value, include, exclude)
+            let ob_type_lookup = ObTypeLookup::cached(py);
+            self.comb_serializer
+                .to_python_json(value, ob_type_lookup, include, exclude)
         } else {
-            self.comb_serializer.to_python(py, value, format, include, exclude)
+            self.comb_serializer.to_python(value, format, include, exclude)
         }
     }
 
@@ -63,7 +63,8 @@ impl SchemaSerializer {
     ) -> PyResult<PyObject> {
         let writer: Vec<u8> = Vec::with_capacity(self.json_size);
 
-        let serializer = PydanticSerializer::new(value, &self.comb_serializer, &self.ob_type_lookup, include, exclude);
+        let ob_type_lookup = ObTypeLookup::cached(py);
+        let serializer = PydanticSerializer::new(value, &self.comb_serializer, ob_type_lookup, include, exclude);
 
         let bytes = match indent {
             Some(indent_size) => {
@@ -97,7 +98,7 @@ impl SchemaSerializer {
 pub trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer>;
+    fn build_combined(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer>;
 }
 
 fn build_specific_serializer<'a, T: BuildSerializer>(
@@ -105,7 +106,7 @@ fn build_specific_serializer<'a, T: BuildSerializer>(
     schema_dict: &'a PyDict,
     config: Option<&'a PyDict>,
 ) -> PyResult<CombinedSerializer> {
-    T::build(schema_dict, config)
+    T::build_combined(schema_dict, config)
         .map_err(|err| py_error_type!("Error building \"{}\" serializer:\n  {}", val_type, err))
 }
 
@@ -116,7 +117,7 @@ macro_rules! serializer_match {
             $(
                 <$validator>::EXPECTED_TYPE => build_specific_serializer::<$validator>($type_, $dict, $config),
             )+
-            _ => return py_err!(r#"Unknown serialization schema type: "{}""#, $type_),
+            _ => any::AnySerializer::build_combined($dict, $config),
         }
     };
 }
@@ -150,23 +151,22 @@ pub enum CombinedSerializer {
 pub trait TypeSerializer: Send + Sync + Clone + Debug {
     fn to_python(
         &self,
-        py: Python,
         value: &PyAny,
         _format: Option<&str>,
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        Ok(value.into_py(py))
+        Ok(value.into_py(value.py()))
     }
 
     fn to_python_json(
         &self,
-        py: Python,
         value: &PyAny,
+        _ob_type_lookup: &ObTypeLookup,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        self.to_python(py, value, Some("json"), include, exclude)
+        self.to_python(value, Some("json"), include, exclude)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(

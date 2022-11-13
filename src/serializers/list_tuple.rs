@@ -13,7 +13,7 @@ use crate::build_tools::SchemaDict;
 
 type IncEx = Option<IntMap<usize, Option<PyObject>>>;
 
-fn to_no_hash_set(value: Option<&PyAny>) -> PyResult<IncEx> {
+pub fn to_inc_ex(value: Option<&PyAny>) -> PyResult<IncEx> {
     match value {
         Some(value) => {
             if let Ok(py_set) = value.cast_as::<PySet>() {
@@ -56,16 +56,16 @@ macro_rules! build_sequence_serializer {
         impl BuildSerializer for $struct_name {
             const EXPECTED_TYPE: &'static str = $expected_type;
 
-            fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+            fn build_combined(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
                 let py = schema.py();
                 let item_serializer = match schema.get_as::<&PyDict>(pyo3::intern!(py, "items_schema"))? {
                     Some(items_schema) => build_serializer(items_schema, config)?,
-                    None => AnySerializer::build(schema, config)?,
+                    None => AnySerializer::build_combined(schema, config)?,
                 };
                 Ok(Self {
                     item_serializer: Box::new(item_serializer),
-                    include: to_no_hash_set(schema.get_item(pyo3::intern!(py, "include")))?,
-                    exclude: to_no_hash_set(schema.get_item(pyo3::intern!(py, "exclude")))?,
+                    include: to_inc_ex(schema.get_item(pyo3::intern!(py, "include")))?,
+                    exclude: to_inc_ex(schema.get_item(pyo3::intern!(py, "exclude")))?,
                 }
                 .into())
             }
@@ -81,7 +81,7 @@ fn union_inc_ex<'py>(
     val_time_arg: Option<&'py PyAny>,
     self_inc_ex: &'py IncEx,
 ) -> PyResult<Cow<'py, IncEx>> {
-    match to_no_hash_set(val_time_arg)? {
+    match to_inc_ex(val_time_arg)? {
         Some(mut inc_ex) => {
             if let Some(self_inc_ex) = self_inc_ex {
                 // this is a union, not an intersection!
@@ -142,12 +142,12 @@ macro_rules! sequence_serializer_impl {
     (to_python: $type_:ident) => {
         fn to_python(
             &self,
-            py: Python,
             value: &PyAny,
             format: Option<&str>,
             include: Option<&PyAny>,
             exclude: Option<&PyAny>,
         ) -> PyResult<PyObject> {
+            let py = value.py();
             let include = union_inc_ex(py, include, &self.include)?;
             let exclude = union_inc_ex(py, exclude, &self.exclude)?;
             let py_seq: &$type_ = value.cast_as()?;
@@ -160,7 +160,7 @@ macro_rules! sequence_serializer_impl {
             } else {
                 for (index, element) in py_seq.iter().enumerate() {
                     if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
-                        items.push(item_serializer.to_python(py, element, format, next_include, next_exclude)?);
+                        items.push(item_serializer.to_python(element, format, next_include, next_exclude)?);
                     }
                 }
                 Ok($type_::new(py, items).into_py(py))
@@ -209,28 +209,39 @@ impl TypeSerializer for TupleSerializer {
     // just like to_python, but we need to return a list, not a tuple
     fn to_python_json(
         &self,
-        py: Python,
         value: &PyAny,
+        _ob_type_lookup: &ObTypeLookup,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
+        let py = value.py();
         let include = union_inc_ex(py, include, &self.include)?;
         let exclude = union_inc_ex(py, exclude, &self.exclude)?;
-        let py_seq: &PyTuple = value.cast_as()?;
-        let mut items = Vec::with_capacity(py_seq.len());
-        let item_serializer = self.item_serializer.as_ref();
-
-        if matches!(item_serializer, CombinedSerializer::Any(_)) && include.is_none() && exclude.is_none() {
-            // if we are using the AnySerializer and there is no include/exclude, we can just return the value
-            Ok(PyList::new(py, value.iter()).into_py(py))
-        } else {
-            for (index, element) in py_seq.iter().enumerate() {
-                if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
-                    items.push(item_serializer.to_python(py, element, Some("json"), next_include, next_exclude)?);
-                }
-            }
-            Ok(items.into_py(py))
-        }
+        tuple_to_python_json(value, include, exclude, &self.item_serializer)
     }
     sequence_serializer_impl!(serde_serialize: PyTuple);
+}
+
+pub fn tuple_to_python_json(
+    value: &PyAny,
+    include: Cow<IncEx>,
+    exclude: Cow<IncEx>,
+    item_serializer: &CombinedSerializer,
+) -> PyResult<PyObject> {
+    let py = value.py();
+    let py_seq: &PyTuple = value.cast_as()?;
+
+    if matches!(item_serializer, CombinedSerializer::Any(_)) && include.is_none() && exclude.is_none() {
+        // if we are using the AnySerializer and there is no include/exclude, we can just return the value
+        // converted to a list
+        Ok(PyList::new(py, py_seq.iter()).into_py(py))
+    } else {
+        let mut items = Vec::with_capacity(py_seq.len());
+        for (index, element) in py_seq.iter().enumerate() {
+            if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
+                items.push(item_serializer.to_python(element, Some("json"), next_include, next_exclude)?);
+            }
+        }
+        Ok(PyList::new(py, items).into_py(py))
+    }
 }

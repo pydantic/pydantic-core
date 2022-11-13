@@ -1,13 +1,18 @@
+use std::borrow::Cow;
+use std::str::from_utf8;
+
+use pyo3::exceptions::PyUnicodeEncodeError;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{
     PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTime, PyTuple,
 };
 
+use crate::build_tools::py_err;
+use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use strum_macros::EnumString;
 
 use crate::url::{PyMultiHostUrl, PyUrl};
-use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use super::{py_err_se_err, BuildSerializer, CombinedSerializer, TypeSerializer};
 
@@ -17,12 +22,52 @@ pub struct AnySerializer;
 impl BuildSerializer for AnySerializer {
     const EXPECTED_TYPE: &'static str = "any";
 
-    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build_combined(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
         Ok(Self {}.into())
     }
 }
 
 impl TypeSerializer for AnySerializer {
+    // TODO implement to_python and respect include and exclude on list, tuple and dict
+
+    fn to_python_json(
+        &self,
+        value: &PyAny,
+        ob_type_lookup: &ObTypeLookup,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
+    ) -> PyResult<PyObject> {
+        let py = value.py();
+        let ob_type = ob_type_lookup.get_type(value);
+        match ob_type {
+            ObType::Bytes => {
+                let py_bytes: &PyBytes = value.cast_as()?;
+                match from_utf8(py_bytes.as_bytes()) {
+                    Ok(s) => Ok(s.into_py(py)),
+                    Err(e) => py_err!(PyUnicodeEncodeError; "{}", e),
+                }
+            }
+            ObType::Bytearray => {
+                let py_byte_array: &PyByteArray = value.cast_as()?;
+                // see https://docs.rs/pyo3/latest/pyo3/types/struct.PyByteArray.html#method.as_bytes
+                // for why this is marked unsafe
+                let bytes = unsafe { py_byte_array.as_bytes() };
+                match from_utf8(bytes) {
+                    Ok(s) => Ok(s.into_py(py)),
+                    Err(e) => py_err!(PyUnicodeEncodeError; "{}", e),
+                }
+            }
+            ObType::Tuple => {
+                let include = Cow::Owned(super::list_tuple::to_inc_ex(include)?);
+                let exclude = Cow::Owned(super::list_tuple::to_inc_ex(exclude)?);
+                // is this really the best way to do this?
+                let item_serializer = self.clone().into();
+                super::list_tuple::tuple_to_python_json(value, include, exclude, &item_serializer)
+            }
+            _ => self.to_python(value, Some("json"), include, exclude),
+        }
+    }
+
     fn serde_serialize<S: Serializer>(
         &self,
         value: &PyAny,
@@ -89,7 +134,21 @@ pub fn common_serialize<S: Serializer>(
         ObType::Bool => serialize!(bool),
         ObType::Float => serialize!(f64),
         ObType::Str => super::string::serialize_str(obj, serializer),
-        ObType::Bytes | ObType::Bytearray => serialize!(&[u8]),
+        ObType::Bytes => {
+            let py_bytes: &PyBytes = obj.cast_as().map_err(py_err_se_err)?;
+            match from_utf8(py_bytes.as_bytes()) {
+                Ok(s) => serializer.serialize_str(s),
+                Err(e) => Err(py_err_se_err(e)),
+            }
+        }
+        ObType::Bytearray => {
+            let py_byte_array: &PyByteArray = obj.cast_as().map_err(py_err_se_err)?;
+            let bytes = unsafe { py_byte_array.as_bytes() };
+            match from_utf8(bytes) {
+                Ok(s) => serializer.serialize_str(s),
+                Err(e) => Err(py_err_se_err(e)),
+            }
+        }
         ObType::Dict => {
             let py_dict: &PyDict = obj.cast_as().map_err(py_err_se_err)?;
 
