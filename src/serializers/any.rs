@@ -106,8 +106,8 @@ pub fn common_serialize<S: Serializer>(
         ObType::List => serialize_seq!(&PyList),
         ObType::Tuple => serialize_seq!(&PyTuple),
         ObType::Set => serialize_seq!(&PySet),
-        ObType::FrozenSet => serialize_seq!(&PyFrozenSet),
-        ObType::DateTime => {
+        ObType::Frozenset => serialize_seq!(&PyFrozenSet),
+        ObType::Datetime => {
             let dt_str = obj
                 .cast_as::<PyDateTime>()
                 .map_err(py_err_se_err)?
@@ -168,7 +168,7 @@ pub struct ObTypeLookup {
     timedelta: usize,
     // types from this package
     url: usize,
-    multihost_url: usize,
+    multi_host_url: usize,
 }
 
 static TYPE_LOOKUP: GILOnceCell<ObTypeLookup> = GILOnceCell::new();
@@ -202,7 +202,7 @@ impl ObTypeLookup {
             timedelta: PyDelta::new(py, 0, 0, 0, false).unwrap().get_type_ptr() as usize,
             // types from this package
             url: PyUrl::new(lib_url.clone()).into_py(py).as_ref(py).get_type_ptr() as usize,
-            multihost_url: PyMultiHostUrl::new(lib_url, None).into_py(py).as_ref(py).get_type_ptr() as usize,
+            multi_host_url: PyMultiHostUrl::new(lib_url, None).into_py(py).as_ref(py).get_type_ptr() as usize,
         }
     }
 
@@ -213,6 +213,7 @@ impl ObTypeLookup {
     fn get_type(&self, obj: &PyAny) -> ObType {
         let ob_type = obj.get_type_ptr() as usize;
         // this should be pretty fast, but still order is a bit important, so the most common types should come first
+        // thus we don't follow the order of ObType
         if ob_type == self.none {
             ObType::None
         } else if ob_type == self.int {
@@ -223,10 +224,6 @@ impl ObTypeLookup {
             ObType::Float
         } else if ob_type == self.string {
             ObType::Str
-        } else if ob_type == self.bytes {
-            ObType::Bytes
-        } else if ob_type == self.bytearray {
-            ObType::Bytearray
         } else if ob_type == self.dict {
             ObType::Dict
         } else if ob_type == self.list {
@@ -236,18 +233,22 @@ impl ObTypeLookup {
         } else if ob_type == self.set {
             ObType::Set
         } else if ob_type == self.frozenset {
-            ObType::FrozenSet
+            ObType::Frozenset
+        } else if ob_type == self.bytes {
+            ObType::Bytes
         } else if ob_type == self.datetime {
-            ObType::DateTime
+            ObType::Datetime
         } else if ob_type == self.date {
             ObType::Date
         } else if ob_type == self.time {
             ObType::Time
         } else if ob_type == self.timedelta {
             ObType::Timedelta
+        } else if ob_type == self.bytearray {
+            ObType::Bytearray
         } else if ob_type == self.url {
             ObType::Url
-        } else if ob_type == self.multihost_url {
+        } else if ob_type == self.multi_host_url {
             ObType::MultiHostUrl
         } else {
             ObType::Unknown
@@ -271,11 +272,11 @@ pub enum ObType {
     List,
     Tuple,
     Set,
-    FrozenSet,
+    Frozenset,
     // mapping types
     Dict,
     // datetime types
-    DateTime,
+    Datetime,
     Date,
     Time,
     Timedelta,

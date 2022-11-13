@@ -13,6 +13,7 @@ __all__ = (
     '__version__',
     'build_profile',
     'SchemaValidator',
+    'SchemaSerializer',
     'Url',
     'MultiHostUrl',
     'SchemaError',
@@ -20,6 +21,7 @@ __all__ = (
     'PydanticCustomError',
     'PydanticKnownError',
     'PydanticOmit',
+    'PydanticSerializationError',
     'list_all_errors',
 )
 __version__: str
@@ -39,6 +41,11 @@ class SchemaValidator:
     def validate_assignment(
         self, field: str, input: Any, data: 'dict[str, Any]', strict: 'bool | None' = None, context: Any = None
     ) -> 'dict[str, Any]': ...
+
+class SchemaSerializer:
+    def __init__(self, schema: CoreSchema, config: 'CoreConfig | None' = None) -> None: ...
+    def to_python(self, value: Any, format: str | None = None, include: Any = None, exclude: Any = None) -> Any: ...
+    def to_json(self, value: Any, indent: int | None = None, include: Any = None, exclude: Any = None) -> bytes: ...
 
 class Url:
     scheme: str
@@ -110,6 +117,9 @@ class PydanticKnownError(ValueError):
 
 class PydanticOmit(Exception):
     def __init__(self) -> None: ...
+
+class PydanticSerializationError(ValueError):
+    def __init__(self, message: str) -> None: ...
 
 class ErrorTypeInfo(TypedDict):
     type: ErrorType
