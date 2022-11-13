@@ -15,7 +15,7 @@ use crate::PydanticSerializationError;
 
 mod any;
 mod int;
-mod list;
+mod list_tuple;
 mod string;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
@@ -130,8 +130,8 @@ pub fn build_serializer<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> Py
         config,
         string::StrSerializer,
         int::IntSerializer,
-        list::ListSerializer,
-        list::TupleSerializer,
+        list_tuple::ListSerializer,
+        list_tuple::TupleSerializer,
         any::AnySerializer,
     )
 }
@@ -141,8 +141,8 @@ pub fn build_serializer<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> Py
 pub enum CombinedSerializer {
     Str(string::StrSerializer),
     Int(int::IntSerializer),
-    List(list::ListSerializer),
-    Tuple(list::TupleSerializer),
+    List(list_tuple::ListSerializer),
+    Tuple(list_tuple::TupleSerializer),
     Any(any::AnySerializer),
 }
 
