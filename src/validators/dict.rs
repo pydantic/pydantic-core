@@ -171,7 +171,7 @@ impl DictValidator {
             Err(err) => return Err(ValError::new(ErrorType::MappingType { error: err.to_string() }, input)),
         };
         for elem in items.iter()? {
-            let elem_t = elem.unwrap().downcast::<PyTuple>()?;
+            let elem_t = elem?.downcast::<PyTuple>()?;
             if elem_t.len() != 2 {
                 errors.push(ValLineError::new(
                     ErrorType::MappingType {

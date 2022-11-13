@@ -358,7 +358,7 @@ impl Validator for TypedDictValidator {
                         None => unreachable!(),
                     };
                     for elem in d.items()?.iter()? {
-                        let elem_t = elem.unwrap().downcast::<PyTuple>()?;
+                        let elem_t = elem?.downcast::<PyTuple>()?;
                         #[cfg(PyPy)]
                         let raw_key = elem_t.get_item(0)?;
                         #[cfg(PyPy)]
