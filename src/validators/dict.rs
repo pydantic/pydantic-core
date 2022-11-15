@@ -89,7 +89,7 @@ impl Validator for DictValidator {
 }
 
 macro_rules! build_validate {
-    ($name:ident, $dict_type:ty) => {
+    ($name:ident, $dict_type:ty, $iter_macro:ident, $extract_macro:ident) => {
         fn $name<'s, 'data>(
             &'s self,
             py: Python<'data>,
@@ -104,8 +104,8 @@ macro_rules! build_validate {
 
             let key_validator = self.key_validator.as_ref();
             let value_validator = self.value_validator.as_ref();
-
-            for (key, value) in dict.iter() {
+            for elem in $iter_macro(dict, input) {
+                let (key, value) = $extract_macro!(elem, input);
                 let output_key = match key_validator.validate(py, key, extra, slots, recursion_guard) {
                     Ok(value) => Some(value),
                     Err(ValError::LineErrors(line_errors)) => {
@@ -147,11 +147,60 @@ macro_rules! build_validate {
     };
 }
 
+
+fn extract_mapping_elem<'data>(
+    elem: Result<&PyAny, PyErr>,
+    input: &'data impl Input<'data>,
+) -> ValResult<'data, (&'data PyAny, &'data PyAny)> {
+    let elem_t = elem?.downcast::<PyTuple>()?;
+    if elem_t.len() != 2 {
+        return Err(ValError::new(
+            ErrorType::MappingType {
+                error: format!(
+                    "ValueError: expected tuple of length 2, but got tuple of length {}",
+                    elem_t.len()
+                ),
+            },
+            input,
+        ));
+    };
+    #[cfg(PyPy)]
+    let key = elem_t.get_item(0)?;
+    #[cfg(PyPy)]
+    let value = elem_t.get_item(1)?;
+    #[cfg(not(PyPy))]
+    let key = unsafe { elem_t.get_item_unchecked(0) };
+    #[cfg(not(PyPy))]
+    let value = unsafe { elem_t.get_item_unchecked(1) };
+    Ok((key, value))
+}
+
+macro_rules! iter_dict {
+    ($obj:ident) => {
+        $obj.iter()
+    };
+}
+
+macro_rules! iter_mapping {
+    ($obj:ident) => {
+        $obj.iter_mapping()?
+    };
+}
+
+macro_rules! extract_dict_elem {
+    ($elem:ident, $input:ident) => {
+        $elem
+    };
+}
+
+macro_rules! extract_mapping_elem {
+    ($elem:ident, $input:ident) => {
+        extract_mapping_elem($elem, $input)?
+    };
+}
+
 trait IterMapping {
-    fn iter_mapping<'data>(
-        &'data self,
-        input: &'data impl Input<'data>,
-    ) -> ValResult<'data, &PyIterator>;
+    fn iter_mapping<'data>(&'data self, input: &'data impl Input<'data>) -> ValResult<'data, &PyIterator>;
 }
 
 impl IterMapping for PyMapping {
@@ -165,82 +214,7 @@ impl IterMapping for PyMapping {
 }
 
 impl DictValidator {
-    build_validate!(validate_dict, PyDict);
-    build_validate!(validate_json_object, JsonObject);
-
-    fn validate_mapping<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        dict: &'data PyMapping,
-        extra: &Extra,
-        slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let output = PyDict::new(py);
-        let mut errors: Vec<ValLineError> = Vec::new();
-
-        let key_validator = self.key_validator.as_ref();
-        let value_validator = self.value_validator.as_ref();
-
-        for elem in dict.iter_mapping(input)? {
-            let elem_t = elem?.downcast::<PyTuple>()?;
-            if elem_t.len() != 2 {
-                errors.push(ValLineError::new(
-                    ErrorType::MappingType {
-                        error: format!(
-                            "ValueError: expected tuple of length 2, but got tuple of length {}",
-                            elem_t.len()
-                        ),
-                    },
-                    input,
-                ));
-                break;
-            }
-            #[cfg(PyPy)]
-            let key = elem_t.get_item(0)?;
-            #[cfg(PyPy)]
-            let value = elem_t.get_item(1)?;
-            #[cfg(not(PyPy))]
-            let key = unsafe { elem_t.get_item_unchecked(0) };
-            #[cfg(not(PyPy))]
-            let value = unsafe { elem_t.get_item_unchecked(1) };
-            let output_key = match key_validator.validate(py, key, extra, slots, recursion_guard) {
-                Ok(value) => Some(value),
-                Err(ValError::LineErrors(line_errors)) => {
-                    for err in line_errors {
-                        // these are added in reverse order so [key] is shunted along by the second call
-                        errors.push(
-                            err.with_outer_location("[key]".into())
-                                .with_outer_location(key.as_loc_item()),
-                        );
-                    }
-                    None
-                }
-                Err(ValError::Omit) => continue,
-                Err(err) => return Err(err),
-            };
-            let output_value = match value_validator.validate(py, value, extra, slots, recursion_guard) {
-                Ok(value) => Some(value),
-                Err(ValError::LineErrors(line_errors)) => {
-                    for err in line_errors {
-                        errors.push(err.with_outer_location(key.as_loc_item()));
-                    }
-                    None
-                }
-                Err(ValError::Omit) => continue,
-                Err(err) => return Err(err),
-            };
-            if let (Some(key), Some(value)) = (output_key, output_value) {
-                output.set_item(key, value)?;
-            }
-        }
-
-        if errors.is_empty() {
-            length_check!(input, "Dictionary", self.min_length, self.max_length, output);
-            Ok(output.into())
-        } else {
-            Err(ValError::LineErrors(errors))
-        }
-    }
+    build_validate!(validate_dict, PyDict, iter_dict, extract_dict_elem);
+    build_validate!(validate_json_object, JsonObject, iter_dict, extract_dict_elem);
+    build_validate!(validate_mapping, PyMapping, iter_mapping, extract_mapping_elem);
 }
