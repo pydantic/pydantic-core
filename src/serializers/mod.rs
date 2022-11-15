@@ -44,12 +44,15 @@ impl SchemaSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        if format == Some("json") {
-            let ob_type_lookup = ObTypeLookup::cached(py);
-            self.comb_serializer
-                .to_python_json(value, ob_type_lookup, include, exclude)
-        } else {
-            self.comb_serializer.to_python(value, format, include, exclude)
+        let format: SerFormat = format.into();
+        let ob_type_lookup = ObTypeLookup::cached(py);
+        match format {
+            SerFormat::Json => self
+                .comb_serializer
+                .to_python_json(value, ob_type_lookup, include, exclude),
+            format => self
+                .comb_serializer
+                .to_python(value, &format, ob_type_lookup, include, exclude),
         }
     }
 
@@ -95,7 +98,7 @@ impl SchemaSerializer {
     }
 }
 
-pub trait BuildSerializer: Sized {
+trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
 
     fn build_combined(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer>;
@@ -122,7 +125,7 @@ macro_rules! serializer_match {
     };
 }
 
-pub fn build_serializer<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> PyResult<CombinedSerializer> {
+fn build_serializer<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> PyResult<CombinedSerializer> {
     let dict: &PyDict = schema.cast_as()?;
     let type_: &str = dict.get_as_req(intern!(schema.py(), "type"))?;
     serializer_match!(
@@ -139,7 +142,7 @@ pub fn build_serializer<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> Py
 
 #[derive(Debug, Clone)]
 #[enum_dispatch]
-pub enum CombinedSerializer {
+enum CombinedSerializer {
     Str(string::StrSerializer),
     Int(int::IntSerializer),
     List(list_tuple::ListSerializer),
@@ -148,11 +151,12 @@ pub enum CombinedSerializer {
 }
 
 #[enum_dispatch(CombinedSerializer)]
-pub trait TypeSerializer: Send + Sync + Clone + Debug {
+trait TypeSerializer: Send + Sync + Clone + Debug {
     fn to_python(
         &self,
         value: &PyAny,
-        _format: Option<&str>,
+        _format: &SerFormat,
+        _ob_type_lookup: &ObTypeLookup,
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
@@ -162,11 +166,11 @@ pub trait TypeSerializer: Send + Sync + Clone + Debug {
     fn to_python_json(
         &self,
         value: &PyAny,
-        _ob_type_lookup: &ObTypeLookup,
+        ob_type_lookup: &ObTypeLookup,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        self.to_python(value, Some("json"), include, exclude)
+        self.to_python(value, &SerFormat::Json, ob_type_lookup, include, exclude)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -214,4 +218,22 @@ impl<'py> Serialize for PydanticSerializer<'py> {
 
 fn py_err_se_err<T: serde::ser::Error, E: fmt::Display>(py_error: E) -> T {
     T::custom(py_error.to_string())
+}
+
+#[cfg_attr(debug_assertions, derive(Debug))]
+enum SerFormat {
+    Python,
+    Json,
+    Other(String),
+}
+
+impl From<Option<&str>> for SerFormat {
+    fn from(s: Option<&str>) -> Self {
+        match s {
+            Some("json") => SerFormat::Json,
+            Some("python") => SerFormat::Python,
+            Some(other) => SerFormat::Other(other.to_string()),
+            None => SerFormat::Python,
+        }
+    }
 }

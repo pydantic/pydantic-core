@@ -16,3 +16,9 @@ def test_str():
 
     # note! serde_json serializes unicode characters differently
     assert v.to_json('emoji 💩') != json.dumps('emoji 💩')
+
+
+def test_str_fallback():
+    v = SchemaSerializer(core_schema.string_schema())
+    assert v.to_python(123) == 123
+    assert v.to_json(123) == b'123'

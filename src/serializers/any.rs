@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::str::from_utf8;
 
 use pyo3::exceptions::PyUnicodeEncodeError;
@@ -14,10 +13,10 @@ use strum_macros::EnumString;
 
 use crate::url::{PyMultiHostUrl, PyUrl};
 
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, TypeSerializer};
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, SerFormat, TypeSerializer};
 
 #[derive(Debug, Clone)]
-pub struct AnySerializer;
+pub(super) struct AnySerializer;
 
 impl BuildSerializer for AnySerializer {
     const EXPECTED_TYPE: &'static str = "any";
@@ -28,44 +27,16 @@ impl BuildSerializer for AnySerializer {
 }
 
 impl TypeSerializer for AnySerializer {
-    // TODO implement to_python and respect include and exclude on list, tuple and dict
+    // to_python is not required since we always just return the value itself
 
     fn to_python_json(
         &self,
         value: &PyAny,
         ob_type_lookup: &ObTypeLookup,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        _include: Option<&PyAny>,
+        _exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        let py = value.py();
-        let ob_type = ob_type_lookup.get_type(value);
-        match ob_type {
-            ObType::Bytes => {
-                let py_bytes: &PyBytes = value.cast_as()?;
-                match from_utf8(py_bytes.as_bytes()) {
-                    Ok(s) => Ok(s.into_py(py)),
-                    Err(e) => py_err!(PyUnicodeEncodeError; "{}", e),
-                }
-            }
-            ObType::Bytearray => {
-                let py_byte_array: &PyByteArray = value.cast_as()?;
-                // see https://docs.rs/pyo3/latest/pyo3/types/struct.PyByteArray.html#method.as_bytes
-                // for why this is marked unsafe
-                let bytes = unsafe { py_byte_array.as_bytes() };
-                match from_utf8(bytes) {
-                    Ok(s) => Ok(s.into_py(py)),
-                    Err(e) => py_err!(PyUnicodeEncodeError; "{}", e),
-                }
-            }
-            ObType::Tuple => {
-                let include = Cow::Owned(super::list_tuple::to_inc_ex(include)?);
-                let exclude = Cow::Owned(super::list_tuple::to_inc_ex(exclude)?);
-                // is this really the best way to do this?
-                let item_serializer = self.clone().into();
-                super::list_tuple::tuple_to_python_json(value, include, exclude, &item_serializer)
-            }
-            _ => self.to_python(value, Some("json"), include, exclude),
-        }
+        fallback_to_python_json(value, ob_type_lookup)
     }
 
     fn serde_serialize<S: Serializer>(
@@ -80,37 +51,71 @@ impl TypeSerializer for AnySerializer {
     }
 }
 
-pub struct SerializeInfer<'py> {
-    obj: &'py PyAny,
+pub(super) fn fallback_to_python(
+    value: &PyAny,
+    format: &SerFormat,
+    ob_type_lookup: &ObTypeLookup,
+) -> PyResult<PyObject> {
+    match format {
+        SerFormat::Json => fallback_to_python_json(value, ob_type_lookup),
+        _ => Ok(value.into_py(value.py())),
+    }
+}
+
+pub(super) fn fallback_to_python_json(value: &PyAny, ob_type_lookup: &ObTypeLookup) -> PyResult<PyObject> {
+    let py = value.py();
+    match ob_type_lookup.get_type(value) {
+        ObType::Bytes => {
+            let py_bytes: &PyBytes = value.cast_as()?;
+            match from_utf8(py_bytes.as_bytes()) {
+                Ok(s) => Ok(s.into_py(py)),
+                Err(e) => py_err!(PyUnicodeEncodeError; "{}", e),
+            }
+        }
+        ObType::Bytearray => {
+            let py_byte_array: &PyByteArray = value.cast_as()?;
+            // see https://docs.rs/pyo3/latest/pyo3/types/struct.PyByteArray.html#method.as_bytes
+            // for why this is marked unsafe
+            let bytes = unsafe { py_byte_array.as_bytes() };
+            match from_utf8(bytes) {
+                Ok(s) => Ok(s.into_py(py)),
+                Err(e) => py_err!(PyUnicodeEncodeError; "{}", e),
+            }
+        }
+        ObType::Tuple => {
+            let py_tuple: &PyTuple = value.cast_as()?;
+            // convert the tuple to a list
+            Ok(PyList::new(py, py_tuple).into_py(py))
+        }
+        _ => Ok(value.into_py(value.py())),
+    }
+}
+
+pub(super) struct SerializeInfer<'py> {
+    value: &'py PyAny,
     ob_type_lookup: &'py ObTypeLookup,
 }
 
 impl<'py> SerializeInfer<'py> {
-    pub fn new(obj: &'py PyAny, ob_type_lookup: &'py ObTypeLookup) -> Self {
-        Self { obj, ob_type_lookup }
+    pub(super) fn new(value: &'py PyAny, ob_type_lookup: &'py ObTypeLookup) -> Self {
+        Self { value, ob_type_lookup }
     }
 }
 
 impl<'py> Serialize for SerializeInfer<'py> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        common_serialize(
-            self.obj,
-            &self.ob_type_lookup.get_type(self.obj),
-            serializer,
-            self.ob_type_lookup,
-        )
+        fallback_serialize(self.value, serializer, self.ob_type_lookup)
     }
 }
 
-pub fn common_serialize<S: Serializer>(
-    obj: &PyAny,
-    ob_type: &ObType,
+pub(super) fn fallback_serialize<S: Serializer>(
+    value: &PyAny,
     serializer: S,
     ob_type_lookup: &ObTypeLookup,
 ) -> Result<S::Ok, S::Error> {
     macro_rules! serialize {
         ($t:ty) => {
-            match obj.extract::<$t>() {
+            match value.extract::<$t>() {
                 Ok(v) => v.serialize(serializer),
                 Err(e) => Err(py_err_se_err(e)),
             }
@@ -119,7 +124,7 @@ pub fn common_serialize<S: Serializer>(
 
     macro_rules! serialize_seq {
         ($t:ty) => {{
-            let py_seq: $t = obj.cast_as().map_err(py_err_se_err)?;
+            let py_seq: $t = value.cast_as().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
             for element in py_seq {
                 seq.serialize_element(&SerializeInfer::new(element, ob_type_lookup))?
@@ -128,21 +133,24 @@ pub fn common_serialize<S: Serializer>(
         }};
     }
 
-    match ob_type {
+    match ob_type_lookup.get_type(value) {
         ObType::None => serializer.serialize_none(),
         ObType::Int => serialize!(i64),
         ObType::Bool => serialize!(bool),
         ObType::Float => serialize!(f64),
-        ObType::Str => super::string::serialize_str(obj, serializer),
+        ObType::Str => {
+            let py_str: &PyString = value.cast_as().map_err(py_err_se_err)?;
+            super::string::serialize_py_str(py_str, serializer)
+        }
         ObType::Bytes => {
-            let py_bytes: &PyBytes = obj.cast_as().map_err(py_err_se_err)?;
+            let py_bytes: &PyBytes = value.cast_as().map_err(py_err_se_err)?;
             match from_utf8(py_bytes.as_bytes()) {
                 Ok(s) => serializer.serialize_str(s),
                 Err(e) => Err(py_err_se_err(e)),
             }
         }
         ObType::Bytearray => {
-            let py_byte_array: &PyByteArray = obj.cast_as().map_err(py_err_se_err)?;
+            let py_byte_array: &PyByteArray = value.cast_as().map_err(py_err_se_err)?;
             let bytes = unsafe { py_byte_array.as_bytes() };
             match from_utf8(bytes) {
                 Ok(s) => serializer.serialize_str(s),
@@ -150,7 +158,7 @@ pub fn common_serialize<S: Serializer>(
             }
         }
         ObType::Dict => {
-            let py_dict: &PyDict = obj.cast_as().map_err(py_err_se_err)?;
+            let py_dict: &PyDict = value.cast_as().map_err(py_err_se_err)?;
 
             let len = py_dict.len();
             let mut map = serializer.serialize_map(Some(len))?;
@@ -167,7 +175,7 @@ pub fn common_serialize<S: Serializer>(
         ObType::Set => serialize_seq!(&PySet),
         ObType::Frozenset => serialize_seq!(&PyFrozenSet),
         ObType::Datetime => {
-            let dt_str = obj
+            let dt_str = value
                 .cast_as::<PyDateTime>()
                 .map_err(py_err_se_err)?
                 .str()
@@ -183,7 +191,8 @@ pub fn common_serialize<S: Serializer>(
             }
         }
         ObType::Date => serializer.serialize_str(
-            obj.cast_as::<PyDate>()
+            value
+                .cast_as::<PyDate>()
                 .map_err(py_err_se_err)?
                 .str()
                 .map_err(py_err_se_err)?
@@ -191,7 +200,8 @@ pub fn common_serialize<S: Serializer>(
                 .map_err(py_err_se_err)?,
         ),
         ObType::Time => serializer.serialize_str(
-            obj.cast_as::<PyTime>()
+            value
+                .cast_as::<PyTime>()
                 .map_err(py_err_se_err)?
                 .str()
                 .map_err(py_err_se_err)?
@@ -203,7 +213,7 @@ pub fn common_serialize<S: Serializer>(
 }
 
 #[derive(Debug, Clone)]
-pub struct ObTypeLookup {
+pub(super) struct ObTypeLookup {
     none: usize,
     // numeric types
     int: usize,
@@ -265,12 +275,12 @@ impl ObTypeLookup {
         }
     }
 
-    pub fn cached(py: Python<'_>) -> &Self {
+    pub(super) fn cached(py: Python<'_>) -> &Self {
         TYPE_LOOKUP.get_or_init(py, || Self::new(py))
     }
 
-    fn get_type(&self, obj: &PyAny) -> ObType {
-        let ob_type = obj.get_type_ptr() as usize;
+    fn get_type(&self, value: &PyAny) -> ObType {
+        let ob_type = value.get_type_ptr() as usize;
         // this should be pretty fast, but still order is a bit important, so the most common types should come first
         // thus we don't follow the order of ObType
         if ob_type == self.none {
@@ -317,7 +327,7 @@ impl ObTypeLookup {
 
 #[derive(Debug, Clone, EnumString)]
 #[strum(serialize_all = "snake_case")]
-pub enum ObType {
+pub(super) enum ObType {
     None,
     // numeric types
     Int,
