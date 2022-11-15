@@ -1,8 +1,6 @@
-use pyo3::indexmap::map::Iter;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::iter::PyDictIterator;
-use pyo3::types::{PyDict, PyIterator, PyMapping, PySequence, PyTuple};
+use pyo3::types::{PyDict, PyIterator, PyMapping, PyTuple};
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
