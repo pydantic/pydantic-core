@@ -1,6 +1,8 @@
+use pyo3::indexmap::map::Iter;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyMapping, PyTuple};
+use pyo3::types::iter::PyDictIterator;
+use pyo3::types::{PyDict, PyIterator, PyMapping, PySequence, PyTuple};
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
@@ -147,6 +149,23 @@ macro_rules! build_validate {
     };
 }
 
+trait IterMapping {
+    fn iter_mapping<'data>(
+        &'data self,
+        input: &'data impl Input<'data>,
+    ) -> ValResult<'data, &PyIterator>;
+}
+
+impl IterMapping for PyMapping {
+    fn iter_mapping<'data>(&'data self, input: &'data impl Input<'data>) -> ValResult<'data, &PyIterator> {
+        let items = match self.items() {
+            Ok(items) => items,
+            Err(err) => return Err(ValError::new(ErrorType::MappingType { error: err.to_string() }, input)),
+        };
+        return Ok(items.iter()?);
+    }
+}
+
 impl DictValidator {
     build_validate!(validate_dict, PyDict);
     build_validate!(validate_json_object, JsonObject);
@@ -166,11 +185,7 @@ impl DictValidator {
         let key_validator = self.key_validator.as_ref();
         let value_validator = self.value_validator.as_ref();
 
-        let items = match dict.items() {
-            Ok(items) => items,
-            Err(err) => return Err(ValError::new(ErrorType::MappingType { error: err.to_string() }, input)),
-        };
-        for elem in items.iter()? {
+        for elem in dict.iter_mapping(input)? {
             let elem_t = elem?.downcast::<PyTuple>()?;
             if elem_t.len() != 2 {
                 errors.push(ValLineError::new(
