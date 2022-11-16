@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySet, PyTuple};
 
 use nohash_hasher::IntMap;
+use pyo3::exceptions::PyTypeError;
 use serde::ser::SerializeSeq;
 
 use super::any::{fallback_serialize, fallback_to_python, fallback_to_python_json, AnySerializer, ObTypeLookup};
@@ -25,9 +26,8 @@ pub(super) fn to_inc_ex(value: Option<&PyAny>) -> PyResult<IncEx> {
                     map.insert(item.extract()?, None);
                 }
                 Ok(Some(map))
-            } else {
+            } else if let Ok(py_dict) = value.cast_as::<PyDict>() {
                 let py = value.py();
-                let py_dict: &PyDict = value.cast_as()?;
                 let mut map: IntMap<usize, Option<PyObject>> =
                     IntMap::with_capacity_and_hasher(py_dict.len(), BuildHasherDefault::default());
                 for (key, value) in py_dict {
@@ -40,6 +40,10 @@ pub(super) fn to_inc_ex(value: Option<&PyAny>) -> PyResult<IncEx> {
                     map.insert(key.extract()?, value);
                 }
                 Ok(Some(map))
+            } else {
+                Err(PyTypeError::new_err(
+                    "`include` and `exclude` inputs must be sets or dicts.",
+                ))
             }
         }
         None => Ok(None),
