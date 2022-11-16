@@ -4,8 +4,8 @@ use std::str::from_utf8;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{
-    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList, PySet,
-    PyString, PyTime, PyTuple, PyType,
+    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList, PyMapping,
+    PySet, PyString, PyTime, PyTuple, PyType,
 };
 #[cfg(not(PyPy))]
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
@@ -328,35 +328,27 @@ impl<'a> Input<'a> for PyAny {
     fn lax_dict(&'a self) -> ValResult<GenericMapping<'a>> {
         if let Ok(dict) = self.cast_as::<PyDict>() {
             Ok(dict.into())
-        } else if let Some(generic_mapping) = cast_as_mapping(self) {
-            generic_mapping
+        } else if let Ok(mapping) = self.cast_as::<PyMapping>() {
+            Ok(mapping.into())
         } else {
             Err(ValError::new(ErrorType::DictType, self))
         }
     }
 
     fn validate_typed_dict(&'a self, strict: bool, from_attributes: bool) -> ValResult<GenericMapping<'a>> {
-        if from_attributes {
-            // if from_attributes, first try a dict, then mapping then from_attributes
-            if let Ok(dict) = self.cast_as::<PyDict>() {
-                return Ok(dict.into());
-            } else if !strict {
-                // we can't do this in one set of if/else because we need to check from_mapping before doing this
-                if let Some(generic_mapping) = cast_as_mapping(self) {
-                    return generic_mapping;
+        match self.validate_dict(strict) {
+            Ok(dict) => Ok(dict),
+            Err(err) => {
+                if from_attributes_applicable(self) {
+                    Ok(self.into())
+                } else if from_attributes {
+                    // note the error here gives a hint about from_attributes
+                    Err(ValError::new(ErrorType::DictAttributesType, self))
+                } else {
+                    // note there error in this case (correctly) won't hint about `from_attributes`
+                    Err(err)
                 }
             }
-
-            if from_attributes_applicable(self) {
-                Ok(self.into())
-            } else {
-                // note the error here gives a hint about from_attributes
-                Err(ValError::new(ErrorType::DictAttributesType, self))
-            }
-        } else {
-            // otherwise we just call back to lax_dict if from_mapping is allowed, not there error in this
-            // case (correctly) won't hint about from_attributes
-            self.validate_dict(strict)
         }
     }
 
@@ -640,15 +632,6 @@ impl<'a> Input<'a> for PyAny {
             Err(ValError::new(ErrorType::TimeDeltaType, self))
         }
     }
-}
-
-/// return None if obj is not a mapping (cast_as::<PyMapping> fails)
-fn cast_as_mapping(obj: &PyAny) -> Option<ValResult<GenericMapping>> {
-    let mapping = match obj.cast_as() {
-        Ok(mapping) => mapping,
-        Err(_) => return None,
-    };
-    Some(Ok(GenericMapping::PyMapping(mapping)))
 }
 
 /// Best effort check of whether it's likely to make sense to inspect obj for attributes and iterate over it

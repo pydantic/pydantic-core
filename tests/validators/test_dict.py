@@ -181,12 +181,9 @@ def test_mapping_error_yield_1():
         {
             'type': 'mapping_type',
             'loc': (),
-            'msg': (
-                'Input should be a valid mapping, error: '
-                'ValueError: expected tuple of length 2, but got tuple of length 1'
-            ),
+            'msg': 'Input should be a valid mapping, error: Mapping items must be tuples of (key, value) pairs',
             'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
-            'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 1'},
+            'ctx': {'error': 'Mapping items must be tuples of (key, value) pairs'},
         }
     ]
 

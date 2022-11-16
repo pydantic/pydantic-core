@@ -233,12 +233,13 @@ impl<'a> GenericCollection<'a> {
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub enum GenericMapping<'a> {
     PyDict(&'a PyDict),
-    PyGetAttr(&'a PyAny),
     PyMapping(&'a PyMapping),
+    PyGetAttr(&'a PyAny),
     JsonObject(&'a JsonObject),
 }
 
 derive_from!(GenericMapping, PyDict, PyDict);
+derive_from!(GenericMapping, PyMapping, PyMapping);
 derive_from!(GenericMapping, PyGetAttr, PyAny);
 derive_from!(GenericMapping, JsonObject, JsonObject);
 

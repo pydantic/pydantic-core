@@ -153,7 +153,7 @@ pub enum ErrorType {
     DictType,
     #[strum(message = "Input should be a valid mapping, error: {error}")]
     MappingType {
-        error: String,
+        error: Cow<'static, str>,
     },
     // ---------------------
     // list errors
@@ -448,7 +448,7 @@ impl ErrorType {
             Self::StringTooShort { .. } => extract_context!(StringTooShort, ctx, min_length: usize),
             Self::StringTooLong { .. } => extract_context!(StringTooLong, ctx, max_length: usize),
             Self::StringPatternMismatch { .. } => extract_context!(StringPatternMismatch, ctx, pattern: String),
-            Self::MappingType { .. } => extract_context!(MappingType, ctx, error: String),
+            Self::MappingType { .. } => extract_context!(Cow::Owned, MappingType, ctx, error: String),
             Self::BytesTooShort { .. } => extract_context!(BytesTooShort, ctx, min_length: usize),
             Self::BytesTooLong { .. } => extract_context!(BytesTooLong, ctx, max_length: usize),
             Self::ValueError { .. } => extract_context!(ValueError, ctx, error: String),
