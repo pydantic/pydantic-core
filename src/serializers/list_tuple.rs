@@ -8,15 +8,16 @@ use nohash_hasher::IntMap;
 use pyo3::exceptions::PyTypeError;
 use serde::ser::SerializeSeq;
 
-use super::any::{fallback_serialize, fallback_to_python, fallback_to_python_json, AnySerializer, ObTypeLookup};
-use super::{
-    build_serializer, py_err_se_err, BuildSerializer, CombinedSerializer, PydanticSerializer, SerFormat, TypeSerializer,
-};
 use crate::build_tools::SchemaDict;
+
+use super::any::{fallback_serialize, fallback_to_python, fallback_to_python_json, AnySerializer};
+use super::{
+    build_serializer, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, TypeSerializer,
+};
 
 type IncEx = Option<IntMap<usize, Option<PyObject>>>;
 
-pub(super) fn to_inc_ex(value: Option<&PyAny>) -> PyResult<IncEx> {
+pub fn to_inc_ex(value: Option<&PyAny>) -> PyResult<IncEx> {
     match value {
         Some(value) => {
             if let Ok(py_set) = value.cast_as::<PySet>() {
@@ -158,10 +159,9 @@ impl TypeSerializer for ListSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        format: &SerFormat,
-        ob_type_lookup: &ObTypeLookup,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
+        extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
         match value.cast_as::<PyList>() {
@@ -178,13 +178,7 @@ impl TypeSerializer for ListSerializer {
                 } else {
                     for (index, element) in py_list.iter().enumerate() {
                         if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
-                            items.push(item_serializer.to_python(
-                                element,
-                                format,
-                                ob_type_lookup,
-                                next_include,
-                                next_exclude,
-                            )?);
+                            items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                         }
                     }
                     Ok(items.into_py(py))
@@ -192,7 +186,10 @@ impl TypeSerializer for ListSerializer {
             }
             // since there's no `to_python_json` method, this method is called, thus we need to handle format='json'
             // correctly here
-            Err(_) => fallback_to_python(value, format, ob_type_lookup),
+            Err(_) => {
+                extra.warnings.fallback(Self::EXPECTED_TYPE, value);
+                fallback_to_python(value, extra)
+            }
         }
     }
 
@@ -200,9 +197,9 @@ impl TypeSerializer for ListSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        ob_type_lookup: &ObTypeLookup,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
+        extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyList>() {
             Ok(py_list) => {
@@ -216,13 +213,13 @@ impl TypeSerializer for ListSerializer {
                 for (index, value) in py_list.iter().enumerate() {
                     if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
                         let item_serialize =
-                            PydanticSerializer::new(value, item_serializer, ob_type_lookup, next_include, next_exclude);
+                            PydanticSerializer::new(value, item_serializer, next_include, next_exclude, extra);
                         seq.serialize_element(&item_serialize)?;
                     }
                 }
                 seq.end()
             }
-            Err(_) => fallback_serialize(value, serializer, ob_type_lookup),
+            Err(_) => fallback_serialize(value, serializer, extra.ob_type_lookup),
         }
     }
 }
@@ -233,10 +230,9 @@ impl TypeSerializer for TupleSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        format: &SerFormat,
-        ob_type_lookup: &ObTypeLookup,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
+        extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
         match value.cast_as::<PyTuple>() {
@@ -253,13 +249,7 @@ impl TypeSerializer for TupleSerializer {
                 } else {
                     for (index, element) in py_tuple.iter().enumerate() {
                         if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
-                            items.push(item_serializer.to_python(
-                                element,
-                                format,
-                                ob_type_lookup,
-                                next_include,
-                                next_exclude,
-                            )?);
+                            items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                         }
                     }
                     Ok(PyTuple::new(py, items).into_py(py))
@@ -273,9 +263,9 @@ impl TypeSerializer for TupleSerializer {
     fn to_python_json(
         &self,
         value: &PyAny,
-        ob_type_lookup: &ObTypeLookup,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
+        extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
         let include = union_inc_ex(py, include, &self.include)?;
@@ -293,19 +283,13 @@ impl TypeSerializer for TupleSerializer {
                     let mut items = Vec::with_capacity(py_tuple.len());
                     for (index, element) in py_tuple.iter().enumerate() {
                         if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
-                            items.push(item_serializer.to_python(
-                                element,
-                                &SerFormat::Json,
-                                ob_type_lookup,
-                                next_include,
-                                next_exclude,
-                            )?);
+                            items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                         }
                     }
                     Ok(PyList::new(py, items).into_py(py))
                 }
             }
-            Err(_) => fallback_to_python_json(value, ob_type_lookup),
+            Err(_) => fallback_to_python_json(value, extra.ob_type_lookup),
         }
     }
 
@@ -313,9 +297,9 @@ impl TypeSerializer for TupleSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        ob_type_lookup: &ObTypeLookup,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
+        extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyTuple>() {
             Ok(py_tuple) => {
@@ -330,13 +314,13 @@ impl TypeSerializer for TupleSerializer {
                 for (index, value) in py_tuple.iter().enumerate() {
                     if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
                         let item_serialize =
-                            PydanticSerializer::new(value, item_serializer, ob_type_lookup, next_include, next_exclude);
+                            PydanticSerializer::new(value, item_serializer, next_include, next_exclude, extra);
                         seq.serialize_element(&item_serialize)?;
                     }
                 }
                 seq.end()
             }
-            Err(_) => fallback_serialize(value, serializer, ob_type_lookup),
+            Err(_) => fallback_serialize(value, serializer, extra.ob_type_lookup),
         }
     }
 }

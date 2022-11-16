@@ -1,11 +1,11 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
-use super::any::{fallback_serialize, ObTypeLookup};
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, TypeSerializer};
+use super::any::fallback_serialize;
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
-pub(super) struct StrSerializer;
+pub struct StrSerializer;
 
 impl BuildSerializer for StrSerializer {
     const EXPECTED_TYPE: &'static str = "str";
@@ -20,18 +20,21 @@ impl TypeSerializer for StrSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        ob_type_lookup: &ObTypeLookup,
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
+        extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyString>() {
             Ok(py_str) => serialize_py_str(py_str, serializer),
-            Err(_) => fallback_serialize(value, serializer, ob_type_lookup),
+            Err(_) => {
+                extra.warnings.fallback(Self::EXPECTED_TYPE, value);
+                fallback_serialize(value, serializer, extra.ob_type_lookup)
+            }
         }
     }
 }
 
-pub(super) fn serialize_py_str<S: serde::ser::Serializer>(py_str: &PyString, serializer: S) -> Result<S::Ok, S::Error> {
+pub fn serialize_py_str<S: serde::ser::Serializer>(py_str: &PyString, serializer: S) -> Result<S::Ok, S::Error> {
     let s = py_str.to_str().map_err(py_err_se_err)?;
     serializer.serialize_str(s)
 }

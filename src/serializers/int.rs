@@ -2,11 +2,11 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde::Serialize;
 
-use super::any::{fallback_serialize, ObTypeLookup};
-use super::{BuildSerializer, CombinedSerializer, TypeSerializer};
+use super::any::fallback_serialize;
+use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
-pub(super) struct IntSerializer;
+pub struct IntSerializer;
 
 impl BuildSerializer for IntSerializer {
     const EXPECTED_TYPE: &'static str = "int";
@@ -21,13 +21,16 @@ impl TypeSerializer for IntSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        ob_type_lookup: &ObTypeLookup,
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
+        extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.extract::<i64>() {
             Ok(v) => v.serialize(serializer),
-            Err(_) => fallback_serialize(value, serializer, ob_type_lookup),
+            Err(_) => {
+                extra.warnings.fallback(Self::EXPECTED_TYPE, value);
+                fallback_serialize(value, serializer, extra.ob_type_lookup)
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
 use enum_dispatch::enum_dispatch;
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Debug;
 
@@ -45,15 +46,13 @@ impl SchemaSerializer {
         exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         let format: SerFormat = format.into();
-        let ob_type_lookup = ObTypeLookup::cached(py);
-        match format {
-            SerFormat::Json => self
-                .comb_serializer
-                .to_python_json(value, ob_type_lookup, include, exclude),
-            format => self
-                .comb_serializer
-                .to_python(value, &format, ob_type_lookup, include, exclude),
-        }
+        let extra = Extra::new(py, &format);
+        let v = match format {
+            SerFormat::Json => self.comb_serializer.to_python_json(value, include, exclude, &extra),
+            _ => self.comb_serializer.to_python(value, include, exclude, &extra),
+        }?;
+        extra.warnings.check(py)?;
+        Ok(v)
     }
 
     pub fn to_json(
@@ -66,8 +65,8 @@ impl SchemaSerializer {
     ) -> PyResult<PyObject> {
         let writer: Vec<u8> = Vec::with_capacity(self.json_size);
 
-        let ob_type_lookup = ObTypeLookup::cached(py);
-        let serializer = PydanticSerializer::new(value, &self.comb_serializer, ob_type_lookup, include, exclude);
+        let extra = Extra::new(py, &SerFormat::Json);
+        let serializer = PydanticSerializer::new(value, &self.comb_serializer, include, exclude, &extra);
 
         let bytes = match indent {
             Some(indent_size) => {
@@ -87,6 +86,8 @@ impl SchemaSerializer {
                 ser.into_inner()
             }
         };
+
+        extra.warnings.check(py)?;
 
         self.json_size = bytes.len();
         let py_bytes = PyBytes::new(py, &bytes);
@@ -155,10 +156,9 @@ trait TypeSerializer: Send + Sync + Clone + Debug {
     fn to_python(
         &self,
         value: &PyAny,
-        _format: &SerFormat,
-        _ob_type_lookup: &ObTypeLookup,
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
+        _extra: &Extra,
     ) -> PyResult<PyObject> {
         Ok(value.into_py(value.py()))
     }
@@ -166,27 +166,27 @@ trait TypeSerializer: Send + Sync + Clone + Debug {
     fn to_python_json(
         &self,
         value: &PyAny,
-        ob_type_lookup: &ObTypeLookup,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
+        extra: &Extra,
     ) -> PyResult<PyObject> {
-        self.to_python(value, &SerFormat::Json, ob_type_lookup, include, exclude)
+        self.to_python(value, include, exclude, extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,
         value: &PyAny,
         serializer: S,
-        ob_type_lookup: &ObTypeLookup,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
+        _extra: &Extra,
     ) -> Result<S::Ok, S::Error>;
 }
 
 struct PydanticSerializer<'py> {
     value: &'py PyAny,
     com_serializer: &'py CombinedSerializer,
-    ob_type_lookup: &'py ObTypeLookup,
+    extra: &'py Extra<'py>,
     include: Option<&'py PyAny>,
     exclude: Option<&'py PyAny>,
 }
@@ -195,16 +195,16 @@ impl<'py> PydanticSerializer<'py> {
     fn new(
         value: &'py PyAny,
         com_serializer: &'py CombinedSerializer,
-        ob_type_lookup: &'py ObTypeLookup,
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
+        extra: &'py Extra<'py>,
     ) -> Self {
         Self {
             value,
             com_serializer,
-            ob_type_lookup,
             include,
             exclude,
+            extra,
         }
     }
 }
@@ -212,12 +212,29 @@ impl<'py> PydanticSerializer<'py> {
 impl<'py> Serialize for PydanticSerializer<'py> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.com_serializer
-            .serde_serialize(self.value, serializer, self.ob_type_lookup, self.include, self.exclude)
+            .serde_serialize(self.value, serializer, self.include, self.exclude, self.extra)
     }
 }
 
 fn py_err_se_err<T: serde::ser::Error, E: fmt::Display>(py_error: E) -> T {
     T::custom(py_error.to_string())
+}
+
+/// Useful things which are passed around by serializers
+struct Extra<'a> {
+    format: &'a SerFormat,
+    ob_type_lookup: &'a ObTypeLookup,
+    warnings: CollectWarnings,
+}
+
+impl<'a> Extra<'a> {
+    fn new(py: Python<'a>, format: &'a SerFormat) -> Self {
+        Self {
+            format,
+            ob_type_lookup: ObTypeLookup::cached(py),
+            warnings: CollectWarnings::new(true),
+        }
+    }
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
@@ -234,6 +251,49 @@ impl From<Option<&str>> for SerFormat {
             Some("python") => SerFormat::Python,
             Some(other) => SerFormat::Other(other.to_string()),
             None => SerFormat::Python,
+        }
+    }
+}
+
+struct CollectWarnings {
+    pub active: bool,
+    warnings: RefCell<Option<Vec<String>>>,
+}
+
+impl CollectWarnings {
+    fn new(active: bool) -> Self {
+        Self {
+            active,
+            warnings: RefCell::new(None),
+        }
+    }
+
+    fn fallback(&self, field_type: &str, value: &PyAny) {
+        if self.active {
+            let type_name = value.get_type().name().unwrap_or("<unknown python object>");
+            let message = format!("Expected `{}` but got `{}`", field_type, type_name);
+            let mut op_warnings = self.warnings.borrow_mut();
+            if let Some(ref mut warnings) = *op_warnings {
+                warnings.push(message);
+            } else {
+                *op_warnings = Some(vec![message]);
+            }
+        }
+    }
+
+    fn check(&self, py: Python) -> PyResult<()> {
+        if self.active {
+            match *self.warnings.borrow() {
+                Some(ref warnings) => {
+                    let warnings = warnings.iter().map(|w| w.as_str()).collect::<Vec<_>>();
+                    let message = format!("Pydantic serializer warnings:\n  {}", warnings.join("\n  "));
+                    let user_warning_type = py.import("builtins")?.getattr("UserWarning")?;
+                    PyErr::warn(py, user_warning_type, &message, 0)
+                }
+                _ => Ok(()),
+            }
+        } else {
+            Ok(())
         }
     }
 }

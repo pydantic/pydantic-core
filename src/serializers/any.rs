@@ -13,10 +13,10 @@ use strum_macros::EnumString;
 
 use crate::url::{PyMultiHostUrl, PyUrl};
 
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, SerFormat, TypeSerializer};
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
 
 #[derive(Debug, Clone)]
-pub(super) struct AnySerializer;
+pub struct AnySerializer;
 
 impl BuildSerializer for AnySerializer {
     const EXPECTED_TYPE: &'static str = "any";
@@ -32,32 +32,28 @@ impl TypeSerializer for AnySerializer {
     fn to_python_json(
         &self,
         value: &PyAny,
-        ob_type_lookup: &ObTypeLookup,
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
+        extra: &Extra,
     ) -> PyResult<PyObject> {
-        fallback_to_python_json(value, ob_type_lookup)
+        fallback_to_python_json(value, extra.ob_type_lookup)
     }
 
     fn serde_serialize<S: Serializer>(
         &self,
         value: &PyAny,
         serializer: S,
-        ob_type_lookup: &ObTypeLookup,
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
+        extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        SerializeInfer::new(value, ob_type_lookup).serialize(serializer)
+        SerializeInfer::new(value, extra.ob_type_lookup).serialize(serializer)
     }
 }
 
-pub(super) fn fallback_to_python(
-    value: &PyAny,
-    format: &SerFormat,
-    ob_type_lookup: &ObTypeLookup,
-) -> PyResult<PyObject> {
-    match format {
-        SerFormat::Json => fallback_to_python_json(value, ob_type_lookup),
+pub(super) fn fallback_to_python(value: &PyAny, extra: &Extra) -> PyResult<PyObject> {
+    match extra.format {
+        SerFormat::Json => fallback_to_python_json(value, extra.ob_type_lookup),
         _ => Ok(value.into_py(value.py())),
     }
 }
@@ -91,13 +87,13 @@ pub(super) fn fallback_to_python_json(value: &PyAny, ob_type_lookup: &ObTypeLook
     }
 }
 
-pub(super) struct SerializeInfer<'py> {
+pub struct SerializeInfer<'py> {
     value: &'py PyAny,
     ob_type_lookup: &'py ObTypeLookup,
 }
 
 impl<'py> SerializeInfer<'py> {
-    pub(super) fn new(value: &'py PyAny, ob_type_lookup: &'py ObTypeLookup) -> Self {
+    pub fn new(value: &'py PyAny, ob_type_lookup: &'py ObTypeLookup) -> Self {
         Self { value, ob_type_lookup }
     }
 }
@@ -108,7 +104,7 @@ impl<'py> Serialize for SerializeInfer<'py> {
     }
 }
 
-pub(super) fn fallback_serialize<S: Serializer>(
+pub fn fallback_serialize<S: Serializer>(
     value: &PyAny,
     serializer: S,
     ob_type_lookup: &ObTypeLookup,
@@ -213,7 +209,7 @@ pub(super) fn fallback_serialize<S: Serializer>(
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct ObTypeLookup {
+pub struct ObTypeLookup {
     none: usize,
     // numeric types
     int: usize,
@@ -275,7 +271,7 @@ impl ObTypeLookup {
         }
     }
 
-    pub(super) fn cached(py: Python<'_>) -> &Self {
+    pub fn cached(py: Python<'_>) -> &Self {
         TYPE_LOOKUP.get_or_init(py, || Self::new(py))
     }
 
@@ -327,7 +323,7 @@ impl ObTypeLookup {
 
 #[derive(Debug, Clone, EnumString)]
 #[strum(serialize_all = "snake_case")]
-pub(super) enum ObType {
+pub enum ObType {
     None,
     // numeric types
     Int,
