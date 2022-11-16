@@ -336,19 +336,26 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn validate_typed_dict(&'a self, strict: bool, from_attributes: bool) -> ValResult<GenericMapping<'a>> {
-        match self.validate_dict(strict) {
-            Ok(dict) => Ok(dict),
-            Err(err) => {
-                if from_attributes_applicable(self) {
-                    Ok(self.into())
-                } else if from_attributes {
-                    // note the error here gives a hint about from_attributes
-                    Err(ValError::new(ErrorType::DictAttributesType, self))
-                } else {
-                    // note there error in this case (correctly) won't hint about `from_attributes`
-                    Err(err)
+        if from_attributes {
+            // if from_attributes, first try a dict, then mapping then from_attributes
+            if let Ok(dict) = self.cast_as::<PyDict>() {
+                return Ok(dict.into());
+            } else if !strict {
+                if let Ok(mapping) = self.cast_as::<PyMapping>() {
+                    return Ok(mapping.into());
                 }
             }
+
+            if from_attributes_applicable(self) {
+                Ok(self.into())
+            } else {
+                // note the error here gives a hint about from_attributes
+                Err(ValError::new(ErrorType::DictAttributesType, self))
+            }
+        } else {
+            // otherwise we just call back to lax_dict if from_mapping is allowed, not there error in this
+            // case (correctly) won't hint about from_attributes
+            self.validate_dict(strict)
         }
     }
 

@@ -1,16 +1,15 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-#[cfg(not(PyPy))]
-use pyo3::types::PyFunction;
-use pyo3::types::{PyDict, PyList, PySet, PyString, PyTuple};
-#[cfg(not(PyPy))]
-use pyo3::PyTypeInfo;
 
 use ahash::AHashSet;
+use pyo3::types::{PyDict, PySet, PyString};
 
 use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same, SchemaDict};
 use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input};
+use crate::input::{
+    AttributesGenericIterator, DictGenericIterator, GenericMapping, Input, JsonObjectGenericIterator,
+    MappingGenericIterator,
+};
 use crate::lookup_key::LookupKey;
 use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
@@ -192,7 +191,7 @@ impl Validator for TypedDictValidator {
         };
 
         macro_rules! process {
-            ($dict:ident, $get_method:ident, $iter_method:ident) => {{
+            ($dict:ident, $get_method:ident, $iter:ty) => {{
                 for field in &self.fields {
                     let op_key_value = match field.lookup_key.$get_method($dict) {
                         Ok(v) => v,
@@ -244,7 +243,8 @@ impl Validator for TypedDictValidator {
                 }
 
                 if let Some(ref mut used_keys) = used_keys {
-                    for (raw_key, value) in $dict.$iter_method() {
+                    for item_result in <$iter>::new($dict)? {
+                        let (raw_key, value) = item_result?;
                         let either_str = match raw_key.strict_str() {
                             Ok(k) => k,
                             Err(ValError::LineErrors(line_errors)) => {
@@ -302,128 +302,10 @@ impl Validator for TypedDictValidator {
             }};
         }
         match dict {
-            GenericMapping::PyDict(d) => process!(d, py_get_dict_item, iter),
-            GenericMapping::PyGetAttr(d) => process!(d, py_get_attr, iter_attrs),
-            GenericMapping::PyMapping(d) => {
-                for field in &self.fields {
-                    let op_key_value = match field.lookup_key.py_get_mapping_item(d) {
-                        Ok(v) => v,
-                        Err(err) => {
-                            errors.push(ValLineError::new_with_loc(
-                                ErrorType::GetAttributeError {
-                                    error: py_err_string(py, err),
-                                },
-                                input,
-                                field.name.clone(),
-                            ));
-                            continue;
-                        }
-                    };
-                    if let Some((used_key, value)) = op_key_value {
-                        if let Some(ref mut used_keys) = used_keys {
-                            // key is "used" whether or not validation passes, since we want to skip this key in
-                            // extra logic either way
-                            used_keys.insert(used_key);
-                        }
-                        match field.validator.validate(py, value, &extra, slots, recursion_guard) {
-                            Ok(value) => {
-                                output_dict.set_item(&field.name_pystring, value)?;
-                                if let Some(ref mut fs) = fields_set_vec {
-                                    fs.push(field.name_pystring.clone_ref(py));
-                                }
-                            }
-                            Err(ValError::Omit) => continue,
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    errors.push(err.with_outer_location(field.name.clone().into()));
-                                }
-                            }
-                            Err(err) => return Err(err),
-                        }
-                        continue;
-                    } else if let Some(value) = get_default(py, &field.validator)? {
-                        output_dict.set_item(&field.name_pystring, value.as_ref())?;
-                    } else if field.required {
-                        errors.push(ValLineError::new_with_loc(
-                            ErrorType::Missing,
-                            input,
-                            field.name.clone(),
-                        ));
-                    }
-                }
-
-                if self.check_extra {
-                    let used_keys = match used_keys {
-                        Some(v) => v,
-                        None => unreachable!(),
-                    };
-                    for elem in d.items()?.iter()? {
-                        let elem_t = elem?.downcast::<PyTuple>()?;
-                        #[cfg(PyPy)]
-                        let raw_key = elem_t.get_item(0)?;
-                        #[cfg(PyPy)]
-                        let value = elem_t.get_item(1)?;
-                        #[cfg(not(PyPy))]
-                        let raw_key = unsafe { elem_t.get_item_unchecked(0) };
-                        #[cfg(not(PyPy))]
-                        let value = unsafe { elem_t.get_item_unchecked(1) };
-                        let either_str = match raw_key.strict_str() {
-                            Ok(k) => k,
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    errors.push(
-                                        err.with_outer_location(raw_key.as_loc_item())
-                                            .with_type(ErrorType::InvalidKey),
-                                    );
-                                }
-                                continue;
-                            }
-                            Err(err) => return Err(err),
-                        };
-                        if used_keys.contains(either_str.as_cow()?.as_ref()) {
-                            continue;
-                        }
-
-                        if self.forbid_extra {
-                            errors.push(ValLineError::new_with_loc(
-                                ErrorType::ExtraForbidden,
-                                value,
-                                raw_key.as_loc_item(),
-                            ));
-                            continue;
-                        }
-
-                        let py_key = either_str.as_py_string(py);
-                        if let Some(ref mut fs) = fields_set_vec {
-                            fs.push(py_key.into_py(py));
-                        }
-
-                        if let Some(ref validator) = self.extra_validator {
-                            match validator.validate(py, value, &extra, slots, recursion_guard) {
-                                Ok(value) => {
-                                    output_dict.set_item(py_key, value)?;
-                                    if let Some(ref mut fs) = fields_set_vec {
-                                        fs.push(py_key.into_py(py));
-                                    }
-                                }
-                                Err(ValError::LineErrors(line_errors)) => {
-                                    for err in line_errors {
-                                        errors.push(err.with_outer_location(raw_key.as_loc_item()));
-                                    }
-                                }
-                                Err(err) => return Err(err),
-                            }
-                        } else {
-                            output_dict.set_item(py_key, value.to_object(py))?;
-                            if let Some(ref mut fs) = fields_set_vec {
-                                fs.push(py_key.into_py(py));
-                            }
-                        }
-                    }
-                }
-            }
-
-            GenericMapping::JsonObject(d) => process!(d, json_get, iter),
+            GenericMapping::PyDict(d) => process!(d, py_get_dict_item, DictGenericIterator),
+            GenericMapping::PyMapping(d) => process!(d, py_get_mapping_item, MappingGenericIterator),
+            GenericMapping::PyGetAttr(d) => process!(d, py_get_attr, AttributesGenericIterator),
+            GenericMapping::JsonObject(d) => process!(d, json_get, JsonObjectGenericIterator),
         }
 
         if !errors.is_empty() {
@@ -517,72 +399,4 @@ impl TypedDictValidator {
             ))
         }
     }
-}
-
-trait IterAttributes<'a> {
-    fn iter_attrs(&self) -> AttributesIterator<'a>;
-}
-
-impl<'a> IterAttributes<'a> for &'a PyAny {
-    fn iter_attrs(&self) -> AttributesIterator<'a> {
-        AttributesIterator {
-            object: self,
-            attributes: self.dir(),
-            index: 0,
-        }
-    }
-}
-
-struct AttributesIterator<'a> {
-    object: &'a PyAny,
-    attributes: &'a PyList,
-    index: usize,
-}
-
-impl<'a> Iterator for AttributesIterator<'a> {
-    type Item = (&'a PyAny, &'a PyAny);
-
-    fn next(&mut self) -> Option<(&'a PyAny, &'a PyAny)> {
-        // loop until we find an attribute who's name does not start with underscore,
-        // or we get to the end of the list of attributes
-        loop {
-            if self.index < self.attributes.len() {
-                #[cfg(PyPy)]
-                let name: &PyAny = self.attributes.get_item(self.index).unwrap();
-                #[cfg(not(PyPy))]
-                let name: &PyAny = unsafe { self.attributes.get_item_unchecked(self.index) };
-                self.index += 1;
-                // from benchmarks this is 14x faster than using the python `startswith` method
-                let name_cow = name
-                    .cast_as::<PyString>()
-                    .expect("dir didn't return a PyString")
-                    .to_string_lossy();
-                if !name_cow.as_ref().starts_with('_') {
-                    // getattr is most likely to fail due to an exception in a @property, skip
-                    if let Ok(attr) = self.object.getattr(name_cow.as_ref()) {
-                        // we don't want bound methods to be included, is there a better way to check?
-                        // ref https://stackoverflow.com/a/18955425/949890
-                        let is_bound = matches!(attr.hasattr(intern!(attr.py(), "__self__")), Ok(true));
-                        // the PyFunction::is_type_of(attr) catches `staticmethod`, but also any other function,
-                        // I think that's better than including static methods in the yielded attributes,
-                        // if someone really wants fields, they can use an explicit field, or a function to modify input
-                        #[cfg(not(PyPy))]
-                        if !is_bound && !PyFunction::is_type_of(attr) {
-                            return Some((name, attr));
-                        }
-                        // MASSIVE HACK! PyFunction doesn't exist for PyPy,
-                        // is_instance_of::<PyFunction> crashes with a null pointer, hence this hack, see
-                        // https://github.com/pydantic/pydantic-core/pull/161#discussion_r917257635
-                        #[cfg(PyPy)]
-                        if !is_bound && attr.get_type().to_string() != "<class 'function'>" {
-                            return Some((name, attr));
-                        }
-                    }
-                }
-            } else {
-                return None;
-            }
-        }
-    }
-    // size_hint is omitted as it isn't needed
 }

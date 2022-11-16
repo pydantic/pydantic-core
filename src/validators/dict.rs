@@ -1,10 +1,12 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyMapping, PyTuple};
+use pyo3::types::{PyDict, PyMapping};
 
 use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input, JsonObject};
+use crate::errors::{ValError, ValLineError, ValResult};
+use crate::input::{
+    DictGenericIterator, GenericMapping, Input, JsonObject, JsonObjectGenericIterator, MappingGenericIterator,
+};
 use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
@@ -89,7 +91,7 @@ impl Validator for DictValidator {
 }
 
 macro_rules! build_validate {
-    ($name:ident, $dict_type:ty, $iter_macro:ident, $extract_macro:ident) => {
+    ($name:ident, $dict_type:ty, $iter:ty) => {
         fn $name<'s, 'data>(
             &'s self,
             py: Python<'data>,
@@ -104,8 +106,8 @@ macro_rules! build_validate {
 
             let key_validator = self.key_validator.as_ref();
             let value_validator = self.value_validator.as_ref();
-            for elem in $iter_macro!(py, dict, input) {
-                let (key, value) = $extract_macro!(py, elem, input);
+            for item_result in <$iter>::new(dict)? {
+                let (key, value) = item_result?;
                 let output_key = match key_validator.validate(py, key, extra, slots, recursion_guard) {
                     Ok(value) => Some(value),
                     Err(ValError::LineErrors(line_errors)) => {
@@ -147,112 +149,8 @@ macro_rules! build_validate {
     };
 }
 
-macro_rules! iter_simple {
-    ($py:ident, $dict:ident, $input:ident) => {
-        $dict.iter()
-    };
-}
-
-fn mapping_err<'py>(err: PyErr, py: Python<'py>, input: &'py impl Input<'py>) -> ValError<'py> {
-    ValError::new(
-        ErrorType::MappingType {
-            error: py_err_string(py, err).into(),
-        },
-        input,
-    )
-}
-
-macro_rules! iter_mapping {
-    ($py:ident, $mapping:ident, $input:ident) => {
-        $mapping
-            .items()
-            .map_err(|e| mapping_err(e, $py, $input))?
-            .iter()
-            .map_err(|e| mapping_err(e, $py, $input))?
-    };
-}
-
-macro_rules! extract_kv_simple {
-    ($py:ident, $item:ident, $input:ident) => {
-        $item
-    };
-}
-
-macro_rules! extract_kv_mapping {
-    ($py:ident, $item:ident, $input:ident) => {
-        extract_mapping_item($py, $item, $input)?
-    };
-}
-
-const MAPPING_TUPLE_ERROR: &str = "Mapping items must be tuples of (key, value) pairs";
-
-fn extract_mapping_item<'py>(
-    py: Python<'py>,
-    result: PyResult<&'py PyAny>,
-    input: &'py impl Input<'py>,
-) -> ValResult<'py, (&'py PyAny, &'py PyAny)> {
-    let item = result.map_err(|e| mapping_err(e, py, input))?;
-    let tuple: &PyTuple = item.cast_as().map_err(|_| {
-        ValError::new(
-            ErrorType::MappingType {
-                error: MAPPING_TUPLE_ERROR.into(),
-            },
-            input,
-        )
-    })?;
-    if tuple.len() != 2 {
-        return Err(ValError::new(
-            ErrorType::MappingType {
-                error: MAPPING_TUPLE_ERROR.into(),
-            },
-            input,
-        ));
-    };
-    #[cfg(PyPy)]
-    let key = tuple.get_item(0)?;
-    #[cfg(PyPy)]
-    let value = tuple.get_item(1)?;
-    #[cfg(not(PyPy))]
-    let key = unsafe { tuple.get_item_unchecked(0) };
-    #[cfg(not(PyPy))]
-    let value = unsafe { tuple.get_item_unchecked(1) };
-    Ok((key, value))
-}
-
-// macro_rules! iter_mapping {
-//     ($obj:ident) => {
-//         $obj.iter_mapping()?
-//     };
-// }
-//
-// macro_rules! extract_dict_elem {
-//     ($elem:ident, $input:ident) => {
-//         $elem
-//     };
-// }
-//
-// macro_rules! extract_mapping_elem {
-//     ($elem:ident, $input:ident) => {
-//         extract_mapping_elem($elem, $input)?
-//     };
-// }
-//
-// trait IterMapping {
-//     fn iter_mapping<'data>(&'data self, input: &'data impl Input<'data>) -> ValResult<'data, &PyIterator>;
-// }
-//
-// impl IterMapping for PyMapping {
-//     fn iter_mapping<'data>(&'data self, input: &'data impl Input<'data>) -> ValResult<'data, &PyIterator> {
-//         let items = match self.items() {
-//             Ok(items) => items,
-//             Err(err) => return Err(ValError::new(ErrorType::MappingType { error: err.to_string() }, input)),
-//         };
-//         return Ok(items.iter()?);
-//     }
-// }
-
 impl DictValidator {
-    build_validate!(validate_dict, PyDict, iter_simple, extract_kv_simple);
-    build_validate!(validate_mapping, PyMapping, iter_mapping, extract_kv_mapping);
-    build_validate!(validate_json_object, JsonObject, iter_simple, extract_kv_simple);
+    build_validate!(validate_dict, PyDict, DictGenericIterator);
+    build_validate!(validate_mapping, PyMapping, MappingGenericIterator);
+    build_validate!(validate_json_object, JsonObject, JsonObjectGenericIterator);
 }
