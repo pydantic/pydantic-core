@@ -329,9 +329,9 @@ impl<'py> Iterator for MappingGenericIterator<'py> {
             )));
         };
         #[cfg(PyPy)]
-        let key = tuple.get_item(0)?;
+        let key = tuple.get_item(0).unwrap();
         #[cfg(PyPy)]
-        let value = tuple.get_item(1)?;
+        let value = tuple.get_item(1).unwrap();
         #[cfg(not(PyPy))]
         let key = unsafe { tuple.get_item_unchecked(0) };
         #[cfg(not(PyPy))]
@@ -363,44 +363,41 @@ impl<'py> Iterator for AttributesGenericIterator<'py> {
     fn next(&mut self) -> Option<Self::Item> {
         // loop until we find an attribute who's name does not start with underscore,
         // or we get to the end of the list of attributes
-        loop {
-            if self.index < self.attributes.len() {
-                #[cfg(PyPy)]
-                let name: &PyAny = self.attributes.get_item(self.index).unwrap();
-                #[cfg(not(PyPy))]
-                let name: &PyAny = unsafe { self.attributes.get_item_unchecked(self.index) };
-                self.index += 1;
-                // from benchmarks this is 14x faster than using the python `startswith` method
-                let name_cow = match name.cast_as::<PyString>() {
-                    Ok(name) => name.to_string_lossy(),
-                    Err(e) => return Some(Err(e.into())),
-                };
-                if !name_cow.as_ref().starts_with('_') {
-                    // getattr is most likely to fail due to an exception in a @property, skip
-                    if let Ok(attr) = self.object.getattr(name_cow.as_ref()) {
-                        // we don't want bound methods to be included, is there a better way to check?
-                        // ref https://stackoverflow.com/a/18955425/949890
-                        let is_bound = matches!(attr.hasattr(intern!(attr.py(), "__self__")), Ok(true));
-                        // the PyFunction::is_type_of(attr) catches `staticmethod`, but also any other function,
-                        // I think that's better than including static methods in the yielded attributes,
-                        // if someone really wants fields, they can use an explicit field, or a function to modify input
-                        #[cfg(not(PyPy))]
-                        if !is_bound && !PyFunction::is_type_of(attr) {
-                            return Some(Ok((name, attr)));
-                        }
-                        // MASSIVE HACK! PyFunction doesn't exist for PyPy,
-                        // is_instance_of::<PyFunction> crashes with a null pointer, hence this hack, see
-                        // https://github.com/pydantic/pydantic-core/pull/161#discussion_r917257635
-                        #[cfg(PyPy)]
-                        if !is_bound && attr.get_type().to_string() != "<class 'function'>" {
-                            return Some(Ok((name, attr)));
-                        }
+        while self.index < self.attributes.len() {
+            #[cfg(PyPy)]
+            let name: &PyAny = self.attributes.get_item(self.index).unwrap();
+            #[cfg(not(PyPy))]
+            let name: &PyAny = unsafe { self.attributes.get_item_unchecked(self.index) };
+            self.index += 1;
+            // from benchmarks this is 14x faster than using the python `startswith` method
+            let name_cow = match name.cast_as::<PyString>() {
+                Ok(name) => name.to_string_lossy(),
+                Err(e) => return Some(Err(e.into())),
+            };
+            if !name_cow.as_ref().starts_with('_') {
+                // getattr is most likely to fail due to an exception in a @property, skip
+                if let Ok(attr) = self.object.getattr(name_cow.as_ref()) {
+                    // we don't want bound methods to be included, is there a better way to check?
+                    // ref https://stackoverflow.com/a/18955425/949890
+                    let is_bound = matches!(attr.hasattr(intern!(attr.py(), "__self__")), Ok(true));
+                    // the PyFunction::is_type_of(attr) catches `staticmethod`, but also any other function,
+                    // I think that's better than including static methods in the yielded attributes,
+                    // if someone really wants fields, they can use an explicit field, or a function to modify input
+                    #[cfg(not(PyPy))]
+                    if !is_bound && !PyFunction::is_type_of(attr) {
+                        return Some(Ok((name, attr)));
+                    }
+                    // MASSIVE HACK! PyFunction doesn't exist for PyPy,
+                    // is_instance_of::<PyFunction> crashes with a null pointer, hence this hack, see
+                    // https://github.com/pydantic/pydantic-core/pull/161#discussion_r917257635
+                    #[cfg(PyPy)]
+                    if !is_bound && attr.get_type().to_string() != "<class 'function'>" {
+                        return Some(Ok((name, attr)));
                     }
                 }
-            } else {
-                return None;
             }
         }
+        None
     }
     // size_hint is omitted as it isn't needed
 }
