@@ -8,7 +8,7 @@ use pyo3::types::PyDict;
 
 use enum_dispatch::enum_dispatch;
 
-use crate::build_tools::{py_error_type, SchemaDict};
+use crate::build_tools::{py_err, py_error_type, SchemaDict};
 
 use super::any::ObTypeLookup;
 
@@ -18,35 +18,40 @@ pub(super) trait BuildSerializer: Sized {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer>;
 }
 
-fn build_specific_serializer<'a, T: BuildSerializer>(
-    val_type: &str,
-    schema_dict: &'a PyDict,
-    config: Option<&'a PyDict>,
-) -> PyResult<CombinedSerializer> {
-    T::build(schema_dict, config)
-        .map_err(|err| py_error_type!("Error building \"{}\" serializer:\n  {}", val_type, err))
-}
-
-#[derive(Debug, Clone)]
-#[enum_dispatch]
-pub(super) enum CombinedSerializer {
-    Str(super::string::StrSerializer),
-    Int(super::int::IntSerializer),
-    List(super::list_tuple::ListSerializer),
-    Tuple(super::list_tuple::TupleSerializer),
-    Any(super::any::AnySerializer),
-}
-
-// macro to build the match statement for validator selection
-macro_rules! serializer_match {
-    ($type_:ident, $dict:ident, $config:ident, $($validator:path,)+) => {
-        match $type_ {
-            $(
-                <$validator>::EXPECTED_TYPE => build_specific_serializer::<$validator>($type_, $dict, $config),
-            )+
-            _ => super::any::AnySerializer::build($dict, $config),
+macro_rules! combined_serializer {
+    ($($key:ident: $validator:path,)+) => {
+        #[derive(Debug, Clone)]
+        #[enum_dispatch]
+        pub(super) enum CombinedSerializer {
+            // function serializers can't be defined by type lookup, but are members of `CombinedSerializer`,
+            // hence defined here
+            Function(super::function::FunctionSerializer),
+            $( $key($validator), )+
         }
+
+        impl CombinedSerializer {
+            fn find_serializer(lookup_type: &str, schema: &PyDict, config: Option<&PyDict>) -> PyResult<Option<CombinedSerializer>> {
+                match lookup_type {
+                    $(
+                        <$validator>::EXPECTED_TYPE => match <$validator>::build(schema, config) {
+                            Ok(serializer) => Ok(Some(serializer)),
+                            Err(err) => py_err!("Error building `{}` serializer:\n  {}", lookup_type, err),
+                        },
+                    )+
+                    _ => Ok(None),
+                }
+            }
+        }
+
     };
+}
+
+combined_serializer! {
+    Str: super::string::StrSerializer,
+    Int: super::int::IntSerializer,
+    List: super::list_tuple::ListSerializer,
+    Tuple: super::list_tuple::TupleSerializer,
+    Any: super::any::AnySerializer,
 }
 
 impl BuildSerializer for CombinedSerializer {
@@ -54,22 +59,31 @@ impl BuildSerializer for CombinedSerializer {
     const EXPECTED_TYPE: &'static str = "";
 
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
-        let type_: &str = schema.get_as_req(intern!(schema.py(), "type"))?;
-        serializer_match!(
-            type_,
-            schema,
-            config,
-            super::string::StrSerializer,
-            super::int::IntSerializer,
-            super::list_tuple::ListSerializer,
-            super::list_tuple::TupleSerializer,
-            super::any::AnySerializer,
-        )
+        let py = schema.py();
+        let type_key = intern!(py, "type");
+        if let Some(ser) = schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
+            if ser.contains(intern!(py, "function")).unwrap_or(false) {
+                // function is defined in `serialization` dict, use a function serializer
+                return super::function::FunctionSerializer::build(ser, config)
+                    .map_err(|err| py_error_type!("Error building `function` serializer:\n  {}", err));
+            } else if let Some(ser_type) = ser.get_as::<&str>(type_key)? {
+                // `type` is defined in `serialization` dict but not function, we use `ser_type` with `find_serializer`
+                return match Self::find_serializer(ser_type, schema, config)? {
+                    Some(serializer) => Ok(serializer),
+                    None => py_err!("Unknown serialization schema type: `{}`", ser_type),
+                };
+            }
+        }
+        let type_: &str = schema.get_as_req(type_key)?;
+        match Self::find_serializer(type_, schema, config)? {
+            Some(serializer) => Ok(serializer),
+            None => super::any::AnySerializer::build(schema, config),
+        }
     }
 }
 
 #[enum_dispatch(CombinedSerializer)]
-pub(super) trait TypeSerializer: Send + Sync + Clone + Debug + BuildSerializer {
+pub(super) trait TypeSerializer: Send + Sync + Clone + Debug {
     fn to_python(
         &self,
         value: &PyAny,
@@ -135,6 +149,16 @@ impl From<Option<&str>> for SerFormat {
             Some("python") => SerFormat::Python,
             Some(other) => SerFormat::Other(other.to_string()),
             None => SerFormat::Python,
+        }
+    }
+}
+
+impl ToPyObject for SerFormat {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        match self {
+            SerFormat::Python => intern!(py, "python").to_object(py),
+            SerFormat::Json => intern!(py, "json").to_object(py),
+            SerFormat::Other(s) => s.to_object(py),
         }
     }
 }

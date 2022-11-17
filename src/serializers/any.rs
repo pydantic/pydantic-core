@@ -59,8 +59,16 @@ pub(super) fn fallback_to_python(value: &PyAny, extra: &Extra) -> PyResult<PyObj
 }
 
 pub(super) fn fallback_to_python_json(value: &PyAny, ob_type_lookup: &ObTypeLookup) -> PyResult<PyObject> {
+    ob_type_to_python_json(&ob_type_lookup.get_type(value), value, ob_type_lookup)
+}
+
+pub(super) fn ob_type_to_python_json(
+    ob_type: &ObType,
+    value: &PyAny,
+    ob_type_lookup: &ObTypeLookup,
+) -> PyResult<PyObject> {
     let py = value.py();
-    match ob_type_lookup.get_type(value) {
+    match ob_type {
         ObType::Bytes => {
             let py_bytes: &PyBytes = value.cast_as()?;
             match from_utf8(py_bytes.as_bytes()) {
@@ -79,9 +87,13 @@ pub(super) fn fallback_to_python_json(value: &PyAny, ob_type_lookup: &ObTypeLook
             }
         }
         ObType::Tuple => {
-            let py_tuple: &PyTuple = value.cast_as()?;
-            // convert the tuple to a list
-            Ok(PyList::new(py, py_tuple).into_py(py))
+            // convert the tuple to a list, while recursively calling `fallback_to_python_json`
+            let vec: Vec<PyObject> = value
+                .cast_as::<PyTuple>()?
+                .iter()
+                .map(|v| fallback_to_python_json(v, ob_type_lookup))
+                .collect::<PyResult<_>>()?;
+            Ok(PyList::new(py, vec).into_py(py))
         }
         _ => Ok(value.into_py(value.py())),
     }
@@ -109,6 +121,15 @@ pub fn fallback_serialize<S: Serializer>(
     serializer: S,
     ob_type_lookup: &ObTypeLookup,
 ) -> Result<S::Ok, S::Error> {
+    fallback_serialize_known(&ob_type_lookup.get_type(value), value, serializer, ob_type_lookup)
+}
+
+pub fn fallback_serialize_known<S: Serializer>(
+    ob_type: &ObType,
+    value: &PyAny,
+    serializer: S,
+    ob_type_lookup: &ObTypeLookup,
+) -> Result<S::Ok, S::Error> {
     macro_rules! serialize {
         ($t:ty) => {
             match value.extract::<$t>() {
@@ -129,7 +150,7 @@ pub fn fallback_serialize<S: Serializer>(
         }};
     }
 
-    match ob_type_lookup.get_type(value) {
+    match ob_type {
         ObType::None => serializer.serialize_none(),
         ObType::Int => serialize!(i64),
         ObType::Bool => serialize!(bool),
@@ -322,7 +343,7 @@ impl ObTypeLookup {
 }
 
 #[derive(Debug, Clone, EnumString)]
-#[strum(serialize_all = "kebab-case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ObType {
     None,
     // numeric types

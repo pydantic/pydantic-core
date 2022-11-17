@@ -5,9 +5,9 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
 
 if sys.version_info < (3, 11):
-    from typing_extensions import Protocol, Required
+    from typing_extensions import Protocol, Required, TypeAlias
 else:
-    from typing import Protocol, Required
+    from typing import Protocol, Required, TypeAlias
 
 if sys.version_info < (3, 9):
     from typing_extensions import Literal, TypedDict
@@ -44,8 +44,11 @@ class CoreConfig(TypedDict, total=False):
     allow_inf_nan: bool  # default: True
 
 
+IncEx: TypeAlias = 'set[int] | set[str] | dict[int, IncEx] | dict[str, IncEx] | None'
+
+
 class SerializeFunction(Protocol):
-    def __call__(self, __input_value: Any, __format: str) -> Any:  # pragma: no cover
+    def __call__(self, __input_value: Any, *, format: str, include: IncEx, exclude: IncEx) -> Any:  # pragma: no cover
         ...
 
 
@@ -68,13 +71,12 @@ ExpectedSerializationTypes = Literal[
     'timedelta',
     'url',
     'multi_host_url',
-    'unknown',
 ]
 
 
 class FunctionSerializationSchema(TypedDict, total=False):
     function: Required[SerializeFunction]
-    expected_type: ExpectedSerializationTypes  # default: 'unknown'
+    type: ExpectedSerializationTypes
 
 
 class AnySchema(TypedDict, total=False):

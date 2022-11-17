@@ -3,7 +3,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
-use crate::build_tools::{py_err, SchemaDict};
+use crate::build_tools::{function_name, kwargs, py_err, SchemaDict};
 use crate::errors::{
     ErrorType, LocItem, PydanticCustomError, PydanticKnownError, PydanticOmit, ValError, ValResult, ValidationError,
 };
@@ -33,12 +33,6 @@ impl BuildValidator for FunctionBuilder {
             _ => FunctionPlainValidator::build(schema, config),
         }
     }
-}
-
-macro_rules! kwargs {
-    ($py:ident, $($k:ident: $v:expr),* $(,)?) => {{
-        Some(pyo3::types::IntoPyDict::into_py_dict([$((stringify!($k), $v.into_py($py)),)*], $py).into())
-    }};
 }
 
 macro_rules! impl_build {
@@ -71,13 +65,6 @@ macro_rules! impl_build {
             }
         }
     };
-}
-
-fn function_name(f: &PyAny) -> PyResult<String> {
-    match f.getattr(intern!(f.py(), "__name__")) {
-        Ok(name) => name.extract(),
-        _ => f.repr()?.extract(),
-    }
 }
 
 #[derive(Debug, Clone)]

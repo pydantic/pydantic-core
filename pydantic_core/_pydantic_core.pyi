@@ -5,9 +5,9 @@ from typing import Any, TypedDict
 from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
 
 if sys.version_info < (3, 11):
-    from typing_extensions import NotRequired
+    from typing_extensions import NotRequired, TypeAlias
 else:
-    from typing import NotRequired
+    from typing import NotRequired, TypeAlias
 
 __all__ = (
     '__version__',
@@ -42,10 +42,12 @@ class SchemaValidator:
         self, field: str, input: Any, data: 'dict[str, Any]', strict: 'bool | None' = None, context: Any = None
     ) -> 'dict[str, Any]': ...
 
+IncEx: TypeAlias = 'set[int] | set[str] | dict[int, IncEx] | dict[str, IncEx] | None'
+
 class SchemaSerializer:
     def __init__(self, schema: CoreSchema, config: 'CoreConfig | None' = None) -> None: ...
-    def to_python(self, value: Any, format: str | None = None, include: Any = None, exclude: Any = None) -> Any: ...
-    def to_json(self, value: Any, indent: int | None = None, include: Any = None, exclude: Any = None) -> bytes: ...
+    def to_python(self, value: Any, format: str | None = None, include: IncEx = None, exclude: IncEx = None) -> Any: ...
+    def to_json(self, value: Any, indent: int | None = None, include: IncEx = None, exclude: IncEx = None) -> bytes: ...
 
 class Url:
     scheme: str
