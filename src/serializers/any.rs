@@ -13,7 +13,7 @@ use strum_macros::EnumString;
 
 use crate::url::{PyMultiHostUrl, PyUrl};
 
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
+use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct AnySerializer;

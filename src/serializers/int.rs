@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 use serde::Serialize;
 
 use super::any::fallback_serialize;
-use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::shared::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct IntSerializer;

@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
 use super::any::fallback_serialize;
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct StrSerializer;
