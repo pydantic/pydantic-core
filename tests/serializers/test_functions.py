@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from pydantic_core import SchemaSerializer, core_schema
+from pydantic_core import PydanticSerializationError, SchemaSerializer, core_schema
 
 
 @pytest.mark.parametrize(
@@ -43,3 +43,34 @@ def test_function_args():
 
     assert s.to_python(1, include={1, 2, 3}, exclude={'foo': {'bar'}}) == 2
     assert f_kwargs == {'format': 'python', 'include': {1, 2, 3}, 'exclude': {'foo': {'bar'}}}
+
+
+def test_function_error():
+    def raise_error(value, **kwargs):
+        raise TypeError('foo')
+
+    s = SchemaSerializer(core_schema.any_schema(serialization={'function': raise_error}))
+
+    with pytest.raises(RuntimeError, match='Error calling `raise_error`: TypeError: foo'):
+        s.to_python('abc')
+
+
+def test_function_known_type():
+    def append_42(value, **kwargs):
+        if isinstance(value, list):
+            value.append(42)
+        return value
+
+    s = SchemaSerializer(core_schema.any_schema(serialization={'function': append_42, 'type': 'list'}))
+    assert s.to_python([1, 2, 3]) == [1, 2, 3, 42]
+    assert s.to_python([1, 2, 3], format='json') == [1, 2, 3, 42]
+    assert s.to_json([1, 2, 3]) == b'[1,2,3,42]'
+
+    assert s.to_python('abc') == 'abc'
+
+    with pytest.raises(TypeError, match="'str' object cannot be converted to 'PyList'"):
+        s.to_python('abc', format='json')
+
+    msg = "Error serializing to JSON: 'str' object cannot be converted to 'PyList'"
+    with pytest.raises(PydanticSerializationError, match=msg):
+        s.to_json('abc')

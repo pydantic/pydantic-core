@@ -68,6 +68,18 @@ pub(super) fn ob_type_to_python_json(
     ob_type_lookup: &ObTypeLookup,
 ) -> PyResult<PyObject> {
     let py = value.py();
+
+    macro_rules! serialize_seq {
+        ($t:ty) => {{
+            let vec: Vec<PyObject> = value
+                .cast_as::<$t>()?
+                .iter()
+                .map(|v| fallback_to_python_json(v, ob_type_lookup))
+                .collect::<PyResult<_>>()?;
+            Ok(PyList::new(py, vec).into_py(py))
+        }};
+    }
+
     match ob_type {
         ObType::Bytes => {
             let py_bytes: &PyBytes = value.cast_as()?;
@@ -86,15 +98,9 @@ pub(super) fn ob_type_to_python_json(
                 Err(e) => py_err!(PyUnicodeEncodeError; "{}", e),
             }
         }
-        ObType::Tuple => {
-            // convert the tuple to a list, while recursively calling `fallback_to_python_json`
-            let vec: Vec<PyObject> = value
-                .cast_as::<PyTuple>()?
-                .iter()
-                .map(|v| fallback_to_python_json(v, ob_type_lookup))
-                .collect::<PyResult<_>>()?;
-            Ok(PyList::new(py, vec).into_py(py))
-        }
+        // convert the tuple to a list, while recursively calling `fallback_to_python_json`
+        ObType::Tuple => serialize_seq!(PyTuple),
+        ObType::List => serialize_seq!(PyList),
         _ => Ok(value.into_py(value.py())),
     }
 }
