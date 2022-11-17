@@ -29,8 +29,8 @@ pub struct SchemaSerializer {
 #[pymethods]
 impl SchemaSerializer {
     #[new]
-    pub fn py_new(schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
-        let serializer = build_serializer(schema, config)?;
+    pub fn py_new(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
+        let serializer = CombinedSerializer::build(schema, config)?;
         Ok(Self {
             comb_serializer: serializer,
             json_size: 1024,
@@ -51,7 +51,7 @@ impl SchemaSerializer {
             SerFormat::Json => self.comb_serializer.to_python_json(value, include, exclude, &extra),
             _ => self.comb_serializer.to_python(value, include, exclude, &extra),
         }?;
-        extra.warnings.check(py)?;
+        extra.warnings.final_check(py)?;
         Ok(v)
     }
 
@@ -87,7 +87,7 @@ impl SchemaSerializer {
             }
         };
 
-        extra.warnings.check(py)?;
+        extra.warnings.final_check(py)?;
 
         self.json_size = bytes.len();
         let py_bytes = PyBytes::new(py, &bytes);
@@ -102,7 +102,7 @@ impl SchemaSerializer {
 trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
 
-    fn build_combined(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer>;
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer>;
 }
 
 fn build_specific_serializer<'a, T: BuildSerializer>(
@@ -110,35 +110,8 @@ fn build_specific_serializer<'a, T: BuildSerializer>(
     schema_dict: &'a PyDict,
     config: Option<&'a PyDict>,
 ) -> PyResult<CombinedSerializer> {
-    T::build_combined(schema_dict, config)
+    T::build(schema_dict, config)
         .map_err(|err| py_error_type!("Error building \"{}\" serializer:\n  {}", val_type, err))
-}
-
-// macro to build the match statement for validator selection
-macro_rules! serializer_match {
-    ($type_:ident, $dict:ident, $config:ident, $($validator:path,)+) => {
-        match $type_ {
-            $(
-                <$validator>::EXPECTED_TYPE => build_specific_serializer::<$validator>($type_, $dict, $config),
-            )+
-            _ => any::AnySerializer::build_combined($dict, $config),
-        }
-    };
-}
-
-fn build_serializer<'a>(schema: &'a PyAny, config: Option<&'a PyDict>) -> PyResult<CombinedSerializer> {
-    let dict: &PyDict = schema.cast_as()?;
-    let type_: &str = dict.get_as_req(intern!(schema.py(), "type"))?;
-    serializer_match!(
-        type_,
-        dict,
-        config,
-        string::StrSerializer,
-        int::IntSerializer,
-        list_tuple::ListSerializer,
-        list_tuple::TupleSerializer,
-        any::AnySerializer,
-    )
 }
 
 #[derive(Debug, Clone)]
@@ -151,8 +124,39 @@ enum CombinedSerializer {
     Any(any::AnySerializer),
 }
 
+// macro to build the match statement for validator selection
+macro_rules! serializer_match {
+    ($type_:ident, $dict:ident, $config:ident, $($validator:path,)+) => {
+        match $type_ {
+            $(
+                <$validator>::EXPECTED_TYPE => build_specific_serializer::<$validator>($type_, $dict, $config),
+            )+
+            _ => any::AnySerializer::build($dict, $config),
+        }
+    };
+}
+
+impl BuildSerializer for CombinedSerializer {
+    // this value is never used, it's just here to satisfy the trait
+    const EXPECTED_TYPE: &'static str = "";
+
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+        let type_: &str = schema.get_as_req(intern!(schema.py(), "type"))?;
+        serializer_match!(
+            type_,
+            schema,
+            config,
+            string::StrSerializer,
+            int::IntSerializer,
+            list_tuple::ListSerializer,
+            list_tuple::TupleSerializer,
+            any::AnySerializer,
+        )
+    }
+}
+
 #[enum_dispatch(CombinedSerializer)]
-trait TypeSerializer: Send + Sync + Clone + Debug {
+trait TypeSerializer: Send + Sync + Clone + Debug + BuildSerializer {
     fn to_python(
         &self,
         value: &PyAny,
@@ -255,6 +259,7 @@ impl From<Option<&str>> for SerFormat {
     }
 }
 
+#[cfg_attr(debug_assertions, derive(Debug))]
 struct CollectWarnings {
     pub active: bool,
     warnings: RefCell<Option<Vec<String>>>,
@@ -268,10 +273,10 @@ impl CollectWarnings {
         }
     }
 
-    fn fallback(&self, field_type: &str, value: &PyAny) {
+    fn fallback(&self, field_type: &str, value: &PyAny, reason: &str) {
         if self.active {
             let type_name = value.get_type().name().unwrap_or("<unknown python object>");
-            let message = format!("Expected `{}` but got `{}`", field_type, type_name);
+            let message = format!("Expected `{}` but got `{}` - {}", field_type, type_name, reason);
             let mut op_warnings = self.warnings.borrow_mut();
             if let Some(ref mut warnings) = *op_warnings {
                 warnings.push(message);
@@ -281,7 +286,19 @@ impl CollectWarnings {
         }
     }
 
-    fn check(&self, py: Python) -> PyResult<()> {
+    fn fallback_slow(&self, field_type: &str, value: &PyAny) {
+        if self.active {
+            self.fallback(field_type, value, "slight slowdown possible");
+        }
+    }
+
+    fn fallback_filtering(&self, field_type: &str, value: &PyAny) {
+        if self.active {
+            self.fallback(field_type, value, "filtering via include/exclude unavailable");
+        }
+    }
+
+    fn final_check(&self, py: Python) -> PyResult<()> {
         if self.active {
             match *self.warnings.borrow() {
                 Some(ref warnings) => {

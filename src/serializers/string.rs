@@ -10,7 +10,7 @@ pub struct StrSerializer;
 impl BuildSerializer for StrSerializer {
     const EXPECTED_TYPE: &'static str = "str";
 
-    fn build_combined(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
         Ok(Self {}.into())
     }
 }
@@ -27,7 +27,7 @@ impl TypeSerializer for StrSerializer {
         match value.cast_as::<PyString>() {
             Ok(py_str) => serialize_py_str(py_str, serializer),
             Err(_) => {
-                extra.warnings.fallback(Self::EXPECTED_TYPE, value);
+                extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
                 fallback_serialize(value, serializer, extra.ob_type_lookup)
             }
         }

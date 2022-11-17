@@ -11,9 +11,7 @@ use serde::ser::SerializeSeq;
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, fallback_to_python_json, AnySerializer};
-use super::{
-    build_serializer, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, TypeSerializer,
-};
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, TypeSerializer};
 
 type IncEx = Option<IntMap<usize, Option<PyObject>>>;
 
@@ -63,11 +61,11 @@ macro_rules! build_serializer {
         impl BuildSerializer for $struct_name {
             const EXPECTED_TYPE: &'static str = $expected_type;
 
-            fn build_combined(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+            fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
                 let py = schema.py();
                 let item_serializer = match schema.get_as::<&PyDict>(pyo3::intern!(py, "items_schema"))? {
-                    Some(items_schema) => build_serializer(items_schema, config)?,
-                    None => AnySerializer::build_combined(schema, config)?,
+                    Some(items_schema) => CombinedSerializer::build(items_schema, config)?,
+                    None => AnySerializer::build(schema, config)?,
                 };
                 let (include, exclude) = match schema.get_as::<&PyDict>(pyo3::intern!(py, "serialization"))? {
                     Some(ser) => {
@@ -187,7 +185,7 @@ impl TypeSerializer for ListSerializer {
             // since there's no `to_python_json` method, this method is called, thus we need to handle format='json'
             // correctly here
             Err(_) => {
-                extra.warnings.fallback(Self::EXPECTED_TYPE, value);
+                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
                 fallback_to_python(value, extra)
             }
         }
@@ -219,7 +217,10 @@ impl TypeSerializer for ListSerializer {
                 }
                 seq.end()
             }
-            Err(_) => fallback_serialize(value, serializer, extra.ob_type_lookup),
+            Err(_) => {
+                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
+                fallback_serialize(value, serializer, extra.ob_type_lookup)
+            }
         }
     }
 }
@@ -255,7 +256,10 @@ impl TypeSerializer for TupleSerializer {
                     Ok(PyTuple::new(py, items).into_py(py))
                 }
             }
-            Err(_) => Ok(value.into_py(py)),
+            Err(_) => {
+                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
+                Ok(value.into_py(py))
+            }
         }
     }
 
@@ -289,7 +293,10 @@ impl TypeSerializer for TupleSerializer {
                     Ok(PyList::new(py, items).into_py(py))
                 }
             }
-            Err(_) => fallback_to_python_json(value, extra.ob_type_lookup),
+            Err(_) => {
+                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
+                fallback_to_python_json(value, extra.ob_type_lookup)
+            }
         }
     }
 
@@ -320,7 +327,10 @@ impl TypeSerializer for TupleSerializer {
                 }
                 seq.end()
             }
-            Err(_) => fallback_serialize(value, serializer, extra.ob_type_lookup),
+            Err(_) => {
+                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
+                fallback_serialize(value, serializer, extra.ob_type_lookup)
+            }
         }
     }
 }

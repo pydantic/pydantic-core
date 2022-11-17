@@ -21,7 +21,7 @@ pub struct AnySerializer;
 impl BuildSerializer for AnySerializer {
     const EXPECTED_TYPE: &'static str = "any";
 
-    fn build_combined(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
         Ok(Self {}.into())
     }
 }
@@ -275,7 +275,7 @@ impl ObTypeLookup {
         TYPE_LOOKUP.get_or_init(py, || Self::new(py))
     }
 
-    fn get_type(&self, value: &PyAny) -> ObType {
+    pub fn get_type(&self, value: &PyAny) -> ObType {
         let ob_type = value.get_type_ptr() as usize;
         // this should be pretty fast, but still order is a bit important, so the most common types should come first
         // thus we don't follow the order of ObType
@@ -322,7 +322,7 @@ impl ObTypeLookup {
 }
 
 #[derive(Debug, Clone, EnumString)]
-#[strum(serialize_all = "snake_case")]
+#[strum(serialize_all = "kebab-case")]
 pub enum ObType {
     None,
     // numeric types

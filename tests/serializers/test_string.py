@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from pydantic_core import SchemaSerializer, core_schema
 
 
@@ -20,5 +22,7 @@ def test_str():
 
 def test_str_fallback():
     v = SchemaSerializer(core_schema.string_schema())
+    # we don't (currently) warn on to_python since it uses the default method
     assert v.to_python(123) == 123
-    assert v.to_json(123) == b'123'
+    with pytest.warns(UserWarning, match='Expected `str` but got `int`'):
+        assert v.to_json(123) == b'123'

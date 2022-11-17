@@ -11,7 +11,7 @@ pub struct IntSerializer;
 impl BuildSerializer for IntSerializer {
     const EXPECTED_TYPE: &'static str = "int";
 
-    fn build_combined(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
         Ok(Self {}.into())
     }
 }
@@ -28,7 +28,7 @@ impl TypeSerializer for IntSerializer {
         match value.extract::<i64>() {
             Ok(v) => v.serialize(serializer),
             Err(_) => {
-                extra.warnings.fallback(Self::EXPECTED_TYPE, value);
+                extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
                 fallback_serialize(value, serializer, extra.ob_type_lookup)
             }
         }

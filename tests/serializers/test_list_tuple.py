@@ -14,12 +14,36 @@ def test_list_any():
 
 def test_list_fallback():
     v = SchemaSerializer(core_schema.list_schema(core_schema.any_schema()))
-    assert v.to_python('apple') == 'apple'
-    assert v.to_json('apple') == b'"apple"'
-    assert v.to_json(b'apple') == b'"apple"'
-    assert v.to_python((1, 2, 3)) == (1, 2, 3)
-    # even though we're in the fallback state, non JSON types should still be converted to JSON here
-    assert v.to_python((1, 2, 3), format='json') == [1, 2, 3]
+    with pytest.warns(UserWarning, match='Expected `list` but got `str` - filtering via include/exclude unavailable'):
+        assert v.to_python('apple') == 'apple'
+
+    with pytest.warns(UserWarning) as warning_info:
+        assert v.to_json('apple') == b'"apple"'
+    assert [w.message.args[0] for w in warning_info.list] == [
+        'Pydantic serializer warnings:\n  Expected `list` but got `str` - filtering via include/exclude unavailable'
+    ]
+
+    with pytest.warns(UserWarning, match='Expected `list` but got `bytes` - filtering via include/exclude unavailable'):
+        assert v.to_json(b'apple') == b'"apple"'
+
+    with pytest.warns(UserWarning, match='Expected `list` but got `tuple` - filtering via include/exclude unavailable'):
+        assert v.to_python((1, 2, 3)) == (1, 2, 3)
+
+    # # even though we're in the fallback state, non JSON types should still be converted to JSON here
+    with pytest.warns(UserWarning, match='Expected `list` but got `tuple` - filtering via include/exclude unavailable'):
+        assert v.to_python((1, 2, 3), format='json') == [1, 2, 3]
+
+
+def test_list_str_fallback():
+    v = SchemaSerializer(core_schema.list_schema(core_schema.string_schema()))
+    with pytest.warns(UserWarning) as warning_info:
+        assert v.to_json([1, 2, 3]) == b'[1,2,3]'
+    assert [w.message.args[0] for w in warning_info.list] == [
+        'Pydantic serializer warnings:\n'
+        '  Expected `str` but got `int` - slight slowdown possible\n'
+        '  Expected `str` but got `int` - slight slowdown possible\n'
+        '  Expected `str` but got `int` - slight slowdown possible'
+    ]
 
 
 def test_tuple_any():
@@ -100,3 +124,26 @@ def test_include_error_call_time(schema_func, seq_f):
     v = SchemaSerializer(schema_func(core_schema.any_schema()))
     with pytest.raises(TypeError, match='`include` and `exclude` inputs must be sets or dicts.'):
         v.to_python(seq_f(0, 1, 2, 3), include=[1, 3, 5])
+
+
+def test_tuple_fallback():
+    v = SchemaSerializer(core_schema.tuple_variable_schema(core_schema.any_schema()))
+    with pytest.warns(UserWarning, match='Expected `tuple` but got `str` - filtering via include/exclude unavailable'):
+        assert v.to_python('apple') == 'apple'
+
+    with pytest.warns(UserWarning) as warning_info:
+        assert v.to_json([1, 2, 3]) == b'[1,2,3]'
+    assert [w.message.args[0] for w in warning_info.list] == [
+        'Pydantic serializer warnings:\n  Expected `tuple` but got `list` - filtering via include/exclude unavailable'
+    ]
+
+    with pytest.warns(
+        UserWarning, match='Expected `tuple` but got `bytes` - filtering via include/exclude unavailable'
+    ):
+        assert v.to_json(b'apple') == b'"apple"'
+
+    assert v.to_python((1, 2, 3)) == (1, 2, 3)
+
+    # # even though we're in the fallback state, non JSON types should still be converted to JSON here
+    with pytest.warns(UserWarning, match='Expected `tuple` but got `list` - filtering via include/exclude unavailable'):
+        assert v.to_python([1, 2, 3], format='json') == [1, 2, 3]
