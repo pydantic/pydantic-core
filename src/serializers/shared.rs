@@ -10,7 +10,7 @@ use enum_dispatch::enum_dispatch;
 
 use crate::build_tools::{py_err, py_error_type, SchemaDict};
 
-use super::any::ObTypeLookup;
+use super::any::{fallback_to_python, ObTypeLookup};
 
 pub(super) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
@@ -111,19 +111,9 @@ pub(super) trait TypeSerializer: Send + Sync + Clone + Debug {
         value: &PyAny,
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
-        _extra: &Extra,
-    ) -> PyResult<PyObject> {
-        Ok(value.into_py(value.py()))
-    }
-
-    fn to_python_json(
-        &self,
-        value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        self.to_python(value, include, exclude, extra)
+        fallback_to_python(value, extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(

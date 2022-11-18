@@ -60,23 +60,20 @@ impl TypeSerializer for FunctionSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        self.call(value, include, exclude, extra.format)
-            .map_err(|e| py_error_type!(PyRuntimeError; "Error calling `{}`: {}", self.function_name, e))
-    }
-
-    fn to_python_json(
-        &self,
-        value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
-        extra: &Extra,
-    ) -> PyResult<PyObject> {
         let py = value.py();
-        let v = self.to_python(value, include, exclude, extra)?;
-        if let Some(ref ob_type) = self.return_ob_type {
-            ob_type_to_python_json(ob_type, v.as_ref(py), extra.ob_type_lookup)
-        } else {
-            fallback_to_python_json(v.as_ref(py), extra.ob_type_lookup)
+        let v = self
+            .call(value, include, exclude, extra.format)
+            .map_err(|e| py_error_type!(PyRuntimeError; "Error calling `{}`: {}", self.function_name, e))?;
+
+        match extra.format {
+            SerFormat::Json => {
+                if let Some(ref ob_type) = self.return_ob_type {
+                    ob_type_to_python_json(ob_type, v.as_ref(py), extra.ob_type_lookup)
+                } else {
+                    fallback_to_python_json(v.as_ref(py), extra.ob_type_lookup)
+                }
+            }
+            _ => Ok(v),
         }
     }
 

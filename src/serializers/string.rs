@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
-use super::any::fallback_serialize;
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::any::{fallback_serialize, fallback_to_python_json};
+use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct StrSerializer;
@@ -16,6 +16,26 @@ impl BuildSerializer for StrSerializer {
 }
 
 impl TypeSerializer for StrSerializer {
+    fn to_python(
+        &self,
+        value: &PyAny,
+        _include: Option<&PyAny>,
+        _exclude: Option<&PyAny>,
+        extra: &Extra,
+    ) -> PyResult<PyObject> {
+        let py = value.py();
+        match extra.format {
+            SerFormat::Json => match value.is_instance_of::<PyString>().unwrap_or(false) {
+                true => Ok(value.into_py(py)),
+                false => {
+                    extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
+                    fallback_to_python_json(value, extra.ob_type_lookup)
+                }
+            },
+            _ => Ok(value.into_py(py)),
+        }
+    }
+
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,
         value: &PyAny,

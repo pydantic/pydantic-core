@@ -27,18 +27,6 @@ impl BuildSerializer for AnySerializer {
 }
 
 impl TypeSerializer for AnySerializer {
-    // to_python is not required since we always just return the value itself
-
-    fn to_python_json(
-        &self,
-        value: &PyAny,
-        _include: Option<&PyAny>,
-        _exclude: Option<&PyAny>,
-        extra: &Extra,
-    ) -> PyResult<PyObject> {
-        fallback_to_python_json(value, extra.ob_type_lookup)
-    }
-
     fn serde_serialize<S: Serializer>(
         &self,
         value: &PyAny,

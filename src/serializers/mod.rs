@@ -45,10 +45,7 @@ impl SchemaSerializer {
     ) -> PyResult<PyObject> {
         let format: shared::SerFormat = format.into();
         let extra = shared::Extra::new(py, &format);
-        let v = match format {
-            shared::SerFormat::Json => self.comb_serializer.to_python_json(value, include, exclude, &extra),
-            _ => self.comb_serializer.to_python(value, include, exclude, &extra),
-        }?;
+        let v = self.comb_serializer.to_python(value, include, exclude, &extra)?;
         extra.warnings.final_check(py)?;
         Ok(v)
     }

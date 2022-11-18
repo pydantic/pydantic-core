@@ -10,8 +10,8 @@ use serde::ser::SerializeSeq;
 
 use crate::build_tools::SchemaDict;
 
-use super::any::{fallback_serialize, fallback_to_python, fallback_to_python_json, AnySerializer};
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
+use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
 use super::PydanticSerializer;
 
 type IncEx = Option<IntMap<usize, Option<PyObject>>>;
@@ -173,7 +173,7 @@ impl TypeSerializer for ListSerializer {
 
                 if matches!(item_serializer, CombinedSerializer::Any(_)) && include.is_none() && exclude.is_none() {
                     // if we are using the AnySerializer and there is no include/exclude, we can just return the value
-                    Ok(py_list.to_object(py))
+                    Ok(py_list.into_py(py))
                 } else {
                     for (index, element) in py_list.iter().enumerate() {
                         if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
@@ -183,8 +183,6 @@ impl TypeSerializer for ListSerializer {
                     Ok(items.into_py(py))
                 }
             }
-            // since there's no `to_python_json` method, this method is called, thus we need to handle format='json'
-            // correctly here
             Err(_) => {
                 extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
                 fallback_to_python(value, extra)
@@ -242,48 +240,15 @@ impl TypeSerializer for TupleSerializer {
                 let include = union_inc_ex(py, include, &self.include)?;
                 let exclude = union_inc_ex(py, exclude, &self.exclude)?;
 
-                let mut items = Vec::with_capacity(py_tuple.len());
                 let item_serializer = self.item_serializer.as_ref();
 
                 if matches!(item_serializer, CombinedSerializer::Any(_)) && include.is_none() && exclude.is_none() {
                     // if we are using the AnySerializer and there is no include/exclude, we can just return the value
-                    Ok(py_tuple.to_object(py))
-                } else {
-                    for (index, element) in py_tuple.iter().enumerate() {
-                        if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
-                            items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
-                        }
+
+                    match extra.format {
+                        SerFormat::Json => Ok(PyList::new(py, py_tuple).into_py(py)),
+                        _ => Ok(py_tuple.to_object(py)),
                     }
-                    Ok(PyTuple::new(py, items).into_py(py))
-                }
-            }
-            Err(_) => {
-                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                Ok(value.into_py(py))
-            }
-        }
-    }
-
-    // just like to_python, but we need to return a list, not a tuple
-    fn to_python_json(
-        &self,
-        value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
-        extra: &Extra,
-    ) -> PyResult<PyObject> {
-        let py = value.py();
-        let include = union_inc_ex(py, include, &self.include)?;
-        let exclude = union_inc_ex(py, exclude, &self.exclude)?;
-
-        match value.cast_as::<PyTuple>() {
-            Ok(py_tuple) => {
-                let item_serializer = self.item_serializer.as_ref();
-
-                if matches!(item_serializer, CombinedSerializer::Any(_)) && include.is_none() && exclude.is_none() {
-                    // if we are using the AnySerializer and there is no include/exclude, we can just return the value
-                    // converted to a list
-                    Ok(PyList::new(py, py_tuple.iter()).into_py(py))
                 } else {
                     let mut items = Vec::with_capacity(py_tuple.len());
                     for (index, element) in py_tuple.iter().enumerate() {
@@ -291,12 +256,15 @@ impl TypeSerializer for TupleSerializer {
                             items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                         }
                     }
-                    Ok(PyList::new(py, items).into_py(py))
+                    match extra.format {
+                        SerFormat::Json => Ok(PyList::new(py, items).into_py(py)),
+                        _ => Ok(PyTuple::new(py, items).into_py(py)),
+                    }
                 }
             }
             Err(_) => {
                 extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                fallback_to_python_json(value, extra.ob_type_lookup)
+                fallback_to_python(value, extra)
             }
         }
     }
