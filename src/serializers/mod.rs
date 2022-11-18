@@ -12,9 +12,9 @@ use shared::{BuildSerializer, TypeSerializer};
 
 mod any;
 mod function;
-mod int;
 mod list_tuple;
 mod shared;
+mod simple;
 mod string;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
