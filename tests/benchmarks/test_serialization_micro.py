@@ -49,3 +49,15 @@ def test_python_json_list_int(benchmark):
     @benchmark
     def t():
         serializer.to_python(items, format='json')
+
+
+@pytest.mark.benchmark(group='list-of-bool')
+def test_python_json_list_none(benchmark):
+    serializer = SchemaSerializer({'type': 'list', 'items_schema': {'type': 'none'}})
+    assert serializer.to_python([None, None, None], format='json') == [None, None, None]
+
+    items = [None for v in range(1000)]
+
+    @benchmark
+    def t():
+        serializer.to_python(items, format='json')

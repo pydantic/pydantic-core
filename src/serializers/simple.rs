@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyFloat, PyInt};
+use pyo3::types::PyDict;
 use serde::Serialize;
 
-use super::any::{fallback_serialize, fallback_to_python_json};
+use super::any::{fallback_serialize, fallback_to_python_json, ObType};
 use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
 
 #[derive(Debug, Clone)]
@@ -17,6 +17,26 @@ impl BuildSerializer for NoneSerializer {
 }
 
 impl TypeSerializer for NoneSerializer {
+    fn to_python(
+        &self,
+        value: &PyAny,
+        _include: Option<&PyAny>,
+        _exclude: Option<&PyAny>,
+        extra: &Extra,
+    ) -> PyResult<PyObject> {
+        let py = value.py();
+        match extra.format {
+            SerFormat::Json => match extra.ob_type_lookup.is_type(value, ObType::None) {
+                true => Ok(py.None().into_py(py)),
+                false => {
+                    extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
+                    fallback_to_python_json(value, extra.ob_type_lookup)
+                }
+            },
+            _ => Ok(value.into_py(py)),
+        }
+    }
+
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,
         value: &PyAny,
@@ -25,7 +45,7 @@ impl TypeSerializer for NoneSerializer {
         _exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        match value.is_none() {
+        match extra.ob_type_lookup.is_type(value, ObType::None) {
             true => serializer.serialize_none(),
             false => {
                 extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
@@ -36,7 +56,7 @@ impl TypeSerializer for NoneSerializer {
 }
 
 macro_rules! build_simple_serializer {
-    ($struct_name:ident, $expected_type:literal, $rust_type:ty, $py_type:ty) => {
+    ($struct_name:ident, $expected_type:literal, $rust_type:ty, $ob_type:expr) => {
         #[derive(Debug, Clone)]
         pub struct $struct_name;
 
@@ -49,7 +69,6 @@ macro_rules! build_simple_serializer {
         }
 
         impl TypeSerializer for $struct_name {
-            // TODO replace with ob_type lookup for performance
             fn to_python(
                 &self,
                 value: &PyAny,
@@ -59,7 +78,7 @@ macro_rules! build_simple_serializer {
             ) -> PyResult<PyObject> {
                 let py = value.py();
                 match extra.format {
-                    SerFormat::Json => match value.is_instance_of::<$py_type>().unwrap_or(false) {
+                    SerFormat::Json => match extra.ob_type_lookup.is_type(value, $ob_type) {
                         true => Ok(value.into_py(py)),
                         false => {
                             extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
@@ -90,6 +109,6 @@ macro_rules! build_simple_serializer {
     };
 }
 
-build_simple_serializer!(IntSerializer, "int", i64, PyInt);
-build_simple_serializer!(BoolSerializer, "bool", bool, PyBool);
-build_simple_serializer!(FloatSerializer, "float", f64, PyFloat);
+build_simple_serializer!(IntSerializer, "int", i64, ObType::Int);
+build_simple_serializer!(BoolSerializer, "bool", bool, ObType::Bool);
+build_simple_serializer!(FloatSerializer, "float", f64, ObType::Float);

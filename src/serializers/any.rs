@@ -290,6 +290,31 @@ impl ObTypeLookup {
         TYPE_LOOKUP.get_or_init(py, || Self::new(py))
     }
 
+    pub fn is_type(&self, value: &PyAny, expected_ob_type: ObType) -> bool {
+        let ob_type = value.get_type_ptr() as usize;
+        match expected_ob_type {
+            ObType::None => self.none == ob_type,
+            ObType::Int => self.int == ob_type,
+            ObType::Bool => self.bool == ob_type,
+            ObType::Float => self.float == ob_type,
+            ObType::Str => self.string == ob_type,
+            ObType::Dict => self.dict == ob_type,
+            ObType::List => self.list == ob_type,
+            ObType::Tuple => self.tuple == ob_type,
+            ObType::Set => self.set == ob_type,
+            ObType::Frozenset => self.frozenset == ob_type,
+            ObType::Bytes => self.bytes == ob_type,
+            ObType::Datetime => self.datetime == ob_type,
+            ObType::Date => self.date == ob_type,
+            ObType::Time => self.time == ob_type,
+            ObType::Timedelta => self.timedelta == ob_type,
+            ObType::Bytearray => self.bytearray == ob_type,
+            ObType::Url => self.url == ob_type,
+            ObType::MultiHostUrl => self.multi_host_url == ob_type,
+            ObType::Unknown => false,
+        }
+    }
+
     pub fn get_type(&self, value: &PyAny) -> ObType {
         let ob_type = value.get_type_ptr() as usize;
         // this should be pretty fast, but still order is a bit important, so the most common types should come first
