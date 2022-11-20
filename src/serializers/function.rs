@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::str::FromStr;
 
 use pyo3::intern;
@@ -10,7 +11,7 @@ use crate::build_tools::{function_name, kwargs, py_error_type, SchemaDict};
 use crate::errors::PydanticSerializationError;
 
 use super::any::{
-    fallback_serialize, fallback_serialize_known, fallback_to_python_json, ob_type_to_python_json, ObType,
+    fallback_serialize, fallback_serialize_known, fallback_to_python_json, json_key, ob_type_to_python_json, ObType,
 };
 use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
@@ -79,6 +80,14 @@ impl TypeSerializer for FunctionSerializer {
             }
             _ => Ok(v),
         }
+    }
+
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+        let v = self
+            .call(key, None, None, extra.mode)
+            .map_err(PydanticSerializationError::new_err)?;
+
+        json_key(v.into_ref(key.py()), extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(

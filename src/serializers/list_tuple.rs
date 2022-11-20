@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::hash::BuildHasherDefault;
 
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySet, PyTuple};
 
@@ -64,14 +65,14 @@ macro_rules! build_serializer {
 
             fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
                 let py = schema.py();
-                let item_serializer = match schema.get_as::<&PyDict>(pyo3::intern!(py, "items_schema"))? {
+                let item_serializer = match schema.get_as::<&PyDict>(intern!(py, "items_schema"))? {
                     Some(items_schema) => CombinedSerializer::build(items_schema, config)?,
                     None => AnySerializer::build(schema, config)?,
                 };
-                let (include, exclude) = match schema.get_as::<&PyDict>(pyo3::intern!(py, "serialization"))? {
+                let (include, exclude) = match schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
                     Some(ser) => {
-                        let include = to_inc_ex(ser.get_item(pyo3::intern!(py, "include")))?;
-                        let exclude = to_inc_ex(ser.get_item(pyo3::intern!(py, "exclude")))?;
+                        let include = to_inc_ex(ser.get_item(intern!(py, "include")))?;
+                        let exclude = to_inc_ex(ser.get_item(intern!(py, "exclude")))?;
                         (include, exclude)
                     }
                     None => (None, None),
@@ -87,7 +88,7 @@ macro_rules! build_serializer {
     };
 }
 
-/// combine the validation time include/exclude with the include/exclude when creating the serializer
+/// Combine the serialization time include/exclude with the include/exclude when creating the serializer
 /// **NOTE:** we merge with union for both include and exclude, this is a change from V1 where we did,
 /// union for exclude and intersection for include
 fn union_inc_ex<'py>(
@@ -168,13 +169,13 @@ impl TypeSerializer for ListSerializer {
                 let include = union_inc_ex(py, include, &self.include)?;
                 let exclude = union_inc_ex(py, exclude, &self.exclude)?;
 
-                let mut items = Vec::with_capacity(py_list.len());
                 let item_serializer = self.item_serializer.as_ref();
 
-                if matches!(item_serializer, CombinedSerializer::Any(_)) && include.is_none() && exclude.is_none() {
+                if item_serializer.is_any() && include.is_none() && exclude.is_none() && !extra.mode.is_json() {
                     // if we are using the AnySerializer and there is no include/exclude, we can just return the value
                     Ok(py_list.into_py(py))
                 } else {
+                    let mut items = Vec::with_capacity(py_list.len());
                     for (index, element) in py_list.iter().enumerate() {
                         if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
                             items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);

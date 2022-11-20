@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Debug;
@@ -10,7 +11,7 @@ use enum_dispatch::enum_dispatch;
 
 use crate::build_tools::{py_err, py_error_type, SchemaDict};
 
-use super::any::{fallback_to_python, ObTypeLookup};
+use super::any::{fallback_to_python, json_key, ObTypeLookup};
 
 pub(super) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
@@ -70,8 +71,15 @@ combined_serializer! {
     both: Str, super::string::StrSerializer;
     both: List, super::list_tuple::ListSerializer;
     both: Tuple, super::list_tuple::TupleSerializer;
+    both: Dict, super::dict::DictSerializer;
     both: Any, super::any::AnySerializer;
     both: Format, super::format::FunctionSerializer;
+}
+
+impl CombinedSerializer {
+    pub fn is_any(&self) -> bool {
+        matches!(self, CombinedSerializer::Any(_))
+    }
 }
 
 impl BuildSerializer for CombinedSerializer {
@@ -124,6 +132,10 @@ pub(super) trait TypeSerializer: Send + Sync + Clone + Debug {
         fallback_to_python(value, extra)
     }
 
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+        json_key(key, extra)
+    }
+
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,
         value: &PyAny,
@@ -160,6 +172,12 @@ pub(super) enum SerMode {
     Python,
     Json,
     Other(String),
+}
+
+impl SerMode {
+    pub fn is_json(&self) -> bool {
+        matches!(self, SerMode::Json)
+    }
 }
 
 impl From<Option<&str>> for SerMode {

@@ -1,12 +1,14 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
+use std::borrow::Cow;
 
 use serde::ser::Error;
 
 use crate::build_tools::SchemaDict;
 use crate::errors::PydanticSerializationError;
 
+use super::any::json_key;
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 use super::string::serialize_py_str;
 
@@ -59,6 +61,11 @@ impl TypeSerializer for FunctionSerializer {
         _extra: &Extra,
     ) -> PyResult<PyObject> {
         self.call(value).map_err(PydanticSerializationError::new_err)
+    }
+
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+        let v = self.call(key).map_err(PydanticSerializationError::new_err)?;
+        json_key(v.into_ref(key.py()), extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(

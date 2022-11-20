@@ -11,6 +11,7 @@ use crate::PydanticSerializationError;
 use shared::{BuildSerializer, TypeSerializer};
 
 mod any;
+mod dict;
 mod format;
 mod function;
 mod list_tuple;
@@ -36,6 +37,7 @@ impl SchemaSerializer {
         })
     }
 
+    #[pyo3(text_signature = "(value, *, mode = None, include = None, exclude = None)")]
     pub fn to_python(
         &self,
         py: Python,
@@ -51,6 +53,7 @@ impl SchemaSerializer {
         Ok(v)
     }
 
+    #[pyo3(text_signature = "(value, *, indent = None, include = None, exclude = None)")]
     pub fn to_json(
         &mut self,
         py: Python,

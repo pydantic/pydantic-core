@@ -1,7 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
+use std::borrow::Cow;
 
-use super::any::{fallback_serialize, fallback_to_python_json, IsType, ObType};
+use super::any::{fallback_serialize, fallback_to_python_json, json_key, IsType, ObType};
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
@@ -37,6 +38,15 @@ impl TypeSerializer for StrSerializer {
                 }
             },
             _ => Ok(value.into_py(py)),
+        }
+    }
+
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+        if let Ok(py_str) = key.cast_as::<PyString>() {
+            Ok(py_str.to_string_lossy())
+        } else {
+            extra.warnings.fallback_slow(Self::EXPECTED_TYPE, key);
+            json_key(key, extra)
         }
     }
 

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::str::from_utf8;
 
 use pyo3::exceptions::PyUnicodeEncodeError;
@@ -234,6 +235,35 @@ pub fn fallback_serialize_known<S: Serializer>(
         ),
         _ => todo!(),
         // _ => serializer.serialize_none(),
+    }
+}
+
+pub(super) fn json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    let ob_type = extra.ob_type_lookup.get_type(key);
+
+    match ob_type {
+        ObType::None => Ok(Cow::Borrowed("None")),
+        ObType::Bool => {
+            let v = if key.is_true().unwrap_or(false) {
+                "true"
+            } else {
+                "false"
+            };
+            Ok(Cow::Borrowed(v))
+        }
+        ObType::Str => {
+            let py_str: &PyString = key.cast_as()?;
+            Ok(py_str.to_string_lossy())
+        }
+        ObType::Bytes => {
+            let py_bytes: &PyBytes = key.cast_as()?;
+            match from_utf8(py_bytes.as_bytes()) {
+                Ok(s) => Ok(Cow::Borrowed(s)),
+                Err(e) => py_err!(PyUnicodeEncodeError; "{}", e),
+            }
+        }
+        // perhaps we could do something faster for things like ints and floats?
+        _ => Ok(key.str()?.to_string_lossy()),
     }
 }
 
