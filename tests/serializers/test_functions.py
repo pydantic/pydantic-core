@@ -78,10 +78,20 @@ def test_function_known_type():
         s.to_json('abc')
 
 
-def test_date_format_function():
+def test_invalid_return_type():
     with pytest.raises(SchemaError, match='Unknown return type "different"'):
         SchemaSerializer(
             core_schema.any_schema(
                 serialization={'type': 'function', 'function': lambda _: 1, 'return_type': 'different'}
             )
         )
+
+
+def test_dict_keys():
+    def fmt(value, **kwargs):
+        return f'<{value}>'
+
+    s = SchemaSerializer(
+        core_schema.dict_schema(core_schema.int_schema(serialization={'type': 'function', 'function': fmt}))
+    )
+    assert s.to_python({1: True}) == {'<1>': True}

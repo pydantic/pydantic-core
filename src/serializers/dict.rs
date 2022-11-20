@@ -160,7 +160,8 @@ impl DictSerializer {
                     }
                     .into_py(py)
                 } else {
-                    k.str()?.into_py(py)
+                    // note here we use the original key so tuples are represent as '(1, 2)' instead of '[1, 2]'
+                    key.str()?.into_py(py)
                 }
             }
             _ => raw_key,

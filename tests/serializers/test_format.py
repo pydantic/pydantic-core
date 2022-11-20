@@ -33,3 +33,10 @@ def test_format_error():
 
     with pytest.raises(PydanticSerializationError, match=re.escape(msg)):
         s.to_json('x')
+
+
+def test_dict_keys():
+    s = SchemaSerializer(
+        core_schema.dict_schema(core_schema.float_schema(serialization={'type': 'format', 'formatting_string': '0.4f'}))
+    )
+    assert s.to_python({1: True}) == {'1.0000': True}
