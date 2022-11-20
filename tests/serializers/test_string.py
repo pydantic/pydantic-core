@@ -15,7 +15,7 @@ def test_str():
     assert v.to_json('emoji 💩') == b'"emoji \xf0\x9f\x92\xa9"'
     assert json.loads(v.to_json('emoji 💩')) == 'emoji 💩'
 
-    assert v.to_python('foobar', format='json') == 'foobar'
+    assert v.to_python('foobar', mode='json') == 'foobar'
 
     # note! serde_json serializes unicode characters differently
     assert v.to_json('emoji 💩') != json.dumps('emoji 💩')
@@ -26,7 +26,7 @@ def test_str_fallback():
     # we don't (currently) warn on to_python since it uses the default method
     assert s.to_python(123) == 123
     with pytest.warns(UserWarning, match='Expected `str` but got `int` - slight slowdown possible'):
-        assert s.to_python(123, format='json') == 123
+        assert s.to_python(123, mode='json') == 123
     with pytest.warns(UserWarning, match='Expected `str` but got `int` - slight slowdown possible'):
         assert s.to_json(123) == b'123'
 
@@ -58,7 +58,7 @@ def test_subclass_str(schema_type, input_value, expected):
     assert v == input_value
     assert type(v) == type(input_value)
 
-    v = s.to_python(input_value, format='json')
+    v = s.to_python(input_value, mode='json')
     assert v == expected
     assert type(v) == str
 

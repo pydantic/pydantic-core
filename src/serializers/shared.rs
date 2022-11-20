@@ -132,15 +132,15 @@ pub(super) fn py_err_se_err<T: serde::ser::Error, E: fmt::Display>(py_error: E) 
 
 /// Useful things which are passed around by serializers
 pub(super) struct Extra<'a> {
-    pub format: &'a SerFormat,
+    pub mode: &'a SerMode,
     pub ob_type_lookup: &'a ObTypeLookup,
     pub warnings: CollectWarnings,
 }
 
 impl<'a> Extra<'a> {
-    pub(super) fn new(py: Python<'a>, format: &'a SerFormat) -> Self {
+    pub(super) fn new(py: Python<'a>, mode: &'a SerMode) -> Self {
         Self {
-            format,
+            mode,
             ob_type_lookup: ObTypeLookup::cached(py),
             warnings: CollectWarnings::new(true),
         }
@@ -148,29 +148,29 @@ impl<'a> Extra<'a> {
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
-pub(super) enum SerFormat {
+pub(super) enum SerMode {
     Python,
     Json,
     Other(String),
 }
 
-impl From<Option<&str>> for SerFormat {
+impl From<Option<&str>> for SerMode {
     fn from(s: Option<&str>) -> Self {
         match s {
-            Some("json") => SerFormat::Json,
-            Some("python") => SerFormat::Python,
-            Some(other) => SerFormat::Other(other.to_string()),
-            None => SerFormat::Python,
+            Some("json") => SerMode::Json,
+            Some("python") => SerMode::Python,
+            Some(other) => SerMode::Other(other.to_string()),
+            None => SerMode::Python,
         }
     }
 }
 
-impl ToPyObject for SerFormat {
+impl ToPyObject for SerMode {
     fn to_object(&self, py: Python<'_>) -> PyObject {
         match self {
-            SerFormat::Python => intern!(py, "python").to_object(py),
-            SerFormat::Json => intern!(py, "json").to_object(py),
-            SerFormat::Other(s) => s.to_object(py),
+            SerMode::Python => intern!(py, "python").to_object(py),
+            SerMode::Json => intern!(py, "json").to_object(py),
+            SerMode::Other(s) => s.to_object(py),
         }
     }
 }

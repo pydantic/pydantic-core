@@ -47,7 +47,7 @@ def test_simple_serializers(schema_type, value, expected_python, expected_json, 
 
     assert s.to_json(value) == expected_json
 
-    v_json = s.to_python(value, format='json')
+    v_json = s.to_python(value, mode='json')
     v_json_expected = json.loads(expected_json)
     assert v_json == v_json_expected
     assert type(v_json) == type(v_json_expected)
@@ -59,7 +59,7 @@ def test_simple_serializers_fallback(schema_type):
     assert s.to_python([1, 2, 3]) == [1, 2, 3]
 
     with pytest.warns(UserWarning, match=f'Expected `{schema_type}` but got `list` - slight slowdown possible'):
-        assert s.to_python([1, 2, b'bytes'], format='json') == [1, 2, 'bytes']
+        assert s.to_python([1, 2, b'bytes'], mode='json') == [1, 2, 'bytes']
 
     with pytest.warns(UserWarning, match=f'Expected `{schema_type}` but got `list` - slight slowdown possible'):
         assert s.to_json([1, 2, 3]) == b'[1,2,3]'

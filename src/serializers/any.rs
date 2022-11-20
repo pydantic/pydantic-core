@@ -14,7 +14,7 @@ use strum_macros::EnumString;
 
 use crate::url::{PyMultiHostUrl, PyUrl};
 
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
+use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct AnySerializer;
@@ -41,8 +41,8 @@ impl TypeSerializer for AnySerializer {
 }
 
 pub(super) fn fallback_to_python(value: &PyAny, extra: &Extra) -> PyResult<PyObject> {
-    match extra.format {
-        SerFormat::Json => fallback_to_python_json(value, extra.ob_type_lookup),
+    match extra.mode {
+        SerMode::Json => fallback_to_python_json(value, extra.ob_type_lookup),
         _ => Ok(value.into_py(value.py())),
     }
 }

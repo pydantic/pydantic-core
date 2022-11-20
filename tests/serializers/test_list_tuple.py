@@ -6,7 +6,7 @@ from pydantic_core import SchemaError, SchemaSerializer, core_schema
 def test_list_any():
     v = SchemaSerializer(core_schema.list_schema(core_schema.any_schema()))
     assert v.to_python(['a', 'b', 'c']) == ['a', 'b', 'c']
-    assert v.to_python(['a', 'b', 'c'], format='json') == ['a', 'b', 'c']
+    assert v.to_python(['a', 'b', 'c'], mode='json') == ['a', 'b', 'c']
     assert v.to_json(['a', 'b', 'c']) == b'["a","b","c"]'
 
     assert v.to_json(['a', 'b', 'c'], indent=2) == b'[\n  "a",\n  "b",\n  "c"\n]'
@@ -31,7 +31,7 @@ def test_list_fallback():
 
     # # even though we're in the fallback state, non JSON types should still be converted to JSON here
     with pytest.warns(UserWarning, match='Expected `list` but got `tuple` - filtering via include/exclude unavailable'):
-        assert v.to_python((1, 2, 3), format='json') == [1, 2, 3]
+        assert v.to_python((1, 2, 3), mode='json') == [1, 2, 3]
 
 
 def test_list_str_fallback():
@@ -49,7 +49,7 @@ def test_list_str_fallback():
 def test_tuple_any():
     v = SchemaSerializer(core_schema.tuple_variable_schema(core_schema.any_schema()))
     assert v.to_python(('a', 'b', 'c')) == ('a', 'b', 'c')
-    assert v.to_python(('a', 'b', 'c'), format='json') == ['a', 'b', 'c']
+    assert v.to_python(('a', 'b', 'c'), mode='json') == ['a', 'b', 'c']
     assert v.to_json(('a', 'b', 'c')) == b'["a","b","c"]'
 
     assert v.to_json(('a', 'b', 'c'), indent=2) == b'[\n  "a",\n  "b",\n  "c"\n]'
@@ -70,7 +70,7 @@ def test_include(schema_func, seq_f):
     v = SchemaSerializer(schema_func(core_schema.any_schema(), serialization={'include': {1, 3, 5}}))
     assert v.to_python(seq_f(0, 1, 2, 3)) == seq_f(1, 3)
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == seq_f('b', 'd', 'f')
-    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), format='json') == ['b', 'd', 'f']
+    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), mode='json') == ['b', 'd', 'f']
     assert v.to_json(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == b'["b","d","f"]'
     # the two include lists are now combined via UNION! unlike in pydantic v1
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), include={6}) == seq_f('b', 'd', 'f', 'g')
@@ -97,7 +97,7 @@ def test_exclude(schema_func, seq_f):
     v = SchemaSerializer(schema_func(core_schema.any_schema(), serialization={'exclude': {1, 3, 5}}))
     assert v.to_python(seq_f(0, 1, 2, 3)) == seq_f(0, 2)
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == seq_f('a', 'c', 'e', 'g', 'h')
-    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), format='json') == ['a', 'c', 'e', 'g', 'h']
+    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), mode='json') == ['a', 'c', 'e', 'g', 'h']
     assert v.to_json(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == b'["a","c","e","g","h"]'
     # the two exclude lists are combined via union as they used to be
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), exclude={6}) == seq_f('a', 'c', 'e', 'h')
@@ -146,4 +146,4 @@ def test_tuple_fallback():
 
     # # even though we're in the fallback state, non JSON types should still be converted to JSON here
     with pytest.warns(UserWarning, match='Expected `tuple` but got `list` - filtering via include/exclude unavailable'):
-        assert v.to_python([1, 2, 3], format='json') == [1, 2, 3]
+        assert v.to_python([1, 2, 3], mode='json') == [1, 2, 3]

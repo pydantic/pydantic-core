@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
 use super::any::{fallback_serialize, fallback_to_python_json, IsType, ObType};
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
+use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct StrSerializer;
@@ -24,8 +24,8 @@ impl TypeSerializer for StrSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        match extra.format {
-            SerFormat::Json => match extra.ob_type_lookup.is_type(value, ObType::Str) {
+        match extra.mode {
+            SerMode::Json => match extra.ob_type_lookup.is_type(value, ObType::Str) {
                 IsType::Exact => Ok(value.into_py(py)),
                 IsType::Subclass => {
                     let s: &str = value.extract()?;

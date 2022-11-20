@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 use serde::Serialize;
 
 use super::any::{fallback_serialize, fallback_to_python_json, IsType, ObType};
-use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
+use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct NoneSerializer;
@@ -25,8 +25,8 @@ impl TypeSerializer for NoneSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        match extra.format {
-            SerFormat::Json => match extra.ob_type_lookup.is_type(value, ObType::None) {
+        match extra.mode {
+            SerMode::Json => match extra.ob_type_lookup.is_type(value, ObType::None) {
                 IsType::Exact => Ok(py.None().into_py(py)),
                 // I don't think subclasses of None can exist
                 _ => {
@@ -79,8 +79,8 @@ macro_rules! build_simple_serializer {
                 extra: &Extra,
             ) -> PyResult<PyObject> {
                 let py = value.py();
-                match extra.format {
-                    SerFormat::Json => match extra.ob_type_lookup.is_type(value, $ob_type) {
+                match extra.mode {
+                    SerMode::Json => match extra.ob_type_lookup.is_type(value, $ob_type) {
                         IsType::Exact => Ok(value.into_py(py)),
                         IsType::Subclass => {
                             let rust_value = value.extract::<$rust_type>()?;

@@ -20,7 +20,7 @@ def test_repr(any_serializer):
 def test_any_json_round_trip(any_serializer, value):
     assert any_serializer.to_python(value) == value
     assert json.loads(any_serializer.to_json(value)) == value
-    assert any_serializer.to_python(value, format='json') == value
+    assert any_serializer.to_python(value, mode='json') == value
 
 
 @pytest.mark.parametrize(
@@ -36,7 +36,7 @@ def test_any_json_round_trip(any_serializer, value):
 def test_any_json_coerce(any_serializer, value, expected_json):
     assert any_serializer.to_python(value) == value
     assert any_serializer.to_json(value) == expected_json
-    assert any_serializer.to_python(value, format='json') == json.loads(expected_json)
+    assert any_serializer.to_python(value, mode='json') == json.loads(expected_json)
 
 
 def test_other_type():

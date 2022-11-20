@@ -15,13 +15,13 @@ def test_json_direct_list_str(benchmark):
 @pytest.mark.benchmark(group='list-of-str')
 def test_python_json_list_str(benchmark):
     serializer = SchemaSerializer({'type': 'list', 'items_schema': {'type': 'str'}})
-    assert serializer.to_python(list(map(str, range(5))), format='json') == ['0', '1', '2', '3', '4']
+    assert serializer.to_python(list(map(str, range(5))), mode='json') == ['0', '1', '2', '3', '4']
 
     items = list(map(str, range(1000)))
 
     @benchmark
     def t():
-        serializer.to_python(items, format='json')
+        serializer.to_python(items, mode='json')
 
 
 @pytest.mark.benchmark(group='list-of-str')
@@ -54,22 +54,22 @@ def test_json_any_list_int(benchmark):
 @pytest.mark.benchmark(group='list-of-int')
 def test_python_json_list_int(benchmark):
     serializer = SchemaSerializer({'type': 'list', 'items_schema': {'type': 'int'}})
-    assert serializer.to_python(list(range(5)), format='json') == [0, 1, 2, 3, 4]
+    assert serializer.to_python(list(range(5)), mode='json') == [0, 1, 2, 3, 4]
 
     items = list(range(1000))
 
     @benchmark
     def t():
-        serializer.to_python(items, format='json')
+        serializer.to_python(items, mode='json')
 
 
 @pytest.mark.benchmark(group='list-of-bool')
 def test_python_json_list_none(benchmark):
     serializer = SchemaSerializer({'type': 'list', 'items_schema': {'type': 'none'}})
-    assert serializer.to_python([None, None, None], format='json') == [None, None, None]
+    assert serializer.to_python([None, None, None], mode='json') == [None, None, None]
 
     items = [None for v in range(1000)]
 
     @benchmark
     def t():
-        serializer.to_python(items, format='json')
+        serializer.to_python(items, mode='json')

@@ -11,7 +11,7 @@ use serde::ser::SerializeSeq;
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
+use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 use super::PydanticSerializer;
 
 type IncEx = Option<IntMap<usize, Option<PyObject>>>;
@@ -245,8 +245,8 @@ impl TypeSerializer for TupleSerializer {
                 if matches!(item_serializer, CombinedSerializer::Any(_)) && include.is_none() && exclude.is_none() {
                     // if we are using the AnySerializer and there is no include/exclude, we can just return the value
 
-                    match extra.format {
-                        SerFormat::Json => Ok(PyList::new(py, py_tuple).into_py(py)),
+                    match extra.mode {
+                        SerMode::Json => Ok(PyList::new(py, py_tuple).into_py(py)),
                         _ => Ok(py_tuple.to_object(py)),
                     }
                 } else {
@@ -256,8 +256,8 @@ impl TypeSerializer for TupleSerializer {
                             items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                         }
                     }
-                    match extra.format {
-                        SerFormat::Json => Ok(PyList::new(py, items).into_py(py)),
+                    match extra.mode {
+                        SerMode::Json => Ok(PyList::new(py, items).into_py(py)),
                         _ => Ok(PyTuple::new(py, items).into_py(py)),
                     }
                 }

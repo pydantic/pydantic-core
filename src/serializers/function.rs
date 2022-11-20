@@ -11,7 +11,7 @@ use crate::build_tools::{function_name, kwargs, py_error_type, SchemaDict};
 use crate::serializers::any::{fallback_serialize, fallback_to_python_json, ob_type_to_python_json};
 
 use super::any::{fallback_serialize_known, ObType};
-use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
+use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct FunctionSerializer {
@@ -44,10 +44,10 @@ impl FunctionSerializer {
         value: &PyAny,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
-        format: &SerFormat,
+        mode: &SerMode,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        let kwargs = kwargs!(py, format: format.to_object(py), include: include, exclude: exclude);
+        let kwargs = kwargs!(py, mode: mode.to_object(py), include: include, exclude: exclude);
         self.func.call(py, (value,), kwargs)
     }
 }
@@ -62,11 +62,11 @@ impl TypeSerializer for FunctionSerializer {
     ) -> PyResult<PyObject> {
         let py = value.py();
         let v = self
-            .call(value, include, exclude, extra.format)
+            .call(value, include, exclude, extra.mode)
             .map_err(|e| py_error_type!(PyRuntimeError; "Error calling `{}`: {}", self.function_name, e))?;
 
-        match extra.format {
-            SerFormat::Json => {
+        match extra.mode {
+            SerMode::Json => {
                 if let Some(ref ob_type) = self.return_ob_type {
                     ob_type_to_python_json(ob_type, v.as_ref(py), extra.ob_type_lookup)
                 } else {
@@ -87,7 +87,7 @@ impl TypeSerializer for FunctionSerializer {
     ) -> Result<S::Ok, S::Error> {
         let py = value.py();
         let return_value = self
-            .call(value, include, exclude, extra.format)
+            .call(value, include, exclude, extra.mode)
             .map_err(|e| Error::custom(format!("Error calling `{}`: {}", self.function_name, e)))?;
 
         if let Some(ref ob_type) = self.return_ob_type {

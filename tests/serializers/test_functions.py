@@ -16,7 +16,7 @@ def test_function(value, expected_python, expected_json):
     s = SchemaSerializer(core_schema.any_schema(serialization={'function': repr_function}))
     assert s.to_python(value) == expected_python
     assert s.to_json(value) == expected_json
-    assert s.to_python(value, format='json') == json.loads(expected_json)
+    assert s.to_python(value, mode='json') == json.loads(expected_json)
 
 
 def test_function_args():
@@ -29,20 +29,20 @@ def test_function_args():
 
     s = SchemaSerializer(core_schema.any_schema(serialization={'function': double}))
     assert s.to_python(4) == 8
-    assert f_kwargs == {'format': 'python', 'include': None, 'exclude': None}
+    assert f_kwargs == {'mode': 'python', 'include': None, 'exclude': None}
     assert s.to_python('x') == 'xx'
 
-    assert s.to_python(4, format='foobar') == 8
-    assert f_kwargs == {'format': 'foobar', 'include': None, 'exclude': None}
+    assert s.to_python(4, mode='foobar') == 8
+    assert f_kwargs == {'mode': 'foobar', 'include': None, 'exclude': None}
 
     assert s.to_json(42) == b'84'
-    assert f_kwargs == {'format': 'json', 'include': None, 'exclude': None}
+    assert f_kwargs == {'mode': 'json', 'include': None, 'exclude': None}
 
-    assert s.to_python(7, format='json') == 14
-    assert f_kwargs == {'format': 'json', 'include': None, 'exclude': None}
+    assert s.to_python(7, mode='json') == 14
+    assert f_kwargs == {'mode': 'json', 'include': None, 'exclude': None}
 
     assert s.to_python(1, include={1, 2, 3}, exclude={'foo': {'bar'}}) == 2
-    assert f_kwargs == {'format': 'python', 'include': {1, 2, 3}, 'exclude': {'foo': {'bar'}}}
+    assert f_kwargs == {'mode': 'python', 'include': {1, 2, 3}, 'exclude': {'foo': {'bar'}}}
 
 
 def test_function_error():
@@ -63,13 +63,13 @@ def test_function_known_type():
 
     s = SchemaSerializer(core_schema.any_schema(serialization={'function': append_42, 'type': 'list'}))
     assert s.to_python([1, 2, 3]) == [1, 2, 3, 42]
-    assert s.to_python([1, 2, 3], format='json') == [1, 2, 3, 42]
+    assert s.to_python([1, 2, 3], mode='json') == [1, 2, 3, 42]
     assert s.to_json([1, 2, 3]) == b'[1,2,3,42]'
 
     assert s.to_python('abc') == 'abc'
 
     with pytest.raises(TypeError, match="'str' object cannot be converted to 'PyList'"):
-        s.to_python('abc', format='json')
+        s.to_python('abc', mode='json')
 
     msg = "Error serializing to JSON: 'str' object cannot be converted to 'PyList'"
     with pytest.raises(PydanticSerializationError, match=msg):

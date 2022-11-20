@@ -39,12 +39,12 @@ impl SchemaSerializer {
         &self,
         py: Python,
         value: &PyAny,
-        format: Option<&str>,
+        mode: Option<&str>,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        let format: shared::SerFormat = format.into();
-        let extra = shared::Extra::new(py, &format);
+        let mode: shared::SerMode = mode.into();
+        let extra = shared::Extra::new(py, &mode);
         let v = self.comb_serializer.to_python(value, include, exclude, &extra)?;
         extra.warnings.final_check(py)?;
         Ok(v)
@@ -60,7 +60,7 @@ impl SchemaSerializer {
     ) -> PyResult<PyObject> {
         let writer: Vec<u8> = Vec::with_capacity(self.json_size);
 
-        let extra = shared::Extra::new(py, &shared::SerFormat::Json);
+        let extra = shared::Extra::new(py, &shared::SerMode::Json);
         let serializer = PydanticSerializer::new(value, &self.comb_serializer, include, exclude, &extra);
 
         let bytes = match indent {
