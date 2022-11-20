@@ -71,6 +71,7 @@ combined_serializer! {
     both: List, super::list_tuple::ListSerializer;
     both: Tuple, super::list_tuple::TupleSerializer;
     both: Any, super::any::AnySerializer;
+    both: Format, super::format::FunctionSerializer;
 }
 
 impl BuildSerializer for CombinedSerializer {
@@ -82,18 +83,25 @@ impl BuildSerializer for CombinedSerializer {
         let type_key = intern!(py, "type");
 
         if let Some(ser) = schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
-            if ser.contains(intern!(py, "function")).unwrap_or(false) {
-                // `schema.serialization.function` is defined, use a function serializer
-                return super::function::FunctionSerializer::build(ser, config)
-                    .map_err(|err| py_error_type!("Error building `function` serializer:\n  {}", err));
-            } else if let Some(ser_type) = ser.get_as::<&str>(type_key)? {
-                // otherwise if `schema.serialization.type` is define, we use that with `find_serializer`
-                // instead of `schema.type`. In this case it's an error if a serializer isn't found.
-                return match Self::find_serializer(ser_type, schema, config)? {
-                    Some(serializer) => Ok(serializer),
-                    None => py_err!("Unknown serialization schema type: `{}`", ser_type),
-                };
-            }
+            let op_ser_type: Option<&str> = ser.get_as(intern!(py, "type"))?;
+            match op_ser_type {
+                Some("function") => {
+                    // `function` is a special case, not inclued in `find_serializer` since it means something different
+                    // in `schema.type`
+                    return super::function::FunctionSerializer::build(ser, config)
+                        .map_err(|err| py_error_type!("Error building `function` serializer:\n  {}", err));
+                }
+                Some(ser_type) => {
+                    // otherwise if `schema.serialization.type` is defined, use that with `find_serializer`
+                    // instead of `schema.type`. In this case it's an error if a serializer isn't found.
+                    return match Self::find_serializer(ser_type, schema, config)? {
+                        Some(serializer) => Ok(serializer),
+                        None => py_err!("Unknown serialization schema type: `{}`", ser_type),
+                    };
+                }
+                // if `schema.serialization.type` is None, fall back to `schema.type`
+                None => (),
+            };
         }
 
         let type_: &str = schema.get_as_req(type_key)?;

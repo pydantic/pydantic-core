@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from pydantic_core import PydanticSerializationError, SchemaSerializer, core_schema
+from pydantic_core import PydanticSerializationError, SchemaError, SchemaSerializer, core_schema
 
 
 @pytest.mark.parametrize(
@@ -13,7 +13,7 @@ def test_function(value, expected_python, expected_json):
     def repr_function(value, **kwargs):
         return repr(value)
 
-    s = SchemaSerializer(core_schema.any_schema(serialization={'function': repr_function}))
+    s = SchemaSerializer(core_schema.any_schema(serialization={'type': 'function', 'function': repr_function}))
     assert s.to_python(value) == expected_python
     assert s.to_json(value) == expected_json
     assert s.to_python(value, mode='json') == json.loads(expected_json)
@@ -27,7 +27,7 @@ def test_function_args():
         f_kwargs = kwargs
         return value * 2
 
-    s = SchemaSerializer(core_schema.any_schema(serialization={'function': double}))
+    s = SchemaSerializer(core_schema.any_schema(serialization={'type': 'function', 'function': double}))
     assert s.to_python(4) == 8
     assert f_kwargs == {'mode': 'python', 'include': None, 'exclude': None}
     assert s.to_python('x') == 'xx'
@@ -49,9 +49,9 @@ def test_function_error():
     def raise_error(value, **kwargs):
         raise TypeError('foo')
 
-    s = SchemaSerializer(core_schema.any_schema(serialization={'function': raise_error}))
+    s = SchemaSerializer(core_schema.any_schema(serialization={'type': 'function', 'function': raise_error}))
 
-    with pytest.raises(RuntimeError, match='Error calling `raise_error`: TypeError: foo'):
+    with pytest.raises(PydanticSerializationError, match='Error calling `raise_error`: TypeError: foo'):
         s.to_python('abc')
 
 
@@ -61,7 +61,9 @@ def test_function_known_type():
             value.append(42)
         return value
 
-    s = SchemaSerializer(core_schema.any_schema(serialization={'function': append_42, 'type': 'list'}))
+    s = SchemaSerializer(
+        core_schema.any_schema(serialization={'type': 'function', 'function': append_42, 'return_type': 'list'})
+    )
     assert s.to_python([1, 2, 3]) == [1, 2, 3, 42]
     assert s.to_python([1, 2, 3], mode='json') == [1, 2, 3, 42]
     assert s.to_json([1, 2, 3]) == b'[1,2,3,42]'
@@ -74,3 +76,12 @@ def test_function_known_type():
     msg = "Error serializing to JSON: 'str' object cannot be converted to 'PyList'"
     with pytest.raises(PydanticSerializationError, match=msg):
         s.to_json('abc')
+
+
+def test_date_format_function():
+    with pytest.raises(SchemaError, match='Unknown return type "different"'):
+        SchemaSerializer(
+            core_schema.any_schema(
+                serialization={'type': 'function', 'function': lambda _: 1, 'return_type': 'different'}
+            )
+        )

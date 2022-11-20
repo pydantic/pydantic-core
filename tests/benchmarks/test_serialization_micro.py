@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 
 from pydantic_core._pydantic_core import SchemaSerializer
@@ -73,3 +75,26 @@ def test_python_json_list_none(benchmark):
     @benchmark
     def t():
         serializer.to_python(items, mode='json')
+
+
+@pytest.mark.benchmark(group='date-format')
+def test_date_format(benchmark):
+    serializer = SchemaSerializer({'type': 'any', 'serialization': {'type': 'format', 'formatting_string': '%Y-%m-%d'}})
+    d = date(2022, 11, 20)
+    assert serializer.to_python(d) == '2022-11-20'
+
+    benchmark(serializer.to_python, d)
+
+
+@pytest.mark.benchmark(group='date-format')
+def test_date_format_function(benchmark):
+    def fmt(value, **kwargs):
+        return value.strftime('%Y-%m-%d')
+
+    serializer = SchemaSerializer(
+        {'type': 'any', 'serialization': {'type': 'function', 'function': fmt, 'return_type': 'str'}}
+    )
+    d = date(2022, 11, 20)
+    assert serializer.to_python(d) == '2022-11-20'
+
+    benchmark(serializer.to_python, d)

@@ -11,6 +11,7 @@ use crate::PydanticSerializationError;
 use shared::{BuildSerializer, TypeSerializer};
 
 mod any;
+mod format;
 mod function;
 mod list_tuple;
 mod shared;

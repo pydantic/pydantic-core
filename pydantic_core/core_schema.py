@@ -74,20 +74,33 @@ ExpectedSerializationTypes = Literal[
 ]
 
 
+class AltTypeSerializationSchema(TypedDict, total=False):
+    type: Required[ExpectedSerializationTypes]
+
+
 class FunctionSerializationSchema(TypedDict, total=False):
+    type: Required[Literal['function']]
     function: Required[SerializeFunction]
-    type: ExpectedSerializationTypes
+    return_type: ExpectedSerializationTypes
+
+
+class FormatSerializationSchema(TypedDict, total=False):
+    type: Required[Literal['format']]
+    formatting_string: Required[str]
+
+
+SerializationSchema = Union[AltTypeSerializationSchema, FunctionSerializationSchema, FormatSerializationSchema]
 
 
 class AnySchema(TypedDict, total=False):
     type: Required[Literal['any']]
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def any_schema(
-    *, ref: str | None = None, extra: Any = None, serialization: FunctionSerializationSchema | None = None
+    *, ref: str | None = None, extra: Any = None, serialization: SerializationSchema | None = None
 ) -> AnySchema:
     return dict_not_none(type='any', ref=ref, extra=extra, serialization=serialization)
 
@@ -96,11 +109,11 @@ class NoneSchema(TypedDict, total=False):
     type: Required[Literal['none']]
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def none_schema(
-    *, ref: str | None = None, extra: Any = None, serialization: FunctionSerializationSchema | None = None
+    *, ref: str | None = None, extra: Any = None, serialization: SerializationSchema | None = None
 ) -> NoneSchema:
     return dict_not_none(type='none', ref=ref, extra=extra, serialization=serialization)
 
@@ -110,14 +123,14 @@ class BoolSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def bool_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> BoolSchema:
     return dict_not_none(type='bool', strict=strict, ref=ref, extra=extra, serialization=serialization)
 
@@ -132,7 +145,7 @@ class IntSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def int_schema(
@@ -145,7 +158,7 @@ def int_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> IntSchema:
     return dict_not_none(
         type='int',
@@ -172,7 +185,7 @@ class FloatSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def float_schema(
@@ -186,7 +199,7 @@ def float_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> FloatSchema:
     return dict_not_none(
         type='float',
@@ -214,7 +227,7 @@ class StringSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def string_schema(
@@ -228,7 +241,7 @@ def string_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> StringSchema:
     return dict_not_none(
         type='str',
@@ -252,7 +265,7 @@ class BytesSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def bytes_schema(
@@ -262,7 +275,7 @@ def bytes_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> BytesSchema:
     return dict_not_none(
         type='bytes',
@@ -288,7 +301,7 @@ class DateSchema(TypedDict, total=False):
     now_utc_offset: int
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def date_schema(
@@ -302,7 +315,7 @@ def date_schema(
     now_op: Literal['past', 'future'] | None = None,
     now_utc_offset: int | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> DateSchema:
     return dict_not_none(
         type='date',
@@ -328,7 +341,7 @@ class TimeSchema(TypedDict, total=False):
     gt: time
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def time_schema(
@@ -340,7 +353,7 @@ def time_schema(
     gt: time | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> TimeSchema:
     return dict_not_none(
         type='time', strict=strict, le=le, ge=ge, lt=lt, gt=gt, ref=ref, extra=extra, serialization=serialization
@@ -361,7 +374,7 @@ class DatetimeSchema(TypedDict, total=False):
     now_utc_offset: int
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def datetime_schema(
@@ -376,7 +389,7 @@ def datetime_schema(
     now_utc_offset: int | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> DatetimeSchema:
     return dict_not_none(
         type='datetime',
@@ -403,7 +416,7 @@ class TimedeltaSchema(TypedDict, total=False):
     gt: timedelta
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def timedelta_schema(
@@ -415,7 +428,7 @@ def timedelta_schema(
     gt: timedelta | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> TimedeltaSchema:
     return dict_not_none(
         type='timedelta', strict=strict, le=le, ge=ge, lt=lt, gt=gt, ref=ref, extra=extra, serialization=serialization
@@ -427,11 +440,11 @@ class LiteralSchema(TypedDict, total=False):
     expected: Required[List[Any]]
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def literal_schema(
-    *expected: Any, ref: str | None = None, extra: Any = None, serialization: FunctionSerializationSchema | None = None
+    *expected: Any, ref: str | None = None, extra: Any = None, serialization: SerializationSchema | None = None
 ) -> LiteralSchema:
     return dict_not_none(type='literal', expected=expected, ref=ref, extra=extra, serialization=serialization)
 
@@ -448,7 +461,7 @@ class IsInstanceSchema(TypedDict, total=False):
     json_function: Callable[[Any], Any]
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def is_instance_schema(
@@ -459,7 +472,7 @@ def is_instance_schema(
     cls_repr: str | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> IsInstanceSchema:
     return dict_not_none(
         type='is-instance',
@@ -479,7 +492,7 @@ class IsSubclassSchema(TypedDict, total=False):
     cls_repr: str
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def is_subclass_schema(
@@ -488,7 +501,7 @@ def is_subclass_schema(
     cls_repr: str | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> IsInstanceSchema:
     return dict_not_none(
         type='is-subclass', cls=cls, cls_repr=cls_repr, ref=ref, extra=extra, serialization=serialization
@@ -499,11 +512,11 @@ class CallableSchema(TypedDict, total=False):
     type: Required[Literal['callable']]
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def callable_schema(
-    *, ref: str | None = None, extra: Any = None, serialization: FunctionSerializationSchema | None = None
+    *, ref: str | None = None, extra: Any = None, serialization: SerializationSchema | None = None
 ) -> CallableSchema:
     return dict_not_none(type='callable', ref=ref, extra=extra, serialization=serialization)
 
@@ -513,7 +526,7 @@ class ListExcludeSerializerSchema(TypedDict, total=False):
     exclude: Union[Set[int], Dict[int, Any]]
 
 
-ListSerializerSchema = Union[ListExcludeSerializerSchema, FunctionSerializationSchema]
+ListSerializerSchema = Union[ListExcludeSerializerSchema, SerializationSchema]
 
 
 class ListSchema(TypedDict, total=False):
@@ -627,7 +640,7 @@ class SetSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def set_schema(
@@ -639,7 +652,7 @@ def set_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> SetSchema:
     return dict_not_none(
         type='set',
@@ -663,7 +676,7 @@ class FrozenSetSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def frozenset_schema(
@@ -675,7 +688,7 @@ def frozenset_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> FrozenSetSchema:
     return dict_not_none(
         type='frozenset',
@@ -696,7 +709,7 @@ class GeneratorSchema(TypedDict, total=False):
     max_length: int
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def generator_schema(
@@ -705,7 +718,7 @@ def generator_schema(
     max_length: int | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> GeneratorSchema:
     return dict_not_none(
         type='generator',
@@ -726,7 +739,7 @@ class DictSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def dict_schema(
@@ -738,7 +751,7 @@ def dict_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> DictSchema:
     return dict_not_none(
         type='dict',
@@ -767,7 +780,7 @@ class FunctionSchema(TypedDict, total=False):
     schema: Required[CoreSchema]
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def function_before_schema(
@@ -776,7 +789,7 @@ def function_before_schema(
     *,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> FunctionSchema:
     return dict_not_none(
         type='function',
@@ -795,7 +808,7 @@ def function_after_schema(
     *,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> FunctionSchema:
     return dict_not_none(
         type='function',
@@ -834,7 +847,7 @@ class FunctionWrapSchema(TypedDict, total=False):
     schema: Required[CoreSchema]
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def function_wrap_schema(
@@ -843,7 +856,7 @@ def function_wrap_schema(
     *,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> FunctionWrapSchema:
     return dict_not_none(
         type='function',
@@ -862,7 +875,7 @@ class FunctionPlainSchema(TypedDict, total=False):
     function: Required[ValidatorFunction]
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def function_plain_schema(
@@ -870,7 +883,7 @@ def function_plain_schema(
     *,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> FunctionPlainSchema:
     return dict_not_none(
         type='function', mode='plain', function=function, ref=ref, extra=extra, serialization=serialization
@@ -886,7 +899,7 @@ class WithDefaultSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 Omitted = object()
@@ -901,7 +914,7 @@ def with_default_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> WithDefaultSchema:
     s = dict_not_none(
         type='default',
@@ -924,7 +937,7 @@ class NullableSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def nullable_schema(
@@ -933,7 +946,7 @@ def nullable_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> NullableSchema:
     return dict_not_none(
         type='nullable', schema=schema, strict=strict, ref=ref, extra=extra, serialization=serialization
@@ -949,7 +962,7 @@ class UnionSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def union_schema(
@@ -960,7 +973,7 @@ def union_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> UnionSchema:
     return dict_not_none(
         type='union',
@@ -987,7 +1000,7 @@ class TaggedUnionSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def tagged_union_schema(
@@ -1000,7 +1013,7 @@ def tagged_union_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> TaggedUnionSchema:
     return dict_not_none(
         type='tagged-union',
@@ -1021,14 +1034,11 @@ class ChainSchema(TypedDict, total=False):
     steps: Required[List[CoreSchema]]
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def chain_schema(
-    *steps: CoreSchema,
-    ref: str | None = None,
-    extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    *steps: CoreSchema, ref: str | None = None, extra: Any = None, serialization: SerializationSchema | None = None
 ) -> ChainSchema:
     return dict_not_none(type='chain', steps=steps, ref=ref, extra=extra, serialization=serialization)
 
@@ -1085,7 +1095,7 @@ class TypedDictSchema(TypedDict, total=False):
     from_attributes: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def typed_dict_schema(
@@ -1100,7 +1110,7 @@ def typed_dict_schema(
     from_attributes: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> TypedDictSchema:
     return dict_not_none(
         type='typed-dict',
@@ -1127,7 +1137,7 @@ class NewClassSchema(TypedDict, total=False):
     config: CoreConfig
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def new_class_schema(
@@ -1139,7 +1149,7 @@ def new_class_schema(
     config: CoreConfig | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> NewClassSchema:
     return dict_not_none(
         type='new-class',
@@ -1179,7 +1189,7 @@ class ArgumentsSchema(TypedDict, total=False):
     var_kwargs_schema: CoreSchema
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def arguments_schema(
@@ -1189,7 +1199,7 @@ def arguments_schema(
     var_kwargs_schema: CoreSchema | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> ArgumentsSchema:
     return dict_not_none(
         type='arguments',
@@ -1210,7 +1220,7 @@ class CallSchema(TypedDict, total=False):
     return_schema: CoreSchema
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def call_schema(
@@ -1220,7 +1230,7 @@ def call_schema(
     return_schema: CoreSchema | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> CallSchema:
     return dict_not_none(
         type='call',
@@ -1250,7 +1260,7 @@ class CustomErrorSchema(TypedDict, total=False):
     custom_error_context: Dict[str, Union[str, int, float]]
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def custom_error_schema(
@@ -1261,7 +1271,7 @@ def custom_error_schema(
     custom_error_context: dict[str, str | int | float] | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> CustomErrorSchema:
     return dict_not_none(
         type='custom_error',
@@ -1280,7 +1290,7 @@ class JsonSchema(TypedDict, total=False):
     schema: CoreSchema
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def json_schema(
@@ -1288,7 +1298,7 @@ def json_schema(
     *,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> JsonSchema:
     return dict_not_none(type='json', schema=schema, ref=ref, extra=extra, serialization=serialization)
 
@@ -1304,7 +1314,7 @@ class UrlSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def url_schema(
@@ -1318,7 +1328,7 @@ def url_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> UrlSchema:
     return dict_not_none(
         type='url',
@@ -1346,7 +1356,7 @@ class MultiHostUrlSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: FunctionSerializationSchema
+    serialization: SerializationSchema
 
 
 def multi_host_url_schema(
@@ -1360,7 +1370,7 @@ def multi_host_url_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: FunctionSerializationSchema | None = None,
+    serialization: SerializationSchema | None = None,
 ) -> MultiHostUrlSchema:
     return dict_not_none(
         type='multi-host-url',

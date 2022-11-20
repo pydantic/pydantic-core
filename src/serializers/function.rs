@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use pyo3::exceptions::PyRuntimeError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -8,9 +7,11 @@ use pyo3::types::PyDict;
 use serde::ser::Error;
 
 use crate::build_tools::{function_name, kwargs, py_error_type, SchemaDict};
-use crate::serializers::any::{fallback_serialize, fallback_to_python_json, ob_type_to_python_json};
+use crate::errors::PydanticSerializationError;
 
-use super::any::{fallback_serialize_known, ObType};
+use super::any::{
+    fallback_serialize, fallback_serialize_known, fallback_to_python_json, ob_type_to_python_json, ObType,
+};
 use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
@@ -31,9 +32,10 @@ impl BuildSerializer for FunctionSerializer {
         Ok(Self {
             func: function.into_py(py),
             function_name,
-            return_ob_type: schema
-                .get_as::<&str>(intern!(py, "type"))?
-                .map(|t| ObType::from_str(t).unwrap()),
+            return_ob_type: match schema.get_as::<&str>(intern!(py, "return_type"))? {
+                Some(t) => Some(ObType::from_str(t).map_err(|_| py_error_type!("Unknown return type {:?}", t))?),
+                None => None,
+            },
         }
         .into())
     }
@@ -45,10 +47,12 @@ impl FunctionSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         mode: &SerMode,
-    ) -> PyResult<PyObject> {
+    ) -> Result<PyObject, String> {
         let py = value.py();
         let kwargs = kwargs!(py, mode: mode.to_object(py), include: include, exclude: exclude);
-        self.func.call(py, (value,), kwargs)
+        self.func
+            .call(py, (value,), kwargs)
+            .map_err(|e| format!("Error calling `{}`: {}", self.function_name, e))
     }
 }
 
@@ -63,7 +67,7 @@ impl TypeSerializer for FunctionSerializer {
         let py = value.py();
         let v = self
             .call(value, include, exclude, extra.mode)
-            .map_err(|e| py_error_type!(PyRuntimeError; "Error calling `{}`: {}", self.function_name, e))?;
+            .map_err(PydanticSerializationError::new_err)?;
 
         match extra.mode {
             SerMode::Json => {
@@ -86,9 +90,7 @@ impl TypeSerializer for FunctionSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let py = value.py();
-        let return_value = self
-            .call(value, include, exclude, extra.mode)
-            .map_err(|e| Error::custom(format!("Error calling `{}`: {}", self.function_name, e)))?;
+        let return_value = self.call(value, include, exclude, extra.mode).map_err(Error::custom)?;
 
         if let Some(ref ob_type) = self.return_ob_type {
             fallback_serialize_known(ob_type, return_value.as_ref(py), serializer, extra.ob_type_lookup)

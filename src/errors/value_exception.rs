@@ -33,6 +33,10 @@ pub struct PydanticSerializationError {
 }
 
 impl PydanticSerializationError {
+    pub(crate) fn new_err(msg: String) -> PyErr {
+        PyErr::new::<PydanticSerializationError, String>(msg)
+    }
+
     pub(crate) fn json_error(error: serde_json::Error) -> PyErr {
         let msg = format!("Error serializing to JSON: {error}");
         PyErr::new::<PydanticSerializationError, String>(msg)
