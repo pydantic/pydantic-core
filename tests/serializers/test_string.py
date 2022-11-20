@@ -21,8 +21,28 @@ def test_str():
 
 
 def test_str_fallback():
-    v = SchemaSerializer(core_schema.string_schema())
+    s = SchemaSerializer(core_schema.string_schema())
     # we don't (currently) warn on to_python since it uses the default method
-    assert v.to_python(123) == 123
-    with pytest.warns(UserWarning, match='Expected `str` but got `int`'):
-        assert v.to_json(123) == b'123'
+    assert s.to_python(123) == 123
+    with pytest.warns(UserWarning, match='Expected `str` but got `int` - slight slowdown possible'):
+        assert s.to_python(123, format='json') == 123
+    with pytest.warns(UserWarning, match='Expected `str` but got `int` - slight slowdown possible'):
+        assert s.to_json(123) == b'123'
+
+
+class Foobar(str):
+    pass
+
+
+@pytest.mark.parametrize('schema_type', ['str', 'any'])
+def test_subclass_str(schema_type):
+    s = SchemaSerializer({'type': schema_type})
+    v = s.to_python(Foobar('foo'))
+    assert v == 'foo'
+    assert type(v) == Foobar
+
+    v = s.to_python(Foobar('foo'), format='json')
+    assert v == 'foo'
+    assert type(v) == str
+
+    assert s.to_json(Foobar('foo')) == b'"foo"'

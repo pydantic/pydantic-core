@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde::Serialize;
 
-use super::any::{fallback_serialize, fallback_to_python_json, ObType};
+use super::any::{fallback_serialize, fallback_to_python_json, IsType, ObType};
 use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
 
 #[derive(Debug, Clone)]
@@ -27,8 +27,9 @@ impl TypeSerializer for NoneSerializer {
         let py = value.py();
         match extra.format {
             SerFormat::Json => match extra.ob_type_lookup.is_type(value, ObType::None) {
-                true => Ok(py.None().into_py(py)),
-                false => {
+                IsType::Exact => Ok(py.None().into_py(py)),
+                // I don't think subclasses of None can exist
+                _ => {
                     extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
                     fallback_to_python_json(value, extra.ob_type_lookup)
                 }
@@ -46,8 +47,9 @@ impl TypeSerializer for NoneSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match extra.ob_type_lookup.is_type(value, ObType::None) {
-            true => serializer.serialize_none(),
-            false => {
+            IsType::Exact => serializer.serialize_none(),
+            // I don't think subclasses of None can exist
+            _ => {
                 extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
                 fallback_serialize(value, serializer, extra.ob_type_lookup)
             }
@@ -79,8 +81,12 @@ macro_rules! build_simple_serializer {
                 let py = value.py();
                 match extra.format {
                     SerFormat::Json => match extra.ob_type_lookup.is_type(value, $ob_type) {
-                        true => Ok(value.into_py(py)),
-                        false => {
+                        IsType::Exact => Ok(value.into_py(py)),
+                        IsType::Subclass => {
+                            let rust_value = value.extract::<$rust_type>()?;
+                            Ok(rust_value.to_object(py))
+                        }
+                        IsType::False => {
                             extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
                             fallback_to_python_json(value, extra.ob_type_lookup)
                         }

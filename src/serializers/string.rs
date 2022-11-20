@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
-use super::any::{fallback_serialize, fallback_to_python_json};
+use super::any::{fallback_serialize, fallback_to_python_json, IsType, ObType};
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerFormat, TypeSerializer};
 
 #[derive(Debug, Clone)]
@@ -25,9 +25,13 @@ impl TypeSerializer for StrSerializer {
     ) -> PyResult<PyObject> {
         let py = value.py();
         match extra.format {
-            SerFormat::Json => match value.is_instance_of::<PyString>().unwrap_or(false) {
-                true => Ok(value.into_py(py)),
-                false => {
+            SerFormat::Json => match extra.ob_type_lookup.is_type(value, ObType::Str) {
+                IsType::Exact => Ok(value.into_py(py)),
+                IsType::Subclass => {
+                    let s: &str = value.extract()?;
+                    Ok(s.into_py(py))
+                }
+                IsType::False => {
                     extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
                     fallback_to_python_json(value, extra.ob_type_lookup)
                 }
