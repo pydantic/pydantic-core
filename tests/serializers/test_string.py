@@ -1,4 +1,5 @@
 import json
+from enum import Enum
 
 import pytest
 
@@ -30,19 +31,35 @@ def test_str_fallback():
         assert s.to_json(123) == b'123'
 
 
-class Foobar(str):
+class StrSubclass(str):
     pass
 
 
-@pytest.mark.parametrize('schema_type', ['str', 'any'])
-def test_subclass_str(schema_type):
-    s = SchemaSerializer({'type': schema_type})
-    v = s.to_python(Foobar('foo'))
-    assert v == 'foo'
-    assert type(v) == Foobar
+class BasicClass:
+    pass
 
-    v = s.to_python(Foobar('foo'), format='json')
-    assert v == 'foo'
+
+class StrMixin(str, BasicClass):
+    pass
+
+
+class StrEnum(str, Enum):
+    foo = 'foo-value'
+    bar = 'bar-value'
+
+
+@pytest.mark.parametrize('schema_type', ['str', 'any'])
+@pytest.mark.parametrize(
+    'input_value,expected', [(StrSubclass('foo'), 'foo'), (StrMixin('foo'), 'foo'), (StrEnum.foo, 'foo-value')]
+)
+def test_subclass_str(schema_type, input_value, expected):
+    s = SchemaSerializer({'type': schema_type})
+    v = s.to_python(input_value)
+    assert v == input_value
+    assert type(v) == type(input_value)
+
+    v = s.to_python(input_value, format='json')
+    assert v == expected
     assert type(v) == str
 
-    assert s.to_json(Foobar('foo')) == b'"foo"'
+    assert s.to_json(input_value) == json.dumps(expected).encode('utf-8')
