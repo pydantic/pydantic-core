@@ -71,6 +71,7 @@ ExpectedSerializationTypes = Literal[
     'timedelta',
     'url',
     'multi_host_url',
+    'json',
 ]
 
 

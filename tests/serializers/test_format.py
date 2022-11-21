@@ -27,7 +27,8 @@ def test_format(value, formatting_string, expected_python, expected_json):
 def test_format_error():
     s = SchemaSerializer(core_schema.any_schema(serialization={'type': 'format', 'formatting_string': '^5d'}))
 
-    msg = "Error calling `format(value, '^5d')`: ValueError: Unknown format code 'd' for object of type 'str'"
+    # the actual error message differs slightly between cpython and pypy
+    msg = "Error calling `format(value, '^5d')`: ValueError:"
     with pytest.raises(PydanticSerializationError, match=re.escape(msg)):
         s.to_python('x')
 
