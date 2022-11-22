@@ -1,4 +1,5 @@
 import json
+import platform
 from enum import Enum
 
 import pytest
@@ -19,16 +20,29 @@ def test_bytes():
     assert json.loads(json_emoji) == 'emoji 💩'
 
 
-def test_bytes_invalid():
+def test_bytes_invalid_all():
     s = SchemaSerializer(core_schema.bytes_schema())
     assert s.to_python(b'\x81') == b'\x81'
-
-    with pytest.raises(UnicodeDecodeError, match="'utf-8' codec can't decode byte 0x81 in position 0: invalid utf-8"):
-        s.to_python(b'\x81', mode='json')
 
     msg = 'Error serializing to JSON: invalid utf-8 sequence of 1 bytes from index 0'
     with pytest.raises(PydanticSerializationError, match=msg):
         s.to_json(b'\x81')
+
+
+@pytest.mark.skipif(platform.python_implementation() != 'PyPy', reason='see PyO3/pyo3#2770')
+def test_bytes_invalid_pypy():
+    s = SchemaSerializer(core_schema.bytes_schema())
+
+    with pytest.raises(ValueError, match='invalid utf-8 sequence of 1 bytes from index 0'):
+        s.to_python(b'\x81', mode='json')
+
+
+@pytest.mark.skipif(platform.python_implementation() != 'CPython', reason='see PyO3/pyo3#2770')
+def test_bytes_invalid_cpython():
+    s = SchemaSerializer(core_schema.bytes_schema())
+
+    with pytest.raises(UnicodeDecodeError, match="'utf-8' codec can't decode byte 0x81 in position 0: invalid utf-8"):
+        s.to_python(b'\x81', mode='json')
 
 
 def test_bytes_dict_key():

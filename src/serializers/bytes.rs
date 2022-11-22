@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::str::from_utf8;
 
-use pyo3::exceptions::PyUnicodeDecodeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 
@@ -71,12 +70,18 @@ impl TypeSerializer for BytesSerializer {
 }
 
 pub fn py_bytes_to_str(py_bytes: &PyBytes) -> PyResult<&str> {
-    match from_utf8(py_bytes.as_bytes()) {
+    let bytes = py_bytes.as_bytes();
+    match from_utf8(bytes) {
         Ok(s) => Ok(s),
         Err(err) => {
-            let py = py_bytes.py();
-            let decode_err = PyUnicodeDecodeError::new_utf8(py, py_bytes.as_bytes(), err)?;
-            Err(PyErr::from_value(decode_err))
+            // See https://github.com/PyO3/pyo3/issues/2770
+            #[cfg(PyPy)]
+            return Err(pyo3::exceptions::PyValueError::new_err(err.to_string()));
+            #[cfg(not(PyPy))]
+            {
+                let decode_err = pyo3::exceptions::PyUnicodeDecodeError::new_utf8(py_bytes.py(), bytes, err)?;
+                Err(PyErr::from_value(decode_err))
+            }
         }
     }
 }
