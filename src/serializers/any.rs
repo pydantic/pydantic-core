@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::str::from_utf8;
 
-use pyo3::exceptions::PyUnicodeEncodeError;
 use pyo3::ffi::PyTypeObject;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
@@ -12,7 +11,6 @@ use pyo3::types::{
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use strum_macros::EnumString;
 
-use crate::build_tools::py_err;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
@@ -91,7 +89,7 @@ pub(super) fn ob_type_to_python_json(
             let bytes = unsafe { py_byte_array.as_bytes() };
             match from_utf8(bytes) {
                 Ok(s) => Ok(s.into_py(py)),
-                Err(e) => py_err!(PyUnicodeEncodeError; "{}", e),
+                Err(err) => Err(super::bytes::utf8_py_error(py, err, bytes)),
             }
         }
         // convert the tuple to a list, while recursively calling `fallback_to_python_json`

@@ -1,3 +1,4 @@
+import base64
 import json
 import platform
 from enum import Enum
@@ -97,3 +98,24 @@ def test_subclass_bytes(schema_type, input_value, expected_json):
     assert type(v) == str
 
     assert s.to_json(input_value) == json.dumps(expected_json).encode('utf-8')
+
+
+def test_bytes_base64():
+    s = SchemaSerializer(core_schema.bytes_schema(serialization={'json_base64': True}))
+    assert s.to_python(b'foobar') == b'foobar'
+
+    assert s.to_json(b'foobar') == b'"Zm9vYmFy"'
+    assert s.to_python(b'foobar', mode='json') == 'Zm9vYmFy'
+    assert base64.b64decode(s.to_python(b'foobar', mode='json').encode()) == b'foobar'
+
+    # with padding
+    assert s.to_json(b'foo bar') == b'"Zm9vIGJhcg=="'
+    assert s.to_python(b'foo bar', mode='json') == 'Zm9vIGJhcg=='
+    assert base64.b64decode(s.to_python(b'foo bar', mode='json').encode()) == b'foo bar'
+
+
+def test_bytes_base64_dict_key():
+    s = SchemaSerializer(core_schema.dict_schema(core_schema.bytes_schema(serialization={'json_base64': True})))
+
+    assert s.to_python({b'foo bar': 123}, mode='json') == {'Zm9vIGJhcg==': 123}
+    assert s.to_json({b'foo bar': 123}) == b'{"Zm9vIGJhcg==":123}'
