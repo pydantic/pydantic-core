@@ -11,6 +11,7 @@ use crate::PydanticSerializationError;
 use shared::{BuildSerializer, TypeSerializer};
 
 mod any;
+mod bytes;
 mod dict;
 mod format;
 mod function;

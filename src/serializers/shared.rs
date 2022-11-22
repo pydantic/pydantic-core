@@ -69,6 +69,7 @@ combined_serializer! {
     both: Bool, super::simple::BoolSerializer;
     both: Float, super::simple::FloatSerializer;
     both: Str, super::string::StrSerializer;
+    both: Bytes, super::bytes::BytesSerializer;
     both: List, super::list_tuple::ListSerializer;
     both: Tuple, super::list_tuple::TupleSerializer;
     both: Dict, super::dict::DictSerializer;

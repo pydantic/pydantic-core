@@ -17,8 +17,10 @@ def test_str():
 
     assert v.to_python('foobar', mode='json') == 'foobar'
 
-    # note! serde_json serializes unicode characters differently
-    assert v.to_json('emoji 💩') != json.dumps('emoji 💩')
+    json_emoji = v.to_json('emoji 💩')
+    # note! serde_json serializes unicode characters differently to json.dumps, but it's still valid JSON
+    assert json_emoji == b'"emoji \xf0\x9f\x92\xa9"'
+    assert json.loads(json_emoji) == 'emoji 💩'
 
 
 def test_str_fallback():

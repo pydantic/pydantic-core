@@ -9,10 +9,10 @@ use pyo3::types::{
     PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTime, PyTuple,
 };
 
-use crate::build_tools::py_err;
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use strum_macros::EnumString;
 
+use crate::build_tools::py_err;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
@@ -83,13 +83,7 @@ pub(super) fn ob_type_to_python_json(
         // `bool` and `None` can't be subclasses, so no need to do the same on bool
         ObType::Float => extract_as!(f64),
         ObType::Str => extract_as!(&str),
-        ObType::Bytes => {
-            let py_bytes: &PyBytes = value.cast_as()?;
-            match from_utf8(py_bytes.as_bytes()) {
-                Ok(s) => Ok(s.into_py(py)),
-                Err(e) => py_err!(PyUnicodeEncodeError; "{}", e),
-            }
-        }
+        ObType::Bytes => super::bytes::py_bytes_to_str(value.cast_as()?).map(|s| s.into_py(py)),
         ObType::Bytearray => {
             let py_byte_array: &PyByteArray = value.cast_as()?;
             // see https://docs.rs/pyo3/latest/pyo3/types/struct.PyByteArray.html#method.as_bytes
@@ -169,10 +163,7 @@ pub fn fallback_serialize_known<S: Serializer>(
         }
         ObType::Bytes => {
             let py_bytes: &PyBytes = value.cast_as().map_err(py_err_se_err)?;
-            match from_utf8(py_bytes.as_bytes()) {
-                Ok(s) => serializer.serialize_str(s),
-                Err(e) => Err(py_err_se_err(e)),
-            }
+            super::bytes::serialize_py_bytes(py_bytes, serializer)
         }
         ObType::Bytearray => {
             let py_byte_array: &PyByteArray = value.cast_as().map_err(py_err_se_err)?;
@@ -255,13 +246,7 @@ pub(super) fn json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py,
             let py_str: &PyString = key.cast_as()?;
             Ok(py_str.to_string_lossy())
         }
-        ObType::Bytes => {
-            let py_bytes: &PyBytes = key.cast_as()?;
-            match from_utf8(py_bytes.as_bytes()) {
-                Ok(s) => Ok(Cow::Borrowed(s)),
-                Err(e) => py_err!(PyUnicodeEncodeError; "{}", e),
-            }
-        }
+        ObType::Bytes => super::bytes::py_bytes_to_str(key.cast_as()?).map(Cow::Borrowed),
         // perhaps we could do something faster for things like ints and floats?
         _ => Ok(key.str()?.to_string_lossy()),
     }
