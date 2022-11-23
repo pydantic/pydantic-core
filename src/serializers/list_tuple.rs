@@ -52,7 +52,7 @@ pub fn to_inc_ex(value: Option<&PyAny>) -> PyResult<IncEx> {
 }
 
 macro_rules! build_serializer {
-    ($struct_name:ident, $expected_type:literal, $type_:ty) => {
+    ($struct_name:ident, $expected_type:literal) => {
         #[derive(Debug, Clone)]
         pub struct $struct_name {
             item_serializer: Box<CombinedSerializer>,
@@ -153,7 +153,7 @@ fn include_or_exclude<'s, 'py>(
     Some((next_include, next_exclude))
 }
 
-build_serializer!(ListSerializer, "list", &PyList);
+build_serializer!(ListSerializer, "list");
 
 impl TypeSerializer for ListSerializer {
     fn to_python(
@@ -225,7 +225,7 @@ impl TypeSerializer for ListSerializer {
     }
 }
 
-build_serializer!(TupleSerializer, "tuple", &PyTuple);
+build_serializer!(TupleSerializer, "tuple");
 
 impl TypeSerializer for TupleSerializer {
     fn to_python(

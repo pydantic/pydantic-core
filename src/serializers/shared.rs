@@ -72,6 +72,8 @@ combined_serializer! {
     both: Bytes, super::bytes::BytesSerializer;
     both: List, super::list_tuple::ListSerializer;
     both: Tuple, super::list_tuple::TupleSerializer;
+    both: Set, super::set_frozenset::SetSerializer;
+    both: FrozenSet, super::set_frozenset::FrozenSetSerializer;
     both: Dict, super::dict::DictSerializer;
     both: Any, super::any::AnySerializer;
     both: Format, super::format::FunctionSerializer;

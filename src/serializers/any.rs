@@ -95,6 +95,8 @@ pub(super) fn ob_type_to_python_json(
         // convert the tuple to a list, while recursively calling `fallback_to_python_json`
         ObType::Tuple => serialize_seq!(PyTuple),
         ObType::List => serialize_seq!(PyList),
+        ObType::Set => serialize_seq!(PySet),
+        ObType::Frozenset => serialize_seq!(PyFrozenSet),
         _ => Ok(value.into_py(value.py())),
     }
 }
@@ -141,7 +143,7 @@ pub fn fallback_serialize_known<S: Serializer>(
 
     macro_rules! serialize_seq {
         ($t:ty) => {{
-            let py_seq: $t = value.cast_as().map_err(py_err_se_err)?;
+            let py_seq: &$t = value.cast_as().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
             for element in py_seq {
                 seq.serialize_element(&SerializeInfer::new(element, ob_type_lookup))?
@@ -184,10 +186,10 @@ pub fn fallback_serialize_known<S: Serializer>(
             }
             map.end()
         }
-        ObType::List => serialize_seq!(&PyList),
-        ObType::Tuple => serialize_seq!(&PyTuple),
-        ObType::Set => serialize_seq!(&PySet),
-        ObType::Frozenset => serialize_seq!(&PyFrozenSet),
+        ObType::List => serialize_seq!(PyList),
+        ObType::Tuple => serialize_seq!(PyTuple),
+        ObType::Set => serialize_seq!(PySet),
+        ObType::Frozenset => serialize_seq!(PyFrozenSet),
         ObType::Datetime => {
             let dt_str = value
                 .cast_as::<PyDateTime>()

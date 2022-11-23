@@ -16,6 +16,7 @@ mod dict;
 mod format;
 mod function;
 mod list_tuple;
+mod set_frozenset;
 mod shared;
 mod simple;
 mod string;
