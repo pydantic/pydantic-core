@@ -79,7 +79,7 @@ def test_function_known_type():
 
 
 def test_invalid_return_type():
-    with pytest.raises(SchemaError, match='Unknown return type "different"'):
+    with pytest.raises(SchemaError, match='function -> return_type\n  Input should be'):
         SchemaSerializer(
             core_schema.any_schema(
                 serialization={'type': 'function', 'function': lambda _: 1, 'return_type': 'different'}

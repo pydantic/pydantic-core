@@ -6,7 +6,7 @@ use serde_json::ser::PrettyFormatter;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 
-use crate::PydanticSerializationError;
+use crate::{PydanticSerializationError, SchemaValidator};
 
 use shared::{BuildSerializer, TypeSerializer};
 
@@ -30,7 +30,8 @@ pub struct SchemaSerializer {
 #[pymethods]
 impl SchemaSerializer {
     #[new]
-    pub fn py_new(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
+    pub fn py_new(py: Python, schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
+        let schema = SchemaValidator::validate_schema(py, schema)?.cast_as()?;
         let serializer = shared::CombinedSerializer::build(schema, config)?;
         Ok(Self {
             comb_serializer: serializer,

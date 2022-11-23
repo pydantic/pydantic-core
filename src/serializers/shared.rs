@@ -100,6 +100,10 @@ impl BuildSerializer for CombinedSerializer {
                     return super::function::FunctionSerializer::build(ser, config)
                         .map_err(|err| py_error_type!("Error building `function` serializer:\n  {}", err));
                 }
+                // applies to lists tuples and dicts, does not override the main schema `type`
+                Some("include-exclude") => (),
+                // applies specifically to bytes, does not override the main schema `type`
+                Some("base64") => (),
                 Some(ser_type) => {
                     // otherwise if `schema.serialization.type` is defined, use that with `find_serializer`
                     // instead of `schema.type`. In this case it's an error if a serializer isn't found.

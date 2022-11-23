@@ -65,19 +65,7 @@ pub struct SchemaValidator {
 impl SchemaValidator {
     #[new]
     pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
-        let self_schema = Self::get_self_schema(py);
-
-        let schema_obj = self_schema
-            .validator
-            .validate(
-                py,
-                schema,
-                &Extra::default(),
-                &self_schema.slots,
-                &mut RecursionGuard::default(),
-            )
-            .map_err(|e| SchemaError::from_val_error(py, e))?;
-        let schema = schema_obj.as_ref(py);
+        let schema = Self::validate_schema(py, schema)?;
 
         let mut used_refs = AHashSet::new();
         extract_used_refs(schema, &mut used_refs)?;
@@ -228,8 +216,27 @@ impl SchemaValidator {
 static SCHEMA_DEFINITION: GILOnceCell<SchemaValidator> = GILOnceCell::new();
 
 impl SchemaValidator {
+    pub(crate) fn validate_schema<'py>(py: Python<'py>, schema: &'py PyAny) -> PyResult<&'py PyAny> {
+        let self_schema = Self::get_self_schema(py);
+        match self_schema.validator.validate(
+            py,
+            schema,
+            &Extra::default(),
+            &self_schema.slots,
+            &mut RecursionGuard::default(),
+        ) {
+            Ok(schema_obj) => Ok(schema_obj.into_ref(py)),
+            Err(e) => Err(SchemaError::from_val_error(py, e)),
+        }
+    }
+
     fn get_self_schema(py: Python) -> &Self {
-        SCHEMA_DEFINITION.get_or_init(py, || Self::build_self_schema(py).unwrap())
+        SCHEMA_DEFINITION.get_or_init(py, || match Self::build_self_schema(py) {
+            Ok(schema) => schema,
+            Err(e) => {
+                panic!("Error building schema validator:\n  {}", e);
+            }
+        })
     }
 
     fn build_self_schema(py: Python) -> PyResult<Self> {
@@ -242,6 +249,8 @@ impl SchemaValidator {
         // NOTE: we don't call `extract_used_refs` for performance reasons, if more recursive references
         // are used, they would need to be manually added here.
         used_refs.insert("root-schema".to_string());
+        used_refs.insert("ser-schema".to_string());
+        used_refs.insert("inc-ex-type".to_string());
         let mut build_context = BuildContext::new(used_refs);
 
         let validator = match build_validator(self_schema, None, &mut build_context) {

@@ -252,11 +252,16 @@ def string_schema(
     )
 
 
-class Base64OnlySerSchema(TypedDict, total=False):
-    json_base64: bool  # default False
+class Base64SerSchema(TypedDict, total=False):
+    type: Required[Literal['base64']]
+    json_base64: Required[bool]
 
 
-Base64SerSchema = Union[Base64OnlySerSchema, SerSchema]
+def base64_ser_schema(json_base64: bool) -> Base64SerSchema:
+    return Base64SerSchema(type='base64', json_base64=json_base64)
+
+
+Base64OrElseSerSchema = Union[Base64SerSchema, SerSchema]
 
 
 class BytesSchema(TypedDict, total=False):
@@ -266,7 +271,7 @@ class BytesSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: Base64SerSchema
+    serialization: Base64OrElseSerSchema
 
 
 def bytes_schema(
@@ -522,12 +527,20 @@ def callable_schema(
     return dict_not_none(type='callable', ref=ref, extra=extra, serialization=serialization)
 
 
-class IncExOnlySerSchema(TypedDict, total=False):
-    include: Union[Set[int], Dict[int, Any]]
-    exclude: Union[Set[int], Dict[int, Any]]
+IncExType = Union[Set[Union[str, int]], Dict[Union[str, int], Union['IncExType', None]]]
 
 
-IncExSerSchema = Union[IncExOnlySerSchema, SerSchema]
+class IncExSerSchema(TypedDict, total=False):
+    type: Required[Literal['include-exclude']]
+    include: IncExType
+    exclude: IncExType
+
+
+def inc_ex_ser_schema(*, include: IncExType | None = None, exclude: IncExType | None = None) -> IncExSerSchema:
+    return dict_not_none(type='include-exclude', include=include, exclude=exclude)
+
+
+IncExOrElseSerSchema = Union[IncExSerSchema, SerSchema]
 
 
 class ListSchema(TypedDict, total=False):
@@ -539,7 +552,7 @@ class ListSchema(TypedDict, total=False):
     allow_any_iter: bool
     ref: str
     extra: Any
-    serialization: IncExSerSchema
+    serialization: IncExOrElseSerSchema
 
 
 def list_schema(
@@ -551,7 +564,7 @@ def list_schema(
     allow_any_iter: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: IncExSerSchema | None = None,
+    serialization: IncExOrElseSerSchema | None = None,
 ) -> ListSchema:
     return dict_not_none(
         type='list',
@@ -574,7 +587,7 @@ class TuplePositionalSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: IncExSerSchema
+    serialization: IncExOrElseSerSchema
 
 
 def tuple_positional_schema(
@@ -583,7 +596,7 @@ def tuple_positional_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: IncExSerSchema | None = None,
+    serialization: IncExOrElseSerSchema | None = None,
 ) -> TuplePositionalSchema:
     return dict_not_none(
         type='tuple',
@@ -606,7 +619,7 @@ class TupleVariableSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: IncExSerSchema
+    serialization: IncExOrElseSerSchema
 
 
 def tuple_variable_schema(
@@ -617,7 +630,7 @@ def tuple_variable_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: IncExSerSchema | None = None,
+    serialization: IncExOrElseSerSchema | None = None,
 ) -> TupleVariableSchema:
     return dict_not_none(
         type='tuple',
@@ -740,7 +753,7 @@ class DictSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: SerSchema
+    serialization: IncExOrElseSerSchema
 
 
 def dict_schema(
@@ -987,7 +1000,7 @@ def union_schema(
 
 class TaggedUnionSchema(TypedDict, total=False):
     type: Required[Literal['tagged-union']]
-    choices: Required[Dict[str, CoreSchema]]
+    choices: Required[Dict[str, Union[str, CoreSchema]]]
     discriminator: Required[
         Union[str, List[Union[str, int]], List[List[Union[str, int]]], Callable[[Any], Optional[str]]]
     ]
@@ -1001,7 +1014,7 @@ class TaggedUnionSchema(TypedDict, total=False):
 
 
 def tagged_union_schema(
-    choices: Dict[str, CoreSchema],
+    choices: Dict[str, str | CoreSchema],
     discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], str | None],
     *,
     custom_error_type: str | None = None,

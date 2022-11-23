@@ -22,7 +22,7 @@ def test_dict_any_any():
 
 
 def test_include():
-    v = SchemaSerializer(core_schema.dict_schema(serialization={'include': {'a', 'c'}}))
+    v = SchemaSerializer(core_schema.dict_schema(serialization=core_schema.inc_ex_ser_schema(include={'a', 'c'})))
 
     assert v.to_python({'a': 1, 'b': 2, 'c': 3, 'd': 4}) == {'a': 1, 'c': 3}
     assert v.to_json({'a': 1, 'b': 2, 'c': 3, 'd': 4}) == b'{"a":1,"c":3}'
@@ -37,7 +37,7 @@ def test_include():
 
 
 def test_exclude():
-    v = SchemaSerializer(core_schema.dict_schema(serialization={'exclude': {'a', 'c'}}))
+    v = SchemaSerializer(core_schema.dict_schema(serialization=core_schema.inc_ex_ser_schema(exclude={'a', 'c'})))
 
     assert v.to_python({'a': 1, 'b': 2, 'c': 3, 'd': 4}) == {'b': 2, 'd': 4}
     assert v.to_json({'a': 1, 'b': 2, 'c': 3, 'd': 4}) == b'{"b":2,"d":4}'

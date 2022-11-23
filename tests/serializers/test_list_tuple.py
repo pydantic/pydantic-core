@@ -67,7 +67,9 @@ def as_tuple(*items):
     'schema_func,seq_f', [(core_schema.list_schema, as_list), (core_schema.tuple_variable_schema, as_tuple)]
 )
 def test_include(schema_func, seq_f):
-    v = SchemaSerializer(schema_func(core_schema.any_schema(), serialization={'include': {1, 3, 5}}))
+    v = SchemaSerializer(
+        schema_func(core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(include={1, 3, 5}))
+    )
     assert v.to_python(seq_f(0, 1, 2, 3)) == seq_f(1, 3)
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == seq_f('b', 'd', 'f')
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), mode='json') == ['b', 'd', 'f']
@@ -82,7 +84,11 @@ def test_include(schema_func, seq_f):
     'schema_func,seq_f', [(core_schema.list_schema, as_list), (core_schema.tuple_variable_schema, as_tuple)]
 )
 def test_include_dict(schema_func, seq_f):
-    v = SchemaSerializer(schema_func(core_schema.any_schema(), serialization={'include': {1: None, 3: None, 5: {42}}}))
+    v = SchemaSerializer(
+        schema_func(
+            core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(include={1: None, 3: None, 5: {42}})
+        )
+    )
     assert v.to_python(seq_f(0, 1, 2, 3, 4)) == seq_f(1, 3)
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == seq_f('b', 'd', 'f')
     assert v.to_python(seq_f(0, 1, 2, 3, 4), include={2: None}) == seq_f(1, 2, 3)
@@ -94,7 +100,9 @@ def test_include_dict(schema_func, seq_f):
     'schema_func,seq_f', [(core_schema.list_schema, as_list), (core_schema.tuple_variable_schema, as_tuple)]
 )
 def test_exclude(schema_func, seq_f):
-    v = SchemaSerializer(schema_func(core_schema.any_schema(), serialization={'exclude': {1, 3, 5}}))
+    v = SchemaSerializer(
+        schema_func(core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(exclude={1, 3, 5}))
+    )
     assert v.to_python(seq_f(0, 1, 2, 3)) == seq_f(0, 2)
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == seq_f('a', 'c', 'e', 'g', 'h')
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), mode='json') == ['a', 'c', 'e', 'g', 'h']
@@ -106,15 +114,19 @@ def test_exclude(schema_func, seq_f):
 
 def test_include_exclude():
     v = SchemaSerializer(
-        core_schema.list_schema(core_schema.any_schema(), serialization={'include': {1, 3, 5}, 'exclude': {5, 6}})
+        core_schema.list_schema(
+            core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(include={1, 3, 5}, exclude={5, 6})
+        )
     )
     assert v.to_python([0, 1, 2, 3, 4, 5, 6, 7]) == [1, 3]
 
 
 @pytest.mark.parametrize('schema_func', [core_schema.list_schema, core_schema.tuple_variable_schema])
 def test_include_error(schema_func):
-    with pytest.raises(SchemaError, match='`include` and `exclude` inputs must be sets or dicts.'):
-        SchemaSerializer(schema_func(core_schema.any_schema(), serialization={'include': [1, 3, 5]}))
+    with pytest.raises(SchemaError, match='Input should be a valid dictionary'):
+        SchemaSerializer(
+            schema_func(core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(include='foobar'))
+        )
 
 
 @pytest.mark.parametrize(

@@ -83,13 +83,38 @@ def get_schema(obj) -> core_schema.CoreSchema:
         raise TypeError(f'Unknown type: {obj!r}')
 
 
+def tagged_union(std_union_schema: Dict[str, Any], discriminator_key: str, ref: str | None = None) -> Dict[str, Any]:
+    """
+    Build a tagged union schema from a standard union schema.
+    """
+    tagged_choices = {}
+    for choice in std_union_schema['choices']:
+        literal = choice['fields'][discriminator_key]['schema']['expected']
+        assert isinstance(literal, list), 'literal expected must be a list'
+        assert all(isinstance(arg, str) for arg in literal), 'literal expected must be a list of strings'
+        first, *rest = literal
+        tagged_choices[first] = choice
+        for arg in rest:
+            tagged_choices[arg] = first
+    s = {'type': 'tagged-union', 'discriminator': discriminator_key, 'choices': tagged_choices}
+    if ref is not None:
+        s['ref'] = ref
+    return s
+
+
+defined_ser_schema = False
+
+
 def type_dict_schema(typed_dict) -> dict[str, Any]:
+    global defined_ser_schema
+
     required_keys = getattr(typed_dict, '__required_keys__', set())
     fields = {}
 
     for field_name, field_type in typed_dict.__annotations__.items():
         required = field_name in required_keys
         schema = None
+        fr_arg = None
         if type(field_type) == ForwardRef:
             fr_arg = field_type.__forward_arg__
 
@@ -104,6 +129,12 @@ def type_dict_schema(typed_dict) -> dict[str, Any]:
                     schema = {'type': 'list', 'items_schema': schema_ref_validator}
                 elif fr_arg == 'Dict[str, CoreSchema]':
                     schema = {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': schema_ref_validator}
+                elif fr_arg == 'Dict[str, Union[str, CoreSchema]]':
+                    schema = {
+                        'type': 'dict',
+                        'keys_schema': {'type': 'str'},
+                        'values_schema': {'type': 'union', 'choices': [{'type': 'str'}, schema_ref_validator]},
+                    }
                 else:
                     raise ValueError(f'Unknown Schema forward ref: {fr_arg}')
             else:
@@ -115,6 +146,14 @@ def type_dict_schema(typed_dict) -> dict[str, Any]:
                 field_type = field_type.__args__[0]
 
             schema = get_schema(field_type)
+            if fr_arg == 'SerSchema':
+                if defined_ser_schema:
+                    schema = {'type': 'recursive-ref', 'schema_ref': 'ser-schema'}
+                else:
+                    defined_ser_schema = True
+                    schema = tagged_union(schema, 'type', 'ser-schema')
+            elif fr_arg.endswith('SerSchema'):
+                schema = tagged_union(schema, 'type')
 
         # now_utc_offset is an int that must be in the range -24 hours to +24 hours, we manually add a constraint here
         if field_name == 'now_utc_offset':
@@ -124,8 +163,34 @@ def type_dict_schema(typed_dict) -> dict[str, Any]:
     return {'type': 'typed-dict', 'fields': fields, 'extra_behavior': 'forbid'}
 
 
-def union_schema(union_type: UnionType) -> core_schema.UnionSchema:
-    return {'type': 'union', 'choices': [get_schema(arg) for arg in union_type.__args__]}
+defined_inc_ex_type = False
+inc_ex_ref_validator = {'type': 'recursive-ref', 'schema_ref': 'inc-ex-type'}
+inc_ex_validator = {
+    'type': 'union',
+    'ref': 'inc-ex-type',
+    'choices': [
+        {'type': 'set', 'items_schema': {'type': 'union', 'choices': [{'type': 'str'}, {'type': 'int'}]}},
+        {
+            'type': 'dict',
+            'keys_schema': {'type': 'union', 'choices': [{'type': 'str'}, {'type': 'int'}]},
+            'values_schema': {'type': 'nullable', 'schema': inc_ex_ref_validator},
+        },
+    ],
+}
+
+
+def union_schema(union_type: UnionType) -> core_schema.UnionSchema | core_schema.RecursiveReferenceSchema:
+    global defined_inc_ex_type
+
+    if "ForwardRef('IncExType')" in repr(union_type):
+        # ugly, but this is the simplest way to build a custom schema for this type
+        if defined_inc_ex_type:
+            return inc_ex_ref_validator
+        else:
+            defined_inc_ex_type = True
+            return inc_ex_validator
+    else:
+        return {'type': 'union', 'choices': [get_schema(arg) for arg in union_type.__args__]}
 
 
 def all_literal_values(type_: type[core_schema.Literal]) -> list[any]:
