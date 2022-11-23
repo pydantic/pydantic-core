@@ -47,3 +47,40 @@ def test_exclude():
     assert v.to_python({'a': 1, 'b': 2, 'c': 3, 'd': 4}, exclude={'d': {1}}) == {'b': 2, 'd': 4}
 
     assert v.to_json({'a': 1, 'b': 2, 'c': 3, 'd': 4}, exclude={'d'}) == b'{"b":2}'
+
+
+def test_include_exclude():
+    v = SchemaSerializer(
+        core_schema.dict_schema(
+            core_schema.any_schema(),
+            serialization=core_schema.inc_ex_ser_schema(include={'1', '3', '5'}, exclude={'5', '6'}),
+        )
+    )
+
+    assert v.to_python({'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7}) == {'1': 1, '3': 3}
+
+
+def test_include_exclude_int():
+    v = SchemaSerializer(
+        core_schema.dict_schema(
+            core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(include={1, 3, 5}, exclude={5, 6})
+        )
+    )
+
+    assert v.to_python({0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7}) == {1: 1, 3: 3}
+
+
+def test_include_exclude_runtime():
+    v = SchemaSerializer(
+        core_schema.dict_schema(
+            core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(exclude={'0', '1'})
+        )
+    )
+    assert v.to_python({'0': 0, '1': 1, '2': 2, '3': 3}, include={'1', '2'}) == {'2': 2}
+
+
+def test_include_exclude_runtime_int():
+    v = SchemaSerializer(
+        core_schema.dict_schema(core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(exclude={0, 1}))
+    )
+    assert v.to_python({0: 0, 1: 1, 2: 2, 3: 3}, include={1, 2}) == {2: 2}

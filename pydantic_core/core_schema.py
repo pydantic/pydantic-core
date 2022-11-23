@@ -1080,6 +1080,7 @@ class TypedDictField(TypedDict, total=False):
     required: bool
     validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
     serialization_alias: str
+    serialization_include: bool  # default: True
     frozen: bool
 
 
@@ -1089,6 +1090,7 @@ def typed_dict_field(
     required: bool | None = None,
     validation_alias: str | list[str | int] | list[list[str | int]] | None = None,
     serialization_alias: str | None = None,
+    serialization_include: bool | None = None,
     frozen: bool | None = None,
 ) -> TypedDictField:
     return dict_not_none(
@@ -1096,6 +1098,7 @@ def typed_dict_field(
         required=required,
         validation_alias=validation_alias,
         serialization_alias=serialization_alias,
+        serialization_include=serialization_include,
         frozen=frozen,
     )
 

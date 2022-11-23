@@ -121,6 +121,13 @@ def test_include_exclude():
     assert v.to_python([0, 1, 2, 3, 4, 5, 6, 7]) == [1, 3]
 
 
+def test_include_exclude_runtime():
+    v = SchemaSerializer(
+        core_schema.list_schema(core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(exclude={0, 1}))
+    )
+    assert v.to_python([0, 1, 2, 3], include={1, 2}) == [2]
+
+
 @pytest.mark.parametrize('schema_func', [core_schema.list_schema, core_schema.tuple_variable_schema])
 def test_include_error(schema_func):
     with pytest.raises(SchemaError, match='Input should be a valid dictionary'):

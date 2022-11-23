@@ -20,6 +20,7 @@ mod set_frozenset;
 mod shared;
 mod simple;
 mod string;
+mod typed_dict;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]

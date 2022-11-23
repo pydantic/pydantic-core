@@ -207,13 +207,14 @@ impl BuildValidator for TaggedUnionValidator {
         let discriminator = Discriminator::new(py, schema.get_as_req(intern!(py, "discriminator"))?)?;
         let discriminator_repr = discriminator.to_string_py(py)?;
 
-        let mut choices = AHashMap::new();
+        let schema_choices: &PyDict = schema.get_as_req(intern!(py, "choices"))?;
+        let mut choices = AHashMap::with_capacity(schema_choices.len());
         let mut repeat_choices_vec: Vec<(String, String)> = Vec::new();
         let mut first = true;
         let mut tags_repr = String::with_capacity(50);
         let mut descr = String::with_capacity(50);
 
-        for (key, value) in schema.get_as_req::<&PyDict>(intern!(py, "choices"))? {
+        for (key, value) in schema_choices {
             let tag: String = key.extract()?;
             if let Ok(py_str) = value.cast_as::<PyString>() {
                 let repeat_tag = py_str.to_str()?.to_string();
@@ -236,7 +237,7 @@ impl BuildValidator for TaggedUnionValidator {
             None
         } else {
             let mut wrong_values = Vec::with_capacity(repeat_choices_vec.len());
-            let mut repeat_choices = AHashMap::new();
+            let mut repeat_choices = AHashMap::with_capacity(repeat_choices_vec.len());
             for (tag, repeat_tag) in repeat_choices_vec {
                 match choices.get(repeat_tag.as_str()) {
                     Some(validator) => {

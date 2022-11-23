@@ -75,6 +75,7 @@ combined_serializer! {
     both: Set, super::set_frozenset::SetSerializer;
     both: FrozenSet, super::set_frozenset::FrozenSetSerializer;
     both: Dict, super::dict::DictSerializer;
+    both: TypedDict, super::typed_dict::TypedDictSerializer;
     both: Any, super::any::AnySerializer;
     both: Format, super::format::FunctionSerializer;
 }
@@ -237,13 +238,19 @@ impl CollectWarnings {
     fn fallback(&self, field_type: &str, value: &PyAny, reason: &str) {
         if self.active {
             let type_name = value.get_type().name().unwrap_or("<unknown python object>");
-            let message = format!("Expected `{}` but got `{}` - {}", field_type, type_name, reason);
-            let mut op_warnings = self.warnings.borrow_mut();
-            if let Some(ref mut warnings) = *op_warnings {
-                warnings.push(message);
-            } else {
-                *op_warnings = Some(vec![message]);
-            }
+            self.add_warning(format!(
+                "Expected `{}` but got `{}` - {}",
+                field_type, type_name, reason
+            ));
+        }
+    }
+
+    fn add_warning(&self, message: String) {
+        let mut op_warnings = self.warnings.borrow_mut();
+        if let Some(ref mut warnings) = *op_warnings {
+            warnings.push(message);
+        } else {
+            *op_warnings = Some(vec![message]);
         }
     }
 
