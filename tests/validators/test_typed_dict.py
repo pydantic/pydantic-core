@@ -774,7 +774,6 @@ class MyDataclass:
         (MyDataclass(), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
         (Cls(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
         (dict(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
-        (dict(a=1, b=2, c='ham', d='bacon'), ({'a': 1, 'b': 2, 'c': 'ham', 'd': 'bacon'}, {'a', 'b', 'c', 'd'})),
         (Map(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
         # using type gives `__module__ == 'builtins'`
         (type('Testing', (), {}), Err('[type=dict_attributes_type,')),
@@ -807,6 +806,23 @@ def test_from_attributes(input_value, expected):
     else:
         output = v.validate_python(input_value)
         assert output == expected
+
+
+def test_from_attributes_kwargs():
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'a': {'schema': {'type': 'int'}},
+                'b': {'schema': {'type': 'int'}},
+                'c': {'schema': {'type': 'str'}},
+            },
+            'from_attributes': True,
+        }
+    )
+    test_input = dict(a=1, b=2, c='3', d=True)
+    output = v.validate_python(test_input)
+    print(output)
 
 
 def test_from_attributes_type_error():
