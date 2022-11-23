@@ -122,7 +122,7 @@ impl BuildValidator for TypedDictValidator {
                 }
             }
 
-            let lookup_key = match field_info.get_item(intern!(py, "alias")) {
+            let lookup_key = match field_info.get_item(intern!(py, "validation_alias")) {
                 Some(alias) => {
                     let alt_alias = if populate_by_name { Some(field_name) } else { None };
                     LookupKey::from_py(py, alias, alt_alias)?

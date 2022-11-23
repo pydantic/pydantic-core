@@ -1078,7 +1078,8 @@ def lax_or_strict_schema(
 class TypedDictField(TypedDict, total=False):
     schema: Required[CoreSchema]
     required: bool
-    alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
+    validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
+    serialization_alias: str
     frozen: bool
 
 
@@ -1086,10 +1087,17 @@ def typed_dict_field(
     schema: CoreSchema,
     *,
     required: bool | None = None,
-    alias: str | list[str | int] | list[list[str | int]] | None = None,
+    validation_alias: str | list[str | int] | list[list[str | int]] | None = None,
+    serialization_alias: str | None = None,
     frozen: bool | None = None,
 ) -> TypedDictField:
-    return dict_not_none(schema=schema, required=required, alias=alias, frozen=frozen)
+    return dict_not_none(
+        schema=schema,
+        required=required,
+        validation_alias=validation_alias,
+        serialization_alias=serialization_alias,
+        frozen=frozen,
+    )
 
 
 class TypedDictSchema(TypedDict, total=False):
