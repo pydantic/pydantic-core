@@ -157,14 +157,16 @@ pub(super) struct Extra<'a> {
     pub mode: &'a SerMode,
     pub ob_type_lookup: &'a ObTypeLookup,
     pub warnings: CollectWarnings,
+    pub by_alias: bool,
 }
 
 impl<'a> Extra<'a> {
-    pub(super) fn new(py: Python<'a>, mode: &'a SerMode) -> Self {
+    pub(super) fn new(py: Python<'a>, mode: &'a SerMode, by_alias: Option<bool>) -> Self {
         Self {
             mode,
             ob_type_lookup: ObTypeLookup::cached(py),
             warnings: CollectWarnings::new(true),
+            by_alias: by_alias.unwrap_or(true),
         }
     }
 }

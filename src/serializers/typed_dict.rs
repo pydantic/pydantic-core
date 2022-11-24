@@ -23,6 +23,26 @@ struct TypedDictField {
     serializer: CombinedSerializer,
 }
 
+impl TypedDictField {
+    fn get_key_py<'py>(&'py self, py: Python<'py>, extra: &Extra) -> &'py PyAny {
+        if extra.by_alias {
+            if let Some(ref alias_py) = self.alias_py {
+                return alias_py.as_ref(py);
+            }
+        }
+        self.key_py.as_ref(py)
+    }
+
+    fn get_key_json<'a>(&'a self, key_str: &'a str, extra: &Extra) -> Cow<'a, str> {
+        if extra.by_alias {
+            if let Some(ref alias) = self.alias {
+                return Cow::Borrowed(alias.as_str());
+            }
+        }
+        Cow::Borrowed(key_str)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TypedDictSerializer {
     fields: AHashMap<String, TypedDictField>,
@@ -62,6 +82,7 @@ impl BuildSerializer for TypedDictSerializer {
             let (alias, alias_py) = match field_info.get_as::<&PyString>(intern!(py, "serialization_alias"))? {
                 Some(alias_py) => {
                     let alias: String = alias_py.extract()?;
+                    let alias_py = PyString::intern(py, &alias);
                     (Some(alias), Some(alias_py.into_py(py)))
                 }
                 None => (None, None),
@@ -124,12 +145,8 @@ impl TypeSerializer for TypedDictSerializer {
                         if let Ok(key_py_str) = key.cast_as::<PyString>() {
                             if let Some(field) = self.fields.get(key_py_str.to_str()?) {
                                 let value = field.serializer.to_python(value, next_include, next_exclude, extra)?;
-                                let key_py = if let Some(ref alias_py) = field.alias_py {
-                                    alias_py.as_ref(py)
-                                } else {
-                                    field.key_py.as_ref(py)
-                                };
-                                new_items[field.index] = Some((key_py, value));
+                                let output_key = field.get_key_py(py, extra);
+                                new_items[field.index] = Some((output_key, value));
                                 continue;
                             }
                         }
@@ -182,11 +199,7 @@ impl TypeSerializer for TypedDictSerializer {
                         if let Ok(key_py_str) = key.cast_as::<PyString>() {
                             let key_str = key_py_str.to_str().map_err(py_err_se_err)?;
                             if let Some(field) = self.fields.get(key_str) {
-                                let output_key = if let Some(ref alias) = field.alias {
-                                    Cow::Borrowed(alias.as_str())
-                                } else {
-                                    Cow::Borrowed(key_str)
-                                };
+                                let output_key = field.get_key_json(key_str, extra);
                                 let s = PydanticSerializer::new(
                                     value,
                                     &field.serializer,

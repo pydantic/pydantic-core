@@ -47,10 +47,22 @@ IncEx: TypeAlias = 'set[int] | set[str] | dict[int, IncEx] | dict[str, IncEx] | 
 class SchemaSerializer:
     def __init__(self, schema: CoreSchema, config: 'CoreConfig | None' = None) -> None: ...
     def to_python(
-        self, value: Any, *, mode: str | None = None, include: IncEx = None, exclude: IncEx = None
+        self,
+        value: Any,
+        *,
+        mode: str | None = None,
+        include: IncEx = None,
+        exclude: IncEx = None,
+        by_alias: bool = True,
     ) -> Any: ...
     def to_json(
-        self, value: Any, *, indent: int | None = None, include: IncEx = None, exclude: IncEx = None
+        self,
+        value: Any,
+        *,
+        indent: int | None = None,
+        include: IncEx = None,
+        exclude: IncEx = None,
+        by_alias: bool = True,
     ) -> bytes: ...
 
 class Url:

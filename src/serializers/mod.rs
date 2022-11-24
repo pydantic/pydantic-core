@@ -42,7 +42,7 @@ impl SchemaSerializer {
         })
     }
 
-    #[pyo3(text_signature = "(value, *, mode = None, include = None, exclude = None)")]
+    #[pyo3(text_signature = "(value, *, mode = None, include = None, exclude = None, by_alias = True)")]
     pub fn to_python(
         &self,
         py: Python,
@@ -50,15 +50,16 @@ impl SchemaSerializer {
         mode: Option<&str>,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
+        by_alias: Option<bool>,
     ) -> PyResult<PyObject> {
         let mode: shared::SerMode = mode.into();
-        let extra = shared::Extra::new(py, &mode);
+        let extra = shared::Extra::new(py, &mode, by_alias);
         let v = self.comb_serializer.to_python(value, include, exclude, &extra)?;
         extra.warnings.final_check(py)?;
         Ok(v)
     }
 
-    #[pyo3(text_signature = "(value, *, indent = None, include = None, exclude = None)")]
+    #[pyo3(text_signature = "(value, *, indent = None, include = None, exclude = None, by_alias = True)")]
     pub fn to_json(
         &mut self,
         py: Python,
@@ -66,10 +67,11 @@ impl SchemaSerializer {
         indent: Option<usize>,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
+        by_alias: Option<bool>,
     ) -> PyResult<PyObject> {
         let writer: Vec<u8> = Vec::with_capacity(self.json_size);
 
-        let extra = shared::Extra::new(py, &shared::SerMode::Json);
+        let extra = shared::Extra::new(py, &shared::SerMode::Json, by_alias);
         let serializer = PydanticSerializer::new(value, &self.comb_serializer, include, exclude, &extra);
 
         let bytes = match indent {

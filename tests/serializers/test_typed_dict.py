@@ -92,3 +92,27 @@ def test_include_exclude_schema():
     assert s.to_python(value) == {'1': 1, '3': 3}
     assert s.to_python(value, mode='json') == {'1': 1, '3': 3}
     assert json.loads(s.to_json(value)) == {'1': 1, '3': 3}
+
+
+def test_alias():
+    s = SchemaSerializer(
+        core_schema.typed_dict_schema(
+            {
+                'cat': core_schema.typed_dict_field(core_schema.int_schema(), serialization_alias='Meow'),
+                'dog': core_schema.typed_dict_field(core_schema.int_schema(), serialization_alias='Woof'),
+                'bird': core_schema.typed_dict_field(core_schema.int_schema()),
+            }
+        )
+    )
+    value = {'cat': 0, 'dog': 1, 'bird': 2}
+    assert s.to_python(value) == IsStrictDict(Meow=0, Woof=1, bird=2)
+    assert s.to_python(value, exclude={'dog'}) == IsStrictDict(Meow=0, bird=2)
+    assert s.to_python(value, by_alias=False) == IsStrictDict(cat=0, dog=1, bird=2)
+
+    assert s.to_python(value, mode='json') == IsStrictDict(Meow=0, Woof=1, bird=2)
+    assert s.to_python(value, mode='json', include={'cat'}) == IsStrictDict(Meow=0)
+    assert s.to_python(value, mode='json', by_alias=False) == IsStrictDict(cat=0, dog=1, bird=2)
+
+    assert json.loads(s.to_json(value)) == IsStrictDict(Meow=0, Woof=1, bird=2)
+    assert json.loads(s.to_json(value, include={'cat', 'bird'})) == IsStrictDict(Meow=0, bird=2)
+    assert json.loads(s.to_json(value, by_alias=False)) == IsStrictDict(cat=0, dog=1, bird=2)
