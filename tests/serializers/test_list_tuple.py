@@ -123,7 +123,9 @@ def test_include_exclude_runtime():
     v = SchemaSerializer(
         core_schema.list_schema(core_schema.any_schema(), serialization=core_schema.inc_ex_seq_schema(exclude={0, 1}))
     )
-    assert v.to_python([0, 1, 2, 3], include={1, 2}) == [2]
+    assert v.to_python([0, 1, 2, 3]) == [2, 3]
+    # `include` as a call argument trumps schema `exclude`
+    assert v.to_python([0, 1, 2, 3], include={1, 2}) == [1, 2]
 
 
 @pytest.mark.parametrize(
@@ -148,7 +150,7 @@ def test_include_error(schema_func, include_value, error_msg):
 )
 def test_include_error_call_time(schema_func, seq_f):
     v = SchemaSerializer(schema_func(core_schema.any_schema()))
-    with pytest.raises(TypeError, match='`include` and `exclude` inputs must be sets or dicts.'):
+    with pytest.raises(TypeError, match='`include` argument must a set or dict.'):
         v.to_python(seq_f(0, 1, 2, 3), include=[1, 3, 5])
 
 

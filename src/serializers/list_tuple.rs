@@ -1,11 +1,10 @@
-use std::borrow::Cow;
 use std::hash::BuildHasherDefault;
 
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySet, PyTuple};
 
-use nohash_hasher::IntMap;
+use nohash_hasher::IntSet;
 use pyo3::exceptions::PyTypeError;
 use serde::ser::SerializeSeq;
 
@@ -15,39 +14,55 @@ use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 use super::PydanticSerializer;
 
-type IncEx = Option<IntMap<usize, Option<PyObject>>>;
+#[derive(Debug, Clone, Default)]
+struct SchemaIncEx {
+    include: Option<IntSet<usize>>,
+    exclude: Option<IntSet<usize>>,
+}
 
-pub fn to_inc_ex(value: Option<&PyAny>) -> PyResult<IncEx> {
-    match value {
-        Some(value) => {
-            if let Ok(py_set) = value.cast_as::<PySet>() {
-                let mut map: IntMap<usize, Option<PyObject>> =
-                    IntMap::with_capacity_and_hasher(py_set.len(), BuildHasherDefault::default());
-                for item in py_set {
-                    map.insert(item.extract()?, None);
-                }
-                Ok(Some(map))
-            } else if let Ok(py_dict) = value.cast_as::<PyDict>() {
-                let py = value.py();
-                let mut map: IntMap<usize, Option<PyObject>> =
-                    IntMap::with_capacity_and_hasher(py_dict.len(), BuildHasherDefault::default());
-                for (key, value) in py_dict {
-                    // I'm using `None` here to replace what `'__all__'` meant in v1
-                    let value = if value.is_none() {
-                        None
-                    } else {
-                        Some(value.to_object(py))
-                    };
-                    map.insert(key.extract()?, value);
-                }
-                Ok(Some(map))
-            } else {
-                Err(PyTypeError::new_err(
-                    "`include` and `exclude` inputs must be sets or dicts.",
-                ))
-            }
+impl SchemaIncEx {
+    fn new(py_include: Option<&PyAny>, py_exclude: Option<&PyAny>) -> PyResult<Self> {
+        let include = Self::build_set(py_include)?;
+        let exclude = Self::build_set(py_exclude)?;
+        Ok(Self { include, exclude })
+    }
+
+    /// default decision on whether to include the item at at given `index`
+    fn default_include(&self, index: usize) -> bool {
+        match (&self.include, &self.exclude) {
+            (Some(include), Some(exclude)) => include.contains(&index) && !exclude.contains(&index),
+            (Some(include), None) => include.contains(&index),
+            (None, Some(exclude)) => !exclude.contains(&index),
+            (None, None) => true,
         }
-        None => Ok(None),
+    }
+
+    /// whether an `index` is explicitly included, this is combined with call-time `include` below
+    fn in_include(&self, index: usize) -> bool {
+        match self.include {
+            Some(ref include) => include.contains(&index),
+            None => false,
+        }
+    }
+
+    fn build_set(v: Option<&PyAny>) -> PyResult<Option<IntSet<usize>>> {
+        match v {
+            Some(value) => {
+                if value.is_none() {
+                    Ok(None)
+                } else {
+                    let py_set: &PySet = value.cast_as()?;
+                    let mut set: IntSet<usize> =
+                        IntSet::with_capacity_and_hasher(py_set.len(), BuildHasherDefault::default());
+
+                    for item in py_set {
+                        set.insert(item.extract()?);
+                    }
+                    Ok(Some(set))
+                }
+            }
+            None => Ok(None),
+        }
     }
 }
 
@@ -56,8 +71,7 @@ macro_rules! build_serializer {
         #[derive(Debug, Clone)]
         pub struct $struct_name {
             item_serializer: Box<CombinedSerializer>,
-            include: IncEx,
-            exclude: IncEx,
+            inc_ex: SchemaIncEx,
         }
 
         impl BuildSerializer for $struct_name {
@@ -69,88 +83,94 @@ macro_rules! build_serializer {
                     Some(items_schema) => CombinedSerializer::build(items_schema, config)?,
                     None => AnySerializer::build(schema, config)?,
                 };
-                let (include, exclude) = match schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
+                let inc_ex = match schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
                     Some(ser) => {
-                        let include = to_inc_ex(ser.get_item(intern!(py, "include")))?;
-                        let exclude = to_inc_ex(ser.get_item(intern!(py, "exclude")))?;
-                        (include, exclude)
+                        let include = ser.get_item(intern!(py, "include"));
+                        let exclude = ser.get_item(intern!(py, "exclude"));
+                        SchemaIncEx::new(include, exclude)?
                     }
-                    None => (None, None),
+                    None => SchemaIncEx::default(),
                 };
                 Ok(Self {
                     item_serializer: Box::new(item_serializer),
-                    include,
-                    exclude,
+                    inc_ex,
                 }
                 .into())
             }
         }
-    };
-}
 
-/// Combine the serialization time include/exclude with the include/exclude when creating the serializer
-/// **NOTE:** we merge with union for both include and exclude, this is a change from V1 where we did,
-/// union for exclude and intersection for include
-fn union_inc_ex<'py>(
-    py: Python<'py>,
-    val_time_arg: Option<&'py PyAny>,
-    self_inc_ex: &'py IncEx,
-) -> PyResult<Cow<'py, IncEx>> {
-    match to_inc_ex(val_time_arg)? {
-        Some(mut inc_ex) => {
-            if let Some(self_inc_ex) = self_inc_ex {
-                // this is a union, not an intersection!
-                for (key, value) in self_inc_ex {
-                    inc_ex
-                        .entry(*key)
-                        .or_insert_with(|| value.as_ref().map(|value| value.clone_ref(py)));
+        impl $struct_name {
+            /// this is the somewhat hellish logic for deciding:
+            /// 1. whether we should omit a value at a particular index - returning `Ok(None)` here
+            /// 2. and if we are including it, what values of `include` and `exclude` should be passed to it
+            fn include_or_exclude<'s, 'py>(
+                &'s self,
+                index: usize,
+                include: Option<&'py PyAny>,
+                exclude: Option<&'py PyAny>,
+            ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+                let mut next_exclude: Option<&PyAny> = None;
+                if let Some(exclude) = exclude {
+                    if let Ok(exclude_dict) = exclude.cast_as::<PyDict>() {
+                        if let Some(exc_value) = exclude_dict.get_item(index) {
+                            if exc_value.is_none() {
+                                // if the index is in exclude, and the exclude value is `None`, we want to omit this index
+                                return Ok(None);
+                            } else {
+                                // if the index is in exclude, and the exclude-value is not `None`,
+                                // we want to return `Some((..., Some(next_exclude))`
+                                next_exclude = Some(exc_value);
+                            }
+                        }
+                    } else if let Ok(exclude_set) = exclude.cast_as::<PySet>() {
+                        // question: should we `unwrap_or(false)` instead of raise an error here?
+                        if exclude_set.contains(index)? {
+                            // index is in the exclude set, we return Ok(None) to omit this index
+                            return Ok(None);
+                        }
+                    } else if !exclude.is_none() {
+                        return Err(PyTypeError::new_err("`exclude` argument must a set or dict."));
+                    }
+                }
+
+                if let Some(include) = include {
+                    if let Ok(include_dict) = include.cast_as::<PyDict>() {
+                        if let Some(inc_value) = include_dict.get_item(index) {
+                            // if the index is in include, we definitely want to include this index
+                            return if inc_value.is_none() {
+                                Ok(Some((None, next_exclude)))
+                            } else {
+                                Ok(Some((Some(inc_value), next_exclude)))
+                            };
+                        } else if !self.inc_ex.in_include(index) {
+                            // if the index is not in include, include exists, AND it's not in schema include,
+                            // this index should be omitted
+                            return Ok(None);
+                        }
+                    } else if let Ok(include_set) = include.cast_as::<PySet>() {
+                        // question: as above
+                        if include_set.contains(index)? {
+                            return Ok(Some((None, next_exclude)));
+                        } else if !self.inc_ex.in_include(index) {
+                            // if the index is not in include, include exists, AND it's not in schema include,
+                            // this index should be omitted
+                            return Ok(None);
+                        }
+                    } else if !include.is_none() {
+                        return Err(PyTypeError::new_err("`include` argument must a set or dict."));
+                    }
+                }
+
+                if next_exclude.is_some() {
+                    return Ok(Some((None, next_exclude)));
+                } else if self.inc_ex.default_include(index) {
+                    Ok(Some((None, None)))
+                } else {
+                    Ok(None)
                 }
             }
-            Ok(Cow::Owned(Some(inc_ex)))
         }
-        None => Ok(Cow::Borrowed(self_inc_ex)),
-    }
-}
-
-/// this is the somewhat hellish logic for deciding:
-/// 1. whether we should omit a value at a particular index - returning `None` here
-/// 2. and if we are including it, what values of `include` and `exclude` should be passed to it
-fn include_or_exclude<'s, 'py>(
-    py: Python<'py>,
-    index: usize,
-    include: &'s IncEx,
-    exclude: &'s IncEx,
-) -> Option<(Option<&'py PyAny>, Option<&'py PyAny>)> {
-    let next_include = match include {
-        Some(include) => {
-            match include.get(&index) {
-                // if the index is in include, based on this, we want to return `Some((next_include, ...))`
-                Some(next_include) => next_include
-                    .as_ref()
-                    .map(|next_include| next_include.clone_ref(py).into_ref(py)),
-                // if the index is not in include, this index should be omitted
-                None => return None,
-            }
-        }
-        None => None,
     };
-    let next_exclude = match exclude {
-        Some(exclude) => {
-            match exclude.get(&index) {
-                Some(next_exclude) => match next_exclude {
-                    // if the index is in exclude, and the exclude-value is `Some()`,
-                    // we want to return `Some((..., Some(next_exclude))`
-                    Some(next_exclude) => Some(next_exclude.clone_ref(py).into_ref(py)),
-                    // if the index is in exclude, and the exclude-value is `None`, we want to omit this index
-                    None => return None,
-                },
-                // if the index is not in exclude, based on this, we want to return `Some((..., None))`
-                None => None,
-            }
-        }
-        None => None,
-    };
-    Some((next_include, next_exclude))
 }
 
 build_serializer!(ListSerializer, "list");
@@ -163,26 +183,18 @@ impl TypeSerializer for ListSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let py = value.py();
         match value.cast_as::<PyList>() {
             Ok(py_list) => {
-                let include = union_inc_ex(py, include, &self.include)?;
-                let exclude = union_inc_ex(py, exclude, &self.exclude)?;
-
+                let py = value.py();
                 let item_serializer = self.item_serializer.as_ref();
 
-                if item_serializer.is_any() && include.is_none() && exclude.is_none() && !extra.mode.is_json() {
-                    // if we are using the AnySerializer and there is no include/exclude, we can just return the value
-                    Ok(py_list.into_py(py))
-                } else {
-                    let mut items = Vec::with_capacity(py_list.len());
-                    for (index, element) in py_list.iter().enumerate() {
-                        if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
-                            items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
-                        }
+                let mut items = Vec::with_capacity(py_list.len());
+                for (index, element) in py_list.iter().enumerate() {
+                    if let Some((next_include, next_exclude)) = self.include_or_exclude(index, include, exclude)? {
+                        items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                     }
-                    Ok(items.into_py(py))
                 }
+                Ok(items.into_py(py))
             }
             Err(_) => {
                 extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
@@ -201,15 +213,14 @@ impl TypeSerializer for ListSerializer {
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyList>() {
             Ok(py_list) => {
-                let py = value.py();
-                let include = union_inc_ex(py, include, &self.include).map_err(py_err_se_err)?;
-                let exclude = union_inc_ex(py, exclude, &self.exclude).map_err(py_err_se_err)?;
-
                 let mut seq = serializer.serialize_seq(Some(py_list.len()))?;
                 let item_serializer = self.item_serializer.as_ref();
 
                 for (index, value) in py_list.iter().enumerate() {
-                    if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
+                    if let Some((next_include, next_exclude)) = self
+                        .include_or_exclude(index, include, exclude)
+                        .map_err(py_err_se_err)?
+                    {
                         let item_serialize =
                             PydanticSerializer::new(value, item_serializer, next_include, next_exclude, extra);
                         seq.serialize_element(&item_serialize)?;
@@ -235,32 +246,20 @@ impl TypeSerializer for TupleSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let py = value.py();
         match value.cast_as::<PyTuple>() {
             Ok(py_tuple) => {
-                let include = union_inc_ex(py, include, &self.include)?;
-                let exclude = union_inc_ex(py, exclude, &self.exclude)?;
-
+                let py = value.py();
                 let item_serializer = self.item_serializer.as_ref();
 
-                if matches!(item_serializer, CombinedSerializer::Any(_)) && include.is_none() && exclude.is_none() {
-                    // if we are using the AnySerializer and there is no include/exclude, we can just return the value
-
-                    match extra.mode {
-                        SerMode::Json => Ok(PyList::new(py, py_tuple).into_py(py)),
-                        _ => Ok(py_tuple.to_object(py)),
+                let mut items = Vec::with_capacity(py_tuple.len());
+                for (index, element) in py_tuple.iter().enumerate() {
+                    if let Some((next_include, next_exclude)) = self.include_or_exclude(index, include, exclude)? {
+                        items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                     }
-                } else {
-                    let mut items = Vec::with_capacity(py_tuple.len());
-                    for (index, element) in py_tuple.iter().enumerate() {
-                        if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
-                            items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
-                        }
-                    }
-                    match extra.mode {
-                        SerMode::Json => Ok(PyList::new(py, items).into_py(py)),
-                        _ => Ok(PyTuple::new(py, items).into_py(py)),
-                    }
+                }
+                match extra.mode {
+                    SerMode::Json => Ok(PyList::new(py, items).into_py(py)),
+                    _ => Ok(PyTuple::new(py, items).into_py(py)),
                 }
             }
             Err(_) => {
@@ -280,16 +279,15 @@ impl TypeSerializer for TupleSerializer {
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyTuple>() {
             Ok(py_tuple) => {
-                let py = value.py();
-                let include = union_inc_ex(py, include, &self.include).map_err(py_err_se_err)?;
-                let exclude = union_inc_ex(py, exclude, &self.exclude).map_err(py_err_se_err)?;
-
                 let py_tuple: &PyTuple = py_tuple.cast_as().map_err(py_err_se_err)?;
                 let item_serializer = self.item_serializer.as_ref();
 
                 let mut seq = serializer.serialize_seq(Some(py_tuple.len()))?;
                 for (index, value) in py_tuple.iter().enumerate() {
-                    if let Some((next_include, next_exclude)) = include_or_exclude(py, index, &include, &exclude) {
+                    if let Some((next_include, next_exclude)) = self
+                        .include_or_exclude(index, include, exclude)
+                        .map_err(py_err_se_err)?
+                    {
                         let item_serialize =
                             PydanticSerializer::new(value, item_serializer, next_include, next_exclude, extra);
                         seq.serialize_element(&item_serialize)?;
