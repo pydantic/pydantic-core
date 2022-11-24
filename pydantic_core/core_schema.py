@@ -44,11 +44,11 @@ class CoreConfig(TypedDict, total=False):
     allow_inf_nan: bool  # default: True
 
 
-IncEx: TypeAlias = 'set[int] | set[str] | dict[int, IncEx] | dict[str, IncEx] | None'
+IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
 
 
-class SerializeFunction(Protocol):
-    def __call__(self, __input_value: Any, *, format: str, include: IncEx, exclude: IncEx) -> Any:  # pragma: no cover
+class SerializeFunction(Protocol):  # pragma: no cover
+    def __call__(self, __input_value: Any, *, format: str, include: IncExCall | None, exclude: IncExCall | None) -> Any:
         ...
 
 
@@ -527,20 +527,17 @@ def callable_schema(
     return dict_not_none(type='callable', ref=ref, extra=extra, serialization=serialization)
 
 
-IncExType = Union[Set[Union[str, int]], Dict[Union[str, int], Union['IncExType', None]]]
+class IncExSeqSerSchema(TypedDict, total=False):
+    type: Required[Literal['include-exclude-sequence']]
+    include: Set[int]
+    exclude: Set[int]
 
 
-class IncExSerSchema(TypedDict, total=False):
-    type: Required[Literal['include-exclude']]
-    include: IncExType
-    exclude: IncExType
+def inc_ex_seq_schema(*, include: Set[int] | None = None, exclude: Set[int] | None = None) -> IncExSeqSerSchema:
+    return dict_not_none(type='include-exclude-sequence', include=include, exclude=exclude)
 
 
-def inc_ex_ser_schema(*, include: IncExType | None = None, exclude: IncExType | None = None) -> IncExSerSchema:
-    return dict_not_none(type='include-exclude', include=include, exclude=exclude)
-
-
-IncExOrElseSerSchema = Union[IncExSerSchema, SerSchema]
+IncExSeqOrElseSerSchema = Union[IncExSeqSerSchema, SerSchema]
 
 
 class ListSchema(TypedDict, total=False):
@@ -552,7 +549,7 @@ class ListSchema(TypedDict, total=False):
     allow_any_iter: bool
     ref: str
     extra: Any
-    serialization: IncExOrElseSerSchema
+    serialization: IncExSeqOrElseSerSchema
 
 
 def list_schema(
@@ -564,7 +561,7 @@ def list_schema(
     allow_any_iter: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: IncExOrElseSerSchema | None = None,
+    serialization: IncExSeqOrElseSerSchema | None = None,
 ) -> ListSchema:
     return dict_not_none(
         type='list',
@@ -587,7 +584,7 @@ class TuplePositionalSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: IncExOrElseSerSchema
+    serialization: IncExSeqOrElseSerSchema
 
 
 def tuple_positional_schema(
@@ -596,7 +593,7 @@ def tuple_positional_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: IncExOrElseSerSchema | None = None,
+    serialization: IncExSeqOrElseSerSchema | None = None,
 ) -> TuplePositionalSchema:
     return dict_not_none(
         type='tuple',
@@ -619,7 +616,7 @@ class TupleVariableSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: IncExOrElseSerSchema
+    serialization: IncExSeqOrElseSerSchema
 
 
 def tuple_variable_schema(
@@ -630,7 +627,7 @@ def tuple_variable_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: IncExOrElseSerSchema | None = None,
+    serialization: IncExSeqOrElseSerSchema | None = None,
 ) -> TupleVariableSchema:
     return dict_not_none(
         type='tuple',
@@ -744,6 +741,22 @@ def generator_schema(
     )
 
 
+IncExDict = Set[Union[int, str]]
+
+
+class IncExDictSerSchema(TypedDict, total=False):
+    type: Required[Literal['include-exclude-dict']]
+    include: IncExDict
+    exclude: IncExDict
+
+
+def inc_ex_dict_schema(*, include: IncExDict | None = None, exclude: IncExDict | None = None) -> IncExDictSerSchema:
+    return dict_not_none(type='include-exclude-dict', include=include, exclude=exclude)
+
+
+IncExDictOrElseSerSchema = Union[IncExDictSerSchema, SerSchema]
+
+
 class DictSchema(TypedDict, total=False):
     type: Required[Literal['dict']]
     keys_schema: CoreSchema  # default: AnySchema
@@ -753,7 +766,7 @@ class DictSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: IncExOrElseSerSchema
+    serialization: IncExDictOrElseSerSchema
 
 
 def dict_schema(

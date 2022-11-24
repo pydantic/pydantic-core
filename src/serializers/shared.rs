@@ -104,7 +104,7 @@ impl BuildSerializer for CombinedSerializer {
                         .map_err(|err| py_error_type!("Error building `function` serializer:\n  {}", err));
                 }
                 // applies to lists tuples and dicts, does not override the main schema `type`
-                Some("include-exclude") => (),
+                Some("include-exclude-sequence") | Some("include-exclude-dict") => (),
                 // applies specifically to bytes, does not override the main schema `type`
                 Some("base64") => (),
                 Some(ser_type) => {

@@ -163,34 +163,8 @@ def type_dict_schema(typed_dict) -> dict[str, Any]:
     return {'type': 'typed-dict', 'fields': fields, 'extra_behavior': 'forbid'}
 
 
-defined_inc_ex_type = False
-inc_ex_ref_validator = {'type': 'recursive-ref', 'schema_ref': 'inc-ex-type'}
-inc_ex_validator = {
-    'type': 'union',
-    'ref': 'inc-ex-type',
-    'choices': [
-        {'type': 'set', 'items_schema': {'type': 'union', 'choices': [{'type': 'str'}, {'type': 'int'}]}},
-        {
-            'type': 'dict',
-            'keys_schema': {'type': 'union', 'choices': [{'type': 'str'}, {'type': 'int'}]},
-            'values_schema': {'type': 'nullable', 'schema': inc_ex_ref_validator},
-        },
-    ],
-}
-
-
 def union_schema(union_type: UnionType) -> core_schema.UnionSchema | core_schema.RecursiveReferenceSchema:
-    global defined_inc_ex_type
-
-    if "ForwardRef('IncExType')" in repr(union_type):
-        # ugly, but this is the simplest way to build a custom schema for this type
-        if defined_inc_ex_type:
-            return inc_ex_ref_validator
-        else:
-            defined_inc_ex_type = True
-            return inc_ex_validator
-    else:
-        return {'type': 'union', 'choices': [get_schema(arg) for arg in union_type.__args__]}
+    return {'type': 'union', 'choices': [get_schema(arg) for arg in union_type.__args__]}
 
 
 def all_literal_values(type_: type[core_schema.Literal]) -> list[any]:

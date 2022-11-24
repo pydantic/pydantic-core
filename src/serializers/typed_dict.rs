@@ -1,6 +1,7 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
+use std::borrow::Cow;
 
 use ahash::AHashMap;
 use serde::ser::SerializeMap;
@@ -94,7 +95,7 @@ impl TypeSerializer for TypedDictSerializer {
         let py = value.py();
         match value.cast_as::<PyDict>() {
             Ok(py_dict) => {
-                let mut new_values: Vec<Option<(PyObject, PyObject)>> = (0..self.fields.len()).map(|_| None).collect();
+                let mut new_values: Vec<Option<(&PyAny, PyObject)>> = (0..self.fields.len()).map(|_| None).collect();
 
                 for (key, value) in py_dict {
                     if let Ok(key_py_str) = key.cast_as::<PyString>() {
@@ -106,14 +107,14 @@ impl TypeSerializer for TypedDictSerializer {
                                 } else {
                                     field.key_py.as_ref(py)
                                 };
-                                new_values[field.index] = Some((key_py.into_py(py), value));
+                                new_values[field.index] = Some((key_py, value));
                             }
                             continue;
                         }
                     }
                     if self.include_extra {
                         let value = fallback_to_python(value, extra)?;
-                        new_values.push(Some((key.into_py(py), value)));
+                        new_values.push(Some((key, value)));
                     }
                 }
                 // TODO: would it be faster here to use `from_sequence`?
@@ -140,11 +141,15 @@ impl TypeSerializer for TypedDictSerializer {
     ) -> Result<S::Ok, S::Error> {
         // TODO include and exclude
 
-        let py = value.py();
         match value.cast_as::<PyDict>() {
             Ok(py_dict) => {
-                let mut new_values: Vec<Option<(String, Option<&TypedDictField>, PyObject)>> =
-                    (0..self.fields.len()).map(|_| None).collect();
+                let expected_len = match self.include_extra {
+                    true => py_dict.len(),
+                    false => self.fields.len(),
+                };
+                #[allow(clippy::type_complexity)]
+                let mut new_values: Vec<Option<(Cow<str>, Option<&TypedDictField>, &PyAny)>> =
+                    (0..expected_len).map(|_| None).collect();
 
                 for (key, value) in py_dict {
                     if let Ok(key_py_str) = key.cast_as::<PyString>() {
@@ -152,27 +157,27 @@ impl TypeSerializer for TypedDictSerializer {
                         if let Some(field) = self.fields.get(key_str) {
                             if field.include {
                                 let output_key = if let Some(ref alias) = field.alias {
-                                    alias.clone()
+                                    Cow::Borrowed(alias.as_str())
                                 } else {
-                                    key_str.to_string()
+                                    Cow::Borrowed(key_str)
                                 };
-                                new_values[field.index] = Some((output_key, Some(field), value.into_py(py)));
+                                new_values[field.index] = Some((output_key, Some(field), value));
                             }
                             continue;
                         }
                     }
                     if self.include_extra {
-                        let output_key = json_key(key, extra).map_err(py_err_se_err)?.to_string();
-                        new_values.push(Some((output_key, None, value.into_py(py))));
+                        let output_key = json_key(key, extra).map_err(py_err_se_err)?;
+                        new_values.push(Some((output_key, None, value)));
                     }
                 }
-                let mut map = serializer.serialize_map(Some(py_dict.len()))?;
+                let mut map = serializer.serialize_map(Some(new_values.len()))?;
                 for (key, op_field, value) in new_values.into_iter().flatten() {
                     if let Some(field) = op_field {
-                        let s = PydanticSerializer::new(value.as_ref(py), &field.serializer, None, None, extra);
+                        let s = PydanticSerializer::new(value, &field.serializer, None, None, extra);
                         map.serialize_entry(&key, &s)
                     } else {
-                        let s = SerializeInfer::new(value.as_ref(py), extra.ob_type_lookup);
+                        let s = SerializeInfer::new(value, extra.ob_type_lookup);
                         map.serialize_entry(&key, &s)
                     }?;
                 }

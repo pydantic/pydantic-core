@@ -1,4 +1,6 @@
-from pydantic_core import SchemaSerializer, core_schema
+import pytest
+
+from pydantic_core import SchemaError, SchemaSerializer, core_schema
 
 
 def test_dict_str_int():
@@ -22,7 +24,7 @@ def test_dict_any_any():
 
 
 def test_include():
-    v = SchemaSerializer(core_schema.dict_schema(serialization=core_schema.inc_ex_ser_schema(include={'a', 'c'})))
+    v = SchemaSerializer(core_schema.dict_schema(serialization=core_schema.inc_ex_dict_schema(include={'a', 'c'})))
 
     assert v.to_python({'a': 1, 'b': 2, 'c': 3, 'd': 4}) == {'a': 1, 'c': 3}
     assert v.to_json({'a': 1, 'b': 2, 'c': 3, 'd': 4}) == b'{"a":1,"c":3}'
@@ -37,7 +39,7 @@ def test_include():
 
 
 def test_exclude():
-    v = SchemaSerializer(core_schema.dict_schema(serialization=core_schema.inc_ex_ser_schema(exclude={'a', 'c'})))
+    v = SchemaSerializer(core_schema.dict_schema(serialization=core_schema.inc_ex_dict_schema(exclude={'a', 'c'})))
 
     assert v.to_python({'a': 1, 'b': 2, 'c': 3, 'd': 4}) == {'b': 2, 'd': 4}
     assert v.to_json({'a': 1, 'b': 2, 'c': 3, 'd': 4}) == b'{"b":2,"d":4}'
@@ -53,7 +55,7 @@ def test_include_exclude():
     v = SchemaSerializer(
         core_schema.dict_schema(
             core_schema.any_schema(),
-            serialization=core_schema.inc_ex_ser_schema(include={'1', '3', '5'}, exclude={'5', '6'}),
+            serialization=core_schema.inc_ex_dict_schema(include={'1', '3', '5'}, exclude={'5', '6'}),
         )
     )
 
@@ -63,7 +65,7 @@ def test_include_exclude():
 def test_include_exclude_int():
     v = SchemaSerializer(
         core_schema.dict_schema(
-            core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(include={1, 3, 5}, exclude={5, 6})
+            core_schema.any_schema(), serialization=core_schema.inc_ex_dict_schema(include={1, 3, 5}, exclude={5, 6})
         )
     )
 
@@ -73,7 +75,7 @@ def test_include_exclude_int():
 def test_include_exclude_runtime():
     v = SchemaSerializer(
         core_schema.dict_schema(
-            core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(exclude={'0', '1'})
+            core_schema.any_schema(), serialization=core_schema.inc_ex_dict_schema(exclude={'0', '1'})
         )
     )
     assert v.to_python({'0': 0, '1': 1, '2': 2, '3': 3}, include={'1', '2'}) == {'2': 2}
@@ -81,6 +83,19 @@ def test_include_exclude_runtime():
 
 def test_include_exclude_runtime_int():
     v = SchemaSerializer(
-        core_schema.dict_schema(core_schema.any_schema(), serialization=core_schema.inc_ex_ser_schema(exclude={0, 1}))
+        core_schema.dict_schema(core_schema.any_schema(), serialization=core_schema.inc_ex_dict_schema(exclude={0, 1}))
     )
     assert v.to_python({0: 0, 1: 1, 2: 2, 3: 3}, include={1, 2}) == {2: 2}
+
+
+@pytest.mark.parametrize(
+    'include_value,error_msg',
+    [
+        ('foobar', 'Input should be a valid set'),
+        ({'a': 'dict'}, 'Input should be a valid set'),
+        ({4.2}, 'Input should be a valid integer, got a number with a fractional part'),
+    ],
+)
+def test_include_error(include_value, error_msg):
+    with pytest.raises(SchemaError, match=error_msg):
+        SchemaSerializer(core_schema.dict_schema(serialization=core_schema.inc_ex_dict_schema(include=include_value)))
