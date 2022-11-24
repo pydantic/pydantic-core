@@ -80,12 +80,6 @@ combined_serializer! {
     both: Format, super::format::FunctionSerializer;
 }
 
-impl CombinedSerializer {
-    pub fn is_any(&self) -> bool {
-        matches!(self, CombinedSerializer::Any(_))
-    }
-}
-
 impl BuildSerializer for CombinedSerializer {
     // this value is never used, it's just here to satisfy the trait
     const EXPECTED_TYPE: &'static str = "";
@@ -180,12 +174,6 @@ pub(super) enum SerMode {
     Python,
     Json,
     Other(String),
-}
-
-impl SerMode {
-    pub fn is_json(&self) -> bool {
-        matches!(self, SerMode::Json)
-    }
 }
 
 impl From<Option<&str>> for SerMode {

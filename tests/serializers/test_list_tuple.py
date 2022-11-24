@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from pydantic_core import SchemaError, SchemaSerializer, core_schema
@@ -175,3 +177,47 @@ def test_tuple_fallback():
     # # even though we're in the fallback state, non JSON types should still be converted to JSON here
     with pytest.warns(UserWarning, match='Expected `tuple` but got `list` - filtering via include/exclude unavailable'):
         assert v.to_python([1, 2, 3], mode='json') == [1, 2, 3]
+
+
+@pytest.mark.parametrize(
+    'params',
+    [
+        dict(include=None, exclude=None, expected=['0', '1', '2', '3']),
+        dict(include={0, 1}, exclude=None, expected=['0', '1']),
+        dict(include={0: None, 1: None}, exclude=None, expected=['0', '1']),
+        dict(include={0: {1}, 1: {1}}, exclude=None, expected=['0', '1']),
+        dict(include=None, exclude={0, 1}, expected=['2', '3']),
+        dict(include=None, exclude={0: None, 1: None}, expected=['2', '3']),
+        dict(include={0, 1}, exclude={1, 2}, expected=['0']),
+        dict(include=None, exclude={3: {1}}, expected=['0', '1', '2', '3']),
+        dict(include={0, 1}, exclude={3: {1}}, expected=['0', '1']),
+        dict(include={0, 1}, exclude={1: {1}}, expected=['0', '1']),
+        dict(include={0, 1}, exclude={1: None}, expected=['0']),
+    ],
+)
+def test_include_exclude_args(params):
+    s = SchemaSerializer(core_schema.list_schema())
+
+    include, exclude, expected = params['include'], params['exclude'], params['expected']
+    value = ['0', '1', '2', '3']
+    assert s.to_python(value, include=include, exclude=exclude) == expected
+    assert s.to_python(value, mode='json', include=include, exclude=exclude) == expected
+    assert json.loads(s.to_json(value, include=include, exclude=exclude)) == expected
+
+
+@pytest.mark.parametrize(
+    'params',
+    [
+        dict(include=None, exclude=None, expected=[[0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]),
+        dict(include=None, exclude={1: {0}}, expected=[[0], [1], [0, 1, 2], [0, 1, 2, 3]]),
+        dict(include={1: {0}}, exclude=None, expected=[[0]]),
+    ],
+)
+def test_include_exclude_args_nested(params):
+    s = SchemaSerializer(core_schema.list_schema(core_schema.list_schema()))
+
+    include, exclude, expected = params['include'], params['exclude'], params['expected']
+    value = [[0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
+    assert s.to_python(value, include=include, exclude=exclude) == expected
+    assert s.to_python(value, mode='json', include=include, exclude=exclude) == expected
+    assert json.loads(s.to_json(value, include=include, exclude=exclude)) == expected
