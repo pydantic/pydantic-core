@@ -10,6 +10,7 @@ use crate::build_tools::{py_error_type, schema_or_config, SchemaDict};
 use crate::serializers::any::SerializeInfer;
 
 use super::any::{fallback_serialize, fallback_to_python, json_key};
+use super::include_exclude::SchemaIncEx;
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 use super::PydanticSerializer;
 
@@ -20,13 +21,14 @@ struct TypedDictField {
     alias: Option<String>,
     alias_py: Option<Py<PyString>>,
     serializer: CombinedSerializer,
-    include: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct TypedDictSerializer {
     fields: AHashMap<String, TypedDictField>,
     include_extra: bool,
+    // isize because we look up include exclude via `.hash()` which returns an isize
+    inc_ex: SchemaIncEx<isize>,
 }
 
 impl BuildSerializer for TypedDictSerializer {
@@ -46,6 +48,7 @@ impl BuildSerializer for TypedDictSerializer {
 
         let fields_dict: &PyDict = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: AHashMap<String, TypedDictField> = AHashMap::with_capacity(fields_dict.len());
+        let mut exclude: Vec<Py<PyString>> = Vec::with_capacity(fields_dict.len());
 
         for (index, (key, value)) in fields_dict.iter().enumerate() {
             let key: String = key.extract()?;
@@ -64,7 +67,11 @@ impl BuildSerializer for TypedDictSerializer {
                 None => (None, None),
             };
 
-            let key_py = PyString::intern(py, &key).into_py(py);
+            let key_py: Py<PyString> = PyString::intern(py, &key).into_py(py);
+
+            if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
+                exclude.push(key_py.clone_ref(py));
+            }
             fields.insert(
                 key,
                 TypedDictField {
@@ -73,21 +80,32 @@ impl BuildSerializer for TypedDictSerializer {
                     alias,
                     alias_py,
                     serializer,
-                    include: field_info.get_as(intern!(py, "serialization_include"))?.unwrap_or(true),
                 },
             );
         }
 
-        Ok(Self { fields, include_extra }.into())
+        let inc_ex = SchemaIncEx::from_vec_hash(py, exclude)?;
+
+        Ok(Self {
+            fields,
+            include_extra,
+            inc_ex,
+        }
+        .into())
     }
+}
+
+enum ValueSerializer<'py> {
+    Infer(SerializeInfer<'py>),
+    Field(PydanticSerializer<'py>),
 }
 
 impl TypeSerializer for TypedDictSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        _include: Option<&PyAny>,
-        _exclude: Option<&PyAny>,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         // TODO include and exclude
@@ -95,31 +113,35 @@ impl TypeSerializer for TypedDictSerializer {
         let py = value.py();
         match value.cast_as::<PyDict>() {
             Ok(py_dict) => {
-                let mut new_values: Vec<Option<(&PyAny, PyObject)>> = (0..self.fields.len()).map(|_| None).collect();
+                // we build a temporary vec, then iterate over it so the order of the output dict matches
+                // the order of the fields in the schema
+                let mut new_items: Vec<Option<(&PyAny, PyObject)>> = (0..self.fields.len()).map(|_| None).collect();
 
                 for (key, value) in py_dict {
-                    if let Ok(key_py_str) = key.cast_as::<PyString>() {
-                        if let Some(field) = self.fields.get(key_py_str.to_str()?) {
-                            if field.include {
-                                let value = field.serializer.to_python(value, None, None, extra)?;
+                    if let Some((next_include, next_exclude)) =
+                        self.inc_ex.include_or_exclude_key(key, include, exclude)?
+                    {
+                        if let Ok(key_py_str) = key.cast_as::<PyString>() {
+                            if let Some(field) = self.fields.get(key_py_str.to_str()?) {
+                                let value = field.serializer.to_python(value, next_include, next_exclude, extra)?;
                                 let key_py = if let Some(ref alias_py) = field.alias_py {
                                     alias_py.as_ref(py)
                                 } else {
                                     field.key_py.as_ref(py)
                                 };
-                                new_values[field.index] = Some((key_py, value));
+                                new_items[field.index] = Some((key_py, value));
+                                continue;
                             }
-                            continue;
                         }
-                    }
-                    if self.include_extra {
-                        let value = fallback_to_python(value, extra)?;
-                        new_values.push(Some((key, value)));
+                        if self.include_extra {
+                            let value = fallback_to_python(value, extra)?;
+                            new_items.push(Some((key, value)));
+                        }
                     }
                 }
                 // TODO: would it be faster here to use `from_sequence`?
                 let new_dict = PyDict::new(py);
-                for (key, value) in new_values.into_iter().flatten() {
+                for (key, value) in new_items.into_iter().flatten() {
                     new_dict.set_item(key, value)?;
                 }
                 Ok(new_dict.into_py(py))
@@ -135,8 +157,8 @@ impl TypeSerializer for TypedDictSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        _include: Option<&PyAny>,
-        _exclude: Option<&PyAny>,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         // TODO include and exclude
@@ -147,39 +169,48 @@ impl TypeSerializer for TypedDictSerializer {
                     true => py_dict.len(),
                     false => self.fields.len(),
                 };
-                #[allow(clippy::type_complexity)]
-                let mut new_values: Vec<Option<(Cow<str>, Option<&TypedDictField>, &PyAny)>> =
-                    (0..expected_len).map(|_| None).collect();
+                // as above, we build a temporary vec, then iterate over it so the order of the output dict matches
+                // the order of the fields in the schema
+                let mut ser_items: Vec<Option<(Cow<str>, ValueSerializer)>> = (0..expected_len).map(|_| None).collect();
 
                 for (key, value) in py_dict {
-                    if let Ok(key_py_str) = key.cast_as::<PyString>() {
-                        let key_str = key_py_str.to_str().map_err(py_err_se_err)?;
-                        if let Some(field) = self.fields.get(key_str) {
-                            if field.include {
+                    if let Some((next_include, next_exclude)) = self
+                        .inc_ex
+                        .include_or_exclude_key(key, include, exclude)
+                        .map_err(py_err_se_err)?
+                    {
+                        if let Ok(key_py_str) = key.cast_as::<PyString>() {
+                            let key_str = key_py_str.to_str().map_err(py_err_se_err)?;
+                            if let Some(field) = self.fields.get(key_str) {
                                 let output_key = if let Some(ref alias) = field.alias {
                                     Cow::Borrowed(alias.as_str())
                                 } else {
                                     Cow::Borrowed(key_str)
                                 };
-                                new_values[field.index] = Some((output_key, Some(field), value));
+                                let s = PydanticSerializer::new(
+                                    value,
+                                    &field.serializer,
+                                    next_include,
+                                    next_exclude,
+                                    extra,
+                                );
+                                ser_items[field.index] = Some((output_key, ValueSerializer::Field(s)));
+                                continue;
                             }
-                            continue;
+                        }
+                        if self.include_extra {
+                            let s = SerializeInfer::new(value, extra.ob_type_lookup);
+                            let output_key = json_key(key, extra).map_err(py_err_se_err)?;
+                            ser_items.push(Some((output_key, ValueSerializer::Infer(s))));
                         }
                     }
-                    if self.include_extra {
-                        let output_key = json_key(key, extra).map_err(py_err_se_err)?;
-                        new_values.push(Some((output_key, None, value)));
-                    }
                 }
-                let mut map = serializer.serialize_map(Some(new_values.len()))?;
-                for (key, op_field, value) in new_values.into_iter().flatten() {
-                    if let Some(field) = op_field {
-                        let s = PydanticSerializer::new(value, &field.serializer, None, None, extra);
-                        map.serialize_entry(&key, &s)
-                    } else {
-                        let s = SerializeInfer::new(value, extra.ob_type_lookup);
-                        map.serialize_entry(&key, &s)
-                    }?;
+                let mut map = serializer.serialize_map(Some(ser_items.len()))?;
+                for (key, serializer) in ser_items.into_iter().flatten() {
+                    match serializer {
+                        ValueSerializer::Infer(s) => map.serialize_entry(&key, &s)?,
+                        ValueSerializer::Field(s) => map.serialize_entry(&key, &s)?,
+                    }
                 }
                 map.end()
             }

@@ -6,7 +6,7 @@ use serde::ser::SerializeMap;
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
-use super::list_tuple::SchemaIncEx;
+use super::include_exclude::SchemaIncEx;
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 use super::PydanticSerializer;
 
@@ -35,7 +35,7 @@ impl BuildSerializer for DictSerializer {
             Some(ser) => {
                 let include = ser.get_item(intern!(py, "include"));
                 let exclude = ser.get_item(intern!(py, "exclude"));
-                SchemaIncEx::new_from_hash(include, exclude)?
+                SchemaIncEx::from_set_hash(include, exclude)?
             }
             None => SchemaIncEx::default(),
         };
@@ -45,21 +45,6 @@ impl BuildSerializer for DictSerializer {
             inc_ex,
         }
         .into())
-    }
-}
-
-impl DictSerializer {
-    /// this is the somewhat hellish logic for deciding:
-    /// 1. whether we should omit a value at a particular index - returning `Ok(None)` here
-    /// 2. and if we are including it, what values of `include` and `exclude` should be passed to it
-    fn include_or_exclude<'s, 'py>(
-        &'s self,
-        key: &PyAny,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
-        let hash = key.hash()?;
-        self.inc_ex.include_or_exclude(key, hash, include, exclude)
     }
 }
 
@@ -105,7 +90,9 @@ impl TypeSerializer for DictSerializer {
 
                 let new_dict = PyDict::new(py);
                 for (key, value) in py_dict {
-                    if let Some((next_include, next_exclude)) = self.include_or_exclude(key, include, exclude)? {
+                    if let Some((next_include, next_exclude)) =
+                        self.inc_ex.include_or_exclude_key(key, include, exclude)?
+                    {
                         let key = self.dict_py_key(key, extra)?;
                         let value = value_serializer.to_python(value, next_include, next_exclude, extra)?;
                         new_dict.set_item(key, value)?;
@@ -135,8 +122,10 @@ impl TypeSerializer for DictSerializer {
                 let value_serializer = self.value_serializer.as_ref();
 
                 for (key, value) in py_dict {
-                    if let Some((next_include, next_exclude)) =
-                        self.include_or_exclude(key, include, exclude).map_err(py_err_se_err)?
+                    if let Some((next_include, next_exclude)) = self
+                        .inc_ex
+                        .include_or_exclude_key(key, include, exclude)
+                        .map_err(py_err_se_err)?
                     {
                         let key = key_serializer.json_key(key, extra).map_err(py_err_se_err)?;
                         let value_serialize =
