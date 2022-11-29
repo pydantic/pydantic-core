@@ -1,7 +1,7 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 
-use ahash::{AHashMap, AHashSet};
+use ahash::AHashSet;
 use pyo3::types::{PyDict, PySet, PyString};
 
 use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same, SchemaDict};
@@ -29,7 +29,7 @@ pub struct TypedDictField {
 }
 
 impl TypedDictField {
-    fn new(
+    pub fn new(
         key: &PyAny,
         value: &PyAny,
         config: Option<&PyDict>,
@@ -110,26 +110,6 @@ impl TypedDictField {
             .map(|(i, (key, value))| Self::new(key, value, config, build_context, total, populate_by_name, i as u16))
             .collect::<PyResult<_>>()?;
 
-        Ok(fields)
-    }
-
-    pub fn build_fields_map(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        build_context: &mut BuildContext,
-        total: bool,
-    ) -> PyResult<AHashMap<String, Self>> {
-        let py = schema.py();
-
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
-
-        let fields_dict: &PyDict = schema.get_as_req(intern!(py, "fields"))?;
-        let mut fields: AHashMap<String, Self> = AHashMap::with_capacity(fields_dict.len());
-
-        for (index, (key, value)) in fields_dict.iter().enumerate() {
-            let field = Self::new(key, value, config, build_context, total, populate_by_name, index as u16)?;
-            fields.insert(field.name.clone(), field);
-        }
         Ok(fields)
     }
 }
