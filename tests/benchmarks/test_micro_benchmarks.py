@@ -95,6 +95,22 @@ class TestBenchmarkSimpleModel:
             }
         )
 
+    @pytest.fixture(scope='class')
+    def core_validator_new_model(self):
+        return SchemaValidator(
+            {
+                'type': 'model',
+                'fields': {
+                    'name': {'schema': {'type': 'str'}},
+                    'age': {'schema': {'type': 'int'}},
+                    'friends': {'schema': {'type': 'list', 'items_schema': {'type': 'int'}}},
+                    'settings': {
+                        'schema': {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'float'}}
+                    },
+                },
+            }
+        )
+
     data = {'name': 'John', 'age': 42, 'friends': list(range(200)), 'settings': {f'v_{i}': i / 2.0 for i in range(50)}}
 
     @skip_pydantic
@@ -118,6 +134,14 @@ class TestBenchmarkSimpleModel:
         assert not hasattr(m, '__fields_set__')
         benchmark(core_validator_not_fs.validate_python, self.data)
 
+    @pytest.mark.benchmark(group='simple model - python')
+    def test_core_python_new_model(self, core_validator_new_model, benchmark):
+        m = core_validator_new_model.validate_python(self.data)
+        assert m.name == 'John'
+        # assert m.__dict__.keys() == {'name', 'age', 'friends', 'settings'}
+        # assert hasattr(m, '__fields_set__')
+        benchmark(core_validator_new_model.validate_python, self.data)
+
     @skip_pydantic
     @pytest.mark.benchmark(group='simple model - JSON')
     def test_pyd_json(self, pydantic_model, benchmark):
@@ -137,6 +161,11 @@ class TestBenchmarkSimpleModel:
     def test_core_json_not_fs(self, core_validator_not_fs, benchmark):
         json_data = json.dumps(self.data)
         benchmark(core_validator_not_fs.validate_json, json_data)
+
+    @pytest.mark.benchmark(group='simple model - JSON')
+    def test_core_json_new_model(self, core_validator_new_model, benchmark):
+        json_data = json.dumps(self.data)
+        benchmark(core_validator_new_model.validate_json, json_data)
 
 
 class TestModelLarge:

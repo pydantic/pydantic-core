@@ -862,13 +862,13 @@ class TypedDictSchema(TypedDict, total=False):
     strict: bool
     extra_validator: CoreSchema
     return_fields_set: bool
-    ref: str
-    extra: Any
     # all these values can be set via config, equivalent fields have `typed_dict_` prefix
     extra_behavior: Literal['allow', 'forbid', 'ignore']
     total: bool  # default: True
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
     from_attributes: bool
+    ref: str
+    extra: Any
 
 
 def typed_dict_schema(
@@ -877,12 +877,12 @@ def typed_dict_schema(
     strict: bool | None = None,
     extra_validator: CoreSchema | None = None,
     return_fields_set: bool | None = None,
-    ref: str | None = None,
-    extra: Any = None,
     extra_behavior: Literal['allow', 'forbid', 'ignore'] | None = None,
     total: bool | None = None,
     populate_by_name: bool | None = None,
     from_attributes: bool | None = None,
+    ref: str | None = None,
+    extra: Any = None,
 ) -> TypedDictSchema:
     return dict_not_none(
         type='typed-dict',
@@ -890,12 +890,49 @@ def typed_dict_schema(
         strict=strict,
         extra_validator=extra_validator,
         return_fields_set=return_fields_set,
-        ref=ref,
-        extra=extra,
         extra_behavior=extra_behavior,
         total=total,
         populate_by_name=populate_by_name,
         from_attributes=from_attributes,
+        ref=ref,
+        extra=extra,
+    )
+
+
+class ModelSchema(TypedDict, total=False):
+    type: Required[Literal['model']]
+    fields: Required[Dict[str, TypedDictField]]
+    strict: bool
+    extra_validator: CoreSchema
+    # all these values can be set via config, equivalent fields have `typed_dict_` prefix
+    extra_behavior: Literal['allow', 'forbid', 'ignore']
+    populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
+    from_attributes: bool
+    ref: str
+    extra: Any
+
+
+def model_schema(
+    fields: Dict[str, TypedDictField],
+    *,
+    strict: bool | None = None,
+    extra_validator: CoreSchema | None = None,
+    extra_behavior: Literal['allow', 'forbid', 'ignore'] | None = None,
+    populate_by_name: bool | None = None,
+    from_attributes: bool | None = None,
+    ref: str | None = None,
+    extra: Any = None,
+) -> TypedDictSchema:
+    return dict_not_none(
+        type='model',
+        fields=fields,
+        strict=strict,
+        extra_validator=extra_validator,
+        extra_behavior=extra_behavior,
+        populate_by_name=populate_by_name,
+        from_attributes=from_attributes,
+        ref=ref,
+        extra=extra,
     )
 
 
@@ -1154,6 +1191,7 @@ CoreSchema = Union[
     ChainSchema,
     LaxOrStrictSchema,
     TypedDictSchema,
+    ModelSchema,
     NewClassSchema,
     ArgumentsSchema,
     CallSchema,

@@ -2,151 +2,34 @@ use pyo3::intern;
 use pyo3::prelude::*;
 
 use ahash::{AHashMap, AHashSet};
-use pyo3::types::{PyDict, PySet, PyString};
+use pyo3::types::{PyDict, PySet};
 
-use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same, SchemaDict};
+use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same};
 use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{
     AttributesGenericIterator, DictGenericIterator, GenericMapping, Input, JsonObjectGenericIterator,
     MappingGenericIterator,
 };
-use crate::lookup_key::LookupKey;
-use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
+use crate::PydanticCoreModel;
 
+use super::typed_dict::TypedDictField;
 use super::with_default::get_default;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
-#[derive(Debug, Clone)]
-pub struct TypedDictField {
-    pub name: String,
-    pub lookup_key: LookupKey,
-    pub name_pystring: Py<PyString>,
-    pub required: bool,
-    pub validator: CombinedValidator,
-    pub frozen: bool,
-    pub index: u16,
-}
-
-impl TypedDictField {
-    fn new(
-        key: &PyAny,
-        value: &PyAny,
-        config: Option<&PyDict>,
-        build_context: &mut BuildContext,
-        total: bool,
-        populate_by_name: bool,
-        index: u16,
-    ) -> PyResult<Self> {
-        let py = key.py();
-        let field_info: &PyDict = value.cast_as()?;
-        let field_name: &str = key.extract()?;
-
-        let schema = field_info.get_as_req(intern!(py, "schema"))?;
-
-        let validator = match build_validator(schema, config, build_context) {
-            Ok(v) => v,
-            Err(err) => return py_err!("Field \"{}\":\n  {}", field_name, err),
-        };
-
-        let required = match field_info.get_as::<bool>(intern!(py, "required"))? {
-            Some(required) => {
-                if required {
-                    if let CombinedValidator::WithDefault(ref val) = validator {
-                        if val.has_default() {
-                            return py_err!("Field '{}': a required field cannot have a default value", field_name);
-                        }
-                    }
-                }
-                required
-            }
-            None => total,
-        };
-
-        if required {
-            if let CombinedValidator::WithDefault(ref val) = validator {
-                if val.omit_on_error() {
-                    return py_err!(
-                        "Field '{}': 'on_error = omit' cannot be set for required fields",
-                        field_name
-                    );
-                }
-            }
-        }
-
-        let lookup_key = match field_info.get_item(intern!(py, "alias")) {
-            Some(alias) => {
-                let alt_alias = if populate_by_name { Some(field_name) } else { None };
-                LookupKey::from_py(py, alias, alt_alias)?
-            }
-            None => LookupKey::from_string(py, field_name),
-        };
-
-        Ok(Self {
-            name: field_name.to_string(),
-            lookup_key,
-            name_pystring: PyString::intern(py, field_name).into(),
-            validator,
-            required,
-            frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
-            index,
-        })
-    }
-
-    pub fn build_fields_vec(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        build_context: &mut BuildContext,
-        total: bool,
-    ) -> PyResult<Vec<Self>> {
-        let py = schema.py();
-
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
-
-        let fields_dict: &PyDict = schema.get_as_req(intern!(py, "fields"))?;
-        let fields: Vec<Self> = fields_dict
-            .iter()
-            .enumerate()
-            .map(|(i, (key, value))| Self::new(key, value, config, build_context, total, populate_by_name, i as u16))
-            .collect::<PyResult<_>>()?;
-
-        Ok(fields)
-    }
-
-    pub fn build_fields_map(
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        build_context: &mut BuildContext,
-        total: bool,
-    ) -> PyResult<AHashMap<String, Self>> {
-        let py = schema.py();
-
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
-
-        let fields_dict: &PyDict = schema.get_as_req(intern!(py, "fields"))?;
-        let mut fields: AHashMap<String, Self> = AHashMap::with_capacity(fields_dict.len());
-
-        for (index, (key, value)) in fields_dict.iter().enumerate() {
-            let field = Self::new(key, value, config, build_context, total, populate_by_name, index as u16)?;
-            fields.insert(field.name.clone(), field);
-        }
-        Ok(fields)
-    }
-}
 
 #[derive(Debug, Clone)]
-pub struct TypedDictValidator {
+pub struct ModelValidator {
     fields: Vec<TypedDictField>,
     check_extra: bool,
     forbid_extra: bool,
     extra_validator: Option<Box<CombinedValidator>>,
     strict: bool,
     from_attributes: bool,
-    return_fields_set: bool,
 }
 
-impl BuildValidator for TypedDictValidator {
-    const EXPECTED_TYPE: &'static str = "typed-dict";
+impl BuildValidator for ModelValidator {
+    const EXPECTED_TYPE: &'static str = "model";
 
     fn build(
         schema: &PyDict,
@@ -194,13 +77,12 @@ impl BuildValidator for TypedDictValidator {
             extra_validator,
             strict,
             from_attributes: schema_or_config_same(schema, config, intern!(py, "from_attributes"))?.unwrap_or(false),
-            return_fields_set: schema.get_as(intern!(py, "return_fields_set"))?.unwrap_or(false),
         }
         .into())
     }
 }
 
-impl Validator for TypedDictValidator {
+impl Validator for ModelValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -216,22 +98,20 @@ impl Validator for TypedDictValidator {
         let strict = extra.strict.unwrap_or(self.strict);
         let dict = input.validate_typed_dict(strict, self.from_attributes)?;
 
-        let output_dict = PyDict::new(py);
-        let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
-        let mut fields_set_vec: Option<Vec<Py<PyString>>> = match self.return_fields_set {
-            true => Some(Vec::with_capacity(self.fields.len())),
-            false => None,
-        };
+        let len = self.fields.len();
+        let mut model = PydanticCoreModel::with_capacity(len);
+        let mut errors: Vec<ValLineError> = Vec::with_capacity(len);
 
         // we only care about which keys have been used if we're iterating over the object for extra after
         // the first pass
         let mut used_keys: Option<AHashSet<&str>> = match self.check_extra {
-            true => Some(AHashSet::with_capacity(self.fields.len())),
+            true => Some(AHashSet::with_capacity(len)),
             false => None,
         };
 
         let extra = Extra {
-            data: Some(output_dict),
+            // data: Some(output_dict),
+            data: None,
             field: None,
             strict: extra.strict,
             context: extra.context,
@@ -264,10 +144,7 @@ impl Validator for TypedDictValidator {
                             .validate(py, value, &extra, slots, recursion_guard)
                         {
                             Ok(value) => {
-                                output_dict.set_item(&field.name_pystring, value)?;
-                                if let Some(ref mut fs) = fields_set_vec {
-                                    fs.push(field.name_pystring.clone_ref(py));
-                                }
+                                model.set_item(field.name_pystring.as_ref(py), value, true);
                             }
                             Err(ValError::Omit) => continue,
                             Err(ValError::LineErrors(line_errors)) => {
@@ -279,8 +156,8 @@ impl Validator for TypedDictValidator {
                         }
                         continue;
                     } else if let Some(value) = get_default(py, &field.validator)? {
-                        output_dict.set_item(&field.name_pystring, value.as_ref())?;
-                    } else if field.required {
+                        model.set_item(field.name_pystring.as_ref(py), value.as_ref(), false);
+                    } else {
                         errors.push(ValLineError::new_with_loc(
                             ErrorType::Missing,
                             input,
@@ -319,17 +196,11 @@ impl Validator for TypedDictValidator {
                         }
 
                         let py_key = either_str.as_py_string(py);
-                        if let Some(ref mut fs) = fields_set_vec {
-                            fs.push(py_key.into_py(py));
-                        }
 
                         if let Some(ref validator) = self.extra_validator {
                             match validator.validate(py, value, &extra, slots, recursion_guard) {
                                 Ok(value) => {
-                                    output_dict.set_item(py_key, value)?;
-                                    if let Some(ref mut fs) = fields_set_vec {
-                                        fs.push(py_key.into_py(py));
-                                    }
+                                    model.set_item(py_key, value, true);
                                 }
                                 Err(ValError::LineErrors(line_errors)) => {
                                     for err in line_errors {
@@ -339,10 +210,7 @@ impl Validator for TypedDictValidator {
                                 Err(err) => return Err(err),
                             }
                         } else {
-                            output_dict.set_item(py_key, value.to_object(py))?;
-                            if let Some(ref mut fs) = fields_set_vec {
-                                fs.push(py_key.into_py(py));
-                            }
+                            model.set_item(py_key, value.to_object(py), true);
                         }
                     }
                 }
@@ -357,22 +225,15 @@ impl Validator for TypedDictValidator {
 
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
-        } else if let Some(fs) = fields_set_vec {
-            let fields_set = PySet::new(py, &fs)?;
-            Ok((output_dict, fields_set).to_object(py))
         } else {
-            Ok(output_dict.to_object(py))
+            // let fields_set = PySet::new(py, &fields_set_vec)?;
+            // Ok((output_dict, fields_set).to_object(py))
+            Ok(model.into_py(py))
         }
     }
 
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
-    }
-
-    fn ask(&self, question: &Question) -> bool {
-        match question {
-            Question::ReturnFieldsSet => self.return_fields_set,
-        }
     }
 
     fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
@@ -382,7 +243,7 @@ impl Validator for TypedDictValidator {
     }
 }
 
-impl TypedDictValidator {
+impl ModelValidator {
     fn validate_assignment<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -403,12 +264,8 @@ impl TypedDictValidator {
 
         let prepare_tuple = |output: PyObject| {
             data.set_item(field, output)?;
-            if self.return_fields_set {
-                let fields_set = PySet::new(py, &[field])?;
-                Ok((data, fields_set).to_object(py))
-            } else {
-                Ok(data.to_object(py))
-            }
+            let fields_set = PySet::new(py, &[field])?;
+            Ok((data, fields_set).to_object(py))
         };
 
         let prepare_result = |result: ValResult<'data, PyObject>| match result {

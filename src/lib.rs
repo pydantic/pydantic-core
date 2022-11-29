@@ -12,6 +12,7 @@ mod build_tools;
 mod errors;
 mod input;
 mod lookup_key;
+mod model;
 mod questions;
 mod recursion_guard;
 mod url;
@@ -21,6 +22,7 @@ mod validators;
 pub use self::url::{PyMultiHostUrl, PyUrl};
 pub use build_tools::SchemaError;
 pub use errors::{list_all_errors, PydanticCustomError, PydanticKnownError, PydanticOmit, ValidationError};
+pub use model::PydanticCoreModel;
 pub use validators::SchemaValidator;
 
 pub fn get_version() -> String {
@@ -39,6 +41,7 @@ fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("build_profile", env!("PROFILE"))?;
     m.add_class::<SchemaValidator>()?;
     m.add_class::<ValidationError>()?;
+    m.add_class::<PydanticCoreModel>()?;
     m.add_class::<SchemaError>()?;
     m.add_class::<PydanticCustomError>()?;
     m.add_class::<PydanticKnownError>()?;
