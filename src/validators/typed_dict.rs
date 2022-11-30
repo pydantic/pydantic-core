@@ -1,8 +1,12 @@
+use std::collections::hash_map::Entry;
+use std::hash::BuildHasherDefault;
+
 use pyo3::intern;
 use pyo3::prelude::*;
-
-use ahash::AHashSet;
 use pyo3::types::{PyDict, PySet, PyString};
+
+use ahash::RandomState;
+use nohash_hasher::{IntMap, IntSet, NoHashHasher};
 
 use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same, SchemaDict};
 use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
@@ -25,7 +29,6 @@ pub struct TypedDictField {
     pub required: bool,
     pub validator: CombinedValidator,
     pub frozen: bool,
-    pub index: u16,
 }
 
 impl TypedDictField {
@@ -36,7 +39,6 @@ impl TypedDictField {
         build_context: &mut BuildContext,
         total: bool,
         populate_by_name: bool,
-        index: u16,
     ) -> PyResult<Self> {
         let py = key.py();
         let field_info: &PyDict = value.cast_as()?;
@@ -89,34 +91,104 @@ impl TypedDictField {
             validator,
             required,
             frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
-            index,
         })
     }
+}
 
-    pub fn build_fields_vec(
+pub type NHHBuilder<T> = BuildHasherDefault<NoHashHasher<T>>;
+
+#[derive(Debug, Clone)]
+pub struct FieldMap {
+    map: IntMap<u64, Vec<usize>>,
+    pub fields: Vec<TypedDictField>,
+    hash_builder: RandomState,
+}
+
+impl FieldMap {
+    pub fn new(
         schema: &PyDict,
         config: Option<&PyDict>,
         build_context: &mut BuildContext,
         total: bool,
-    ) -> PyResult<Vec<Self>> {
+    ) -> PyResult<Self> {
         let py = schema.py();
 
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
         let fields_dict: &PyDict = schema.get_as_req(intern!(py, "fields"))?;
-        let fields: Vec<Self> = fields_dict
-            .iter()
-            .enumerate()
-            .map(|(i, (key, value))| Self::new(key, value, config, build_context, total, populate_by_name, i as u16))
-            .collect::<PyResult<_>>()?;
+        let capacity = fields_dict.len();
 
-        Ok(fields)
+        let mut map: IntMap<u64, Vec<usize>> = IntMap::with_capacity_and_hasher(capacity, NHHBuilder::default());
+        let mut fields: Vec<TypedDictField> = Vec::with_capacity(capacity);
+        let hash_builder = RandomState::new();
+
+        for (key, value) in fields_dict.iter() {
+            let field = TypedDictField::new(key, value, config, build_context, total, populate_by_name)?;
+            let index = fields.len();
+            for key in field.lookup_key.first_keys() {
+                match map.entry(hash_builder.hash_one(key)) {
+                    Entry::Occupied(mut entry) => {
+                        entry.get_mut().push(index);
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(vec![index]);
+                    }
+                };
+            }
+            fields.push(field);
+        }
+
+        Ok(Self {
+            map,
+            fields,
+            hash_builder,
+        })
+    }
+
+    pub fn get<'a>(&'a self, key: &'_ str) -> Option<FieldMatch<'a>> {
+        let hash = self.hash_builder.hash_one(key);
+        self.map.get(&hash).map(|field_ids| FieldMatch::new(field_ids, self))
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+}
+
+pub struct FieldMatch<'a> {
+    index: usize,
+    field_ids: &'a [usize],
+    fields: &'a [TypedDictField],
+}
+
+impl<'a> FieldMatch<'a> {
+    fn new(field_ids: &'a [usize], field_map: &'a FieldMap) -> Self {
+        Self {
+            index: 0,
+            field_ids,
+            fields: &field_map.fields,
+        }
+    }
+}
+
+impl<'a> Iterator for FieldMatch<'a> {
+    type Item = (usize, &'a TypedDictField);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.field_ids.len() {
+            let fields_index = self.field_ids[self.index];
+            let field = &self.fields[fields_index];
+            self.index += 1;
+            Some((fields_index, field))
+        } else {
+            None
+        }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct TypedDictValidator {
-    fields: Vec<TypedDictField>,
+    fields_map: FieldMap,
     check_extra: bool,
     forbid_extra: bool,
     extra_validator: Option<Box<CombinedValidator>>,
@@ -168,7 +240,7 @@ impl BuildValidator for TypedDictValidator {
             schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
 
         Ok(Self {
-            fields: TypedDictField::build_fields_vec(schema, config, build_context, total)?,
+            fields_map: FieldMap::new(schema, config, build_context, total)?,
             check_extra,
             forbid_extra,
             extra_validator,
@@ -196,19 +268,15 @@ impl Validator for TypedDictValidator {
         let strict = extra.strict.unwrap_or(self.strict);
         let dict = input.validate_typed_dict(strict, self.from_attributes)?;
 
+        let fields_len = self.fields_map.len();
         let output_dict = PyDict::new(py);
-        let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
+        let mut errors: Vec<ValLineError> = Vec::with_capacity(fields_len);
         let mut fields_set_vec: Option<Vec<Py<PyString>>> = match self.return_fields_set {
-            true => Some(Vec::with_capacity(self.fields.len())),
+            true => Some(Vec::with_capacity(fields_len)),
             false => None,
         };
 
-        // we only care about which keys have been used if we're iterating over the object for extra after
-        // the first pass
-        let mut used_keys: Option<AHashSet<&str>> = match self.check_extra {
-            true => Some(AHashSet::with_capacity(self.fields.len())),
-            false => None,
-        };
+        let mut used_fields: IntSet<usize> = IntSet::with_capacity_and_hasher(fields_len, NHHBuilder::default());
 
         let extra = Extra {
             data: Some(output_dict),
@@ -219,90 +287,70 @@ impl Validator for TypedDictValidator {
 
         macro_rules! process {
             ($dict:ident, $get_method:ident, $iter:ty) => {{
-                for field in &self.fields {
-                    let op_key_value = match field.lookup_key.$get_method($dict) {
-                        Ok(v) => v,
-                        Err(err) => {
-                            errors.push(ValLineError::new_with_loc(
-                                ErrorType::GetAttributeError {
-                                    error: py_err_string(py, err),
-                                },
-                                input,
-                                field.name.clone(),
-                            ));
+                for item_result in <$iter>::new($dict)? {
+                    let (raw_key, value) = item_result?;
+                    let either_str = match raw_key.strict_str() {
+                        Ok(k) => k,
+                        Err(ValError::LineErrors(line_errors)) => {
+                            for err in line_errors {
+                                errors.push(
+                                    err.with_outer_location(raw_key.as_loc_item())
+                                        .with_type(ErrorType::InvalidKey),
+                                );
+                            }
                             continue;
                         }
+                        Err(err) => return Err(err),
                     };
-                    if let Some((used_key, value)) = op_key_value {
-                        if let Some(ref mut used_keys) = used_keys {
-                            // key is "used" whether or not validation passes, since we want to skip this key in
-                            // extra logic either way
-                            used_keys.insert(used_key);
-                        }
-                        match field
-                            .validator
-                            .validate(py, value, &extra, slots, recursion_guard)
-                        {
-                            Ok(value) => {
-                                output_dict.set_item(&field.name_pystring, value)?;
-                                if let Some(ref mut fs) = fields_set_vec {
-                                    fs.push(field.name_pystring.clone_ref(py));
+                    let key_str: &str = &either_str.as_cow()?;
+
+                    if let Some(fields_matchs) = self.fields_map.get(key_str) {
+                        for (field_index, field) in fields_matchs {
+                            let op_key_value = match field.lookup_key.$get_method(key_str, value) {
+                                Ok(v) => v,
+                                Err(err) => {
+                                    errors.push(ValLineError::new_with_loc(
+                                        ErrorType::GetAttributeError {
+                                            error: py_err_string(py, err),
+                                        },
+                                        input,
+                                        field.name.clone(),
+                                    ));
+                                    continue;
+                                }
+                            };
+                            if let Some(value) = op_key_value {
+                                // key is "used" whether or not validation passes, since we want to skip this key in
+                                // extra logic either way
+                                used_fields.insert(field_index);
+                                match field
+                                    .validator
+                                    .validate(py, value, &extra, slots, recursion_guard)
+                                {
+                                    Ok(value) => {
+                                        output_dict.set_item(&field.name_pystring, value)?;
+                                        if let Some(ref mut fs) = fields_set_vec {
+                                            fs.push(field.name_pystring.clone_ref(py));
+                                        }
+                                    }
+                                    Err(ValError::Omit) => (),
+                                    Err(ValError::LineErrors(line_errors)) => {
+                                        for err in line_errors {
+                                            errors.push(err.with_outer_location(field.name.clone().into()));
+                                        }
+                                    }
+                                    Err(err) => return Err(err),
                                 }
                             }
-                            Err(ValError::Omit) => continue,
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    errors.push(err.with_outer_location(field.name.clone().into()));
-                                }
-                            }
-                            Err(err) => return Err(err),
                         }
-                        continue;
-                    } else if let Some(value) = get_default(py, &field.validator)? {
-                        output_dict.set_item(&field.name_pystring, value.as_ref())?;
-                    } else if field.required {
+                    } else if self.forbid_extra {
                         errors.push(ValLineError::new_with_loc(
-                            ErrorType::Missing,
-                            input,
-                            field.name.clone(),
+                            ErrorType::ExtraForbidden,
+                            value,
+                            raw_key.as_loc_item(),
                         ));
-                    }
-                }
-
-                if let Some(ref mut used_keys) = used_keys {
-                    for item_result in <$iter>::new($dict)? {
-                        let (raw_key, value) = item_result?;
-                        let either_str = match raw_key.strict_str() {
-                            Ok(k) => k,
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    errors.push(
-                                        err.with_outer_location(raw_key.as_loc_item())
-                                            .with_type(ErrorType::InvalidKey),
-                                    );
-                                }
-                                continue;
-                            }
-                            Err(err) => return Err(err),
-                        };
-                        if used_keys.contains(either_str.as_cow()?.as_ref()) {
-                            continue;
-                        }
-
-                        if self.forbid_extra {
-                            errors.push(ValLineError::new_with_loc(
-                                ErrorType::ExtraForbidden,
-                                value,
-                                raw_key.as_loc_item(),
-                            ));
-                            continue;
-                        }
-
+                    } else if self.check_extra {
                         let py_key = either_str.as_py_string(py);
-                        if let Some(ref mut fs) = fields_set_vec {
-                            fs.push(py_key.into_py(py));
-                        }
-
                         if let Some(ref validator) = self.extra_validator {
                             match validator.validate(py, value, &extra, slots, recursion_guard) {
                                 Ok(value) => {
@@ -326,13 +374,29 @@ impl Validator for TypedDictValidator {
                         }
                     }
                 }
+                // iterate over any missing fields and either add them to errors or set them to default
+                if used_fields.len() != fields_len {
+                    for (field_index, field) in self.fields_map.fields.iter().enumerate() {
+                        if !used_fields.contains(&field_index) {
+                            if let Some(value) = get_default(py, &field.validator)? {
+                                output_dict.set_item(&field.name_pystring, value.as_ref())?;
+                            } else if field.required {
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorType::Missing,
+                                    input,
+                                    field.name.clone(),
+                                ));
+                            }
+                        }
+                    }
+                }
             }};
         }
         match dict {
-            GenericMapping::PyDict(d) => process!(d, py_get_dict_item, DictGenericIterator),
-            GenericMapping::PyMapping(d) => process!(d, py_get_mapping_item, MappingGenericIterator),
-            GenericMapping::PyGetAttr(d) => process!(d, py_get_attr, AttributesGenericIterator),
-            GenericMapping::JsonObject(d) => process!(d, json_get, JsonObjectGenericIterator),
+            GenericMapping::PyDict(d) => process!(d, py_mapping_pair, DictGenericIterator),
+            GenericMapping::PyMapping(d) => process!(d, py_mapping_pair, MappingGenericIterator),
+            GenericMapping::PyGetAttr(d) => process!(d, py_get_attr_pair, AttributesGenericIterator),
+            GenericMapping::JsonObject(d) => process!(d, json_get_pair, JsonObjectGenericIterator),
         }
 
         if !errors.is_empty() {
@@ -356,7 +420,8 @@ impl Validator for TypedDictValidator {
     }
 
     fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
-        self.fields
+        self.fields_map
+            .fields
             .iter_mut()
             .try_for_each(|f| f.validator.complete(build_context))
     }
@@ -403,7 +468,7 @@ impl TypedDictValidator {
             Err(err) => Err(err),
         };
 
-        if let Some(field) = self.fields.iter().find(|f| f.name == field) {
+        if let Some(field) = self.fields_map.fields.iter().find(|f| f.name == field) {
             if field.frozen {
                 Err(ValError::new_with_loc(ErrorType::Frozen, input, field.name.to_string()))
             } else {

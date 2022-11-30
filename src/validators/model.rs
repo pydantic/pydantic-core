@@ -1,14 +1,11 @@
-use std::hash::BuildHasherDefault;
-
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use ahash::RandomState;
-use nohash_hasher::{IntMap, IntSet, NoHashHasher};
+use nohash_hasher::IntSet;
 
-use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same, SchemaDict};
-use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
+use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same};
+use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{
     AttributesGenericIterator, DictGenericIterator, GenericMapping, Input, JsonObjectGenericIterator,
     MappingGenericIterator,
@@ -16,68 +13,13 @@ use crate::input::{
 use crate::recursion_guard::RecursionGuard;
 use crate::PydanticCoreModel;
 
-use super::typed_dict::TypedDictField;
+use super::typed_dict::{FieldMap, NHHBuilder};
 use super::with_default::get_default;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
-type NHHBuilder = BuildHasherDefault<NoHashHasher<u64>>;
-
-#[derive(Debug, Clone)]
-struct FastMap<T> {
-    map: IntMap<u64, T>,
-    hash_builder: RandomState,
-}
-
-impl<T> FastMap<T> {
-    fn new(capacity: usize) -> Self {
-        Self {
-            map: IntMap::with_capacity_and_hasher(capacity, NHHBuilder::default()),
-            hash_builder: RandomState::new(),
-        }
-    }
-
-    fn hash(&self, key: &str) -> u64 {
-        self.hash_builder.hash_one(key)
-    }
-
-    fn insert(&mut self, key: &str, value: T) {
-        let hash = self.hash(key);
-        self.map.insert(hash, value);
-    }
-
-    fn get(&self, key: &str) -> Option<(u64, &T)> {
-        let hash = self.hash(key);
-        self.map.get(&hash).map(|v| (hash, v))
-    }
-
-    fn len(&self) -> usize {
-        self.map.len()
-    }
-}
-
-fn build_fields_map(
-    schema: &PyDict,
-    config: Option<&PyDict>,
-    build_context: &mut BuildContext,
-    total: bool,
-) -> PyResult<FastMap<TypedDictField>> {
-    let py = schema.py();
-
-    let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
-
-    let fields_dict: &PyDict = schema.get_as_req(intern!(py, "fields"))?;
-    let mut fields: FastMap<TypedDictField> = FastMap::new(fields_dict.len());
-
-    for (index, (key, value)) in fields_dict.iter().enumerate() {
-        let field = TypedDictField::new(key, value, config, build_context, total, populate_by_name, index as u16)?;
-        fields.insert(&field.name.clone(), field);
-    }
-    Ok(fields)
-}
-
 #[derive(Debug, Clone)]
 pub struct ModelValidator {
-    fields: FastMap<TypedDictField>,
+    fields_map: FieldMap,
     check_extra: bool,
     forbid_extra: bool,
     extra_validator: Option<Box<CombinedValidator>>,
@@ -124,11 +66,8 @@ impl BuildValidator for ModelValidator {
             None => None,
         };
 
-        let total =
-            schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
-
         Ok(Self {
-            fields: build_fields_map(schema, config, build_context, total)?,
+            fields_map: FieldMap::new(schema, config, build_context, true)?,
             check_extra,
             forbid_extra,
             extra_validator,
@@ -155,9 +94,9 @@ impl Validator for ModelValidator {
         let strict = extra.strict.unwrap_or(self.strict);
         let dict = input.validate_typed_dict(strict, self.from_attributes)?;
 
-        let len = self.fields.len();
-        let mut model = PydanticCoreModel::with_capacity(len);
-        let mut errors: Vec<ValLineError> = Vec::with_capacity(len);
+        let fields_len = self.fields_map.len();
+        let mut model = PydanticCoreModel::with_capacity(fields_len);
+        let mut errors: Vec<ValLineError> = Vec::with_capacity(fields_len);
 
         let extra = Extra {
             // data: Some(output_dict),
@@ -166,7 +105,7 @@ impl Validator for ModelValidator {
             strict: extra.strict,
             context: extra.context,
         };
-        let mut used_fields: IntSet<u64> = IntSet::with_capacity_and_hasher(len, NHHBuilder::default());
+        let mut used_fields: IntSet<usize> = IntSet::with_capacity_and_hasher(fields_len, NHHBuilder::default());
 
         macro_rules! process {
             ($dict:ident, $get_method:ident, $iter:ty) => {{
@@ -186,22 +125,43 @@ impl Validator for ModelValidator {
                         Err(err) => return Err(err),
                     };
 
-                    if let Some((hash, field)) = self.fields.get(&either_str.as_cow()? as &str) {
-                        used_fields.insert(hash);
-                        match field
-                            .validator
-                            .validate(py, value, &extra, slots, recursion_guard)
-                        {
-                            Ok(value) => {
-                                model.set_item(field.name_pystring.as_ref(py), value, true);
-                            }
-                            Err(ValError::Omit) => (),
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    errors.push(err.with_outer_location(field.name.clone().into()));
+                    let key_str: &str = &either_str.as_cow()?;
+
+                    if let Some(fields_matchs) = self.fields_map.get(key_str) {
+                        for (field_index, field) in fields_matchs {
+                            let op_key_value = match field.lookup_key.$get_method(key_str, value) {
+                                Ok(v) => v,
+                                Err(err) => {
+                                    errors.push(ValLineError::new_with_loc(
+                                        ErrorType::GetAttributeError {
+                                            error: py_err_string(py, err),
+                                        },
+                                        input,
+                                        field.name.clone(),
+                                    ));
+                                    continue;
+                                }
+                            };
+                            if let Some(value) = op_key_value {
+                                // key is "used" whether or not validation passes, since we want to skip this key in
+                                // extra logic either way
+                                used_fields.insert(field_index);
+                                match field
+                                    .validator
+                                    .validate(py, value, &extra, slots, recursion_guard)
+                                {
+                                    Ok(value) => {
+                                        model.set_item(field.name_pystring.as_ref(py), value, true);
+                                    }
+                                    Err(ValError::Omit) => (),
+                                    Err(ValError::LineErrors(line_errors)) => {
+                                        for err in line_errors {
+                                            errors.push(err.with_outer_location(field.name.clone().into()));
+                                        }
+                                    }
+                                    Err(err) => return Err(err),
                                 }
                             }
-                            Err(err) => return Err(err),
                         }
                     } else if self.forbid_extra {
                         errors.push(ValLineError::new_with_loc(
@@ -229,21 +189,19 @@ impl Validator for ModelValidator {
                         }
                     }
                 }
-                // iterate over any missing fields and either and them to errors or set them to default
-                if used_fields.len() != self.fields.len() {
-                    for (hash, field) in &self.fields.map {
-                        if used_fields.contains(hash) {
-                            continue;
-                        }
-
-                        if let Some(value) = get_default(py, &field.validator)? {
-                            model.set_item(field.name_pystring.as_ref(py), value.as_ref(), false);
-                        } else {
-                            errors.push(ValLineError::new_with_loc(
-                                ErrorType::Missing,
-                                input,
-                                field.name.clone(),
-                            ));
+                // iterate over any missing fields and either add them to errors or set them to default
+                if used_fields.len() != fields_len {
+                    for (field_index, field) in self.fields_map.fields.iter().enumerate() {
+                        if !used_fields.contains(&field_index) {
+                            if let Some(value) = get_default(py, &field.validator)? {
+                                model.set_item(field.name_pystring.as_ref(py), value.as_ref(), false);
+                            } else if field.required {
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorType::Missing,
+                                    input,
+                                    field.name.clone(),
+                                ));
+                            }
                         }
                     }
                 }
@@ -251,10 +209,10 @@ impl Validator for ModelValidator {
         }
 
         match dict {
-            GenericMapping::PyDict(d) => process!(d, py_get_dict_item, DictGenericIterator),
-            GenericMapping::PyMapping(d) => process!(d, py_get_mapping_item, MappingGenericIterator),
-            GenericMapping::PyGetAttr(d) => process!(d, py_get_attr, AttributesGenericIterator),
-            GenericMapping::JsonObject(d) => process!(d, json_get, JsonObjectGenericIterator),
+            GenericMapping::PyDict(d) => process!(d, py_mapping_pair, DictGenericIterator),
+            GenericMapping::PyMapping(d) => process!(d, py_mapping_pair, MappingGenericIterator),
+            GenericMapping::PyGetAttr(d) => process!(d, py_get_attr_pair, AttributesGenericIterator),
+            GenericMapping::JsonObject(d) => process!(d, json_get_pair, JsonObjectGenericIterator),
         }
 
         if !errors.is_empty() {
@@ -271,10 +229,10 @@ impl Validator for ModelValidator {
     }
 
     fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
-        self.fields
-            .map
+        self.fields_map
+            .fields
             .iter_mut()
-            .try_for_each(|f| f.1.validator.complete(build_context))
+            .try_for_each(|f| f.validator.complete(build_context))
     }
 }
 

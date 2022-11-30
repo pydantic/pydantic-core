@@ -76,6 +76,17 @@ impl LookupKey {
         }
     }
 
+    /// Get the key(s) this lookup key relates to
+    /// E.g. if the key is `Choice("foo", "bar")` then this will return `["foo", "bar"]`,
+    /// for paths this will return the first item in each path
+    pub fn first_keys(&self) -> Vec<&str> {
+        match self {
+            Self::Simple(key, _) => vec![key.as_str()],
+            Self::Choice(key1, key2, _, _) => vec![key1.as_str(), key2.as_str()],
+            Self::PathChoices(paths) => paths.iter().map(|path| path.first().unwrap().get_key()).collect(),
+        }
+    }
+
     pub fn from_string(py: Python, key: &str) -> Self {
         LookupKey::Simple(key.to_string(), py_string!(py, key))
     }
@@ -95,6 +106,7 @@ impl LookupKey {
         }
     }
 
+    /// inspect a dict and see if the key is present, returning the value and the key used top level key
     pub fn py_get_dict_item<'data, 's>(&'s self, dict: &'data PyDict) -> PyResult<Option<(&'s str, &'data PyAny)>> {
         match self {
             LookupKey::Simple(key, py_key) => match dict.get_item(py_key) {
@@ -124,6 +136,7 @@ impl LookupKey {
         }
     }
 
+    /// like `py_get_dict_item` but for a mapping
     pub fn py_get_mapping_item<'data, 's>(
         &'s self,
         dict: &'data PyMapping,
@@ -156,6 +169,43 @@ impl LookupKey {
         }
     }
 
+    /// inspect a `(key, value)` pair from a dict (OR mapping) and check if they matches this lookup key
+    pub fn py_mapping_pair<'data, 's>(&'s self, key: &str, value: &'data PyAny) -> PyResult<Option<&'data PyAny>> {
+        match self {
+            LookupKey::Simple(s_key, _) => {
+                // NOTE this should always match!
+                if key == s_key {
+                    Ok(Some(value))
+                } else {
+                    Ok(None)
+                }
+            }
+            LookupKey::Choice(c_key1, c_key2, _, _) => {
+                if key == c_key1 || key == c_key2 {
+                    Ok(Some(value))
+                } else {
+                    Ok(None)
+                }
+            }
+            LookupKey::PathChoices(path_choices) => {
+                for path in path_choices {
+                    let mut path_iter = path.iter();
+                    let first_key = path_iter.next().unwrap().get_key();
+                    // if the first key in path matches `key` iterate over the rest of the path as above
+                    if key == first_key {
+                        if let Some(v) = path_iter.try_fold(value as &PyAny, |d, loc| loc.py_get_item(d)) {
+                            // Successfully found an item, return it
+                            return Ok(Some(v));
+                        }
+                    }
+                }
+                // got to the end of path_choices, without a match, return None
+                Ok(None)
+            }
+        }
+    }
+
+    /// like `py_get_dict_item` but uses `__getattr__`, e.g. when inspecting an object
     pub fn py_get_attr<'data, 's>(&'s self, obj: &'data PyAny) -> PyResult<Option<(&'s str, &'data PyAny)>> {
         match self {
             LookupKey::Simple(key, py_key) => match py_get_attrs(obj, py_key)? {
@@ -186,6 +236,49 @@ impl LookupKey {
                     // Successfully found an item, return it
                     let key = path.first().unwrap().get_key();
                     return Ok(Some((key, v)));
+                }
+                // got to the end of path_choices, without a match, return None
+                Ok(None)
+            }
+        }
+    }
+
+    pub fn py_get_attr_pair<'data, 's>(&'s self, key: &str, value: &'data PyAny) -> PyResult<Option<&'data PyAny>> {
+        match self {
+            LookupKey::Simple(s_key, _) => {
+                // NOTE this should always match!
+                if key == s_key {
+                    Ok(Some(value))
+                } else {
+                    Ok(None)
+                }
+            }
+            LookupKey::Choice(c_key1, c_key2, _, _) => {
+                if key == c_key1 || key == c_key2 {
+                    Ok(Some(value))
+                } else {
+                    Ok(None)
+                }
+            }
+            LookupKey::PathChoices(path_choices) => {
+                'outer: for path in path_choices {
+                    let mut path_iter = path.iter();
+                    let first_key = path_iter.next().unwrap().get_key();
+                    // if the first key in path matches `key` iterate over the rest of the path as above
+                    if key == first_key {
+                        let mut v = value;
+                        for loc in path_iter {
+                            v = match loc.py_get_attrs(v) {
+                                Ok(Some(v)) => v,
+                                Ok(None) => {
+                                    continue 'outer;
+                                }
+                                Err(e) => return Err(e),
+                            }
+                        }
+                        // Successfully found an item, return it
+                        return Ok(Some(v));
+                    }
                 }
                 // got to the end of path_choices, without a match, return None
                 Ok(None)
@@ -224,6 +317,45 @@ impl LookupKey {
                         // Successfully found an item, return it
                         let key = path.first().unwrap().get_key();
                         return Ok(Some((key, v)));
+                    }
+                }
+                // got to the end of path_choices, without a match, return None
+                Ok(None)
+            }
+        }
+    }
+
+    pub fn json_get_pair<'data, 's>(
+        &'s self,
+        key: &str,
+        value: &'data JsonInput,
+    ) -> PyResult<Option<&'data JsonInput>> {
+        match self {
+            LookupKey::Simple(s_key, _) => {
+                // NOTE this should always match!
+                if key == s_key {
+                    Ok(Some(value))
+                } else {
+                    Ok(None)
+                }
+            }
+            LookupKey::Choice(c_key1, c_key2, _, _) => {
+                if key == c_key1 || key == c_key2 {
+                    Ok(Some(value))
+                } else {
+                    Ok(None)
+                }
+            }
+            LookupKey::PathChoices(path_choices) => {
+                for path in path_choices {
+                    let mut path_iter = path.iter();
+                    let first_key = path_iter.next().unwrap().get_key();
+                    // if the first key in path matches `key` iterate over the rest of the path as above
+                    if key == first_key {
+                        if let Some(v) = path_iter.try_fold(value, |d, loc| loc.json_get(d)) {
+                            // Successfully found an item, return it
+                            return Ok(Some(v));
+                        }
                     }
                 }
                 // got to the end of path_choices, without a match, return None
