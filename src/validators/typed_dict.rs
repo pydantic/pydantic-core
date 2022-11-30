@@ -269,7 +269,7 @@ impl Validator for TypedDictValidator {
         let dict = input.validate_typed_dict(strict, self.from_attributes)?;
 
         let fields_len = self.fields_map.len();
-        let output_dict = PyDict::new(py);
+        let mut output_vec: Vec<(usize, Py<PyString>, PyObject)> = Vec::with_capacity(fields_len);
         let mut errors: Vec<ValLineError> = Vec::with_capacity(fields_len);
         let mut fields_set_vec: Option<Vec<Py<PyString>>> = match self.return_fields_set {
             true => Some(Vec::with_capacity(fields_len)),
@@ -279,7 +279,8 @@ impl Validator for TypedDictValidator {
         let mut used_fields: IntSet<usize> = IntSet::with_capacity_and_hasher(fields_len, NHHBuilder::default());
 
         let extra = Extra {
-            data: Some(output_dict),
+            // data: Some(output_dict),
+            data: None,
             field: None,
             strict: extra.strict,
             context: extra.context,
@@ -289,7 +290,7 @@ impl Validator for TypedDictValidator {
             ($dict:ident, $get_method:ident, $iter:ty) => {{
                 for item_result in <$iter>::new($dict)? {
                     let (raw_key, value) = item_result?;
-                    let either_str = match raw_key.strict_str() {
+                    let either_str = match raw_key.validate_str(strict) {
                         Ok(k) => k,
                         Err(ValError::LineErrors(line_errors)) => {
                             for err in line_errors {
@@ -306,8 +307,48 @@ impl Validator for TypedDictValidator {
 
                     if let Some(fields_matchs) = self.fields_map.get(key_str) {
                         for (field_index, field) in fields_matchs {
-                            let op_key_value = match field.lookup_key.$get_method(key_str, value) {
-                                Ok(v) => v,
+                            // this field is used whatever happens as we don't want to go over it again later
+                            used_fields.insert(field_index);
+                            match field.lookup_key.$get_method(key_str, value) {
+                                Ok(Some(value)) => {
+                                    // this field is used whether or not validation passes, since we don't
+                                    // want to check this field again
+                                    used_fields.insert(field_index);
+                                    match field
+                                        .validator
+                                        .validate(py, value, &extra, slots, recursion_guard)
+                                    {
+                                        Ok(value) => {
+                                            output_vec.push((field_index, field.name_pystring.clone_ref(py), value));
+                                            if let Some(ref mut fs) = fields_set_vec {
+                                                fs.push(field.name_pystring.clone_ref(py));
+                                            }
+                                        }
+                                        Err(ValError::Omit) => (),
+                                        Err(ValError::LineErrors(line_errors)) => {
+                                            for err in line_errors {
+                                                errors.push(err.with_outer_location(field.name.clone().into()));
+                                            }
+                                        }
+                                        Err(err) => return Err(err),
+                                    }
+                                }
+                                Ok(None) => {
+                                    if let Some(value) = get_default(py, &field.validator)? {
+                                        let default_value = value.as_ref().clone_ref(py);
+                                        output_vec.push((
+                                            field_index,
+                                            field.name_pystring.clone_ref(py),
+                                            default_value,
+                                        ));
+                                    } else if field.required {
+                                        errors.push(ValLineError::new_with_loc(
+                                            ErrorType::Missing,
+                                            input,
+                                            field.name.clone(),
+                                        ));
+                                    }
+                                }
                                 Err(err) => {
                                     errors.push(ValLineError::new_with_loc(
                                         ErrorType::GetAttributeError {
@@ -316,32 +357,8 @@ impl Validator for TypedDictValidator {
                                         input,
                                         field.name.clone(),
                                     ));
-                                    continue;
                                 }
                             };
-                            if let Some(value) = op_key_value {
-                                // key is "used" whether or not validation passes, since we want to skip this key in
-                                // extra logic either way
-                                used_fields.insert(field_index);
-                                match field
-                                    .validator
-                                    .validate(py, value, &extra, slots, recursion_guard)
-                                {
-                                    Ok(value) => {
-                                        output_dict.set_item(&field.name_pystring, value)?;
-                                        if let Some(ref mut fs) = fields_set_vec {
-                                            fs.push(field.name_pystring.clone_ref(py));
-                                        }
-                                    }
-                                    Err(ValError::Omit) => (),
-                                    Err(ValError::LineErrors(line_errors)) => {
-                                        for err in line_errors {
-                                            errors.push(err.with_outer_location(field.name.clone().into()));
-                                        }
-                                    }
-                                    Err(err) => return Err(err),
-                                }
-                            }
                         }
                     } else if self.forbid_extra {
                         errors.push(ValLineError::new_with_loc(
@@ -354,7 +371,7 @@ impl Validator for TypedDictValidator {
                         if let Some(ref validator) = self.extra_validator {
                             match validator.validate(py, value, &extra, slots, recursion_guard) {
                                 Ok(value) => {
-                                    output_dict.set_item(py_key, value)?;
+                                    output_vec.push((fields_len, py_key.into_py(py), value));
                                     if let Some(ref mut fs) = fields_set_vec {
                                         fs.push(py_key.into_py(py));
                                     }
@@ -367,7 +384,7 @@ impl Validator for TypedDictValidator {
                                 Err(err) => return Err(err),
                             }
                         } else {
-                            output_dict.set_item(py_key, value.to_object(py))?;
+                            output_vec.push((fields_len, py_key.into_py(py), value.to_object(py)));
                             if let Some(ref mut fs) = fields_set_vec {
                                 fs.push(py_key.into_py(py));
                             }
@@ -379,7 +396,8 @@ impl Validator for TypedDictValidator {
                     for (field_index, field) in self.fields_map.fields.iter().enumerate() {
                         if !used_fields.contains(&field_index) {
                             if let Some(value) = get_default(py, &field.validator)? {
-                                output_dict.set_item(&field.name_pystring, value.as_ref())?;
+                                let default_value = value.as_ref().clone_ref(py);
+                                output_vec.push((field_index, field.name_pystring.clone_ref(py), default_value));
                             } else if field.required {
                                 errors.push(ValLineError::new_with_loc(
                                     ErrorType::Missing,
@@ -400,8 +418,16 @@ impl Validator for TypedDictValidator {
         }
 
         if !errors.is_empty() {
-            Err(ValError::LineErrors(errors))
-        } else if let Some(fs) = fields_set_vec {
+            return Err(ValError::LineErrors(errors));
+        }
+
+        output_vec.sort_by(|a, b| a.0.cmp(&b.0));
+        let output_dict = PyDict::new(py);
+        for (_, key, value) in output_vec {
+            output_dict.set_item(key, value)?;
+        }
+
+        if let Some(fs) = fields_set_vec {
             let fields_set = PySet::new(py, &fs)?;
             Ok((output_dict, fields_set).to_object(py))
         } else {

@@ -172,21 +172,9 @@ impl LookupKey {
     /// inspect a `(key, value)` pair from a dict (OR mapping) and check if they matches this lookup key
     pub fn py_mapping_pair<'data, 's>(&'s self, key: &str, value: &'data PyAny) -> PyResult<Option<&'data PyAny>> {
         match self {
-            LookupKey::Simple(s_key, _) => {
-                // NOTE this should always match!
-                if key == s_key {
-                    Ok(Some(value))
-                } else {
-                    Ok(None)
-                }
-            }
-            LookupKey::Choice(c_key1, c_key2, _, _) => {
-                if key == c_key1 || key == c_key2 {
-                    Ok(Some(value))
-                } else {
-                    Ok(None)
-                }
-            }
+            // simple and choice should always match since we're already looking at at matching key
+            LookupKey::Simple(_, _) => Ok(Some(value)),
+            LookupKey::Choice(_, _, _, _) => Ok(Some(value)),
             LookupKey::PathChoices(path_choices) => {
                 for path in path_choices {
                     let mut path_iter = path.iter();
@@ -245,21 +233,9 @@ impl LookupKey {
 
     pub fn py_get_attr_pair<'data, 's>(&'s self, key: &str, value: &'data PyAny) -> PyResult<Option<&'data PyAny>> {
         match self {
-            LookupKey::Simple(s_key, _) => {
-                // NOTE this should always match!
-                if key == s_key {
-                    Ok(Some(value))
-                } else {
-                    Ok(None)
-                }
-            }
-            LookupKey::Choice(c_key1, c_key2, _, _) => {
-                if key == c_key1 || key == c_key2 {
-                    Ok(Some(value))
-                } else {
-                    Ok(None)
-                }
-            }
+            // simple and choice should always match since we're already looking at at matching key
+            LookupKey::Simple(_, _) => Ok(Some(value)),
+            LookupKey::Choice(_, _, _, _) => Ok(Some(value)),
             LookupKey::PathChoices(path_choices) => {
                 'outer: for path in path_choices {
                     let mut path_iter = path.iter();
@@ -331,21 +307,9 @@ impl LookupKey {
         value: &'data JsonInput,
     ) -> PyResult<Option<&'data JsonInput>> {
         match self {
-            LookupKey::Simple(s_key, _) => {
-                // NOTE this should always match!
-                if key == s_key {
-                    Ok(Some(value))
-                } else {
-                    Ok(None)
-                }
-            }
-            LookupKey::Choice(c_key1, c_key2, _, _) => {
-                if key == c_key1 || key == c_key2 {
-                    Ok(Some(value))
-                } else {
-                    Ok(None)
-                }
-            }
+            // simple and choice should always match since we're already looking at at matching key
+            LookupKey::Simple(_, _) => Ok(Some(value)),
+            LookupKey::Choice(_, _, _, _) => Ok(Some(value)),
             LookupKey::PathChoices(path_choices) => {
                 for path in path_choices {
                     let mut path_iter = path.iter();

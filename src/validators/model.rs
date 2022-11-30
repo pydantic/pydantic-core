@@ -111,7 +111,7 @@ impl Validator for ModelValidator {
             ($dict:ident, $get_method:ident, $iter:ty) => {{
                 for item_result in <$iter>::new($dict)? {
                     let (raw_key, value) = item_result?;
-                    let either_str = match raw_key.strict_str() {
+                    let either_str = match raw_key.validate_str(strict) {
                         Ok(k) => k,
                         Err(ValError::LineErrors(line_errors)) => {
                             for err in line_errors {
@@ -129,8 +129,38 @@ impl Validator for ModelValidator {
 
                     if let Some(fields_matchs) = self.fields_map.get(key_str) {
                         for (field_index, field) in fields_matchs {
-                            let op_key_value = match field.lookup_key.$get_method(key_str, value) {
-                                Ok(v) => v,
+                            // this field is used whatever happens as we don't want to go over it again later
+                            used_fields.insert(field_index);
+                            match field.lookup_key.$get_method(key_str, value) {
+                                Ok(Some(value)) => {
+                                    match field
+                                        .validator
+                                        .validate(py, value, &extra, slots, recursion_guard)
+                                    {
+                                        Ok(value) => {
+                                            model.set_item(field.name_pystring.as_ref(py), value, true);
+                                        }
+                                        Err(ValError::Omit) => (),
+                                        Err(ValError::LineErrors(line_errors)) => {
+                                            for err in line_errors {
+                                                errors.push(err.with_outer_location(field.name.clone().into()));
+                                            }
+                                        }
+                                        Err(err) => return Err(err),
+                                    }
+                                }
+                                Ok(None) => {
+                                    if let Some(value) = get_default(py, &field.validator)? {
+                                        let default_value = value.as_ref().clone_ref(py);
+                                        model.set_item(field.name_pystring.as_ref(py), default_value, false);
+                                    } else if field.required {
+                                        errors.push(ValLineError::new_with_loc(
+                                            ErrorType::Missing,
+                                            input,
+                                            field.name.clone(),
+                                        ));
+                                    }
+                                }
                                 Err(err) => {
                                     errors.push(ValLineError::new_with_loc(
                                         ErrorType::GetAttributeError {
@@ -139,29 +169,8 @@ impl Validator for ModelValidator {
                                         input,
                                         field.name.clone(),
                                     ));
-                                    continue;
                                 }
                             };
-                            if let Some(value) = op_key_value {
-                                // key is "used" whether or not validation passes, since we want to skip this key in
-                                // extra logic either way
-                                used_fields.insert(field_index);
-                                match field
-                                    .validator
-                                    .validate(py, value, &extra, slots, recursion_guard)
-                                {
-                                    Ok(value) => {
-                                        model.set_item(field.name_pystring.as_ref(py), value, true);
-                                    }
-                                    Err(ValError::Omit) => (),
-                                    Err(ValError::LineErrors(line_errors)) => {
-                                        for err in line_errors {
-                                            errors.push(err.with_outer_location(field.name.clone().into()));
-                                        }
-                                    }
-                                    Err(err) => return Err(err),
-                                }
-                            }
                         }
                     } else if self.forbid_extra {
                         errors.push(ValLineError::new_with_loc(

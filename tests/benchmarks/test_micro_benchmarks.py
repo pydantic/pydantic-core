@@ -247,31 +247,49 @@ class TestModelLarge:
                     'type': 'typed-dict',
                     'return_fields_set': True,
                     'extra_behavior': 'allow',
-                    'total': False,
                     'fields': {f'field_{i}': {'schema': {'type': 'int'}} for i in range(100)},
                 },
             }
         )
 
-    data = {f'field_{97 - i}': i for i in range(98)}
+    @pytest.fixture(scope='class')
+    def core_validator_new_model(self):
+        return SchemaValidator(
+            {
+                'type': 'model',
+                'extra': 'forbid',
+                'fields': {f'field_{i}': {'schema': {'type': 'int'}} for i in range(100)},
+            }
+        )
+
+    data = {f'field_{99 - i}': i for i in range(100)}
     data['more'] = 'more data'
 
     @pytest.mark.benchmark(group='large model - python')
     def test_core_python(self, core_model_validator, benchmark):
         m = core_model_validator.validate_python(self.data)
-        assert m.field_0 == 97
-        assert m.field_1 == 96
-        assert m.field_97 == 0
+        assert m.field_0 == 99
+        assert m.field_1 == 98
+        assert m.field_99 == 0
         assert m.more == 'more data'
         benchmark(core_model_validator.validate_python, self.data)
+
+    @pytest.mark.benchmark(group='large model - python')
+    def test_core_python_new(self, core_validator_new_model, benchmark):
+        m = core_validator_new_model.validate_python(self.data)
+        assert m.field_0 == 99
+        assert m.field_1 == 98
+        assert m.field_99 == 0
+        # assert m.more == 'more data'
+        benchmark(core_validator_new_model.validate_python, self.data)
 
     @pytest.mark.benchmark(group='large model - JSON')
     def test_core_json_fs(self, core_model_validator, benchmark):
         json_data = json.dumps(self.data)
         m = core_model_validator.validate_json(json_data)
-        assert m.field_0 == 97
-        assert m.field_1 == 96
-        assert m.field_97 == 0
+        assert m.field_0 == 99
+        assert m.field_1 == 98
+        assert m.field_99 == 0
         assert m.more == 'more data'
         benchmark(core_model_validator.validate_json, json_data)
 
