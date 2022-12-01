@@ -17,11 +17,11 @@ def test_typed_dict():
         )
     )
     assert v.to_python({'foo': 1, 'bar': b'more'}) == IsStrictDict(foo=1, bar=b'more')
-    assert v.to_python({'bar': b'more', 'foo': 1}) == IsStrictDict(foo=1, bar=b'more')
+    assert v.to_python({'bar': b'more', 'foo': 1}) == IsStrictDict(bar=b'more', foo=1)
     assert v.to_python({'foo': 1, 'bar': b'more', 'c': 3}) == IsStrictDict(foo=1, bar=b'more')
-    assert v.to_python({'bar': b'more', 'foo': 1, 'c': 3}, mode='json') == IsStrictDict(foo=1, bar='more')
+    assert v.to_python({'bar': b'more', 'foo': 1, 'c': 3}, mode='json') == IsStrictDict(bar='more', foo=1)
 
-    assert v.to_json({'bar': b'more', 'foo': 1, 'c': 3}) == b'{"foo":1,"bar":"more"}'
+    assert v.to_json({'bar': b'more', 'foo': 1, 'c': 3}) == b'{"bar":"more","foo":1}'
 
 
 def test_typed_dict_allow_extra():
@@ -35,10 +35,10 @@ def test_typed_dict_allow_extra():
         )
     )
     # extra fields go last but retain their order
-    assert v.to_python({'bar': b'more', 'b': 3, 'foo': 1, 'a': 4}) == IsStrictDict(foo=1, bar=b'more', b=3, a=4)
-    assert v.to_python({'bar': b'more', 'c': 3, 'foo': 1}, mode='json') == IsStrictDict(foo=1, bar='more', c=3)
+    assert v.to_python({'bar': b'more', 'b': 3, 'foo': 1, 'a': 4}) == IsStrictDict(bar=b'more', b=3, foo=1, a=4)
+    assert v.to_python({'bar': b'more', 'c': 3, 'foo': 1}, mode='json') == IsStrictDict(bar='more', c=3, foo=1)
 
-    assert v.to_json({'bar': b'more', 'c': 3, 'foo': 1, 'cc': 4}) == b'{"foo":1,"bar":"more","c":3,"cc":4}'
+    assert v.to_json({'bar': b'more', 'c': 3, 'foo': 1, 'cc': 4}) == b'{"bar":"more","c":3,"foo":1,"cc":4}'
 
 
 @pytest.mark.parametrize(

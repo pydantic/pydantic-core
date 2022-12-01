@@ -16,7 +16,6 @@ use super::PydanticSerializer;
 
 #[derive(Debug, Clone)]
 struct TypedDictField {
-    index: usize,
     key_py: Py<PyString>,
     alias: Option<String>,
     alias_py: Option<Py<PyString>>,
@@ -70,7 +69,7 @@ impl BuildSerializer for TypedDictSerializer {
         let mut fields: AHashMap<String, TypedDictField> = AHashMap::with_capacity(fields_dict.len());
         let mut exclude: Vec<Py<PyString>> = Vec::with_capacity(fields_dict.len());
 
-        for (index, (key, value)) in fields_dict.iter().enumerate() {
+        for (key, value) in fields_dict.iter() {
             let key: String = key.extract()?;
             let field_info: &PyDict = value.cast_as()?;
 
@@ -96,7 +95,6 @@ impl BuildSerializer for TypedDictSerializer {
             fields.insert(
                 key,
                 TypedDictField {
-                    index,
                     key_py,
                     alias,
                     alias_py,
@@ -116,11 +114,6 @@ impl BuildSerializer for TypedDictSerializer {
     }
 }
 
-enum ValueSerializer<'py> {
-    Infer(SerializeInfer<'py>),
-    Field(PydanticSerializer<'py>),
-}
-
 impl TypeSerializer for TypedDictSerializer {
     fn to_python(
         &self,
@@ -134,9 +127,8 @@ impl TypeSerializer for TypedDictSerializer {
         let py = value.py();
         match value.cast_as::<PyDict>() {
             Ok(py_dict) => {
-                // we build a temporary vec, then iterate over it so the order of the output dict matches
-                // the order of the fields in the schema
-                let mut new_items: Vec<Option<(&PyAny, PyObject)>> = (0..self.fields.len()).map(|_| None).collect();
+                // NOTE! we maintain the order of the input dict assuming that's right
+                let new_dict = PyDict::new(py);
 
                 for (key, value) in py_dict {
                     if let Some((next_include, next_exclude)) =
@@ -146,20 +138,15 @@ impl TypeSerializer for TypedDictSerializer {
                             if let Some(field) = self.fields.get(key_py_str.to_str()?) {
                                 let value = field.serializer.to_python(value, next_include, next_exclude, extra)?;
                                 let output_key = field.get_key_py(py, extra);
-                                new_items[field.index] = Some((output_key, value));
+                                new_dict.set_item(output_key, value)?;
                                 continue;
                             }
                         }
                         if self.include_extra {
                             let value = fallback_to_python(value, extra)?;
-                            new_items.push(Some((key, value)));
+                            new_dict.set_item(key, value)?;
                         }
                     }
-                }
-                // TODO: would it be faster here to use `from_sequence`?
-                let new_dict = PyDict::new(py);
-                for (key, value) in new_items.into_iter().flatten() {
-                    new_dict.set_item(key, value)?;
                 }
                 Ok(new_dict.into_py(py))
             }
@@ -186,9 +173,8 @@ impl TypeSerializer for TypedDictSerializer {
                     true => py_dict.len(),
                     false => self.fields.len(),
                 };
-                // as above, we build a temporary vec, then iterate over it so the order of the output dict matches
-                // the order of the fields in the schema
-                let mut ser_items: Vec<Option<(Cow<str>, ValueSerializer)>> = (0..expected_len).map(|_| None).collect();
+                // NOTE! As above, we maintain the order of the input dict assuming that's right
+                let mut map = serializer.serialize_map(Some(expected_len))?;
 
                 for (key, value) in py_dict {
                     if let Some((next_include, next_exclude)) = self
@@ -207,22 +193,15 @@ impl TypeSerializer for TypedDictSerializer {
                                     next_exclude,
                                     extra,
                                 );
-                                ser_items[field.index] = Some((output_key, ValueSerializer::Field(s)));
+                                map.serialize_entry(&output_key, &s)?;
                                 continue;
                             }
                         }
                         if self.include_extra {
                             let s = SerializeInfer::new(value, extra.ob_type_lookup);
                             let output_key = json_key(key, extra).map_err(py_err_se_err)?;
-                            ser_items.push(Some((output_key, ValueSerializer::Infer(s))));
+                            map.serialize_entry(&output_key, &s)?
                         }
-                    }
-                }
-                let mut map = serializer.serialize_map(Some(ser_items.len()))?;
-                for (key, serializer) in ser_items.into_iter().flatten() {
-                    match serializer {
-                        ValueSerializer::Infer(s) => map.serialize_entry(&key, &s)?,
-                        ValueSerializer::Field(s) => map.serialize_entry(&key, &s)?,
                     }
                 }
                 map.end()
