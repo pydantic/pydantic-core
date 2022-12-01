@@ -12,6 +12,7 @@ use crate::serializers::any::SerializeInfer;
 use super::any::{fallback_serialize, fallback_to_python, json_key};
 use super::include_exclude::SchemaIncEx;
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::with_default::get_default;
 use super::PydanticSerializer;
 
 #[derive(Debug, Clone)]
@@ -115,19 +116,15 @@ impl BuildSerializer for TypedDictSerializer {
 }
 
 impl TypedDictSerializer {
-    fn calc_inc_ex<'py>(
-        &self,
-        key: &'py PyAny,
-        value: &'py PyAny,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-        extra: &Extra,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
-        if extra.exclude_none && value.is_none() {
-            Ok(None)
-        } else {
-            self.inc_ex.include_or_exclude_key(key, include, exclude)
+    fn exclude_default(&self, value: &PyAny, extra: &Extra, field: &TypedDictField) -> PyResult<bool> {
+        if extra.exclude_defaults {
+            if let Some(default) = get_default(value.py(), &field.serializer)? {
+                if value.eq(default.as_ref())? {
+                    return Ok(true);
+                }
+            }
         }
+        Ok(false)
     }
 }
 
@@ -148,9 +145,17 @@ impl TypeSerializer for TypedDictSerializer {
                 let new_dict = PyDict::new(py);
 
                 for (key, value) in py_dict {
-                    if let Some((next_include, next_exclude)) = self.calc_inc_ex(key, value, include, exclude, extra)? {
+                    if extra.exclude_none && value.is_none() {
+                        continue;
+                    }
+                    if let Some((next_include, next_exclude)) =
+                        self.inc_ex.include_or_exclude_key(key, include, exclude)?
+                    {
                         if let Ok(key_py_str) = key.cast_as::<PyString>() {
                             if let Some(field) = self.fields.get(key_py_str.to_str()?) {
+                                if self.exclude_default(value, extra, field)? {
+                                    continue;
+                                }
                                 let value = field.serializer.to_python(value, next_include, next_exclude, extra)?;
                                 let output_key = field.get_key_py(py, extra);
                                 new_dict.set_item(output_key, value)?;
@@ -192,13 +197,20 @@ impl TypeSerializer for TypedDictSerializer {
                 let mut map = serializer.serialize_map(Some(expected_len))?;
 
                 for (key, value) in py_dict {
+                    if extra.exclude_none && value.is_none() {
+                        continue;
+                    }
                     if let Some((next_include, next_exclude)) = self
-                        .calc_inc_ex(key, value, include, exclude, extra)
+                        .inc_ex
+                        .include_or_exclude_key(key, include, exclude)
                         .map_err(py_err_se_err)?
                     {
                         if let Ok(key_py_str) = key.cast_as::<PyString>() {
                             let key_str = key_py_str.to_str().map_err(py_err_se_err)?;
                             if let Some(field) = self.fields.get(key_str) {
+                                if self.exclude_default(value, extra, field).map_err(py_err_se_err)? {
+                                    continue;
+                                }
                                 let output_key = field.get_key_json(key_str, extra);
                                 let s = PydanticSerializer::new(
                                     value,

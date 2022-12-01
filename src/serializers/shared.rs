@@ -79,6 +79,7 @@ combined_serializer! {
     both: ModelDict, super::new_class::NewClassSerializer;
     both: Any, super::any::AnySerializer;
     both: Format, super::format::FunctionSerializer;
+    both: WithDefault, super::with_default::WithDefaultSerializer;
 }
 
 impl BuildSerializer for CombinedSerializer {
@@ -161,7 +162,6 @@ pub(super) struct Extra<'a> {
     pub by_alias: bool,
     #[allow(dead_code)]
     pub exclude_unset: bool,
-    #[allow(dead_code)]
     pub exclude_defaults: bool,
     pub exclude_none: bool,
 }

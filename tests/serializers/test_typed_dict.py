@@ -125,16 +125,37 @@ def test_exclude_none():
                 'foo': core_schema.typed_dict_field(core_schema.nullable_schema(core_schema.int_schema())),
                 'bar': core_schema.typed_dict_field(core_schema.bytes_schema()),
             },
-            extra_behavior='ignore',  # this is the default
+            extra_behavior='allow',
         )
     )
-    assert v.to_python({'foo': 1, 'bar': b'more'}) == {'foo': 1, 'bar': b'more'}
-    assert v.to_python({'foo': None, 'bar': b'more'}) == {'foo': None, 'bar': b'more'}
-    assert v.to_python({'foo': None, 'bar': b'more'}, exclude_none=True) == {'bar': b'more'}
+    assert v.to_python({'foo': 1, 'bar': b'more', 'c': 3}) == {'foo': 1, 'bar': b'more', 'c': 3}
+    assert v.to_python({'foo': None, 'bar': b'more', 'c': None}) == {'foo': None, 'bar': b'more', 'c': None}
+    assert v.to_python({'foo': None, 'bar': b'more', 'c': None}, exclude_none=True) == {'bar': b'more'}
 
-    assert v.to_python({'foo': None, 'bar': b'more'}, mode='json') == {'foo': None, 'bar': 'more'}
-    assert v.to_python({'foo': None, 'bar': b'more'}, mode='json', exclude_none=True) == {'bar': 'more'}
+    assert v.to_python({'foo': None, 'bar': b'more', 'c': None}, mode='json') == {'foo': None, 'bar': 'more', 'c': None}
+    assert v.to_python({'foo': None, 'bar': b'more', 'c': None}, mode='json', exclude_none=True) == {'bar': 'more'}
 
-    assert v.to_json({'foo': 1, 'bar': b'more'}) == b'{"foo":1,"bar":"more"}'
+    assert v.to_json({'foo': 1, 'bar': b'more', 'c': None}) == b'{"foo":1,"bar":"more","c":null}'
     assert v.to_json({'foo': None, 'bar': b'more'}) == b'{"foo":null,"bar":"more"}'
-    assert v.to_json({'foo': None, 'bar': b'more'}, exclude_none=True) == b'{"bar":"more"}'
+    assert v.to_json({'foo': None, 'bar': b'more', 'c': None}, exclude_none=True) == b'{"bar":"more"}'
+
+
+def test_exclude_default():
+    v = SchemaSerializer(
+        core_schema.typed_dict_schema(
+            {
+                'foo': core_schema.typed_dict_field(core_schema.nullable_schema(core_schema.int_schema())),
+                'bar': core_schema.typed_dict_field(
+                    core_schema.with_default_schema(core_schema.bytes_schema(), default=b'[default]')
+                ),
+            }
+        )
+    )
+    assert v.to_python({'foo': 1, 'bar': b'x'}) == {'foo': 1, 'bar': b'x'}
+    assert v.to_python({'foo': 1, 'bar': b'[default]'}) == {'foo': 1, 'bar': b'[default]'}
+    assert v.to_python({'foo': 1, 'bar': b'[default]'}, exclude_defaults=True) == {'foo': 1}
+    assert v.to_python({'foo': 1, 'bar': b'[default]'}, mode='json') == {'foo': 1, 'bar': '[default]'}
+    assert v.to_python({'foo': 1, 'bar': b'[default]'}, exclude_defaults=True, mode='json') == {'foo': 1}
+
+    assert v.to_json({'foo': 1, 'bar': b'[default]'}) == b'{"foo":1,"bar":"[default]"}'
+    assert v.to_json({'foo': 1, 'bar': b'[default]'}, exclude_defaults=True) == b'{"foo":1}'

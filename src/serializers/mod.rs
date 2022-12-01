@@ -23,6 +23,7 @@ mod shared;
 mod simple;
 mod string;
 mod typed_dict;
+mod with_default;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
