@@ -54,6 +54,9 @@ class SchemaSerializer:
         include: IncEx = None,
         exclude: IncEx = None,
         by_alias: bool = True,
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
     ) -> Any: ...
     def to_json(
         self,
@@ -63,6 +66,9 @@ class SchemaSerializer:
         include: IncEx = None,
         exclude: IncEx = None,
         by_alias: bool = True,
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
     ) -> bytes: ...
 
 class Url:

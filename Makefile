@@ -49,7 +49,7 @@ build-wasm:
 
 .PHONY: format
 format:
-	$(ruff) --fix
+	$(ruff) --fix --exit-zero
 	$(isort)
 	$(black)
 	cargo fmt

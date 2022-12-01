@@ -76,6 +76,7 @@ combined_serializer! {
     both: FrozenSet, super::set_frozenset::FrozenSetSerializer;
     both: Dict, super::dict::DictSerializer;
     both: TypedDict, super::typed_dict::TypedDictSerializer;
+    both: ModelDict, super::new_class::NewClassSerializer;
     both: Any, super::any::AnySerializer;
     both: Format, super::format::FunctionSerializer;
 }
@@ -158,15 +159,30 @@ pub(super) struct Extra<'a> {
     pub ob_type_lookup: &'a ObTypeLookup,
     pub warnings: CollectWarnings,
     pub by_alias: bool,
+    #[allow(dead_code)]
+    pub exclude_unset: bool,
+    #[allow(dead_code)]
+    pub exclude_defaults: bool,
+    pub exclude_none: bool,
 }
 
 impl<'a> Extra<'a> {
-    pub(super) fn new(py: Python<'a>, mode: &'a SerMode, by_alias: Option<bool>) -> Self {
+    pub(super) fn new(
+        py: Python<'a>,
+        mode: &'a SerMode,
+        by_alias: Option<bool>,
+        exclude_unset: Option<bool>,
+        exclude_defaults: Option<bool>,
+        exclude_none: Option<bool>,
+    ) -> Self {
         Self {
             mode,
             ob_type_lookup: ObTypeLookup::cached(py),
             warnings: CollectWarnings::new(true),
             by_alias: by_alias.unwrap_or(true),
+            exclude_unset: exclude_unset.unwrap_or(false),
+            exclude_defaults: exclude_defaults.unwrap_or(false),
+            exclude_none: exclude_none.unwrap_or(false),
         }
     }
 }

@@ -116,3 +116,25 @@ def test_alias():
     assert json.loads(s.to_json(value)) == IsStrictDict(Meow=0, Woof=1, bird=2)
     assert json.loads(s.to_json(value, include={'cat', 'bird'})) == IsStrictDict(Meow=0, bird=2)
     assert json.loads(s.to_json(value, by_alias=False)) == IsStrictDict(cat=0, dog=1, bird=2)
+
+
+def test_exclude_none():
+    v = SchemaSerializer(
+        core_schema.typed_dict_schema(
+            {
+                'foo': core_schema.typed_dict_field(core_schema.nullable_schema(core_schema.int_schema())),
+                'bar': core_schema.typed_dict_field(core_schema.bytes_schema()),
+            },
+            extra_behavior='ignore',  # this is the default
+        )
+    )
+    assert v.to_python({'foo': 1, 'bar': b'more'}) == {'foo': 1, 'bar': b'more'}
+    assert v.to_python({'foo': None, 'bar': b'more'}) == {'foo': None, 'bar': b'more'}
+    assert v.to_python({'foo': None, 'bar': b'more'}, exclude_none=True) == {'bar': b'more'}
+
+    assert v.to_python({'foo': None, 'bar': b'more'}, mode='json') == {'foo': None, 'bar': 'more'}
+    assert v.to_python({'foo': None, 'bar': b'more'}, mode='json', exclude_none=True) == {'bar': 'more'}
+
+    assert v.to_json({'foo': 1, 'bar': b'more'}) == b'{"foo":1,"bar":"more"}'
+    assert v.to_json({'foo': None, 'bar': b'more'}) == b'{"foo":null,"bar":"more"}'
+    assert v.to_json({'foo': None, 'bar': b'more'}, exclude_none=True) == b'{"bar":"more"}'

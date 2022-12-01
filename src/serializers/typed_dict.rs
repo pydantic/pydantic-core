@@ -114,6 +114,23 @@ impl BuildSerializer for TypedDictSerializer {
     }
 }
 
+impl TypedDictSerializer {
+    fn calc_inc_ex<'py>(
+        &self,
+        key: &'py PyAny,
+        value: &'py PyAny,
+        include: Option<&'py PyAny>,
+        exclude: Option<&'py PyAny>,
+        extra: &Extra,
+    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        if extra.exclude_none && value.is_none() {
+            Ok(None)
+        } else {
+            self.inc_ex.include_or_exclude_key(key, include, exclude)
+        }
+    }
+}
+
 impl TypeSerializer for TypedDictSerializer {
     fn to_python(
         &self,
@@ -131,9 +148,7 @@ impl TypeSerializer for TypedDictSerializer {
                 let new_dict = PyDict::new(py);
 
                 for (key, value) in py_dict {
-                    if let Some((next_include, next_exclude)) =
-                        self.inc_ex.include_or_exclude_key(key, include, exclude)?
-                    {
+                    if let Some((next_include, next_exclude)) = self.calc_inc_ex(key, value, include, exclude, extra)? {
                         if let Ok(key_py_str) = key.cast_as::<PyString>() {
                             if let Some(field) = self.fields.get(key_py_str.to_str()?) {
                                 let value = field.serializer.to_python(value, next_include, next_exclude, extra)?;
@@ -178,8 +193,7 @@ impl TypeSerializer for TypedDictSerializer {
 
                 for (key, value) in py_dict {
                     if let Some((next_include, next_exclude)) = self
-                        .inc_ex
-                        .include_or_exclude_key(key, include, exclude)
+                        .calc_inc_ex(key, value, include, exclude, extra)
                         .map_err(py_err_se_err)?
                     {
                         if let Ok(key_py_str) = key.cast_as::<PyString>() {

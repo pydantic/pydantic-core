@@ -17,6 +17,7 @@ mod format;
 mod function;
 mod include_exclude;
 mod list_tuple;
+mod new_class;
 mod set_frozenset;
 mod shared;
 mod simple;
@@ -42,7 +43,7 @@ impl SchemaSerializer {
         })
     }
 
-    #[pyo3(text_signature = "(value, *, mode = None, include = None, exclude = None, by_alias = True)")]
+    #[allow(clippy::too_many_arguments)]
     pub fn to_python(
         &self,
         py: Python,
@@ -51,15 +52,18 @@ impl SchemaSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         by_alias: Option<bool>,
+        exclude_unset: Option<bool>,
+        exclude_defaults: Option<bool>,
+        exclude_none: Option<bool>,
     ) -> PyResult<PyObject> {
         let mode: shared::SerMode = mode.into();
-        let extra = shared::Extra::new(py, &mode, by_alias);
+        let extra = shared::Extra::new(py, &mode, by_alias, exclude_unset, exclude_defaults, exclude_none);
         let v = self.comb_serializer.to_python(value, include, exclude, &extra)?;
         extra.warnings.final_check(py)?;
         Ok(v)
     }
 
-    #[pyo3(text_signature = "(value, *, indent = None, include = None, exclude = None, by_alias = True)")]
+    #[allow(clippy::too_many_arguments)]
     pub fn to_json(
         &mut self,
         py: Python,
@@ -68,10 +72,14 @@ impl SchemaSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         by_alias: Option<bool>,
+        exclude_unset: Option<bool>,
+        exclude_defaults: Option<bool>,
+        exclude_none: Option<bool>,
     ) -> PyResult<PyObject> {
         let writer: Vec<u8> = Vec::with_capacity(self.json_size);
 
-        let extra = shared::Extra::new(py, &shared::SerMode::Json, by_alias);
+        let mode = shared::SerMode::Json;
+        let extra = shared::Extra::new(py, &mode, by_alias, exclude_unset, exclude_defaults, exclude_none);
         let serializer = PydanticSerializer::new(value, &self.comb_serializer, include, exclude, &extra);
 
         let bytes = match indent {

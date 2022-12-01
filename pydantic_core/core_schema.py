@@ -63,6 +63,7 @@ ExpectedSerializationTypes = Literal[
     'list',
     'tuple',
     'set',
+    'new-class',
     'frozenset',
     'dict',
     'datetime',
