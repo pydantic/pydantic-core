@@ -160,7 +160,6 @@ pub(super) struct Extra<'a> {
     pub ob_type_lookup: &'a ObTypeLookup,
     pub warnings: CollectWarnings,
     pub by_alias: bool,
-    #[allow(dead_code)]
     pub exclude_unset: bool,
     pub exclude_defaults: bool,
     pub exclude_none: bool,

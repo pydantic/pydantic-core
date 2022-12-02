@@ -150,3 +150,43 @@ def test_exclude_none():
     assert v.to_json(BasicModel(foo=1, bar=b'more')) == b'{"foo":1,"bar":"more"}'
     assert v.to_json(BasicModel(foo=None, bar=b'more')) == b'{"foo":null,"bar":"more"}'
     assert v.to_json(BasicModel(foo=None, bar=b'more'), exclude_none=True) == b'{"bar":"more"}'
+
+
+class FieldsSetModel:
+    __slots__ = '__dict__', '__fields_set__'
+
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
+def test_exclude_unset():
+    v = SchemaSerializer(
+        core_schema.new_class_schema(
+            BasicModel,
+            core_schema.typed_dict_schema(
+                {
+                    'foo': core_schema.typed_dict_field(core_schema.int_schema()),
+                    'bar': core_schema.typed_dict_field(core_schema.int_schema()),
+                    'spam': core_schema.typed_dict_field(core_schema.int_schema()),
+                },
+                extra_behavior='ignore',  # this is the default
+            ),
+        )
+    )
+    m = FieldsSetModel(foo=1, bar=2, spam=3, __fields_set__={'bar', 'spam'})
+    assert v.to_python(m) == {'foo': 1, 'bar': 2, 'spam': 3}
+    assert v.to_python(m, exclude_unset=True) == {'bar': 2, 'spam': 3}
+    assert v.to_python(m, exclude=None, exclude_unset=True) == {'bar': 2, 'spam': 3}
+    assert v.to_python(m, exclude={'bar'}, exclude_unset=True) == {'spam': 3}
+    assert v.to_python(m, exclude={'bar': None}, exclude_unset=True) == {'spam': 3}
+    assert v.to_python(m, exclude={'bar': {}}, exclude_unset=True) == {'bar': 2, 'spam': 3}
+
+    assert v.to_json(m, exclude=None, exclude_unset=True) == b'{"bar":2,"spam":3}'
+    assert v.to_json(m, exclude={'bar'}, exclude_unset=True) == b'{"spam":3}'
+    assert v.to_json(m, exclude={'bar': None}, exclude_unset=True) == b'{"spam":3}'
+    assert v.to_json(m, exclude={'bar': {}}, exclude_unset=True) == b'{"bar":2,"spam":3}'
+
+    m2 = FieldsSetModel(foo=1, bar=2, spam=3, __fields_set__={'bar', 'spam', 'missing'})
+    assert v.to_python(m2) == {'foo': 1, 'bar': 2, 'spam': 3}
+    assert v.to_python(m2, exclude_unset=True) == {'bar': 2, 'spam': 3}
