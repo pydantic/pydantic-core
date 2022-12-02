@@ -1,9 +1,16 @@
 import json
+import platform
 
 import pytest
-from dirty_equals import IsStrictDict
 
 from pydantic_core import SchemaSerializer, core_schema
+
+on_pypy = platform.python_implementation() == 'PyPy'
+# pypy doesn't seem to maintain order of `__dict__`
+if on_pypy:
+    IsStrictDict = dict
+else:
+    from dirty_equals import IsStrictDict
 
 
 class BasicModel:
@@ -13,7 +20,7 @@ class BasicModel:
 
 
 def test_new_class():
-    v = SchemaSerializer(
+    s = SchemaSerializer(
         core_schema.new_class_schema(
             type('Anything', (), {}),
             core_schema.typed_dict_schema(
@@ -24,16 +31,20 @@ def test_new_class():
             ),
         )
     )
-    assert v.to_python(BasicModel(foo=1, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
-    assert v.to_python(BasicModel(bar=b'more', foo=1)) == IsStrictDict(bar=b'more', foo=1)
-    assert v.to_python(BasicModel(foo=1, c=3, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
-    assert v.to_python(BasicModel(bar=b'more', foo=1, c=3), mode='json') == IsStrictDict(bar='more', foo=1)
+    assert s.to_python(BasicModel(foo=1, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
+    assert s.to_python(BasicModel(bar=b'more', foo=1)) == IsStrictDict(bar=b'more', foo=1)
+    assert s.to_python(BasicModel(foo=1, c=3, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
+    assert s.to_python(BasicModel(bar=b'more', foo=1, c=3), mode='json') == IsStrictDict(bar='more', foo=1)
 
-    assert v.to_json(BasicModel(bar=b'more', foo=1, c=3)) == b'{"bar":"more","foo":1}'
+    j = s.to_json(BasicModel(bar=b'more', foo=1, c=3))
+    if on_pypy:
+        assert json.loads(j) == {'bar': 'more', 'foo': 1}
+    else:
+        assert j == b'{"bar":"more","foo":1}'
 
 
 def test_new_class_allow_extra():
-    v = SchemaSerializer(
+    s = SchemaSerializer(
         core_schema.new_class_schema(
             BasicModel,
             core_schema.typed_dict_schema(
@@ -45,12 +56,16 @@ def test_new_class_allow_extra():
             ),
         )
     )
-    assert v.to_python(BasicModel(foo=1, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
-    assert v.to_python(BasicModel(bar=b'more', foo=1)) == IsStrictDict(bar=b'more', foo=1)
-    assert v.to_python(BasicModel(foo=1, c=3, bar=b'more')) == IsStrictDict(foo=1, c=3, bar=b'more')
-    assert v.to_python(BasicModel(bar=b'more', c=3, foo=1), mode='json') == IsStrictDict(bar='more', c=3, foo=1)
+    assert s.to_python(BasicModel(foo=1, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
+    assert s.to_python(BasicModel(bar=b'more', foo=1)) == IsStrictDict(bar=b'more', foo=1)
+    assert s.to_python(BasicModel(foo=1, c=3, bar=b'more')) == IsStrictDict(foo=1, c=3, bar=b'more')
+    assert s.to_python(BasicModel(bar=b'more', c=3, foo=1), mode='json') == IsStrictDict(bar='more', c=3, foo=1)
 
-    assert v.to_json(BasicModel(bar=b'more', foo=1, c=3)) == b'{"bar":"more","foo":1,"c":3}'
+    j = s.to_json(BasicModel(bar=b'more', foo=1, c=3))
+    if on_pypy:
+        assert json.loads(j) == {'bar': 'more', 'foo': 1, 'c': 3}
+    else:
+        assert j == b'{"bar":"more","foo":1,"c":3}'
 
 
 @pytest.mark.parametrize(
@@ -110,7 +125,7 @@ def test_alias():
 
 
 def test_new_class_wrong():
-    v = SchemaSerializer(
+    s = SchemaSerializer(
         core_schema.new_class_schema(
             type('Anything', (), {}),
             core_schema.typed_dict_schema(
@@ -122,13 +137,13 @@ def test_new_class_wrong():
         )
     )
     with pytest.raises(AttributeError, match="'int' object has no attribute '__dict__'"):
-        v.to_python(123)
+        s.to_python(123)
     with pytest.raises(AttributeError, match="'dict' object has no attribute '__dict__'"):
-        v.to_python({'foo': 1, 'bar': b'more'})
+        s.to_python({'foo': 1, 'bar': b'more'})
 
 
 def test_exclude_none():
-    v = SchemaSerializer(
+    s = SchemaSerializer(
         core_schema.new_class_schema(
             BasicModel,
             core_schema.typed_dict_schema(
@@ -140,16 +155,16 @@ def test_exclude_none():
             ),
         )
     )
-    assert v.to_python(BasicModel(foo=1, bar=b'more')) == {'foo': 1, 'bar': b'more'}
-    assert v.to_python(BasicModel(foo=None, bar=b'more')) == {'foo': None, 'bar': b'more'}
-    assert v.to_python(BasicModel(foo=None, bar=b'more'), exclude_none=True) == {'bar': b'more'}
+    assert s.to_python(BasicModel(foo=1, bar=b'more')) == {'foo': 1, 'bar': b'more'}
+    assert s.to_python(BasicModel(foo=None, bar=b'more')) == {'foo': None, 'bar': b'more'}
+    assert s.to_python(BasicModel(foo=None, bar=b'more'), exclude_none=True) == {'bar': b'more'}
 
-    assert v.to_python(BasicModel(foo=None, bar=b'more'), mode='json') == {'foo': None, 'bar': 'more'}
-    assert v.to_python(BasicModel(foo=None, bar=b'more'), mode='json', exclude_none=True) == {'bar': 'more'}
+    assert s.to_python(BasicModel(foo=None, bar=b'more'), mode='json') == {'foo': None, 'bar': 'more'}
+    assert s.to_python(BasicModel(foo=None, bar=b'more'), mode='json', exclude_none=True) == {'bar': 'more'}
 
-    assert v.to_json(BasicModel(foo=1, bar=b'more')) == b'{"foo":1,"bar":"more"}'
-    assert v.to_json(BasicModel(foo=None, bar=b'more')) == b'{"foo":null,"bar":"more"}'
-    assert v.to_json(BasicModel(foo=None, bar=b'more'), exclude_none=True) == b'{"bar":"more"}'
+    assert s.to_json(BasicModel(foo=1, bar=b'more')) == b'{"foo":1,"bar":"more"}'
+    assert s.to_json(BasicModel(foo=None, bar=b'more')) == b'{"foo":null,"bar":"more"}'
+    assert s.to_json(BasicModel(foo=None, bar=b'more'), exclude_none=True) == b'{"bar":"more"}'
 
 
 class FieldsSetModel:
@@ -161,7 +176,7 @@ class FieldsSetModel:
 
 
 def test_exclude_unset():
-    v = SchemaSerializer(
+    s = SchemaSerializer(
         core_schema.new_class_schema(
             BasicModel,
             core_schema.typed_dict_schema(
@@ -175,18 +190,18 @@ def test_exclude_unset():
         )
     )
     m = FieldsSetModel(foo=1, bar=2, spam=3, __fields_set__={'bar', 'spam'})
-    assert v.to_python(m) == {'foo': 1, 'bar': 2, 'spam': 3}
-    assert v.to_python(m, exclude_unset=True) == {'bar': 2, 'spam': 3}
-    assert v.to_python(m, exclude=None, exclude_unset=True) == {'bar': 2, 'spam': 3}
-    assert v.to_python(m, exclude={'bar'}, exclude_unset=True) == {'spam': 3}
-    assert v.to_python(m, exclude={'bar': None}, exclude_unset=True) == {'spam': 3}
-    assert v.to_python(m, exclude={'bar': {}}, exclude_unset=True) == {'bar': 2, 'spam': 3}
+    assert s.to_python(m) == {'foo': 1, 'bar': 2, 'spam': 3}
+    assert s.to_python(m, exclude_unset=True) == {'bar': 2, 'spam': 3}
+    assert s.to_python(m, exclude=None, exclude_unset=True) == {'bar': 2, 'spam': 3}
+    assert s.to_python(m, exclude={'bar'}, exclude_unset=True) == {'spam': 3}
+    assert s.to_python(m, exclude={'bar': None}, exclude_unset=True) == {'spam': 3}
+    assert s.to_python(m, exclude={'bar': {}}, exclude_unset=True) == {'bar': 2, 'spam': 3}
 
-    assert v.to_json(m, exclude=None, exclude_unset=True) == b'{"bar":2,"spam":3}'
-    assert v.to_json(m, exclude={'bar'}, exclude_unset=True) == b'{"spam":3}'
-    assert v.to_json(m, exclude={'bar': None}, exclude_unset=True) == b'{"spam":3}'
-    assert v.to_json(m, exclude={'bar': {}}, exclude_unset=True) == b'{"bar":2,"spam":3}'
+    assert s.to_json(m, exclude=None, exclude_unset=True) == b'{"bar":2,"spam":3}'
+    assert s.to_json(m, exclude={'bar'}, exclude_unset=True) == b'{"spam":3}'
+    assert s.to_json(m, exclude={'bar': None}, exclude_unset=True) == b'{"spam":3}'
+    assert s.to_json(m, exclude={'bar': {}}, exclude_unset=True) == b'{"bar":2,"spam":3}'
 
     m2 = FieldsSetModel(foo=1, bar=2, spam=3, __fields_set__={'bar', 'spam', 'missing'})
-    assert v.to_python(m2) == {'foo': 1, 'bar': 2, 'spam': 3}
-    assert v.to_python(m2, exclude_unset=True) == {'bar': 2, 'spam': 3}
+    assert s.to_python(m2) == {'foo': 1, 'bar': 2, 'spam': 3}
+    assert s.to_python(m2, exclude_unset=True) == {'bar': 2, 'spam': 3}
