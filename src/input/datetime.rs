@@ -195,10 +195,10 @@ pub fn pydatetime_as_datetime(py_dt: &PyDateTime) -> PyResult<DateTime> {
     let mut offset: Option<i32> = None;
     let tzinfo = py_dt.getattr(intern!(py, "tzinfo"))?;
     if !tzinfo.is_none() {
-        let offset_delta = tzinfo.getattr(intern!(py, "utcoffset"))?.call1((py_dt.as_ref(),))?;
+        let offset_delta = tzinfo.call_method1(intern!(py, "utcoffset"), (py_dt.as_ref(),))?;
         // as per the docs, utcoffset() can return None
         if !offset_delta.is_none() {
-            let offset_seconds: f64 = offset_delta.getattr(intern!(py, "total_seconds"))?.call0()?.extract()?;
+            let offset_seconds: f64 = offset_delta.call_method0(intern!(py, "total_seconds"))?.extract()?;
             offset = Some(offset_seconds.round() as i32);
         }
     }

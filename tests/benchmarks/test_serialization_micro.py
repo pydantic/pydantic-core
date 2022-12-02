@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, datetime
+from typing import List
 
 import pytest
 
@@ -208,7 +209,7 @@ def test_model_exclude_unset_true(benchmark, core_serializer):
 @pytest.mark.benchmark(group='model-list-json')
 def test_model_list_v1_json(benchmark):
     class PydanticModel(BaseModel):
-        a: list[int]
+        a: List[int]
 
     m = PydanticModel(a=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     assert m.json(exclude={'a': {1, 2}}) == '{"a": [0, 3, 4, 5, 6, 7, 8, 9]}'
@@ -223,7 +224,6 @@ def test_model_list_v1_json(benchmark):
         m_big.json(exclude={'a': {1, 2}})
 
 
-@skip_pydantic
 @pytest.mark.benchmark(group='model-list-json')
 def test_model_list_core_json(benchmark):
     s = SchemaSerializer(
@@ -252,3 +252,14 @@ def test_model_list_core_json(benchmark):
     @benchmark
     def r():
         s.to_json(m_big)
+
+
+@pytest.mark.benchmark(group='model-list-json')
+def test_datetime(benchmark):
+    v = SchemaSerializer(core_schema.datetime_schema())
+    d = datetime(2022, 12, 2, 12, 13, 14)
+    assert v.to_python(d, mode='json') == '2022-12-02T12:13:14'
+
+    @benchmark
+    def r():
+        v.to_python(d, mode='json')
