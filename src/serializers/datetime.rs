@@ -51,7 +51,7 @@ macro_rules! build_serializer {
                         }
                         Err(_) => {
                             extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                            fallback_to_python_json(value, extra.ob_type_lookup)
+                            fallback_to_python_json(value, extra)
                         }
                     },
                     _ => Ok(value.into_py(py)),
@@ -83,7 +83,7 @@ macro_rules! build_serializer {
                     }
                     Err(_) => {
                         extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_serialize(value, serializer, extra.ob_type_lookup)
+                        fallback_serialize(value, serializer, extra)
                     }
                 }
             }

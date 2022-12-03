@@ -1,4 +1,5 @@
 import json
+from datetime import date, datetime, time, timedelta
 
 import pytest
 
@@ -31,6 +32,10 @@ def test_any_json_round_trip(any_serializer, value):
         (b'foobar', b'"foobar"'),
         (bytearray(b'foobar'), b'"foobar"'),
         ((1, 2, 3), b'[1,2,3]'),
+        (datetime(2022, 12, 3, 12, 30, 45), b'"2022-12-03T12:30:45"'),
+        (date(2022, 12, 3), b'"2022-12-03"'),
+        (time(12, 30, 45), b'"12:30:45"'),
+        (timedelta(hours=2), b'"PT7200S"'),
     ],
 )
 def test_any_json_coerce(any_serializer, value, expected_json):
@@ -56,3 +61,42 @@ def test_any_json_decode_error(any_serializer, value):
 
     with pytest.raises(ValueError):
         any_serializer.to_python(value, mode='json')
+
+
+def test_any_with_date_serializer():
+    s = SchemaSerializer(core_schema.any_schema(serialization={'type': 'date'}))
+    assert s.to_python(date(2022, 12, 3)) == date(2022, 12, 3)
+    assert s.to_python(date(2022, 12, 3), mode='json') == '2022-12-03'
+    assert s.to_json(date(2022, 12, 3)) == b'"2022-12-03"'
+
+    with pytest.warns(UserWarning) as warning_info:
+        assert s.to_python(b'bang', mode='json') == 'bang'
+
+    assert [w.message.args[0] for w in warning_info.list] == [
+        'Pydantic serializer warnings:\n  Expected `date` but got `bytes` - slight slowdown possible'
+    ]
+
+
+def test_any_with_timedelta_serializer():
+    s = SchemaSerializer(core_schema.any_schema(serialization={'type': 'timedelta'}))
+    assert s.to_python(timedelta(hours=2)) == timedelta(hours=2)
+    assert s.to_python(timedelta(hours=2), mode='json') == 'PT7200S'
+    assert s.to_json(timedelta(hours=2)) == b'"PT7200S"'
+
+    with pytest.warns(UserWarning) as warning_info:
+        assert s.to_python(b'bang', mode='json') == 'bang'
+
+    assert [w.message.args[0] for w in warning_info.list] == [
+        'Pydantic serializer warnings:\n  Expected `timedelta` but got `bytes` - slight slowdown possible'
+    ]
+
+
+def test_any_config_timedelta_float():
+    s = SchemaSerializer(core_schema.any_schema(), config={'serialization_timedelta_mode': 'float'})
+    assert s.to_python(timedelta(hours=2)) == timedelta(hours=2)
+    # assert s.to_python(timedelta(hours=2), mode='json') == 7200.0
+    assert s.to_json(timedelta(hours=2)) == b'7200.0'
+
+    assert s.to_python({timedelta(hours=2): 'foo'}) == {timedelta(hours=2): 'foo'}
+    # assert s.to_python({timedelta(hours=2): 'foo'}, mode='json') == {'7200.0': 'foo'}
+    assert s.to_json({timedelta(hours=2): 'foo'}) == b'{"7200":"foo"}'

@@ -84,7 +84,7 @@ macro_rules! build_serializer {
                     }
                     Err(_) => {
                         extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_serialize(value, serializer, extra.ob_type_lookup)
+                        fallback_serialize(value, serializer, extra)
                     }
                 }
             }

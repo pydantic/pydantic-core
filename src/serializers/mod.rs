@@ -23,6 +23,7 @@ mod set_frozenset;
 mod shared;
 mod simple;
 mod string;
+mod timedelta;
 mod typed_dict;
 mod with_default;
 
@@ -31,6 +32,7 @@ mod with_default;
 pub struct SchemaSerializer {
     comb_serializer: shared::CombinedSerializer,
     json_size: usize,
+    timedelta_mode: timedelta::TimedeltaMode,
 }
 
 #[pymethods]
@@ -42,6 +44,7 @@ impl SchemaSerializer {
         Ok(Self {
             comb_serializer: serializer,
             json_size: 1024,
+            timedelta_mode: timedelta::TimedeltaMode::from_config(config)?,
         })
     }
 
@@ -59,7 +62,15 @@ impl SchemaSerializer {
         exclude_none: Option<bool>,
     ) -> PyResult<PyObject> {
         let mode: shared::SerMode = mode.into();
-        let extra = shared::Extra::new(py, &mode, by_alias, exclude_unset, exclude_defaults, exclude_none);
+        let extra = shared::Extra::new(
+            py,
+            &mode,
+            by_alias,
+            exclude_unset,
+            exclude_defaults,
+            exclude_none,
+            self.timedelta_mode,
+        );
         let v = self.comb_serializer.to_python(value, include, exclude, &extra)?;
         extra.warnings.final_check(py)?;
         Ok(v)
@@ -81,7 +92,15 @@ impl SchemaSerializer {
         let writer: Vec<u8> = Vec::with_capacity(self.json_size);
 
         let mode = shared::SerMode::Json;
-        let extra = shared::Extra::new(py, &mode, by_alias, exclude_unset, exclude_defaults, exclude_none);
+        let extra = shared::Extra::new(
+            py,
+            &mode,
+            by_alias,
+            exclude_unset,
+            exclude_defaults,
+            exclude_none,
+            self.timedelta_mode,
+        );
         let serializer = PydanticSerializer::new(value, &self.comb_serializer, include, exclude, &extra);
 
         let bytes = match indent {

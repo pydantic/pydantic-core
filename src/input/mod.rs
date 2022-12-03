@@ -11,7 +11,8 @@ mod return_enums;
 mod shared;
 
 pub(crate) use datetime::{
-    pydate_as_date, pydatetime_as_datetime, pytime_as_time, EitherDate, EitherDateTime, EitherTime, EitherTimedelta,
+    pydate_as_date, pydatetime_as_datetime, pytime_as_time, pytimedelta_as_duration, EitherDate, EitherDateTime,
+    EitherTime, EitherTimedelta,
 };
 pub(crate) use input_abstract::Input;
 pub(crate) use parse_json::{JsonInput, JsonObject, JsonType};

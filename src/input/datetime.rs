@@ -91,7 +91,7 @@ impl<'a> From<&'a PyDelta> for EitherTimedelta<'a> {
     }
 }
 
-pub fn pytimedelta_as_timedelta(py_timedelta: &PyDelta) -> Duration {
+pub fn pytimedelta_as_duration(py_timedelta: &PyDelta) -> Duration {
     // see https://docs.python.org/3/c-api/datetime.html#c.PyDateTime_DELTA_GET_DAYS
     // days can be negative, but seconds and microseconds are always positive.
     let mut days = py_timedelta.get_days(); // -999999999 to 999999999
@@ -118,7 +118,7 @@ impl<'a> EitherTimedelta<'a> {
     pub fn as_raw(&self) -> Duration {
         match self {
             Self::Raw(timedelta) => timedelta.clone(),
-            Self::Py(py_timedelta) => pytimedelta_as_timedelta(py_timedelta),
+            Self::Py(py_timedelta) => pytimedelta_as_duration(py_timedelta),
         }
     }
 

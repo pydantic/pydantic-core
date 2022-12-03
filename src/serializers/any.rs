@@ -35,26 +35,22 @@ impl TypeSerializer for AnySerializer {
         _exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        SerializeInfer::new(value, extra.ob_type_lookup).serialize(serializer)
+        SerializeInfer::new(value, extra).serialize(serializer)
     }
 }
 
 pub(super) fn fallback_to_python(value: &PyAny, extra: &Extra) -> PyResult<PyObject> {
     match extra.mode {
-        SerMode::Json => fallback_to_python_json(value, extra.ob_type_lookup),
+        SerMode::Json => fallback_to_python_json(value, extra),
         _ => Ok(value.into_py(value.py())),
     }
 }
 
-pub(super) fn fallback_to_python_json(value: &PyAny, ob_type_lookup: &ObTypeLookup) -> PyResult<PyObject> {
-    ob_type_to_python_json(&ob_type_lookup.get_type(value), value, ob_type_lookup)
+pub(super) fn fallback_to_python_json(value: &PyAny, extra: &Extra) -> PyResult<PyObject> {
+    ob_type_to_python_json(&extra.ob_type_lookup.get_type(value), value, extra)
 }
 
-pub(super) fn ob_type_to_python_json(
-    ob_type: &ObType,
-    value: &PyAny,
-    ob_type_lookup: &ObTypeLookup,
-) -> PyResult<PyObject> {
+pub(super) fn ob_type_to_python_json(ob_type: &ObType, value: &PyAny, extra: &Extra) -> PyResult<PyObject> {
     let py = value.py();
 
     // have to do this to make sure subclasses of for example str are upcast to `str`
@@ -70,7 +66,7 @@ pub(super) fn ob_type_to_python_json(
             let vec: Vec<PyObject> = value
                 .cast_as::<$t>()?
                 .iter()
-                .map(|v| fallback_to_python_json(v, ob_type_lookup))
+                .map(|v| fallback_to_python_json(v, extra))
                 .collect::<PyResult<_>>()?;
             Ok(PyList::new(py, vec).into_py(py))
         }};
@@ -97,40 +93,59 @@ pub(super) fn ob_type_to_python_json(
         ObType::List => serialize_seq!(PyList),
         ObType::Set => serialize_seq!(PySet),
         ObType::Frozenset => serialize_seq!(PyFrozenSet),
+        ObType::Datetime => {
+            let py_dt: &PyDateTime = value.cast_as()?;
+            let iso_dt = super::datetime::datetime_to_string(py_dt)?;
+            Ok(iso_dt.into_py(py))
+        }
+        ObType::Date => {
+            let py_date: &PyDate = value.cast_as()?;
+            let iso_date = super::datetime::date_to_string(py_date)?;
+            Ok(iso_date.into_py(py))
+        }
+        ObType::Time => {
+            let py_time: &PyTime = value.cast_as()?;
+            let iso_time = super::datetime::time_to_string(py_time)?;
+            Ok(iso_time.into_py(py))
+        }
+        ObType::Timedelta => {
+            let py_timedelta: &PyDelta = value.cast_as()?;
+            extra.timedelta_mode.timedelta_to_json(py_timedelta)
+        }
         _ => Ok(value.into_py(value.py())),
     }
 }
 
-pub struct SerializeInfer<'py> {
+pub(super) struct SerializeInfer<'py> {
     value: &'py PyAny,
-    ob_type_lookup: &'py ObTypeLookup,
+    extra: &'py Extra<'py>,
 }
 
 impl<'py> SerializeInfer<'py> {
-    pub fn new(value: &'py PyAny, ob_type_lookup: &'py ObTypeLookup) -> Self {
-        Self { value, ob_type_lookup }
+    pub(super) fn new(value: &'py PyAny, extra: &'py Extra) -> Self {
+        Self { value, extra }
     }
 }
 
 impl<'py> Serialize for SerializeInfer<'py> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        fallback_serialize(self.value, serializer, self.ob_type_lookup)
+        fallback_serialize(self.value, serializer, self.extra)
     }
 }
 
-pub fn fallback_serialize<S: Serializer>(
+pub(super) fn fallback_serialize<S: Serializer>(
     value: &PyAny,
     serializer: S,
-    ob_type_lookup: &ObTypeLookup,
+    extra: &Extra,
 ) -> Result<S::Ok, S::Error> {
-    fallback_serialize_known(&ob_type_lookup.get_type(value), value, serializer, ob_type_lookup)
+    fallback_serialize_known(&extra.ob_type_lookup.get_type(value), value, serializer, extra)
 }
 
-pub fn fallback_serialize_known<S: Serializer>(
+pub(super) fn fallback_serialize_known<S: Serializer>(
     ob_type: &ObType,
     value: &PyAny,
     serializer: S,
-    ob_type_lookup: &ObTypeLookup,
+    extra: &Extra,
 ) -> Result<S::Ok, S::Error> {
     macro_rules! serialize {
         ($t:ty) => {
@@ -146,7 +161,7 @@ pub fn fallback_serialize_known<S: Serializer>(
             let py_seq: &$t = value.cast_as().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
             for element in py_seq {
-                seq.serialize_element(&SerializeInfer::new(element, ob_type_lookup))?
+                seq.serialize_element(&SerializeInfer::new(element, extra))?
             }
             seq.end()
         }};
@@ -178,11 +193,9 @@ pub fn fallback_serialize_known<S: Serializer>(
 
             let len = py_dict.len();
             let mut map = serializer.serialize_map(Some(len))?;
-            for (k, v) in py_dict {
-                map.serialize_entry(
-                    &SerializeInfer::new(k, ob_type_lookup),
-                    &SerializeInfer::new(v, ob_type_lookup),
-                )?;
+            for (key, value) in py_dict {
+                let key = json_key(key, extra).map_err(py_err_se_err)?;
+                map.serialize_entry(&key, &SerializeInfer::new(value, extra))?;
             }
             map.end()
         }
@@ -204,6 +217,10 @@ pub fn fallback_serialize_known<S: Serializer>(
             let py_time: &PyTime = value.cast_as().map_err(py_err_se_err)?;
             let iso_time = super::datetime::time_to_string(py_time).map_err(py_err_se_err)?;
             serializer.serialize_str(&iso_time)
+        }
+        ObType::Timedelta => {
+            let py_timedelta: &PyDelta = value.cast_as().map_err(py_err_se_err)?;
+            extra.timedelta_mode.timedelta_serialize(py_timedelta, serializer)
         }
         _ => todo!(),
         // _ => serializer.serialize_none(),
@@ -243,6 +260,10 @@ pub(super) fn json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py,
             let py_time: &PyTime = key.cast_as()?;
             let iso_time = super::datetime::time_to_string(py_time)?;
             Ok(Cow::Owned(iso_time))
+        }
+        ObType::Timedelta => {
+            let py_timedelta: &PyDelta = key.cast_as()?;
+            extra.timedelta_mode.json_key(py_timedelta)
         }
         _ => Ok(key.str()?.to_string_lossy()),
     }

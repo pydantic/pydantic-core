@@ -117,7 +117,7 @@ impl TypeSerializer for ListSerializer {
             }
             Err(_) => {
                 extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                fallback_serialize(value, serializer, extra.ob_type_lookup)
+                fallback_serialize(value, serializer, extra)
             }
         }
     }
@@ -184,7 +184,7 @@ impl TypeSerializer for TupleSerializer {
             }
             Err(_) => {
                 extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                fallback_serialize(value, serializer, extra.ob_type_lookup)
+                fallback_serialize(value, serializer, extra)
             }
         }
     }

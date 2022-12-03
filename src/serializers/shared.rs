@@ -12,6 +12,7 @@ use enum_dispatch::enum_dispatch;
 use crate::build_tools::{py_err, py_error_type, SchemaDict};
 
 use super::any::{fallback_to_python, json_key, ObTypeLookup};
+use super::timedelta::TimedeltaMode;
 
 pub(super) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
@@ -71,6 +72,7 @@ combined_serializer! {
     both: Str, super::string::StrSerializer;
     both: Bytes, super::bytes::BytesSerializer;
     both: Datetime, super::datetime::DatetimeSerializer;
+    both: TimeDelta, super::timedelta::TimeDeltaSerializer;
     both: Date, super::datetime::DateSerializer;
     both: Time, super::datetime::TimeSerializer;
     both: List, super::list_tuple::ListSerializer;
@@ -166,6 +168,7 @@ pub(super) struct Extra<'a> {
     pub exclude_unset: bool,
     pub exclude_defaults: bool,
     pub exclude_none: bool,
+    pub timedelta_mode: TimedeltaMode,
 }
 
 impl<'a> Extra<'a> {
@@ -176,6 +179,7 @@ impl<'a> Extra<'a> {
         exclude_unset: Option<bool>,
         exclude_defaults: Option<bool>,
         exclude_none: Option<bool>,
+        timedelta_mode: TimedeltaMode,
     ) -> Self {
         Self {
             mode,
@@ -185,6 +189,7 @@ impl<'a> Extra<'a> {
             exclude_unset: exclude_unset.unwrap_or(false),
             exclude_defaults: exclude_defaults.unwrap_or(false),
             exclude_none: exclude_none.unwrap_or(false),
+            timedelta_mode,
         }
     }
 }

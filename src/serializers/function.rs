@@ -73,9 +73,9 @@ impl TypeSerializer for FunctionSerializer {
         match extra.mode {
             SerMode::Json => {
                 if let Some(ref ob_type) = self.return_ob_type {
-                    ob_type_to_python_json(ob_type, v.as_ref(py), extra.ob_type_lookup)
+                    ob_type_to_python_json(ob_type, v.as_ref(py), extra)
                 } else {
-                    fallback_to_python_json(v.as_ref(py), extra.ob_type_lookup)
+                    fallback_to_python_json(v.as_ref(py), extra)
                 }
             }
             _ => Ok(v),
@@ -102,9 +102,9 @@ impl TypeSerializer for FunctionSerializer {
         let return_value = self.call(value, include, exclude, extra.mode).map_err(Error::custom)?;
 
         if let Some(ref ob_type) = self.return_ob_type {
-            fallback_serialize_known(ob_type, return_value.as_ref(py), serializer, extra.ob_type_lookup)
+            fallback_serialize_known(ob_type, return_value.as_ref(py), serializer, extra)
         } else {
-            fallback_serialize(return_value.as_ref(py), serializer, extra.ob_type_lookup)
+            fallback_serialize(return_value.as_ref(py), serializer, extra)
         }
     }
 }

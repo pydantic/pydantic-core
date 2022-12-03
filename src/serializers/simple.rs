@@ -48,7 +48,7 @@ impl TypeSerializer for NoneSerializer {
             // I don't think subclasses of None can exist
             _ => {
                 extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                fallback_serialize(value, serializer, extra.ob_type_lookup)
+                fallback_serialize(value, serializer, extra)
             }
         }
     }
@@ -104,7 +104,7 @@ macro_rules! build_simple_serializer {
                     Ok(v) => v.serialize(serializer),
                     Err(_) => {
                         extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_serialize(value, serializer, extra.ob_type_lookup)
+                        fallback_serialize(value, serializer, extra)
                     }
                 }
             }
