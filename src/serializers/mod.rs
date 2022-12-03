@@ -25,6 +25,7 @@ mod simple;
 mod string;
 mod timedelta;
 mod typed_dict;
+mod url;
 mod with_default;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]

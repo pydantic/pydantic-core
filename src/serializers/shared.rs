@@ -82,6 +82,8 @@ combined_serializer! {
     both: Dict, super::dict::DictSerializer;
     both: TypedDict, super::typed_dict::TypedDictSerializer;
     both: ModelDict, super::new_class::NewClassSerializer;
+    both: Url, super::url::UrlSerializer;
+    both: MultiHostUrl, super::url::MultiHostUrlSerializer;
     both: Any, super::any::AnySerializer;
     both: Format, super::format::FunctionSerializer;
     both: WithDefault, super::with_default::WithDefaultSerializer;

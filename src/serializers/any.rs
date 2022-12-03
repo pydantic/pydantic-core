@@ -93,6 +93,16 @@ pub(super) fn ob_type_to_python_json(ob_type: &ObType, value: &PyAny, extra: &Ex
         ObType::List => serialize_seq!(PyList),
         ObType::Set => serialize_seq!(PySet),
         ObType::Frozenset => serialize_seq!(PyFrozenSet),
+        ObType::Dict => {
+            let dict: &PyDict = value.cast_as()?;
+            let new_dict = PyDict::new(py);
+            for (k, v) in dict {
+                let k = fallback_to_python_json(k, extra)?;
+                let v = fallback_to_python_json(v, extra)?;
+                new_dict.set_item(k, v)?;
+            }
+            Ok(new_dict.into_py(py))
+        }
         ObType::Datetime => {
             let py_dt: &PyDateTime = value.cast_as()?;
             let iso_dt = super::datetime_etc::datetime_to_string(py_dt)?;
@@ -111,6 +121,14 @@ pub(super) fn ob_type_to_python_json(ob_type: &ObType, value: &PyAny, extra: &Ex
         ObType::Timedelta => {
             let py_timedelta: &PyDelta = value.cast_as()?;
             extra.timedelta_mode.timedelta_to_json(py_timedelta)
+        }
+        ObType::Url => {
+            let py_url: PyUrl = value.extract()?;
+            Ok(py_url.__str__().into_py(py))
+        }
+        ObType::MultiHostUrl => {
+            let py_url: PyMultiHostUrl = value.extract()?;
+            Ok(py_url.__str__().into_py(py))
         }
         _ => Ok(value.into_py(value.py())),
     }
@@ -222,6 +240,14 @@ pub(super) fn fallback_serialize_known<S: Serializer>(
             let py_timedelta: &PyDelta = value.cast_as().map_err(py_err_se_err)?;
             extra.timedelta_mode.timedelta_serialize(py_timedelta, serializer)
         }
+        ObType::Url => {
+            let py_url: PyUrl = value.extract().map_err(py_err_se_err)?;
+            serializer.serialize_str(py_url.__str__())
+        }
+        ObType::MultiHostUrl => {
+            let py_url: PyMultiHostUrl = value.extract().map_err(py_err_se_err)?;
+            serializer.serialize_str(&py_url.__str__())
+        }
         _ => todo!(),
         // _ => serializer.serialize_none(),
     }
@@ -264,6 +290,14 @@ pub(super) fn json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py,
         ObType::Timedelta => {
             let py_timedelta: &PyDelta = key.cast_as()?;
             extra.timedelta_mode.json_key(py_timedelta)
+        }
+        ObType::Url => {
+            let py_url: PyUrl = key.extract()?;
+            Ok(Cow::Owned(py_url.__str__().to_string()))
+        }
+        ObType::MultiHostUrl => {
+            let py_url: PyMultiHostUrl = key.extract()?;
+            Ok(Cow::Owned(py_url.__str__()))
         }
         _ => Ok(key.str()?.to_string_lossy()),
     }
