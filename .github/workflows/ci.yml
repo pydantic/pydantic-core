@@ -82,22 +82,26 @@ jobs:
 
       - run: pip freeze
 
+      # See https://github.com/PyO3/pyo3/discussions/2781
+      # tests intermittently segfault with pypy when using `coverage run ...`
       - run: make test
+        if: "!startsWith(matrix.python-version, 'pypy')"
         env:
           BENCHMARK_VS_PYDANTIC: 1
           HYPOTHESIS_PROFILE: slow
 
-      # see https://github.com/PyO3/pyo3/discussions/2781
-      - uses: mxschmitt/action-tmate@v3
-        if: failure()
+      - run: pytest
+        if: startsWith(matrix.python-version, 'pypy')
 
       - run: ls -lha
       - run: coverage xml
+        if: "!startsWith(matrix.python-version, 'pypy')"
 
       - run: coverage-prepare lcov pydantic_core/*.so
+        if: "!startsWith(matrix.python-version, 'pypy')"
 
       - uses: codecov/codecov-action@v3
-        if: matrix.rust-toolchain == 'nightly'
+        if: matrix.rust-toolchain == 'nightly' && !startsWith(matrix.python-version, 'pypy')
         with:
           env_vars: PYTHON
 
