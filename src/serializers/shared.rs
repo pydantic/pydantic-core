@@ -71,10 +71,10 @@ combined_serializer! {
     both: Float, super::simple::FloatSerializer;
     both: Str, super::string::StrSerializer;
     both: Bytes, super::bytes::BytesSerializer;
-    both: Datetime, super::datetime::DatetimeSerializer;
+    both: Datetime, super::datetime_etc::DatetimeSerializer;
     both: TimeDelta, super::timedelta::TimeDeltaSerializer;
-    both: Date, super::datetime::DateSerializer;
-    both: Time, super::datetime::TimeSerializer;
+    both: Date, super::datetime_etc::DateSerializer;
+    both: Time, super::datetime_etc::TimeSerializer;
     both: List, super::list_tuple::ListSerializer;
     both: Tuple, super::list_tuple::TupleSerializer;
     both: Set, super::set_frozenset::SetSerializer;

@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+import pytest
+
 from pydantic_core import SchemaSerializer, core_schema
 
 
@@ -9,6 +11,12 @@ def test_timedelta():
 
     assert v.to_python(timedelta(days=2, hours=3, minutes=4), mode='json') == 'P2DT11040S'
     assert v.to_json(timedelta(days=2, hours=3, minutes=4)) == b'"P2DT11040S"'
+
+    with pytest.warns(UserWarning, match='Expected `timedelta` but got `int` - slight slowdown possible'):
+        assert v.to_python(123, mode='json') == 123
+
+    with pytest.warns(UserWarning, match='Expected `timedelta` but got `int` - slight slowdown possible'):
+        assert v.to_json(123) == b'123'
 
 
 def test_timedelta_float():

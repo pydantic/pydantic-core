@@ -12,6 +12,12 @@ def test_datetime():
     assert v.to_python(datetime(2022, 12, 2, 12, 13, 14), mode='json') == '2022-12-02T12:13:14'
     assert v.to_json(datetime(2022, 12, 2, 12, 13, 14)) == b'"2022-12-02T12:13:14"'
 
+    with pytest.warns(UserWarning, match='Expected `datetime` but got `int` - slight slowdown possible'):
+        assert v.to_python(123, mode='json') == 123
+
+    with pytest.warns(UserWarning, match='Expected `datetime` but got `int` - slight slowdown possible'):
+        assert v.to_json(123) == b'123'
+
 
 def test_datetime_key():
     v = SchemaSerializer(core_schema.dict_schema(core_schema.datetime_schema(), core_schema.datetime_schema()))

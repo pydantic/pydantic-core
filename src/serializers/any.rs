@@ -95,17 +95,17 @@ pub(super) fn ob_type_to_python_json(ob_type: &ObType, value: &PyAny, extra: &Ex
         ObType::Frozenset => serialize_seq!(PyFrozenSet),
         ObType::Datetime => {
             let py_dt: &PyDateTime = value.cast_as()?;
-            let iso_dt = super::datetime::datetime_to_string(py_dt)?;
+            let iso_dt = super::datetime_etc::datetime_to_string(py_dt)?;
             Ok(iso_dt.into_py(py))
         }
         ObType::Date => {
             let py_date: &PyDate = value.cast_as()?;
-            let iso_date = super::datetime::date_to_string(py_date)?;
+            let iso_date = super::datetime_etc::date_to_string(py_date)?;
             Ok(iso_date.into_py(py))
         }
         ObType::Time => {
             let py_time: &PyTime = value.cast_as()?;
-            let iso_time = super::datetime::time_to_string(py_time)?;
+            let iso_time = super::datetime_etc::time_to_string(py_time)?;
             Ok(iso_time.into_py(py))
         }
         ObType::Timedelta => {
@@ -205,17 +205,17 @@ pub(super) fn fallback_serialize_known<S: Serializer>(
         ObType::Frozenset => serialize_seq!(PyFrozenSet),
         ObType::Datetime => {
             let py_dt: &PyDateTime = value.cast_as().map_err(py_err_se_err)?;
-            let iso_dt = super::datetime::datetime_to_string(py_dt).map_err(py_err_se_err)?;
+            let iso_dt = super::datetime_etc::datetime_to_string(py_dt).map_err(py_err_se_err)?;
             serializer.serialize_str(&iso_dt)
         }
         ObType::Date => {
             let py_date: &PyDate = value.cast_as().map_err(py_err_se_err)?;
-            let iso_date = super::datetime::date_to_string(py_date).map_err(py_err_se_err)?;
+            let iso_date = super::datetime_etc::date_to_string(py_date).map_err(py_err_se_err)?;
             serializer.serialize_str(&iso_date)
         }
         ObType::Time => {
             let py_time: &PyTime = value.cast_as().map_err(py_err_se_err)?;
-            let iso_time = super::datetime::time_to_string(py_time).map_err(py_err_se_err)?;
+            let iso_time = super::datetime_etc::time_to_string(py_time).map_err(py_err_se_err)?;
             serializer.serialize_str(&iso_time)
         }
         ObType::Timedelta => {
@@ -248,17 +248,17 @@ pub(super) fn json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py,
         // perhaps we could do something faster for things like ints and floats?
         ObType::Datetime => {
             let py_dt: &PyDateTime = key.cast_as()?;
-            let iso_dt = super::datetime::datetime_to_string(py_dt)?;
+            let iso_dt = super::datetime_etc::datetime_to_string(py_dt)?;
             Ok(Cow::Owned(iso_dt))
         }
         ObType::Date => {
             let py_date: &PyDate = key.cast_as()?;
-            let iso_date = super::datetime::date_to_string(py_date)?;
+            let iso_date = super::datetime_etc::date_to_string(py_date)?;
             Ok(Cow::Owned(iso_date))
         }
         ObType::Time => {
             let py_time: &PyTime = key.cast_as()?;
-            let iso_time = super::datetime::time_to_string(py_time)?;
+            let iso_time = super::datetime_etc::time_to_string(py_time)?;
             Ok(Cow::Owned(iso_time))
         }
         ObType::Timedelta => {

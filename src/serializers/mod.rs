@@ -12,7 +12,7 @@ use shared::{BuildSerializer, TypeSerializer};
 
 mod any;
 mod bytes;
-mod datetime;
+mod datetime_etc;
 mod dict;
 mod format;
 mod function;

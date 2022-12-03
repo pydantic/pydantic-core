@@ -95,3 +95,18 @@ def test_dict_keys():
         core_schema.dict_schema(core_schema.int_schema(serialization={'type': 'function', 'function': fmt}))
     )
     assert s.to_python({1: True}) == {'<1>': True}
+
+
+def test_function_as_key():
+    def repr_function(value, **kwargs):
+        return repr(value)
+
+    s = SchemaSerializer(
+        core_schema.dict_schema(
+            core_schema.any_schema(serialization={'type': 'function', 'function': repr_function}),
+            core_schema.any_schema(),
+        )
+    )
+    assert s.to_python({123: 4}) == {'123': 4}
+    assert s.to_python({123: 4}, mode='json') == {'123': 4}
+    assert s.to_json({123: 4}) == b'{"123":4}'
