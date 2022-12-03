@@ -116,7 +116,7 @@ jobs:
 
       - run: rm rust-toolchain
 
-      - name: install rust nightly
+      - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
 
       - name: cache rust
