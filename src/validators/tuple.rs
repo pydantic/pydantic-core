@@ -125,7 +125,7 @@ impl TuplePositionalValidator {
         let validators: Vec<CombinedValidator> = items
             .iter()
             .map(|item| build_validator(item, config, build_context))
-            .collect::<PyResult<Vec<CombinedValidator>>>()?;
+            .collect::<PyResult<_>>()?;
 
         let descr = validators.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
         Ok(Self {

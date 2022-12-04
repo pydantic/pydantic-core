@@ -221,3 +221,17 @@ def test_include_exclude_args_nested(params):
     assert s.to_python(value, include=include, exclude=exclude) == expected
     assert s.to_python(value, mode='json', include=include, exclude=exclude) == expected
     assert json.loads(s.to_json(value, include=include, exclude=exclude)) == expected
+
+
+def test_positional_tuple():
+    s = SchemaSerializer(
+        {'type': 'tuple', 'mode': 'positional', 'items_schema': [{'type': 'int'}, {'type': 'bytes'}, {'type': 'float'}]}
+    )
+    assert s.to_python((1, b'2', 3.0)) == (1, b'2', 3.0)
+    assert s.to_python((1, b'2', 3.0, 123)) == (1, b'2', 3.0, 123)
+
+    assert s.to_python((1, b'2', 3.0), mode='json') == [1, '2', 3.0]
+    assert s.to_python((1, b'2', 3.0, 123), mode='json') == [1, '2', 3.0, 123]
+
+    assert s.to_json((1, b'2', 3.0)) == b'[1,"2",3.0]'
+    assert s.to_json((1, b'2', 3.0, 123)) == b'[1,"2",3.0,123]'

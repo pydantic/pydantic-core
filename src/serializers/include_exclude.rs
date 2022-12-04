@@ -1,10 +1,13 @@
 use std::hash::{BuildHasher, BuildHasherDefault, Hash};
 
+use pyo3::exceptions::PyTypeError;
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString};
 
 use nohash_hasher::{IntSet, NoHashHasher};
-use pyo3::exceptions::PyTypeError;
+
+use crate::build_tools::SchemaDict;
 
 #[derive(Debug, Clone, Default)]
 pub struct SchemaIncEx<T> {
@@ -13,10 +16,16 @@ pub struct SchemaIncEx<T> {
 }
 
 impl SchemaIncEx<usize> {
-    pub fn from_ints(include: Option<&PyAny>, exclude: Option<&PyAny>) -> PyResult<Self> {
-        let include = Self::build_set_ints(include)?;
-        let exclude = Self::build_set_ints(exclude)?;
-        Ok(Self { include, exclude })
+    pub fn from_schema(schema: &PyDict) -> PyResult<Self> {
+        let py = schema.py();
+        match schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
+            Some(ser) => {
+                let include = Self::build_set_ints(ser.get_item(intern!(py, "include")))?;
+                let exclude = Self::build_set_ints(ser.get_item(intern!(py, "exclude")))?;
+                Ok(Self { include, exclude })
+            }
+            None => Ok(SchemaIncEx::default()),
+        }
     }
 
     fn build_set_ints(v: Option<&PyAny>) -> PyResult<Option<IntSet<usize>>> {

@@ -60,7 +60,7 @@ macro_rules! combined_serializer {
 }
 
 combined_serializer! {
-    // function serializers can't be defined by type lookup, but must be members of `CombinedSerializer`,
+    // function serializers cannot be defined by type lookup, but must be members of `CombinedSerializer`,
     // hence they're `enum_only` here.
     enum_only: Function, super::function::FunctionSerializer;
     // both means the struct is added to both the `CombinedSerializer` enum the match statement in `find_serializer`
@@ -75,8 +75,9 @@ combined_serializer! {
     both: TimeDelta, super::timedelta::TimeDeltaSerializer;
     both: Date, super::datetime_etc::DateSerializer;
     both: Time, super::datetime_etc::TimeSerializer;
-    both: List, super::list_tuple::ListSerializer;
-    both: Tuple, super::list_tuple::TupleSerializer;
+    both: List, super::list::ListSerializer;
+    both: TupleVariable, super::tuple::TupleVariableSerializer;
+    enum_only: TuplePositional, super::tuple::TuplePositionalSerializer;
     both: Set, super::set_frozenset::SetSerializer;
     both: FrozenSet, super::set_frozenset::FrozenSetSerializer;
     both: Dict, super::dict::DictSerializer;
