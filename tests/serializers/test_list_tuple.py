@@ -1,4 +1,5 @@
 import json
+from functools import partial
 
 import pytest
 
@@ -229,9 +230,40 @@ def test_positional_tuple():
     )
     assert s.to_python((1, b'2', 3.0)) == (1, b'2', 3.0)
     assert s.to_python((1, b'2', 3.0, 123)) == (1, b'2', 3.0, 123)
+    assert s.to_python((1, b'2')) == (1, b'2')
 
     assert s.to_python((1, b'2', 3.0), mode='json') == [1, '2', 3.0]
     assert s.to_python((1, b'2', 3.0, 123), mode='json') == [1, '2', 3.0, 123]
+    assert s.to_python((1, b'2'), mode='json') == [1, '2']
 
     assert s.to_json((1, b'2', 3.0)) == b'[1,"2",3.0]'
     assert s.to_json((1, b'2', 3.0, 123)) == b'[1,"2",3.0,123]'
+    assert s.to_json((1, b'2')) == b'[1,"2"]'
+
+
+def test_function_positional_tuple():
+    def f(prefix, value, **kwargs):
+        return f'{prefix}{value}'
+
+    s = SchemaSerializer(
+        {
+            'type': 'tuple',
+            'mode': 'positional',
+            'items_schema': [
+                core_schema.any_schema(serialization={'type': 'function', 'function': partial(f, 'a')}),
+                core_schema.any_schema(serialization={'type': 'function', 'function': partial(f, 'b')}),
+            ],
+            'extra_schema': core_schema.any_schema(serialization={'type': 'function', 'function': partial(f, 'extra')}),
+        }
+    )
+    assert s.to_python((1,)) == ('a1',)
+    assert s.to_python((1, 2)) == ('a1', 'b2')
+    assert s.to_python((1, 2, 3)) == ('a1', 'b2', 'extra3')
+
+    assert s.to_python((1,), mode='json') == ['a1']
+    assert s.to_python((1, 2), mode='json') == ['a1', 'b2']
+    assert s.to_python((1, 2, 3), mode='json') == ['a1', 'b2', 'extra3']
+
+    assert s.to_json((1,)) == b'["a1"]'
+    assert s.to_json((1, 2)) == b'["a1","b2"]'
+    assert s.to_json((1, 2, 3)) == b'["a1","b2","extra3"]'
