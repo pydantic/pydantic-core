@@ -1,6 +1,8 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::str::from_utf8;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::ffi::PyTypeObject;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
@@ -8,9 +10,12 @@ use pyo3::types::{
     PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTime, PyTuple,
 };
 
+use nohash_hasher::IntSet;
+use pyo3::AsPyPointer;
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use strum_macros::EnumString;
 
+use crate::build_tools::py_err;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
@@ -35,7 +40,8 @@ impl TypeSerializer for AnySerializer {
         _exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        SerializeInfer::new(value, extra).serialize(serializer)
+        let rec = SerRecursionGuard::default();
+        SerializeInfer::new(value, extra, &rec).serialize(serializer)
     }
 }
 
@@ -47,17 +53,29 @@ pub(super) fn fallback_to_python(value: &PyAny, extra: &Extra) -> PyResult<PyObj
 }
 
 pub(super) fn fallback_to_python_json(value: &PyAny, extra: &Extra) -> PyResult<PyObject> {
-    ob_type_to_python_json(&extra.ob_type_lookup.get_type(value), value, extra)
+    let rec = SerRecursionGuard::default();
+    _fallback_to_python_json(value, extra, &rec)
 }
 
-pub(super) fn ob_type_to_python_json(ob_type: &ObType, value: &PyAny, extra: &Extra) -> PyResult<PyObject> {
+// identical to `fallback_to_python_json` but with an existing depth, e.g. used below
+pub(super) fn _fallback_to_python_json(value: &PyAny, extra: &Extra, rec: &SerRecursionGuard) -> PyResult<PyObject> {
+    ob_type_to_python_json(&extra.ob_type_lookup.get_type(value), value, extra, rec)
+}
+
+pub(super) fn ob_type_to_python_json(
+    ob_type: &ObType,
+    value: &PyAny,
+    extra: &Extra,
+    rec: &SerRecursionGuard,
+) -> PyResult<PyObject> {
+    let value_id = rec.add(value)?;
     let py = value.py();
 
     // have to do this to make sure subclasses of for example str are upcast to `str`
     macro_rules! extract_as {
         ($t:ty) => {{
             let v: $t = value.extract()?;
-            Ok(v.into_py(py))
+            v.into_py(py)
         }};
     }
 
@@ -66,29 +84,28 @@ pub(super) fn ob_type_to_python_json(ob_type: &ObType, value: &PyAny, extra: &Ex
             let vec: Vec<PyObject> = value
                 .cast_as::<$t>()?
                 .iter()
-                .map(|v| fallback_to_python_json(v, extra))
+                .map(|v| _fallback_to_python_json(v, extra, rec))
                 .collect::<PyResult<_>>()?;
-            Ok(PyList::new(py, vec).into_py(py))
+            PyList::new(py, vec).into_py(py)
         }};
     }
 
-    match ob_type {
+    let value = match ob_type {
         ObType::Int => extract_as!(i64),
         // `bool` and `None` can't be subclasses, so no need to do the same on bool
         ObType::Float => extract_as!(f64),
         ObType::Str => extract_as!(&str),
-        ObType::Bytes => super::bytes::py_bytes_to_str(value.cast_as()?).map(|s| s.into_py(py)),
+        ObType::Bytes => super::bytes::py_bytes_to_str(value.cast_as()?)?.into_py(py),
         ObType::Bytearray => {
             let py_byte_array: &PyByteArray = value.cast_as()?;
             // see https://docs.rs/pyo3/latest/pyo3/types/struct.PyByteArray.html#method.as_bytes
             // for why this is marked unsafe
             let bytes = unsafe { py_byte_array.as_bytes() };
             match from_utf8(bytes) {
-                Ok(s) => Ok(s.into_py(py)),
-                Err(err) => Err(super::bytes::utf8_py_error(py, err, bytes)),
+                Ok(s) => s.into_py(py),
+                Err(err) => return Err(super::bytes::utf8_py_error(py, err, bytes)),
             }
         }
-        // convert the tuple to a list, while recursively calling `fallback_to_python_json`
         ObType::Tuple => serialize_seq!(PyTuple),
         ObType::List => serialize_seq!(PyList),
         ObType::Set => serialize_seq!(PySet),
@@ -97,57 +114,62 @@ pub(super) fn ob_type_to_python_json(ob_type: &ObType, value: &PyAny, extra: &Ex
             let dict: &PyDict = value.cast_as()?;
             let new_dict = PyDict::new(py);
             for (k, v) in dict {
-                let k = fallback_to_python_json(k, extra)?;
-                let v = fallback_to_python_json(v, extra)?;
+                let k = _fallback_to_python_json(k, extra, rec)?;
+                let v = _fallback_to_python_json(v, extra, rec)?;
                 new_dict.set_item(k, v)?;
             }
-            Ok(new_dict.into_py(py))
+            new_dict.into_py(py)
         }
         ObType::Datetime => {
             let py_dt: &PyDateTime = value.cast_as()?;
             let iso_dt = super::datetime_etc::datetime_to_string(py_dt)?;
-            Ok(iso_dt.into_py(py))
+            iso_dt.into_py(py)
         }
         ObType::Date => {
             let py_date: &PyDate = value.cast_as()?;
             let iso_date = super::datetime_etc::date_to_string(py_date)?;
-            Ok(iso_date.into_py(py))
+            iso_date.into_py(py)
         }
         ObType::Time => {
             let py_time: &PyTime = value.cast_as()?;
             let iso_time = super::datetime_etc::time_to_string(py_time)?;
-            Ok(iso_time.into_py(py))
+            iso_time.into_py(py)
         }
         ObType::Timedelta => {
             let py_timedelta: &PyDelta = value.cast_as()?;
-            extra.timedelta_mode.timedelta_to_json(py_timedelta)
+            extra.timedelta_mode.timedelta_to_json(py_timedelta)?
         }
         ObType::Url => {
             let py_url: PyUrl = value.extract()?;
-            Ok(py_url.__str__().into_py(py))
+            py_url.__str__().into_py(py)
         }
         ObType::MultiHostUrl => {
             let py_url: PyMultiHostUrl = value.extract()?;
-            Ok(py_url.__str__().into_py(py))
+            py_url.__str__().into_py(py)
         }
-        _ => Ok(value.into_py(value.py())),
-    }
+        // TODO error here we
+        _ => value.into_py(value.py()),
+    };
+    rec.pop(value_id);
+    Ok(value)
 }
 
-pub(super) struct SerializeInfer<'py> {
+pub(super) struct SerializeInfer<'py, 'r> {
     value: &'py PyAny,
     extra: &'py Extra<'py>,
+    rec: &'r SerRecursionGuard,
 }
 
-impl<'py> SerializeInfer<'py> {
-    pub(super) fn new(value: &'py PyAny, extra: &'py Extra) -> Self {
-        Self { value, extra }
+impl<'py, 'r> SerializeInfer<'py, 'r> {
+    pub(super) fn new(value: &'py PyAny, extra: &'py Extra, rec: &'r SerRecursionGuard) -> Self {
+        Self { value, extra, rec }
     }
 }
 
-impl<'py> Serialize for SerializeInfer<'py> {
+impl<'py, 'r> Serialize for SerializeInfer<'py, 'r> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        fallback_serialize(self.value, serializer, self.extra)
+        let ob_type = self.extra.ob_type_lookup.get_type(self.value);
+        fallback_serialize_known(&ob_type, self.value, serializer, self.extra, self.rec)
     }
 }
 
@@ -156,7 +178,8 @@ pub(super) fn fallback_serialize<S: Serializer>(
     serializer: S,
     extra: &Extra,
 ) -> Result<S::Ok, S::Error> {
-    fallback_serialize_known(&extra.ob_type_lookup.get_type(value), value, serializer, extra)
+    let rec = SerRecursionGuard::default();
+    fallback_serialize_known(&extra.ob_type_lookup.get_type(value), value, serializer, extra, &rec)
 }
 
 pub(super) fn fallback_serialize_known<S: Serializer>(
@@ -164,7 +187,9 @@ pub(super) fn fallback_serialize_known<S: Serializer>(
     value: &PyAny,
     serializer: S,
     extra: &Extra,
+    rec: &SerRecursionGuard,
 ) -> Result<S::Ok, S::Error> {
+    let value_id = rec.add(value).map_err(py_err_se_err)?;
     macro_rules! serialize {
         ($t:ty) => {
             match value.extract::<$t>() {
@@ -179,13 +204,13 @@ pub(super) fn fallback_serialize_known<S: Serializer>(
             let py_seq: &$t = value.cast_as().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
             for element in py_seq {
-                seq.serialize_element(&SerializeInfer::new(element, extra))?
+                seq.serialize_element(&SerializeInfer::new(element, extra, rec))?
             }
             seq.end()
         }};
     }
 
-    match ob_type {
+    let ser_result = match ob_type {
         ObType::None => serializer.serialize_none(),
         ObType::Int => serialize!(i64),
         ObType::Bool => serialize!(bool),
@@ -213,7 +238,7 @@ pub(super) fn fallback_serialize_known<S: Serializer>(
             let mut map = serializer.serialize_map(Some(len))?;
             for (key, value) in py_dict {
                 let key = json_key(key, extra).map_err(py_err_se_err)?;
-                map.serialize_entry(&key, &SerializeInfer::new(value, extra))?;
+                map.serialize_entry(&key, &SerializeInfer::new(value, extra, rec))?;
             }
             map.end()
         }
@@ -250,7 +275,9 @@ pub(super) fn fallback_serialize_known<S: Serializer>(
         }
         _ => todo!(),
         // _ => serializer.serialize_none(),
-    }
+    };
+    rec.pop(value_id);
+    ser_result
 }
 
 pub(super) fn json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
@@ -508,4 +535,43 @@ pub enum ObType {
     MultiHostUrl,
     // unknown type
     Unknown,
+}
+
+/// we have `RecursionInfo` then a `RefCell` since `SerializeInfer.serialize` can't take a `&mut self`
+#[derive(Default)]
+pub struct RecursionInfo {
+    ids: IntSet<usize>,
+    /// as with `src/recursion_guard.rs` this is used as a backup in case the identity check recursion guard fails
+    /// see #143
+    depth: u16,
+}
+
+#[derive(Default)]
+pub struct SerRecursionGuard {
+    info: RefCell<RecursionInfo>,
+}
+
+impl SerRecursionGuard {
+    const MAX_DEPTH: u16 = 200;
+
+    fn add(&self, value: &PyAny) -> PyResult<usize> {
+        // https://doc.rust-lang.org/std/collections/struct.HashSet.html#method.insert
+        // "If the set did not have this value present, `true` is returned."
+        let id = value.as_ptr() as usize;
+        let mut info = self.info.borrow_mut();
+        if !info.ids.insert(id) {
+            py_err!(PyValueError; "Circular reference detected (id repeated)")
+        } else if info.depth > Self::MAX_DEPTH {
+            py_err!(PyValueError; "Circular reference detected (depth exceeded)")
+        } else {
+            info.depth += 1;
+            Ok(id)
+        }
+    }
+
+    fn pop(&self, id: usize) {
+        let mut info = self.info.borrow_mut();
+        info.depth -= 1;
+        info.ids.remove(&id);
+    }
 }

@@ -100,3 +100,14 @@ def test_any_config_timedelta_float():
     assert s.to_python({timedelta(hours=2): 'foo'}) == {timedelta(hours=2): 'foo'}
     # assert s.to_python({timedelta(hours=2): 'foo'}, mode='json') == {'7200.0': 'foo'}
     assert s.to_json({timedelta(hours=2): 'foo'}) == b'{"7200":"foo"}'
+
+
+def test_recursion():
+    s = SchemaSerializer(core_schema.any_schema())
+    v = [1, 2]
+    v.append(v)
+    assert s.to_python(v) == v
+    with pytest.raises(ValueError, match=r'Circular reference detected \(id repeated\)'):
+        s.to_python(v, mode='json')
+    with pytest.raises(ValueError, match=r'Circular reference detected \(id repeated\)'):
+        s.to_json(v)

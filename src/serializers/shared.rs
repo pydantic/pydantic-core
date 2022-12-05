@@ -77,6 +77,7 @@ combined_serializer! {
     both: Time, super::datetime_etc::TimeSerializer;
     both: List, super::list::ListSerializer;
     both: TupleVariable, super::tuple::TupleVariableSerializer;
+    // `TuplePositionalSerializer` is created by `TupleVariableSerializer` based on the `mode` parameter.
     enum_only: TuplePositional, super::tuple::TuplePositionalSerializer;
     both: Set, super::set_frozenset::SetSerializer;
     both: FrozenSet, super::set_frozenset::FrozenSetSerializer;
@@ -154,7 +155,7 @@ pub(super) trait TypeSerializer: Send + Sync + Clone + Debug {
         serializer: S,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
-        _extra: &Extra,
+        extra: &Extra,
     ) -> Result<S::Ok, S::Error>;
 }
 

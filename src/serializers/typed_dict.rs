@@ -9,7 +9,7 @@ use serde::ser::SerializeMap;
 use crate::build_tools::{py_error_type, schema_or_config, SchemaDict};
 use crate::serializers::any::SerializeInfer;
 
-use super::any::{fallback_serialize, fallback_to_python, json_key};
+use super::any::{fallback_serialize, fallback_to_python, json_key, SerRecursionGuard};
 use super::include_exclude::SchemaIncEx;
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 use super::with_default::get_default;
@@ -185,7 +185,7 @@ impl TypeSerializer for TypedDictSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        // TODO include and exclude
+        let rec = SerRecursionGuard::default();
 
         match value.cast_as::<PyDict>() {
             Ok(py_dict) => {
@@ -224,7 +224,7 @@ impl TypeSerializer for TypedDictSerializer {
                             }
                         }
                         if self.include_extra {
-                            let s = SerializeInfer::new(value, extra);
+                            let s = SerializeInfer::new(value, extra, &rec);
                             let output_key = json_key(key, extra).map_err(py_err_se_err)?;
                             map.serialize_entry(&output_key, &s)?
                         }

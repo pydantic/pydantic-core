@@ -29,7 +29,7 @@ impl RecursionGuard {
         }
     }
 
-    // see #143 this used as a backup in case the identity check recursion guard fails
+    // see #143 this is used as a backup in case the identity check recursion guard fails
     pub fn incr_depth(&mut self) -> u16 {
         self.depth += 1;
         self.depth
