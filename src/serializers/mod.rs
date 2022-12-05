@@ -8,7 +8,7 @@ use pyo3::types::{PyBytes, PyDict};
 
 use crate::{PydanticSerializationError, SchemaValidator};
 
-use shared::{BuildSerializer, TypeSerializer};
+use shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 mod any;
 mod bytes;
@@ -17,6 +17,7 @@ mod dict;
 mod format;
 mod function;
 mod include_exclude;
+mod json;
 mod list;
 mod new_class;
 mod set_frozenset;
@@ -32,7 +33,7 @@ mod with_default;
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
 pub struct SchemaSerializer {
-    comb_serializer: shared::CombinedSerializer,
+    serializer: CombinedSerializer,
     json_size: usize,
     timedelta_mode: timedelta::TimedeltaMode,
 }
@@ -42,9 +43,9 @@ impl SchemaSerializer {
     #[new]
     pub fn py_new(py: Python, schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
         let schema = SchemaValidator::validate_schema(py, schema)?.cast_as()?;
-        let serializer = shared::CombinedSerializer::build(schema, config)?;
+        let serializer = CombinedSerializer::build(schema, config)?;
         Ok(Self {
-            comb_serializer: serializer,
+            serializer,
             json_size: 1024,
             timedelta_mode: timedelta::TimedeltaMode::from_config(config)?,
         })
@@ -62,18 +63,20 @@ impl SchemaSerializer {
         exclude_unset: Option<bool>,
         exclude_defaults: Option<bool>,
         exclude_none: Option<bool>,
+        round_trip: Option<bool>,
     ) -> PyResult<PyObject> {
-        let mode: shared::SerMode = mode.into();
-        let extra = shared::Extra::new(
+        let mode: SerMode = mode.into();
+        let extra = Extra::new(
             py,
             &mode,
             by_alias,
             exclude_unset,
             exclude_defaults,
             exclude_none,
+            round_trip,
             self.timedelta_mode,
         );
-        let v = self.comb_serializer.to_python(value, include, exclude, &extra)?;
+        let v = self.serializer.to_python(value, include, exclude, &extra)?;
         extra.warnings.final_check(py)?;
         Ok(v)
     }
@@ -90,39 +93,28 @@ impl SchemaSerializer {
         exclude_unset: Option<bool>,
         exclude_defaults: Option<bool>,
         exclude_none: Option<bool>,
+        round_trip: Option<bool>,
     ) -> PyResult<PyObject> {
-        let writer: Vec<u8> = Vec::with_capacity(self.json_size);
-
-        let mode = shared::SerMode::Json;
-        let extra = shared::Extra::new(
+        let mode = SerMode::Json;
+        let extra = Extra::new(
             py,
             &mode,
             by_alias,
             exclude_unset,
             exclude_defaults,
             exclude_none,
+            round_trip,
             self.timedelta_mode,
         );
-        let serializer = PydanticSerializer::new(value, &self.comb_serializer, include, exclude, &extra);
-
-        let bytes = match indent {
-            Some(indent_size) => {
-                let indent = vec![b' '; indent_size];
-                let formatter = PrettyFormatter::with_indent(&indent);
-                let mut ser = serde_json::Serializer::with_formatter(writer, formatter);
-                serializer
-                    .serialize(&mut ser)
-                    .map_err(PydanticSerializationError::json_error)?;
-                ser.into_inner()
-            }
-            None => {
-                let mut ser = serde_json::Serializer::new(writer);
-                serializer
-                    .serialize(&mut ser)
-                    .map_err(PydanticSerializationError::json_error)?;
-                ser.into_inner()
-            }
-        };
+        let bytes = to_json_bytes(
+            value,
+            &self.serializer,
+            include,
+            exclude,
+            &extra,
+            indent,
+            self.json_size,
+        )?;
 
         extra.warnings.final_check(py)?;
 
@@ -132,14 +124,14 @@ impl SchemaSerializer {
     }
 
     pub fn __repr__(&self) -> String {
-        format!("SchemaSerializer(serializer={:#?})", self.comb_serializer)
+        format!("SchemaSerializer(serializer={:#?})", self.serializer)
     }
 }
 
 struct PydanticSerializer<'py> {
     value: &'py PyAny,
-    com_serializer: &'py shared::CombinedSerializer,
-    extra: &'py shared::Extra<'py>,
+    serializer: &'py CombinedSerializer,
+    extra: &'py Extra<'py>,
     include: Option<&'py PyAny>,
     exclude: Option<&'py PyAny>,
 }
@@ -147,14 +139,14 @@ struct PydanticSerializer<'py> {
 impl<'py> PydanticSerializer<'py> {
     fn new(
         value: &'py PyAny,
-        com_serializer: &'py shared::CombinedSerializer,
+        serializer: &'py CombinedSerializer,
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
-        extra: &'py shared::Extra<'py>,
+        extra: &'py Extra<'py>,
     ) -> Self {
         Self {
             value,
-            com_serializer,
+            serializer,
             include,
             exclude,
             extra,
@@ -164,7 +156,40 @@ impl<'py> PydanticSerializer<'py> {
 
 impl<'py> Serialize for PydanticSerializer<'py> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.com_serializer
+        self.serializer
             .serde_serialize(self.value, serializer, self.include, self.exclude, self.extra)
     }
+}
+
+fn to_json_bytes(
+    value: &PyAny,
+    serializer: &CombinedSerializer,
+    include: Option<&PyAny>,
+    exclude: Option<&PyAny>,
+    extra: &Extra,
+    indent: Option<usize>,
+    json_size: usize,
+) -> PyResult<Vec<u8>> {
+    let serializer = PydanticSerializer::new(value, serializer, include, exclude, extra);
+
+    let writer: Vec<u8> = Vec::with_capacity(json_size);
+    let bytes = match indent {
+        Some(indent) => {
+            let indent = vec![b' '; indent];
+            let formatter = PrettyFormatter::with_indent(&indent);
+            let mut ser = serde_json::Serializer::with_formatter(writer, formatter);
+            serializer
+                .serialize(&mut ser)
+                .map_err(PydanticSerializationError::json_error)?;
+            ser.into_inner()
+        }
+        None => {
+            let mut ser = serde_json::Serializer::new(writer);
+            serializer
+                .serialize(&mut ser)
+                .map_err(PydanticSerializationError::json_error)?;
+            ser.into_inner()
+        }
+    };
+    Ok(bytes)
 }

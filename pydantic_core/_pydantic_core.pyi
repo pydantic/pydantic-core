@@ -57,6 +57,7 @@ class SchemaSerializer:
         exclude_unset: bool = False,
         exclude_defaults: bool = False,
         exclude_none: bool = False,
+        round_trip: bool = False,
     ) -> Any: ...
     def to_json(
         self,
@@ -69,6 +70,7 @@ class SchemaSerializer:
         exclude_unset: bool = False,
         exclude_defaults: bool = False,
         exclude_none: bool = False,
+        round_trip: bool = False,
     ) -> bytes: ...
 
 class Url:

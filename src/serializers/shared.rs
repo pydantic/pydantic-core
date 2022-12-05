@@ -89,6 +89,7 @@ combined_serializer! {
     both: Any, super::any::AnySerializer;
     both: Format, super::format::FunctionSerializer;
     both: WithDefault, super::with_default::WithDefaultSerializer;
+    both: Json, super::json::JsonSerializer;
 }
 
 impl BuildSerializer for CombinedSerializer {
@@ -172,10 +173,12 @@ pub(super) struct Extra<'a> {
     pub exclude_unset: bool,
     pub exclude_defaults: bool,
     pub exclude_none: bool,
+    pub round_trip: bool,
     pub timedelta_mode: TimedeltaMode,
 }
 
 impl<'a> Extra<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
         py: Python<'a>,
         mode: &'a SerMode,
@@ -183,6 +186,7 @@ impl<'a> Extra<'a> {
         exclude_unset: Option<bool>,
         exclude_defaults: Option<bool>,
         exclude_none: Option<bool>,
+        round_trip: Option<bool>,
         timedelta_mode: TimedeltaMode,
     ) -> Self {
         Self {
@@ -193,6 +197,7 @@ impl<'a> Extra<'a> {
             exclude_unset: exclude_unset.unwrap_or(false),
             exclude_defaults: exclude_defaults.unwrap_or(false),
             exclude_none: exclude_none.unwrap_or(false),
+            round_trip: round_trip.unwrap_or(false),
             timedelta_mode,
         }
     }
