@@ -11,15 +11,26 @@ use super::include_exclude::SchemaIncEx;
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 use super::PydanticSerializer;
 
+pub struct TupleBuilder;
+
+impl BuildSerializer for TupleBuilder {
+    const EXPECTED_TYPE: &'static str = "tuple";
+
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+        match schema.get_as::<&str>(intern!(schema.py(), "mode"))? {
+            Some("positional") => TuplePositionalSerializer::build(schema, config),
+            _ => TupleVariableSerializer::build(schema, config),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TupleVariableSerializer {
     item_serializer: Box<CombinedSerializer>,
     inc_ex: SchemaIncEx<usize>,
 }
 
-impl BuildSerializer for TupleVariableSerializer {
-    const EXPECTED_TYPE: &'static str = "tuple";
-
+impl TupleVariableSerializer {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         if let Some("positional") = schema.get_as::<&str>(intern!(py, "mode"))? {
@@ -35,9 +46,7 @@ impl BuildSerializer for TupleVariableSerializer {
         }
         .into())
     }
-}
 
-impl TupleVariableSerializer {
     fn include_or_exclude<'s, 'py>(
         &'s self,
         py: Python<'py>,
@@ -76,7 +85,7 @@ impl TypeSerializer for TupleVariableSerializer {
                 }
             }
             Err(_) => {
-                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
+                extra.warnings.fallback_filtering("tuple", value);
                 fallback_to_python(value, extra)
             }
         }
@@ -110,7 +119,7 @@ impl TypeSerializer for TupleVariableSerializer {
                 seq.end()
             }
             Err(_) => {
-                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
+                extra.warnings.fallback_filtering("tuple", value);
                 fallback_serialize(value, serializer, extra)
             }
         }
@@ -124,10 +133,7 @@ pub struct TuplePositionalSerializer {
     inc_ex: SchemaIncEx<usize>,
 }
 
-impl BuildSerializer for TuplePositionalSerializer {
-    // this should never actually be used, it's here just to satisfy the trait and macro
-    const EXPECTED_TYPE: &'static str = "tuple-positional";
-
+impl TuplePositionalSerializer {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let items: &PyList = schema.get_as_req(intern!(py, "items_schema"))?;
@@ -146,9 +152,7 @@ impl BuildSerializer for TuplePositionalSerializer {
         }
         .into())
     }
-}
 
-impl TuplePositionalSerializer {
     fn include_or_exclude<'s, 'py>(
         &'s self,
         py: Python<'py>,
@@ -200,7 +204,7 @@ impl TypeSerializer for TuplePositionalSerializer {
                 }
             }
             Err(_) => {
-                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
+                extra.warnings.fallback_filtering("tuple", value);
                 fallback_to_python(value, extra)
             }
         }
@@ -253,7 +257,7 @@ impl TypeSerializer for TuplePositionalSerializer {
                 seq.end()
             }
             Err(_) => {
-                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
+                extra.warnings.fallback_filtering("tuple", value);
                 fallback_serialize(value, serializer, extra)
             }
         }

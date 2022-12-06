@@ -20,27 +20,18 @@ pub(super) trait BuildSerializer: Sized {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer>;
 }
 
-/// `s_match` is used within `combined_serializer` to exclude `enum_only` arguments from the `find_serializer`
-/// match statement.
-macro_rules! s_match {
-    (both, $validator:path, $schema:ident, $config:ident, $lookup_type:ident) => {
-        match <$validator>::build($schema, $config) {
-            Ok(serializer) => Ok(Some(serializer)),
-            Err(err) => py_err!("Error building `{}` serializer:\n  {}", $lookup_type, err),
-        }
-    };
-    (enum_only, $validator:path, $schema:ident, $config:ident, $lookup_type:ident) => {
-        Ok(None)
-    };
-}
-
 /// Build the `CombinedSerializer` enum and implement a `find_serializer` method for it.
 macro_rules! combined_serializer {
-    ($($classifier:ident: $key:ident, $validator:path;)+) => {
+    (
+        enum_only: {$($e_key:ident: $e_serializer:path;)*}
+        find_only: {$($builder:path;)*}
+        both: {$($b_key:ident: $b_serializer:path;)*}
+    ) => {
         #[derive(Debug, Clone)]
         #[enum_dispatch]
         pub(super) enum CombinedSerializer {
-            $( $key($validator), )+
+            $($e_key($e_serializer),)*
+            $($b_key($b_serializer),)*
         }
 
         impl CombinedSerializer {
@@ -49,7 +40,16 @@ macro_rules! combined_serializer {
             ) -> PyResult<Option<CombinedSerializer>> {
                 match lookup_type {
                     $(
-                        <$validator>::EXPECTED_TYPE => s_match!($classifier, $validator, schema, config, lookup_type),
+                        <$b_serializer>::EXPECTED_TYPE => match <$b_serializer>::build(schema, config) {
+                            Ok(serializer) => Ok(Some(serializer)),
+                            Err(err) => py_err!("Error building `{}` serializer:\n  {}", lookup_type, err),
+                        },
+                    )*
+                    $(
+                        <$builder>::EXPECTED_TYPE => match <$builder>::build(schema, config) {
+                            Ok(serializer) => Ok(Some(serializer)),
+                            Err(err) => py_err!("Error building `{}` serializer:\n  {}", lookup_type, err),
+                        },
                     )*
                     _ => Ok(None),
                 }
@@ -60,36 +60,48 @@ macro_rules! combined_serializer {
 }
 
 combined_serializer! {
-    // function serializers cannot be defined by type lookup, but must be members of `CombinedSerializer`,
-    // hence they're `enum_only` here.
-    enum_only: Function, super::function::FunctionSerializer;
-    // both means the struct is added to both the `CombinedSerializer` enum the match statement in `find_serializer`
-    // so they can be used via a `type` str.
-    both: None, super::simple::NoneSerializer;
-    both: Int, super::simple::IntSerializer;
-    both: Bool, super::simple::BoolSerializer;
-    both: Float, super::simple::FloatSerializer;
-    both: Str, super::string::StrSerializer;
-    both: Bytes, super::bytes::BytesSerializer;
-    both: Datetime, super::datetime_etc::DatetimeSerializer;
-    both: TimeDelta, super::timedelta::TimeDeltaSerializer;
-    both: Date, super::datetime_etc::DateSerializer;
-    both: Time, super::datetime_etc::TimeSerializer;
-    both: List, super::list::ListSerializer;
-    both: TupleVariable, super::tuple::TupleVariableSerializer;
-    // `TuplePositionalSerializer` is created by `TupleVariableSerializer` based on the `mode` parameter.
-    enum_only: TuplePositional, super::tuple::TuplePositionalSerializer;
-    both: Set, super::set_frozenset::SetSerializer;
-    both: FrozenSet, super::set_frozenset::FrozenSetSerializer;
-    both: Dict, super::dict::DictSerializer;
-    both: TypedDict, super::typed_dict::TypedDictSerializer;
-    both: ModelDict, super::new_class::NewClassSerializer;
-    both: Url, super::url::UrlSerializer;
-    both: MultiHostUrl, super::url::MultiHostUrlSerializer;
-    both: Any, super::any::AnySerializer;
-    both: Format, super::format::FunctionSerializer;
-    both: WithDefault, super::with_default::WithDefaultSerializer;
-    both: Json, super::json::JsonSerializer;
+    // `enum_only` is for serializers which are not built directly via the `type` key and `find_serializer`
+    // but are included in the `CombinedSerializer` enum
+    enum_only: {
+        // function serializers cannot be defined by type lookup, but must be members of `CombinedSerializer`,
+        // hence they're here.
+        Function: super::function::FunctionSerializer;
+        // `TuplePositionalSerializer` & `TupleVariableSerializer` are created by
+        // `TupleBuilder` based on the `mode` parameter.
+        TuplePositional: super::tuple::TuplePositionalSerializer;
+        TupleVariable: super::tuple::TupleVariableSerializer;
+    }
+    // `find_only` is for serializers which are built directly via the `type` key and `find_serializer`
+    // but aren't actually used for serialization, e.g. their `build` method must return another serializer
+    find_only: {
+        super::tuple::TupleBuilder;
+    }
+    // `both` means the struct is added to both the `CombinedSerializer` enum and the match statement in
+    // `find_serializer` so they can be used via a `type` str.
+    both: {
+        None: super::simple::NoneSerializer;
+        Int: super::simple::IntSerializer;
+        Bool: super::simple::BoolSerializer;
+        Float: super::simple::FloatSerializer;
+        Str: super::string::StrSerializer;
+        Bytes: super::bytes::BytesSerializer;
+        Datetime: super::datetime_etc::DatetimeSerializer;
+        TimeDelta: super::timedelta::TimeDeltaSerializer;
+        Date: super::datetime_etc::DateSerializer;
+        Time: super::datetime_etc::TimeSerializer;
+        List: super::list::ListSerializer;
+        Set: super::set_frozenset::SetSerializer;
+        FrozenSet: super::set_frozenset::FrozenSetSerializer;
+        Dict: super::dict::DictSerializer;
+        TypedDict: super::typed_dict::TypedDictSerializer;
+        ModelDict: super::new_class::NewClassSerializer;
+        Url: super::url::UrlSerializer;
+        MultiHostUrl: super::url::MultiHostUrlSerializer;
+        Any: super::any::AnySerializer;
+        Format: super::format::FunctionSerializer;
+        WithDefault: super::with_default::WithDefaultSerializer;
+        Json: super::json::JsonSerializer;
+    }
 }
 
 impl BuildSerializer for CombinedSerializer {
