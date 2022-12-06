@@ -1,14 +1,11 @@
 use std::fmt::Debug;
 
-use serde::Serialize;
-use serde_json::ser::PrettyFormatter;
-
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 
-use crate::{PydanticSerializationError, SchemaValidator};
+use crate::SchemaValidator;
 
-use shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
+use shared::{to_json_bytes, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 mod any;
 mod bytes;
@@ -126,70 +123,4 @@ impl SchemaSerializer {
     pub fn __repr__(&self) -> String {
         format!("SchemaSerializer(serializer={:#?})", self.serializer)
     }
-}
-
-struct PydanticSerializer<'py> {
-    value: &'py PyAny,
-    serializer: &'py CombinedSerializer,
-    extra: &'py Extra<'py>,
-    include: Option<&'py PyAny>,
-    exclude: Option<&'py PyAny>,
-}
-
-impl<'py> PydanticSerializer<'py> {
-    fn new(
-        value: &'py PyAny,
-        serializer: &'py CombinedSerializer,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-        extra: &'py Extra<'py>,
-    ) -> Self {
-        Self {
-            value,
-            serializer,
-            include,
-            exclude,
-            extra,
-        }
-    }
-}
-
-impl<'py> Serialize for PydanticSerializer<'py> {
-    fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.serializer
-            .serde_serialize(self.value, serializer, self.include, self.exclude, self.extra)
-    }
-}
-
-fn to_json_bytes(
-    value: &PyAny,
-    serializer: &CombinedSerializer,
-    include: Option<&PyAny>,
-    exclude: Option<&PyAny>,
-    extra: &Extra,
-    indent: Option<usize>,
-    json_size: usize,
-) -> PyResult<Vec<u8>> {
-    let serializer = PydanticSerializer::new(value, serializer, include, exclude, extra);
-
-    let writer: Vec<u8> = Vec::with_capacity(json_size);
-    let bytes = match indent {
-        Some(indent) => {
-            let indent = vec![b' '; indent];
-            let formatter = PrettyFormatter::with_indent(&indent);
-            let mut ser = serde_json::Serializer::with_formatter(writer, formatter);
-            serializer
-                .serialize(&mut ser)
-                .map_err(PydanticSerializationError::json_error)?;
-            ser.into_inner()
-        }
-        None => {
-            let mut ser = serde_json::Serializer::new(writer);
-            serializer
-                .serialize(&mut ser)
-                .map_err(PydanticSerializationError::json_error)?;
-            ser.into_inner()
-        }
-    };
-    Ok(bytes)
 }

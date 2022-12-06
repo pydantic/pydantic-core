@@ -1,7 +1,8 @@
+use std::borrow::Cow;
+
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
-use std::borrow::Cow;
 
 use serde::ser::Error;
 

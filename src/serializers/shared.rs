@@ -8,8 +8,11 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use enum_dispatch::enum_dispatch;
+use serde::Serialize;
+use serde_json::ser::PrettyFormatter;
 
 use crate::build_tools::{py_err, py_error_type, SchemaDict};
+use crate::PydanticSerializationError;
 
 use super::any::{fallback_to_python, json_key, ObTypeLookup};
 use super::timedelta::TimedeltaMode;
@@ -176,6 +179,39 @@ pub(super) fn py_err_se_err<T: serde::ser::Error, E: fmt::Display>(py_error: E) 
     T::custom(py_error.to_string())
 }
 
+pub(super) struct PydanticSerializer<'py> {
+    value: &'py PyAny,
+    serializer: &'py CombinedSerializer,
+    extra: &'py Extra<'py>,
+    include: Option<&'py PyAny>,
+    exclude: Option<&'py PyAny>,
+}
+
+impl<'py> PydanticSerializer<'py> {
+    pub(super) fn new(
+        value: &'py PyAny,
+        serializer: &'py CombinedSerializer,
+        include: Option<&'py PyAny>,
+        exclude: Option<&'py PyAny>,
+        extra: &'py Extra<'py>,
+    ) -> Self {
+        Self {
+            value,
+            serializer,
+            include,
+            exclude,
+            extra,
+        }
+    }
+}
+
+impl<'py> Serialize for PydanticSerializer<'py> {
+    fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.serializer
+            .serde_serialize(self.value, serializer, self.include, self.exclude, self.extra)
+    }
+}
+
 /// Useful things which are passed around by serializers
 pub(super) struct Extra<'a> {
     pub mode: &'a SerMode,
@@ -303,4 +339,37 @@ impl CollectWarnings {
             Ok(())
         }
     }
+}
+
+pub(super) fn to_json_bytes(
+    value: &PyAny,
+    serializer: &CombinedSerializer,
+    include: Option<&PyAny>,
+    exclude: Option<&PyAny>,
+    extra: &Extra,
+    indent: Option<usize>,
+    json_size: usize,
+) -> PyResult<Vec<u8>> {
+    let serializer = PydanticSerializer::new(value, serializer, include, exclude, extra);
+
+    let writer: Vec<u8> = Vec::with_capacity(json_size);
+    let bytes = match indent {
+        Some(indent) => {
+            let indent = vec![b' '; indent];
+            let formatter = PrettyFormatter::with_indent(&indent);
+            let mut ser = serde_json::Serializer::with_formatter(writer, formatter);
+            serializer
+                .serialize(&mut ser)
+                .map_err(PydanticSerializationError::json_error)?;
+            ser.into_inner()
+        }
+        None => {
+            let mut ser = serde_json::Serializer::new(writer);
+            serializer
+                .serialize(&mut ser)
+                .map_err(PydanticSerializationError::json_error)?;
+            ser.into_inner()
+        }
+    };
+    Ok(bytes)
 }

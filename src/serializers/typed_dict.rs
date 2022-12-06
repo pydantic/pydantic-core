@@ -7,13 +7,11 @@ use ahash::AHashMap;
 use serde::ser::SerializeMap;
 
 use crate::build_tools::{py_error_type, schema_or_config, SchemaDict};
-use crate::serializers::any::SerializeInfer;
 
-use super::any::{fallback_serialize, fallback_to_python, json_key, SerRecursionGuard};
+use super::any::{fallback_serialize, fallback_to_python, json_key, SerRecursionGuard, SerializeInfer};
 use super::include_exclude::SchemaIncEx;
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, TypeSerializer};
 use super::with_default::get_default;
-use super::PydanticSerializer;
 
 #[derive(Debug, Clone)]
 struct TypedDictField {

@@ -1,14 +1,16 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+
 use serde::ser::SerializeMap;
 
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
 use super::include_exclude::SchemaIncEx;
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
-use super::PydanticSerializer;
+use super::shared::{
+    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SerMode, TypeSerializer,
+};
 
 #[derive(Debug, Clone)]
 pub struct DictSerializer {

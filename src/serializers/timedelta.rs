@@ -1,10 +1,10 @@
-use pyo3::{intern, PyNativeType};
 use std::borrow::Cow;
 
-use crate::build_tools::{py_err, SchemaDict};
 use pyo3::prelude::*;
 use pyo3::types::{PyDelta, PyDict};
+use pyo3::{intern, PyNativeType};
 
+use crate::build_tools::{py_err, SchemaDict};
 use crate::input::pytimedelta_as_duration;
 
 use super::any::{fallback_serialize, fallback_to_python_json, json_key};

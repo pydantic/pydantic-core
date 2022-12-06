@@ -9,9 +9,9 @@ use pyo3::prelude::*;
 use pyo3::types::{
     PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTime, PyTuple,
 };
+use pyo3::AsPyPointer;
 
 use nohash_hasher::IntSet;
-use pyo3::AsPyPointer;
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use strum_macros::EnumString;
 

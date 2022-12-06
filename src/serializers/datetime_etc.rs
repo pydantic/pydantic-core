@@ -1,10 +1,12 @@
+use std::borrow::Cow;
+
 use pyo3::prelude::*;
 use pyo3::types::{PyDate, PyDateTime, PyDict, PyTime};
-use std::borrow::Cow;
+
+use crate::input::{pydate_as_date, pydatetime_as_datetime, pytime_as_time};
 
 use super::any::{fallback_serialize, fallback_to_python_json, json_key};
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
-use crate::input::{pydate_as_date, pydatetime_as_datetime, pytime_as_time};
 
 pub(crate) fn datetime_to_string(py_dt: &PyDateTime) -> PyResult<String> {
     let dt = pydatetime_as_datetime(py_dt)?;

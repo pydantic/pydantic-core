@@ -1,8 +1,9 @@
+use std::borrow::Cow;
+use std::str::from_utf8;
+
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use std::borrow::Cow;
-use std::str::from_utf8;
 
 use serde::ser::Error;
 
@@ -10,8 +11,7 @@ use crate::build_tools::SchemaDict;
 
 use super::any::{json_key, AnySerializer};
 use super::bytes::utf8_py_error;
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
-use super::to_json_bytes;
+use super::shared::{py_err_se_err, to_json_bytes, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct JsonSerializer {

@@ -7,8 +7,7 @@ use serde::ser::SerializeSeq;
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
-use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
-use super::PydanticSerializer;
+use super::shared::{BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SerMode, TypeSerializer};
 
 macro_rules! build_serializer {
     ($struct_name:ident, $expected_type:literal, $py_type:ty) => {
