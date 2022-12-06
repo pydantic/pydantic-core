@@ -78,6 +78,9 @@ combined_serializer! {
     // but aren't actually used for serialization, e.g. their `build` method must return another serializer
     find_only: {
         super::tuple::TupleBuilder;
+        super::other::ChainBuilder;
+        super::other::FunctionBuilder;
+        super::other::CustomErrorBuilder;
     }
     // `both` means the struct is added to both the `CombinedSerializer` enum and the match statement in
     // `find_serializer` so they can be used via a `type` str.

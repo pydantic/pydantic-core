@@ -17,6 +17,7 @@ mod include_exclude;
 mod json;
 mod list;
 mod new_class;
+mod other;
 mod set_frozenset;
 mod shared;
 mod simple;

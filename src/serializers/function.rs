@@ -42,6 +42,7 @@ impl BuildSerializer for FunctionSerializer {
         .into())
     }
 }
+
 impl FunctionSerializer {
     fn call(
         &self,
