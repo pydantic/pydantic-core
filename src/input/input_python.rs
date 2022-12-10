@@ -337,17 +337,6 @@ impl<'a> Input<'a> for PyAny {
 
     fn validate_typed_dict(&'a self, strict: bool, from_attributes: bool) -> ValResult<GenericMapping<'a>> {
         if from_attributes {
-            if let Ok((obj, kwargs)) = self.extract::<(&PyAny, &PyDict)>() {
-                // test_typed_dict#test_from_attributes_kwargs
-                // never reaches here
-                // println!("inside from attributes extract");
-
-                if from_attributes_applicable(self) {
-                    return Ok(GenericMapping::PyGetAttr(obj, Some(kwargs)));
-                } else {
-                    return Err(ValError::new(ErrorType::DictAttributesType, self));
-                }
-            }
             // if from_attributes, first try a dict, then mapping then from_attributes
             if let Ok(dict) = self.cast_as::<PyDict>() {
                 return Ok(dict.into());
@@ -359,6 +348,12 @@ impl<'a> Input<'a> for PyAny {
 
             if from_attributes_applicable(self) {
                 Ok(self.into())
+            } else if let Ok((obj, kwargs)) = self.extract::<(&PyAny, &PyDict)>() {
+                if from_attributes_applicable(obj) {
+                    return Ok(GenericMapping::PyGetAttr(obj, Some(kwargs)));
+                } else {
+                    return Err(ValError::new(ErrorType::DictAttributesType, self));
+                }
             } else {
                 // note the error here gives a hint about from_attributes
                 Err(ValError::new(ErrorType::DictAttributesType, self))

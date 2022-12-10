@@ -162,7 +162,9 @@ impl LookupKey {
         kwargs: Option<&'data PyDict>,
     ) -> PyResult<Option<(&'s str, &'data PyAny)>> {
         if let Some(dict) = kwargs {
-            return self.py_get_item(dict);
+            if let Ok(Some(item)) = self.py_get_item(dict) {
+                return Ok(Some(item));
+            }
         }
 
         match self {
