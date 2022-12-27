@@ -51,6 +51,15 @@ class AnySchema(TypedDict, total=False):
 
 
 def any_schema(*, ref: str | None = None, extra: Any = None) -> AnySchema:
+    """Returns a schema that matches any value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.any_schema()
+    v = SchemaValidator(schema)
+    v.validate_python(1)
+    ```
+    """
     return dict_not_none(type='any', ref=ref, extra=extra)
 
 
@@ -61,6 +70,15 @@ class NoneSchema(TypedDict, total=False):
 
 
 def none_schema(*, ref: str | None = None, extra: Any = None) -> NoneSchema:
+    """Returns a schema that matches a None value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.none_schema()
+    v = SchemaValidator(schema)
+    v.validate_python(None)
+    ```
+    """
     return dict_not_none(type='none', ref=ref, extra=extra)
 
 
@@ -72,6 +90,15 @@ class BoolSchema(TypedDict, total=False):
 
 
 def bool_schema(strict: bool | None = None, ref: str | None = None, extra: Any = None) -> BoolSchema:
+    """Returns a schema that matches a bool value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.bool_schema()
+    v = SchemaValidator(schema)
+    v.validate_python(True)
+    ```
+    """
     return dict_not_none(type='bool', strict=strict, ref=ref, extra=extra)
 
 
@@ -98,6 +125,15 @@ def int_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> IntSchema:
+    """Returns a schema that matches a int value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.int_schema(multiple_of=2, le=6, ge=2)
+    v = SchemaValidator(schema)
+    v.validate_python(4)
+    ```
+    """
     return dict_not_none(
         type='int', multiple_of=multiple_of, le=le, ge=ge, lt=lt, gt=gt, strict=strict, ref=ref, extra=extra
     )
@@ -128,6 +164,15 @@ def float_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> FloatSchema:
+    """Returns a schema that matches a float value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.float_schema(le=0.8, ge=0.2)
+    v = SchemaValidator(schema)
+    v.validate_python(0.5)
+    ```
+    """
     return dict_not_none(
         type='float',
         allow_inf_nan=allow_inf_nan,
@@ -167,6 +212,15 @@ def string_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> StringSchema:
+    """Returns a schema that matches a string value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.string_schema(max_length=10, min_length=2)
+    v = SchemaValidator(schema)
+    v.validate_python('hello')
+    ```
+    """
     return dict_not_none(
         type='str',
         pattern=pattern,
@@ -198,6 +252,15 @@ def bytes_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> BytesSchema:
+    """Returns a schema that matches a bytes value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.bytes_schema(max_length=10, min_length=2)
+    v = SchemaValidator(schema)
+    v.validate_python(b'hello')
+    ```
+    """
     return dict_not_none(
         type='bytes', max_length=max_length, min_length=min_length, strict=strict, ref=ref, extra=extra
     )
@@ -230,6 +293,16 @@ def date_schema(
     now_utc_offset: int | None = None,
     extra: Any = None,
 ) -> DateSchema:
+    """Returns a schema that matches a date value, e.g.:
+
+    ```python
+    from datetime import date
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.date_schema(le=date(2020, 1, 1), ge=date(2019, 1, 1))
+    v = SchemaValidator(schema)
+    v.validate_python(date(2019, 6, 1))
+    ```
+    """
     return dict_not_none(
         type='date',
         strict=strict,
@@ -265,6 +338,16 @@ def time_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> TimeSchema:
+    """Returns a schema that matches a time value, e.g.:
+
+    ```python
+    from datetime import time
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.time_schema(le=time(12, 0, 0), ge=time(6, 0, 0))
+    v = SchemaValidator(schema)
+    v.validate_python(time(9, 0, 0))
+    ```
+    """
     return dict_not_none(type='time', strict=strict, le=le, ge=ge, lt=lt, gt=gt, ref=ref, extra=extra)
 
 
@@ -297,6 +380,16 @@ def datetime_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> DatetimeSchema:
+    """Returns a schema that matches a datetime value, e.g.:
+
+    ```python
+    from datetime import datetime
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.datetime_schema()
+    v = SchemaValidator(schema)
+    v.validate_python(datetime.now())
+    ```
+    """
     return dict_not_none(
         type='datetime',
         strict=strict,
@@ -333,6 +426,16 @@ def timedelta_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> TimedeltaSchema:
+    """Returns a schema that matches a timedelta value, e.g.:
+
+    ```python
+    from datetime import timedelta
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.timedelta_schema(le=timedelta(days=1), ge=timedelta(days=0))
+    v = SchemaValidator(schema)
+    v.validate_python(timedelta(hours=12))
+    ```
+    """
     return dict_not_none(type='timedelta', strict=strict, le=le, ge=ge, lt=lt, gt=gt, ref=ref, extra=extra)
 
 
@@ -344,6 +447,15 @@ class LiteralSchema(TypedDict, total=False):
 
 
 def literal_schema(*expected: Any, ref: str | None = None, extra: Any = None) -> LiteralSchema:
+    """Returns a schema that matches a literal value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.literal_schema('hello', "world")
+    v = SchemaValidator(schema)
+    v.validate_python('hello')
+    ```
+    """
     return dict_not_none(type='literal', expected=expected, ref=ref, extra=extra)
 
 
@@ -370,6 +482,19 @@ def is_instance_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> IsInstanceSchema:
+    """Returns a schema that matches an object to a class, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+
+    class A:
+        pass
+
+    schema = core_schema.is_instance_schema(cls=A)
+    v = SchemaValidator(schema)
+    v.validate_python(A())
+    ```
+    """
     return dict_not_none(
         type='is-instance',
         cls=cls,
@@ -392,6 +517,22 @@ class IsSubclassSchema(TypedDict, total=False):
 def is_subclass_schema(
     cls: Type[Any], *, cls_repr: str | None = None, ref: str | None = None, extra: Any = None
 ) -> IsInstanceSchema:
+    """Returns a schema that matches a subclass to a class, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+
+    class A:
+        pass
+
+    class B(A):
+        pass
+
+    schema = core_schema.is_subclass_schema(cls=A)
+    v = SchemaValidator(schema)
+    v.validate_python(B)
+    ```
+    """
     return dict_not_none(type='is-subclass', cls=cls, cls_repr=cls_repr, ref=ref, extra=extra)
 
 
@@ -402,6 +543,15 @@ class CallableSchema(TypedDict, total=False):
 
 
 def callable_schema(*, ref: str | None = None, extra: Any = None) -> CallableSchema:
+    """Returns a schema that matches a callable value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.callable_schema()
+    v = SchemaValidator(schema)
+    v.validate_python(min)
+    ```
+    """
     return dict_not_none(type='callable', ref=ref, extra=extra)
 
 
@@ -426,6 +576,15 @@ def list_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> ListSchema:
+    """Returns a schema that matches a list value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.list_schema(core_schema.string_schema(), min_length=0, max_length=10)
+    v = SchemaValidator(schema)
+    v.validate_python(['hello'])
+    ```
+    """
     return dict_not_none(
         type='list',
         items_schema=items_schema,
@@ -455,6 +614,15 @@ def tuple_positional_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> TuplePositionalSchema:
+    """Returns a schema that matches a tuple of schemas, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.tuple_positional_schema(core_schema.int_schema(), core_schema.string_schema())
+    v = SchemaValidator(schema)
+    v.validate_python((1, 'hello'))
+    ```
+    """
     return dict_not_none(
         type='tuple',
         mode='positional',
@@ -486,6 +654,15 @@ def tuple_variable_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> TupleVariableSchema:
+    """Returns a schema that matches a tuple of a given schema, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.tuple_variable_schema(items_schema=core_schema.int_schema(), min_length=0, max_length=10)
+    v = SchemaValidator(schema)
+    v.validate_python((1, 2, 3))
+    ```
+    """
     return dict_not_none(
         type='tuple',
         mode='variable',
@@ -519,6 +696,15 @@ def set_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> SetSchema:
+    """Returns a schema that matches a set of a given schema, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.set_schema(items_schema=core_schema.int_schema(), min_length=0, max_length=10)
+    v = SchemaValidator(schema)
+    v.validate_python({1, 2, 3})
+    ```
+    """
     return dict_not_none(
         type='set',
         items_schema=items_schema,
@@ -552,6 +738,15 @@ def frozenset_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> FrozenSetSchema:
+    """Returns a schema that matches a frozenset of a given schema, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.frozenset_schema(items_schema=core_schema.int_schema(), min_length=0, max_length=10)
+    v = SchemaValidator(schema)
+    v.validate_python(frozenset({1, 2, 3}))
+    ```
+    """
     return dict_not_none(
         type='frozenset',
         items_schema=items_schema,
@@ -575,6 +770,20 @@ class GeneratorSchema(TypedDict, total=False):
 def generator_schema(
     items_schema: CoreSchema | None = None, *, max_length: int | None = None, ref: str | None = None, extra: Any = None
 ) -> GeneratorSchema:
+    """Returns a schema that matches a generator value, e.g.:
+
+    ```python
+    from typing import Iterator
+    from pydantic_core import SchemaValidator, core_schema
+
+    def gen() -> Iterator[int]:
+        yield 1
+
+    schema = core_schema.generator_schema(items_schema=core_schema.int_schema())
+    v = SchemaValidator(schema)
+    v.validate_python(gen())
+    ```
+    """
     return dict_not_none(type='generator', items_schema=items_schema, max_length=max_length, ref=ref, extra=extra)
 
 
@@ -599,6 +808,17 @@ def dict_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> DictSchema:
+    """Returns a schema that matches a dict value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.dict_schema(
+        keys_schema=core_schema.string_schema(), values_schema=core_schema.int_schema()
+    )
+    v = SchemaValidator(schema)
+    v.validate_python({'a': 1, 'b': 2})
+    ```
+    """
     return dict_not_none(
         type='dict',
         keys_schema=keys_schema,
@@ -630,12 +850,42 @@ class FunctionSchema(TypedDict, total=False):
 def function_before_schema(
     function: ValidatorFunction, schema: CoreSchema, *, ref: str | None = None, extra: Any = None
 ) -> FunctionSchema:
+    """Returns a schema that calls a validator function before validating the provided schema, e.g.:
+
+    ```python
+    from typing import Any
+    from pydantic_core import SchemaValidator, core_schema
+
+    def fn(v: Any, **kwargs) -> str:
+        v_str = str(v)
+        assert 'hello' in v_str
+        return v_str + 'world'
+
+    schema = core_schema.function_before_schema(function=fn, schema=core_schema.string_schema())
+    v = SchemaValidator(schema)
+    v.validate_python(b"hello ")
+    ```
+    """
     return dict_not_none(type='function', mode='before', function=function, schema=schema, ref=ref, extra=extra)
 
 
 def function_after_schema(
     schema: CoreSchema, function: ValidatorFunction, *, ref: str | None = None, extra: Any = None
 ) -> FunctionSchema:
+    """Returns a schema that calls a validator function after validating the provided schema, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+
+    def fn(v: str, **kwargs) -> str:
+        assert 'hello' in v
+        return v + 'world'
+
+    schema = core_schema.function_after_schema(schema=core_schema.string_schema(), function=fn)
+    v = SchemaValidator(schema)
+    v.validate_python("hello ")
+    ```
+    """
     return dict_not_none(type='function', mode='after', function=function, schema=schema, ref=ref, extra=extra)
 
 
@@ -670,6 +920,20 @@ class FunctionWrapSchema(TypedDict, total=False):
 def function_wrap_schema(
     function: WrapValidatorFunction, schema: CoreSchema, *, ref: str | None = None, extra: Any = None
 ) -> FunctionWrapSchema:
+    """Returns a schema that wraps a function around the result of schema validation, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+
+    def fn(v: str, **kwargs) -> str:
+        assert 'hello' in v
+        return v + 'world'
+
+    schema = core_schema.function_wrap_schema(function=fn, schema=core_schema.string_schema())
+    v = SchemaValidator(schema)
+    v.validate_python("hello ")
+    ```
+    """
     return dict_not_none(type='function', mode='wrap', function=function, schema=schema, ref=ref, extra=extra)
 
 
@@ -684,6 +948,20 @@ class FunctionPlainSchema(TypedDict, total=False):
 def function_plain_schema(
     function: ValidatorFunction, *, ref: str | None = None, extra: Any = None
 ) -> FunctionPlainSchema:
+    """Returns a schema that uses the provided function for validation, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+
+    def fn(v: str, **kwargs) -> str:
+        assert 'hello' in v
+        return v + 'world'
+
+    schema = core_schema.function_plain_schema(function=fn)
+    v = SchemaValidator(schema)
+    v.validate_python("hello ")
+    ```
+    """
     return dict_not_none(type='function', mode='plain', function=function, ref=ref, extra=extra)
 
 
@@ -711,6 +989,18 @@ def with_default_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> WithDefaultSchema:
+    """Returns a schema that adds a default value to the given schema, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.with_default_schema(core_schema.string_schema(), default='hello')
+    wrapper_schema = core_schema.typed_dict_schema(
+        {'a': core_schema.typed_dict_field(schema)}
+    )
+    v = SchemaValidator(wrapper_schema)
+    assert v.validate_python({}) == v.validate_python({'a': 'hello'})
+    ```
+    """
     s = dict_not_none(
         type='default',
         schema=schema,
@@ -736,6 +1026,15 @@ class NullableSchema(TypedDict, total=False):
 def nullable_schema(
     schema: CoreSchema, *, strict: bool | None = None, ref: str | None = None, extra: Any = None
 ) -> NullableSchema:
+    """Returns a schema that matches a nullable value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.nullable_schema(core_schema.string_schema())
+    v = SchemaValidator(schema)
+    v.validate_python(None)
+    ```
+    """
     return dict_not_none(type='nullable', schema=schema, strict=strict, ref=ref, extra=extra)
 
 
@@ -759,6 +1058,16 @@ def union_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> UnionSchema:
+    """Returns a schema that matches a union value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.union_schema(core_schema.string_schema(), core_schema.int_schema())
+    v = SchemaValidator(schema)
+    v.validate_python('hello')
+    v.validate_python(1)
+    ```
+    """
     return dict_not_none(
         type='union',
         choices=choices,
@@ -796,6 +1105,34 @@ def tagged_union_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> TaggedUnionSchema:
+    """Returns a schema that matches a tagged union value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    apple_schema = core_schema.typed_dict_schema(
+        {
+            'foo': core_schema.typed_dict_field(core_schema.string_schema()),
+            'bar': core_schema.typed_dict_field(core_schema.int_schema()),
+        }
+    )
+    banana_schema = core_schema.typed_dict_schema(
+        {
+            'foo': core_schema.typed_dict_field(core_schema.string_schema()),
+            'spam': core_schema.typed_dict_field(core_schema.list_schema(items_schema=core_schema.int_schema())),
+        }
+    )
+    schema = core_schema.tagged_union_schema(
+        choices={
+            'apple': apple_schema,
+            'banana': banana_schema,
+        },
+        discriminator='foo',
+    )
+    v = SchemaValidator(schema)
+    v.validate_python({'foo': 'apple', 'bar': '123'})
+    v.validate_python({'foo': 'banana', 'spam': [1, 2, 3]})
+    ```
+    """
     return dict_not_none(
         type='tagged-union',
         choices=choices,
@@ -817,6 +1154,21 @@ class ChainSchema(TypedDict, total=False):
 
 
 def chain_schema(*steps: CoreSchema, ref: str | None = None, extra: Any = None) -> ChainSchema:
+    """Returns a schema that chains the provided validation schemas, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+
+    def fn(v: str, **kwargs) -> str:
+        assert 'hello' in v
+        return v + ' world'
+
+    fn_schema = core_schema.function_plain_schema(function=fn)
+    schema = core_schema.chain_schema(fn_schema, fn_schema, fn_schema, core_schema.string_schema())
+    v = SchemaValidator(schema)
+    assert v.validate_python("hello") == 'hello world world world'
+    ```
+    """
     return dict_not_none(type='chain', steps=steps, ref=ref, extra=extra)
 
 
@@ -837,6 +1189,27 @@ def lax_or_strict_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> LaxOrStrictSchema:
+    """Returns a schema that uses the lax or strict schema, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+
+    def fn(v: str, **kwargs) -> str:
+        assert 'hello' in v
+        return v + ' world'
+
+    lax_schema = core_schema.int_schema(strict=False)
+    strict_schema = core_schema.int_schema(strict=True)
+
+    schema = core_schema.lax_or_strict_schema(lax_schema=lax_schema, strict_schema=strict_schema, strict=True)
+    v = SchemaValidator(schema)
+    assert v.validate_python(123) == 123
+
+    schema = core_schema.lax_or_strict_schema(lax_schema=lax_schema, strict_schema=strict_schema, strict=False)
+    v = SchemaValidator(schema)
+    assert v.validate_python('123') == 123
+    ```
+    """
     return dict_not_none(
         type='lax-or-strict', lax_schema=lax_schema, strict_schema=strict_schema, strict=strict, ref=ref, extra=extra
     )
@@ -856,6 +1229,13 @@ def typed_dict_field(
     alias: str | list[str | int] | list[list[str | int]] | None = None,
     frozen: bool | None = None,
 ) -> TypedDictField:
+    """Returns a schema that matches a typed dict field, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    field = core_schema.typed_dict_field(schema=core_schema.int_schema(), required=True)
+    ```
+    """
     return dict_not_none(schema=schema, required=required, alias=alias, frozen=frozen)
 
 
@@ -887,6 +1267,17 @@ def typed_dict_schema(
     populate_by_name: bool | None = None,
     from_attributes: bool | None = None,
 ) -> TypedDictSchema:
+    """Returns a schema that matches a typed dict, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    wrapper_schema = core_schema.typed_dict_schema(
+        {'a': core_schema.typed_dict_field(core_schema.string_schema())}
+    )
+    v = SchemaValidator(wrapper_schema)
+    v.validate_python({'a': 'hello'})
+    ```
+    """
     return dict_not_none(
         type='typed-dict',
         fields=fields,
@@ -923,6 +1314,26 @@ def new_class_schema(
     extra: Any = None,
     config: CoreConfig | None = None,
 ) -> NewClassSchema:
+    """Returns a schema that matches a new class, e.g.:
+
+    ```python
+    from pydantic_core import CoreConfig, SchemaValidator, core_schema
+
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+
+    schema = core_schema.new_class_schema(
+        cls=MyModel,
+        config=CoreConfig(str_max_length=5),
+        schema=core_schema.typed_dict_schema(
+            fields={'a': core_schema.typed_dict_field(core_schema.string_schema())},
+        ),
+    )
+    v = SchemaValidator(schema)
+    assert v.isinstance_python({'a': 'hello'}) is True
+    assert v.isinstance_python({'a': 'too long'}) is False
+    ```
+    """
     return dict_not_none(
         type='new-class', cls=cls, schema=schema, call_after_init=call_after_init, strict=strict, ref=ref, config=config
     )
@@ -942,6 +1353,13 @@ def arguments_parameter(
     mode: Literal['positional_only', 'positional_or_keyword', 'keyword_only'] | None = None,
     alias: str | list[str | int] | list[list[str | int]] | None = None,
 ) -> ArgumentsParameter:
+    """Returns a schema that matches an argument parameter, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    param = core_schema.arguments_parameter(name='a', schema=core_schema.string_schema(), mode='positional_only')
+    ```
+    """
     return dict_not_none(name=name, schema=schema, mode=mode, alias=alias)
 
 
@@ -963,6 +1381,17 @@ def arguments_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> ArgumentsSchema:
+    """Returns a schema that matches an arguments schema, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    param_a = core_schema.arguments_parameter(name='a', schema=core_schema.string_schema(), mode='positional_only')
+    param_b = core_schema.arguments_parameter(name='b', schema=core_schema.bool_schema(), mode='positional_only')
+    schema = core_schema.arguments_schema(param_a, param_b)
+    v = SchemaValidator(schema)
+    v.validate_python({'__args__': ('hello', True), '__kwargs__': {}})
+    ```
+    """
     return dict_not_none(
         type='arguments',
         arguments_schema=arguments,
@@ -991,6 +1420,23 @@ def call_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> CallSchema:
+    """Returns a schema that matches an arguments schema, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    param_a = core_schema.arguments_parameter(name='a', schema=core_schema.string_schema(), mode='positional_only')
+    param_b = core_schema.arguments_parameter(name='b', schema=core_schema.bool_schema(), mode='positional_only')
+    args_schema = core_schema.arguments_schema(param_a, param_b)
+
+    schema = core_schema.call_schema(
+        arguments=args_schema,
+        function=lambda a, b: a + str(not b),
+        return_schema=core_schema.string_schema(),
+    )
+    v = SchemaValidator(schema)
+    assert v.validate_python((('hello', True))) == 'helloFalse'
+    ```
+    """
     return dict_not_none(
         type='call', arguments_schema=arguments, function=function, return_schema=return_schema, ref=ref, extra=extra
     )
@@ -1002,6 +1448,16 @@ class RecursiveReferenceSchema(TypedDict, total=False):
 
 
 def recursive_reference_schema(schema_ref: str) -> RecursiveReferenceSchema:
+    """Returns a schema that matches a recursive reference value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema_recursive = core_schema.recursive_reference_schema('list-schema')
+    schema = core_schema.list_schema(items_schema=schema_recursive, ref='list-schema')
+    v = SchemaValidator(schema)
+    v.validate_python([[]])
+    ```
+    """
     return {'type': 'recursive-ref', 'schema_ref': schema_ref}
 
 
@@ -1024,6 +1480,17 @@ def custom_error_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> CustomErrorSchema:
+    """Returns a schema that matches a custom error value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.custom_error_schema(
+        schema=core_schema.int_schema(), custom_error_type='MyError', custom_error_message="Error msg"
+    )
+    v = SchemaValidator(schema)
+    v.validate_python(1)
+    ```
+    """
     return dict_not_none(
         type='custom_error',
         schema=schema,
@@ -1043,6 +1510,29 @@ class JsonSchema(TypedDict, total=False):
 
 
 def json_schema(schema: CoreSchema | None = None, *, ref: str | None = None, extra: Any = None) -> JsonSchema:
+    """Returns a schema that matches a JSON value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    dict_schema = core_schema.typed_dict_schema(
+        {
+            'field_a': core_schema.typed_dict_field(core_schema.string_schema()),
+            'field_b': core_schema.typed_dict_field(core_schema.bool_schema()),
+        }
+    )
+
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+        field_a: str
+        field_b: bool
+
+    json_schema = core_schema.json_schema(schema=dict_schema)
+    schema = core_schema.new_class_schema(cls=MyModel, schema=json_schema)
+    v = SchemaValidator(schema)
+    m = v.validate_python('{"field_a": "hello", "field_b": true}')
+    assert isinstance(m, MyModel)
+    ```
+    """
     return dict_not_none(type='json', schema=schema, ref=ref, extra=extra)
 
 
@@ -1071,6 +1561,15 @@ def url_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> UrlSchema:
+    """Returns a schema that matches a URL value, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.url_schema()
+    v = SchemaValidator(schema)
+    v.validate_python('https://example.com')
+    ```
+    """
     return dict_not_none(
         type='url',
         max_length=max_length,
@@ -1110,6 +1609,15 @@ def multi_host_url_schema(
     ref: str | None = None,
     extra: Any = None,
 ) -> MultiHostUrlSchema:
+    """Returns a schema that matches a URL value with possibly multiple hosts, e.g.:
+
+    ```python
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.multi_host_url_schema()
+    v = SchemaValidator(schema)
+    v.validate_python('redis://localhost,0.0.0.0,127.0.0.1')
+    ```
+    """
     return dict_not_none(
         type='multi-host-url',
         max_length=max_length,
