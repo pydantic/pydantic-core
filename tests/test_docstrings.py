@@ -9,7 +9,7 @@ import pytest
 
 import pydantic_core
 
-DOCSTRING_REGEX = r'```python(.*)```'
+DOCSTRING_REGEX = r'```python(.*?)```'
 
 
 class DocstringTest:
@@ -18,6 +18,11 @@ class DocstringTest:
         ```python
         assert 1 == 1
         assert 1 != 2
+        ```
+
+        ```python
+        assert 1 != 3
+        assert 2 + 2 == 4
         ```
         """
         pass
@@ -67,6 +72,10 @@ def test_write_docstrings_to_test_file():
             == """def test_method_a_0():
     assert 1 == 1
     assert 1 != 2
+
+def test_method_a_1():
+    assert 1 != 3
+    assert 2 + 2 == 4
 
 def test_method_b_0():
     print('hello')
