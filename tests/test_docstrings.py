@@ -13,10 +13,9 @@ DOCSTRING_REGEX = r'```python(.*)```'
 def write_docstrings_to_test_file(f: NamedTemporaryFile):
     for name, obj in inspect.getmembers(pydantic_core.core_schema):
         if obj.__doc__ is not None:
-            match = re.search(DOCSTRING_REGEX, obj.__doc__, re.DOTALL)
-            if match:
+            for i, match in enumerate(re.finditer(DOCSTRING_REGEX, obj.__doc__, re.DOTALL)):
                 code = match.group(1)
-                f.write(f'def test_{name}():\n')
+                f.write(f'def test_{name}_{i}():\n')
                 f.write(code)
                 f.write('\n\n')
     f.flush()
