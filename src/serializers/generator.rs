@@ -143,7 +143,8 @@ impl TypeSerializer for GeneratorSerializer {
 }
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 struct SerializationIterator {
     iterator: Py<PyIterator>,
     #[pyo3(get)]
