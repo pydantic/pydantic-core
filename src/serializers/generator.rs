@@ -1,6 +1,6 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyDict;
 
 use serde::ser::SerializeSeq;
 
@@ -12,13 +12,13 @@ use super::include_exclude::SchemaIncEx;
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, TypeSerializer};
 
 #[derive(Debug, Clone)]
-pub struct ListSerializer {
+pub struct GeneratorSerializer {
     item_serializer: Box<CombinedSerializer>,
     inc_ex: SchemaIncEx<usize>,
 }
 
-impl BuildSerializer for ListSerializer {
-    const EXPECTED_TYPE: &'static str = "list";
+impl BuildSerializer for GeneratorSerializer {
+    const EXPECTED_TYPE: &'static str = "generator";
 
     fn build(
         schema: &PyDict,
@@ -38,7 +38,7 @@ impl BuildSerializer for ListSerializer {
     }
 }
 
-impl ListSerializer {
+impl GeneratorSerializer {
     fn include_or_exclude<'py>(
         &self,
         py: Python<'py>,
@@ -51,7 +51,7 @@ impl ListSerializer {
     }
 }
 
-impl TypeSerializer for ListSerializer {
+impl TypeSerializer for GeneratorSerializer {
     fn to_python(
         &self,
         value: &PyAny,
@@ -59,13 +59,17 @@ impl TypeSerializer for ListSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        match value.cast_as::<PyList>() {
-            Ok(py_list) => {
+        match value.iter() {
+            Ok(py_iter) => {
                 let py = value.py();
                 let item_serializer = self.item_serializer.as_ref();
 
-                let mut items = Vec::with_capacity(py_list.len());
-                for (index, element) in py_list.iter().enumerate() {
+                let mut items = match value.len() {
+                    Ok(len) => Vec::with_capacity(len),
+                    Err(_) => Vec::new(),
+                };
+                for (index, iter_result) in py_iter.enumerate() {
+                    let element = iter_result?;
                     if let Some((next_include, next_exclude)) = self.include_or_exclude(py, index, include, exclude)? {
                         items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                     }
@@ -87,12 +91,17 @@ impl TypeSerializer for ListSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        match value.cast_as::<PyList>() {
-            Ok(py_list) => {
-                let mut seq = serializer.serialize_seq(Some(py_list.len()))?;
+        match value.iter() {
+            Ok(py_iter) => {
+                let len = match value.len() {
+                    Ok(len) => Some(len),
+                    Err(_) => None,
+                };
+                let mut seq = serializer.serialize_seq(len)?;
                 let item_serializer = self.item_serializer.as_ref();
 
-                for (index, element) in py_list.iter().enumerate() {
+                for (index, iter_result) in py_iter.enumerate() {
+                    let element = iter_result.map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = self
                         .include_or_exclude(element.py(), index, include, exclude)
                         .map_err(py_err_se_err)?

@@ -723,7 +723,7 @@ class GeneratorSchema(TypedDict, total=False):
     max_length: int
     ref: str
     extra: Any
-    serialization: SerSchema
+    serialization: IncExSeqOrElseSerSchema
 
 
 def generator_schema(
@@ -732,7 +732,7 @@ def generator_schema(
     max_length: int | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: SerSchema | None = None,
+    serialization: IncExSeqOrElseSerSchema | None = None,
 ) -> GeneratorSchema:
     return dict_not_none(
         type='generator',

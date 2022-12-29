@@ -15,6 +15,7 @@ mod datetime_etc;
 mod dict;
 mod format;
 mod function;
+mod generator;
 mod include_exclude;
 mod json;
 mod list;

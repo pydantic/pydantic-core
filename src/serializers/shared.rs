@@ -110,6 +110,7 @@ combined_serializer! {
         List: super::list::ListSerializer;
         Set: super::set_frozenset::SetSerializer;
         FrozenSet: super::set_frozenset::FrozenSetSerializer;
+        Generator: super::generator::GeneratorSerializer;
         Dict: super::dict::DictSerializer;
         TypedDict: super::typed_dict::TypedDictSerializer;
         ModelDict: super::new_class::NewClassSerializer;
