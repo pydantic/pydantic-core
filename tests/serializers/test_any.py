@@ -14,7 +14,7 @@ def any_serializer():
 
 
 def test_repr(any_serializer):
-    assert plain_repr(any_serializer) == 'SchemaSerializer(serializer=Any(AnySerializer))'
+    assert plain_repr(any_serializer) == 'SchemaSerializer(serializer=Any(AnySerializer),slots=[])'
 
 
 @pytest.mark.parametrize('value', [None, 1, 1.0, True, 'foo', [1, 2, 3], {'a': 1, 'b': 2}])
@@ -47,7 +47,7 @@ def test_any_json_coerce(any_serializer, value, expected_json):
 def test_other_type():
     """Types with no serializer, fall back to any serializer"""
     v = SchemaSerializer(core_schema.is_instance_schema(int))
-    assert plain_repr(v) == 'SchemaSerializer(serializer=Any(AnySerializer))'
+    assert plain_repr(v) == 'SchemaSerializer(serializer=Any(AnySerializer),slots=[])'
     assert v.to_json('foobar') == b'"foobar"'
 
 

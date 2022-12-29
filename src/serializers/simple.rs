@@ -5,6 +5,7 @@ use serde::Serialize;
 
 use super::any::{fallback_serialize, fallback_to_python, IsType, ObType};
 use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
+use crate::build_context::BuildContext;
 
 #[derive(Debug, Clone)]
 pub struct NoneSerializer;
@@ -12,7 +13,11 @@ pub struct NoneSerializer;
 impl BuildSerializer for NoneSerializer {
     const EXPECTED_TYPE: &'static str = "none";
 
-    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        _schema: &PyDict,
+        _config: Option<&PyDict>,
+        _build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         Ok(Self {}.into())
     }
 }
@@ -46,7 +51,6 @@ impl TypeSerializer for NoneSerializer {
     ) -> Result<S::Ok, S::Error> {
         match extra.ob_type_lookup.is_type(value, ObType::None) {
             IsType::Exact => serializer.serialize_none(),
-            // I don't think subclasses of None can exist
             _ => {
                 extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
                 fallback_serialize(value, serializer, extra)
@@ -63,7 +67,11 @@ macro_rules! build_simple_serializer {
         impl BuildSerializer for $struct_name {
             const EXPECTED_TYPE: &'static str = $expected_type;
 
-            fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+            fn build(
+                _schema: &PyDict,
+                _config: Option<&PyDict>,
+                _build_context: &mut BuildContext<CombinedSerializer>,
+            ) -> PyResult<CombinedSerializer> {
                 Ok(Self {}.into())
             }
         }

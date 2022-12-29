@@ -4,6 +4,7 @@ use pyo3::types::PyDict;
 
 use serde::ser::SerializeMap;
 
+use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
@@ -23,15 +24,19 @@ pub struct DictSerializer {
 impl BuildSerializer for DictSerializer {
     const EXPECTED_TYPE: &'static str = "dict";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let key_serializer = match schema.get_as::<&PyDict>(intern!(py, "keys_schema"))? {
-            Some(items_schema) => CombinedSerializer::build(items_schema, config)?,
-            None => AnySerializer::build(schema, config)?,
+            Some(items_schema) => CombinedSerializer::build(items_schema, config, build_context)?,
+            None => AnySerializer::build(schema, config, build_context)?,
         };
         let value_serializer = match schema.get_as::<&PyDict>(intern!(py, "values_schema"))? {
-            Some(items_schema) => CombinedSerializer::build(items_schema, config)?,
-            None => AnySerializer::build(schema, config)?,
+            Some(items_schema) => CombinedSerializer::build(items_schema, config, build_context)?,
+            None => AnySerializer::build(schema, config, build_context)?,
         };
         let inc_ex = match schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
             Some(ser) => {

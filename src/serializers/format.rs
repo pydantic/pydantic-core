@@ -6,6 +6,7 @@ use pyo3::types::{PyDict, PyString};
 
 use serde::ser::Error;
 
+use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 use crate::errors::PydanticSerializationError;
 
@@ -22,7 +23,11 @@ pub struct FunctionSerializer {
 impl BuildSerializer for FunctionSerializer {
     const EXPECTED_TYPE: &'static str = "format";
 
-    fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        _config: Option<&PyDict>,
+        _build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let serialization: &PyDict = schema.get_as_req(intern!(py, "serialization"))?;
         Ok(Self {

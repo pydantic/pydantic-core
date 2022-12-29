@@ -7,6 +7,7 @@ use pyo3::types::{PyBytes, PyDict};
 
 use serde::ser::Error;
 
+use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python_json, json_key};
@@ -20,7 +21,11 @@ pub struct BytesSerializer {
 impl BuildSerializer for BytesSerializer {
     const EXPECTED_TYPE: &'static str = "bytes";
 
-    fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        _config: Option<&PyDict>,
+        _build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let json_base64: bool = match schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
             Some(ser) => ser.get_as(intern!(py, "json_base64"))?.unwrap_or(false),

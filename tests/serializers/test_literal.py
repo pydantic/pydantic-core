@@ -7,7 +7,7 @@ from ..conftest import plain_repr
 
 def test_int_literal():
     s = SchemaSerializer(core_schema.literal_schema(1, 2, 3))
-    assert plain_repr(s) == 'SchemaSerializer(serializer=Int(IntSerializer))'
+    assert plain_repr(s) == 'SchemaSerializer(serializer=Int(IntSerializer),slots=[])'
 
     assert s.to_python(1) == 1
     assert s.to_python(1, mode='json') == 1
@@ -23,7 +23,7 @@ def test_int_literal():
 
 def test_str_literal():
     s = SchemaSerializer(core_schema.literal_schema('a', 'b', 'c'))
-    assert plain_repr(s) == 'SchemaSerializer(serializer=Str(StrSerializer))'
+    assert plain_repr(s) == 'SchemaSerializer(serializer=Str(StrSerializer),slots=[])'
 
     assert s.to_python('a') == 'a'
     assert s.to_python('a', mode='json') == 'a'
@@ -39,7 +39,7 @@ def test_str_literal():
 
 def test_other_literal():
     s = SchemaSerializer(core_schema.literal_schema('a', 1))
-    assert plain_repr(s) == 'SchemaSerializer(serializer=Any(AnySerializer))'
+    assert plain_repr(s) == 'SchemaSerializer(serializer=Any(AnySerializer),slots=[])'
 
     assert s.to_python('a') == 'a'
     assert s.to_python('a', mode='json') == 'a'

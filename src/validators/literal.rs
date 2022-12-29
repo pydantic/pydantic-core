@@ -24,7 +24,7 @@ impl BuildValidator for LiteralBuilder {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext,
+        build_context: &mut BuildContext<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let expected: &PyList = schema.get_as_req(intern!(schema.py(), "expected"))?;
         if expected.is_empty() {

@@ -3,6 +3,8 @@ use std::borrow::Cow;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
+use crate::build_context::BuildContext;
+
 use super::any::{fallback_serialize, fallback_to_python_json, json_key, IsType, ObType};
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
@@ -12,7 +14,11 @@ pub struct StrSerializer;
 impl BuildSerializer for StrSerializer {
     const EXPECTED_TYPE: &'static str = "str";
 
-    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        _schema: &PyDict,
+        _config: Option<&PyDict>,
+        _build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         Ok(Self {}.into())
     }
 }

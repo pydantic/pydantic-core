@@ -15,6 +15,7 @@ use nohash_hasher::IntSet;
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use strum_macros::EnumString;
 
+use crate::build_context::BuildContext;
 use crate::build_tools::py_err;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
@@ -26,7 +27,11 @@ pub struct AnySerializer;
 impl BuildSerializer for AnySerializer {
     const EXPECTED_TYPE: &'static str = "any";
 
-    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        _schema: &PyDict,
+        _config: Option<&PyDict>,
+        _build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         Ok(Self {}.into())
     }
 }

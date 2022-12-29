@@ -63,7 +63,7 @@ impl BuildValidator for WithDefaultValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext,
+        build_context: &mut BuildContext<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let default = DefaultType::new(schema)?;
@@ -122,7 +122,7 @@ impl Validator for WithDefaultValidator {
         self.validator.ask(question)
     }
 
-    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
+    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
         self.validator.complete(build_context)
     }
 }

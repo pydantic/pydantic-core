@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::build_context::BuildContext;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::any::{fallback_serialize, fallback_to_python_json, json_key};
@@ -16,7 +17,11 @@ macro_rules! build_serializer {
         impl BuildSerializer for $struct_name {
             const EXPECTED_TYPE: &'static str = $expected_type;
 
-            fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+            fn build(
+                _schema: &PyDict,
+                _config: Option<&PyDict>,
+                _build_context: &mut BuildContext<CombinedSerializer>,
+            ) -> PyResult<CombinedSerializer> {
                 Ok(Self {}.into())
             }
         }

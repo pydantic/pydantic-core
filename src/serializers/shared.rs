@@ -11,6 +11,7 @@ use enum_dispatch::enum_dispatch;
 use serde::Serialize;
 use serde_json::ser::PrettyFormatter;
 
+use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, py_error_type, SchemaDict};
 use crate::PydanticSerializationError;
 
@@ -20,7 +21,11 @@ use super::timedelta::TimedeltaMode;
 pub(super) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer>;
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer>;
 }
 
 /// Build the `CombinedSerializer` enum and implement a `find_serializer` method for it.
@@ -32,24 +37,27 @@ macro_rules! combined_serializer {
     ) => {
         #[derive(Debug, Clone)]
         #[enum_dispatch]
-        pub(super) enum CombinedSerializer {
+        pub enum CombinedSerializer {
             $($e_key($e_serializer),)*
             $($b_key($b_serializer),)*
         }
 
         impl CombinedSerializer {
             fn find_serializer(
-                lookup_type: &str, schema: &PyDict, config: Option<&PyDict>
+                lookup_type: &str,
+                schema: &PyDict,
+                config: Option<&PyDict>,
+                build_context: &mut BuildContext<CombinedSerializer>
             ) -> PyResult<Option<CombinedSerializer>> {
                 match lookup_type {
                     $(
-                        <$b_serializer>::EXPECTED_TYPE => match <$b_serializer>::build(schema, config) {
+                        <$b_serializer>::EXPECTED_TYPE => match <$b_serializer>::build(schema, config, build_context) {
                             Ok(serializer) => Ok(Some(serializer)),
                             Err(err) => py_err!("Error building `{}` serializer:\n  {}", lookup_type, err),
                         },
                     )*
                     $(
-                        <$builder>::EXPECTED_TYPE => match <$builder>::build(schema, config) {
+                        <$builder>::EXPECTED_TYPE => match <$builder>::build(schema, config, build_context) {
                             Ok(serializer) => Ok(Some(serializer)),
                             Err(err) => py_err!("Error building `{}` serializer:\n  {}", lookup_type, err),
                         },
@@ -87,6 +95,7 @@ combined_serializer! {
     // `find_serializer` so they can be used via a `type` str.
     both: {
         None: super::simple::NoneSerializer;
+        Nullable: super::nullable::NullableSerializer;
         Int: super::simple::IntSerializer;
         Bool: super::simple::BoolSerializer;
         Float: super::simple::FloatSerializer;
@@ -108,24 +117,26 @@ combined_serializer! {
         Format: super::format::FunctionSerializer;
         WithDefault: super::with_default::WithDefaultSerializer;
         Json: super::json::JsonSerializer;
+        Recursive: super::recursive::RecursiveRefSerializer;
     }
 }
 
-impl BuildSerializer for CombinedSerializer {
-    // this value is never used, it's just here to satisfy the trait
-    const EXPECTED_TYPE: &'static str = "";
-
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+impl CombinedSerializer {
+    fn _build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let type_key = intern!(py, "type");
 
         if let Some(ser) = schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
-            let op_ser_type: Option<&str> = ser.get_as(intern!(py, "type"))?;
+            let op_ser_type: Option<&str> = ser.get_as(type_key)?;
             match op_ser_type {
                 Some("function") => {
-                    // `function` is a special case, not inclued in `find_serializer` since it means something different
-                    // in `schema.type`
-                    return super::function::FunctionSerializer::build(ser, config)
+                    // `function` is a special case, not included in `find_serializer` since it means something
+                    // different in `schema.type`
+                    return super::function::FunctionSerializer::build(ser, config, build_context)
                         .map_err(|err| py_error_type!("Error building `function` serializer:\n  {}", err));
                 }
                 // applies to lists tuples and dicts, does not override the main schema `type`
@@ -135,7 +146,7 @@ impl BuildSerializer for CombinedSerializer {
                 Some(ser_type) => {
                     // otherwise if `schema.serialization.type` is defined, use that with `find_serializer`
                     // instead of `schema.type`. In this case it's an error if a serializer isn't found.
-                    return match Self::find_serializer(ser_type, schema, config)? {
+                    return match Self::find_serializer(ser_type, schema, config, build_context)? {
                         Some(serializer) => Ok(serializer),
                         None => py_err!("Unknown serialization schema type: `{}`", ser_type),
                     };
@@ -146,10 +157,33 @@ impl BuildSerializer for CombinedSerializer {
         }
 
         let type_: &str = schema.get_as_req(type_key)?;
-        match Self::find_serializer(type_, schema, config)? {
+        match Self::find_serializer(type_, schema, config, build_context)? {
             Some(serializer) => Ok(serializer),
-            None => super::any::AnySerializer::build(schema, config),
+            None => super::any::AnySerializer::build(schema, config, build_context),
         }
+    }
+}
+
+impl BuildSerializer for CombinedSerializer {
+    // this value is never used, it's just here to satisfy the trait
+    const EXPECTED_TYPE: &'static str = "";
+
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
+        if let Some(schema_ref) = schema.get_as::<String>(intern!(schema.py(), "ref"))? {
+            // as with validators, only use a recursive reference if the ref is used
+            if build_context.ref_used(&schema_ref) {
+                let slot_id = build_context.prepare_slot(schema_ref, None)?;
+                let inner_ser = Self::_build(schema, config, build_context)?;
+                build_context.complete_slot(slot_id, inner_ser)?;
+                return Ok(super::recursive::RecursiveRefSerializer::from_id(slot_id));
+            }
+        }
+
+        Self::_build(schema, config, build_context)
     }
 }
 
@@ -219,6 +253,7 @@ impl<'py> Serialize for PydanticSerializer<'py> {
 /// Useful things which are passed around by serializers
 pub(super) struct Extra<'a> {
     pub mode: &'a SerMode,
+    pub slots: &'a [CombinedSerializer],
     pub ob_type_lookup: &'a ObTypeLookup,
     pub warnings: CollectWarnings,
     pub by_alias: bool,
@@ -234,6 +269,7 @@ impl<'a> Extra<'a> {
     pub(super) fn new(
         py: Python<'a>,
         mode: &'a SerMode,
+        slots: &'a [CombinedSerializer],
         by_alias: Option<bool>,
         exclude_unset: Option<bool>,
         exclude_defaults: Option<bool>,
@@ -243,6 +279,7 @@ impl<'a> Extra<'a> {
     ) -> Self {
         Self {
             mode,
+            slots,
             ob_type_lookup: ObTypeLookup::cached(py),
             warnings: CollectWarnings::new(true),
             by_alias: by_alias.unwrap_or(true),
@@ -312,10 +349,7 @@ impl CollectWarnings {
     fn fallback(&self, field_type: &str, value: &PyAny, reason: &str) {
         if self.active {
             let type_name = value.get_type().name().unwrap_or("<unknown python object>");
-            self.add_warning(format!(
-                "Expected `{}` but got `{}` - {}",
-                field_type, type_name, reason
-            ));
+            self.add_warning(format!("Expected `{field_type}` but got `{type_name}` - {reason}"));
         }
     }
 

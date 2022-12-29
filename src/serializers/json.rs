@@ -7,6 +7,7 @@ use pyo3::types::PyDict;
 
 use serde::ser::Error;
 
+use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
 use super::any::{json_key, AnySerializer};
@@ -21,12 +22,16 @@ pub struct JsonSerializer {
 impl BuildSerializer for JsonSerializer {
     const EXPECTED_TYPE: &'static str = "json";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
         let serializer = match schema.get_as::<&PyDict>(intern!(py, "schema"))? {
-            Some(items_schema) => CombinedSerializer::build(items_schema, config)?,
-            None => AnySerializer::build(schema, config)?,
+            Some(items_schema) => CombinedSerializer::build(items_schema, config, build_context)?,
+            None => AnySerializer::build(schema, config, build_context)?,
         };
         Ok(Self {
             serializer: Box::new(serializer),

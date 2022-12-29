@@ -3,9 +3,11 @@ use std::fmt::Debug;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 
+use crate::build_context::BuildContext;
 use crate::SchemaValidator;
 
-use shared::{to_json_bytes, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
+pub use shared::CombinedSerializer;
+use shared::{to_json_bytes, BuildSerializer, Extra, SerMode, TypeSerializer};
 
 mod any;
 mod bytes;
@@ -18,7 +20,9 @@ mod json;
 mod list;
 mod literal;
 mod new_class;
+mod nullable;
 mod other;
+mod recursive;
 mod set_frozenset;
 mod shared;
 mod simple;
@@ -33,6 +37,7 @@ mod with_default;
 #[derive(Debug, Clone)]
 pub struct SchemaSerializer {
     serializer: CombinedSerializer,
+    slots: Vec<CombinedSerializer>,
     json_size: usize,
     timedelta_mode: timedelta::TimedeltaMode,
 }
@@ -41,10 +46,12 @@ pub struct SchemaSerializer {
 impl SchemaSerializer {
     #[new]
     pub fn py_new(py: Python, schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
-        let schema = SchemaValidator::validate_schema(py, schema)?.cast_as()?;
-        let serializer = CombinedSerializer::build(schema, config)?;
+        let schema = SchemaValidator::validate_schema(py, schema)?;
+        let mut build_context = BuildContext::for_schema(schema)?;
+        let serializer = CombinedSerializer::build(schema.cast_as()?, config, &mut build_context)?;
         Ok(Self {
             serializer,
+            slots: build_context.into_slots_ser()?,
             json_size: 1024,
             timedelta_mode: timedelta::TimedeltaMode::from_config(config)?,
         })
@@ -68,6 +75,7 @@ impl SchemaSerializer {
         let extra = Extra::new(
             py,
             &mode,
+            &self.slots,
             by_alias,
             exclude_unset,
             exclude_defaults,
@@ -98,6 +106,7 @@ impl SchemaSerializer {
         let extra = Extra::new(
             py,
             &mode,
+            &self.slots,
             by_alias,
             exclude_unset,
             exclude_defaults,
@@ -123,6 +132,9 @@ impl SchemaSerializer {
     }
 
     pub fn __repr__(&self) -> String {
-        format!("SchemaSerializer(serializer={:#?})", self.serializer)
+        format!(
+            "SchemaSerializer(serializer={:#?}, slots={:#?})",
+            self.serializer, self.slots
+        )
     }
 }

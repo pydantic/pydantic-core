@@ -22,7 +22,7 @@ impl BuildValidator for FunctionBuilder {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext,
+        build_context: &mut BuildContext<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let mode: &str = schema.get_as_req(intern!(schema.py(), "mode"))?;
         match mode {
@@ -41,7 +41,7 @@ macro_rules! impl_build {
             pub fn build(
                 schema: &PyDict,
                 config: Option<&PyDict>,
-                build_context: &mut BuildContext,
+                build_context: &mut BuildContext<CombinedValidator>,
             ) -> PyResult<CombinedValidator> {
                 let py = schema.py();
                 let validator = build_validator(schema.get_as_req(intern!(py, "schema"))?, config, build_context)?;
@@ -104,7 +104,7 @@ impl Validator for FunctionBeforeValidator {
         self.validator.ask(question)
     }
 
-    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
+    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
         self.validator.complete(build_context)
     }
 }
@@ -141,7 +141,7 @@ impl Validator for FunctionAfterValidator {
         self.validator.ask(question)
     }
 
-    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
+    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
         self.validator.complete(build_context)
     }
 }
@@ -231,7 +231,7 @@ impl Validator for FunctionWrapValidator {
         self.validator.ask(question)
     }
 
-    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
+    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
         self.validator.complete(build_context)
     }
 }

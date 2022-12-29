@@ -4,6 +4,7 @@ use pyo3::types::{PyDict, PyList};
 
 use serde::ser::SerializeSeq;
 
+use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
@@ -19,11 +20,15 @@ pub struct ListSerializer {
 impl BuildSerializer for ListSerializer {
     const EXPECTED_TYPE: &'static str = "list";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let item_serializer = match schema.get_as::<&PyDict>(intern!(py, "items_schema"))? {
-            Some(items_schema) => CombinedSerializer::build(items_schema, config)?,
-            None => AnySerializer::build(schema, config)?,
+            Some(items_schema) => CombinedSerializer::build(items_schema, config, build_context)?,
+            None => AnySerializer::build(schema, config, build_context)?,
         };
         Ok(Self {
             item_serializer: Box::new(item_serializer),
@@ -34,8 +39,8 @@ impl BuildSerializer for ListSerializer {
 }
 
 impl ListSerializer {
-    fn include_or_exclude<'s, 'py>(
-        &'s self,
+    fn include_or_exclude<'py>(
+        &self,
         py: Python<'py>,
         index: usize,
         include: Option<&'py PyAny>,

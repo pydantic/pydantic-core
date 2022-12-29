@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDelta, PyDict};
 use pyo3::{intern, PyNativeType};
 
+use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, SchemaDict};
 use crate::input::pytimedelta_as_duration;
 
@@ -89,7 +90,11 @@ pub struct TimeDeltaSerializer;
 impl BuildSerializer for TimeDeltaSerializer {
     const EXPECTED_TYPE: &'static str = "timedelta";
 
-    fn build(_schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        _schema: &PyDict,
+        _config: Option<&PyDict>,
+        _build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         Ok(Self {}.into())
     }
 }

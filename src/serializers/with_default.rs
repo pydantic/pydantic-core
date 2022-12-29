@@ -4,6 +4,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 use crate::validators::DefaultType;
 
@@ -18,12 +19,16 @@ pub struct WithDefaultSerializer {
 impl BuildSerializer for WithDefaultSerializer {
     const EXPECTED_TYPE: &'static str = "default";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let default = DefaultType::new(schema)?;
 
         let sub_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
-        let serializer = Box::new(CombinedSerializer::build(sub_schema, config)?);
+        let serializer = Box::new(CombinedSerializer::build(sub_schema, config, build_context)?);
 
         Ok(Self { default, serializer }.into())
     }

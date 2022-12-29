@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use ahash::AHashMap;
 use serde::ser::SerializeMap;
 
+use crate::build_context::BuildContext;
 use crate::build_tools::{py_error_type, schema_or_config, SchemaDict};
 
 use super::any::{fallback_serialize, fallback_to_python, json_key, SerRecursionGuard, SerializeInfer};
@@ -52,7 +53,11 @@ pub struct TypedDictSerializer {
 impl BuildSerializer for TypedDictSerializer {
     const EXPECTED_TYPE: &'static str = "typed-dict";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
         let extra_behavior = schema_or_config::<&str>(
@@ -74,8 +79,8 @@ impl BuildSerializer for TypedDictSerializer {
 
             let schema = field_info.get_as_req(intern!(py, "schema"))?;
 
-            let serializer =
-                CombinedSerializer::build(schema, config).map_err(|e| py_error_type!("Field `{}`:\n  {}", key, e))?;
+            let serializer = CombinedSerializer::build(schema, config, build_context)
+                .map_err(|e| py_error_type!("Field `{}`:\n  {}", key, e))?;
 
             let (alias, alias_py) = match field_info.get_as::<&PyString>(intern!(py, "serialization_alias"))? {
                 Some(alias_py) => {

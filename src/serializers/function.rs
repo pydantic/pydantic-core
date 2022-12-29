@@ -7,6 +7,7 @@ use pyo3::types::PyDict;
 
 use serde::ser::Error;
 
+use crate::build_context::BuildContext;
 use crate::build_tools::{function_name, kwargs, py_error_type, SchemaDict};
 use crate::errors::PydanticSerializationError;
 
@@ -27,7 +28,11 @@ impl BuildSerializer for FunctionSerializer {
     // this value is never used, it's just here to satisfy the trait
     const EXPECTED_TYPE: &'static str = "";
 
-    fn build(schema: &PyDict, _config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        _config: Option<&PyDict>,
+        _build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let function = schema.get_as_req::<&PyAny>(intern!(py, "function"))?;
         let function_name = function_name(function)?;

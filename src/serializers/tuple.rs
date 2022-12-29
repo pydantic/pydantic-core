@@ -4,6 +4,7 @@ use pyo3::types::{PyDict, PyList, PyTuple};
 
 use serde::ser::SerializeSeq;
 
+use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
@@ -17,10 +18,14 @@ pub struct TupleBuilder;
 impl BuildSerializer for TupleBuilder {
     const EXPECTED_TYPE: &'static str = "tuple";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         match schema.get_as::<&str>(intern!(schema.py(), "mode"))? {
-            Some("positional") => TuplePositionalSerializer::build(schema, config),
-            _ => TupleVariableSerializer::build(schema, config),
+            Some("positional") => TuplePositionalSerializer::build(schema, config, build_context),
+            _ => TupleVariableSerializer::build(schema, config, build_context),
         }
     }
 }
@@ -32,14 +37,18 @@ pub struct TupleVariableSerializer {
 }
 
 impl TupleVariableSerializer {
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         if let Some("positional") = schema.get_as::<&str>(intern!(py, "mode"))? {
-            return TuplePositionalSerializer::build(schema, config);
+            return TuplePositionalSerializer::build(schema, config, build_context);
         }
         let item_serializer = match schema.get_as::<&PyDict>(intern!(py, "items_schema"))? {
-            Some(items_schema) => CombinedSerializer::build(items_schema, config)?,
-            None => AnySerializer::build(schema, config)?,
+            Some(items_schema) => CombinedSerializer::build(items_schema, config, build_context)?,
+            None => AnySerializer::build(schema, config, build_context)?,
         };
         Ok(Self {
             item_serializer: Box::new(item_serializer),
@@ -48,8 +57,8 @@ impl TupleVariableSerializer {
         .into())
     }
 
-    fn include_or_exclude<'s, 'py>(
-        &'s self,
+    fn include_or_exclude<'py>(
+        &self,
         py: Python<'py>,
         index: usize,
         include: Option<&'py PyAny>,
@@ -135,18 +144,22 @@ pub struct TuplePositionalSerializer {
 }
 
 impl TuplePositionalSerializer {
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let items: &PyList = schema.get_as_req(intern!(py, "items_schema"))?;
 
         let extra_serializer = match schema.get_as::<&PyDict>(intern!(py, "extra_schema"))? {
-            Some(extra_schema) => CombinedSerializer::build(extra_schema, config)?,
-            None => AnySerializer::build(schema, config)?,
+            Some(extra_schema) => CombinedSerializer::build(extra_schema, config, build_context)?,
+            None => AnySerializer::build(schema, config, build_context)?,
         };
         Ok(Self {
             items_serializers: items
                 .iter()
-                .map(|item| CombinedSerializer::build(item.cast_as()?, config))
+                .map(|item| CombinedSerializer::build(item.cast_as()?, config, build_context))
                 .collect::<PyResult<_>>()?,
             extra_serializer: Box::new(extra_serializer),
             inc_ex: SchemaIncEx::from_schema(schema)?,
@@ -154,8 +167,8 @@ impl TuplePositionalSerializer {
         .into())
     }
 
-    fn include_or_exclude<'s, 'py>(
-        &'s self,
+    fn include_or_exclude<'py>(
+        &self,
         py: Python<'py>,
         index: usize,
         include: Option<&'py PyAny>,

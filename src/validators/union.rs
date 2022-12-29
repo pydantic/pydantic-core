@@ -31,7 +31,7 @@ impl BuildValidator for UnionValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext,
+        build_context: &mut BuildContext<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let choices: Vec<CombinedValidator> = schema
@@ -144,7 +144,7 @@ impl Validator for UnionValidator {
         self.choices.iter().all(|v| v.ask(question))
     }
 
-    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
+    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
         self.choices.iter_mut().try_for_each(|v| v.complete(build_context))
     }
 }
@@ -201,7 +201,7 @@ impl BuildValidator for TaggedUnionValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext,
+        build_context: &mut BuildContext<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let discriminator = Discriminator::new(py, schema.get_as_req(intern!(py, "discriminator"))?)?;
@@ -344,7 +344,7 @@ impl Validator for TaggedUnionValidator {
         self.choices.values().all(|v| v.ask(question))
     }
 
-    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
+    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
         self.choices
             .iter_mut()
             .try_for_each(|(_, validator)| validator.complete(build_context))

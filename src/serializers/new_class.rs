@@ -2,6 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet};
 
+use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
@@ -14,10 +15,14 @@ pub struct NewClassSerializer {
 impl BuildSerializer for NewClassSerializer {
     const EXPECTED_TYPE: &'static str = "new-class";
 
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedSerializer> {
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let sub_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
-        let serializer = Box::new(CombinedSerializer::build(sub_schema, config)?);
+        let serializer = Box::new(CombinedSerializer::build(sub_schema, config, build_context)?);
 
         Ok(Self { serializer }.into())
     }
