@@ -112,7 +112,7 @@ impl fmt::Debug for SchemaError {
 
 impl fmt::Display for SchemaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.message)
+        f.write_str(&self.message)
     }
 }
 

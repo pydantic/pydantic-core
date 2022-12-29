@@ -26,8 +26,7 @@ def test_branch_nullable():
     }
 
 
-@pytest.mark.skip(reason='TODO')
-def test_recursion():
+def test_cyclic_recursion():
     s = SchemaSerializer(
         {
             'type': 'typed-dict',
@@ -42,7 +41,8 @@ def test_recursion():
     )
     v = {'name': 'root'}
     v['sub_branch'] = v
-    assert s.to_python(v) == v
+    with pytest.raises(ValueError, match=r'Circular reference detected \(id repeated\)'):
+        s.to_python(v)
     with pytest.raises(ValueError, match=r'Circular reference detected \(id repeated\)'):
         s.to_python(v, mode='json')
     with pytest.raises(ValueError, match=r'Circular reference detected \(id repeated\)'):

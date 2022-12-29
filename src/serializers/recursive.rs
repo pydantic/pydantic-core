@@ -5,6 +5,7 @@ use pyo3::types::PyDict;
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
+use super::shared::py_err_se_err;
 use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
@@ -40,8 +41,11 @@ impl TypeSerializer for RecursiveRefSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
+        let value_id = extra.rec_guard.add(value)?;
         let comb_serializer = unsafe { extra.slots.get_unchecked(self.serializer_id) };
-        comb_serializer.to_python(value, include, exclude, extra)
+        let r = comb_serializer.to_python(value, include, exclude, extra);
+        extra.rec_guard.pop(value_id);
+        r
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -52,7 +56,10 @@ impl TypeSerializer for RecursiveRefSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
+        let value_id = extra.rec_guard.add(value).map_err(py_err_se_err)?;
         let comb_serializer = unsafe { extra.slots.get_unchecked(self.serializer_id) };
-        comb_serializer.serde_serialize(value, serializer, include, exclude, extra)
+        let r = comb_serializer.serde_serialize(value, serializer, include, exclude, extra);
+        extra.rec_guard.pop(value_id);
+        r
     }
 }

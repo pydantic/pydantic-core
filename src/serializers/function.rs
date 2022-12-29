@@ -13,7 +13,6 @@ use crate::errors::PydanticSerializationError;
 
 use super::any::{
     fallback_serialize, fallback_serialize_known, fallback_to_python_json, json_key, ob_type_to_python_json, ObType,
-    SerRecursionGuard,
 };
 use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
@@ -80,8 +79,7 @@ impl TypeSerializer for FunctionSerializer {
         match extra.mode {
             SerMode::Json => {
                 if let Some(ref ob_type) = self.return_ob_type {
-                    let rec = SerRecursionGuard::default();
-                    ob_type_to_python_json(ob_type, v.as_ref(py), extra, &rec)
+                    ob_type_to_python_json(ob_type, v.as_ref(py), extra)
                 } else {
                     fallback_to_python_json(v.as_ref(py), extra)
                 }
@@ -110,8 +108,7 @@ impl TypeSerializer for FunctionSerializer {
         let return_value = self.call(value, include, exclude, extra.mode).map_err(Error::custom)?;
 
         if let Some(ref ob_type) = self.return_ob_type {
-            let rec = SerRecursionGuard::default();
-            fallback_serialize_known(ob_type, return_value.as_ref(py), serializer, extra, &rec)
+            fallback_serialize_known(ob_type, return_value.as_ref(py), serializer, extra)
         } else {
             fallback_serialize(return_value.as_ref(py), serializer, extra)
         }

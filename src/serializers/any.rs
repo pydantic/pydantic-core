@@ -1,22 +1,17 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::str::from_utf8;
 
-use pyo3::exceptions::PyValueError;
 use pyo3::ffi::PyTypeObject;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{
     PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTime, PyTuple,
 };
-use pyo3::AsPyPointer;
 
-use nohash_hasher::IntSet;
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use strum_macros::EnumString;
 
 use crate::build_context::BuildContext;
-use crate::build_tools::py_err;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
@@ -45,8 +40,7 @@ impl TypeSerializer for AnySerializer {
         _exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let rec = SerRecursionGuard::default();
-        SerializeInfer::new(value, extra, &rec).serialize(serializer)
+        SerializeInfer::new(value, extra).serialize(serializer)
     }
 }
 
@@ -58,22 +52,11 @@ pub(super) fn fallback_to_python(value: &PyAny, extra: &Extra) -> PyResult<PyObj
 }
 
 pub(super) fn fallback_to_python_json(value: &PyAny, extra: &Extra) -> PyResult<PyObject> {
-    let rec = SerRecursionGuard::default();
-    _fallback_to_python_json(value, extra, &rec)
+    ob_type_to_python_json(&extra.ob_type_lookup.get_type(value), value, extra)
 }
 
-// identical to `fallback_to_python_json` but with an existing depth, e.g. used below
-pub(super) fn _fallback_to_python_json(value: &PyAny, extra: &Extra, rec: &SerRecursionGuard) -> PyResult<PyObject> {
-    ob_type_to_python_json(&extra.ob_type_lookup.get_type(value), value, extra, rec)
-}
-
-pub(super) fn ob_type_to_python_json(
-    ob_type: &ObType,
-    value: &PyAny,
-    extra: &Extra,
-    rec: &SerRecursionGuard,
-) -> PyResult<PyObject> {
-    let value_id = rec.add(value)?;
+pub(super) fn ob_type_to_python_json(ob_type: &ObType, value: &PyAny, extra: &Extra) -> PyResult<PyObject> {
+    let value_id = extra.rec_guard.add(value)?;
     let py = value.py();
 
     // have to do this to make sure subclasses of for example str are upcast to `str`
@@ -89,7 +72,7 @@ pub(super) fn ob_type_to_python_json(
             let vec: Vec<PyObject> = value
                 .cast_as::<$t>()?
                 .iter()
-                .map(|v| _fallback_to_python_json(v, extra, rec))
+                .map(|v| fallback_to_python_json(v, extra))
                 .collect::<PyResult<_>>()?;
             PyList::new(py, vec).into_py(py)
         }};
@@ -119,8 +102,9 @@ pub(super) fn ob_type_to_python_json(
             let dict: &PyDict = value.cast_as()?;
             let new_dict = PyDict::new(py);
             for (k, v) in dict {
-                let k = _fallback_to_python_json(k, extra, rec)?;
-                let v = _fallback_to_python_json(v, extra, rec)?;
+                let k_str = json_key(k, extra)?;
+                let k = PyString::new(py, &k_str);
+                let v = fallback_to_python_json(v, extra)?;
                 new_dict.set_item(k, v)?;
             }
             new_dict.into_py(py)
@@ -155,26 +139,25 @@ pub(super) fn ob_type_to_python_json(
         // TODO error here we
         _ => value.into_py(value.py()),
     };
-    rec.pop(value_id);
+    extra.rec_guard.pop(value_id);
     Ok(value)
 }
 
-pub(super) struct SerializeInfer<'py, 'r> {
+pub(super) struct SerializeInfer<'py> {
     value: &'py PyAny,
     extra: &'py Extra<'py>,
-    rec: &'r SerRecursionGuard,
 }
 
-impl<'py, 'r> SerializeInfer<'py, 'r> {
-    pub(super) fn new(value: &'py PyAny, extra: &'py Extra, rec: &'r SerRecursionGuard) -> Self {
-        Self { value, extra, rec }
+impl<'py> SerializeInfer<'py> {
+    pub(super) fn new(value: &'py PyAny, extra: &'py Extra) -> Self {
+        Self { value, extra }
     }
 }
 
-impl<'py, 'r> Serialize for SerializeInfer<'py, 'r> {
+impl<'py> Serialize for SerializeInfer<'py> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let ob_type = self.extra.ob_type_lookup.get_type(self.value);
-        fallback_serialize_known(&ob_type, self.value, serializer, self.extra, self.rec)
+        fallback_serialize_known(&ob_type, self.value, serializer, self.extra)
     }
 }
 
@@ -183,8 +166,7 @@ pub(super) fn fallback_serialize<S: Serializer>(
     serializer: S,
     extra: &Extra,
 ) -> Result<S::Ok, S::Error> {
-    let rec = SerRecursionGuard::default();
-    fallback_serialize_known(&extra.ob_type_lookup.get_type(value), value, serializer, extra, &rec)
+    fallback_serialize_known(&extra.ob_type_lookup.get_type(value), value, serializer, extra)
 }
 
 pub(super) fn fallback_serialize_known<S: Serializer>(
@@ -192,9 +174,8 @@ pub(super) fn fallback_serialize_known<S: Serializer>(
     value: &PyAny,
     serializer: S,
     extra: &Extra,
-    rec: &SerRecursionGuard,
 ) -> Result<S::Ok, S::Error> {
-    let value_id = rec.add(value).map_err(py_err_se_err)?;
+    let value_id = extra.rec_guard.add(value).map_err(py_err_se_err)?;
     macro_rules! serialize {
         ($t:ty) => {
             match value.extract::<$t>() {
@@ -209,7 +190,7 @@ pub(super) fn fallback_serialize_known<S: Serializer>(
             let py_seq: &$t = value.cast_as().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
             for element in py_seq {
-                seq.serialize_element(&SerializeInfer::new(element, extra, rec))?
+                seq.serialize_element(&SerializeInfer::new(element, extra))?
             }
             seq.end()
         }};
@@ -243,7 +224,7 @@ pub(super) fn fallback_serialize_known<S: Serializer>(
             let mut map = serializer.serialize_map(Some(len))?;
             for (key, value) in py_dict {
                 let key = json_key(key, extra).map_err(py_err_se_err)?;
-                map.serialize_entry(&key, &SerializeInfer::new(value, extra, rec))?;
+                map.serialize_entry(&key, &SerializeInfer::new(value, extra))?;
             }
             map.end()
         }
@@ -281,7 +262,7 @@ pub(super) fn fallback_serialize_known<S: Serializer>(
         _ => todo!(),
         // _ => serializer.serialize_none(),
     };
-    rec.pop(value_id);
+    extra.rec_guard.pop(value_id);
     ser_result
 }
 
@@ -540,43 +521,4 @@ pub enum ObType {
     MultiHostUrl,
     // unknown type
     Unknown,
-}
-
-/// we have `RecursionInfo` then a `RefCell` since `SerializeInfer.serialize` can't take a `&mut self`
-#[derive(Default)]
-pub struct RecursionInfo {
-    ids: IntSet<usize>,
-    /// as with `src/recursion_guard.rs` this is used as a backup in case the identity check recursion guard fails
-    /// see #143
-    depth: u16,
-}
-
-#[derive(Default)]
-pub struct SerRecursionGuard {
-    info: RefCell<RecursionInfo>,
-}
-
-impl SerRecursionGuard {
-    const MAX_DEPTH: u16 = 200;
-
-    fn add(&self, value: &PyAny) -> PyResult<usize> {
-        // https://doc.rust-lang.org/std/collections/struct.HashSet.html#method.insert
-        // "If the set did not have this value present, `true` is returned."
-        let id = value.as_ptr() as usize;
-        let mut info = self.info.borrow_mut();
-        if !info.ids.insert(id) {
-            py_err!(PyValueError; "Circular reference detected (id repeated)")
-        } else if info.depth > Self::MAX_DEPTH {
-            py_err!(PyValueError; "Circular reference detected (depth exceeded)")
-        } else {
-            info.depth += 1;
-            Ok(id)
-        }
-    }
-
-    fn pop(&self, id: usize) {
-        let mut info = self.info.borrow_mut();
-        info.depth -= 1;
-        info.ids.remove(&id);
-    }
 }

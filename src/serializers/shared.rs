@@ -3,11 +3,13 @@ use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Debug;
 
-use pyo3::intern;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use pyo3::{intern, AsPyPointer};
 
 use enum_dispatch::enum_dispatch;
+use nohash_hasher::IntSet;
 use serde::Serialize;
 use serde_json::ser::PrettyFormatter;
 
@@ -262,6 +264,7 @@ pub(super) struct Extra<'a> {
     pub exclude_none: bool,
     pub round_trip: bool,
     pub timedelta_mode: TimedeltaMode,
+    pub rec_guard: SerRecursionGuard,
 }
 
 impl<'a> Extra<'a> {
@@ -288,6 +291,7 @@ impl<'a> Extra<'a> {
             exclude_none: exclude_none.unwrap_or(false),
             round_trip: round_trip.unwrap_or(false),
             timedelta_mode,
+            rec_guard: SerRecursionGuard::default(),
         }
     }
 }
@@ -410,4 +414,43 @@ pub(super) fn to_json_bytes(
         }
     };
     Ok(bytes)
+}
+
+/// we have `RecursionInfo` then a `RefCell` since `SerializeInfer.serialize` can't take a `&mut self`
+#[derive(Default)]
+pub struct RecursionInfo {
+    ids: IntSet<usize>,
+    /// as with `src/recursion_guard.rs` this is used as a backup in case the identity check recursion guard fails
+    /// see #143
+    depth: u16,
+}
+
+#[derive(Default)]
+pub struct SerRecursionGuard {
+    info: RefCell<RecursionInfo>,
+}
+
+impl SerRecursionGuard {
+    const MAX_DEPTH: u16 = 200;
+
+    pub fn add(&self, value: &PyAny) -> PyResult<usize> {
+        // https://doc.rust-lang.org/std/collections/struct.HashSet.html#method.insert
+        // "If the set did not have this value present, `true` is returned."
+        let id = value.as_ptr() as usize;
+        let mut info = self.info.borrow_mut();
+        if !info.ids.insert(id) {
+            py_err!(PyValueError; "Circular reference detected (id repeated)")
+        } else if info.depth > Self::MAX_DEPTH {
+            py_err!(PyValueError; "Circular reference detected (depth exceeded)")
+        } else {
+            info.depth += 1;
+            Ok(id)
+        }
+    }
+
+    pub fn pop(&self, id: usize) {
+        let mut info = self.info.borrow_mut();
+        info.depth -= 1;
+        info.ids.remove(&id);
+    }
 }
