@@ -26,8 +26,7 @@ def test_schema_typing() -> None:
         'choices': [{'type': 'int'}, {'type': 'int', 'ge': 1}, {'type': 'float', 'lt': 1.0}],
     }
     SchemaValidator(schema)
-    # this should be valid but it seems pyright is unable to infer the type correctly
-    schema: CoreSchema = {  # type: ignore
+    schema: CoreSchema = {
         'type': 'tagged-union',
         'discriminator': 'type',
         'choices': {
