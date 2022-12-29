@@ -297,6 +297,55 @@ impl<'a> Extra<'a> {
     }
 }
 
+#[derive(Clone)]
+#[cfg_attr(debug_assertions, derive(Debug))]
+pub(super) struct ExtraOwned {
+    mode: SerMode,
+    slots: Vec<CombinedSerializer>,
+    warnings: CollectWarnings,
+    by_alias: bool,
+    exclude_unset: bool,
+    exclude_defaults: bool,
+    exclude_none: bool,
+    round_trip: bool,
+    timedelta_mode: TimedeltaMode,
+    rec_guard: SerRecursionGuard,
+}
+
+impl ExtraOwned {
+    pub fn new(extra: &Extra) -> Self {
+        Self {
+            mode: extra.mode.clone(),
+            slots: extra.slots.to_vec(),
+            warnings: extra.warnings.clone(),
+            by_alias: extra.by_alias,
+            exclude_unset: extra.exclude_unset,
+            exclude_defaults: extra.exclude_defaults,
+            exclude_none: extra.exclude_none,
+            round_trip: extra.round_trip,
+            timedelta_mode: extra.timedelta_mode,
+            rec_guard: extra.rec_guard.clone(),
+        }
+    }
+
+    pub fn to_extra<'py>(&'py self, py: Python<'py>) -> Extra<'py> {
+        Extra {
+            mode: &self.mode,
+            slots: &self.slots,
+            ob_type_lookup: ObTypeLookup::cached(py),
+            warnings: self.warnings.clone(),
+            by_alias: self.by_alias,
+            exclude_unset: self.exclude_unset,
+            exclude_defaults: self.exclude_defaults,
+            exclude_none: self.exclude_none,
+            round_trip: self.round_trip,
+            timedelta_mode: self.timedelta_mode,
+            rec_guard: self.rec_guard.clone(),
+        }
+    }
+}
+
+#[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(super) enum SerMode {
     Python,
@@ -325,6 +374,7 @@ impl ToPyObject for SerMode {
     }
 }
 
+#[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(super) struct CollectWarnings {
     active: bool,
@@ -418,7 +468,8 @@ pub(super) fn to_json_bytes(
 }
 
 /// we have `RecursionInfo` then a `RefCell` since `SerializeInfer.serialize` can't take a `&mut self`
-#[derive(Default)]
+#[derive(Default, Clone)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub struct RecursionInfo {
     ids: IntSet<usize>,
     /// as with `src/recursion_guard.rs` this is used as a backup in case the identity check recursion guard fails
@@ -426,7 +477,8 @@ pub struct RecursionInfo {
     depth: u16,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub struct SerRecursionGuard {
     info: RefCell<RecursionInfo>,
 }

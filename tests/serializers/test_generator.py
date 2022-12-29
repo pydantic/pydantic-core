@@ -1,4 +1,5 @@
 import pytest
+from dirty_equals import IsStr
 
 from pydantic_core import SchemaSerializer, core_schema
 
@@ -14,12 +15,30 @@ def gen_error(*things):
     raise ValueError('oops')
 
 
+def test_generator_any_iter():
+    s = SchemaSerializer(core_schema.generator_schema(core_schema.any_schema()))
+    gen = s.to_python(gen_ok('a', b'b', 3))
+    assert repr(gen) == IsStr(regex=r'SerializationIterator\(index=0, iterator=<generator object gen_ok at 0x\w+>\)')
+    assert str(gen) == repr(gen)
+    assert gen.index == 0
+    assert next(gen) == 'a'
+    assert gen.index == 1
+    assert repr(gen) == IsStr(regex=r'SerializationIterator\(index=1, iterator=<generator object gen_ok at 0x\w+>\)')
+    assert next(gen) == b'b'
+    assert gen.index == 2
+    assert next(gen) == 3
+    assert gen.index == 3
+    with pytest.raises(StopIteration):
+        next(gen)
+    assert gen.index == 3
+
+
 def test_generator_any():
     s = SchemaSerializer(core_schema.generator_schema(core_schema.any_schema()))
-    assert s.to_python(iter(['a', b'b', 3])) == ['a', b'b', 3]
-    assert s.to_python(gen_ok('a', b'b', 3)) == ['a', b'b', 3]
-    assert s.to_python(('a', b'b', 3)) == ['a', b'b', 3]
-    assert s.to_python('abc') == ['a', 'b', 'c']
+    assert list(s.to_python(iter(['a', b'b', 3]))) == ['a', b'b', 3]
+    assert list(s.to_python(gen_ok('a', b'b', 3))) == ['a', b'b', 3]
+    assert list(s.to_python(('a', b'b', 3))) == ['a', b'b', 3]
+    assert list(s.to_python('abc')) == ['a', 'b', 'c']
 
     assert s.to_python(iter(['a', b'b', 3]), mode='json') == ['a', 'b', 3]
 
@@ -31,14 +50,20 @@ def test_generator_any():
         assert s.to_python(4) == 4
 
     with pytest.raises(ValueError, match='oops'):
-        s.to_python(gen_error(1, 2))
+        list(s.to_python(gen_error(1, 2)))
+
+    with pytest.raises(ValueError, match='oops'):
+        s.to_python(gen_error(1, 2), mode='json')
+
+    with pytest.raises(ValueError, match='oops'):
+        s.to_json(gen_error(1, 2))
 
 
 def test_generator_int():
     s = SchemaSerializer(core_schema.generator_schema(core_schema.int_schema()))
-    assert s.to_python(iter([1, 2, 3])) == [1, 2, 3]
-    assert s.to_python(gen_ok(1, 2, 3)) == [1, 2, 3]
-    assert s.to_python((1, 2, 3)) == [1, 2, 3]
+    assert list(s.to_python(iter([1, 2, 3]))) == [1, 2, 3]
+    assert list(s.to_python(gen_ok(1, 2, 3))) == [1, 2, 3]
+    assert list(s.to_python((1, 2, 3))) == [1, 2, 3]
 
     assert s.to_python(iter([1, 2, 3]), mode='json') == [1, 2, 3]
 
@@ -47,4 +72,33 @@ def test_generator_int():
     assert s.to_json((1, 2, 3)) == b'[1,2,3]'
 
     with pytest.raises(ValueError, match='oops'):
-        s.to_python(gen_error(1, 2))
+        list(s.to_python(gen_error(1, 2)))
+
+    with pytest.raises(ValueError, match='oops'):
+        s.to_json(gen_error(1, 2))
+
+    with pytest.warns(UserWarning, match='Expected `int` but got `str` - slight slowdown possible'):
+        s.to_json(gen_ok(1, 'a'))
+
+    gen = s.to_python(gen_ok(1, 'a'))
+    assert next(gen) == 1
+    with pytest.warns(UserWarning, match='Expected `int` but got `str` - slight slowdown possible'):
+        assert next(gen) == 'a'
+
+
+def test_include():
+    v = SchemaSerializer(
+        core_schema.generator_schema(
+            core_schema.any_schema(), serialization=core_schema.inc_ex_seq_schema(include={1, 3, 5})
+        )
+    )
+    assert v.to_python([0, 1, 2, 3], mode='json') == [1, 3]
+    assert list(v.to_python([0, 1, 2, 3])) == [1, 3]
+    assert v.to_python(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], mode='json') == ['b', 'd', 'f']
+    assert v.to_python(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], mode='json') == ['b', 'd', 'f']
+    assert v.to_json(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) == b'["b","d","f"]'
+    # the two include lists are now combined via UNION! unlike in pydantic v1
+    assert v.to_python(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], include={6}, mode='json') == ['b', 'd', 'f', 'g']
+    assert list(v.to_python(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], include={6})) == ['b', 'd', 'f', 'g']
+    assert v.to_json(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], include={6}) == b'["b","d","f","g"]'
+    assert v.to_python(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], include={6: None}, mode='json') == ['b', 'd', 'f', 'g']
