@@ -81,6 +81,7 @@ combined_serializer! {
         super::other::ChainBuilder;
         super::other::FunctionBuilder;
         super::other::CustomErrorBuilder;
+        super::literal::LiteralBuildSerializer;
     }
     // `both` means the struct is added to both the `CombinedSerializer` enum and the match statement in
     // `find_serializer` so they can be used via a `type` str.

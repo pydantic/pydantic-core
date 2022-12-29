@@ -205,9 +205,9 @@ impl LiteralMultipleIntsValidator {
         let mut expected: IntSet<i64> = IntSet::with_hasher(BuildHasherDefault::default());
         let mut repr_args = Vec::new();
         for item in expected_list.iter() {
-            if let Ok(str) = item.extract() {
-                expected.insert(str);
-                repr_args.push(str.to_string());
+            if let Ok(int) = item.extract() {
+                expected.insert(int);
+                repr_args.push(int.to_string());
             } else {
                 return None;
             }
