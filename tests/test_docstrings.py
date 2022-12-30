@@ -9,18 +9,18 @@ import pytest
 
 import pydantic_core
 
-DOCSTRING_REGEX = r'```python(.*?)```'
+DOCSTRING_REGEX = r'```py(.*?)```'
 
 
 class DocstringTest:
     def method_a(self):
         """
-        ```python
+        ```py
         assert 1 == 1
         assert 1 != 2
         ```
 
-        ```python
+        ```py
         assert 1 != 3
         assert 2 + 2 == 4
         ```
@@ -29,7 +29,7 @@ class DocstringTest:
 
     def method_b(self):
         """
-        ```python
+        ```py
         print('hello')
         print('world')
         ```
@@ -40,7 +40,7 @@ class DocstringTest:
 class DocstringTestBadIndent:
     def method_a(self):
         """
-          ```python
+          ```py
           assert 1 == 1
         print('badly indented line')
           ```
