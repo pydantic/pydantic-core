@@ -92,7 +92,7 @@ def test_any_with_timedelta_serializer():
 
 
 def test_any_config_timedelta_float():
-    s = SchemaSerializer(core_schema.any_schema(), config={'serialization_timedelta_mode': 'float'})
+    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': 'float'})
     h2 = timedelta(hours=2)
     assert s.to_python(h2) == h2
     assert s.to_python(h2, mode='json') == 7200.0
@@ -104,7 +104,7 @@ def test_any_config_timedelta_float():
 
 
 def test_any_config_timedelta_float_faction():
-    s = SchemaSerializer(core_schema.any_schema(), config={'serialization_timedelta_mode': 'float'})
+    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': 'float'})
     one_half_s = timedelta(seconds=1.5)
     assert s.to_python(one_half_s) == one_half_s
     assert s.to_python(one_half_s, mode='json') == 1.5

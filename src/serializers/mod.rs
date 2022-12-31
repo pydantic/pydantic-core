@@ -6,11 +6,12 @@ use pyo3::types::{PyBytes, PyDict};
 use crate::build_context::BuildContext;
 use crate::SchemaValidator;
 
+use config::SerializationConfig;
 use extra::{Extra, SerMode};
 pub use shared::CombinedSerializer;
 use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
-use type_serializers::timedelta::TimedeltaMode;
 
+mod config;
 mod extra;
 mod include_exclude;
 mod ob_type;
@@ -23,7 +24,7 @@ pub struct SchemaSerializer {
     serializer: CombinedSerializer,
     slots: Vec<CombinedSerializer>,
     json_size: usize,
-    timedelta_mode: TimedeltaMode,
+    config: SerializationConfig,
 }
 
 #[pymethods]
@@ -37,7 +38,7 @@ impl SchemaSerializer {
             serializer,
             slots: build_context.into_slots_ser()?,
             json_size: 1024,
-            timedelta_mode: TimedeltaMode::from_config(config)?,
+            config: SerializationConfig::from_config(config)?,
         })
     }
 
@@ -65,7 +66,7 @@ impl SchemaSerializer {
             exclude_defaults,
             exclude_none,
             round_trip,
-            self.timedelta_mode,
+            self.config,
         );
         let v = self.serializer.to_python(value, include, exclude, &extra)?;
         extra.warnings.final_check(py)?;
@@ -96,7 +97,7 @@ impl SchemaSerializer {
             exclude_defaults,
             exclude_none,
             round_trip,
-            self.timedelta_mode,
+            self.config,
         );
         let bytes = to_json_bytes(
             value,

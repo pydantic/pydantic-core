@@ -9,9 +9,9 @@ use nohash_hasher::IntSet;
 
 use crate::build_tools::py_err;
 
+use super::config::SerializationConfig;
 use super::ob_type::ObTypeLookup;
 use super::shared::CombinedSerializer;
-use super::type_serializers::timedelta::TimedeltaMode;
 
 /// Useful things which are passed around by type_serializers
 pub(crate) struct Extra<'a> {
@@ -24,7 +24,7 @@ pub(crate) struct Extra<'a> {
     pub exclude_defaults: bool,
     pub exclude_none: bool,
     pub round_trip: bool,
-    pub timedelta_mode: TimedeltaMode,
+    pub config: SerializationConfig,
     pub rec_guard: SerRecursionGuard,
 }
 
@@ -39,7 +39,7 @@ impl<'a> Extra<'a> {
         exclude_defaults: Option<bool>,
         exclude_none: Option<bool>,
         round_trip: Option<bool>,
-        timedelta_mode: TimedeltaMode,
+        config: SerializationConfig,
     ) -> Self {
         Self {
             mode,
@@ -51,7 +51,7 @@ impl<'a> Extra<'a> {
             exclude_defaults: exclude_defaults.unwrap_or(false),
             exclude_none: exclude_none.unwrap_or(false),
             round_trip: round_trip.unwrap_or(false),
-            timedelta_mode,
+            config,
             rec_guard: SerRecursionGuard::default(),
         }
     }
@@ -68,7 +68,7 @@ pub(crate) struct ExtraOwned {
     exclude_defaults: bool,
     exclude_none: bool,
     round_trip: bool,
-    timedelta_mode: TimedeltaMode,
+    config: SerializationConfig,
     rec_guard: SerRecursionGuard,
 }
 
@@ -83,7 +83,7 @@ impl ExtraOwned {
             exclude_defaults: extra.exclude_defaults,
             exclude_none: extra.exclude_none,
             round_trip: extra.round_trip,
-            timedelta_mode: extra.timedelta_mode,
+            config: extra.config,
             rec_guard: extra.rec_guard.clone(),
         }
     }
@@ -99,7 +99,7 @@ impl ExtraOwned {
             exclude_defaults: self.exclude_defaults,
             exclude_none: self.exclude_none,
             round_trip: self.round_trip,
-            timedelta_mode: self.timedelta_mode,
+            config: self.config,
             rec_guard: self.rec_guard.clone(),
         }
     }

@@ -42,8 +42,9 @@ class CoreConfig(TypedDict, total=False):
     str_to_upper: bool
     # fields related to float fields only
     allow_inf_nan: bool  # default: True
-    # the config options are used to customise serialization
-    serialization_timedelta_mode: Literal['iso8601', 'float']
+    # the config options are used to customise serialization to JSON
+    ser_json_timedelta: Literal['iso8601', 'float']  # default: 'iso8601'
+    ser_json_bytes: Literal['utf8', 'base64']  # default: 'utf8'
 
 
 IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'

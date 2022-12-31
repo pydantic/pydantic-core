@@ -123,7 +123,7 @@ pub(crate) fn ob_type_to_python_json(ob_type: &ObType, value: &PyAny, extra: &Ex
         }
         ObType::Timedelta => {
             let py_timedelta: &PyDelta = value.cast_as()?;
-            extra.timedelta_mode.timedelta_to_json(py_timedelta)?
+            extra.config.timedelta_mode.timedelta_to_json(py_timedelta)?
         }
         ObType::Url => {
             let py_url: PyUrl = value.extract()?;
@@ -246,7 +246,10 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
         }
         ObType::Timedelta => {
             let py_timedelta: &PyDelta = value.cast_as().map_err(py_err_se_err)?;
-            extra.timedelta_mode.timedelta_serialize(py_timedelta, serializer)
+            extra
+                .config
+                .timedelta_mode
+                .timedelta_serialize(py_timedelta, serializer)
         }
         ObType::Url => {
             let py_url: PyUrl = value.extract().map_err(py_err_se_err)?;
@@ -299,7 +302,7 @@ pub(crate) fn json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py,
         }
         ObType::Timedelta => {
             let py_timedelta: &PyDelta = key.cast_as()?;
-            extra.timedelta_mode.json_key(py_timedelta)
+            extra.config.timedelta_mode.json_key(py_timedelta)
         }
         ObType::Url => {
             let py_url: PyUrl = key.extract()?;
