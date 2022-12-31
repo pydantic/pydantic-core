@@ -1,15 +1,12 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Debug;
 
-use pyo3::exceptions::PyValueError;
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pyo3::{intern, AsPyPointer};
 
 use enum_dispatch::enum_dispatch;
-use nohash_hasher::IntSet;
 use serde::Serialize;
 use serde_json::ser::PrettyFormatter;
 
@@ -17,10 +14,10 @@ use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, py_error_type, SchemaDict};
 use crate::PydanticSerializationError;
 
-use super::any::{fallback_to_python, json_key, ObTypeLookup};
-use super::timedelta::TimedeltaMode;
+use super::extra::Extra;
+use super::type_serializers::any::{fallback_to_python, json_key};
 
-pub(super) trait BuildSerializer: Sized {
+pub(crate) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
 
     fn build(
@@ -73,54 +70,54 @@ macro_rules! combined_serializer {
 }
 
 combined_serializer! {
-    // `enum_only` is for serializers which are not built directly via the `type` key and `find_serializer`
+    // `enum_only` is for type_serializers which are not built directly via the `type` key and `find_serializer`
     // but are included in the `CombinedSerializer` enum
     enum_only: {
-        // function serializers cannot be defined by type lookup, but must be members of `CombinedSerializer`,
+        // function type_serializers cannot be defined by type lookup, but must be members of `CombinedSerializer`,
         // hence they're here.
-        Function: super::function::FunctionSerializer;
+        Function: super::type_serializers::function::FunctionSerializer;
         // `TuplePositionalSerializer` & `TupleVariableSerializer` are created by
         // `TupleBuilder` based on the `mode` parameter.
-        TuplePositional: super::tuple::TuplePositionalSerializer;
-        TupleVariable: super::tuple::TupleVariableSerializer;
+        TuplePositional: super::type_serializers::tuple::TuplePositionalSerializer;
+        TupleVariable: super::type_serializers::tuple::TupleVariableSerializer;
     }
-    // `find_only` is for serializers which are built directly via the `type` key and `find_serializer`
+    // `find_only` is for type_serializers which are built directly via the `type` key and `find_serializer`
     // but aren't actually used for serialization, e.g. their `build` method must return another serializer
     find_only: {
-        super::tuple::TupleBuilder;
-        super::other::ChainBuilder;
-        super::other::FunctionBuilder;
-        super::other::CustomErrorBuilder;
-        super::literal::LiteralBuildSerializer;
+        super::type_serializers::tuple::TupleBuilder;
+        super::type_serializers::other::ChainBuilder;
+        super::type_serializers::other::FunctionBuilder;
+        super::type_serializers::other::CustomErrorBuilder;
+        super::type_serializers::literal::LiteralBuildSerializer;
     }
     // `both` means the struct is added to both the `CombinedSerializer` enum and the match statement in
     // `find_serializer` so they can be used via a `type` str.
     both: {
-        None: super::simple::NoneSerializer;
-        Nullable: super::nullable::NullableSerializer;
-        Int: super::simple::IntSerializer;
-        Bool: super::simple::BoolSerializer;
-        Float: super::simple::FloatSerializer;
-        Str: super::string::StrSerializer;
-        Bytes: super::bytes::BytesSerializer;
-        Datetime: super::datetime_etc::DatetimeSerializer;
-        TimeDelta: super::timedelta::TimeDeltaSerializer;
-        Date: super::datetime_etc::DateSerializer;
-        Time: super::datetime_etc::TimeSerializer;
-        List: super::list::ListSerializer;
-        Set: super::set_frozenset::SetSerializer;
-        FrozenSet: super::set_frozenset::FrozenSetSerializer;
-        Generator: super::generator::GeneratorSerializer;
-        Dict: super::dict::DictSerializer;
-        TypedDict: super::typed_dict::TypedDictSerializer;
-        ModelDict: super::new_class::NewClassSerializer;
-        Url: super::url::UrlSerializer;
-        MultiHostUrl: super::url::MultiHostUrlSerializer;
-        Any: super::any::AnySerializer;
-        Format: super::format::FunctionSerializer;
-        WithDefault: super::with_default::WithDefaultSerializer;
-        Json: super::json::JsonSerializer;
-        Recursive: super::recursive::RecursiveRefSerializer;
+        None: super::type_serializers::simple::NoneSerializer;
+        Nullable: super::type_serializers::nullable::NullableSerializer;
+        Int: super::type_serializers::simple::IntSerializer;
+        Bool: super::type_serializers::simple::BoolSerializer;
+        Float: super::type_serializers::simple::FloatSerializer;
+        Str: super::type_serializers::string::StrSerializer;
+        Bytes: super::type_serializers::bytes::BytesSerializer;
+        Datetime: super::type_serializers::datetime_etc::DatetimeSerializer;
+        TimeDelta: super::type_serializers::timedelta::TimeDeltaSerializer;
+        Date: super::type_serializers::datetime_etc::DateSerializer;
+        Time: super::type_serializers::datetime_etc::TimeSerializer;
+        List: super::type_serializers::list::ListSerializer;
+        Set: super::type_serializers::set_frozenset::SetSerializer;
+        FrozenSet: super::type_serializers::set_frozenset::FrozenSetSerializer;
+        Generator: super::type_serializers::generator::GeneratorSerializer;
+        Dict: super::type_serializers::dict::DictSerializer;
+        TypedDict: super::type_serializers::typed_dict::TypedDictSerializer;
+        ModelDict: super::type_serializers::new_class::NewClassSerializer;
+        Url: super::type_serializers::url::UrlSerializer;
+        MultiHostUrl: super::type_serializers::url::MultiHostUrlSerializer;
+        Any: super::type_serializers::any::AnySerializer;
+        Format: super::type_serializers::format::FunctionSerializer;
+        WithDefault: super::type_serializers::with_default::WithDefaultSerializer;
+        Json: super::type_serializers::json::JsonSerializer;
+        Recursive: super::type_serializers::recursive::RecursiveRefSerializer;
     }
 }
 
@@ -139,7 +136,7 @@ impl CombinedSerializer {
                 Some("function") => {
                     // `function` is a special case, not included in `find_serializer` since it means something
                     // different in `schema.type`
-                    return super::function::FunctionSerializer::build(ser, config, build_context)
+                    return super::type_serializers::function::FunctionSerializer::build(ser, config, build_context)
                         .map_err(|err| py_error_type!("Error building `function` serializer:\n  {}", err));
                 }
                 // applies to lists tuples and dicts, does not override the main schema `type`
@@ -162,7 +159,7 @@ impl CombinedSerializer {
         let type_: &str = schema.get_as_req(type_key)?;
         match Self::find_serializer(type_, schema, config, build_context)? {
             Some(serializer) => Ok(serializer),
-            None => super::any::AnySerializer::build(schema, config, build_context),
+            None => super::type_serializers::any::AnySerializer::build(schema, config, build_context),
         }
     }
 }
@@ -182,7 +179,9 @@ impl BuildSerializer for CombinedSerializer {
                 let slot_id = build_context.prepare_slot(schema_ref, None)?;
                 let inner_ser = Self::_build(schema, config, build_context)?;
                 build_context.complete_slot(slot_id, inner_ser)?;
-                return Ok(super::recursive::RecursiveRefSerializer::from_id(slot_id));
+                return Ok(super::type_serializers::recursive::RecursiveRefSerializer::from_id(
+                    slot_id,
+                ));
             }
         }
 
@@ -191,7 +190,7 @@ impl BuildSerializer for CombinedSerializer {
 }
 
 #[enum_dispatch(CombinedSerializer)]
-pub(super) trait TypeSerializer: Send + Sync + Clone + Debug {
+pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
     fn to_python(
         &self,
         value: &PyAny,
@@ -216,11 +215,11 @@ pub(super) trait TypeSerializer: Send + Sync + Clone + Debug {
     ) -> Result<S::Ok, S::Error>;
 }
 
-pub(super) fn py_err_se_err<T: serde::ser::Error, E: fmt::Display>(py_error: E) -> T {
+pub(crate) fn py_err_se_err<T: serde::ser::Error, E: fmt::Display>(py_error: E) -> T {
     T::custom(py_error.to_string())
 }
 
-pub(super) struct PydanticSerializer<'py> {
+pub(crate) struct PydanticSerializer<'py> {
     value: &'py PyAny,
     serializer: &'py CombinedSerializer,
     extra: &'py Extra<'py>,
@@ -229,7 +228,7 @@ pub(super) struct PydanticSerializer<'py> {
 }
 
 impl<'py> PydanticSerializer<'py> {
-    pub(super) fn new(
+    pub(crate) fn new(
         value: &'py PyAny,
         serializer: &'py CombinedSerializer,
         include: Option<&'py PyAny>,
@@ -253,188 +252,7 @@ impl<'py> Serialize for PydanticSerializer<'py> {
     }
 }
 
-/// Useful things which are passed around by serializers
-pub(super) struct Extra<'a> {
-    pub mode: &'a SerMode,
-    pub slots: &'a [CombinedSerializer],
-    pub ob_type_lookup: &'a ObTypeLookup,
-    pub warnings: CollectWarnings,
-    pub by_alias: bool,
-    pub exclude_unset: bool,
-    pub exclude_defaults: bool,
-    pub exclude_none: bool,
-    pub round_trip: bool,
-    pub timedelta_mode: TimedeltaMode,
-    pub rec_guard: SerRecursionGuard,
-}
-
-impl<'a> Extra<'a> {
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn new(
-        py: Python<'a>,
-        mode: &'a SerMode,
-        slots: &'a [CombinedSerializer],
-        by_alias: Option<bool>,
-        exclude_unset: Option<bool>,
-        exclude_defaults: Option<bool>,
-        exclude_none: Option<bool>,
-        round_trip: Option<bool>,
-        timedelta_mode: TimedeltaMode,
-    ) -> Self {
-        Self {
-            mode,
-            slots,
-            ob_type_lookup: ObTypeLookup::cached(py),
-            warnings: CollectWarnings::new(true),
-            by_alias: by_alias.unwrap_or(true),
-            exclude_unset: exclude_unset.unwrap_or(false),
-            exclude_defaults: exclude_defaults.unwrap_or(false),
-            exclude_none: exclude_none.unwrap_or(false),
-            round_trip: round_trip.unwrap_or(false),
-            timedelta_mode,
-            rec_guard: SerRecursionGuard::default(),
-        }
-    }
-}
-
-#[derive(Clone)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-pub(super) struct ExtraOwned {
-    mode: SerMode,
-    slots: Vec<CombinedSerializer>,
-    warnings: CollectWarnings,
-    by_alias: bool,
-    exclude_unset: bool,
-    exclude_defaults: bool,
-    exclude_none: bool,
-    round_trip: bool,
-    timedelta_mode: TimedeltaMode,
-    rec_guard: SerRecursionGuard,
-}
-
-impl ExtraOwned {
-    pub fn new(extra: &Extra) -> Self {
-        Self {
-            mode: extra.mode.clone(),
-            slots: extra.slots.to_vec(),
-            warnings: extra.warnings.clone(),
-            by_alias: extra.by_alias,
-            exclude_unset: extra.exclude_unset,
-            exclude_defaults: extra.exclude_defaults,
-            exclude_none: extra.exclude_none,
-            round_trip: extra.round_trip,
-            timedelta_mode: extra.timedelta_mode,
-            rec_guard: extra.rec_guard.clone(),
-        }
-    }
-
-    pub fn to_extra<'py>(&'py self, py: Python<'py>) -> Extra<'py> {
-        Extra {
-            mode: &self.mode,
-            slots: &self.slots,
-            ob_type_lookup: ObTypeLookup::cached(py),
-            warnings: self.warnings.clone(),
-            by_alias: self.by_alias,
-            exclude_unset: self.exclude_unset,
-            exclude_defaults: self.exclude_defaults,
-            exclude_none: self.exclude_none,
-            round_trip: self.round_trip,
-            timedelta_mode: self.timedelta_mode,
-            rec_guard: self.rec_guard.clone(),
-        }
-    }
-}
-
-#[derive(Clone)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-pub(super) enum SerMode {
-    Python,
-    Json,
-    Other(String),
-}
-
-impl From<Option<&str>> for SerMode {
-    fn from(s: Option<&str>) -> Self {
-        match s {
-            Some("json") => SerMode::Json,
-            Some("python") => SerMode::Python,
-            Some(other) => SerMode::Other(other.to_string()),
-            None => SerMode::Python,
-        }
-    }
-}
-
-impl ToPyObject for SerMode {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        match self {
-            SerMode::Python => intern!(py, "python").to_object(py),
-            SerMode::Json => intern!(py, "json").to_object(py),
-            SerMode::Other(s) => s.to_object(py),
-        }
-    }
-}
-
-#[derive(Clone)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-pub(super) struct CollectWarnings {
-    active: bool,
-    warnings: RefCell<Option<Vec<String>>>,
-}
-
-impl CollectWarnings {
-    pub(super) fn new(active: bool) -> Self {
-        Self {
-            active,
-            warnings: RefCell::new(None),
-        }
-    }
-
-    pub(super) fn fallback_slow(&self, field_type: &str, value: &PyAny) {
-        if self.active {
-            self.fallback(field_type, value, "slight slowdown possible");
-        }
-    }
-
-    pub(super) fn fallback_filtering(&self, field_type: &str, value: &PyAny) {
-        if self.active {
-            self.fallback(field_type, value, "filtering via include/exclude unavailable");
-        }
-    }
-
-    fn fallback(&self, field_type: &str, value: &PyAny, reason: &str) {
-        if self.active {
-            let type_name = value.get_type().name().unwrap_or("<unknown python object>");
-            self.add_warning(format!("Expected `{field_type}` but got `{type_name}` - {reason}"));
-        }
-    }
-
-    fn add_warning(&self, message: String) {
-        let mut op_warnings = self.warnings.borrow_mut();
-        if let Some(ref mut warnings) = *op_warnings {
-            warnings.push(message);
-        } else {
-            *op_warnings = Some(vec![message]);
-        }
-    }
-
-    pub(super) fn final_check(&self, py: Python) -> PyResult<()> {
-        if self.active {
-            match *self.warnings.borrow() {
-                Some(ref warnings) => {
-                    let warnings = warnings.iter().map(|w| w.as_str()).collect::<Vec<_>>();
-                    let message = format!("Pydantic serializer warnings:\n  {}", warnings.join("\n  "));
-                    let user_warning_type = py.import("builtins")?.getattr("UserWarning")?;
-                    PyErr::warn(py, user_warning_type, &message, 0)
-                }
-                _ => Ok(()),
-            }
-        } else {
-            Ok(())
-        }
-    }
-}
-
-pub(super) fn to_json_bytes(
+pub(crate) fn to_json_bytes(
     value: &PyAny,
     serializer: &CombinedSerializer,
     include: Option<&PyAny>,
@@ -465,45 +283,4 @@ pub(super) fn to_json_bytes(
         }
     };
     Ok(bytes)
-}
-
-/// we have `RecursionInfo` then a `RefCell` since `SerializeInfer.serialize` can't take a `&mut self`
-#[derive(Default, Clone)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-pub struct RecursionInfo {
-    ids: IntSet<usize>,
-    /// as with `src/recursion_guard.rs` this is used as a backup in case the identity check recursion guard fails
-    /// see #143
-    depth: u16,
-}
-
-#[derive(Default, Clone)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-pub struct SerRecursionGuard {
-    info: RefCell<RecursionInfo>,
-}
-
-impl SerRecursionGuard {
-    const MAX_DEPTH: u16 = 200;
-
-    pub fn add(&self, value: &PyAny) -> PyResult<usize> {
-        // https://doc.rust-lang.org/std/collections/struct.HashSet.html#method.insert
-        // "If the set did not have this value present, `true` is returned."
-        let id = value.as_ptr() as usize;
-        let mut info = self.info.borrow_mut();
-        if !info.ids.insert(id) {
-            py_err!(PyValueError; "Circular reference detected (id repeated)")
-        } else if info.depth > Self::MAX_DEPTH {
-            py_err!(PyValueError; "Circular reference detected (depth exceeded)")
-        } else {
-            info.depth += 1;
-            Ok(id)
-        }
-    }
-
-    pub fn pop(&self, id: usize) {
-        let mut info = self.info.borrow_mut();
-        info.depth -= 1;
-        info.ids.remove(&id);
-    }
 }

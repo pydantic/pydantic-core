@@ -3,8 +3,8 @@ use pyo3::types::PyDict;
 
 use serde::Serialize;
 
-use super::any::{fallback_serialize, fallback_to_python, IsType, ObType};
-use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
+use super::any::{fallback_serialize, fallback_to_python};
+use super::{BuildSerializer, CombinedSerializer, Extra, IsType, ObType, SerMode, TypeSerializer};
 use crate::build_context::BuildContext;
 
 #[derive(Debug, Clone)]

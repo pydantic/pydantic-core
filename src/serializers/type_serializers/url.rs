@@ -7,7 +7,7 @@ use crate::build_context::BuildContext;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::any::{fallback_serialize, fallback_to_python_json, json_key};
-use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
+use super::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 macro_rules! build_serializer {
     ($struct_name:ident, $expected_type:literal, $extract:ty) => {

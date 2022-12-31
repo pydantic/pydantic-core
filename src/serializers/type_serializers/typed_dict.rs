@@ -10,9 +10,10 @@ use crate::build_context::BuildContext;
 use crate::build_tools::{py_error_type, schema_or_config, SchemaDict};
 
 use super::any::{fallback_serialize, fallback_to_python, json_key, SerializeInfer};
-use super::include_exclude::SchemaIncEx;
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, TypeSerializer};
 use super::with_default::get_default;
+use super::{
+    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaIncEx, TypeSerializer,
+};
 
 #[derive(Debug, Clone)]
 struct TypedDictField {

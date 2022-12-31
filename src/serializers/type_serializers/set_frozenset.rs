@@ -8,7 +8,7 @@ use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
-use super::shared::{BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SerMode, TypeSerializer};
+use super::{BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SerMode, TypeSerializer};
 
 macro_rules! build_serializer {
     ($struct_name:ident, $expected_type:literal, $py_type:ty) => {

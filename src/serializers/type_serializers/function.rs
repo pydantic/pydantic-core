@@ -12,9 +12,9 @@ use crate::build_tools::{function_name, kwargs, py_error_type, SchemaDict};
 use crate::errors::PydanticSerializationError;
 
 use super::any::{
-    fallback_serialize, fallback_serialize_known, fallback_to_python_json, json_key, ob_type_to_python_json, ObType,
+    fallback_serialize, fallback_serialize_known, fallback_to_python_json, json_key, ob_type_to_python_json,
 };
-use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
+use super::{BuildSerializer, CombinedSerializer, Extra, ObType, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct FunctionSerializer {

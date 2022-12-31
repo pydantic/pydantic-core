@@ -4,9 +4,8 @@ use pyo3::types::PyDict;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
-use crate::serializers::any::{IsType, ObType};
 
-use super::shared::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{BuildSerializer, CombinedSerializer, Extra, IsType, ObType, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct NullableSerializer {

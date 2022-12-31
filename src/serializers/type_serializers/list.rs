@@ -8,8 +8,9 @@ use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
-use super::include_exclude::SchemaIncEx;
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, TypeSerializer};
+use super::{
+    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaIncEx, TypeSerializer,
+};
 
 #[derive(Debug, Clone)]
 pub struct ListSerializer {

@@ -7,7 +7,7 @@ use crate::build_tools::SchemaDict;
 use crate::serializers::shared::CombinedSerializer;
 
 use super::any::AnySerializer;
-use super::shared::BuildSerializer;
+use super::BuildSerializer;
 
 pub struct ChainBuilder;
 

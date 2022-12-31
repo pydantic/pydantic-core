@@ -6,9 +6,9 @@ use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, SchemaDict};
 
 use super::any::AnySerializer;
-use super::shared::{BuildSerializer, CombinedSerializer};
 use super::simple::IntSerializer;
 use super::string::StrSerializer;
+use super::{BuildSerializer, CombinedSerializer};
 
 #[derive(Debug, Clone)]
 pub struct LiteralBuildSerializer;

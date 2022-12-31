@@ -6,33 +6,16 @@ use pyo3::types::{PyBytes, PyDict};
 use crate::build_context::BuildContext;
 use crate::SchemaValidator;
 
+use extra::{Extra, SerMode};
 pub use shared::CombinedSerializer;
-use shared::{to_json_bytes, BuildSerializer, Extra, SerMode, TypeSerializer};
+use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
+use type_serializers::timedelta::TimedeltaMode;
 
-mod any;
-mod bytes;
-mod datetime_etc;
-mod dict;
-mod format;
-mod function;
-mod generator;
+mod extra;
 mod include_exclude;
-mod json;
-mod list;
-mod literal;
-mod new_class;
-mod nullable;
-mod other;
-mod recursive;
-mod set_frozenset;
+mod ob_type;
 mod shared;
-mod simple;
-mod string;
-mod timedelta;
-mod tuple;
-mod typed_dict;
-mod url;
-mod with_default;
+mod type_serializers;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
@@ -40,7 +23,7 @@ pub struct SchemaSerializer {
     serializer: CombinedSerializer,
     slots: Vec<CombinedSerializer>,
     json_size: usize,
-    timedelta_mode: timedelta::TimedeltaMode,
+    timedelta_mode: TimedeltaMode,
 }
 
 #[pymethods]
@@ -54,7 +37,7 @@ impl SchemaSerializer {
             serializer,
             slots: build_context.into_slots_ser()?,
             json_size: 1024,
-            timedelta_mode: timedelta::TimedeltaMode::from_config(config)?,
+            timedelta_mode: TimedeltaMode::from_config(config)?,
         })
     }
 

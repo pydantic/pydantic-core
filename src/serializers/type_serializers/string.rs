@@ -5,8 +5,8 @@ use pyo3::types::{PyDict, PyString};
 
 use crate::build_context::BuildContext;
 
-use super::any::{fallback_serialize, fallback_to_python_json, json_key, IsType, ObType};
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
+use super::any::{fallback_serialize, fallback_to_python_json, json_key};
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, IsType, ObType, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct StrSerializer;

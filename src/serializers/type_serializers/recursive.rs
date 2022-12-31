@@ -5,8 +5,7 @@ use pyo3::types::PyDict;
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
-use super::shared::py_err_se_err;
-use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct RecursiveRefSerializer {

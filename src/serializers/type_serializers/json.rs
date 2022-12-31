@@ -12,7 +12,7 @@ use crate::build_tools::SchemaDict;
 
 use super::any::{json_key, AnySerializer};
 use super::bytes::utf8_py_error;
-use super::shared::{py_err_se_err, to_json_bytes, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{py_err_se_err, to_json_bytes, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct JsonSerializer {

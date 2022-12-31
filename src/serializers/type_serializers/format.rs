@@ -11,8 +11,8 @@ use crate::build_tools::SchemaDict;
 use crate::errors::PydanticSerializationError;
 
 use super::any::json_key;
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 use super::string::serialize_py_str;
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct FunctionSerializer {

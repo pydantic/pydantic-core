@@ -16,9 +16,9 @@ struct Slot<T> {
     answers: Option<Answers>,
 }
 
-/// `BuildContext` is used to store extra information while building validators and serializers,
-/// currently it just holds a vec "slots" which holds validators/serializers which need to be accessed from
-/// multiple other validators/serializers and therefore can't be owned by them directly.
+/// `BuildContext` is used to store extra information while building validators and type_serializers,
+/// currently it just holds a vec "slots" which holds validators/type_serializers which need to be accessed from
+/// multiple other validators/type_serializers and therefore can't be owned by them directly.
 #[derive(Clone)]
 pub struct BuildContext<T> {
     used_refs: AHashSet<String>,

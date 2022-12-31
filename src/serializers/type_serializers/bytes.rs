@@ -11,7 +11,7 @@ use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python_json, json_key};
-use super::shared::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
+use super::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct BytesSerializer {

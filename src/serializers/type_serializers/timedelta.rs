@@ -9,7 +9,7 @@ use crate::build_tools::{py_err, SchemaDict};
 use crate::input::pytimedelta_as_duration;
 
 use super::any::{fallback_serialize, fallback_to_python_json, json_key};
-use super::shared::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone, Copy)]
 pub enum TimedeltaMode {

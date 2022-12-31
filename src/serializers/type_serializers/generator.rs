@@ -6,12 +6,11 @@ use serde::ser::SerializeSeq;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
-use crate::serializers::shared::SerMode;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
-use super::include_exclude::SchemaIncEx;
-use super::shared::{
-    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ExtraOwned, PydanticSerializer, TypeSerializer,
+use super::{
+    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ExtraOwned, PydanticSerializer, SchemaIncEx, SerMode,
+    TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
