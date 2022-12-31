@@ -11,7 +11,9 @@ use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use crate::build_context::BuildContext;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ObType, SerMode, TypeSerializer};
+use super::{
+    py_err_se_err, utf8_py_error, BuildSerializer, CombinedSerializer, Extra, ObType, SerMode, TypeSerializer,
+};
 
 #[derive(Debug, Clone)]
 pub struct AnySerializer;
@@ -80,7 +82,11 @@ pub(crate) fn ob_type_to_python_json(ob_type: &ObType, value: &PyAny, extra: &Ex
         // `bool` and `None` can't be subclasses, so no need to do the same on bool
         ObType::Float => extract_as!(f64),
         ObType::Str => extract_as!(&str),
-        ObType::Bytes => super::bytes::py_bytes_to_str(value.cast_as()?)?.into_py(py),
+        ObType::Bytes => extra
+            .config
+            .bytes_mode
+            .bytes_to_string(value.cast_as()?)
+            .map(|s| s.into_py(py))?,
         ObType::Bytearray => {
             let py_byte_array: &PyByteArray = value.cast_as()?;
             // see https://docs.rs/pyo3/latest/pyo3/types/struct.PyByteArray.html#method.as_bytes
@@ -88,7 +94,7 @@ pub(crate) fn ob_type_to_python_json(ob_type: &ObType, value: &PyAny, extra: &Ex
             let bytes = unsafe { py_byte_array.as_bytes() };
             match from_utf8(bytes) {
                 Ok(s) => s.into_py(py),
-                Err(err) => return Err(super::bytes::utf8_py_error(py, err, bytes)),
+                Err(err) => return Err(utf8_py_error(py, err, bytes)),
             }
         }
         ObType::Tuple => serialize_seq!(PyTuple),
@@ -204,7 +210,7 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
         }
         ObType::Bytes => {
             let py_bytes: &PyBytes = value.cast_as().map_err(py_err_se_err)?;
-            super::bytes::serialize_py_bytes(py_bytes, serializer)
+            extra.config.bytes_mode.serialize_bytes(py_bytes, serializer)
         }
         ObType::Bytearray => {
             let py_byte_array: &PyByteArray = value.cast_as().map_err(py_err_se_err)?;
@@ -283,7 +289,7 @@ pub(crate) fn json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py,
             let py_str: &PyString = key.cast_as()?;
             Ok(Cow::Borrowed(py_str.to_str()?))
         }
-        ObType::Bytes => super::bytes::py_bytes_to_str(key.cast_as()?).map(Cow::Borrowed),
+        ObType::Bytes => extra.config.bytes_mode.bytes_to_string(key.cast_as()?),
         // perhaps we could do something faster for things like ints and floats?
         ObType::Datetime => {
             let py_dt: &PyDateTime = key.cast_as()?;

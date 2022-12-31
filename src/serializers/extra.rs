@@ -24,7 +24,7 @@ pub(crate) struct Extra<'a> {
     pub exclude_defaults: bool,
     pub exclude_none: bool,
     pub round_trip: bool,
-    pub config: SerializationConfig,
+    pub config: &'a SerializationConfig,
     pub rec_guard: SerRecursionGuard,
 }
 
@@ -39,7 +39,7 @@ impl<'a> Extra<'a> {
         exclude_defaults: Option<bool>,
         exclude_none: Option<bool>,
         round_trip: Option<bool>,
-        config: SerializationConfig,
+        config: &'a SerializationConfig,
     ) -> Self {
         Self {
             mode,
@@ -83,7 +83,7 @@ impl ExtraOwned {
             exclude_defaults: extra.exclude_defaults,
             exclude_none: extra.exclude_none,
             round_trip: extra.round_trip,
-            config: extra.config,
+            config: extra.config.clone(),
             rec_guard: extra.rec_guard.clone(),
         }
     }
@@ -99,7 +99,7 @@ impl ExtraOwned {
             exclude_defaults: self.exclude_defaults,
             exclude_none: self.exclude_none,
             round_trip: self.round_trip,
-            config: self.config,
+            config: &self.config,
             rec_guard: self.rec_guard.clone(),
         }
     }

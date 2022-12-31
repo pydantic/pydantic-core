@@ -66,7 +66,7 @@ impl SchemaSerializer {
             exclude_defaults,
             exclude_none,
             round_trip,
-            self.config,
+            &self.config,
         );
         let v = self.serializer.to_python(value, include, exclude, &extra)?;
         extra.warnings.final_check(py)?;
@@ -97,7 +97,7 @@ impl SchemaSerializer {
             exclude_defaults,
             exclude_none,
             round_trip,
-            self.config,
+            &self.config,
         );
         let bytes = to_json_bytes(
             value,

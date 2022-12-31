@@ -256,18 +256,6 @@ def string_schema(
     )
 
 
-class Base64SerSchema(TypedDict, total=False):
-    type: Required[Literal['base64']]
-    json_base64: Required[bool]
-
-
-def base64_ser_schema(json_base64: bool) -> Base64SerSchema:
-    return Base64SerSchema(type='base64', json_base64=json_base64)
-
-
-Base64OrElseSerSchema = Union[Base64SerSchema, SerSchema]
-
-
 class BytesSchema(TypedDict, total=False):
     type: Required[Literal['bytes']]
     max_length: int
@@ -275,7 +263,7 @@ class BytesSchema(TypedDict, total=False):
     strict: bool
     ref: str
     extra: Any
-    serialization: Base64OrElseSerSchema
+    serialization: SerSchema
 
 
 def bytes_schema(
@@ -285,7 +273,7 @@ def bytes_schema(
     strict: bool | None = None,
     ref: str | None = None,
     extra: Any = None,
-    serialization: Base64SerSchema | None = None,
+    serialization: SerSchema | None = None,
 ) -> BytesSchema:
     return dict_not_none(
         type='bytes',

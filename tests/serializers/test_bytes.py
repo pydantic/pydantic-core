@@ -101,7 +101,7 @@ def test_subclass_bytes(schema_type, input_value, expected_json):
 
 
 def test_bytes_base64():
-    s = SchemaSerializer(core_schema.bytes_schema(serialization=core_schema.base64_ser_schema(True)))
+    s = SchemaSerializer(core_schema.bytes_schema(), {'ser_json_bytes': 'base64'})
     assert s.to_python(b'foobar') == b'foobar'
 
     assert s.to_json(b'foobar') == b'"Zm9vYmFy"'
@@ -115,9 +115,16 @@ def test_bytes_base64():
 
 
 def test_bytes_base64_dict_key():
-    s = SchemaSerializer(
-        core_schema.dict_schema(core_schema.bytes_schema(serialization=core_schema.base64_ser_schema(True)))
-    )
+    s = SchemaSerializer(core_schema.dict_schema(core_schema.bytes_schema()), {'ser_json_bytes': 'base64'})
 
     assert s.to_python({b'foo bar': 123}, mode='json') == {'Zm9vIGJhcg==': 123}
     assert s.to_json({b'foo bar': 123}) == b'{"Zm9vIGJhcg==":123}'
+
+
+def test_any_bytes_base64():
+    s = SchemaSerializer(core_schema.any_schema(), {'ser_json_bytes': 'base64'})
+    assert s.to_python(b'foobar') == b'foobar'
+
+    assert s.to_json(b'foobar') == b'"Zm9vYmFy"'
+    assert s.to_json({b'foobar': 123}) == b'{"Zm9vYmFy":123}'
+    assert s.to_python({b'foobar': 123}, mode='json') == {'Zm9vYmFy': 123}
