@@ -347,9 +347,9 @@ def date_schema(
     ge: date | None = None,
     lt: date | None = None,
     gt: date | None = None,
-    ref: str | None = None,
     now_op: Literal['past', 'future'] | None = None,
     now_utc_offset: int | None = None,
+    ref: str | None = None,
     extra: Any = None,
 ) -> DateSchema:
     """
