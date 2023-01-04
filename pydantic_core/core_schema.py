@@ -1131,7 +1131,7 @@ def function_wrap_schema(
     function: WrapValidatorFunction, schema: CoreSchema, *, ref: str | None = None, extra: Any = None
 ) -> FunctionWrapSchema:
     """
-    Returns a schema that wraps a function around the result of schema validation, e.g.:
+    Returns a schema which calls a function with a `validator` callable argument which can optionally be used to call inner validation with the function logic, this is much like the "onion" implementation of middleware in many popular web frameworks, e.g.:
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
