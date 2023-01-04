@@ -671,7 +671,7 @@ class CallableSchema(TypedDict, total=False):
 
 def callable_schema(*, ref: str | None = None, extra: Any = None) -> CallableSchema:
     """
-    Returns a schema that matches a callable value, e.g.:
+    Returns a schema that checks if a value is callable, equivalent to python's `callable` method, e.g.:
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
