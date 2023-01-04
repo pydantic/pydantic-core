@@ -610,7 +610,8 @@ def is_instance_schema(
     Args:
         cls: The value must be an instance of this class
         json_types: When parsing JSON directly, the value must be one of these json types
-        json_function: When parsing JSON directly, If provided, the JSON value is passed to this function and the return value used as the output value
+        json_function: When parsing JSON directly, If provided, the JSON value is passed to this
+            function and the return value used as the output value
         cls_repr: If provided this string is used in the validator name instead of `repr(cls)`
         ref: See [TODO] for details
         extra: See [TODO] for details
@@ -1131,7 +1132,9 @@ def function_wrap_schema(
     function: WrapValidatorFunction, schema: CoreSchema, *, ref: str | None = None, extra: Any = None
 ) -> FunctionWrapSchema:
     """
-    Returns a schema which calls a function with a `validator` callable argument which can optionally be used to call inner validation with the function logic, this is much like the "onion" implementation of middleware in many popular web frameworks, e.g.:
+    Returns a schema which calls a function with a `validator` callable argument which can
+    optionally be used to call inner validation with the function logic, this is much like the
+    "onion" implementation of middleware in many popular web frameworks, e.g.:
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
