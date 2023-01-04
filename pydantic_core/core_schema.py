@@ -656,7 +656,7 @@ def is_subclass_schema(
 
     Args:
         cls: The value must be a subclass of this class
-        cls_repr: The representation of the class of which the value must be a subclass
+        cls_repr: If provided this string is used in the validator name instead of `repr(cls)`
         ref: See [TODO] for details
         extra: See [TODO] for details
     """
