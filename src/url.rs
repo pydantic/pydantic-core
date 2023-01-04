@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use url::Url;
 
-use crate::validators::SchemaValidator;
+use crate::SchemaValidator;
 
 static SCHEMA_DEFINITION_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
 

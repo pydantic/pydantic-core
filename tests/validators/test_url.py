@@ -1,6 +1,5 @@
 import re
-from enum import Enum, auto
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import pytest
 from dirty_equals import HasRepr, IsInstance
@@ -12,25 +11,22 @@ from ..conftest import Err, PyAndJson
 
 def test_url_ok(py_and_json: PyAndJson):
     v = py_and_json(core_schema.url_schema())
-    urls: List[Url] = [
-        v.validate_test('https://example.com/foo/bar?baz=qux#quux'),
-        Url('https://example.com/foo/bar?baz=qux#quux'),
-    ]
-    for url in urls:
-        assert isinstance(url, Url)
-        assert str(url) == 'https://example.com/foo/bar?baz=qux#quux'
-        assert repr(url) == "Url('https://example.com/foo/bar?baz=qux#quux')"
-        assert url.unicode_string() == 'https://example.com/foo/bar?baz=qux#quux'
-        assert url.scheme == 'https'
-        assert url.host == 'example.com'
-        assert url.unicode_host() == 'example.com'
-        assert url.path == '/foo/bar'
-        assert url.query == 'baz=qux'
-        assert url.query_params() == [('baz', 'qux')]
-        assert url.fragment == 'quux'
-        assert url.username is None
-        assert url.password is None
-        assert url.port == 443
+    url = v.validate_test('https://example.com/foo/bar?baz=qux#quux')
+
+    assert isinstance(url, Url)
+    assert str(url) == 'https://example.com/foo/bar?baz=qux#quux'
+    assert repr(url) == "Url('https://example.com/foo/bar?baz=qux#quux')"
+    assert url.unicode_string() == 'https://example.com/foo/bar?baz=qux#quux'
+    assert url.scheme == 'https'
+    assert url.host == 'example.com'
+    assert url.unicode_host() == 'example.com'
+    assert url.path == '/foo/bar'
+    assert url.query == 'baz=qux'
+    assert url.query_params() == [('baz', 'qux')]
+    assert url.fragment == 'quux'
+    assert url.username is None
+    assert url.password is None
+    assert url.port == 443
 
 
 @pytest.fixture(scope='module', name='url_validator')
@@ -38,38 +34,35 @@ def url_validator_fixture():
     return SchemaValidator(core_schema.url_schema())
 
 
-class UrlValidatorMode(Enum):
-    SCHEMA_VALIDATOR = auto()
-    URL_CLASS = auto()
-    MULTI_URL_CLASS = auto()
-
-
-def validate_url(url: str, validator_mode: UrlValidatorMode, url_validator: Optional[SchemaValidator]):
-    if validator_mode == UrlValidatorMode.SCHEMA_VALIDATOR:
-        return url_validator.validate_python(url)
-    elif validator_mode == UrlValidatorMode.URL_CLASS:
-        return Url(url)
-    elif validator_mode == UrlValidatorMode.MULTI_URL_CLASS:
-        return MultiHostUrl(url)
-    else:
-        raise ValueError(f'Unknown validator mode: {validator_mode}')
+SCHEMA_VALIDATOR_MODE = 'SCHEMA_VALIDATOR'
+URL_CLASS_MODE = 'URI_CLASS'
+MULTI_URL_CLASS_MODE = 'MULTI_URL_CLASS'
 
 
 def url_test_case_helper(
-    url: str,
-    expected: Union[Err, str],
-    validator_mode: UrlValidatorMode,
-    url_validator: Optional[SchemaValidator] = None,
+    url: str, expected: Union[Err, str], validator_mode: str, url_validator: Optional[SchemaValidator] = None
 ):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError) as exc_info:
-            validate_url(url, validator_mode, url_validator)
+            if validator_mode == SCHEMA_VALIDATOR_MODE:
+                url_validator.validate_python(url)
+            elif validator_mode == URL_CLASS_MODE:
+                Url(url)
+            else:  # validator_mode == MULTI_URL_CLASS_MODE:
+                MultiHostUrl(url)
         assert exc_info.value.error_count() == 1
         error = exc_info.value.errors()[0]
         assert error['type'] == 'url_parsing'
         assert error['ctx']['error'] == expected.message
     else:
-        output_url = validate_url(url, validator_mode, url_validator)
+        if validator_mode == SCHEMA_VALIDATOR_MODE:
+            output_url = url_validator.validate_python(url)
+        elif validator_mode == URL_CLASS_MODE:
+            output_url = Url(url)
+        elif validator_mode == MULTI_URL_CLASS_MODE:
+            output_url = MultiHostUrl(url)
+        else:
+            raise ValueError(f'Unknown validator mode: {validator_mode}')
         assert isinstance(output_url, (Url, MultiHostUrl))
         if isinstance(expected, str):
             assert str(output_url) == expected
@@ -86,6 +79,7 @@ def url_test_case_helper(
             assert output_parts == expected
 
 
+@pytest.mark.parametrize('mode', [SCHEMA_VALIDATOR_MODE, URL_CLASS_MODE])
 @pytest.mark.parametrize(
     'url,expected',
     [
@@ -251,38 +245,8 @@ def url_test_case_helper(
         ),
     ],
 )
-def test_url_cases(url_validator, url, expected):
-    url_test_case_helper(url, expected, UrlValidatorMode.SCHEMA_VALIDATOR, url_validator)
-    url_test_case_helper(url, expected, UrlValidatorMode.URL_CLASS, None)
-
-
-@pytest.mark.parametrize(
-    'validator_kwargs,url,expected',
-    [
-        (
-            dict(default_port=1234, default_path='/baz'),
-            'http://example.org',
-            {'str()': 'http://example.org:1234/baz', 'path': '/baz'},
-        ),
-        (dict(default_port=1234, default_path='/baz'), 'http://example.org/', 'http://example.org:1234/baz'),
-        (dict(default_port=1234, default_path='/baz'), 'http://example.org/bang', 'http://example.org:1234/bang'),
-        (dict(default_port=1234, default_path='/baz'), 'http://example.org:1111', 'http://example.org:1111/baz'),
-        (dict(default_port=1234, default_path='/baz'), 'foobar://example.org', 'foobar://example.org:1234/baz'),
-        (dict(default_host='localhost'), 'redis:///foobar', 'redis://localhost/foobar'),
-        (dict(default_host='localhost'), 'redis://', 'redis://localhost'),
-        (dict(default_host='localhost', default_path='/baz'), 'redis://', 'redis://localhost/baz'),
-        (dict(default_host='localhost'), 'redis://xxx/foobar', 'redis://xxx/foobar'),
-        (dict(host_required=True), 'redis://', Err('empty host')),
-    ],
-)
-@pytest.mark.parametrize('validator_type', ['Url', 'MultiHostUrl'])
-def test_url_defaults(validator_type, validator_kwargs, url, expected):
-    if validator_type == 'Url':
-        schema = core_schema.url_schema(**validator_kwargs)
-    else:
-        schema = core_schema.multi_host_url_schema(**validator_kwargs)
-    s = SchemaValidator(schema)
-    url_test_case_helper(url, expected, UrlValidatorMode.SCHEMA_VALIDATOR, s)
+def test_url_cases(url_validator, url, expected, mode):
+    url_test_case_helper(url, expected, mode, url_validator)
 
 
 @pytest.mark.parametrize(
@@ -298,7 +262,7 @@ def test_url_defaults(validator_type, validator_kwargs, url, expected):
 )
 def test_url_defaults_single_url(validator_kwargs, url, expected):
     s = SchemaValidator(core_schema.url_schema(**validator_kwargs))
-    url_test_case_helper(url, expected, UrlValidatorMode.SCHEMA_VALIDATOR, s)
+    url_test_case_helper(url, expected, SCHEMA_VALIDATOR_MODE, s)
 
 
 @pytest.mark.parametrize(
@@ -337,7 +301,7 @@ def test_url_defaults_single_url(validator_kwargs, url, expected):
 )
 def test_url_defaults_multi_host_url(validator_kwargs, url, expected):
     s = SchemaValidator(core_schema.multi_host_url_schema(**validator_kwargs))
-    url_test_case_helper(url, expected, UrlValidatorMode.SCHEMA_VALIDATOR, s)
+    url_test_case_helper(url, expected, SCHEMA_VALIDATOR_MODE, s)
 
 
 @pytest.mark.parametrize(
@@ -365,7 +329,7 @@ def test_url_defaults_multi_host_url(validator_kwargs, url, expected):
     ],
 )
 def test_multi_host_url(url, expected):
-    url_test_case_helper(url, expected, UrlValidatorMode.MULTI_URL_CLASS, None)
+    url_test_case_helper(url, expected, MULTI_URL_CLASS_MODE, None)
 
 
 def test_multi_host_default_host_no_comma():
