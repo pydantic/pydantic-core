@@ -9,8 +9,8 @@ use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
 use super::{
-    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ExtraOwned, PydanticSerializer, SchemaIncEx, SerMode,
-    TypeSerializer,
+    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ExtraOwned, IncEx, PydanticSerializer, SchemaIncEx,
+    SerMode, TypeSerializer,
 };
 
 #[derive(Debug, Clone)]

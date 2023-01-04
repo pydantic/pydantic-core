@@ -99,15 +99,16 @@ impl SchemaIncEx<isize> {
     }
 }
 
-impl<T> SchemaIncEx<T>
-where
-    T: Hash + Eq + Copy,
-    BuildHasherDefault<NoHashHasher<T>>: BuildHasher,
-{
+pub trait IncEx<T: Eq + Copy> {
+    /// default decision on whether to include the item at at given `index`/`key`
+    fn default_include(&self, value: T) -> bool;
+    /// whether an `index`/`key` is explicitly included, this is combined with call-time `include` below
+    fn in_include(&self, value: T) -> bool;
+
     /// this is the somewhat hellish logic for deciding:
     /// 1. whether we should omit a value at a particular index/key - returning `Ok(None)` here
-    /// 2. and if we are including it, what values of `include` and `exclude` should be passed to it
-    pub fn include_or_exclude<'py>(
+    /// 2. or include it, in which case, what values of `include` and `exclude` should be passed to it
+    fn include_or_exclude<'py>(
         &self,
         py_key: &PyAny,
         int_key: T,
@@ -174,9 +175,14 @@ where
             Ok(None)
         }
     }
+}
 
-    /// default decision on whether to include the item at at given `index`/`key`
-    pub fn default_include(&self, value: T) -> bool {
+impl<T> IncEx<T> for SchemaIncEx<T>
+where
+    T: Hash + Eq + Copy,
+    BuildHasherDefault<NoHashHasher<T>>: BuildHasher,
+{
+    fn default_include(&self, value: T) -> bool {
         match (&self.include, &self.exclude) {
             (Some(include), Some(exclude)) => include.contains(&value) && !exclude.contains(&value),
             (Some(include), None) => include.contains(&value),
@@ -185,11 +191,32 @@ where
         }
     }
 
-    /// whether an `index`/`key` is explicitly included, this is combined with call-time `include` below
-    pub fn in_include(&self, value: T) -> bool {
+    fn in_include(&self, value: T) -> bool {
         match self.include {
             Some(ref include) => include.contains(&value),
             None => false,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AnyIncEx;
+
+impl AnyIncEx {
+    fn new() -> Self {
+        AnyIncEx {}
+    }
+}
+
+impl<T> IncEx<T> for AnyIncEx
+where
+    T: Eq + Copy,
+{
+    fn default_include(&self, _value: T) -> bool {
+        true
+    }
+
+    fn in_include(&self, _value: T) -> bool {
+        false
     }
 }

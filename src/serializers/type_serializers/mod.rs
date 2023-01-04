@@ -23,7 +23,7 @@ pub mod with_default;
 
 pub(self) use super::config::utf8_py_error;
 pub(self) use super::extra::{Extra, ExtraOwned, SerMode};
-pub(self) use super::include_exclude::SchemaIncEx;
+pub(self) use super::include_exclude::{IncEx, SchemaIncEx};
 pub(self) use super::ob_type::{IsType, ObType};
 pub(self) use super::shared::{
     py_err_se_err, to_json_bytes, BuildSerializer, CombinedSerializer, PydanticSerializer, TypeSerializer,

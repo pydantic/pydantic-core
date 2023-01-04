@@ -140,8 +140,6 @@ impl TypeSerializer for TypedDictSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        // TODO include and exclude
-
         let py = value.py();
         match value.cast_as::<PyDict>() {
             Ok(py_dict) => {
