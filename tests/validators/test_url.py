@@ -29,6 +29,25 @@ def test_url_ok(py_and_json: PyAndJson):
     assert url.port == 443
 
 
+def test_url_from_constructor_ok():
+    url = Url('https://example.com/foo/bar?baz=qux#quux')
+
+    assert isinstance(url, Url)
+    assert str(url) == 'https://example.com/foo/bar?baz=qux#quux'
+    assert repr(url) == "Url('https://example.com/foo/bar?baz=qux#quux')"
+    assert url.unicode_string() == 'https://example.com/foo/bar?baz=qux#quux'
+    assert url.scheme == 'https'
+    assert url.host == 'example.com'
+    assert url.unicode_host() == 'example.com'
+    assert url.path == '/foo/bar'
+    assert url.query == 'baz=qux'
+    assert url.query_params() == [('baz', 'qux')]
+    assert url.fragment == 'quux'
+    assert url.username is None
+    assert url.password is None
+    assert url.port == 443
+
+
 @pytest.fixture(scope='module', name='url_validator')
 def url_validator_fixture():
     return SchemaValidator(core_schema.url_schema())
