@@ -371,6 +371,7 @@ def date_schema(
         gt: The value must be strictly greater than this date
         now_op: The value must be in the past or future relative to the current date
         now_utc_offset: The value must be in the past or future relative to the current date with this utc offset
+        ref: See [TODO] for details
         extra: See [TODO] for details
     """
     return dict_not_none(
@@ -425,6 +426,7 @@ def time_schema(
         ge: The value must be greater than or equal to this time
         lt: The value must be strictly less than this time
         gt: The value must be strictly greater than this time
+        ref: See [TODO] for details
         extra: See [TODO] for details
     """
     return dict_not_none(type='time', strict=strict, le=le, ge=ge, lt=lt, gt=gt, ref=ref, extra=extra)
@@ -478,7 +480,7 @@ def datetime_schema(
         lt: The value must be strictly less than this datetime
         gt: The value must be strictly greater than this datetime
         now_op: The value must be in the past or future relative to the current datetime
-        tz_constraint: The value must be aware or naive
+        tz_constraint: The value must be timezone aware or naive
         now_utc_offset: The value must be in the past or future relative to the current datetime with this utc offset
         ref: See [TODO] for details
         extra: See [TODO] for details
@@ -1134,9 +1136,8 @@ def function_wrap_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, **kwargs) -> str:
-        assert 'hello' in v
-        return v + 'world'
+    def fn(v: str, *, validator, **kwargs) -> str:
+        return validator(input_value=v) + 'world'
 
     schema = core_schema.function_wrap_schema(function=fn, schema=core_schema.string_schema())
     v = SchemaValidator(schema)
