@@ -638,7 +638,7 @@ def is_subclass_schema(
     cls: Type[Any], *, cls_repr: str | None = None, ref: str | None = None, extra: Any = None
 ) -> IsInstanceSchema:
     """
-    Returns a schema that matches a subclass to a class, e.g.:
+    Returns a schema that checks if a value is a subtype of a class, equivalent to python's `issubclass` method, e.g.:
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
