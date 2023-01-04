@@ -5,7 +5,7 @@ use pyo3::types::{PyDict, PyString};
 
 use crate::build_context::BuildContext;
 
-use super::any::{fallback_serialize, fallback_to_python_json, json_key};
+use super::any::{fallback_json_key, fallback_serialize, fallback_to_python};
 use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, IsType, ObType, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
@@ -27,24 +27,21 @@ impl TypeSerializer for StrSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        _include: Option<&PyAny>,
-        _exclude: Option<&PyAny>,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        match extra.mode {
-            SerMode::Json => match extra.ob_type_lookup.is_type(value, ObType::Str) {
-                IsType::Exact => Ok(value.into_py(py)),
-                IsType::Subclass => {
-                    let s: &str = value.extract()?;
-                    Ok(s.into_py(py))
-                }
-                IsType::False => {
-                    extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                    fallback_to_python_json(value, extra)
-                }
+        match extra.ob_type_lookup.is_type(value, ObType::Str) {
+            IsType::Exact => Ok(value.into_py(py)),
+            IsType::Subclass => match extra.mode {
+                SerMode::Json => Ok(value.extract::<&str>()?.into_py(py)),
+                _ => Ok(value.into_py(py)),
             },
-            _ => Ok(value.into_py(py)),
+            IsType::False => {
+                extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
+                fallback_to_python(value, include, exclude, extra)
+            }
         }
     }
 
@@ -53,7 +50,7 @@ impl TypeSerializer for StrSerializer {
             Ok(py_str.to_string_lossy())
         } else {
             extra.warnings.fallback_slow(Self::EXPECTED_TYPE, key);
-            json_key(key, extra)
+            fallback_json_key(key, extra)
         }
     }
 

@@ -9,8 +9,8 @@ use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
 use super::{
-    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ExtraOwned, IncEx, PydanticSerializer, SchemaIncEx,
-    SerMode, TypeSerializer,
+    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ExtraOwned, PydanticSerializer, SchemaIncEx, SerMode,
+    TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
@@ -40,19 +40,6 @@ impl BuildSerializer for GeneratorSerializer {
     }
 }
 
-impl GeneratorSerializer {
-    fn include_or_exclude<'py>(
-        &self,
-        py: Python<'py>,
-        index: usize,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
-        self.inc_ex
-            .include_or_exclude(index.to_object(py).as_ref(py), index, include, exclude)
-    }
-}
-
 impl TypeSerializer for GeneratorSerializer {
     fn to_python(
         &self,
@@ -74,9 +61,8 @@ impl TypeSerializer for GeneratorSerializer {
                         };
                         for (index, iter_result) in py_iter.enumerate() {
                             let element = iter_result?;
-                            if let Some((next_include, next_exclude)) =
-                                self.include_or_exclude(py, index, include, exclude)?
-                            {
+                            let op_next = self.inc_ex.value(index, include, exclude)?;
+                            if let Some((next_include, next_exclude)) = op_next {
                                 items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                             }
                         }
@@ -98,7 +84,7 @@ impl TypeSerializer for GeneratorSerializer {
             }
             Err(_) => {
                 extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                fallback_to_python(value, extra)
+                fallback_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -122,10 +108,8 @@ impl TypeSerializer for GeneratorSerializer {
 
                 for (index, iter_result) in py_iter.enumerate() {
                     let element = iter_result.map_err(py_err_se_err)?;
-                    if let Some((next_include, next_exclude)) = self
-                        .include_or_exclude(element.py(), index, include, exclude)
-                        .map_err(py_err_se_err)?
-                    {
+                    let op_next = self.inc_ex.value(index, include, exclude).map_err(py_err_se_err)?;
+                    if let Some((next_include, next_exclude)) = op_next {
                         let item_serialize =
                             PydanticSerializer::new(element, item_serializer, next_include, next_exclude, extra);
                         seq.serialize_element(&item_serialize)?;
@@ -169,9 +153,7 @@ impl SerializationIterator {
 
         for iter_result in iterator {
             let element = iter_result?;
-            let inc_ex =
-                self.inc_ex
-                    .include_or_exclude(self.index.to_object(py).as_ref(py), self.index, include, exclude)?;
+            let inc_ex = self.inc_ex.value(self.index, include, exclude)?;
             self.index += 1;
             if let Some((next_include, next_exclude)) = inc_ex {
                 let v = self

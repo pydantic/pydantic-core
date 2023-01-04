@@ -6,7 +6,7 @@ use pyo3::types::{PyDate, PyDateTime, PyDict, PyTime};
 use crate::build_context::BuildContext;
 use crate::input::{pydate_as_date, pydatetime_as_datetime, pytime_as_time};
 
-use super::any::{fallback_serialize, fallback_to_python_json, json_key};
+use super::any::{fallback_json_key, fallback_serialize, fallback_to_python};
 use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 pub(crate) fn datetime_to_string(py_dt: &PyDateTime) -> PyResult<String> {
@@ -45,23 +45,23 @@ macro_rules! build_serializer {
             fn to_python(
                 &self,
                 value: &PyAny,
-                _include: Option<&PyAny>,
-                _exclude: Option<&PyAny>,
+                include: Option<&PyAny>,
+                exclude: Option<&PyAny>,
                 extra: &Extra,
             ) -> PyResult<PyObject> {
                 let py = value.py();
-                match extra.mode {
-                    SerMode::Json => match value.cast_as::<$cast_as>() {
-                        Ok(py_value) => {
+                match value.cast_as::<$cast_as>() {
+                    Ok(py_value) => match extra.mode {
+                        SerMode::Json => {
                             let s = $convert_func(py_value)?;
                             Ok(s.into_py(py))
                         }
-                        Err(_) => {
-                            extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                            fallback_to_python_json(value, extra)
-                        }
+                        _ => Ok(value.into_py(py)),
                     },
-                    _ => Ok(value.into_py(py)),
+                    Err(_) => {
+                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
+                        fallback_to_python(value, include, exclude, extra)
+                    }
                 }
             }
 
@@ -70,7 +70,7 @@ macro_rules! build_serializer {
                     Ok(py_value) => Ok(Cow::Owned($convert_func(py_value)?)),
                     Err(_) => {
                         extra.warnings.fallback_slow(Self::EXPECTED_TYPE, key);
-                        json_key(key, extra)
+                        fallback_json_key(key, extra)
                     }
                 }
             }

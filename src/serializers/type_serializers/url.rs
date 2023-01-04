@@ -6,7 +6,7 @@ use pyo3::types::PyDict;
 use crate::build_context::BuildContext;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
-use super::any::{fallback_serialize, fallback_to_python_json, json_key};
+use super::any::{fallback_json_key, fallback_serialize, fallback_to_python};
 use super::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 macro_rules! build_serializer {
@@ -30,20 +30,20 @@ macro_rules! build_serializer {
             fn to_python(
                 &self,
                 value: &PyAny,
-                _include: Option<&PyAny>,
-                _exclude: Option<&PyAny>,
+                include: Option<&PyAny>,
+                exclude: Option<&PyAny>,
                 extra: &Extra,
             ) -> PyResult<PyObject> {
                 let py = value.py();
-                match extra.mode {
-                    SerMode::Json => match value.extract::<$extract>() {
-                        Ok(py_url) => Ok(py_url.__str__().into_py(py)),
-                        Err(_) => {
-                            extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                            fallback_to_python_json(value, extra)
-                        }
+                match value.extract::<$extract>() {
+                    Ok(py_url) => match extra.mode {
+                        SerMode::Json => Ok(py_url.__str__().into_py(py)),
+                        _ => Ok(value.into_py(py)),
                     },
-                    _ => Ok(value.into_py(py)),
+                    Err(_) => {
+                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
+                        fallback_to_python(value, include, exclude, extra)
+                    }
                 }
             }
 
@@ -52,7 +52,7 @@ macro_rules! build_serializer {
                     Ok(py_url) => Ok(Cow::Owned(py_url.__str__().to_string())),
                     Err(_) => {
                         extra.warnings.fallback_slow(Self::EXPECTED_TYPE, key);
-                        json_key(key, extra)
+                        fallback_json_key(key, extra)
                     }
                 }
             }

@@ -26,8 +26,8 @@ impl TypeSerializer for NoneSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        _include: Option<&PyAny>,
-        _exclude: Option<&PyAny>,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
@@ -36,7 +36,7 @@ impl TypeSerializer for NoneSerializer {
             // I don't think subclasses of None can exist
             _ => {
                 extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                fallback_to_python(value, extra)
+                fallback_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -80,8 +80,8 @@ macro_rules! build_simple_serializer {
             fn to_python(
                 &self,
                 value: &PyAny,
-                _include: Option<&PyAny>,
-                _exclude: Option<&PyAny>,
+                include: Option<&PyAny>,
+                exclude: Option<&PyAny>,
                 extra: &Extra,
             ) -> PyResult<PyObject> {
                 let py = value.py();
@@ -92,11 +92,11 @@ macro_rules! build_simple_serializer {
                             let rust_value = value.extract::<$rust_type>()?;
                             Ok(rust_value.to_object(py))
                         }
-                        _ => Ok(value.into_py(py)),
+                        _ => fallback_to_python(value, include, exclude, extra),
                     },
                     IsType::False => {
                         extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_to_python(value, extra)
+                        fallback_to_python(value, include, exclude, extra)
                     }
                 }
             }

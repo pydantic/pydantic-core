@@ -55,8 +55,8 @@ def test_bytes_dict_key():
 
 def test_bytes_fallback():
     s = SchemaSerializer(core_schema.bytes_schema())
-    # we don't (currently) warn on to_python since it uses the default method
-    assert s.to_python(123) == 123
+    with pytest.warns(UserWarning, match='Expected `bytes` but got `int` - slight slowdown possible'):
+        assert s.to_python(123) == 123
     with pytest.warns(UserWarning, match='Expected `bytes` but got `int` - slight slowdown possible'):
         assert s.to_python(123, mode='json') == 123
     with pytest.warns(UserWarning, match='Expected `bytes` but got `int` - slight slowdown possible'):

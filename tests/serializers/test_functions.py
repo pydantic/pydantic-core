@@ -68,7 +68,8 @@ def test_function_known_type():
     assert s.to_python([1, 2, 3], mode='json') == [1, 2, 3, 42]
     assert s.to_json([1, 2, 3]) == b'[1,2,3,42]'
 
-    assert s.to_python('abc') == 'abc'
+    with pytest.raises(TypeError, match="'str' object cannot be converted to 'PyList'"):
+        s.to_python('abc')
 
     with pytest.raises(TypeError, match="'str' object cannot be converted to 'PyList'"):
         s.to_python('abc', mode='json')

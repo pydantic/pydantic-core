@@ -10,7 +10,7 @@ use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 use crate::errors::PydanticSerializationError;
 
-use super::any::json_key;
+use super::any::fallback_json_key;
 use super::string::serialize_py_str;
 use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
@@ -71,7 +71,7 @@ impl TypeSerializer for FunctionSerializer {
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
         let v = self.call(key).map_err(PydanticSerializationError::new_err)?;
-        json_key(v.into_ref(key.py()), extra)
+        fallback_json_key(v.into_ref(key.py()), extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(

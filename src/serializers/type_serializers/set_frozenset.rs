@@ -61,7 +61,7 @@ macro_rules! build_serializer {
                     }
                     Err(_) => {
                         extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_to_python(value, extra)
+                        fallback_to_python(value, include, exclude, extra)
                     }
                 }
             }

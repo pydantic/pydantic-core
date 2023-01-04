@@ -9,7 +9,7 @@ use serde::ser::SerializeMap;
 use crate::build_context::BuildContext;
 use crate::build_tools::{py_error_type, schema_or_config, SchemaDict};
 
-use super::any::{fallback_serialize, fallback_to_python, json_key, SerializeInfer};
+use super::any::{fallback_json_key, fallback_serialize, fallback_to_python, SerializeInfer};
 use super::with_default::get_default;
 use super::{
     py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaIncEx, TypeSerializer,
@@ -150,9 +150,7 @@ impl TypeSerializer for TypedDictSerializer {
                     if extra.exclude_none && value.is_none() {
                         continue;
                     }
-                    if let Some((next_include, next_exclude)) =
-                        self.inc_ex.include_or_exclude_key(key, include, exclude)?
-                    {
+                    if let Some((next_include, next_exclude)) = self.inc_ex.key(key, include, exclude)? {
                         if let Ok(key_py_str) = key.cast_as::<PyString>() {
                             if let Some(field) = self.fields.get(key_py_str.to_str()?) {
                                 if self.exclude_default(value, extra, field)? {
@@ -165,7 +163,7 @@ impl TypeSerializer for TypedDictSerializer {
                             }
                         }
                         if self.include_extra {
-                            let value = fallback_to_python(value, extra)?;
+                            let value = fallback_to_python(value, include, exclude, extra)?;
                             new_dict.set_item(key, value)?;
                         }
                     }
@@ -174,7 +172,7 @@ impl TypeSerializer for TypedDictSerializer {
             }
             Err(_) => {
                 extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                fallback_to_python(value, extra)
+                fallback_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -200,10 +198,8 @@ impl TypeSerializer for TypedDictSerializer {
                     if extra.exclude_none && value.is_none() {
                         continue;
                     }
-                    if let Some((next_include, next_exclude)) = self
-                        .inc_ex
-                        .include_or_exclude_key(key, include, exclude)
-                        .map_err(py_err_se_err)?
+                    if let Some((next_include, next_exclude)) =
+                        self.inc_ex.key(key, include, exclude).map_err(py_err_se_err)?
                     {
                         if let Ok(key_py_str) = key.cast_as::<PyString>() {
                             let key_str = key_py_str.to_str().map_err(py_err_se_err)?;
@@ -225,7 +221,7 @@ impl TypeSerializer for TypedDictSerializer {
                         }
                         if self.include_extra {
                             let s = SerializeInfer::new(value, extra);
-                            let output_key = json_key(key, extra).map_err(py_err_se_err)?;
+                            let output_key = fallback_json_key(key, extra).map_err(py_err_se_err)?;
                             map.serialize_entry(&output_key, &s)?
                         }
                     }

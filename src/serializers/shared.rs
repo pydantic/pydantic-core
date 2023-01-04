@@ -15,7 +15,7 @@ use crate::build_tools::{py_err, py_error_type, SchemaDict};
 use crate::PydanticSerializationError;
 
 use super::extra::Extra;
-use super::type_serializers::any::{fallback_to_python, json_key};
+use super::type_serializers::any::{fallback_json_key, fallback_to_python};
 
 pub(crate) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
@@ -194,15 +194,15 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
     fn to_python(
         &self,
         value: &PyAny,
-        _include: Option<&PyAny>,
-        _exclude: Option<&PyAny>,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        fallback_to_python(value, extra)
+        fallback_to_python(value, include, exclude, extra)
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
-        json_key(key, extra)
+        fallback_json_key(key, extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(

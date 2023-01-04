@@ -10,7 +10,7 @@ use nohash_hasher::{IntSet, NoHashHasher};
 use crate::build_tools::SchemaDict;
 
 #[derive(Debug, Clone, Default)]
-pub struct SchemaIncEx<T> {
+pub(super) struct SchemaIncEx<T> {
     include: Option<IntSet<T>>,
     exclude: Option<IntSet<T>>,
 }
@@ -47,6 +47,15 @@ impl SchemaIncEx<usize> {
             None => Ok(None),
         }
     }
+
+    pub fn value<'py>(
+        &self,
+        index: usize,
+        include: Option<&'py PyAny>,
+        exclude: Option<&'py PyAny>,
+    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        self.include_or_exclude(index, index, include, exclude)
+    }
 }
 
 impl SchemaIncEx<isize> {
@@ -55,6 +64,7 @@ impl SchemaIncEx<isize> {
         let exclude = Self::build_set_hashes(exclude)?;
         Ok(Self { include, exclude })
     }
+
     pub fn from_vec_hash(py: Python, exclude: Vec<Py<PyString>>) -> PyResult<Self> {
         let exclude = if exclude.is_empty() {
             None
@@ -88,7 +98,7 @@ impl SchemaIncEx<isize> {
         }
     }
 
-    pub fn include_or_exclude_key<'py>(
+    pub fn key<'py>(
         &self,
         key: &PyAny,
         include: Option<&'py PyAny>,
@@ -99,18 +109,18 @@ impl SchemaIncEx<isize> {
     }
 }
 
-pub trait IncEx<T: Eq + Copy> {
-    /// default decision on whether to include the item at at given `index`/`key`
-    fn default_include(&self, value: T) -> bool;
+trait IncEx<T: Eq + Copy> {
     /// whether an `index`/`key` is explicitly included, this is combined with call-time `include` below
-    fn in_include(&self, value: T) -> bool;
+    fn explicit_include(&self, value: T) -> bool;
+    /// default decision on whether to include the item at a given `index`/`key`
+    fn default_inc_ex(&self, value: T) -> bool;
 
     /// this is the somewhat hellish logic for deciding:
     /// 1. whether we should omit a value at a particular index/key - returning `Ok(None)` here
     /// 2. or include it, in which case, what values of `include` and `exclude` should be passed to it
     fn include_or_exclude<'py>(
         &self,
-        py_key: &PyAny,
+        py_key: impl ToPyObject + Copy,
         int_key: T,
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
@@ -148,7 +158,7 @@ pub trait IncEx<T: Eq + Copy> {
                     } else {
                         Ok(Some((Some(inc_value), next_exclude)))
                     };
-                } else if !self.in_include(int_key) {
+                } else if !self.explicit_include(int_key) {
                     // if the index is not in include, include exists, AND it's not in schema include,
                     // this index should be omitted
                     return Ok(None);
@@ -157,7 +167,7 @@ pub trait IncEx<T: Eq + Copy> {
                 // question: as above
                 if include_set.contains(py_key)? {
                     return Ok(Some((None, next_exclude)));
-                } else if !self.in_include(int_key) {
+                } else if !self.explicit_include(int_key) {
                     // if the index is not in include, include exists, AND it's not in schema include,
                     // this index should be omitted
                     return Ok(None);
@@ -169,7 +179,7 @@ pub trait IncEx<T: Eq + Copy> {
 
         if next_exclude.is_some() {
             Ok(Some((None, next_exclude)))
-        } else if self.default_include(int_key) {
+        } else if self.default_inc_ex(int_key) {
             Ok(Some((None, None)))
         } else {
             Ok(None)
@@ -182,7 +192,14 @@ where
     T: Hash + Eq + Copy,
     BuildHasherDefault<NoHashHasher<T>>: BuildHasher,
 {
-    fn default_include(&self, value: T) -> bool {
+    fn explicit_include(&self, value: T) -> bool {
+        match self.include {
+            Some(ref include) => include.contains(&value),
+            None => false,
+        }
+    }
+
+    fn default_inc_ex(&self, value: T) -> bool {
         match (&self.include, &self.exclude) {
             (Some(include), Some(exclude)) => include.contains(&value) && !exclude.contains(&value),
             (Some(include), None) => include.contains(&value),
@@ -190,21 +207,33 @@ where
             (None, None) => true,
         }
     }
-
-    fn in_include(&self, value: T) -> bool {
-        match self.include {
-            Some(ref include) => include.contains(&value),
-            None => false,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
-pub struct AnyIncEx;
+pub(super) struct AnyIncEx;
 
 impl AnyIncEx {
-    fn new() -> Self {
+    pub fn new() -> Self {
         AnyIncEx {}
+    }
+
+    pub fn key<'py>(
+        &self,
+        key: &PyAny,
+        include: Option<&'py PyAny>,
+        exclude: Option<&'py PyAny>,
+    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        // just use 0 for the int_key, it's always ignored in the implementation here
+        self.include_or_exclude(key, 0, include, exclude)
+    }
+
+    pub fn value<'py>(
+        &self,
+        index: usize,
+        include: Option<&'py PyAny>,
+        exclude: Option<&'py PyAny>,
+    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        self.include_or_exclude(index, index, include, exclude)
     }
 }
 
@@ -212,11 +241,11 @@ impl<T> IncEx<T> for AnyIncEx
 where
     T: Eq + Copy,
 {
-    fn default_include(&self, _value: T) -> bool {
-        true
+    fn explicit_include(&self, _value: T) -> bool {
+        false
     }
 
-    fn in_include(&self, _value: T) -> bool {
-        false
+    fn default_inc_ex(&self, _value: T) -> bool {
+        true
     }
 }

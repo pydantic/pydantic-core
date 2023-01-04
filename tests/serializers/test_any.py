@@ -6,6 +6,7 @@ import pytest
 from pydantic_core import PydanticSerializationError, SchemaSerializer, core_schema
 
 from ..conftest import plain_repr
+from .test_list_tuple import as_list, as_tuple
 
 
 @pytest.fixture(scope='module')
@@ -124,3 +125,32 @@ def test_recursion():
         s.to_python(v, mode='json')
     with pytest.raises(ValueError, match=r'Circular reference detected \(id repeated\)'):
         s.to_json(v)
+
+
+@pytest.mark.parametrize('seq_f', [as_list, as_tuple])
+def test_include_list_tuple(seq_f):
+    v = SchemaSerializer(core_schema.any_schema())
+    assert v.to_python(seq_f(0, 1, 2, 3)) == seq_f(0, 1, 2, 3)
+    assert v.to_python(seq_f('a', 'b', 'c')) == seq_f('a', 'b', 'c')
+    assert v.to_python(seq_f('a', 'b', 'c'), mode='json') == ['a', 'b', 'c']
+    assert v.to_json(seq_f('a', 'b', 'c')) == b'["a","b","c"]'
+
+    assert v.to_python(seq_f(0, 1, 2, 3), include={1, 2}) == seq_f(1, 2)
+    assert v.to_python(seq_f(0, 1, 2, 3), include={1, 2}, mode='json') == [1, 2]
+    assert v.to_python(seq_f('a', 'b', 'c', 'd'), include={1, 2}) == seq_f('b', 'c')
+    assert v.to_python(seq_f('a', 'b', 'c', 'd'), include={1, 2}, mode='json') == ['b', 'c']
+    # assert v.to_json(seq_f('a', 'b', 'c', 'd'), include={1, 2}) == b'["b","c"]'
+
+
+def test_include_dict():
+    v = SchemaSerializer(core_schema.any_schema())
+    assert v.to_python({1: 2, '3': 4}) == {1: 2, '3': 4}
+    assert v.to_python({1: 2, '3': 4}, mode='json') == {'1': 2, '3': 4}
+    assert v.to_json({1: 2, '3': 4}) == b'{"1":2,"3":4}'
+
+    assert v.to_python({1: 2, '3': 4}, include={1}) == {1: 2}
+    assert v.to_python({1: 2, '3': 4}, include={'3'}) == {'3': 4}
+    assert v.to_python({1: 2, '3': 4}, include={1}, mode='json') == {'1': 2}
+    assert v.to_python({1: 2, '3': 4}, include={'3'}, mode='json') == {'3': 4}
+    # assert v.to_json({1: 2, '3': 4}, include={1}) == b'{"1":2}'
+    # assert v.to_json({1: 2, '3': 4}, include={'3'}) == b'{"3":4}'

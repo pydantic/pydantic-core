@@ -5,7 +5,7 @@ use pyo3::types::{PyBytes, PyDict};
 
 use crate::build_context::BuildContext;
 
-use super::any::{fallback_serialize, fallback_to_python_json, json_key};
+use super::any::{fallback_json_key, fallback_serialize, fallback_to_python};
 use super::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
@@ -27,20 +27,20 @@ impl TypeSerializer for BytesSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        _include: Option<&PyAny>,
-        _exclude: Option<&PyAny>,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        match extra.mode {
-            SerMode::Json => match value.cast_as::<PyBytes>() {
-                Ok(py_bytes) => extra.config.bytes_mode.bytes_to_string(py_bytes).map(|s| s.into_py(py)),
-                Err(_) => {
-                    extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                    fallback_to_python_json(value, extra)
-                }
+        match value.cast_as::<PyBytes>() {
+            Ok(py_bytes) => match extra.mode {
+                SerMode::Json => extra.config.bytes_mode.bytes_to_string(py_bytes).map(|s| s.into_py(py)),
+                _ => Ok(value.into_py(py)),
             },
-            _ => Ok(value.into_py(py)),
+            Err(_) => {
+                extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
+                fallback_to_python(value, include, exclude, extra)
+            }
         }
     }
 
@@ -49,7 +49,7 @@ impl TypeSerializer for BytesSerializer {
             Ok(py_bytes) => extra.config.bytes_mode.bytes_to_string(py_bytes),
             Err(_) => {
                 extra.warnings.fallback_slow(Self::EXPECTED_TYPE, key);
-                json_key(key, extra)
+                fallback_json_key(key, extra)
             }
         }
     }
