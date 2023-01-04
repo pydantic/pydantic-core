@@ -609,7 +609,7 @@ def is_instance_schema(
 
     Args:
         cls: The value must be an instance of this class
-        json_types: The value must be one of these json types
+        json_types: When parsing JSON directly, the value must be one of these json types
         json_function: The value must be a json type that can be converted to this type
         cls_repr: The value must be an instance of this class
         ref: See [TODO] for details
