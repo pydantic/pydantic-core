@@ -611,7 +611,7 @@ def is_instance_schema(
         cls: The value must be an instance of this class
         json_types: When parsing JSON directly, the value must be one of these json types
         json_function: When parsing JSON directly, If provided, the JSON value is passed to this function and the return value used as the output value
-        cls_repr: The value must be an instance of this class
+        cls_repr: If provided this string is used in the validator name instead of `repr(cls)`
         ref: See [TODO] for details
         extra: See [TODO] for details
     """
