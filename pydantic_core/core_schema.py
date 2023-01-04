@@ -594,7 +594,7 @@ def is_instance_schema(
     extra: Any = None,
 ) -> IsInstanceSchema:
     """
-    Returns a schema that matches an object to a class, e.g.:
+    Returns a schema that checks if a value is an instance of a class, equivalent to python's `isinstnace` method, e.g.:
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
