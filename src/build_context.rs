@@ -117,7 +117,7 @@ impl<T: Clone> BuildContext<T> {
 impl BuildContext<CombinedValidator> {
     /// Move validators into a new vec which maintains the order of slots, `complete` is called on each validator
     /// at the same time.
-    pub fn into_slots(self) -> PyResult<Vec<CombinedValidator>> {
+    pub fn into_slots_val(self) -> PyResult<Vec<CombinedValidator>> {
         let self_clone = self.clone();
         self.slots
             .into_iter()
@@ -133,6 +133,7 @@ impl BuildContext<CombinedValidator> {
 }
 
 impl BuildContext<CombinedSerializer> {
+    /// Move validators into a new vec which maintains the order of slots
     pub fn into_slots_ser(self) -> PyResult<Vec<CombinedSerializer>> {
         self.slots
             .into_iter()

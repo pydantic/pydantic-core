@@ -72,7 +72,7 @@ impl SchemaValidator {
 
         let mut validator = build_validator(schema, config, &mut build_context)?;
         validator.complete(&build_context)?;
-        let slots = build_context.into_slots()?;
+        let slots = build_context.into_slots_val()?;
         let config_title = match config {
             Some(c) => c.get_item("title"),
             None => None,
@@ -252,7 +252,7 @@ impl SchemaValidator {
         };
         Ok(Self {
             validator,
-            slots: build_context.into_slots()?,
+            slots: build_context.into_slots_val()?,
             schema: py.None(),
             title: "Self Schema".into_py(py),
         })
