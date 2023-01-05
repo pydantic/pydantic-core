@@ -26,6 +26,14 @@ class MyDataclass:
     b: str
 
 
+class MyModel:
+    __pydantic_validator__ = 42
+
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
 @pytest.mark.parametrize('value', [None, 1, 1.0, True, 'foo', [1, 2, 3], {'a': 1, 'b': 2}])
 def test_any_json_round_trip(any_serializer, value):
     assert any_serializer.to_python(value) == value
@@ -37,6 +45,7 @@ def test_any_json_round_trip(any_serializer, value):
     'input_value,expected_plain,expected_json_obj',
     [
         (MyDataclass(1, 'foo'), {'a': 1, 'b': 'foo'}, {'a': 1, 'b': 'foo'}),
+        (MyModel(a=1, b='foo'), {'a': 1, 'b': 'foo'}, {'a': 1, 'b': 'foo'}),
         ({1, 2, 3}, {1, 2, 3}, IsList(1, 2, 3, check_order=False)),
         ({1, '2', b'3'}, {1, '2', b'3'}, IsList(1, '2', '3', check_order=False)),
     ],
@@ -69,7 +78,8 @@ def test_set_member_db(any_serializer):
         (time(12, 30, 45), b'"12:30:45"'),
         (timedelta(hours=2), b'"PT7200S"'),
         (MyDataclass(1, 'foo'), b'{"a":1,"b":"foo"}'),
-        ([MyDataclass(1, 'a'), MyDataclass(2, 'b')], b'[{"a":1,"b":"a"},{"a":2,"b":"b"}]'),
+        (MyModel(a=1, b='foo'), b'{"a":1,"b":"foo"}'),
+        ([MyDataclass(1, 'a'), MyModel(a=2, b='b')], b'[{"a":1,"b":"a"},{"a":2,"b":"b"}]'),
     ],
 )
 def test_any_json(any_serializer, value, expected_json):
@@ -183,11 +193,42 @@ def test_include_dict(any_serializer):
     assert any_serializer.to_python({1: 2, '3': 4}, include={'3'}) == {'3': 4}
     assert any_serializer.to_python(MyDataclass(a=1, b='foo'), include={'a'}) == {'a': 1}
     assert any_serializer.to_python(MyDataclass(a=1, b='foo'), include={'a'}, mode='json') == {'a': 1}
+    assert any_serializer.to_python(MyModel(a=1, b='foo'), include={'a'}) == {'a': 1}
+    assert any_serializer.to_python(MyModel(a=1, b='foo'), include={'a'}, mode='json') == {'a': 1}
     assert any_serializer.to_python({1: 2, '3': 4}, include={1}, mode='json') == {'1': 2}
     assert any_serializer.to_python({1: 2, '3': 4}, include={'3'}, mode='json') == {'3': 4}
     assert any_serializer.to_json({1: 2, '3': 4}, include={1}) == b'{"1":2}'
     assert any_serializer.to_json({1: 2, '3': 4}, include={'3'}) == b'{"3":4}'
     assert any_serializer.to_json(MyDataclass(a=1, b='foo'), include={'a'}) == b'{"a":1}'
+
+
+class FieldsSetModel:
+    __pydantic_validator__ = 42
+    __slots__ = '__dict__', '__fields_set__'
+
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
+def test_exclude_unset(any_serializer):
+    # copied from test of the same name in test_new_class.py
+    m = FieldsSetModel(foo=1, bar=2, spam=3, __fields_set__={'bar', 'spam'})
+    assert any_serializer.to_python(m) == {'foo': 1, 'bar': 2, 'spam': 3}
+    assert any_serializer.to_python(m, exclude_unset=True) == {'bar': 2, 'spam': 3}
+    assert any_serializer.to_python(m, exclude=None, exclude_unset=True) == {'bar': 2, 'spam': 3}
+    assert any_serializer.to_python(m, exclude={'bar'}, exclude_unset=True) == {'spam': 3}
+    assert any_serializer.to_python(m, exclude={'bar': None}, exclude_unset=True) == {'spam': 3}
+    assert any_serializer.to_python(m, exclude={'bar': {}}, exclude_unset=True) == {'bar': 2, 'spam': 3}
+
+    assert any_serializer.to_json(m, exclude=None, exclude_unset=True) == b'{"bar":2,"spam":3}'
+    assert any_serializer.to_json(m, exclude={'bar'}, exclude_unset=True) == b'{"spam":3}'
+    assert any_serializer.to_json(m, exclude={'bar': None}, exclude_unset=True) == b'{"spam":3}'
+    assert any_serializer.to_json(m, exclude={'bar': {}}, exclude_unset=True) == b'{"bar":2,"spam":3}'
+
+    m2 = FieldsSetModel(foo=1, bar=2, spam=3, __fields_set__={'bar', 'spam', 'missing'})
+    assert any_serializer.to_python(m2) == {'foo': 1, 'bar': 2, 'spam': 3}
+    assert any_serializer.to_python(m2, exclude_unset=True) == {'bar': 2, 'spam': 3}
 
 
 def test_unknown_type(any_serializer):

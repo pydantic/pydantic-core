@@ -114,6 +114,7 @@ impl ObTypeLookup {
             ObType::Url => self.url == ob_type,
             ObType::MultiHostUrl => self.multi_host_url == ob_type,
             ObType::Dataclass => is_dataclass(op_value),
+            ObType::PydanticModel => is_pydantic_model(op_value),
             ObType::Unknown => false,
         };
 
@@ -182,6 +183,8 @@ impl ObTypeLookup {
             ObType::MultiHostUrl
         } else if is_dataclass(op_value) {
             ObType::Dataclass
+        } else if is_pydantic_model(op_value) {
+            ObType::PydanticModel
         } else {
             // this allows for subtypes of the supported class types,
             // if `ob_type` didn't match any member of self, we try again with the next base type pointer
@@ -200,6 +203,16 @@ fn is_dataclass(op_value: Option<&PyAny>) -> bool {
     if let Some(value) = op_value {
         value
             .hasattr(intern!(value.py(), "__dataclass_fields__"))
+            .unwrap_or(false)
+    } else {
+        false
+    }
+}
+
+fn is_pydantic_model(op_value: Option<&PyAny>) -> bool {
+    if let Some(value) = op_value {
+        value
+            .hasattr(intern!(value.py(), "__pydantic_validator__"))
             .unwrap_or(false)
     } else {
         false
@@ -235,6 +248,7 @@ pub enum ObType {
     MultiHostUrl,
     // dataclasses and pydantic models
     Dataclass,
+    PydanticModel,
     // unknown type
     Unknown,
 }
