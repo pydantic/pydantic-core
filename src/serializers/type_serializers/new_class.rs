@@ -28,27 +28,6 @@ impl BuildSerializer for NewClassSerializer {
     }
 }
 
-impl NewClassSerializer {
-    fn get_dict<'py>(&self, value: &'py PyAny, extra: &Extra) -> PyResult<&'py PyDict> {
-        let py = value.py();
-        let attr = value.getattr(intern!(py, "__dict__"))?;
-        let attrs: &PyDict = attr.cast_as()?;
-        if extra.exclude_unset {
-            let fields_set: &PySet = value.getattr(intern!(py, "__fields_set__"))?.cast_as()?;
-
-            let new_attrs = attrs.copy()?;
-            for key in new_attrs.keys() {
-                if !fields_set.contains(key)? {
-                    new_attrs.del_item(key)?;
-                }
-            }
-            Ok(new_attrs)
-        } else {
-            Ok(attrs)
-        }
-    }
-}
-
 impl TypeSerializer for NewClassSerializer {
     fn to_python(
         &self,
@@ -57,7 +36,7 @@ impl TypeSerializer for NewClassSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let dict = self.get_dict(value, extra)?;
+        let dict = get_object_dict(value, true, extra)?;
         self.serializer.to_python(dict, include, exclude, extra)
     }
 
@@ -69,8 +48,27 @@ impl TypeSerializer for NewClassSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let dict = self.get_dict(value, extra).map_err(py_err_se_err)?;
+        let dict = get_object_dict(value, true, extra).map_err(py_err_se_err)?;
         self.serializer
             .serde_serialize(dict, serializer, include, exclude, extra)
+    }
+}
+
+pub(super) fn get_object_dict<'py>(value: &'py PyAny, is_model: bool, extra: &Extra) -> PyResult<&'py PyDict> {
+    let py = value.py();
+    let attr = value.getattr(intern!(py, "__dict__"))?;
+    let attrs: &PyDict = attr.cast_as()?;
+    if is_model && extra.exclude_unset {
+        let fields_set: &PySet = value.getattr(intern!(py, "__fields_set__"))?.cast_as()?;
+
+        let new_attrs = attrs.copy()?;
+        for key in new_attrs.keys() {
+            if !fields_set.contains(key)? {
+                new_attrs.del_item(key)?;
+            }
+        }
+        Ok(new_attrs)
+    } else {
+        Ok(attrs)
     }
 }

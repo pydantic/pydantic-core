@@ -22,10 +22,6 @@ pub(crate) use return_enums::{
     PyArgs,
 };
 
-pub fn repr_string(v: &PyAny) -> PyResult<String> {
-    v.repr()?.extract()
-}
-
 // Defined here as it's not exported by pyo3
 pub fn py_error_on_minusone(py: Python<'_>, result: c_int) -> PyResult<()> {
     if result != -1 {

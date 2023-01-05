@@ -9,8 +9,11 @@ use pyo3::types::{
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::build_context::BuildContext;
+use crate::build_tools::safe_repr;
+use crate::errors::PydanticSerializationError;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
+use super::new_class::get_object_dict;
 use super::{
     py_err_se_err, utf8_py_error, AnyFilter, BuildSerializer, CombinedSerializer, Extra, ObType, SerMode,
     TypeSerializer,
@@ -60,17 +63,17 @@ pub(crate) fn fallback_to_python_known(
     exclude: Option<&PyAny>,
     extra: &Extra,
 ) -> PyResult<PyObject> {
+    let py = value.py();
     let value_id = match extra.rec_guard.add(value) {
         Ok(id) => id,
         Err(e) => {
             return match extra.mode {
                 SerMode::Json => Err(e),
                 // if recursion is detected by we're serializing to python, we just return the value
-                _ => Ok(value.into_py(value.py())),
+                _ => Ok(value.into_py(py)),
             };
         }
     };
-    let py = value.py();
 
     // have to do this to make sure subclasses of for example str are upcast to `str`
     macro_rules! extract_as {
@@ -80,14 +83,13 @@ pub(crate) fn fallback_to_python_known(
     }
 
     macro_rules! serialize_seq {
-        ($t:ty) => {{
-            let vec: Vec<PyObject> = value
+        ($t:ty) => {
+            value
                 .cast_as::<$t>()?
                 .iter()
                 .map(|v| fallback_to_python(v, include, exclude, extra))
-                .collect::<PyResult<_>>()?;
-            PyList::new(py, vec).into_py(py)
-        }};
+                .collect::<PyResult<Vec<PyObject>>>()?
+        };
     }
 
     macro_rules! serialize_seq_filter {
@@ -106,8 +108,26 @@ pub(crate) fn fallback_to_python_known(
         }};
     }
 
+    let serialize_dict = |dict: &PyDict| {
+        let new_dict = PyDict::new(py);
+        let filter = AnyFilter::new();
+
+        for (k, v) in dict {
+            let op_next = filter.key_filter(k, include, exclude)?;
+            if let Some((next_include, next_exclude)) = op_next {
+                let k_str = fallback_json_key(k, extra)?;
+                let k = PyString::new(py, &k_str);
+                let v = fallback_to_python(v, next_include, next_exclude, extra)?;
+                new_dict.set_item(k, v)?;
+            }
+        }
+        Ok::<PyObject, PyErr>(new_dict.into_py(py))
+    };
+
     let value = match extra.mode {
         SerMode::Json => match ob_type {
+            ObType::None => value.into_py(py),
+            ObType::Bool => extract_as!(bool),
             ObType::Int => extract_as!(i64),
             // `bool` and `None` can't be subclasses, so no need to do the same on bool
             ObType::Float => extract_as!(f64),
@@ -128,31 +148,22 @@ pub(crate) fn fallback_to_python_known(
                 }
             }
             ObType::Tuple => {
-                let items = serialize_seq_filter!(PyTuple);
-                PyList::new(py, items).into_py(py)
+                let elements = serialize_seq_filter!(PyTuple);
+                PyList::new(py, elements).into_py(py)
             }
             ObType::List => {
-                let items = serialize_seq_filter!(PyList);
-                PyList::new(py, items).into_py(py)
+                let elements = serialize_seq_filter!(PyList);
+                PyList::new(py, elements).into_py(py)
             }
-            ObType::Set => serialize_seq!(PySet),
-            ObType::Frozenset => serialize_seq!(PyFrozenSet),
-            ObType::Dict => {
-                let dict: &PyDict = value.cast_as()?;
-                let new_dict = PyDict::new(py);
-                let filter = AnyFilter::new();
-
-                for (k, v) in dict {
-                    let op_next = filter.key_filter(k, include, exclude)?;
-                    if let Some((next_include, next_exclude)) = op_next {
-                        let k_str = fallback_json_key(k, extra)?;
-                        let k = PyString::new(py, &k_str);
-                        let v = fallback_to_python(v, next_include, next_exclude, extra)?;
-                        new_dict.set_item(k, v)?;
-                    }
-                }
-                new_dict.into_py(py)
+            ObType::Set => {
+                let elements = serialize_seq!(PySet);
+                PyList::new(py, elements).into_py(py)
             }
+            ObType::Frozenset => {
+                let elements = serialize_seq!(PyFrozenSet);
+                PyList::new(py, elements).into_py(py)
+            }
+            ObType::Dict => serialize_dict(value.cast_as()?)?,
             ObType::Datetime => {
                 let py_dt: &PyDateTime = value.cast_as()?;
                 let iso_dt = super::datetime_etc::datetime_to_string(py_dt)?;
@@ -180,17 +191,25 @@ pub(crate) fn fallback_to_python_known(
                 let py_url: PyMultiHostUrl = value.extract()?;
                 py_url.__str__().into_py(py)
             }
-            // TODO error here we
-            _ => value.into_py(value.py()),
+            ObType::Dataclass => serialize_dict(get_object_dict(value, false, extra)?)?,
+            ObType::Unknown => return Err(unknown_type_error(value)),
         },
         _ => match ob_type {
             ObType::Tuple => {
-                let items = serialize_seq_filter!(PyTuple);
-                PyTuple::new(py, items).into_py(py)
+                let elements = serialize_seq_filter!(PyTuple);
+                PyTuple::new(py, elements).into_py(py)
             }
             ObType::List => {
-                let items = serialize_seq_filter!(PyList);
-                PyList::new(py, items).into_py(py)
+                let elements = serialize_seq_filter!(PyList);
+                PyList::new(py, elements).into_py(py)
+            }
+            ObType::Set => {
+                let elements = serialize_seq!(PySet);
+                PySet::new(py, &elements)?.into_py(py)
+            }
+            ObType::Frozenset => {
+                let elements = serialize_seq!(PyFrozenSet);
+                PyFrozenSet::new(py, &elements)?.into_py(py)
             }
             ObType::Dict => {
                 // different logic for keys from above
@@ -207,7 +226,8 @@ pub(crate) fn fallback_to_python_known(
                 }
                 new_dict.into_py(py)
             }
-            _ => value.into_py(value.py()),
+            ObType::Dataclass => serialize_dict(get_object_dict(value, false, extra)?)?,
+            _ => value.into_py(py),
         },
     };
     extra.rec_guard.pop(value_id);
@@ -307,6 +327,23 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
         }};
     }
 
+    macro_rules! serialize_dict {
+        ($py_dict:expr) => {{
+            let mut map = serializer.serialize_map(Some($py_dict.len()))?;
+            let filter = AnyFilter::new();
+
+            for (key, value) in $py_dict {
+                let op_next = filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
+                if let Some((next_include, next_exclude)) = op_next {
+                    let key = fallback_json_key(key, extra).map_err(py_err_se_err)?;
+                    let value_serializer = SerializeInfer::new(value, next_include, next_exclude, extra);
+                    map.serialize_entry(&key, &value_serializer)?;
+                }
+            }
+            map.end()
+        }};
+    }
+
     let ser_result = match ob_type {
         ObType::None => serializer.serialize_none(),
         ObType::Int => serialize!(i64),
@@ -328,23 +365,7 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
                 Err(e) => Err(py_err_se_err(e)),
             }
         }
-        ObType::Dict => {
-            let py_dict: &PyDict = value.cast_as().map_err(py_err_se_err)?;
-
-            let len = py_dict.len();
-            let mut map = serializer.serialize_map(Some(len))?;
-            let filter = AnyFilter::new();
-
-            for (key, value) in py_dict {
-                let op_next = filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
-                if let Some((next_include, next_exclude)) = op_next {
-                    let key = fallback_json_key(key, extra).map_err(py_err_se_err)?;
-                    let value_serializer = SerializeInfer::new(value, next_include, next_exclude, extra);
-                    map.serialize_entry(&key, &value_serializer)?;
-                }
-            }
-            map.end()
-        }
+        ObType::Dict => serialize_dict!(value.cast_as::<PyDict>().map_err(py_err_se_err)?),
         ObType::List => serialize_seq_filter!(PyList),
         ObType::Tuple => serialize_seq_filter!(PyTuple),
         ObType::Set => serialize_seq!(PySet),
@@ -379,11 +400,15 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
             let py_url: PyMultiHostUrl = value.extract().map_err(py_err_se_err)?;
             serializer.serialize_str(&py_url.__str__())
         }
-        _ => todo!(),
-        // _ => serializer.serialize_none(),
+        ObType::Dataclass => serialize_dict!(get_object_dict(value, false, extra).map_err(py_err_se_err)?),
+        ObType::Unknown => return Err(py_err_se_err(unknown_type_error(value))),
     };
     extra.rec_guard.pop(value_id);
     ser_result
+}
+
+fn unknown_type_error(value: &PyAny) -> PyErr {
+    PydanticSerializationError::new_err(format!("Unable to serialize unknown type: {}", safe_repr(value)))
 }
 
 pub(crate) fn fallback_json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {

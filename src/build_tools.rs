@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 
@@ -208,3 +209,10 @@ macro_rules! kwargs {
     }};
 }
 pub(crate) use kwargs;
+
+pub fn safe_repr(v: &PyAny) -> Cow<str> {
+    match v.repr() {
+        Ok(r) => r.to_string_lossy(),
+        Err(_) => v.to_string().into(),
+    }
+}
