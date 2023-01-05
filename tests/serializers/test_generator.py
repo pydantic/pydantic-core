@@ -89,7 +89,7 @@ def test_generator_int():
 def test_include():
     v = SchemaSerializer(
         core_schema.generator_schema(
-            core_schema.any_schema(), serialization=core_schema.inc_ex_seq_schema(include={1, 3, 5})
+            core_schema.any_schema(), serialization=core_schema.filter_seq_schema(include={1, 3, 5})
         )
     )
     assert v.to_python([0, 1, 2, 3], mode='json') == [1, 3]

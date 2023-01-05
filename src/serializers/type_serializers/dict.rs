@@ -9,7 +9,8 @@ use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
 use super::{
-    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaIncEx, SerMode, TypeSerializer,
+    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaFilter, SerMode,
+    TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
@@ -17,7 +18,7 @@ pub struct DictSerializer {
     key_serializer: Box<CombinedSerializer>,
     value_serializer: Box<CombinedSerializer>,
     // isize because we look up include exclude via `.hash()` which returns an isize
-    inc_ex: SchemaIncEx<isize>,
+    filter: SchemaFilter<isize>,
 }
 
 impl BuildSerializer for DictSerializer {
@@ -37,18 +38,18 @@ impl BuildSerializer for DictSerializer {
             Some(items_schema) => CombinedSerializer::build(items_schema, config, build_context)?,
             None => AnySerializer::build(schema, config, build_context)?,
         };
-        let inc_ex = match schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
+        let filter = match schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
             Some(ser) => {
                 let include = ser.get_item(intern!(py, "include"));
                 let exclude = ser.get_item(intern!(py, "exclude"));
-                SchemaIncEx::from_set_hash(include, exclude)?
+                SchemaFilter::from_set_hash(include, exclude)?
             }
-            None => SchemaIncEx::default(),
+            None => SchemaFilter::default(),
         };
         Ok(Self {
             key_serializer: Box::new(key_serializer),
             value_serializer: Box::new(value_serializer),
-            inc_ex,
+            filter,
         }
         .into())
     }
@@ -69,7 +70,7 @@ impl TypeSerializer for DictSerializer {
 
                 let new_dict = PyDict::new(py);
                 for (key, value) in py_dict {
-                    let op_next = self.inc_ex.key(key, include, exclude)?;
+                    let op_next = self.filter.key_filter(key, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let key = match extra.mode {
                             SerMode::Json => self.key_serializer.json_key(key, extra)?.into_py(py),
@@ -103,7 +104,7 @@ impl TypeSerializer for DictSerializer {
                 let value_serializer = self.value_serializer.as_ref();
 
                 for (key, value) in py_dict {
-                    let op_next = self.inc_ex.key(key, include, exclude).map_err(py_err_se_err)?;
+                    let op_next = self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let key = key_serializer.json_key(key, extra).map_err(py_err_se_err)?;
                         let value_serialize =

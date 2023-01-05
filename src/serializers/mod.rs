@@ -13,7 +13,7 @@ use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
 
 mod config;
 mod extra;
-mod include_exclude;
+mod filter;
 mod ob_type;
 mod shared;
 mod type_serializers;

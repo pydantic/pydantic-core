@@ -10,12 +10,12 @@ use nohash_hasher::{IntSet, NoHashHasher};
 use crate::build_tools::SchemaDict;
 
 #[derive(Debug, Clone, Default)]
-pub(super) struct SchemaIncEx<T> {
+pub(super) struct SchemaFilter<T> {
     include: Option<IntSet<T>>,
     exclude: Option<IntSet<T>>,
 }
 
-impl SchemaIncEx<usize> {
+impl SchemaFilter<usize> {
     pub fn from_schema(schema: &PyDict) -> PyResult<Self> {
         let py = schema.py();
         match schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
@@ -24,7 +24,7 @@ impl SchemaIncEx<usize> {
                 let exclude = Self::build_set_ints(ser.get_item(intern!(py, "exclude")))?;
                 Ok(Self { include, exclude })
             }
-            None => Ok(SchemaIncEx::default()),
+            None => Ok(SchemaFilter::default()),
         }
     }
 
@@ -48,17 +48,17 @@ impl SchemaIncEx<usize> {
         }
     }
 
-    pub fn value<'py>(
+    pub fn value_filter<'py>(
         &self,
         index: usize,
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
     ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
-        self.include_or_exclude(index, index, include, exclude)
+        self.filter(index, index, include, exclude)
     }
 }
 
-impl SchemaIncEx<isize> {
+impl SchemaFilter<isize> {
     pub fn from_set_hash(include: Option<&PyAny>, exclude: Option<&PyAny>) -> PyResult<Self> {
         let include = Self::build_set_hashes(include)?;
         let exclude = Self::build_set_hashes(exclude)?;
@@ -98,27 +98,27 @@ impl SchemaIncEx<isize> {
         }
     }
 
-    pub fn key<'py>(
+    pub fn key_filter<'py>(
         &self,
         key: &PyAny,
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
     ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
         let hash = key.hash()?;
-        self.include_or_exclude(key, hash, include, exclude)
+        self.filter(key, hash, include, exclude)
     }
 }
 
-trait IncEx<T: Eq + Copy> {
+trait FilterLogic<T: Eq + Copy> {
     /// whether an `index`/`key` is explicitly included, this is combined with call-time `include` below
     fn explicit_include(&self, value: T) -> bool;
     /// default decision on whether to include the item at a given `index`/`key`
-    fn default_inc_ex(&self, value: T) -> bool;
+    fn default_filter(&self, value: T) -> bool;
 
     /// this is the somewhat hellish logic for deciding:
     /// 1. whether we should omit a value at a particular index/key - returning `Ok(None)` here
     /// 2. or include it, in which case, what values of `include` and `exclude` should be passed to it
-    fn include_or_exclude<'py>(
+    fn filter<'py>(
         &self,
         py_key: impl ToPyObject + Copy,
         int_key: T,
@@ -179,7 +179,7 @@ trait IncEx<T: Eq + Copy> {
 
         if next_exclude.is_some() {
             Ok(Some((None, next_exclude)))
-        } else if self.default_inc_ex(int_key) {
+        } else if self.default_filter(int_key) {
             Ok(Some((None, None)))
         } else {
             Ok(None)
@@ -187,7 +187,7 @@ trait IncEx<T: Eq + Copy> {
     }
 }
 
-impl<T> IncEx<T> for SchemaIncEx<T>
+impl<T> FilterLogic<T> for SchemaFilter<T>
 where
     T: Hash + Eq + Copy,
     BuildHasherDefault<NoHashHasher<T>>: BuildHasher,
@@ -199,7 +199,7 @@ where
         }
     }
 
-    fn default_inc_ex(&self, value: T) -> bool {
+    fn default_filter(&self, value: T) -> bool {
         match (&self.include, &self.exclude) {
             (Some(include), Some(exclude)) => include.contains(&value) && !exclude.contains(&value),
             (Some(include), None) => include.contains(&value),
@@ -210,34 +210,34 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct AnyIncEx;
+pub(super) struct AnyFilter;
 
-impl AnyIncEx {
+impl AnyFilter {
     pub fn new() -> Self {
-        AnyIncEx {}
+        AnyFilter {}
     }
 
-    pub fn key<'py>(
+    pub fn key_filter<'py>(
         &self,
         key: &PyAny,
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
     ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
         // just use 0 for the int_key, it's always ignored in the implementation here
-        self.include_or_exclude(key, 0, include, exclude)
+        self.filter(key, 0, include, exclude)
     }
 
-    pub fn value<'py>(
+    pub fn value_filter<'py>(
         &self,
         index: usize,
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
     ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
-        self.include_or_exclude(index, index, include, exclude)
+        self.filter(index, index, include, exclude)
     }
 }
 
-impl<T> IncEx<T> for AnyIncEx
+impl<T> FilterLogic<T> for AnyFilter
 where
     T: Eq + Copy,
 {
@@ -245,7 +245,7 @@ where
         false
     }
 
-    fn default_inc_ex(&self, _value: T) -> bool {
+    fn default_filter(&self, _value: T) -> bool {
         true
     }
 }

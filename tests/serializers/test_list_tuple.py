@@ -71,7 +71,7 @@ def as_tuple(*items):
 )
 def test_include(schema_func, seq_f):
     v = SchemaSerializer(
-        schema_func(core_schema.any_schema(), serialization=core_schema.inc_ex_seq_schema(include={1, 3, 5}))
+        schema_func(core_schema.any_schema(), serialization=core_schema.filter_seq_schema(include={1, 3, 5}))
     )
     assert v.to_python(seq_f(0, 1, 2, 3)) == seq_f(1, 3)
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == seq_f('b', 'd', 'f')
@@ -88,7 +88,7 @@ def test_include(schema_func, seq_f):
 )
 def test_include_dict(schema_func, seq_f):
     v = SchemaSerializer(
-        schema_func(core_schema.any_schema(), serialization=core_schema.inc_ex_seq_schema(include={1, 3, 5}))
+        schema_func(core_schema.any_schema(), serialization=core_schema.filter_seq_schema(include={1, 3, 5}))
     )
     assert v.to_python(seq_f(0, 1, 2, 3, 4)) == seq_f(1, 3)
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == seq_f('b', 'd', 'f')
@@ -102,7 +102,7 @@ def test_include_dict(schema_func, seq_f):
 )
 def test_exclude(schema_func, seq_f):
     v = SchemaSerializer(
-        schema_func(core_schema.any_schema(), serialization=core_schema.inc_ex_seq_schema(exclude={1, 3, 5}))
+        schema_func(core_schema.any_schema(), serialization=core_schema.filter_seq_schema(exclude={1, 3, 5}))
     )
     assert v.to_python(seq_f(0, 1, 2, 3)) == seq_f(0, 2)
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == seq_f('a', 'c', 'e', 'g', 'h')
@@ -116,7 +116,7 @@ def test_exclude(schema_func, seq_f):
 def test_include_exclude():
     v = SchemaSerializer(
         core_schema.list_schema(
-            core_schema.any_schema(), serialization=core_schema.inc_ex_seq_schema(include={1, 3, 5}, exclude={5, 6})
+            core_schema.any_schema(), serialization=core_schema.filter_seq_schema(include={1, 3, 5}, exclude={5, 6})
         )
     )
     assert v.to_python([0, 1, 2, 3, 4, 5, 6, 7]) == [1, 3]
@@ -124,7 +124,7 @@ def test_include_exclude():
 
 def test_include_exclude_runtime():
     v = SchemaSerializer(
-        core_schema.list_schema(core_schema.any_schema(), serialization=core_schema.inc_ex_seq_schema(exclude={0, 1}))
+        core_schema.list_schema(core_schema.any_schema(), serialization=core_schema.filter_seq_schema(exclude={0, 1}))
     )
     assert v.to_python([0, 1, 2, 3]) == [2, 3]
     # `include` as a call argument trumps schema `exclude`
@@ -144,7 +144,7 @@ def test_include_exclude_runtime():
 def test_include_error(schema_func, include_value, error_msg):
     with pytest.raises(SchemaError, match=error_msg):
         SchemaSerializer(
-            schema_func(core_schema.any_schema(), serialization=core_schema.inc_ex_seq_schema(include=include_value))
+            schema_func(core_schema.any_schema(), serialization=core_schema.filter_seq_schema(include=include_value))
         )
 
 

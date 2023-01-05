@@ -525,7 +525,7 @@ class IncExSeqSerSchema(TypedDict, total=False):
     exclude: Set[int]
 
 
-def inc_ex_seq_schema(*, include: Set[int] | None = None, exclude: Set[int] | None = None) -> IncExSeqSerSchema:
+def filter_seq_schema(*, include: Set[int] | None = None, exclude: Set[int] | None = None) -> IncExSeqSerSchema:
     return dict_not_none(type='include-exclude-sequence', include=include, exclude=exclude)
 
 
@@ -742,7 +742,7 @@ class IncExDictSerSchema(TypedDict, total=False):
     exclude: IncExDict
 
 
-def inc_ex_dict_schema(*, include: IncExDict | None = None, exclude: IncExDict | None = None) -> IncExDictSerSchema:
+def filter_dict_schema(*, include: IncExDict | None = None, exclude: IncExDict | None = None) -> IncExDictSerSchema:
     return dict_not_none(type='include-exclude-dict', include=include, exclude=exclude)
 
 

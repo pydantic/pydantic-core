@@ -9,7 +9,8 @@ use crate::build_tools::SchemaDict;
 
 use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
 use super::{
-    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaIncEx, SerMode, TypeSerializer,
+    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaFilter, SerMode,
+    TypeSerializer,
 };
 
 pub struct TupleBuilder;
@@ -32,7 +33,7 @@ impl BuildSerializer for TupleBuilder {
 #[derive(Debug, Clone)]
 pub struct TupleVariableSerializer {
     item_serializer: Box<CombinedSerializer>,
-    inc_ex: SchemaIncEx<usize>,
+    filter: SchemaFilter<usize>,
 }
 
 impl TupleVariableSerializer {
@@ -51,7 +52,7 @@ impl TupleVariableSerializer {
         };
         Ok(Self {
             item_serializer: Box::new(item_serializer),
-            inc_ex: SchemaIncEx::from_schema(schema)?,
+            filter: SchemaFilter::from_schema(schema)?,
         }
         .into())
     }
@@ -72,7 +73,7 @@ impl TypeSerializer for TupleVariableSerializer {
 
                 let mut items = Vec::with_capacity(py_tuple.len());
                 for (index, element) in py_tuple.iter().enumerate() {
-                    let op_next = self.inc_ex.value(index, include, exclude)?;
+                    let op_next = self.filter.value_filter(index, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                     }
@@ -104,7 +105,10 @@ impl TypeSerializer for TupleVariableSerializer {
 
                 let mut seq = serializer.serialize_seq(Some(py_tuple.len()))?;
                 for (index, element) in py_tuple.iter().enumerate() {
-                    let op_next = self.inc_ex.value(index, include, exclude).map_err(py_err_se_err)?;
+                    let op_next = self
+                        .filter
+                        .value_filter(index, include, exclude)
+                        .map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let item_serialize =
                             PydanticSerializer::new(element, item_serializer, next_include, next_exclude, extra);
@@ -125,7 +129,7 @@ impl TypeSerializer for TupleVariableSerializer {
 pub struct TuplePositionalSerializer {
     items_serializers: Vec<CombinedSerializer>,
     extra_serializer: Box<CombinedSerializer>,
-    inc_ex: SchemaIncEx<usize>,
+    filter: SchemaFilter<usize>,
 }
 
 impl TuplePositionalSerializer {
@@ -147,7 +151,7 @@ impl TuplePositionalSerializer {
                 .map(|item| CombinedSerializer::build(item.cast_as()?, config, build_context))
                 .collect::<PyResult<_>>()?,
             extra_serializer: Box::new(extra_serializer),
-            inc_ex: SchemaIncEx::from_schema(schema)?,
+            filter: SchemaFilter::from_schema(schema)?,
         }
         .into())
     }
@@ -172,7 +176,7 @@ impl TypeSerializer for TuplePositionalSerializer {
                         Some(value) => value,
                         None => break,
                     };
-                    let op_next = self.inc_ex.value(index, include, exclude)?;
+                    let op_next = self.filter.value_filter(index, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         items.push(serializer.to_python(element, next_include, next_exclude, extra)?);
                     }
@@ -181,7 +185,7 @@ impl TypeSerializer for TuplePositionalSerializer {
                 let extra_serializer = self.extra_serializer.as_ref();
                 for (index2, element) in py_tuple_iter.enumerate() {
                     let index = index2 + expected_length;
-                    let op_next = self.inc_ex.value(index, include, exclude)?;
+                    let op_next = self.filter.value_filter(index, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         items.push(extra_serializer.to_python(element, next_include, next_exclude, extra)?);
                     }
@@ -218,7 +222,10 @@ impl TypeSerializer for TuplePositionalSerializer {
                         Some(value) => value,
                         None => break,
                     };
-                    let op_next = self.inc_ex.value(index, include, exclude).map_err(py_err_se_err)?;
+                    let op_next = self
+                        .filter
+                        .value_filter(index, include, exclude)
+                        .map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let item_serialize =
                             PydanticSerializer::new(element, serializer, next_include, next_exclude, extra);
@@ -230,7 +237,10 @@ impl TypeSerializer for TuplePositionalSerializer {
                 let extra_serializer = self.extra_serializer.as_ref();
                 for (index2, element) in py_tuple_iter.enumerate() {
                     let index = index2 + expected_length;
-                    let op_next = self.inc_ex.value(index, include, exclude).map_err(py_err_se_err)?;
+                    let op_next = self
+                        .filter
+                        .value_filter(index, include, exclude)
+                        .map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let item_serialize =
                             PydanticSerializer::new(element, extra_serializer, next_include, next_exclude, extra);

@@ -12,7 +12,8 @@ use crate::build_context::BuildContext;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::{
-    py_err_se_err, utf8_py_error, AnyIncEx, BuildSerializer, CombinedSerializer, Extra, ObType, SerMode, TypeSerializer,
+    py_err_se_err, utf8_py_error, AnyFilter, BuildSerializer, CombinedSerializer, Extra, ObType, SerMode,
+    TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
@@ -89,14 +90,14 @@ pub(crate) fn fallback_to_python_known(
         }};
     }
 
-    macro_rules! serialize_seq_inc_ex {
+    macro_rules! serialize_seq_filter {
         ($t:ty) => {{
             let py_seq: &$t = value.cast_as()?;
             let mut items = Vec::with_capacity(py_seq.len());
-            let inc_ex = AnyIncEx::new();
+            let filter = AnyFilter::new();
 
             for (index, element) in py_seq.iter().enumerate() {
-                let op_next = inc_ex.value(index, include, exclude)?;
+                let op_next = filter.value_filter(index, include, exclude)?;
                 if let Some((next_include, next_exclude)) = op_next {
                     items.push(fallback_to_python(element, next_include, next_exclude, extra)?);
                 }
@@ -127,11 +128,11 @@ pub(crate) fn fallback_to_python_known(
                 }
             }
             ObType::Tuple => {
-                let items = serialize_seq_inc_ex!(PyTuple);
+                let items = serialize_seq_filter!(PyTuple);
                 PyList::new(py, items).into_py(py)
             }
             ObType::List => {
-                let items = serialize_seq_inc_ex!(PyList);
+                let items = serialize_seq_filter!(PyList);
                 PyList::new(py, items).into_py(py)
             }
             ObType::Set => serialize_seq!(PySet),
@@ -139,10 +140,10 @@ pub(crate) fn fallback_to_python_known(
             ObType::Dict => {
                 let dict: &PyDict = value.cast_as()?;
                 let new_dict = PyDict::new(py);
-                let inc_ex = AnyIncEx::new();
+                let filter = AnyFilter::new();
 
                 for (k, v) in dict {
-                    let op_next = inc_ex.key(k, include, exclude)?;
+                    let op_next = filter.key_filter(k, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let k_str = fallback_json_key(k, extra)?;
                         let k = PyString::new(py, &k_str);
@@ -184,21 +185,21 @@ pub(crate) fn fallback_to_python_known(
         },
         _ => match ob_type {
             ObType::Tuple => {
-                let items = serialize_seq_inc_ex!(PyTuple);
+                let items = serialize_seq_filter!(PyTuple);
                 PyTuple::new(py, items).into_py(py)
             }
             ObType::List => {
-                let items = serialize_seq_inc_ex!(PyList);
+                let items = serialize_seq_filter!(PyList);
                 PyList::new(py, items).into_py(py)
             }
             ObType::Dict => {
                 // different logic for keys from above
                 let dict: &PyDict = value.cast_as()?;
                 let new_dict = PyDict::new(py);
-                let inc_ex = AnyIncEx::new();
+                let filter = AnyFilter::new();
 
                 for (k, v) in dict {
-                    let op_next = inc_ex.key(k, include, exclude)?;
+                    let op_next = filter.key_filter(k, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let v = fallback_to_python(v, next_include, next_exclude, extra)?;
                         new_dict.set_item(k, v)?;
@@ -290,13 +291,13 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
         }};
     }
 
-    macro_rules! serialize_seq_inc_ex {
+    macro_rules! serialize_seq_filter {
         ($t:ty) => {{
             let py_seq: &$t = value.cast_as().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
-            let inc_ex = AnyIncEx::new();
+            let filter = AnyFilter::new();
             for (index, element) in py_seq.iter().enumerate() {
-                let op_next = inc_ex.value(index, include, exclude).map_err(py_err_se_err)?;
+                let op_next = filter.value_filter(index, include, exclude).map_err(py_err_se_err)?;
                 if let Some((next_include, next_exclude)) = op_next {
                     let item_serializer = SerializeInfer::new(element, next_include, next_exclude, extra);
                     seq.serialize_element(&item_serializer)?
@@ -332,10 +333,10 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
 
             let len = py_dict.len();
             let mut map = serializer.serialize_map(Some(len))?;
-            let inc_ex = AnyIncEx::new();
+            let filter = AnyFilter::new();
 
             for (key, value) in py_dict {
-                let op_next = inc_ex.key(key, include, exclude).map_err(py_err_se_err)?;
+                let op_next = filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
                 if let Some((next_include, next_exclude)) = op_next {
                     let key = fallback_json_key(key, extra).map_err(py_err_se_err)?;
                     let value_serializer = SerializeInfer::new(value, next_include, next_exclude, extra);
@@ -344,8 +345,8 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
             }
             map.end()
         }
-        ObType::List => serialize_seq_inc_ex!(PyList),
-        ObType::Tuple => serialize_seq_inc_ex!(PyTuple),
+        ObType::List => serialize_seq_filter!(PyList),
+        ObType::Tuple => serialize_seq_filter!(PyTuple),
         ObType::Set => serialize_seq!(PySet),
         ObType::Frozenset => serialize_seq!(PyFrozenSet),
         ObType::Datetime => {

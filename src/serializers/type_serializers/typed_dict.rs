@@ -12,7 +12,7 @@ use crate::build_tools::{py_error_type, schema_or_config, SchemaDict};
 use super::any::{fallback_json_key, fallback_serialize, fallback_to_python, SerializeInfer};
 use super::with_default::get_default;
 use super::{
-    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaIncEx, TypeSerializer,
+    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaFilter, TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
@@ -48,7 +48,7 @@ pub struct TypedDictSerializer {
     fields: AHashMap<String, TypedDictField>,
     include_extra: bool,
     // isize because we look up include exclude via `.hash()` which returns an isize
-    inc_ex: SchemaIncEx<isize>,
+    filter: SchemaFilter<isize>,
 }
 
 impl BuildSerializer for TypedDictSerializer {
@@ -108,12 +108,12 @@ impl BuildSerializer for TypedDictSerializer {
             );
         }
 
-        let inc_ex = SchemaIncEx::from_vec_hash(py, exclude)?;
+        let filter = SchemaFilter::from_vec_hash(py, exclude)?;
 
         Ok(Self {
             fields,
             include_extra,
-            inc_ex,
+            filter,
         }
         .into())
     }
@@ -150,7 +150,7 @@ impl TypeSerializer for TypedDictSerializer {
                     if extra.exclude_none && value.is_none() {
                         continue;
                     }
-                    if let Some((next_include, next_exclude)) = self.inc_ex.key(key, include, exclude)? {
+                    if let Some((next_include, next_exclude)) = self.filter.key_filter(key, include, exclude)? {
                         if let Ok(key_py_str) = key.cast_as::<PyString>() {
                             if let Some(field) = self.fields.get(key_py_str.to_str()?) {
                                 if self.exclude_default(value, extra, field)? {
@@ -199,7 +199,7 @@ impl TypeSerializer for TypedDictSerializer {
                         continue;
                     }
                     if let Some((next_include, next_exclude)) =
-                        self.inc_ex.key(key, include, exclude).map_err(py_err_se_err)?
+                        self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?
                     {
                         if let Ok(key_py_str) = key.cast_as::<PyString>() {
                             let key_str = key_py_str.to_str().map_err(py_err_se_err)?;

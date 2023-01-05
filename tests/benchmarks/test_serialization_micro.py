@@ -233,7 +233,7 @@ def test_model_list_core_json(benchmark):
                 {
                     'a': core_schema.typed_dict_field(
                         core_schema.list_schema(
-                            core_schema.int_schema(), serialization=core_schema.inc_ex_seq_schema(exclude={1, 2})
+                            core_schema.int_schema(), serialization=core_schema.filter_seq_schema(exclude={1, 2})
                         )
                     )
                 }
