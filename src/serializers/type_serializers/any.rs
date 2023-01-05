@@ -13,7 +13,7 @@ use crate::build_tools::safe_repr;
 use crate::errors::PydanticSerializationError;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
-use super::new_class::get_object_dict;
+use super::new_class::object_to_dict;
 use super::{
     py_err_se_err, utf8_py_error, AnyFilter, BuildSerializer, CombinedSerializer, Extra, ObType, SerMode,
     TypeSerializer,
@@ -191,7 +191,7 @@ pub(crate) fn fallback_to_python_known(
                 let py_url: PyMultiHostUrl = value.extract()?;
                 py_url.__str__().into_py(py)
             }
-            ObType::Dataclass => serialize_dict(get_object_dict(value, false, extra)?)?,
+            ObType::Dataclass => serialize_dict(object_to_dict(value, false, extra)?)?,
             ObType::Unknown => return Err(unknown_type_error(value)),
         },
         _ => match ob_type {
@@ -226,7 +226,7 @@ pub(crate) fn fallback_to_python_known(
                 }
                 new_dict.into_py(py)
             }
-            ObType::Dataclass => serialize_dict(get_object_dict(value, false, extra)?)?,
+            ObType::Dataclass => serialize_dict(object_to_dict(value, false, extra)?)?,
             _ => value.into_py(py),
         },
     };
@@ -400,7 +400,7 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
             let py_url: PyMultiHostUrl = value.extract().map_err(py_err_se_err)?;
             serializer.serialize_str(&py_url.__str__())
         }
-        ObType::Dataclass => serialize_dict!(get_object_dict(value, false, extra).map_err(py_err_se_err)?),
+        ObType::Dataclass => serialize_dict!(object_to_dict(value, false, extra).map_err(py_err_se_err)?),
         ObType::Unknown => return Err(py_err_se_err(unknown_type_error(value))),
     };
     extra.rec_guard.pop(value_id);

@@ -130,14 +130,18 @@ impl CombinedSerializer {
         let py = schema.py();
         let type_key = intern!(py, "type");
 
-        if let Some(ser) = schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
-            let op_ser_type: Option<&str> = ser.get_as(type_key)?;
+        if let Some(ser_schema) = schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
+            let op_ser_type: Option<&str> = ser_schema.get_as(type_key)?;
             match op_ser_type {
                 Some("function") => {
                     // `function` is a special case, not included in `find_serializer` since it means something
                     // different in `schema.type`
-                    return super::type_serializers::function::FunctionSerializer::build(ser, config, build_context)
-                        .map_err(|err| py_error_type!("Error building `function` serializer:\n  {}", err));
+                    return super::type_serializers::function::FunctionSerializer::build(
+                        ser_schema,
+                        config,
+                        build_context,
+                    )
+                    .map_err(|err| py_error_type!("Error building `function` serializer:\n  {}", err));
                 }
                 // applies to lists tuples and dicts, does not override the main schema `type`
                 Some("include-exclude-sequence") | Some("include-exclude-dict") => (),
@@ -146,7 +150,7 @@ impl CombinedSerializer {
                 Some(ser_type) => {
                     // otherwise if `schema.serialization.type` is defined, use that with `find_serializer`
                     // instead of `schema.type`. In this case it's an error if a serializer isn't found.
-                    return match Self::find_serializer(ser_type, schema, config, build_context)? {
+                    return match Self::find_serializer(ser_type, ser_schema, config, build_context)? {
                         Some(serializer) => Ok(serializer),
                         None => py_err!("Unknown serialization schema type: `{}`", ser_type),
                     };

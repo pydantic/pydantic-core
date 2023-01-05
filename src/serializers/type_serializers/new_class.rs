@@ -36,7 +36,7 @@ impl TypeSerializer for NewClassSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let dict = get_object_dict(value, true, extra)?;
+        let dict = object_to_dict(value, true, extra)?;
         self.serializer.to_python(dict, include, exclude, extra)
     }
 
@@ -48,13 +48,13 @@ impl TypeSerializer for NewClassSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let dict = get_object_dict(value, true, extra).map_err(py_err_se_err)?;
+        let dict = object_to_dict(value, true, extra).map_err(py_err_se_err)?;
         self.serializer
             .serde_serialize(dict, serializer, include, exclude, extra)
     }
 }
 
-pub(super) fn get_object_dict<'py>(value: &'py PyAny, is_model: bool, extra: &Extra) -> PyResult<&'py PyDict> {
+pub(super) fn object_to_dict<'py>(value: &'py PyAny, is_model: bool, extra: &Extra) -> PyResult<&'py PyDict> {
     let py = value.py();
     let attr = value.getattr(intern!(py, "__dict__"))?;
     let attrs: &PyDict = attr.cast_as()?;

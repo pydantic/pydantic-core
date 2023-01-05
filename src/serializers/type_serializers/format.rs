@@ -29,13 +29,12 @@ impl BuildSerializer for FunctionSerializer {
         _build_context: &mut BuildContext<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
-        let serialization: &PyDict = schema.get_as_req(intern!(py, "serialization"))?;
         Ok(Self {
             format_func: py
                 .import(intern!(py, "builtins"))?
                 .getattr(intern!(py, "format"))?
                 .into_py(py),
-            formatting_string: serialization.get_as_req(intern!(py, "formatting_string"))?,
+            formatting_string: schema.get_as_req(intern!(py, "formatting_string"))?,
         }
         .into())
     }

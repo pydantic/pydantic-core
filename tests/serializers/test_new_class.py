@@ -1,9 +1,10 @@
+import dataclasses
 import json
 import platform
 
 import pytest
 
-from pydantic_core import SchemaSerializer, core_schema
+from pydantic_core import SchemaSerializer, SchemaValidator, core_schema
 
 on_pypy = platform.python_implementation() == 'PyPy'
 # pypy doesn't seem to maintain order of `__dict__`
@@ -41,6 +42,46 @@ def test_new_class():
         assert json.loads(j) == {'bar': 'more', 'foo': 1}
     else:
         assert j == b'{"bar":"more","foo":1}'
+
+
+@dataclasses.dataclass
+class DataClass:
+    foo: int
+    bar: str
+    spam: bytes
+
+
+def test_dataclass():
+    schema = core_schema.call_schema(
+        core_schema.arguments_schema(
+            core_schema.arguments_parameter('foo', core_schema.int_schema()),
+            core_schema.arguments_parameter('bar', core_schema.string_schema()),
+            core_schema.arguments_parameter('spam', core_schema.bytes_schema(), mode='keyword_only'),
+        ),
+        DataClass,
+        serialization={
+            'type': 'new-class',
+            'schema': core_schema.typed_dict_schema(
+                {
+                    'foo': core_schema.typed_dict_field(core_schema.int_schema()),
+                    'bar': core_schema.typed_dict_field(core_schema.string_schema()),
+                    'spam': core_schema.typed_dict_field(core_schema.bytes_schema()),
+                }
+            ),
+        },
+    )
+    # just check validation works as expected
+    v = SchemaValidator(schema)
+    dc = v.validate_python({'foo': 1, 'bar': 'bar-str', 'spam': 'bite'})
+    assert dc == DataClass(foo=1, bar='bar-str', spam=b'bite')
+    assert dataclasses.is_dataclass(dc)
+
+    s = SchemaSerializer(schema)
+
+    assert s.to_python(dc) == IsStrictDict(foo=1, bar='bar-str', spam=b'bite')
+
+    assert s.to_python(dc, mode='json') == {'foo': 1, 'bar': 'bar-str', 'spam': 'bite'}
+    assert json.loads(s.to_json(dc)) == {'foo': 1, 'bar': 'bar-str', 'spam': 'bite'}
 
 
 def test_new_class_allow_extra():

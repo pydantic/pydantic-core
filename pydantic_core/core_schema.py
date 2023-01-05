@@ -66,7 +66,6 @@ ExpectedSerializationTypes = Literal[
     'list',
     'tuple',
     'set',
-    'new-class',
     'frozenset',
     'dict',
     'datetime',
@@ -94,7 +93,12 @@ class FormatSerSchema(TypedDict, total=False):
     formatting_string: Required[str]
 
 
-SerSchema = Union[AltTypeSerSchema, FunctionSerSchema, FormatSerSchema]
+class NewClassSerSchema(TypedDict, total=False):
+    type: Required[Literal['new-class']]
+    schema: Required[CoreSchema]
+
+
+SerSchema = Union[AltTypeSerSchema, FunctionSerSchema, FormatSerSchema, NewClassSerSchema]
 
 
 class AnySchema(TypedDict, total=False):
