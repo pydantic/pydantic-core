@@ -139,7 +139,7 @@ def test_include_list_tuple(seq_f):
     assert v.to_python(seq_f(0, 1, 2, 3), include={1, 2}, mode='json') == [1, 2]
     assert v.to_python(seq_f('a', 'b', 'c', 'd'), include={1, 2}) == seq_f('b', 'c')
     assert v.to_python(seq_f('a', 'b', 'c', 'd'), include={1, 2}, mode='json') == ['b', 'c']
-    # assert v.to_json(seq_f('a', 'b', 'c', 'd'), include={1, 2}) == b'["b","c"]'
+    assert v.to_json(seq_f('a', 'b', 'c', 'd'), include={1, 2}) == b'["b","c"]'
 
 
 def test_include_dict():
@@ -152,5 +152,5 @@ def test_include_dict():
     assert v.to_python({1: 2, '3': 4}, include={'3'}) == {'3': 4}
     assert v.to_python({1: 2, '3': 4}, include={1}, mode='json') == {'1': 2}
     assert v.to_python({1: 2, '3': 4}, include={'3'}, mode='json') == {'3': 4}
-    # assert v.to_json({1: 2, '3': 4}, include={1}) == b'{"1":2}'
-    # assert v.to_json({1: 2, '3': 4}, include={'3'}) == b'{"3":4}'
+    assert v.to_json({1: 2, '3': 4}, include={1}) == b'{"1":2}'
+    assert v.to_json({1: 2, '3': 4}, include={'3'}) == b'{"3":4}'

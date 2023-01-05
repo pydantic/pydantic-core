@@ -61,15 +61,15 @@ macro_rules! build_serializer {
                 &self,
                 value: &PyAny,
                 serializer: S,
-                _include: Option<&PyAny>,
-                _exclude: Option<&PyAny>,
+                include: Option<&PyAny>,
+                exclude: Option<&PyAny>,
                 extra: &Extra,
             ) -> Result<S::Ok, S::Error> {
                 match value.extract::<$extract>() {
                     Ok(py_url) => serializer.serialize_str(&py_url.__str__()),
                     Err(_) => {
                         extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_serialize(value, serializer, extra)
+                        fallback_serialize(value, serializer, include, exclude, extra)
                     }
                 }
             }

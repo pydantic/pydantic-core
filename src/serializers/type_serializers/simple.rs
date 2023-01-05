@@ -45,15 +45,15 @@ impl TypeSerializer for NoneSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        _include: Option<&PyAny>,
-        _exclude: Option<&PyAny>,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match extra.ob_type_lookup.is_type(value, ObType::None) {
             IsType::Exact => serializer.serialize_none(),
             _ => {
                 extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                fallback_serialize(value, serializer, extra)
+                fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
     }
@@ -105,15 +105,15 @@ macro_rules! build_simple_serializer {
                 &self,
                 value: &PyAny,
                 serializer: S,
-                _include: Option<&PyAny>,
-                _exclude: Option<&PyAny>,
+                include: Option<&PyAny>,
+                exclude: Option<&PyAny>,
                 extra: &Extra,
             ) -> Result<S::Ok, S::Error> {
                 match value.extract::<$rust_type>() {
                     Ok(v) => v.serialize(serializer),
                     Err(_) => {
                         extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_serialize(value, serializer, extra)
+                        fallback_serialize(value, serializer, include, exclude, extra)
                     }
                 }
             }

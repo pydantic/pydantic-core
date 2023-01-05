@@ -35,11 +35,11 @@ impl TypeSerializer for AnySerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        _include: Option<&PyAny>,
-        _exclude: Option<&PyAny>,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        SerializeInfer::new(value, extra).serialize(serializer)
+        SerializeInfer::new(value, include, exclude, extra).serialize(serializer)
     }
 }
 
@@ -49,10 +49,10 @@ pub(crate) fn fallback_to_python(
     exclude: Option<&PyAny>,
     extra: &Extra,
 ) -> PyResult<PyObject> {
-    ob_type_to_python(&extra.ob_type_lookup.get_type(value), value, include, exclude, extra)
+    fallback_to_python_known(&extra.ob_type_lookup.get_type(value), value, include, exclude, extra)
 }
 
-pub(crate) fn ob_type_to_python(
+pub(crate) fn fallback_to_python_known(
     ob_type: &ObType,
     value: &PyAny,
     include: Option<&PyAny>,
@@ -83,20 +83,20 @@ pub(crate) fn ob_type_to_python(
             let vec: Vec<PyObject> = value
                 .cast_as::<$t>()?
                 .iter()
-                .map(|v| fallback_to_python(v, None, None, extra))
+                .map(|v| fallback_to_python(v, include, exclude, extra))
                 .collect::<PyResult<_>>()?;
             PyList::new(py, vec).into_py(py)
         }};
     }
 
     macro_rules! serialize_seq_inc_ex {
-        ($t:ty, $include:ident, $exclude:ident) => {{
-            let py_type = value.cast_as::<$t>()?;
-            let mut items = Vec::with_capacity(py_type.len());
+        ($t:ty) => {{
+            let py_seq: &$t = value.cast_as()?;
+            let mut items = Vec::with_capacity(py_seq.len());
             let inc_ex = AnyIncEx::new();
 
-            for (index, element) in py_type.iter().enumerate() {
-                let op_next = inc_ex.value(index, $include, $exclude)?;
+            for (index, element) in py_seq.iter().enumerate() {
+                let op_next = inc_ex.value(index, include, exclude)?;
                 if let Some((next_include, next_exclude)) = op_next {
                     items.push(fallback_to_python(element, next_include, next_exclude, extra)?);
                 }
@@ -127,11 +127,11 @@ pub(crate) fn ob_type_to_python(
                 }
             }
             ObType::Tuple => {
-                let items = serialize_seq_inc_ex!(PyTuple, include, exclude);
+                let items = serialize_seq_inc_ex!(PyTuple);
                 PyList::new(py, items).into_py(py)
             }
             ObType::List => {
-                let items = serialize_seq_inc_ex!(PyList, include, exclude);
+                let items = serialize_seq_inc_ex!(PyList);
                 PyList::new(py, items).into_py(py)
             }
             ObType::Set => serialize_seq!(PySet),
@@ -184,11 +184,11 @@ pub(crate) fn ob_type_to_python(
         },
         _ => match ob_type {
             ObType::Tuple => {
-                let items = serialize_seq_inc_ex!(PyTuple, include, exclude);
+                let items = serialize_seq_inc_ex!(PyTuple);
                 PyTuple::new(py, items).into_py(py)
             }
             ObType::List => {
-                let items = serialize_seq_inc_ex!(PyList, include, exclude);
+                let items = serialize_seq_inc_ex!(PyList);
                 PyList::new(py, items).into_py(py)
             }
             ObType::Dict => {
@@ -216,33 +216,56 @@ pub(crate) fn ob_type_to_python(
 pub(crate) struct SerializeInfer<'py> {
     value: &'py PyAny,
     extra: &'py Extra<'py>,
+    include: Option<&'py PyAny>,
+    exclude: Option<&'py PyAny>,
 }
 
 impl<'py> SerializeInfer<'py> {
-    pub(crate) fn new(value: &'py PyAny, extra: &'py Extra) -> Self {
-        Self { value, extra }
+    pub(crate) fn new(
+        value: &'py PyAny,
+        include: Option<&'py PyAny>,
+        exclude: Option<&'py PyAny>,
+        extra: &'py Extra,
+    ) -> Self {
+        Self {
+            value,
+            extra,
+            include,
+            exclude,
+        }
     }
 }
 
 impl<'py> Serialize for SerializeInfer<'py> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let ob_type = self.extra.ob_type_lookup.get_type(self.value);
-        fallback_serialize_known(&ob_type, self.value, serializer, self.extra)
+        fallback_serialize_known(&ob_type, self.value, serializer, self.include, self.exclude, self.extra)
     }
 }
 
 pub(crate) fn fallback_serialize<S: Serializer>(
     value: &PyAny,
     serializer: S,
+    include: Option<&PyAny>,
+    exclude: Option<&PyAny>,
     extra: &Extra,
 ) -> Result<S::Ok, S::Error> {
-    fallback_serialize_known(&extra.ob_type_lookup.get_type(value), value, serializer, extra)
+    fallback_serialize_known(
+        &extra.ob_type_lookup.get_type(value),
+        value,
+        serializer,
+        include,
+        exclude,
+        extra,
+    )
 }
 
 pub(crate) fn fallback_serialize_known<S: Serializer>(
     ob_type: &ObType,
     value: &PyAny,
     serializer: S,
+    include: Option<&PyAny>,
+    exclude: Option<&PyAny>,
     extra: &Extra,
 ) -> Result<S::Ok, S::Error> {
     let value_id = extra.rec_guard.add(value).map_err(py_err_se_err)?;
@@ -260,7 +283,24 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
             let py_seq: &$t = value.cast_as().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
             for element in py_seq {
-                seq.serialize_element(&SerializeInfer::new(element, extra))?
+                let item_serializer = SerializeInfer::new(element, include, exclude, extra);
+                seq.serialize_element(&item_serializer)?
+            }
+            seq.end()
+        }};
+    }
+
+    macro_rules! serialize_seq_inc_ex {
+        ($t:ty) => {{
+            let py_seq: &$t = value.cast_as().map_err(py_err_se_err)?;
+            let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
+            let inc_ex = AnyIncEx::new();
+            for (index, element) in py_seq.iter().enumerate() {
+                let op_next = inc_ex.value(index, include, exclude).map_err(py_err_se_err)?;
+                if let Some((next_include, next_exclude)) = op_next {
+                    let item_serializer = SerializeInfer::new(element, next_include, next_exclude, extra);
+                    seq.serialize_element(&item_serializer)?
+                }
             }
             seq.end()
         }};
@@ -292,14 +332,20 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
 
             let len = py_dict.len();
             let mut map = serializer.serialize_map(Some(len))?;
+            let inc_ex = AnyIncEx::new();
+
             for (key, value) in py_dict {
-                let key = fallback_json_key(key, extra).map_err(py_err_se_err)?;
-                map.serialize_entry(&key, &SerializeInfer::new(value, extra))?;
+                let op_next = inc_ex.key(key, include, exclude).map_err(py_err_se_err)?;
+                if let Some((next_include, next_exclude)) = op_next {
+                    let key = fallback_json_key(key, extra).map_err(py_err_se_err)?;
+                    let value_serializer = SerializeInfer::new(value, next_include, next_exclude, extra);
+                    map.serialize_entry(&key, &value_serializer)?;
+                }
             }
             map.end()
         }
-        ObType::List => serialize_seq!(PyList),
-        ObType::Tuple => serialize_seq!(PyTuple),
+        ObType::List => serialize_seq_inc_ex!(PyList),
+        ObType::Tuple => serialize_seq_inc_ex!(PyTuple),
         ObType::Set => serialize_seq!(PySet),
         ObType::Frozenset => serialize_seq!(PyFrozenSet),
         ObType::Datetime => {

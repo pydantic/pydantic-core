@@ -12,7 +12,7 @@ use crate::build_tools::{function_name, kwargs, py_error_type, SchemaDict};
 use crate::errors::PydanticSerializationError;
 
 use super::any::{
-    fallback_json_key, fallback_serialize, fallback_serialize_known, fallback_to_python, ob_type_to_python,
+    fallback_json_key, fallback_serialize, fallback_serialize_known, fallback_to_python, fallback_to_python_known,
 };
 use super::{BuildSerializer, CombinedSerializer, Extra, ObType, SerMode, TypeSerializer};
 
@@ -77,7 +77,7 @@ impl TypeSerializer for FunctionSerializer {
             .map_err(PydanticSerializationError::new_err)?;
 
         if let Some(ref ob_type) = self.return_ob_type {
-            ob_type_to_python(ob_type, v.as_ref(py), include, exclude, extra)
+            fallback_to_python_known(ob_type, v.as_ref(py), include, exclude, extra)
         } else {
             fallback_to_python(v.as_ref(py), include, exclude, extra)
         }
@@ -103,9 +103,9 @@ impl TypeSerializer for FunctionSerializer {
         let return_value = self.call(value, include, exclude, extra.mode).map_err(Error::custom)?;
 
         if let Some(ref ob_type) = self.return_ob_type {
-            fallback_serialize_known(ob_type, return_value.as_ref(py), serializer, extra)
+            fallback_serialize_known(ob_type, return_value.as_ref(py), serializer, include, exclude, extra)
         } else {
-            fallback_serialize(return_value.as_ref(py), serializer, extra)
+            fallback_serialize(return_value.as_ref(py), serializer, include, exclude, extra)
         }
     }
 }

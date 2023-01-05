@@ -115,7 +115,7 @@ impl TypeSerializer for TupleVariableSerializer {
             }
             Err(_) => {
                 extra.warnings.fallback_filtering("tuple", value);
-                fallback_serialize(value, serializer, extra)
+                fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
     }
@@ -242,7 +242,7 @@ impl TypeSerializer for TuplePositionalSerializer {
             }
             Err(_) => {
                 extra.warnings.fallback_filtering("tuple", value);
-                fallback_serialize(value, serializer, extra)
+                fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
     }

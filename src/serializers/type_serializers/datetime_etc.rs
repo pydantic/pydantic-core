@@ -79,8 +79,8 @@ macro_rules! build_serializer {
                 &self,
                 value: &PyAny,
                 serializer: S,
-                _include: Option<&PyAny>,
-                _exclude: Option<&PyAny>,
+                include: Option<&PyAny>,
+                exclude: Option<&PyAny>,
                 extra: &Extra,
             ) -> Result<S::Ok, S::Error> {
                 match value.cast_as::<$cast_as>() {
@@ -90,7 +90,7 @@ macro_rules! build_serializer {
                     }
                     Err(_) => {
                         extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_serialize(value, serializer, extra)
+                        fallback_serialize(value, serializer, include, exclude, extra)
                     }
                 }
             }

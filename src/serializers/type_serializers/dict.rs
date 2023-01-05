@@ -103,9 +103,8 @@ impl TypeSerializer for DictSerializer {
                 let value_serializer = self.value_serializer.as_ref();
 
                 for (key, value) in py_dict {
-                    if let Some((next_include, next_exclude)) =
-                        self.inc_ex.key(key, include, exclude).map_err(py_err_se_err)?
-                    {
+                    let op_next = self.inc_ex.key(key, include, exclude).map_err(py_err_se_err)?;
+                    if let Some((next_include, next_exclude)) = op_next {
                         let key = key_serializer.json_key(key, extra).map_err(py_err_se_err)?;
                         let value_serialize =
                             PydanticSerializer::new(value, value_serializer, next_include, next_exclude, extra);
@@ -116,7 +115,7 @@ impl TypeSerializer for DictSerializer {
             }
             Err(_) => {
                 extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                fallback_serialize(value, serializer, extra)
+                fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
     }

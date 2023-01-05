@@ -220,7 +220,7 @@ impl TypeSerializer for TypedDictSerializer {
                             }
                         }
                         if self.include_extra {
-                            let s = SerializeInfer::new(value, extra);
+                            let s = SerializeInfer::new(value, include, exclude, extra);
                             let output_key = fallback_json_key(key, extra).map_err(py_err_se_err)?;
                             map.serialize_entry(&output_key, &s)?
                         }
@@ -230,7 +230,7 @@ impl TypeSerializer for TypedDictSerializer {
             }
             Err(_) => {
                 extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                fallback_serialize(value, serializer, extra)
+                fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
     }
