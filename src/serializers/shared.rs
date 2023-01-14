@@ -201,12 +201,11 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        _error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         infer_to_python(value, include, exclude, extra)
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra, _error_on_fallback: bool) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
         infer_json_key(key, extra)
     }
 
@@ -217,7 +216,6 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error>;
 
     fn get_name(&self) -> &str;
@@ -229,7 +227,6 @@ pub(crate) struct PydanticSerializer<'py> {
     include: Option<&'py PyAny>,
     exclude: Option<&'py PyAny>,
     extra: &'py Extra<'py>,
-    error_on_fallback: bool,
 }
 
 impl<'py> PydanticSerializer<'py> {
@@ -239,7 +236,6 @@ impl<'py> PydanticSerializer<'py> {
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
         extra: &'py Extra<'py>,
-        error_on_fallback: bool,
     ) -> Self {
         Self {
             value,
@@ -247,21 +243,14 @@ impl<'py> PydanticSerializer<'py> {
             include,
             exclude,
             extra,
-            error_on_fallback,
         }
     }
 }
 
 impl<'py> Serialize for PydanticSerializer<'py> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.serializer.serde_serialize(
-            self.value,
-            serializer,
-            self.include,
-            self.exclude,
-            self.extra,
-            self.error_on_fallback,
-        )
+        self.serializer
+            .serde_serialize(self.value, serializer, self.include, self.exclude, self.extra)
     }
 }
 
@@ -272,11 +261,10 @@ pub(crate) fn to_json_bytes(
     include: Option<&PyAny>,
     exclude: Option<&PyAny>,
     extra: &Extra,
-    error_on_fallback: bool,
     indent: Option<usize>,
     json_size: usize,
 ) -> PyResult<Vec<u8>> {
-    let serializer = PydanticSerializer::new(value, serializer, include, exclude, extra, error_on_fallback);
+    let serializer = PydanticSerializer::new(value, serializer, include, exclude, extra);
 
     let writer: Vec<u8> = Vec::with_capacity(json_size);
     let bytes = match indent {

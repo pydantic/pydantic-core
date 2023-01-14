@@ -44,16 +44,14 @@ impl TypeSerializer for NewClassSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         if value.get_type().eq(&self.class)? {
             let dict = object_to_dict(value, true, extra)?;
-            self.serializer
-                .to_python(dict, include, exclude, extra, error_on_fallback)
+            self.serializer.to_python(dict, include, exclude, extra)
         } else {
             extra
                 .warnings
-                .on_fallback_py(self.get_name(), value, error_on_fallback)?;
+                .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
             infer_to_python(value, include, exclude, extra)
         }
     }
@@ -65,16 +63,15 @@ impl TypeSerializer for NewClassSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         if value.get_type().eq(&self.class).map_err(py_err_se_err)? {
             let dict = object_to_dict(value, true, extra).map_err(py_err_se_err)?;
             self.serializer
-                .serde_serialize(dict, serializer, include, exclude, extra, error_on_fallback)
+                .serde_serialize(dict, serializer, include, exclude, extra)
         } else {
             extra
                 .warnings
-                .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
+                .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
             infer_serialize(value, serializer, include, exclude, extra)
         }
     }

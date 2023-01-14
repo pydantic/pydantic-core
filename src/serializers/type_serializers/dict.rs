@@ -70,7 +70,6 @@ impl TypeSerializer for DictSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         let py = value.py();
         match value.cast_as::<PyDict>() {
@@ -82,13 +81,10 @@ impl TypeSerializer for DictSerializer {
                     let op_next = self.filter.key_filter(key, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let key = match extra.mode {
-                            SerMode::Json => self.key_serializer.json_key(key, extra, error_on_fallback)?.into_py(py),
-                            _ => self
-                                .key_serializer
-                                .to_python(key, None, None, extra, error_on_fallback)?,
+                            SerMode::Json => self.key_serializer.json_key(key, extra)?.into_py(py),
+                            _ => self.key_serializer.to_python(key, None, None, extra)?,
                         };
-                        let value =
-                            value_serializer.to_python(value, next_include, next_exclude, extra, error_on_fallback)?;
+                        let value = value_serializer.to_python(value, next_include, next_exclude, extra)?;
                         new_dict.set_item(key, value)?;
                     }
                 }
@@ -97,7 +93,7 @@ impl TypeSerializer for DictSerializer {
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_py(self.get_name(), value, error_on_fallback)?;
+                    .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
                 infer_to_python(value, include, exclude, extra)
             }
         }
@@ -110,7 +106,6 @@ impl TypeSerializer for DictSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyDict>() {
             Ok(py_dict) => {
@@ -121,17 +116,9 @@ impl TypeSerializer for DictSerializer {
                 for (key, value) in py_dict {
                     let op_next = self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        let key = key_serializer
-                            .json_key(key, extra, error_on_fallback)
-                            .map_err(py_err_se_err)?;
-                        let value_serialize = PydanticSerializer::new(
-                            value,
-                            value_serializer,
-                            next_include,
-                            next_exclude,
-                            extra,
-                            error_on_fallback,
-                        );
+                        let key = key_serializer.json_key(key, extra).map_err(py_err_se_err)?;
+                        let value_serialize =
+                            PydanticSerializer::new(value, value_serializer, next_include, next_exclude, extra);
                         map.serialize_entry(&key, &value_serialize)?;
                     }
                 }
@@ -140,7 +127,7 @@ impl TypeSerializer for DictSerializer {
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
+                    .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }

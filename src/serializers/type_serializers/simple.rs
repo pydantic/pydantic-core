@@ -31,7 +31,6 @@ impl TypeSerializer for NoneSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::None) {
@@ -40,7 +39,7 @@ impl TypeSerializer for NoneSerializer {
             _ => {
                 extra
                     .warnings
-                    .on_fallback_py(self.get_name(), value, error_on_fallback)?;
+                    .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
                 infer_to_python(value, include, exclude, extra)
             }
         }
@@ -53,14 +52,13 @@ impl TypeSerializer for NoneSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match extra.ob_type_lookup.is_type(value, ObType::None) {
             IsType::Exact => serializer.serialize_none(),
             _ => {
                 extra
                     .warnings
-                    .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
+                    .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }
@@ -95,7 +93,6 @@ macro_rules! build_simple_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
-                error_on_fallback: bool,
             ) -> PyResult<PyObject> {
                 let py = value.py();
                 match extra.ob_type_lookup.is_type(value, $ob_type) {
@@ -110,7 +107,7 @@ macro_rules! build_simple_serializer {
                     IsType::False => {
                         extra
                             .warnings
-                            .on_fallback_py(self.get_name(), value, error_on_fallback)?;
+                            .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
                         infer_to_python(value, include, exclude, extra)
                     }
                 }
@@ -123,14 +120,13 @@ macro_rules! build_simple_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
-                error_on_fallback: bool,
             ) -> Result<S::Ok, S::Error> {
                 match value.extract::<$rust_type>() {
                     Ok(v) => v.serialize(serializer),
                     Err(_) => {
                         extra
                             .warnings
-                            .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
+                            .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
                         infer_serialize(value, serializer, include, exclude, extra)
                     }
                 }

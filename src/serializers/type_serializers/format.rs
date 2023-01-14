@@ -62,12 +62,11 @@ impl TypeSerializer for FunctionSerializer {
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
         _extra: &Extra,
-        _error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         self.call(value).map_err(PydanticSerializationError::new_err)
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, _extra: &Extra, _error_on_fallback: bool) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &'py PyAny, _extra: &Extra) -> PyResult<Cow<'py, str>> {
         let v = self.call(key).map_err(PydanticSerializationError::new_err)?;
         let py_str: &PyString = v.into_ref(key.py()).cast_as()?;
         Ok(Cow::Borrowed(py_str.to_str()?))
@@ -80,7 +79,6 @@ impl TypeSerializer for FunctionSerializer {
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
         _extra: &Extra,
-        _error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match self.call(value) {
             Ok(v) => {

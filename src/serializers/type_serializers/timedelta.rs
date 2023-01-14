@@ -32,7 +32,6 @@ impl TypeSerializer for TimeDeltaSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         match extra.mode {
             SerMode::Json => match value.cast_as::<PyDelta>() {
@@ -40,7 +39,7 @@ impl TypeSerializer for TimeDeltaSerializer {
                 Err(_) => {
                     extra
                         .warnings
-                        .on_fallback_py(self.get_name(), value, error_on_fallback)?;
+                        .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
                     infer_to_python(value, include, exclude, extra)
                 }
             },
@@ -48,11 +47,13 @@ impl TypeSerializer for TimeDeltaSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra, error_on_fallback: bool) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
         match key.cast_as::<PyDelta>() {
             Ok(py_timedelta) => extra.config.timedelta_mode.json_key(py_timedelta),
             Err(_) => {
-                extra.warnings.on_fallback_py(self.get_name(), key, error_on_fallback)?;
+                extra
+                    .warnings
+                    .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
                 infer_json_key(key, extra)
             }
         }
@@ -65,7 +66,6 @@ impl TypeSerializer for TimeDeltaSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyDelta>() {
             Ok(py_timedelta) => extra
@@ -75,7 +75,7 @@ impl TypeSerializer for TimeDeltaSerializer {
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
+                    .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }

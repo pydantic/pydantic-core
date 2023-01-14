@@ -39,11 +39,10 @@ impl TypeSerializer for RecursiveRefSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         let value_id = extra.rec_guard.add(value)?;
         let comb_serializer = unsafe { extra.slots.get_unchecked(self.serializer_id) };
-        let r = comb_serializer.to_python(value, include, exclude, extra, error_on_fallback);
+        let r = comb_serializer.to_python(value, include, exclude, extra);
         extra.rec_guard.pop(value_id);
         r
     }
@@ -55,11 +54,10 @@ impl TypeSerializer for RecursiveRefSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         let value_id = extra.rec_guard.add(value).map_err(py_err_se_err)?;
         let comb_serializer = unsafe { extra.slots.get_unchecked(self.serializer_id) };
-        let r = comb_serializer.serde_serialize(value, serializer, include, exclude, extra, error_on_fallback);
+        let r = comb_serializer.serde_serialize(value, serializer, include, exclude, extra);
         extra.rec_guard.pop(value_id);
         r
     }

@@ -8,7 +8,7 @@ use crate::SchemaValidator;
 
 use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
-use extra::{Extra, SerMode};
+use extra::{CollectWarnings, Extra, SerMode, SerRecursionGuard};
 pub use shared::CombinedSerializer;
 use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
 
@@ -61,20 +61,23 @@ impl SchemaSerializer {
         warnings: Option<bool>,
     ) -> PyResult<PyObject> {
         let mode: SerMode = mode.into();
+        let warnings = CollectWarnings::new(warnings);
+        let rec_guard = SerRecursionGuard::default();
         let extra = Extra::new(
             py,
             &mode,
             &self.slots,
             by_alias,
+            &warnings,
             exclude_unset,
             exclude_defaults,
             exclude_none,
             round_trip,
             &self.config,
-            warnings,
+            &rec_guard,
         );
-        let v = self.serializer.to_python(value, include, exclude, &extra, false)?;
-        extra.warnings.final_check(py)?;
+        let v = self.serializer.to_python(value, include, exclude, &extra)?;
+        warnings.final_check(py)?;
         Ok(v)
     }
 
@@ -93,17 +96,20 @@ impl SchemaSerializer {
         round_trip: Option<bool>,
         warnings: Option<bool>,
     ) -> PyResult<PyObject> {
+        let warnings = CollectWarnings::new(warnings);
+        let rec_guard = SerRecursionGuard::default();
         let extra = Extra::new(
             py,
             &SerMode::Json,
             &self.slots,
             by_alias,
+            &warnings,
             exclude_unset,
             exclude_defaults,
             exclude_none,
             round_trip,
             &self.config,
-            warnings,
+            &rec_guard,
         );
         let bytes = to_json_bytes(
             value,
@@ -111,12 +117,11 @@ impl SchemaSerializer {
             include,
             exclude,
             &extra,
-            false,
             indent,
             self.json_size,
         )?;
 
-        extra.warnings.final_check(py)?;
+        warnings.final_check(py)?;
 
         self.json_size = bytes.len();
         let py_bytes = PyBytes::new(py, &bytes);

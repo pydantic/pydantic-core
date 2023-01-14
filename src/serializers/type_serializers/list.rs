@@ -50,7 +50,6 @@ impl TypeSerializer for ListSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         match value.cast_as::<PyList>() {
             Ok(py_list) => {
@@ -61,13 +60,7 @@ impl TypeSerializer for ListSerializer {
                 for (index, element) in py_list.iter().enumerate() {
                     let op_next = self.filter.value_filter(index, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        items.push(item_serializer.to_python(
-                            element,
-                            next_include,
-                            next_exclude,
-                            extra,
-                            error_on_fallback,
-                        )?);
+                        items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                     }
                 }
                 Ok(items.into_py(py))
@@ -75,7 +68,7 @@ impl TypeSerializer for ListSerializer {
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_py(self.get_name(), value, error_on_fallback)?;
+                    .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
                 infer_to_python(value, include, exclude, extra)
             }
         }
@@ -88,7 +81,6 @@ impl TypeSerializer for ListSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyList>() {
             Ok(py_list) => {
@@ -101,14 +93,8 @@ impl TypeSerializer for ListSerializer {
                         .value_filter(index, include, exclude)
                         .map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        let item_serialize = PydanticSerializer::new(
-                            element,
-                            item_serializer,
-                            next_include,
-                            next_exclude,
-                            extra,
-                            error_on_fallback,
-                        );
+                        let item_serialize =
+                            PydanticSerializer::new(element, item_serializer, next_include, next_exclude, extra);
                         seq.serialize_element(&item_serialize)?;
                     }
                 }
@@ -117,7 +103,7 @@ impl TypeSerializer for ListSerializer {
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
+                    .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }

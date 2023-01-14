@@ -46,7 +46,7 @@ def model_serializer() -> SchemaSerializer:
                         'type': 'typed-dict',
                         'return_fields_set': True,
                         'fields': {
-                            'a': {'schema': {'type': 'int'}},
+                            'a': {'schema': {'type': 'bytes'}},
                             'b': {
                                 'schema': {
                                     'type': 'float',
@@ -63,7 +63,7 @@ def model_serializer() -> SchemaSerializer:
                         'type': 'typed-dict',
                         'return_fields_set': True,
                         'fields': {
-                            'c': {'schema': {'type': 'int'}},
+                            'c': {'schema': {'type': 'bytes'}},
                             'd': {
                                 'schema': {
                                     'type': 'float',
@@ -79,10 +79,14 @@ def model_serializer() -> SchemaSerializer:
 
 
 def test_model_a(model_serializer: SchemaSerializer):
-    m_a = ModelA(1, 2.3456)
-    assert model_serializer.to_python(m_a) == {'a': 1, 'b': '2.3'}
+    m_a = ModelA(b'bite', 2.3456)
+    assert model_serializer.to_python(m_a) == {'a': b'bite', 'b': '2.3'}
+    assert model_serializer.to_python(m_a, mode='json') == {'a': 'bite', 'b': '2.3'}
+    assert model_serializer.to_json(m_a) == b'{"a":"bite","b":"2.3"}'
 
 
 def test_model_b(model_serializer: SchemaSerializer):
-    m_b = ModelB(1, 2.3456)
-    assert model_serializer.to_python(m_b) == {'c': 1, 'd': '2.35'}
+    m_b = ModelB(b'bite', 2.3456)
+    assert model_serializer.to_python(m_b) == {'c': b'bite', 'd': '2.35'}
+    assert model_serializer.to_python(m_b, mode='json') == {'c': 'bite', 'd': '2.35'}
+    assert model_serializer.to_json(m_b) == b'{"c":"bite","d":"2.35"}'

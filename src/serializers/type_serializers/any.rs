@@ -30,7 +30,6 @@ impl TypeSerializer for AnySerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        _error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         infer_serialize(value, serializer, include, exclude, extra)
     }

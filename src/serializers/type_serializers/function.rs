@@ -75,7 +75,6 @@ impl TypeSerializer for FunctionSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        _error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         let py = value.py();
         let v = self
@@ -89,7 +88,7 @@ impl TypeSerializer for FunctionSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra, _error_on_fallback: bool) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
         let v = self
             .call(key, None, None, extra.mode)
             .map_err(PydanticSerializationError::new_err)?;
@@ -104,7 +103,6 @@ impl TypeSerializer for FunctionSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        _error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         let py = value.py();
         let return_value = self.call(value, include, exclude, extra.mode).map_err(Error::custom)?;

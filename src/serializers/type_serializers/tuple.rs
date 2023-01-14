@@ -68,7 +68,6 @@ impl TypeSerializer for TupleVariableSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         match value.cast_as::<PyTuple>() {
             Ok(py_tuple) => {
@@ -79,13 +78,7 @@ impl TypeSerializer for TupleVariableSerializer {
                 for (index, element) in py_tuple.iter().enumerate() {
                     let op_next = self.filter.value_filter(index, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        items.push(item_serializer.to_python(
-                            element,
-                            next_include,
-                            next_exclude,
-                            extra,
-                            error_on_fallback,
-                        )?);
+                        items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
                     }
                 }
                 match extra.mode {
@@ -94,7 +87,7 @@ impl TypeSerializer for TupleVariableSerializer {
                 }
             }
             Err(_) => {
-                extra.warnings.on_fallback_py("tuple", value, error_on_fallback)?;
+                extra.warnings.on_fallback_py("tuple", value, extra.error_on_fallback)?;
                 infer_to_python(value, include, exclude, extra)
             }
         }
@@ -107,7 +100,6 @@ impl TypeSerializer for TupleVariableSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyTuple>() {
             Ok(py_tuple) => {
@@ -121,21 +113,17 @@ impl TypeSerializer for TupleVariableSerializer {
                         .value_filter(index, include, exclude)
                         .map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        let item_serialize = PydanticSerializer::new(
-                            element,
-                            item_serializer,
-                            next_include,
-                            next_exclude,
-                            extra,
-                            error_on_fallback,
-                        );
+                        let item_serialize =
+                            PydanticSerializer::new(element, item_serializer, next_include, next_exclude, extra);
                         seq.serialize_element(&item_serialize)?;
                     }
                 }
                 seq.end()
             }
             Err(_) => {
-                extra.warnings.on_fallback_ser::<S>("tuple", value, error_on_fallback)?;
+                extra
+                    .warnings
+                    .on_fallback_ser::<S>("tuple", value, extra.error_on_fallback)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }
@@ -194,7 +182,6 @@ impl TypeSerializer for TuplePositionalSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         match value.cast_as::<PyTuple>() {
             Ok(py_tuple) => {
@@ -209,13 +196,7 @@ impl TypeSerializer for TuplePositionalSerializer {
                     };
                     let op_next = self.filter.value_filter(index, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        items.push(serializer.to_python(
-                            element,
-                            next_include,
-                            next_exclude,
-                            extra,
-                            error_on_fallback,
-                        )?);
+                        items.push(serializer.to_python(element, next_include, next_exclude, extra)?);
                     }
                 }
                 let expected_length = self.items_serializers.len();
@@ -224,13 +205,7 @@ impl TypeSerializer for TuplePositionalSerializer {
                     let index = index2 + expected_length;
                     let op_next = self.filter.value_filter(index, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        items.push(extra_serializer.to_python(
-                            element,
-                            next_include,
-                            next_exclude,
-                            extra,
-                            error_on_fallback,
-                        )?);
+                        items.push(extra_serializer.to_python(element, next_include, next_exclude, extra)?);
                     }
                 }
 
@@ -240,7 +215,7 @@ impl TypeSerializer for TuplePositionalSerializer {
                 }
             }
             Err(_) => {
-                extra.warnings.on_fallback_py("tuple", value, error_on_fallback)?;
+                extra.warnings.on_fallback_py("tuple", value, extra.error_on_fallback)?;
                 infer_to_python(value, include, exclude, extra)
             }
         }
@@ -253,7 +228,6 @@ impl TypeSerializer for TuplePositionalSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyTuple>() {
             Ok(py_tuple) => {
@@ -271,14 +245,8 @@ impl TypeSerializer for TuplePositionalSerializer {
                         .value_filter(index, include, exclude)
                         .map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        let item_serialize = PydanticSerializer::new(
-                            element,
-                            serializer,
-                            next_include,
-                            next_exclude,
-                            extra,
-                            error_on_fallback,
-                        );
+                        let item_serialize =
+                            PydanticSerializer::new(element, serializer, next_include, next_exclude, extra);
                         seq.serialize_element(&item_serialize)?;
                     }
                 }
@@ -292,14 +260,8 @@ impl TypeSerializer for TuplePositionalSerializer {
                         .value_filter(index, include, exclude)
                         .map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        let item_serialize = PydanticSerializer::new(
-                            element,
-                            extra_serializer,
-                            next_include,
-                            next_exclude,
-                            extra,
-                            error_on_fallback,
-                        );
+                        let item_serialize =
+                            PydanticSerializer::new(element, extra_serializer, next_include, next_exclude, extra);
                         seq.serialize_element(&item_serialize)?;
                     }
                 }
@@ -307,7 +269,9 @@ impl TypeSerializer for TuplePositionalSerializer {
                 seq.end()
             }
             Err(_) => {
-                extra.warnings.on_fallback_ser::<S>("tuple", value, error_on_fallback)?;
+                extra
+                    .warnings
+                    .on_fallback_ser::<S>("tuple", value, extra.error_on_fallback)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }

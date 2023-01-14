@@ -35,7 +35,6 @@ macro_rules! build_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
-                error_on_fallback: bool,
             ) -> PyResult<PyObject> {
                 let py = value.py();
                 match value.extract::<$extract>() {
@@ -46,24 +45,19 @@ macro_rules! build_serializer {
                     Err(_) => {
                         extra
                             .warnings
-                            .on_fallback_py(self.get_name(), value, error_on_fallback)?;
+                            .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
                         infer_to_python(value, include, exclude, extra)
                     }
                 }
             }
 
-            fn json_key<'py>(
-                &self,
-                key: &'py PyAny,
-                extra: &Extra,
-                error_on_fallback: bool,
-            ) -> PyResult<Cow<'py, str>> {
+            fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
                 match key.extract::<$extract>() {
                     Ok(py_url) => Ok(Cow::Owned(py_url.__str__().to_string())),
                     Err(_) => {
                         extra
                             .warnings
-                            .on_fallback_py(self.get_name(), key, error_on_fallback)?;
+                            .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
                         infer_json_key(key, extra)
                     }
                 }
@@ -76,14 +70,13 @@ macro_rules! build_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
-                error_on_fallback: bool,
             ) -> Result<S::Ok, S::Error> {
                 match value.extract::<$extract>() {
                     Ok(py_url) => serializer.serialize_str(&py_url.__str__()),
                     Err(_) => {
                         extra
                             .warnings
-                            .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
+                            .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
                         infer_serialize(value, serializer, include, exclude, extra)
                     }
                 }

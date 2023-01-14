@@ -32,7 +32,6 @@ impl TypeSerializer for StrSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::Str) {
@@ -44,17 +43,19 @@ impl TypeSerializer for StrSerializer {
             IsType::False => {
                 extra
                     .warnings
-                    .on_fallback_py(self.get_name(), value, error_on_fallback)?;
+                    .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
                 infer_to_python(value, include, exclude, extra)
             }
         }
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra, error_on_fallback: bool) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
         if let Ok(py_str) = key.cast_as::<PyString>() {
             Ok(py_str.to_string_lossy())
         } else {
-            extra.warnings.on_fallback_py(self.get_name(), key, error_on_fallback)?;
+            extra
+                .warnings
+                .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
             infer_json_key(key, extra)
         }
     }
@@ -66,14 +67,13 @@ impl TypeSerializer for StrSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyString>() {
             Ok(py_str) => serialize_py_str(py_str, serializer),
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
+                    .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }

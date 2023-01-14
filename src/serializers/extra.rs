@@ -16,47 +16,57 @@ use super::ob_type::ObTypeLookup;
 use super::shared::CombinedSerializer;
 
 /// Useful things which are passed around by type_serializers
+#[derive(Clone)]
 pub(crate) struct Extra<'a> {
     pub mode: &'a SerMode,
     pub slots: &'a [CombinedSerializer],
     pub ob_type_lookup: &'a ObTypeLookup,
-    pub warnings: CollectWarnings,
+    pub warnings: &'a CollectWarnings,
     pub by_alias: bool,
     pub exclude_unset: bool,
     pub exclude_defaults: bool,
     pub exclude_none: bool,
     pub round_trip: bool,
     pub config: &'a SerializationConfig,
-    pub rec_guard: SerRecursionGuard,
+    pub rec_guard: &'a SerRecursionGuard,
+    pub error_on_fallback: bool,
 }
 
 impl<'a> Extra<'a> {
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn new(
+    pub fn new(
         py: Python<'a>,
         mode: &'a SerMode,
         slots: &'a [CombinedSerializer],
         by_alias: Option<bool>,
+        warnings: &'a CollectWarnings,
         exclude_unset: Option<bool>,
         exclude_defaults: Option<bool>,
         exclude_none: Option<bool>,
         round_trip: Option<bool>,
         config: &'a SerializationConfig,
-        warnings: Option<bool>,
+        rec_guard: &'a SerRecursionGuard,
     ) -> Self {
         Self {
             mode,
             slots,
             ob_type_lookup: ObTypeLookup::cached(py),
-            warnings: CollectWarnings::new(warnings),
+            warnings,
             by_alias: by_alias.unwrap_or(true),
             exclude_unset: exclude_unset.unwrap_or(false),
             exclude_defaults: exclude_defaults.unwrap_or(false),
             exclude_none: exclude_none.unwrap_or(false),
             round_trip: round_trip.unwrap_or(false),
             config,
-            rec_guard: SerRecursionGuard::default(),
+            rec_guard,
+            error_on_fallback: false,
         }
+    }
+
+    pub fn with_error_on_fallback(&self) -> Self {
+        let mut new_extra = self.clone();
+        new_extra.error_on_fallback = true;
+        new_extra
     }
 }
 
@@ -73,6 +83,7 @@ pub(crate) struct ExtraOwned {
     round_trip: bool,
     config: SerializationConfig,
     rec_guard: SerRecursionGuard,
+    error_on_fallback: bool,
 }
 
 impl ExtraOwned {
@@ -88,6 +99,7 @@ impl ExtraOwned {
             round_trip: extra.round_trip,
             config: extra.config.clone(),
             rec_guard: extra.rec_guard.clone(),
+            error_on_fallback: extra.error_on_fallback,
         }
     }
 
@@ -96,14 +108,15 @@ impl ExtraOwned {
             mode: &self.mode,
             slots: &self.slots,
             ob_type_lookup: ObTypeLookup::cached(py),
-            warnings: self.warnings.clone(),
+            warnings: &self.warnings,
             by_alias: self.by_alias,
             exclude_unset: self.exclude_unset,
             exclude_defaults: self.exclude_defaults,
             exclude_none: self.exclude_none,
             round_trip: self.round_trip,
             config: &self.config,
-            rec_guard: self.rec_guard.clone(),
+            rec_guard: &self.rec_guard,
+            error_on_fallback: self.error_on_fallback,
         }
     }
 }

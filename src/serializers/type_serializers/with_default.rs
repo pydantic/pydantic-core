@@ -52,10 +52,8 @@ impl TypeSerializer for WithDefaultSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
-        self.serializer
-            .to_python(value, include, exclude, extra, error_on_fallback)
+        self.serializer.to_python(value, include, exclude, extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -65,10 +63,9 @@ impl TypeSerializer for WithDefaultSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         self.serializer
-            .serde_serialize(value, serializer, include, exclude, extra, error_on_fallback)
+            .serde_serialize(value, serializer, include, exclude, extra)
     }
 
     fn get_name(&self) -> &str {

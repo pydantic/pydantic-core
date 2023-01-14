@@ -1,13 +1,15 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use std::borrow::Cow;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, SchemaDict};
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::{
-    infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer,
+    infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
+    TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
@@ -53,11 +55,11 @@ impl TypeSerializer for UnionSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         // try the serializers in with error_on fallback=true
+        let strict_extra = extra.with_error_on_fallback();
         for comb_serializer in &self.choices {
-            match comb_serializer.to_python(value, include, exclude, extra, true) {
+            match comb_serializer.to_python(value, include, exclude, &strict_extra) {
                 Ok(v) => return Ok(v),
                 Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(value.py()) {
                     true => (),
@@ -67,8 +69,25 @@ impl TypeSerializer for UnionSerializer {
         }
         extra
             .warnings
-            .on_fallback_py(self.get_name(), value, error_on_fallback)?;
+            .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
         infer_to_python(value, include, exclude, extra)
+    }
+
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+        let strict_extra = extra.with_error_on_fallback();
+        for comb_serializer in &self.choices {
+            match comb_serializer.json_key(key, &strict_extra) {
+                Ok(v) => return Ok(v),
+                Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(key.py()) {
+                    true => (),
+                    false => return Err(err),
+                },
+            }
+        }
+        extra
+            .warnings
+            .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
+        infer_json_key(key, extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -78,11 +97,11 @@ impl TypeSerializer for UnionSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         let py = value.py();
+        let strict_extra = extra.with_error_on_fallback();
         for comb_serializer in &self.choices {
-            match comb_serializer.to_python(value, include, exclude, extra, true) {
+            match comb_serializer.to_python(value, include, exclude, &strict_extra) {
                 Ok(v) => return infer_serialize(v.as_ref(py), serializer, None, None, extra),
                 Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
                     true => (),
@@ -93,7 +112,7 @@ impl TypeSerializer for UnionSerializer {
 
         extra
             .warnings
-            .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
+            .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
         infer_serialize(value, serializer, include, exclude, extra)
     }
 
