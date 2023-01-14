@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
@@ -5,8 +7,12 @@ use pyo3::types::{PyDict, PyType};
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 use crate::serializers::infer::{infer_serialize, infer_to_python};
+use crate::serializers::ob_type::ObType;
 
-use super::{object_to_dict, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{
+    infer_json_key, infer_json_key_known, object_to_dict, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
+    TypeSerializer,
+};
 
 #[derive(Debug, Clone)]
 pub struct NewClassSerializer {
@@ -64,6 +70,17 @@ impl TypeSerializer for NewClassSerializer {
                 .warnings
                 .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
             infer_to_python(value, include, exclude, extra)
+        }
+    }
+
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+        if self.allow_value(key, extra)? {
+            infer_json_key_known(key, ObType::PydanticModel, extra)
+        } else {
+            extra
+                .warnings
+                .on_fallback_py(&self.name, key, extra.error_on_fallback)?;
+            infer_json_key(key, extra)
         }
     }
 

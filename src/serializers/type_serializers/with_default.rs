@@ -56,6 +56,10 @@ impl TypeSerializer for WithDefaultSerializer {
         self.serializer.to_python(value, include, exclude, extra)
     }
 
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+        self.serializer.json_key(key, extra)
+    }
+
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,
         value: &PyAny,

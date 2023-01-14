@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -5,7 +7,7 @@ use serde::ser::Serializer;
 
 use crate::build_context::BuildContext;
 
-use super::{infer_serialize, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{infer_json_key, infer_serialize, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct AnySerializer;
@@ -23,6 +25,10 @@ impl BuildSerializer for AnySerializer {
 }
 
 impl TypeSerializer for AnySerializer {
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+        infer_json_key(key, extra)
+    }
+
     fn serde_serialize<S: Serializer>(
         &self,
         value: &PyAny,

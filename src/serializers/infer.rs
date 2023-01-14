@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::str::from_utf8;
 
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{
     PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTime, PyTuple,
@@ -8,7 +9,7 @@ use pyo3::types::{
 
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 
-use crate::build_tools::safe_repr;
+use crate::build_tools::{py_err, safe_repr};
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::config::utf8_py_error;
@@ -393,6 +394,7 @@ pub(crate) fn infer_json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Co
 pub(crate) fn infer_json_key_known<'py>(key: &'py PyAny, ob_type: ObType, extra: &Extra) -> PyResult<Cow<'py, str>> {
     match ob_type {
         ObType::None => Ok(Cow::Borrowed("None")),
+        ObType::Int | ObType::Float => Ok(key.str()?.to_string_lossy()),
         ObType::Bool => {
             let v = if key.is_true().unwrap_or(false) {
                 "true"
@@ -406,7 +408,14 @@ pub(crate) fn infer_json_key_known<'py>(key: &'py PyAny, ob_type: ObType, extra:
             Ok(Cow::Borrowed(py_str.to_str()?))
         }
         ObType::Bytes => extra.config.bytes_mode.bytes_to_string(key.cast_as()?),
-        // perhaps we could do something faster for things like ints and floats?
+        ObType::Bytearray => {
+            let py_byte_array: &PyByteArray = key.cast_as()?;
+            let bytes = unsafe { py_byte_array.as_bytes() };
+            match from_utf8(bytes) {
+                Ok(s) => Ok(Cow::Borrowed(s)),
+                Err(err) => Err(utf8_py_error(key.py(), err, bytes)),
+            }
+        }
         ObType::Datetime => {
             let py_dt: &PyDateTime = key.cast_as()?;
             let iso_dt = super::type_serializers::datetime_etc::datetime_to_string(py_dt)?;
@@ -434,6 +443,30 @@ pub(crate) fn infer_json_key_known<'py>(key: &'py PyAny, ob_type: ObType, extra:
             let py_url: PyMultiHostUrl = key.extract()?;
             Ok(Cow::Owned(py_url.__str__()))
         }
-        _ => Ok(key.str()?.to_string_lossy()),
+        ObType::Tuple => {
+            let mut s = String::with_capacity(31);
+            s.push('(');
+            let mut first = true;
+            for element in key.cast_as::<PyTuple>()?.iter() {
+                if first {
+                    first = false;
+                } else {
+                    s.push_str(", ");
+                }
+                s.push_str(&infer_json_key(element, extra)?);
+            }
+            s.push(')');
+            Ok(Cow::Owned(s))
+        }
+        ObType::List | ObType::Set | ObType::Frozenset | ObType::Dict => {
+            py_err!(PyTypeError; "`{}` not valid as object key", ob_type)
+        }
+        ObType::Dataclass | ObType::PydanticModel => {
+            // check that the instance is hashable
+            key.hash()?;
+            let key = key.str()?.to_string();
+            Ok(Cow::Owned(key))
+        }
+        ObType::Unknown => Err(unknown_type_error(key)),
     }
 }

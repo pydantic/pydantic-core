@@ -14,7 +14,7 @@ use crate::build_tools::{py_err, py_error_type, SchemaDict};
 
 use super::errors::se_err_py_err;
 use super::extra::Extra;
-use super::infer::{infer_json_key, infer_to_python};
+use super::infer::infer_to_python;
 
 pub(crate) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
@@ -205,9 +205,7 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
         infer_to_python(value, include, exclude, extra)
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
-        infer_json_key(key, extra)
-    }
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>>;
 
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,

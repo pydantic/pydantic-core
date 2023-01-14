@@ -6,6 +6,7 @@ use pyo3::types::{
     PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTime, PyTuple,
 };
 
+use strum::Display;
 use strum_macros::EnumString;
 
 use crate::url::{PyMultiHostUrl, PyUrl};
@@ -219,7 +220,7 @@ fn is_pydantic_model(op_value: Option<&PyAny>) -> bool {
     }
 }
 
-#[derive(Debug, Clone, EnumString)]
+#[derive(Debug, Clone, EnumString, Display)]
 #[strum(serialize_all = "snake_case")]
 pub enum ObType {
     None,

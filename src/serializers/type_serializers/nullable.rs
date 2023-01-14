@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -5,7 +7,7 @@ use pyo3::types::PyDict;
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
-use super::{BuildSerializer, CombinedSerializer, Extra, IsType, ObType, TypeSerializer};
+use super::{infer_json_key_known, BuildSerializer, CombinedSerializer, Extra, IsType, ObType, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct NullableSerializer {
@@ -41,6 +43,13 @@ impl TypeSerializer for NullableSerializer {
             IsType::Exact => Ok(py.None().into_py(py)),
             // I don't think subclasses of None can exist
             _ => self.serializer.to_python(value, include, exclude, extra),
+        }
+    }
+
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+        match extra.ob_type_lookup.is_type(key, ObType::None) {
+            IsType::Exact => infer_json_key_known(key, ObType::None, extra),
+            _ => self.serializer.json_key(key, extra),
         }
     }
 
