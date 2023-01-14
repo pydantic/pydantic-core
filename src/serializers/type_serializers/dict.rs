@@ -7,10 +7,10 @@ use serde::ser::SerializeMap;
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
-use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
+use super::any::AnySerializer;
 use super::{
-    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaFilter, SerMode,
-    TypeSerializer,
+    infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer,
+    SchemaFilter, SerMode, TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
@@ -47,7 +47,12 @@ impl BuildSerializer for DictSerializer {
             }
             None => SchemaFilter::default(),
         };
-        let name = format!("{}[{}, {}]", Self::EXPECTED_TYPE, key_serializer.get_name(), value_serializer.get_name());
+        let name = format!(
+            "{}[{}, {}]",
+            Self::EXPECTED_TYPE,
+            key_serializer.get_name(),
+            value_serializer.get_name()
+        );
         Ok(Self {
             key_serializer: Box::new(key_serializer),
             value_serializer: Box::new(value_serializer),
@@ -93,7 +98,7 @@ impl TypeSerializer for DictSerializer {
                 extra
                     .warnings
                     .on_fallback_py(self.get_name(), value, error_on_fallback)?;
-                fallback_to_python(value, include, exclude, extra)
+                infer_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -136,7 +141,7 @@ impl TypeSerializer for DictSerializer {
                 extra
                     .warnings
                     .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
-                fallback_serialize(value, serializer, include, exclude, extra)
+                infer_serialize(value, serializer, include, exclude, extra)
             }
         }
     }

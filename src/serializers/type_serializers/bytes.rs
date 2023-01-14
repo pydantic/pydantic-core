@@ -5,8 +5,10 @@ use pyo3::types::{PyBytes, PyDict};
 
 use crate::build_context::BuildContext;
 
-use super::any::{fallback_json_key, fallback_serialize, fallback_to_python};
-use super::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
+use super::{
+    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerMode,
+    TypeSerializer,
+};
 
 #[derive(Debug, Clone)]
 pub struct BytesSerializer;
@@ -42,7 +44,7 @@ impl TypeSerializer for BytesSerializer {
                 extra
                     .warnings
                     .on_fallback_py(self.get_name(), value, error_on_fallback)?;
-                fallback_to_python(value, include, exclude, extra)
+                infer_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -51,10 +53,8 @@ impl TypeSerializer for BytesSerializer {
         match key.cast_as::<PyBytes>() {
             Ok(py_bytes) => extra.config.bytes_mode.bytes_to_string(py_bytes),
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_py(self.get_name(), key, error_on_fallback)?;
-                fallback_json_key(key, extra)
+                extra.warnings.on_fallback_py(self.get_name(), key, error_on_fallback)?;
+                infer_json_key(key, extra)
             }
         }
     }
@@ -74,7 +74,7 @@ impl TypeSerializer for BytesSerializer {
                 extra
                     .warnings
                     .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
-                fallback_serialize(value, serializer, include, exclude, extra)
+                infer_serialize(value, serializer, include, exclude, extra)
             }
         }
     }

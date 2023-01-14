@@ -7,8 +7,11 @@ use serde::ser::SerializeSeq;
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
-use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
-use super::{BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SerMode, TypeSerializer};
+use super::any::AnySerializer;
+use super::{
+    infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SerMode,
+    TypeSerializer,
+};
 
 macro_rules! build_serializer {
     ($struct_name:ident, $expected_type:literal, $py_type:ty) => {
@@ -73,7 +76,7 @@ macro_rules! build_serializer {
                         extra
                             .warnings
                             .on_fallback_py(self.get_name(), value, error_on_fallback)?;
-                        fallback_to_python(value, include, exclude, extra)
+                        infer_to_python(value, include, exclude, extra)
                     }
                 }
             }
@@ -109,7 +112,7 @@ macro_rules! build_serializer {
                         extra
                             .warnings
                             .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
-                        fallback_serialize(value, serializer, include, exclude, extra)
+                        infer_serialize(value, serializer, include, exclude, extra)
                     }
                 }
             }

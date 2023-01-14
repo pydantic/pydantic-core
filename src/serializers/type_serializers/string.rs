@@ -5,8 +5,10 @@ use pyo3::types::{PyDict, PyString};
 
 use crate::build_context::BuildContext;
 
-use super::any::{fallback_json_key, fallback_serialize, fallback_to_python};
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, IsType, ObType, SerMode, TypeSerializer};
+use super::{
+    infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
+    IsType, ObType, SerMode, TypeSerializer,
+};
 
 #[derive(Debug, Clone)]
 pub struct StrSerializer;
@@ -43,7 +45,7 @@ impl TypeSerializer for StrSerializer {
                 extra
                     .warnings
                     .on_fallback_py(self.get_name(), value, error_on_fallback)?;
-                fallback_to_python(value, include, exclude, extra)
+                infer_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -52,10 +54,8 @@ impl TypeSerializer for StrSerializer {
         if let Ok(py_str) = key.cast_as::<PyString>() {
             Ok(py_str.to_string_lossy())
         } else {
-            extra
-                .warnings
-                .on_fallback_py(self.get_name(), key, error_on_fallback)?;
-            fallback_json_key(key, extra)
+            extra.warnings.on_fallback_py(self.get_name(), key, error_on_fallback)?;
+            infer_json_key(key, extra)
         }
     }
 
@@ -74,7 +74,7 @@ impl TypeSerializer for StrSerializer {
                 extra
                     .warnings
                     .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
-                fallback_serialize(value, serializer, include, exclude, extra)
+                infer_serialize(value, serializer, include, exclude, extra)
             }
         }
     }

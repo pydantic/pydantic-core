@@ -7,10 +7,10 @@ use serde::ser::SerializeSeq;
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
-use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
+use super::any::AnySerializer;
 use super::{
-    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaFilter, SerMode,
-    TypeSerializer,
+    infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer,
+    SchemaFilter, SerMode, TypeSerializer,
 };
 
 pub struct TupleBuilder;
@@ -95,7 +95,7 @@ impl TypeSerializer for TupleVariableSerializer {
             }
             Err(_) => {
                 extra.warnings.on_fallback_py("tuple", value, error_on_fallback)?;
-                fallback_to_python(value, include, exclude, extra)
+                infer_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -136,7 +136,7 @@ impl TypeSerializer for TupleVariableSerializer {
             }
             Err(_) => {
                 extra.warnings.on_fallback_ser::<S>("tuple", value, error_on_fallback)?;
-                fallback_serialize(value, serializer, include, exclude, extra)
+                infer_serialize(value, serializer, include, exclude, extra)
             }
         }
     }
@@ -168,11 +168,15 @@ impl TuplePositionalSerializer {
             None => AnySerializer::build(schema, config, build_context)?,
         };
         let items_serializers: Vec<CombinedSerializer> = items
-                .iter()
-                .map(|item| CombinedSerializer::build(item.cast_as()?, config, build_context))
-                .collect::<PyResult<_>>()?;
+            .iter()
+            .map(|item| CombinedSerializer::build(item.cast_as()?, config, build_context))
+            .collect::<PyResult<_>>()?;
 
-        let descr = items_serializers.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
+        let descr = items_serializers
+            .iter()
+            .map(|v| v.get_name())
+            .collect::<Vec<_>>()
+            .join(", ");
         Ok(Self {
             items_serializers,
             extra_serializer: Box::new(extra_serializer),
@@ -237,7 +241,7 @@ impl TypeSerializer for TuplePositionalSerializer {
             }
             Err(_) => {
                 extra.warnings.on_fallback_py("tuple", value, error_on_fallback)?;
-                fallback_to_python(value, include, exclude, extra)
+                infer_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -304,7 +308,7 @@ impl TypeSerializer for TuplePositionalSerializer {
             }
             Err(_) => {
                 extra.warnings.on_fallback_ser::<S>("tuple", value, error_on_fallback)?;
-                fallback_serialize(value, serializer, include, exclude, extra)
+                infer_serialize(value, serializer, include, exclude, extra)
             }
         }
     }

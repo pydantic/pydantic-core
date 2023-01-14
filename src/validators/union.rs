@@ -40,9 +40,10 @@ impl BuildValidator for UnionValidator {
             .map(|choice| build_validator(choice, config, build_context))
             .collect::<PyResult<Vec<CombinedValidator>>>()?;
 
+        let auto_collapse = || schema.get_as_req(intern!(py, "auto_collapse")).unwrap_or(true);
         match choices.len() {
             0 => py_err!("One or more union choices required"),
-            1 => Ok(choices.into_iter().next().unwrap()),
+            1 if auto_collapse() => Ok(choices.into_iter().next().unwrap()),
             _ => {
                 let descr = choices.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(",");
 

@@ -5,8 +5,10 @@ use pyo3::types::{PyDelta, PyDict};
 
 use crate::build_context::BuildContext;
 
-use super::any::{fallback_json_key, fallback_serialize, fallback_to_python};
-use super::{BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
+use super::{
+    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerMode,
+    TypeSerializer,
+};
 
 #[derive(Debug, Clone)]
 pub struct TimeDeltaSerializer;
@@ -39,10 +41,10 @@ impl TypeSerializer for TimeDeltaSerializer {
                     extra
                         .warnings
                         .on_fallback_py(self.get_name(), value, error_on_fallback)?;
-                    fallback_to_python(value, include, exclude, extra)
+                    infer_to_python(value, include, exclude, extra)
                 }
             },
-            _ => fallback_to_python(value, include, exclude, extra),
+            _ => infer_to_python(value, include, exclude, extra),
         }
     }
 
@@ -50,10 +52,8 @@ impl TypeSerializer for TimeDeltaSerializer {
         match key.cast_as::<PyDelta>() {
             Ok(py_timedelta) => extra.config.timedelta_mode.json_key(py_timedelta),
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_py(self.get_name(), key, error_on_fallback)?;
-                fallback_json_key(key, extra)
+                extra.warnings.on_fallback_py(self.get_name(), key, error_on_fallback)?;
+                infer_json_key(key, extra)
             }
         }
     }
@@ -76,7 +76,7 @@ impl TypeSerializer for TimeDeltaSerializer {
                 extra
                     .warnings
                     .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
-                fallback_serialize(value, serializer, include, exclude, extra)
+                infer_serialize(value, serializer, include, exclude, extra)
             }
         }
     }

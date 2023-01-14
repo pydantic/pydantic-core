@@ -1544,6 +1544,8 @@ def nullable_schema(
 class UnionSchema(TypedDict, total=False):
     type: Required[Literal['union']]
     choices: Required[List[CoreSchema]]
+    # default true, whether to automatically collapse unions with one element to the inner validator
+    auto_collapse: bool
     custom_error_type: str
     custom_error_message: str
     custom_error_context: Dict[str, Union[str, int, float]]
@@ -1555,6 +1557,7 @@ class UnionSchema(TypedDict, total=False):
 
 def union_schema(
     *choices: CoreSchema,
+    auto_collapse: bool | None = None,
     custom_error_type: str | None = None,
     custom_error_message: str | None = None,
     custom_error_context: dict[str, str | int] | None = None,
@@ -1576,6 +1579,7 @@ def union_schema(
 
     Args:
         *choices: The schemas to match
+        auto_collapse: whether to automatically collapse unions with one element to the inner validator, default true
         custom_error_type: The custom error type to use if the validation fails
         custom_error_message: The custom error message to use if the validation fails
         custom_error_context: The custom error context to use if the validation fails
@@ -1587,6 +1591,7 @@ def union_schema(
     return dict_not_none(
         type='union',
         choices=choices,
+        auto_collapse=auto_collapse,
         custom_error_type=custom_error_type,
         custom_error_message=custom_error_message,
         custom_error_context=custom_error_context,

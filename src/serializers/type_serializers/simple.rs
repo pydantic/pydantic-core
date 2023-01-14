@@ -3,8 +3,10 @@ use pyo3::types::PyDict;
 
 use serde::Serialize;
 
-use super::any::{fallback_serialize, fallback_to_python};
-use super::{BuildSerializer, CombinedSerializer, Extra, IsType, ObType, SerMode, TypeSerializer};
+use super::{
+    infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, IsType, ObType, SerMode,
+    TypeSerializer,
+};
 use crate::build_context::BuildContext;
 
 #[derive(Debug, Clone)]
@@ -39,7 +41,7 @@ impl TypeSerializer for NoneSerializer {
                 extra
                     .warnings
                     .on_fallback_py(self.get_name(), value, error_on_fallback)?;
-                fallback_to_python(value, include, exclude, extra)
+                infer_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -59,7 +61,7 @@ impl TypeSerializer for NoneSerializer {
                 extra
                     .warnings
                     .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
-                fallback_serialize(value, serializer, include, exclude, extra)
+                infer_serialize(value, serializer, include, exclude, extra)
             }
         }
     }
@@ -103,13 +105,13 @@ macro_rules! build_simple_serializer {
                             let rust_value = value.extract::<$rust_type>()?;
                             Ok(rust_value.to_object(py))
                         }
-                        _ => fallback_to_python(value, include, exclude, extra),
+                        _ => infer_to_python(value, include, exclude, extra),
                     },
                     IsType::False => {
                         extra
                             .warnings
                             .on_fallback_py(self.get_name(), value, error_on_fallback)?;
-                        fallback_to_python(value, include, exclude, extra)
+                        infer_to_python(value, include, exclude, extra)
                     }
                 }
             }
@@ -129,7 +131,7 @@ macro_rules! build_simple_serializer {
                         extra
                             .warnings
                             .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
-                        fallback_serialize(value, serializer, include, exclude, extra)
+                        infer_serialize(value, serializer, include, exclude, extra)
                     }
                 }
             }

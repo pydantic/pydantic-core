@@ -1,11 +1,11 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySet};
+use pyo3::types::PyDict;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{object_to_dict, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct NewClassSerializer {
@@ -58,24 +58,5 @@ impl TypeSerializer for NewClassSerializer {
 
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
-    }
-}
-
-pub(super) fn object_to_dict<'py>(value: &'py PyAny, is_model: bool, extra: &Extra) -> PyResult<&'py PyDict> {
-    let py = value.py();
-    let attr = value.getattr(intern!(py, "__dict__"))?;
-    let attrs: &PyDict = attr.cast_as()?;
-    if is_model && extra.exclude_unset {
-        let fields_set: &PySet = value.getattr(intern!(py, "__fields_set__"))?.cast_as()?;
-
-        let new_attrs = attrs.copy()?;
-        for key in new_attrs.keys() {
-            if !fields_set.contains(key)? {
-                new_attrs.del_item(key)?;
-            }
-        }
-        Ok(new_attrs)
-    } else {
-        Ok(attrs)
     }
 }

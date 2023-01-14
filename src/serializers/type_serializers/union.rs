@@ -6,8 +6,9 @@ use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, SchemaDict};
 use crate::PydanticSerializationUnexpectedValue;
 
-use super::any::{fallback_serialize, fallback_to_python};
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{
+    infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer,
+};
 
 #[derive(Debug, Clone)]
 pub struct UnionSerializer {
@@ -37,8 +38,9 @@ impl BuildSerializer for UnionSerializer {
                 let descr = choices.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
                 Ok(Self {
                     choices,
-                    name: format!("Union[{descr}]")
-                }.into())
+                    name: format!("Union[{descr}]"),
+                }
+                .into())
             }
         }
     }
@@ -66,7 +68,7 @@ impl TypeSerializer for UnionSerializer {
         extra
             .warnings
             .on_fallback_py(self.get_name(), value, error_on_fallback)?;
-        fallback_to_python(value, include, exclude, extra)
+        infer_to_python(value, include, exclude, extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -81,7 +83,7 @@ impl TypeSerializer for UnionSerializer {
         let py = value.py();
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, extra, true) {
-                Ok(v) => return fallback_serialize(v.as_ref(py), serializer, None, None, extra),
+                Ok(v) => return infer_serialize(v.as_ref(py), serializer, None, None, extra),
                 Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
                     true => (),
                     false => return Err(py_err_se_err(err)),
@@ -92,7 +94,7 @@ impl TypeSerializer for UnionSerializer {
         extra
             .warnings
             .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
-        fallback_serialize(value, serializer, include, exclude, extra)
+        infer_serialize(value, serializer, include, exclude, extra)
     }
 
     fn get_name(&self) -> &str {

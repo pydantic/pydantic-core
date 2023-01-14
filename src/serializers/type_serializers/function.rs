@@ -12,10 +12,10 @@ use crate::build_tools::{function_name, kwargs, py_error_type, SchemaDict};
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::super::errors::UNEXPECTED_TYPE_SER;
-use super::any::{
-    fallback_json_key, fallback_serialize, fallback_serialize_known, fallback_to_python, fallback_to_python_known,
+use super::{
+    infer_json_key, infer_serialize, infer_serialize_known, infer_to_python, infer_to_python_known, BuildSerializer,
+    CombinedSerializer, Extra, ObType, PydanticSerializationError, SerMode, TypeSerializer,
 };
-use super::{BuildSerializer, CombinedSerializer, Extra, ObType, PydanticSerializationError, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct FunctionSerializer {
@@ -60,7 +60,7 @@ impl FunctionSerializer {
         let kwargs = kwargs!(py, mode: mode.to_object(py), include: include, exclude: exclude);
         self.func.call(py, (value,), kwargs).map_err(|err| {
             if err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
-                format!("{}{}", UNEXPECTED_TYPE_SER, err.to_string())
+                format!("{}{}", UNEXPECTED_TYPE_SER, err)
             } else {
                 format!("Error calling `{}`: {}", self.function_name, err)
             }
@@ -83,9 +83,9 @@ impl TypeSerializer for FunctionSerializer {
             .map_err(PydanticSerializationError::new_err)?;
 
         if let Some(ref ob_type) = self.return_ob_type {
-            fallback_to_python_known(ob_type, v.as_ref(py), include, exclude, extra)
+            infer_to_python_known(ob_type, v.as_ref(py), include, exclude, extra)
         } else {
-            fallback_to_python(v.as_ref(py), include, exclude, extra)
+            infer_to_python(v.as_ref(py), include, exclude, extra)
         }
     }
 
@@ -94,7 +94,7 @@ impl TypeSerializer for FunctionSerializer {
             .call(key, None, None, extra.mode)
             .map_err(PydanticSerializationError::new_err)?;
 
-        fallback_json_key(v.into_ref(key.py()), extra)
+        infer_json_key(v.into_ref(key.py()), extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -110,9 +110,9 @@ impl TypeSerializer for FunctionSerializer {
         let return_value = self.call(value, include, exclude, extra.mode).map_err(Error::custom)?;
 
         if let Some(ref ob_type) = self.return_ob_type {
-            fallback_serialize_known(ob_type, return_value.as_ref(py), serializer, include, exclude, extra)
+            infer_serialize_known(ob_type, return_value.as_ref(py), serializer, include, exclude, extra)
         } else {
-            fallback_serialize(return_value.as_ref(py), serializer, include, exclude, extra)
+            infer_serialize(return_value.as_ref(py), serializer, include, exclude, extra)
         }
     }
 

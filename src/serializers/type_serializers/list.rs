@@ -7,9 +7,10 @@ use serde::ser::SerializeSeq;
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
-use super::any::{fallback_serialize, fallback_to_python, AnySerializer};
+use super::any::AnySerializer;
 use super::{
-    py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SchemaFilter, TypeSerializer,
+    infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer,
+    SchemaFilter, TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
@@ -36,7 +37,7 @@ impl BuildSerializer for ListSerializer {
         Ok(Self {
             item_serializer: Box::new(item_serializer),
             filter: SchemaFilter::from_schema(schema)?,
-            name
+            name,
         }
         .into())
     }
@@ -75,7 +76,7 @@ impl TypeSerializer for ListSerializer {
                 extra
                     .warnings
                     .on_fallback_py(self.get_name(), value, error_on_fallback)?;
-                fallback_to_python(value, include, exclude, extra)
+                infer_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -117,7 +118,7 @@ impl TypeSerializer for ListSerializer {
                 extra
                     .warnings
                     .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
-                fallback_serialize(value, serializer, include, exclude, extra)
+                infer_serialize(value, serializer, include, exclude, extra)
             }
         }
     }

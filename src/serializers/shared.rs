@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PySet};
 
 use enum_dispatch::enum_dispatch;
 use serde::Serialize;
@@ -14,7 +14,7 @@ use crate::build_tools::{py_err, py_error_type, SchemaDict};
 
 use super::errors::se_err_py_err;
 use super::extra::Extra;
-use super::type_serializers::any::{fallback_json_key, fallback_to_python};
+use super::infer::{infer_json_key, infer_to_python};
 
 pub(crate) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
@@ -203,11 +203,11 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
         extra: &Extra,
         _error_on_fallback: bool,
     ) -> PyResult<PyObject> {
-        fallback_to_python(value, include, exclude, extra)
+        infer_to_python(value, include, exclude, extra)
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra, _error_on_fallback: bool) -> PyResult<Cow<'py, str>> {
-        fallback_json_key(key, extra)
+        infer_json_key(key, extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -294,4 +294,23 @@ pub(crate) fn to_json_bytes(
         }
     };
     Ok(bytes)
+}
+
+pub(super) fn object_to_dict<'py>(value: &'py PyAny, is_model: bool, extra: &Extra) -> PyResult<&'py PyDict> {
+    let py = value.py();
+    let attr = value.getattr(intern!(py, "__dict__"))?;
+    let attrs: &PyDict = attr.cast_as()?;
+    if is_model && extra.exclude_unset {
+        let fields_set: &PySet = value.getattr(intern!(py, "__fields_set__"))?.cast_as()?;
+
+        let new_attrs = attrs.copy()?;
+        for key in new_attrs.keys() {
+            if !fields_set.contains(key)? {
+                new_attrs.del_item(key)?;
+            }
+        }
+        Ok(new_attrs)
+    } else {
+        Ok(attrs)
+    }
 }
