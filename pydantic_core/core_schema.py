@@ -95,6 +95,7 @@ class FormatSerSchema(TypedDict, total=False):
 
 class NewClassSerSchema(TypedDict, total=False):
     type: Required[Literal['new-class']]
+    cls: Required[Type[Any]]
     schema: Required[CoreSchema]
 
 

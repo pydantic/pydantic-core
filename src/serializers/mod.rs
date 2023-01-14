@@ -58,6 +58,7 @@ impl SchemaSerializer {
         exclude_defaults: Option<bool>,
         exclude_none: Option<bool>,
         round_trip: Option<bool>,
+        warnings: Option<bool>,
     ) -> PyResult<PyObject> {
         let mode: SerMode = mode.into();
         let extra = Extra::new(
@@ -70,6 +71,7 @@ impl SchemaSerializer {
             exclude_none,
             round_trip,
             &self.config,
+            warnings,
         );
         let v = self.serializer.to_python(value, include, exclude, &extra, false)?;
         extra.warnings.final_check(py)?;
@@ -89,6 +91,7 @@ impl SchemaSerializer {
         exclude_defaults: Option<bool>,
         exclude_none: Option<bool>,
         round_trip: Option<bool>,
+        warnings: Option<bool>,
     ) -> PyResult<PyObject> {
         let extra = Extra::new(
             py,
@@ -100,6 +103,7 @@ impl SchemaSerializer {
             exclude_none,
             round_trip,
             &self.config,
+            warnings,
         );
         let bytes = to_json_bytes(
             value,

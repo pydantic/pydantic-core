@@ -23,7 +23,7 @@ class BasicModel:
 def test_new_class():
     s = SchemaSerializer(
         core_schema.new_class_schema(
-            type('Anything', (), {}),
+            BasicModel,
             core_schema.typed_dict_schema(
                 {
                     'foo': core_schema.typed_dict_field(core_schema.int_schema()),
@@ -61,6 +61,7 @@ def test_dataclass():
         DataClass,
         serialization={
             'type': 'new-class',
+            'cls': DataClass,
             'schema': core_schema.typed_dict_schema(
                 {
                     'foo': core_schema.typed_dict_field(core_schema.int_schema()),
@@ -165,7 +166,7 @@ def test_alias():
     assert s.to_python(value) == IsStrictDict(Meow=0, Woof=1, bird=2)
 
 
-def test_new_class_wrong():
+def test_new_class_wrong_warn():
     s = SchemaSerializer(
         core_schema.new_class_schema(
             type('Anything', (), {}),
@@ -177,10 +178,10 @@ def test_new_class_wrong():
             ),
         )
     )
-    with pytest.raises(AttributeError, match="'int' object has no attribute '__dict__'"):
-        s.to_python(123)
-    with pytest.raises(AttributeError, match="'dict' object has no attribute '__dict__'"):
-        s.to_python({'foo': 1, 'bar': b'more'})
+    with pytest.warns(UserWarning, match='Expected `Anything` but got `int` - serialized value may not be as expected'):
+        assert s.to_python(123) == 123
+    with pytest.warns(UserWarning, match='Expected `Anything` but got `dict` - serialized value may not be as .+'):
+        assert s.to_python({'foo': 1, 'bar': b'more'}) == {'foo': 1, 'bar': b'more'}
 
 
 def test_exclude_none():
@@ -219,7 +220,7 @@ class FieldsSetModel:
 def test_exclude_unset():
     s = SchemaSerializer(
         core_schema.new_class_schema(
-            BasicModel,
+            FieldsSetModel,
             core_schema.typed_dict_schema(
                 {
                     'foo': core_schema.typed_dict_field(core_schema.int_schema()),

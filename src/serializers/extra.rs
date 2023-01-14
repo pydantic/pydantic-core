@@ -42,12 +42,13 @@ impl<'a> Extra<'a> {
         exclude_none: Option<bool>,
         round_trip: Option<bool>,
         config: &'a SerializationConfig,
+        warnings: Option<bool>,
     ) -> Self {
         Self {
             mode,
             slots,
             ob_type_lookup: ObTypeLookup::cached(py),
-            warnings: CollectWarnings::new(true),
+            warnings: CollectWarnings::new(warnings),
             by_alias: by_alias.unwrap_or(true),
             exclude_unset: exclude_unset.unwrap_or(false),
             exclude_defaults: exclude_defaults.unwrap_or(false),
@@ -144,9 +145,9 @@ pub(crate) struct CollectWarnings {
 }
 
 impl CollectWarnings {
-    pub(crate) fn new(active: bool) -> Self {
+    pub(crate) fn new(active: Option<bool>) -> Self {
         Self {
-            active,
+            active: active.unwrap_or(true),
             warnings: RefCell::new(None),
         }
     }

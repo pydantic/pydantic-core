@@ -33,6 +33,13 @@ def test_str_fallback():
         assert s.to_json(123) == b'123'
 
 
+def test_str_no_warnings():
+    s = SchemaSerializer(core_schema.string_schema())
+    assert s.to_python(123, warnings=False) == 123
+    assert s.to_python(123, mode='json', warnings=False) == 123
+    assert s.to_json(123, warnings=False) == b'123'
+
+
 class StrSubclass(str):
     pass
 

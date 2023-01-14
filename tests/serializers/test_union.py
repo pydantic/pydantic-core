@@ -19,3 +19,70 @@ def test_union_error():
     msg = 'Expected `Union[bool, int]` but got `str` - serialized value may not be as expected'
     with pytest.warns(UserWarning, match=re.escape(msg)):
         assert v.to_python('a string') == 'a string'
+
+
+class ModelA:
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
+
+
+class ModelB:
+    def __init__(self, c, d):
+        self.c = c
+        self.d = d
+
+
+@pytest.fixture(scope='module')
+def model_serializer() -> SchemaSerializer:
+    return SchemaSerializer(
+        {
+            'type': 'union',
+            'choices': [
+                {
+                    'type': 'new-class',
+                    'cls': ModelA,
+                    'schema': {
+                        'type': 'typed-dict',
+                        'return_fields_set': True,
+                        'fields': {
+                            'a': {'schema': {'type': 'int'}},
+                            'b': {
+                                'schema': {
+                                    'type': 'float',
+                                    'serialization': {'type': 'format', 'formatting_string': '0.1f'},
+                                }
+                            },
+                        },
+                    },
+                },
+                {
+                    'type': 'new-class',
+                    'cls': ModelB,
+                    'schema': {
+                        'type': 'typed-dict',
+                        'return_fields_set': True,
+                        'fields': {
+                            'c': {'schema': {'type': 'int'}},
+                            'd': {
+                                'schema': {
+                                    'type': 'float',
+                                    'serialization': {'type': 'format', 'formatting_string': '0.2f'},
+                                }
+                            },
+                        },
+                    },
+                },
+            ],
+        }
+    )
+
+
+def test_model_a(model_serializer: SchemaSerializer):
+    m_a = ModelA(1, 2.3456)
+    assert model_serializer.to_python(m_a) == {'a': 1, 'b': '2.3'}
+
+
+def test_model_b(model_serializer: SchemaSerializer):
+    m_b = ModelB(1, 2.3456)
+    assert model_serializer.to_python(m_b) == {'c': 1, 'd': '2.35'}
