@@ -63,4 +63,8 @@ impl TypeSerializer for NullableSerializer {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
+
+    fn retry_with_subclasses(&self) -> bool {
+        self.serializer.retry_with_subclasses()
+    }
 }

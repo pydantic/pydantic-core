@@ -37,6 +37,17 @@ impl BuildSerializer for NewClassSerializer {
     }
 }
 
+impl NewClassSerializer {
+    fn allow_value(&self, value: &PyAny, extra: &Extra) -> PyResult<bool> {
+        let class = self.class.as_ref(value.py());
+        if extra.allow_subclasses {
+            value.is_instance(class)
+        } else {
+            value.get_type().eq(class)
+        }
+    }
+}
+
 impl TypeSerializer for NewClassSerializer {
     fn to_python(
         &self,
@@ -45,7 +56,7 @@ impl TypeSerializer for NewClassSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        if value.get_type().eq(&self.class)? {
+        if self.allow_value(value, extra)? {
             let dict = object_to_dict(value, true, extra)?;
             self.serializer.to_python(dict, include, exclude, extra)
         } else {
@@ -64,7 +75,7 @@ impl TypeSerializer for NewClassSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        if value.get_type().eq(&self.class).map_err(py_err_se_err)? {
+        if self.allow_value(value, extra).map_err(py_err_se_err)? {
             let dict = object_to_dict(value, true, extra).map_err(py_err_se_err)?;
             self.serializer
                 .serde_serialize(dict, serializer, include, exclude, extra)
@@ -78,5 +89,9 @@ impl TypeSerializer for NewClassSerializer {
 
     fn get_name(&self) -> &str {
         &self.name
+    }
+
+    fn retry_with_subclasses(&self) -> bool {
+        true
     }
 }

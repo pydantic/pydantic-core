@@ -57,9 +57,9 @@ impl TypeSerializer for UnionSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         // try the serializers in with error_on fallback=true
-        let strict_extra = extra.with_error_on_fallback();
+        let mut new_extra = extra.with_error_on_fallback(false);
         for comb_serializer in &self.choices {
-            match comb_serializer.to_python(value, include, exclude, &strict_extra) {
+            match comb_serializer.to_python(value, include, exclude, &new_extra) {
                 Ok(v) => return Ok(v),
                 Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(value.py()) {
                     true => (),
@@ -67,6 +67,19 @@ impl TypeSerializer for UnionSerializer {
                 },
             }
         }
+        if self.retry_with_subclasses() {
+            new_extra.allow_subclasses = true;
+            for comb_serializer in &self.choices {
+                match comb_serializer.to_python(value, include, exclude, &new_extra) {
+                    Ok(v) => return Ok(v),
+                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(value.py()) {
+                        true => (),
+                        false => return Err(err),
+                    },
+                }
+            }
+        }
+
         extra
             .warnings
             .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
@@ -74,9 +87,9 @@ impl TypeSerializer for UnionSerializer {
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
-        let strict_extra = extra.with_error_on_fallback();
+        let mut new_extra = extra.with_error_on_fallback(false);
         for comb_serializer in &self.choices {
-            match comb_serializer.json_key(key, &strict_extra) {
+            match comb_serializer.json_key(key, &new_extra) {
                 Ok(v) => return Ok(v),
                 Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(key.py()) {
                     true => (),
@@ -84,6 +97,19 @@ impl TypeSerializer for UnionSerializer {
                 },
             }
         }
+        if self.retry_with_subclasses() {
+            new_extra.allow_subclasses = true;
+            for comb_serializer in &self.choices {
+                match comb_serializer.json_key(key, &new_extra) {
+                    Ok(v) => return Ok(v),
+                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(key.py()) {
+                        true => (),
+                        false => return Err(err),
+                    },
+                }
+            }
+        }
+
         extra
             .warnings
             .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
@@ -99,14 +125,26 @@ impl TypeSerializer for UnionSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let py = value.py();
-        let strict_extra = extra.with_error_on_fallback();
+        let mut new_extra = extra.with_error_on_fallback(false);
         for comb_serializer in &self.choices {
-            match comb_serializer.to_python(value, include, exclude, &strict_extra) {
+            match comb_serializer.to_python(value, include, exclude, &new_extra) {
                 Ok(v) => return infer_serialize(v.as_ref(py), serializer, None, None, extra),
                 Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
                     true => (),
                     false => return Err(py_err_se_err(err)),
                 },
+            }
+        }
+        if self.retry_with_subclasses() {
+            new_extra.allow_subclasses = true;
+            for comb_serializer in &self.choices {
+                match comb_serializer.to_python(value, include, exclude, &new_extra) {
+                    Ok(v) => return infer_serialize(v.as_ref(py), serializer, None, None, extra),
+                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
+                        true => (),
+                        false => return Err(py_err_se_err(err)),
+                    },
+                }
             }
         }
 
@@ -118,5 +156,9 @@ impl TypeSerializer for UnionSerializer {
 
     fn get_name(&self) -> &str {
         &self.name
+    }
+
+    fn retry_with_subclasses(&self) -> bool {
+        self.choices.iter().any(|c| c.retry_with_subclasses())
     }
 }

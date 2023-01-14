@@ -219,6 +219,11 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
     ) -> Result<S::Ok, S::Error>;
 
     fn get_name(&self) -> &str;
+
+    /// Used by union serializers to decide if it's worth trying again while allowing subclasses
+    fn retry_with_subclasses(&self) -> bool {
+        false
+    }
 }
 
 pub(crate) struct PydanticSerializer<'py> {

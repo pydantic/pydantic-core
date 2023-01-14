@@ -1,13 +1,15 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::borrow::Cow;
 
 use serde::Serialize;
 
-use super::{
-    infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, IsType, ObType, SerMode,
-    TypeSerializer,
-};
 use crate::build_context::BuildContext;
+
+use super::{
+    infer_json_key, infer_json_key_known, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra,
+    IsType, ObType, SerMode, TypeSerializer,
+};
 
 #[derive(Debug, Clone)]
 pub struct NoneSerializer;
@@ -41,6 +43,18 @@ impl TypeSerializer for NoneSerializer {
                     .warnings
                     .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
                 infer_to_python(value, include, exclude, extra)
+            }
+        }
+    }
+
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+        match extra.ob_type_lookup.is_type(key, ObType::None) {
+            IsType::Exact => infer_json_key_known(key, ObType::None, extra),
+            _ => {
+                extra
+                    .warnings
+                    .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
+                infer_json_key(key, extra)
             }
         }
     }
@@ -109,6 +123,18 @@ macro_rules! build_simple_serializer {
                             .warnings
                             .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
                         infer_to_python(value, include, exclude, extra)
+                    }
+                }
+            }
+
+            fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+                match extra.ob_type_lookup.is_type(key, $ob_type) {
+                    IsType::Exact | IsType::Subclass => infer_json_key_known(key, $ob_type, extra),
+                    IsType::False => {
+                        extra
+                            .warnings
+                            .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
+                        infer_json_key(key, extra)
                     }
                 }
             }

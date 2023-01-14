@@ -78,15 +78,38 @@ def model_serializer() -> SchemaSerializer:
     )
 
 
-def test_model_a(model_serializer: SchemaSerializer):
-    m_a = ModelA(b'bite', 2.3456)
-    assert model_serializer.to_python(m_a) == {'a': b'bite', 'b': '2.3'}
-    assert model_serializer.to_python(m_a, mode='json') == {'a': 'bite', 'b': '2.3'}
-    assert model_serializer.to_json(m_a) == b'{"a":"bite","b":"2.3"}'
+class SubclassA(ModelA):
+    pass
 
 
-def test_model_b(model_serializer: SchemaSerializer):
-    m_b = ModelB(b'bite', 2.3456)
-    assert model_serializer.to_python(m_b) == {'c': b'bite', 'd': '2.35'}
-    assert model_serializer.to_python(m_b, mode='json') == {'c': 'bite', 'd': '2.35'}
-    assert model_serializer.to_json(m_b) == b'{"c":"bite","d":"2.35"}'
+@pytest.mark.parametrize('input_value', [ModelA(b'bite', 2.3456), SubclassA(b'bite', 2.3456)])
+def test_model_a(model_serializer: SchemaSerializer, input_value):
+    assert model_serializer.to_python(input_value) == {'a': b'bite', 'b': '2.3'}
+    assert model_serializer.to_python(input_value, mode='json') == {'a': 'bite', 'b': '2.3'}
+    assert model_serializer.to_json(input_value) == b'{"a":"bite","b":"2.3"}'
+
+
+class SubclassB(ModelB):
+    pass
+
+
+@pytest.mark.parametrize('input_value', [ModelB(b'bite', 2.3456), SubclassB(b'bite', 2.3456)])
+def test_model_b(model_serializer: SchemaSerializer, input_value):
+    assert model_serializer.to_python(input_value) == {'c': b'bite', 'd': '2.35'}
+    assert model_serializer.to_python(input_value, mode='json') == {'c': 'bite', 'd': '2.35'}
+    assert model_serializer.to_json(input_value) == b'{"c":"bite","d":"2.35"}'
+
+
+def test_keys():
+    v = SchemaSerializer(
+        core_schema.dict_schema(
+            core_schema.union_schema(
+                core_schema.int_schema(),
+                core_schema.float_schema(serialization={'type': 'format', 'formatting_string': '0.0f'}),
+            ),
+            core_schema.int_schema(),
+        )
+    )
+    assert v.to_python({1: 2, 2.111: 3}) == {1: 2, '2': 3}
+    assert v.to_python({1: 2, 2.111: 3}, mode='json') == {'1': 2, '2': 3}
+    assert v.to_json({1: 2, 2.111: 3}) == b'{"1":2,"2":3}'

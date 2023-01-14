@@ -29,7 +29,10 @@ pub(crate) struct Extra<'a> {
     pub round_trip: bool,
     pub config: &'a SerializationConfig,
     pub rec_guard: &'a SerRecursionGuard,
+    // the next two are used for union logic
     pub error_on_fallback: bool,
+    // "subclasses" could be generalised to some kind of "also allows similar values" in future if required
+    pub allow_subclasses: bool,
 }
 
 impl<'a> Extra<'a> {
@@ -60,12 +63,14 @@ impl<'a> Extra<'a> {
             config,
             rec_guard,
             error_on_fallback: false,
+            allow_subclasses: true,
         }
     }
 
-    pub fn with_error_on_fallback(&self) -> Self {
+    pub fn with_error_on_fallback(&self, allow_subclasses: bool) -> Self {
         let mut new_extra = self.clone();
         new_extra.error_on_fallback = true;
+        new_extra.allow_subclasses = allow_subclasses;
         new_extra
     }
 }
@@ -84,6 +89,7 @@ pub(crate) struct ExtraOwned {
     config: SerializationConfig,
     rec_guard: SerRecursionGuard,
     error_on_fallback: bool,
+    allow_subclasses: bool,
 }
 
 impl ExtraOwned {
@@ -100,6 +106,7 @@ impl ExtraOwned {
             config: extra.config.clone(),
             rec_guard: extra.rec_guard.clone(),
             error_on_fallback: extra.error_on_fallback,
+            allow_subclasses: extra.allow_subclasses,
         }
     }
 
@@ -117,6 +124,7 @@ impl ExtraOwned {
             config: &self.config,
             rec_guard: &self.rec_guard,
             error_on_fallback: self.error_on_fallback,
+            allow_subclasses: self.allow_subclasses,
         }
     }
 }

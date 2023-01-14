@@ -20,6 +20,10 @@ class BasicModel:
             setattr(self, key, value)
 
 
+class BasicSubModel(BasicModel):
+    pass
+
+
 def test_new_class():
     s = SchemaSerializer(
         core_schema.new_class_schema(
@@ -33,15 +37,19 @@ def test_new_class():
         )
     )
     assert s.to_python(BasicModel(foo=1, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
+    assert s.to_python(BasicSubModel(foo=1, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
     assert s.to_python(BasicModel(bar=b'more', foo=1)) == IsStrictDict(bar=b'more', foo=1)
     assert s.to_python(BasicModel(foo=1, c=3, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
     assert s.to_python(BasicModel(bar=b'more', foo=1, c=3), mode='json') == IsStrictDict(bar='more', foo=1)
+    assert s.to_python(BasicSubModel(bar=b'more', foo=1, c=3), mode='json') == IsStrictDict(bar='more', foo=1)
 
     j = s.to_json(BasicModel(bar=b'more', foo=1, c=3))
     if on_pypy:
         assert json.loads(j) == {'bar': 'more', 'foo': 1}
     else:
         assert j == b'{"bar":"more","foo":1}'
+
+    assert json.loads(s.to_json(BasicSubModel(bar=b'more', foo=1, c=3))) == {'bar': 'more', 'foo': 1}
 
 
 @dataclasses.dataclass

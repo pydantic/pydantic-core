@@ -387,7 +387,10 @@ fn unknown_type_error(value: &PyAny) -> PyErr {
 
 pub(crate) fn infer_json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
     let ob_type = extra.ob_type_lookup.get_type(key);
+    infer_json_key_known(key, ob_type, extra)
+}
 
+pub(crate) fn infer_json_key_known<'py>(key: &'py PyAny, ob_type: ObType, extra: &Extra) -> PyResult<Cow<'py, str>> {
     match ob_type {
         ObType::None => Ok(Cow::Borrowed("None")),
         ObType::Bool => {
