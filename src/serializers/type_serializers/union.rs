@@ -12,6 +12,7 @@ use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSeria
 #[derive(Debug, Clone)]
 pub struct UnionSerializer {
     choices: Vec<CombinedSerializer>,
+    name: String,
 }
 
 impl BuildSerializer for UnionSerializer {
@@ -33,8 +34,11 @@ impl BuildSerializer for UnionSerializer {
             0 => py_err!("One or more union choices required"),
             1 => Ok(choices.into_iter().next().unwrap()),
             _ => {
-                // let descr = choices.iter().map(|v| v.get_name()).collect::<Vec<_>>();
-                Ok(Self { choices }.into())
+                let descr = choices.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
+                Ok(Self {
+                    choices,
+                    name: format!("Union[{descr}]")
+                }.into())
             }
         }
     }
@@ -61,7 +65,7 @@ impl TypeSerializer for UnionSerializer {
         }
         extra
             .warnings
-            .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+            .on_fallback_py(self.get_name(), value, error_on_fallback)?;
         fallback_to_python(value, include, exclude, extra)
     }
 
@@ -87,7 +91,11 @@ impl TypeSerializer for UnionSerializer {
 
         extra
             .warnings
-            .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+            .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
         fallback_serialize(value, serializer, include, exclude, extra)
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
     }
 }

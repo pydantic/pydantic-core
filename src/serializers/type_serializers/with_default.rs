@@ -70,4 +70,8 @@ impl TypeSerializer for WithDefaultSerializer {
         self.serializer
             .serde_serialize(value, serializer, include, exclude, extra, error_on_fallback)
     }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
 }

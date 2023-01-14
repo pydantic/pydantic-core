@@ -90,4 +90,8 @@ impl TypeSerializer for FunctionSerializer {
             Err(e) => Err(S::Error::custom(e)),
         }
     }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
 }

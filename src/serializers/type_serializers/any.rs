@@ -45,6 +45,10 @@ impl TypeSerializer for AnySerializer {
     ) -> Result<S::Ok, S::Error> {
         SerializeInfer::new(value, include, exclude, extra).serialize(serializer)
     }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
 }
 
 pub(crate) fn fallback_to_python(

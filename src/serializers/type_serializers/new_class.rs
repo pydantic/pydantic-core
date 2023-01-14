@@ -55,6 +55,10 @@ impl TypeSerializer for NewClassSerializer {
         self.serializer
             .serde_serialize(dict, serializer, include, exclude, extra, error_on_fallback)
     }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
 }
 
 pub(super) fn object_to_dict<'py>(value: &'py PyAny, is_model: bool, extra: &Extra) -> PyResult<&'py PyDict> {

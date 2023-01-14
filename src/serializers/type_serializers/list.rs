@@ -16,6 +16,7 @@ use super::{
 pub struct ListSerializer {
     item_serializer: Box<CombinedSerializer>,
     filter: SchemaFilter<usize>,
+    name: String,
 }
 
 impl BuildSerializer for ListSerializer {
@@ -31,9 +32,11 @@ impl BuildSerializer for ListSerializer {
             Some(items_schema) => CombinedSerializer::build(items_schema, config, build_context)?,
             None => AnySerializer::build(schema, config, build_context)?,
         };
+        let name = format!("{}[{}]", Self::EXPECTED_TYPE, item_serializer.get_name());
         Ok(Self {
             item_serializer: Box::new(item_serializer),
             filter: SchemaFilter::from_schema(schema)?,
+            name
         }
         .into())
     }
@@ -71,7 +74,7 @@ impl TypeSerializer for ListSerializer {
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                    .on_fallback_py(self.get_name(), value, error_on_fallback)?;
                 fallback_to_python(value, include, exclude, extra)
             }
         }
@@ -113,9 +116,13 @@ impl TypeSerializer for ListSerializer {
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                    .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
                 fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
     }
 }

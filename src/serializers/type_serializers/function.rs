@@ -115,4 +115,8 @@ impl TypeSerializer for FunctionSerializer {
             fallback_serialize(return_value.as_ref(py), serializer, include, exclude, extra)
         }
     }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
 }

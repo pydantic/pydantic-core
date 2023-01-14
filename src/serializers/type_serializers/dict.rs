@@ -19,6 +19,7 @@ pub struct DictSerializer {
     value_serializer: Box<CombinedSerializer>,
     // isize because we look up include exclude via `.hash()` which returns an isize
     filter: SchemaFilter<isize>,
+    name: String,
 }
 
 impl BuildSerializer for DictSerializer {
@@ -46,10 +47,12 @@ impl BuildSerializer for DictSerializer {
             }
             None => SchemaFilter::default(),
         };
+        let name = format!("{}[{}, {}]", Self::EXPECTED_TYPE, key_serializer.get_name(), value_serializer.get_name());
         Ok(Self {
             key_serializer: Box::new(key_serializer),
             value_serializer: Box::new(value_serializer),
             filter,
+            name,
         }
         .into())
     }
@@ -89,7 +92,7 @@ impl TypeSerializer for DictSerializer {
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                    .on_fallback_py(self.get_name(), value, error_on_fallback)?;
                 fallback_to_python(value, include, exclude, extra)
             }
         }
@@ -132,9 +135,13 @@ impl TypeSerializer for DictSerializer {
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                    .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
                 fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
     }
 }

@@ -26,10 +26,10 @@ def test_frozenset_any():
 @pytest.mark.parametrize(
     'input_value,json_output,warning_type',
     [
-        ('apple', 'apple', '`set` but got `str`'),
-        ([1, 2, 3], [1, 2, 3], '`set` but got `list`'),
-        ((1, 2, 3), [1, 2, 3], '`set` but got `tuple`'),
-        (frozenset([1, 2, 3]), IsList(1, 2, 3, check_order=False), '`set` but got `frozenset`'),
+        ('apple', 'apple', r'`set\[int\]` but got `str`'),
+        ([1, 2, 3], [1, 2, 3], r'`set\[int\]` but got `list`'),
+        ((1, 2, 3), [1, 2, 3], r'`set\[int\]` but got `tuple`'),
+        (frozenset([1, 2, 3]), IsList(1, 2, 3, check_order=False), r'`set\[int\]` but got `frozenset`'),
         ({1, 2, 'a'}, IsList(1, 2, 'a', check_order=False), '`int` but got `str`'),
     ],
 )

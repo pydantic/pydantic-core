@@ -1,4 +1,5 @@
 import json
+import re
 from functools import partial
 
 import pytest
@@ -17,23 +18,27 @@ def test_list_any():
 
 def test_list_fallback():
     v = SchemaSerializer(core_schema.list_schema(core_schema.any_schema()))
-    with pytest.warns(UserWarning, match='Expected `list` but got `str` - serialized value may not be as expected'):
+    msg = 'Expected `list[any]` but got `str` - serialized value may not be as expected'
+    with pytest.warns(UserWarning, match=re.escape(msg)):
         assert v.to_python('apple') == 'apple'
 
     with pytest.warns(UserWarning) as warning_info:
         assert v.to_json('apple') == b'"apple"'
     assert [w.message.args[0] for w in warning_info.list] == [
-        'Pydantic serializer warnings:\n  Expected `list` but got `str` - serialized value may not be as expected'
+        'Pydantic serializer warnings:\n  Expected `list[any]` but got `str` - serialized value may not be as expected'
     ]
 
-    with pytest.warns(UserWarning, match='Expected `list` but got `bytes` - serialized value may not be as expected'):
+    msg = 'Expected `list[any]` but got `bytes` - serialized value may not be as expected'
+    with pytest.warns(UserWarning, match=re.escape(msg)):
         assert v.to_json(b'apple') == b'"apple"'
 
-    with pytest.warns(UserWarning, match='Expected `list` but got `tuple` - serialized value may not be as expected'):
+    msg = 'Expected `list[any]` but got `tuple` - serialized value may not be as expected'
+    with pytest.warns(UserWarning, match=re.escape(msg)):
         assert v.to_python((1, 2, 3)) == (1, 2, 3)
 
     # # even though we're in the fallback state, non JSON types should still be converted to JSON here
-    with pytest.warns(UserWarning, match='Expected `list` but got `tuple` - serialized value may not be as expected'):
+    msg = 'Expected `list[any]` but got `tuple` - serialized value may not be as expected'
+    with pytest.warns(UserWarning, match=re.escape(msg)):
         assert v.to_python((1, 2, 3), mode='json') == [1, 2, 3]
 
 

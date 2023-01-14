@@ -219,6 +219,8 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
         extra: &Extra,
         error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error>;
+
+    fn get_name(&self) -> &str;
 }
 
 pub(crate) struct PydanticSerializer<'py> {

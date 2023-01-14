@@ -38,7 +38,7 @@ impl TypeSerializer for TimeDeltaSerializer {
                 Err(_) => {
                     extra
                         .warnings
-                        .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                        .on_fallback_py(self.get_name(), value, error_on_fallback)?;
                     fallback_to_python(value, include, exclude, extra)
                 }
             },
@@ -52,7 +52,7 @@ impl TypeSerializer for TimeDeltaSerializer {
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_py(Self::EXPECTED_TYPE, key, error_on_fallback)?;
+                    .on_fallback_py(self.get_name(), key, error_on_fallback)?;
                 fallback_json_key(key, extra)
             }
         }
@@ -75,9 +75,13 @@ impl TypeSerializer for TimeDeltaSerializer {
             Err(_) => {
                 extra
                     .warnings
-                    .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                    .on_fallback_ser::<S>(self.get_name(), value, error_on_fallback)?;
                 fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
     }
 }

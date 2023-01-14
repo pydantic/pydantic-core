@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 
@@ -15,4 +16,6 @@ def test_union_bool_int(input_value, expected_value):
 
 def test_union_error():
     v = SchemaSerializer(core_schema.union_schema(core_schema.bool_schema(), core_schema.int_schema()))
-    assert v.to_python('a string') == 'a string'
+    msg = 'Expected `Union[bool, int]` but got `str` - serialized value may not be as expected'
+    with pytest.warns(UserWarning, match=re.escape(msg)):
+        assert v.to_python('a string') == 'a string'

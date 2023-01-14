@@ -63,4 +63,8 @@ impl TypeSerializer for RecursiveRefSerializer {
         extra.rec_guard.pop(value_id);
         r
     }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
 }

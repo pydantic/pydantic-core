@@ -34,6 +34,7 @@ impl BuildSerializer for TupleBuilder {
 pub struct TupleVariableSerializer {
     item_serializer: Box<CombinedSerializer>,
     filter: SchemaFilter<usize>,
+    name: String,
 }
 
 impl TupleVariableSerializer {
@@ -50,9 +51,11 @@ impl TupleVariableSerializer {
             Some(items_schema) => CombinedSerializer::build(items_schema, config, build_context)?,
             None => AnySerializer::build(schema, config, build_context)?,
         };
+        let name = format!("tuple[{}, ...]", item_serializer.get_name());
         Ok(Self {
             item_serializer: Box::new(item_serializer),
             filter: SchemaFilter::from_schema(schema)?,
+            name,
         }
         .into())
     }
@@ -137,6 +140,10 @@ impl TypeSerializer for TupleVariableSerializer {
             }
         }
     }
+
+    fn get_name(&self) -> &str {
+        &self.name
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -144,6 +151,7 @@ pub struct TuplePositionalSerializer {
     items_serializers: Vec<CombinedSerializer>,
     extra_serializer: Box<CombinedSerializer>,
     filter: SchemaFilter<usize>,
+    name: String,
 }
 
 impl TuplePositionalSerializer {
@@ -159,13 +167,17 @@ impl TuplePositionalSerializer {
             Some(extra_schema) => CombinedSerializer::build(extra_schema, config, build_context)?,
             None => AnySerializer::build(schema, config, build_context)?,
         };
-        Ok(Self {
-            items_serializers: items
+        let items_serializers: Vec<CombinedSerializer> = items
                 .iter()
                 .map(|item| CombinedSerializer::build(item.cast_as()?, config, build_context))
-                .collect::<PyResult<_>>()?,
+                .collect::<PyResult<_>>()?;
+
+        let descr = items_serializers.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
+        Ok(Self {
+            items_serializers,
             extra_serializer: Box::new(extra_serializer),
             filter: SchemaFilter::from_schema(schema)?,
+            name: format!("tuple[{}]", descr),
         }
         .into())
     }
@@ -295,5 +307,9 @@ impl TypeSerializer for TuplePositionalSerializer {
                 fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
     }
 }
