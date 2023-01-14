@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::fmt::Debug;
 
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::{intern, AsPyPointer};
 
@@ -11,6 +11,7 @@ use serde::ser::Error;
 use crate::build_tools::py_err;
 
 use super::config::SerializationConfig;
+use super::errors::PydanticSerializationUnexpectedValue;
 use super::ob_type::ObTypeLookup;
 use super::shared::CombinedSerializer;
 
@@ -152,7 +153,7 @@ impl CollectWarnings {
 
     pub(crate) fn on_fallback_py(&self, field_type: &str, value: &PyAny, error_on_fallback: bool) -> PyResult<()> {
         if error_on_fallback {
-            py_err!(PyTypeError; "Unexpected value")
+            Err(PydanticSerializationUnexpectedValue::new_err())
         } else {
             self.fallback_warning(field_type, value);
             Ok(())

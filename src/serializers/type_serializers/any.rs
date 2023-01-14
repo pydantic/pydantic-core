@@ -10,13 +10,12 @@ use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::build_context::BuildContext;
 use crate::build_tools::safe_repr;
-use crate::errors::PydanticSerializationError;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::new_class::object_to_dict;
 use super::{
-    py_err_se_err, utf8_py_error, AnyFilter, BuildSerializer, CombinedSerializer, Extra, ObType, SerMode,
-    TypeSerializer,
+    py_err_se_err, utf8_py_error, AnyFilter, BuildSerializer, CombinedSerializer, Extra, ObType,
+    PydanticSerializationError, SerMode, TypeSerializer,
 };
 
 #[derive(Debug, Clone)]

@@ -7,11 +7,13 @@ use crate::build_context::BuildContext;
 use crate::SchemaValidator;
 
 use config::SerializationConfig;
+pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
 use extra::{Extra, SerMode};
 pub use shared::CombinedSerializer;
 use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
 
 mod config;
+mod errors;
 mod extra;
 mod filter;
 mod ob_type;

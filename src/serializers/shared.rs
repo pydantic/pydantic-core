@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::fmt;
 use std::fmt::Debug;
 
 use pyo3::intern;
@@ -12,8 +11,8 @@ use serde_json::ser::PrettyFormatter;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, py_error_type, SchemaDict};
-use crate::PydanticSerializationError;
 
+use super::errors::se_err_py_err;
 use super::extra::Extra;
 use super::type_serializers::any::{fallback_json_key, fallback_to_python};
 
@@ -118,6 +117,7 @@ combined_serializer! {
         WithDefault: super::type_serializers::with_default::WithDefaultSerializer;
         Json: super::type_serializers::json::JsonSerializer;
         Recursive: super::type_serializers::recursive::RecursiveRefSerializer;
+        Union: super::type_serializers::union::UnionSerializer;
     }
 }
 
@@ -221,10 +221,6 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
     ) -> Result<S::Ok, S::Error>;
 }
 
-pub(crate) fn py_err_se_err<T: serde::ser::Error, E: fmt::Display>(py_error: E) -> T {
-    T::custom(py_error.to_string())
-}
-
 pub(crate) struct PydanticSerializer<'py> {
     value: &'py PyAny,
     serializer: &'py CombinedSerializer,
@@ -286,16 +282,12 @@ pub(crate) fn to_json_bytes(
             let indent = vec![b' '; indent];
             let formatter = PrettyFormatter::with_indent(&indent);
             let mut ser = serde_json::Serializer::with_formatter(writer, formatter);
-            serializer
-                .serialize(&mut ser)
-                .map_err(PydanticSerializationError::json_error)?;
+            serializer.serialize(&mut ser).map_err(se_err_py_err)?;
             ser.into_inner()
         }
         None => {
             let mut ser = serde_json::Serializer::new(writer);
-            serializer
-                .serialize(&mut ser)
-                .map_err(PydanticSerializationError::json_error)?;
+            serializer.serialize(&mut ser).map_err(se_err_py_err)?;
             ser.into_inner()
         }
     };

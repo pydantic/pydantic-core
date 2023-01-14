@@ -9,12 +9,11 @@ use serde::ser::Error;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{function_name, kwargs, py_error_type, SchemaDict};
-use crate::errors::PydanticSerializationError;
 
 use super::any::{
     fallback_json_key, fallback_serialize, fallback_serialize_known, fallback_to_python, fallback_to_python_known,
 };
-use super::{BuildSerializer, CombinedSerializer, Extra, ObType, SerMode, TypeSerializer};
+use super::{BuildSerializer, CombinedSerializer, Extra, ObType, PydanticSerializationError, SerMode, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct FunctionSerializer {

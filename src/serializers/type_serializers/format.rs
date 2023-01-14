@@ -8,10 +8,9 @@ use serde::ser::Error;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
-use crate::errors::PydanticSerializationError;
 
 use super::string::serialize_py_str;
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializationError, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct FunctionSerializer {
