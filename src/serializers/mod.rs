@@ -89,10 +89,9 @@ impl SchemaSerializer {
         exclude_none: Option<bool>,
         round_trip: Option<bool>,
     ) -> PyResult<PyObject> {
-        let mode = SerMode::Json;
         let extra = Extra::new(
             py,
-            &mode,
+            &SerMode::Json,
             &self.slots,
             by_alias,
             exclude_unset,

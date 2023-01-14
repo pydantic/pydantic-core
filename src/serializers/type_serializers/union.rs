@@ -3,11 +3,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use crate::build_context::BuildContext;
-use crate::build_tools::SchemaDict;
+use crate::build_tools::{py_err, SchemaDict};
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::any::{fallback_serialize, fallback_to_python};
-use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct UnionSerializer {
@@ -29,7 +29,14 @@ impl BuildSerializer for UnionSerializer {
             .map(|choice| CombinedSerializer::build(choice.cast_as()?, config, build_context))
             .collect::<PyResult<Vec<CombinedSerializer>>>()?;
 
-        Ok(Self { choices }.into())
+        match choices.len() {
+            0 => py_err!("One or more union choices required"),
+            1 => Ok(choices.into_iter().next().unwrap()),
+            _ => {
+                // let descr = choices.iter().map(|v| v.get_name()).collect::<Vec<_>>();
+                Ok(Self { choices }.into())
+            }
+        }
     }
 }
 
@@ -55,7 +62,7 @@ impl TypeSerializer for UnionSerializer {
         extra
             .warnings
             .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
-        fallback_to_python(value, include, exclude, extra, error_on_fallback)
+        fallback_to_python(value, include, exclude, extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -67,17 +74,20 @@ impl TypeSerializer for UnionSerializer {
         extra: &Extra,
         error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
-        // try the serializers in with error_on fallback=true
-        // for comb_serializer in &self.choices {
-        //     match comb_serializer.serde_serialize(value, serializer, include, exclude, extra, true) {
-        //         Ok(v) => return Ok(v),
-        //         Err(_e) => (),
-        //     }
-        // }
+        let py = value.py();
+        for comb_serializer in &self.choices {
+            match comb_serializer.to_python(value, include, exclude, extra, true) {
+                Ok(v) => return fallback_serialize(v.as_ref(py), serializer, None, None, extra),
+                Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
+                    true => (),
+                    false => return Err(py_err_se_err(err)),
+                },
+            }
+        }
 
         extra
             .warnings
             .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
-        fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
+        fallback_serialize(value, serializer, include, exclude, extra)
     }
 }

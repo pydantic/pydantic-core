@@ -92,7 +92,7 @@ impl TypeSerializer for TupleVariableSerializer {
             }
             Err(_) => {
                 extra.warnings.on_fallback_py("tuple", value, error_on_fallback)?;
-                fallback_to_python(value, include, exclude, extra, error_on_fallback)
+                fallback_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -133,7 +133,7 @@ impl TypeSerializer for TupleVariableSerializer {
             }
             Err(_) => {
                 extra.warnings.on_fallback_ser::<S>("tuple", value, error_on_fallback)?;
-                fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
+                fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
     }
@@ -225,7 +225,7 @@ impl TypeSerializer for TuplePositionalSerializer {
             }
             Err(_) => {
                 extra.warnings.on_fallback_py("tuple", value, error_on_fallback)?;
-                fallback_to_python(value, include, exclude, extra, error_on_fallback)
+                fallback_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -292,7 +292,7 @@ impl TypeSerializer for TuplePositionalSerializer {
             }
             Err(_) => {
                 extra.warnings.on_fallback_ser::<S>("tuple", value, error_on_fallback)?;
-                fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
+                fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
     }

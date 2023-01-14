@@ -153,7 +153,7 @@ impl CollectWarnings {
 
     pub(crate) fn on_fallback_py(&self, field_type: &str, value: &PyAny, error_on_fallback: bool) -> PyResult<()> {
         if error_on_fallback {
-            Err(PydanticSerializationUnexpectedValue::new_err())
+            Err(PydanticSerializationUnexpectedValue::new_err(None))
         } else {
             self.fallback_warning(field_type, value);
             Ok(())

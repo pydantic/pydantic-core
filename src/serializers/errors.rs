@@ -2,7 +2,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fmt;
 
-static UNEXPECTED_TYPE_SER: &str = "__PydanticSerializationUnexpectedValue__";
+pub(super) static UNEXPECTED_TYPE_SER: &str = "__PydanticSerializationUnexpectedValue__";
 
 pub(super) fn py_err_se_err<T: serde::ser::Error, E: fmt::Display>(py_error: E) -> T {
     T::custom(py_error.to_string())
@@ -10,8 +10,13 @@ pub(super) fn py_err_se_err<T: serde::ser::Error, E: fmt::Display>(py_error: E) 
 
 pub(super) fn se_err_py_err(error: serde_json::Error) -> PyErr {
     let s = error.to_string();
-    return if s == UNEXPECTED_TYPE_SER {
-        PydanticSerializationUnexpectedValue::new_err()
+    return if s.starts_with(UNEXPECTED_TYPE_SER) {
+        if s.len() == UNEXPECTED_TYPE_SER.len() {
+            PydanticSerializationUnexpectedValue::new_err(None)
+        } else {
+            let msg = s[s.len()..].to_string();
+            PydanticSerializationUnexpectedValue::new_err(Some(msg))
+        }
     } else {
         let msg = format!("Error serializing to JSON: {s}");
         PydanticSerializationError::new_err(msg)
@@ -53,8 +58,8 @@ pub struct PydanticSerializationUnexpectedValue {
 }
 
 impl PydanticSerializationUnexpectedValue {
-    pub(crate) fn new_err() -> PyErr {
-        PyErr::new::<Self, Option<String>>(None)
+    pub(crate) fn new_err(msg: Option<String>) -> PyErr {
+        PyErr::new::<Self, Option<String>>(msg)
     }
 }
 

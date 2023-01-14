@@ -201,9 +201,9 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
+        _error_on_fallback: bool,
     ) -> PyResult<PyObject> {
-        fallback_to_python(value, include, exclude, extra, error_on_fallback)
+        fallback_to_python(value, include, exclude, extra)
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra, _error_on_fallback: bool) -> PyResult<Cow<'py, str>> {

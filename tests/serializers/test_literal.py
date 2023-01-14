@@ -14,10 +14,10 @@ def test_int_literal():
     assert s.to_python(44) == 44
     assert s.to_json(1) == b'1'
 
-    with pytest.warns(UserWarning, match='Expected `int` but got `str` - slight slowdown possible'):
+    with pytest.warns(UserWarning, match='Expected `int` but got `str` - serialized value may not be as expected'):
         assert s.to_python('a', mode='json') == 'a'
 
-    with pytest.warns(UserWarning, match='Expected `int` but got `str` - slight slowdown possible'):
+    with pytest.warns(UserWarning, match='Expected `int` but got `str` - serialized value may not be as expected'):
         assert s.to_json('a') == b'"a"'
 
 
@@ -30,10 +30,10 @@ def test_str_literal():
     assert s.to_python('not in literal') == 'not in literal'
     assert s.to_json('a') == b'"a"'
 
-    with pytest.warns(UserWarning, match='Expected `str` but got `int` - slight slowdown possible'):
+    with pytest.warns(UserWarning, match='Expected `str` but got `int` - serialized value may not be as expected'):
         assert s.to_python(1, mode='json') == 1
 
-    with pytest.warns(UserWarning, match='Expected `str` but got `int` - slight slowdown possible'):
+    with pytest.warns(UserWarning, match='Expected `str` but got `int` - serialized value may not be as expected'):
         assert s.to_json(1) == b'1'
 
 

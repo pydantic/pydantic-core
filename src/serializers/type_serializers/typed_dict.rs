@@ -170,7 +170,7 @@ impl TypeSerializer for TypedDictSerializer {
                             }
                         }
                         if self.include_extra {
-                            let value = fallback_to_python(value, include, exclude, extra, error_on_fallback)?;
+                            let value = fallback_to_python(value, include, exclude, extra)?;
                             new_dict.set_item(key, value)?;
                         }
                     }
@@ -181,7 +181,7 @@ impl TypeSerializer for TypedDictSerializer {
                 extra
                     .warnings
                     .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
-                fallback_to_python(value, include, exclude, extra, error_on_fallback)
+                fallback_to_python(value, include, exclude, extra)
             }
         }
     }
@@ -231,7 +231,7 @@ impl TypeSerializer for TypedDictSerializer {
                             }
                         }
                         if self.include_extra {
-                            let s = SerializeInfer::new(value, include, exclude, extra, error_on_fallback);
+                            let s = SerializeInfer::new(value, include, exclude, extra);
                             let output_key = fallback_json_key(key, extra).map_err(py_err_se_err)?;
                             map.serialize_entry(&output_key, &s)?
                         }
@@ -243,7 +243,7 @@ impl TypeSerializer for TypedDictSerializer {
                 extra
                     .warnings
                     .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
-                fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
+                fallback_serialize(value, serializer, include, exclude, extra)
             }
         }
     }

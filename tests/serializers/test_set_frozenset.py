@@ -37,11 +37,11 @@ def test_set_fallback(input_value, json_output, warning_type):
     v = SchemaSerializer(core_schema.set_schema(core_schema.int_schema()))
     assert v.to_python({1, 2, 3}) == {1, 2, 3}
 
-    with pytest.warns(UserWarning, match=f'Expected {warning_type} - slight slowdown possible'):
+    with pytest.warns(UserWarning, match=f'Expected {warning_type} - serialized value may not be as expected'):
         assert v.to_python(input_value) == input_value
 
-    with pytest.warns(UserWarning, match=f'Expected {warning_type} - slight slowdown possible'):
+    with pytest.warns(UserWarning, match=f'Expected {warning_type} - serialized value may not be as expected'):
         assert v.to_python(input_value, mode='json') == json_output
 
-    with pytest.warns(UserWarning, match=f'Expected {warning_type} - slight slowdown possible'):
+    with pytest.warns(UserWarning, match=f'Expected {warning_type} - serialized value may not be as expected'):
         assert json.loads(v.to_json(input_value)) == json_output

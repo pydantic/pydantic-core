@@ -70,7 +70,7 @@ macro_rules! build_serializer {
                         extra
                             .warnings
                             .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
-                        fallback_to_python(value, include, exclude, extra, error_on_fallback)
+                        fallback_to_python(value, include, exclude, extra)
                     }
                 }
             }
@@ -106,7 +106,7 @@ macro_rules! build_serializer {
                         extra
                             .warnings
                             .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
-                        fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
+                        fallback_serialize(value, serializer, include, exclude, extra)
                     }
                 }
             }

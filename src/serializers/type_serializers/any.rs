@@ -41,9 +41,9 @@ impl TypeSerializer for AnySerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-        error_on_fallback: bool,
+        _error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
-        SerializeInfer::new(value, include, exclude, extra, error_on_fallback).serialize(serializer)
+        SerializeInfer::new(value, include, exclude, extra).serialize(serializer)
     }
 }
 
@@ -52,16 +52,8 @@ pub(crate) fn fallback_to_python(
     include: Option<&PyAny>,
     exclude: Option<&PyAny>,
     extra: &Extra,
-    error_on_fallback: bool,
 ) -> PyResult<PyObject> {
-    fallback_to_python_known(
-        &extra.ob_type_lookup.get_type(value),
-        value,
-        include,
-        exclude,
-        extra,
-        error_on_fallback,
-    )
+    fallback_to_python_known(&extra.ob_type_lookup.get_type(value), value, include, exclude, extra)
 }
 
 pub(crate) fn fallback_to_python_known(
@@ -70,7 +62,6 @@ pub(crate) fn fallback_to_python_known(
     include: Option<&PyAny>,
     exclude: Option<&PyAny>,
     extra: &Extra,
-    error_on_fallback: bool,
 ) -> PyResult<PyObject> {
     let py = value.py();
     let value_id = match extra.rec_guard.add(value) {
@@ -96,7 +87,7 @@ pub(crate) fn fallback_to_python_known(
             value
                 .cast_as::<$t>()?
                 .iter()
-                .map(|v| fallback_to_python(v, include, exclude, extra, error_on_fallback))
+                .map(|v| fallback_to_python(v, include, exclude, extra))
                 .collect::<PyResult<Vec<PyObject>>>()?
         };
     }
@@ -110,13 +101,7 @@ pub(crate) fn fallback_to_python_known(
             for (index, element) in py_seq.iter().enumerate() {
                 let op_next = filter.value_filter(index, include, exclude)?;
                 if let Some((next_include, next_exclude)) = op_next {
-                    items.push(fallback_to_python(
-                        element,
-                        next_include,
-                        next_exclude,
-                        extra,
-                        error_on_fallback,
-                    )?);
+                    items.push(fallback_to_python(element, next_include, next_exclude, extra)?);
                 }
             }
             items
@@ -132,7 +117,7 @@ pub(crate) fn fallback_to_python_known(
             if let Some((next_include, next_exclude)) = op_next {
                 let k_str = fallback_json_key(k, extra)?;
                 let k = PyString::new(py, &k_str);
-                let v = fallback_to_python(v, next_include, next_exclude, extra, error_on_fallback)?;
+                let v = fallback_to_python(v, next_include, next_exclude, extra)?;
                 new_dict.set_item(k, v)?;
             }
         }
@@ -236,7 +221,7 @@ pub(crate) fn fallback_to_python_known(
                 for (k, v) in dict {
                     let op_next = filter.key_filter(k, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        let v = fallback_to_python(v, next_include, next_exclude, extra, error_on_fallback)?;
+                        let v = fallback_to_python(v, next_include, next_exclude, extra)?;
                         new_dict.set_item(k, v)?;
                     }
                 }
@@ -256,7 +241,6 @@ pub(crate) struct SerializeInfer<'py> {
     include: Option<&'py PyAny>,
     exclude: Option<&'py PyAny>,
     extra: &'py Extra<'py>,
-    error_on_fallback: bool,
 }
 
 impl<'py> SerializeInfer<'py> {
@@ -265,14 +249,12 @@ impl<'py> SerializeInfer<'py> {
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
         extra: &'py Extra,
-        error_on_fallback: bool,
     ) -> Self {
         Self {
             value,
             include,
             exclude,
             extra,
-            error_on_fallback,
         }
     }
 }
@@ -280,15 +262,7 @@ impl<'py> SerializeInfer<'py> {
 impl<'py> Serialize for SerializeInfer<'py> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let ob_type = self.extra.ob_type_lookup.get_type(self.value);
-        fallback_serialize_known(
-            &ob_type,
-            self.value,
-            serializer,
-            self.include,
-            self.exclude,
-            self.extra,
-            self.error_on_fallback,
-        )
+        fallback_serialize_known(&ob_type, self.value, serializer, self.include, self.exclude, self.extra)
     }
 }
 
@@ -298,7 +272,6 @@ pub(crate) fn fallback_serialize<S: Serializer>(
     include: Option<&PyAny>,
     exclude: Option<&PyAny>,
     extra: &Extra,
-    error_on_fallback: bool,
 ) -> Result<S::Ok, S::Error> {
     fallback_serialize_known(
         &extra.ob_type_lookup.get_type(value),
@@ -307,7 +280,6 @@ pub(crate) fn fallback_serialize<S: Serializer>(
         include,
         exclude,
         extra,
-        error_on_fallback,
     )
 }
 
@@ -318,7 +290,6 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
     include: Option<&PyAny>,
     exclude: Option<&PyAny>,
     extra: &Extra,
-    error_on_fallback: bool,
 ) -> Result<S::Ok, S::Error> {
     let value_id = extra.rec_guard.add(value).map_err(py_err_se_err)?;
     macro_rules! serialize {
@@ -335,7 +306,7 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
             let py_seq: &$t = value.cast_as().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
             for element in py_seq {
-                let item_serializer = SerializeInfer::new(element, include, exclude, extra, error_on_fallback);
+                let item_serializer = SerializeInfer::new(element, include, exclude, extra);
                 seq.serialize_element(&item_serializer)?
             }
             seq.end()
@@ -350,8 +321,7 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
             for (index, element) in py_seq.iter().enumerate() {
                 let op_next = filter.value_filter(index, include, exclude).map_err(py_err_se_err)?;
                 if let Some((next_include, next_exclude)) = op_next {
-                    let item_serializer =
-                        SerializeInfer::new(element, next_include, next_exclude, extra, error_on_fallback);
+                    let item_serializer = SerializeInfer::new(element, next_include, next_exclude, extra);
                     seq.serialize_element(&item_serializer)?
                 }
             }
@@ -368,8 +338,7 @@ pub(crate) fn fallback_serialize_known<S: Serializer>(
                 let op_next = filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
                 if let Some((next_include, next_exclude)) = op_next {
                     let key = fallback_json_key(key, extra).map_err(py_err_se_err)?;
-                    let value_serializer =
-                        SerializeInfer::new(value, next_include, next_exclude, extra, error_on_fallback);
+                    let value_serializer = SerializeInfer::new(value, next_include, next_exclude, extra);
                     map.serialize_entry(&key, &value_serializer)?;
                 }
             }
