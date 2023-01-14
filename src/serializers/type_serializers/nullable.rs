@@ -35,12 +35,15 @@ impl TypeSerializer for NullableSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::None) {
             IsType::Exact => Ok(py.None().into_py(py)),
             // I don't think subclasses of None can exist
-            _ => self.serializer.to_python(value, include, exclude, extra),
+            _ => self
+                .serializer
+                .to_python(value, include, exclude, extra, error_on_fallback),
         }
     }
 
@@ -51,12 +54,13 @@ impl TypeSerializer for NullableSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match extra.ob_type_lookup.is_type(value, ObType::None) {
             IsType::Exact => serializer.serialize_none(),
             _ => self
                 .serializer
-                .serde_serialize(value, serializer, include, exclude, extra),
+                .serde_serialize(value, serializer, include, exclude, extra, error_on_fallback),
         }
     }
 }

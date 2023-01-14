@@ -47,6 +47,7 @@ impl TypeSerializer for GeneratorSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         match value.iter() {
             Ok(py_iter) => {
@@ -63,7 +64,13 @@ impl TypeSerializer for GeneratorSerializer {
                             let element = iter_result?;
                             let op_next = self.filter.value_filter(index, include, exclude)?;
                             if let Some((next_include, next_exclude)) = op_next {
-                                items.push(item_serializer.to_python(element, next_include, next_exclude, extra)?);
+                                items.push(item_serializer.to_python(
+                                    element,
+                                    next_include,
+                                    next_exclude,
+                                    extra,
+                                    error_on_fallback,
+                                )?);
                             }
                         }
                         Ok(items.into_py(py))
@@ -83,8 +90,10 @@ impl TypeSerializer for GeneratorSerializer {
                 }
             }
             Err(_) => {
-                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                fallback_to_python(value, include, exclude, extra)
+                extra
+                    .warnings
+                    .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                fallback_to_python(value, include, exclude, extra, error_on_fallback)
             }
         }
     }
@@ -96,6 +105,7 @@ impl TypeSerializer for GeneratorSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match value.iter() {
             Ok(py_iter) => {
@@ -114,15 +124,17 @@ impl TypeSerializer for GeneratorSerializer {
                         .map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let item_serialize =
-                            PydanticSerializer::new(element, item_serializer, next_include, next_exclude, extra);
+                            PydanticSerializer::new(element, item_serializer, next_include, next_exclude, extra, false);
                         seq.serialize_element(&item_serialize)?;
                     }
                 }
                 seq.end()
             }
             Err(_) => {
-                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                fallback_serialize(value, serializer, include, exclude, extra)
+                extra
+                    .warnings
+                    .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
             }
         }
     }
@@ -161,7 +173,8 @@ impl SerializationIterator {
             if let Some((next_include, next_exclude)) = filter {
                 let v = self
                     .item_serializer
-                    .to_python(element, next_include, next_exclude, &extra)?;
+                    // TODO do we need error_on_fallback to be customizable?
+                    .to_python(element, next_include, next_exclude, &extra, false)?;
                 extra.warnings.final_check(py)?;
                 return Ok(Some(v));
             }

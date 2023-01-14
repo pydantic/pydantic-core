@@ -30,6 +30,7 @@ impl TypeSerializer for BytesSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         let py = value.py();
         match value.cast_as::<PyBytes>() {
@@ -38,17 +39,21 @@ impl TypeSerializer for BytesSerializer {
                 _ => Ok(value.into_py(py)),
             },
             Err(_) => {
-                extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                fallback_to_python(value, include, exclude, extra)
+                extra
+                    .warnings
+                    .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                fallback_to_python(value, include, exclude, extra, error_on_fallback)
             }
         }
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra, error_on_fallback: bool) -> PyResult<Cow<'py, str>> {
         match key.cast_as::<PyBytes>() {
             Ok(py_bytes) => extra.config.bytes_mode.bytes_to_string(py_bytes),
             Err(_) => {
-                extra.warnings.fallback_slow(Self::EXPECTED_TYPE, key);
+                extra
+                    .warnings
+                    .on_fallback_py(Self::EXPECTED_TYPE, key, error_on_fallback)?;
                 fallback_json_key(key, extra)
             }
         }
@@ -61,12 +66,15 @@ impl TypeSerializer for BytesSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyBytes>() {
             Ok(py_bytes) => extra.config.bytes_mode.serialize_bytes(py_bytes, serializer),
             Err(_) => {
-                extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                fallback_serialize(value, serializer, include, exclude, extra)
+                extra
+                    .warnings
+                    .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
             }
         }
     }

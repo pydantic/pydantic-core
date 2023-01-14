@@ -44,6 +44,7 @@ macro_rules! build_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
+                error_on_fallback: bool,
             ) -> PyResult<PyObject> {
                 let py = value.py();
                 match value.cast_as::<$py_type>() {
@@ -52,7 +53,13 @@ macro_rules! build_serializer {
 
                         let mut items = Vec::with_capacity(py_set.len());
                         for element in py_set.iter() {
-                            items.push(item_serializer.to_python(element, include, exclude, extra)?);
+                            items.push(item_serializer.to_python(
+                                element,
+                                include,
+                                exclude,
+                                extra,
+                                error_on_fallback,
+                            )?);
                         }
                         match extra.mode {
                             SerMode::Json => Ok(PyList::new(py, items).into_py(py)),
@@ -60,8 +67,10 @@ macro_rules! build_serializer {
                         }
                     }
                     Err(_) => {
-                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_to_python(value, include, exclude, extra)
+                        extra
+                            .warnings
+                            .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                        fallback_to_python(value, include, exclude, extra, error_on_fallback)
                     }
                 }
             }
@@ -73,6 +82,7 @@ macro_rules! build_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
+                error_on_fallback: bool,
             ) -> Result<S::Ok, S::Error> {
                 match value.cast_as::<$py_type>() {
                     Ok(py_set) => {
@@ -80,15 +90,23 @@ macro_rules! build_serializer {
                         let item_serializer = self.item_serializer.as_ref();
 
                         for value in py_set.iter() {
-                            let item_serialize =
-                                PydanticSerializer::new(value, item_serializer, include, exclude, extra);
+                            let item_serialize = PydanticSerializer::new(
+                                value,
+                                item_serializer,
+                                include,
+                                exclude,
+                                extra,
+                                error_on_fallback,
+                            );
                             seq.serialize_element(&item_serialize)?;
                         }
                         seq.end()
                     }
                     Err(_) => {
-                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_serialize(value, serializer, include, exclude, extra)
+                        extra
+                            .warnings
+                            .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                        fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
                     }
                 }
             }

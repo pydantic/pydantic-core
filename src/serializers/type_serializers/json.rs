@@ -46,20 +46,31 @@ impl TypeSerializer for JsonSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         if extra.round_trip {
-            let bytes = to_json_bytes(value, &self.serializer, include, exclude, extra, None, 0)?;
+            let bytes = to_json_bytes(
+                value,
+                &self.serializer,
+                include,
+                exclude,
+                extra,
+                error_on_fallback,
+                None,
+                0,
+            )?;
             let py = value.py();
             let s = from_utf8(&bytes).map_err(|e| utf8_py_error(py, e, &bytes))?;
             Ok(s.to_object(py))
         } else {
-            self.serializer.to_python(value, include, exclude, extra)
+            self.serializer
+                .to_python(value, include, exclude, extra, error_on_fallback)
         }
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra, error_on_fallback: bool) -> PyResult<Cow<'py, str>> {
         if extra.round_trip {
-            let bytes = to_json_bytes(key, &self.serializer, None, None, extra, None, 0)?;
+            let bytes = to_json_bytes(key, &self.serializer, None, None, extra, error_on_fallback, None, 0)?;
             let py = key.py();
             let s = from_utf8(&bytes).map_err(|e| utf8_py_error(py, e, &bytes))?;
             Ok(Cow::Owned(s.to_string()))
@@ -75,17 +86,27 @@ impl TypeSerializer for JsonSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         if extra.round_trip {
-            let bytes =
-                to_json_bytes(value, &self.serializer, include, exclude, extra, None, 0).map_err(py_err_se_err)?;
+            let bytes = to_json_bytes(
+                value,
+                &self.serializer,
+                include,
+                exclude,
+                extra,
+                error_on_fallback,
+                None,
+                0,
+            )
+            .map_err(py_err_se_err)?;
             match from_utf8(&bytes) {
                 Ok(s) => serializer.serialize_str(s),
                 Err(e) => Err(Error::custom(e.to_string())),
             }
         } else {
             self.serializer
-                .serde_serialize(value, serializer, include, exclude, extra)
+                .serde_serialize(value, serializer, include, exclude, extra, error_on_fallback)
         }
     }
 }

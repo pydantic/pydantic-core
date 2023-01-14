@@ -48,6 +48,7 @@ macro_rules! build_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
+                error_on_fallback: bool,
             ) -> PyResult<PyObject> {
                 let py = value.py();
                 match value.cast_as::<$cast_as>() {
@@ -59,17 +60,26 @@ macro_rules! build_serializer {
                         _ => Ok(value.into_py(py)),
                     },
                     Err(_) => {
-                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_to_python(value, include, exclude, extra)
+                        extra
+                            .warnings
+                            .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                        fallback_to_python(value, include, exclude, extra, error_on_fallback)
                     }
                 }
             }
 
-            fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+            fn json_key<'py>(
+                &self,
+                key: &'py PyAny,
+                extra: &Extra,
+                error_on_fallback: bool,
+            ) -> PyResult<Cow<'py, str>> {
                 match key.cast_as::<$cast_as>() {
                     Ok(py_value) => Ok(Cow::Owned($convert_func(py_value)?)),
                     Err(_) => {
-                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, key);
+                        extra
+                            .warnings
+                            .on_fallback_py(Self::EXPECTED_TYPE, key, error_on_fallback)?;
                         fallback_json_key(key, extra)
                     }
                 }
@@ -82,6 +92,7 @@ macro_rules! build_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
+                error_on_fallback: bool,
             ) -> Result<S::Ok, S::Error> {
                 match value.cast_as::<$cast_as>() {
                     Ok(py_value) => {
@@ -89,8 +100,10 @@ macro_rules! build_serializer {
                         serializer.serialize_str(&s)
                     }
                     Err(_) => {
-                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_serialize(value, serializer, include, exclude, extra)
+                        extra
+                            .warnings
+                            .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                        fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
                     }
                 }
             }

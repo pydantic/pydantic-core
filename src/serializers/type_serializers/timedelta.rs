@@ -30,24 +30,29 @@ impl TypeSerializer for TimeDeltaSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         match extra.mode {
             SerMode::Json => match value.cast_as::<PyDelta>() {
                 Ok(py_timedelta) => extra.config.timedelta_mode.timedelta_to_json(py_timedelta),
                 Err(_) => {
-                    extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                    fallback_to_python(value, include, exclude, extra)
+                    extra
+                        .warnings
+                        .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                    fallback_to_python(value, include, exclude, extra, error_on_fallback)
                 }
             },
-            _ => fallback_to_python(value, include, exclude, extra),
+            _ => fallback_to_python(value, include, exclude, extra, error_on_fallback),
         }
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra, error_on_fallback: bool) -> PyResult<Cow<'py, str>> {
         match key.cast_as::<PyDelta>() {
             Ok(py_timedelta) => extra.config.timedelta_mode.json_key(py_timedelta),
             Err(_) => {
-                extra.warnings.fallback_slow(Self::EXPECTED_TYPE, key);
+                extra
+                    .warnings
+                    .on_fallback_py(Self::EXPECTED_TYPE, key, error_on_fallback)?;
                 fallback_json_key(key, extra)
             }
         }
@@ -60,6 +65,7 @@ impl TypeSerializer for TimeDeltaSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyDelta>() {
             Ok(py_timedelta) => extra
@@ -67,8 +73,10 @@ impl TypeSerializer for TimeDeltaSerializer {
                 .timedelta_mode
                 .timedelta_serialize(py_timedelta, serializer),
             Err(_) => {
-                extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                fallback_serialize(value, serializer, include, exclude, extra)
+                extra
+                    .warnings
+                    .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
             }
         }
     }

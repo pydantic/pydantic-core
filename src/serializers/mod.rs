@@ -68,7 +68,7 @@ impl SchemaSerializer {
             round_trip,
             &self.config,
         );
-        let v = self.serializer.to_python(value, include, exclude, &extra)?;
+        let v = self.serializer.to_python(value, include, exclude, &extra, false)?;
         extra.warnings.final_check(py)?;
         Ok(v)
     }
@@ -105,6 +105,7 @@ impl SchemaSerializer {
             include,
             exclude,
             &extra,
+            false,
             indent,
             self.json_size,
         )?;

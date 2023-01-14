@@ -33,6 +33,7 @@ macro_rules! build_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
+                error_on_fallback: bool,
             ) -> PyResult<PyObject> {
                 let py = value.py();
                 match value.extract::<$extract>() {
@@ -41,17 +42,26 @@ macro_rules! build_serializer {
                         _ => Ok(value.into_py(py)),
                     },
                     Err(_) => {
-                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_to_python(value, include, exclude, extra)
+                        extra
+                            .warnings
+                            .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                        fallback_to_python(value, include, exclude, extra, error_on_fallback)
                     }
                 }
             }
 
-            fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+            fn json_key<'py>(
+                &self,
+                key: &'py PyAny,
+                extra: &Extra,
+                error_on_fallback: bool,
+            ) -> PyResult<Cow<'py, str>> {
                 match key.extract::<$extract>() {
                     Ok(py_url) => Ok(Cow::Owned(py_url.__str__().to_string())),
                     Err(_) => {
-                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, key);
+                        extra
+                            .warnings
+                            .on_fallback_py(Self::EXPECTED_TYPE, key, error_on_fallback)?;
                         fallback_json_key(key, extra)
                     }
                 }
@@ -64,12 +74,15 @@ macro_rules! build_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
+                error_on_fallback: bool,
             ) -> Result<S::Ok, S::Error> {
                 match value.extract::<$extract>() {
                     Ok(py_url) => serializer.serialize_str(&py_url.__str__()),
                     Err(_) => {
-                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_serialize(value, serializer, include, exclude, extra)
+                        extra
+                            .warnings
+                            .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                        fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
                     }
                 }
             }

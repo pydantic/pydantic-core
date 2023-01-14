@@ -29,14 +29,17 @@ impl TypeSerializer for NoneSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::None) {
             IsType::Exact => Ok(py.None().into_py(py)),
             // I don't think subclasses of None can exist
             _ => {
-                extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                fallback_to_python(value, include, exclude, extra)
+                extra
+                    .warnings
+                    .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                fallback_to_python(value, include, exclude, extra, error_on_fallback)
             }
         }
     }
@@ -48,12 +51,15 @@ impl TypeSerializer for NoneSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match extra.ob_type_lookup.is_type(value, ObType::None) {
             IsType::Exact => serializer.serialize_none(),
             _ => {
-                extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                fallback_serialize(value, serializer, include, exclude, extra)
+                extra
+                    .warnings
+                    .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
             }
         }
     }
@@ -83,6 +89,7 @@ macro_rules! build_simple_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
+                error_on_fallback: bool,
             ) -> PyResult<PyObject> {
                 let py = value.py();
                 match extra.ob_type_lookup.is_type(value, $ob_type) {
@@ -92,11 +99,13 @@ macro_rules! build_simple_serializer {
                             let rust_value = value.extract::<$rust_type>()?;
                             Ok(rust_value.to_object(py))
                         }
-                        _ => fallback_to_python(value, include, exclude, extra),
+                        _ => fallback_to_python(value, include, exclude, extra, error_on_fallback),
                     },
                     IsType::False => {
-                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_to_python(value, include, exclude, extra)
+                        extra
+                            .warnings
+                            .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                        fallback_to_python(value, include, exclude, extra, error_on_fallback)
                     }
                 }
             }
@@ -108,12 +117,15 @@ macro_rules! build_simple_serializer {
                 include: Option<&PyAny>,
                 exclude: Option<&PyAny>,
                 extra: &Extra,
+                error_on_fallback: bool,
             ) -> Result<S::Ok, S::Error> {
                 match value.extract::<$rust_type>() {
                     Ok(v) => v.serialize(serializer),
                     Err(_) => {
-                        extra.warnings.fallback_slow(Self::EXPECTED_TYPE, value);
-                        fallback_serialize(value, serializer, include, exclude, extra)
+                        extra
+                            .warnings
+                            .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                        fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
                     }
                 }
             }

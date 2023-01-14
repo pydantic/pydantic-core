@@ -1,11 +1,12 @@
 use std::cell::RefCell;
 use std::fmt::Debug;
 
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::{intern, AsPyPointer};
 
 use nohash_hasher::IntSet;
+use serde::ser::Error;
 
 use crate::build_tools::py_err;
 
@@ -149,22 +150,35 @@ impl CollectWarnings {
         }
     }
 
-    pub(crate) fn fallback_slow(&self, field_type: &str, value: &PyAny) {
-        if self.active {
-            self.fallback(field_type, value, "slight slowdown possible");
+    pub(crate) fn on_fallback_py(&self, field_type: &str, value: &PyAny, error_on_fallback: bool) -> PyResult<()> {
+        if error_on_fallback {
+            py_err!(PyTypeError; "Unexpected value")
+        } else {
+            self.fallback_warning(field_type, value);
+            Ok(())
         }
     }
 
-    pub(crate) fn fallback_filtering(&self, field_type: &str, value: &PyAny) {
-        if self.active {
-            self.fallback(field_type, value, "filtering via include/exclude unavailable");
+    pub(crate) fn on_fallback_ser<S: serde::ser::Serializer>(
+        &self,
+        field_type: &str,
+        value: &PyAny,
+        error_on_fallback: bool,
+    ) -> Result<(), S::Error> {
+        if error_on_fallback {
+            Err(S::Error::custom("Unexpected value"))
+        } else {
+            self.fallback_warning(field_type, value);
+            Ok(())
         }
     }
 
-    fn fallback(&self, field_type: &str, value: &PyAny, reason: &str) {
+    fn fallback_warning(&self, field_type: &str, value: &PyAny) {
         if self.active {
             let type_name = value.get_type().name().unwrap_or("<unknown python object>");
-            self.add_warning(format!("Expected `{field_type}` but got `{type_name}` - {reason}"));
+            self.add_warning(format!(
+                "Expected `{field_type}` but got `{type_name}` - serialized value may not be as expected"
+            ));
         }
     }
 

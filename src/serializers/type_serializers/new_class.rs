@@ -35,9 +35,11 @@ impl TypeSerializer for NewClassSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         let dict = object_to_dict(value, true, extra)?;
-        self.serializer.to_python(dict, include, exclude, extra)
+        self.serializer
+            .to_python(dict, include, exclude, extra, error_on_fallback)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -47,10 +49,11 @@ impl TypeSerializer for NewClassSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         let dict = object_to_dict(value, true, extra).map_err(py_err_se_err)?;
         self.serializer
-            .serde_serialize(dict, serializer, include, exclude, extra)
+            .serde_serialize(dict, serializer, include, exclude, extra, error_on_fallback)
     }
 }
 

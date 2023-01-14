@@ -139,6 +139,7 @@ impl TypeSerializer for TypedDictSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         let py = value.py();
         match value.cast_as::<PyDict>() {
@@ -156,14 +157,20 @@ impl TypeSerializer for TypedDictSerializer {
                                 if self.exclude_default(value, extra, field)? {
                                     continue;
                                 }
-                                let value = field.serializer.to_python(value, next_include, next_exclude, extra)?;
+                                let value = field.serializer.to_python(
+                                    value,
+                                    next_include,
+                                    next_exclude,
+                                    extra,
+                                    error_on_fallback,
+                                )?;
                                 let output_key = field.get_key_py(py, extra);
                                 new_dict.set_item(output_key, value)?;
                                 continue;
                             }
                         }
                         if self.include_extra {
-                            let value = fallback_to_python(value, include, exclude, extra)?;
+                            let value = fallback_to_python(value, include, exclude, extra, error_on_fallback)?;
                             new_dict.set_item(key, value)?;
                         }
                     }
@@ -171,8 +178,10 @@ impl TypeSerializer for TypedDictSerializer {
                 Ok(new_dict.into_py(py))
             }
             Err(_) => {
-                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                fallback_to_python(value, include, exclude, extra)
+                extra
+                    .warnings
+                    .on_fallback_py(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                fallback_to_python(value, include, exclude, extra, error_on_fallback)
             }
         }
     }
@@ -184,6 +193,7 @@ impl TypeSerializer for TypedDictSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         match value.cast_as::<PyDict>() {
             Ok(py_dict) => {
@@ -214,13 +224,14 @@ impl TypeSerializer for TypedDictSerializer {
                                     next_include,
                                     next_exclude,
                                     extra,
+                                    error_on_fallback,
                                 );
                                 map.serialize_entry(&output_key, &s)?;
                                 continue;
                             }
                         }
                         if self.include_extra {
-                            let s = SerializeInfer::new(value, include, exclude, extra);
+                            let s = SerializeInfer::new(value, include, exclude, extra, error_on_fallback);
                             let output_key = fallback_json_key(key, extra).map_err(py_err_se_err)?;
                             map.serialize_entry(&output_key, &s)?
                         }
@@ -229,8 +240,10 @@ impl TypeSerializer for TypedDictSerializer {
                 map.end()
             }
             Err(_) => {
-                extra.warnings.fallback_filtering(Self::EXPECTED_TYPE, value);
-                fallback_serialize(value, serializer, include, exclude, extra)
+                extra
+                    .warnings
+                    .on_fallback_ser::<S>(Self::EXPECTED_TYPE, value, error_on_fallback)?;
+                fallback_serialize(value, serializer, include, exclude, extra, error_on_fallback)
             }
         }
     }

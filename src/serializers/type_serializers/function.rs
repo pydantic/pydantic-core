@@ -70,6 +70,7 @@ impl TypeSerializer for FunctionSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> PyResult<PyObject> {
         let py = value.py();
         let v = self
@@ -77,13 +78,13 @@ impl TypeSerializer for FunctionSerializer {
             .map_err(PydanticSerializationError::new_err)?;
 
         if let Some(ref ob_type) = self.return_ob_type {
-            fallback_to_python_known(ob_type, v.as_ref(py), include, exclude, extra)
+            fallback_to_python_known(ob_type, v.as_ref(py), include, exclude, extra, error_on_fallback)
         } else {
-            fallback_to_python(v.as_ref(py), include, exclude, extra)
+            fallback_to_python(v.as_ref(py), include, exclude, extra, error_on_fallback)
         }
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra, _error_on_fallback: bool) -> PyResult<Cow<'py, str>> {
         let v = self
             .call(key, None, None, extra.mode)
             .map_err(PydanticSerializationError::new_err)?;
@@ -98,14 +99,30 @@ impl TypeSerializer for FunctionSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
+        error_on_fallback: bool,
     ) -> Result<S::Ok, S::Error> {
         let py = value.py();
         let return_value = self.call(value, include, exclude, extra.mode).map_err(Error::custom)?;
 
         if let Some(ref ob_type) = self.return_ob_type {
-            fallback_serialize_known(ob_type, return_value.as_ref(py), serializer, include, exclude, extra)
+            fallback_serialize_known(
+                ob_type,
+                return_value.as_ref(py),
+                serializer,
+                include,
+                exclude,
+                extra,
+                error_on_fallback,
+            )
         } else {
-            fallback_serialize(return_value.as_ref(py), serializer, include, exclude, extra)
+            fallback_serialize(
+                return_value.as_ref(py),
+                serializer,
+                include,
+                exclude,
+                extra,
+                error_on_fallback,
+            )
         }
     }
 }
