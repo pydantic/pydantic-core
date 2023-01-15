@@ -7,7 +7,9 @@ use serde::ser::Serializer;
 
 use crate::build_context::BuildContext;
 
-use super::{infer_json_key, infer_serialize, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{
+    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, TypeSerializer,
+};
 
 #[derive(Debug, Clone)]
 pub struct AnySerializer;
@@ -25,6 +27,16 @@ impl BuildSerializer for AnySerializer {
 }
 
 impl TypeSerializer for AnySerializer {
+    fn to_python(
+        &self,
+        value: &PyAny,
+        include: Option<&PyAny>,
+        exclude: Option<&PyAny>,
+        extra: &Extra,
+    ) -> PyResult<PyObject> {
+        infer_to_python(value, include, exclude, extra)
+    }
+
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
         infer_json_key(key, extra)
     }
