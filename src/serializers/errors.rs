@@ -1,13 +1,19 @@
-use pyo3::exceptions::PyValueError;
-use pyo3::prelude::*;
 use std::fmt;
 
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+
+use serde::ser;
+
+/// `UNEXPECTED_TYPE_SER` is a special prefix to denote a `PydanticSerializationUnexpectedValue` error.
 pub(super) static UNEXPECTED_TYPE_SER: &str = "__PydanticSerializationUnexpectedValue__";
 
-pub(super) fn py_err_se_err<T: serde::ser::Error, E: fmt::Display>(py_error: E) -> T {
+// convert a `PyErr` or `PyDowncastError` into a serde serialization error
+pub(super) fn py_err_se_err<T: ser::Error, E: fmt::Display>(py_error: E) -> T {
     T::custom(py_error.to_string())
 }
 
+/// convert a serde serialization error into a `PyErr`
 pub(super) fn se_err_py_err(error: serde_json::Error) -> PyErr {
     let s = error.to_string();
     return if s.starts_with(UNEXPECTED_TYPE_SER) {

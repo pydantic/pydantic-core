@@ -11,7 +11,7 @@ use serde::ser::Error;
 use crate::build_tools::py_err;
 
 use super::config::SerializationConfig;
-use super::errors::PydanticSerializationUnexpectedValue;
+use super::errors::{PydanticSerializationUnexpectedValue, UNEXPECTED_TYPE_SER};
 use super::ob_type::ObTypeLookup;
 use super::shared::CombinedSerializer;
 
@@ -189,7 +189,10 @@ impl CollectWarnings {
         error_on_fallback: bool,
     ) -> Result<(), S::Error> {
         if error_on_fallback {
-            Err(S::Error::custom("Unexpected value"))
+            // note: I think this should never actually happen since we use `to_python(..., mode='json')` during
+            // JSON serialisation to "try" union branches, but it's here for completeness/correctness
+            // in particular, in future we could allow errors instead of warnings on fallback
+            Err(S::Error::custom(UNEXPECTED_TYPE_SER))
         } else {
             self.fallback_warning(field_type, value);
             Ok(())

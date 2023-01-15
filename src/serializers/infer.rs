@@ -48,6 +48,7 @@ pub(crate) fn infer_to_python_known(
     };
 
     // have to do this to make sure subclasses of for example str are upcast to `str`
+    // TODO we could make this significantly faster if we added sub-types to the ObType enum as separate members
     macro_rules! extract_as {
         ($t:ty) => {
             value.extract::<$t>()?.into_py(py)
@@ -98,10 +99,9 @@ pub(crate) fn infer_to_python_known(
 
     let value = match extra.mode {
         SerMode::Json => match ob_type {
-            ObType::None => value.into_py(py),
-            ObType::Bool => extract_as!(bool),
-            ObType::Int => extract_as!(i64),
             // `bool` and `None` can't be subclasses, so no need to do the same on bool
+            ObType::None | ObType::Bool => value.into_py(py),
+            ObType::Int => extract_as!(i64),
             ObType::Float => extract_as!(f64),
             ObType::Str => extract_as!(&str),
             ObType::Bytes => extra
