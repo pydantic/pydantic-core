@@ -47,14 +47,6 @@ pub(crate) fn infer_to_python_known(
         }
     };
 
-    // have to do this to make sure subclasses of for example str are upcast to `str`
-    // TODO we could make this significantly faster if we added sub-types to the ObType enum as separate members
-    macro_rules! extract_as {
-        ($t:ty) => {
-            value.extract::<$t>()?.into_py(py)
-        };
-    }
-
     macro_rules! serialize_seq {
         ($t:ty) => {
             value
@@ -99,11 +91,12 @@ pub(crate) fn infer_to_python_known(
 
     let value = match extra.mode {
         SerMode::Json => match ob_type {
-            // `bool` and `None` can't be subclasses, so no need to do the same on bool
-            ObType::None | ObType::Bool => value.into_py(py),
-            ObType::Int => extract_as!(i64),
-            ObType::Float => extract_as!(f64),
-            ObType::Str => extract_as!(&str),
+            // `bool` and `None` can't be subclasses, `ObType::Int`, `ObType::Float`, `ObType::Str` refer to exact types
+            ObType::None | ObType::Bool | ObType::Int | ObType::Float | ObType::Str => value.into_py(py),
+            // have to do this to make sure subclasses of for example str are upcast to `str`
+            ObType::IntSubclass => value.extract::<i64>()?.into_py(py),
+            ObType::FloatSubclass => value.extract::<f64>()?.into_py(py),
+            ObType::StrSubclass => value.extract::<&str>()?.into_py(py),
             ObType::Bytes => extra
                 .config
                 .bytes_mode
@@ -320,10 +313,10 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
 
     let ser_result = match ob_type {
         ObType::None => serializer.serialize_none(),
-        ObType::Int => serialize!(i64),
+        ObType::Int | ObType::IntSubclass => serialize!(i64),
         ObType::Bool => serialize!(bool),
-        ObType::Float => serialize!(f64),
-        ObType::Str => {
+        ObType::Float | ObType::FloatSubclass => serialize!(f64),
+        ObType::Str | ObType::StrSubclass => {
             let py_str: &PyString = value.cast_as().map_err(py_err_se_err)?;
             super::type_serializers::string::serialize_py_str(py_str, serializer)
         }
@@ -394,7 +387,7 @@ pub(crate) fn infer_json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Co
 pub(crate) fn infer_json_key_known<'py>(key: &'py PyAny, ob_type: ObType, extra: &Extra) -> PyResult<Cow<'py, str>> {
     match ob_type {
         ObType::None => Ok(Cow::Borrowed("None")),
-        ObType::Int | ObType::Float => Ok(key.str()?.to_string_lossy()),
+        ObType::Int | ObType::IntSubclass | ObType::Float | ObType::FloatSubclass => Ok(key.str()?.to_string_lossy()),
         ObType::Bool => {
             let v = if key.is_true().unwrap_or(false) {
                 "true"
@@ -403,7 +396,7 @@ pub(crate) fn infer_json_key_known<'py>(key: &'py PyAny, ob_type: ObType, extra:
             };
             Ok(Cow::Borrowed(v))
         }
-        ObType::Str => {
+        ObType::Str | ObType::StrSubclass => {
             let py_str: &PyString = key.cast_as()?;
             Ok(Cow::Borrowed(py_str.to_str()?))
         }
