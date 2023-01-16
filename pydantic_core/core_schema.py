@@ -88,9 +88,32 @@ class FunctionSerSchema(TypedDict, total=False):
     return_type: ExpectedSerializationTypes
 
 
+def function_ser_schema(
+    function: SerializeFunction, return_type: ExpectedSerializationTypes | None = None
+) -> FunctionSerSchema:
+    """
+    Returns a schema for serialization with a function.
+
+    Args:
+        function: The function to use for serialization
+        return_type: The type that the function returns
+    """
+    return dict_not_none(type='function', function=function, return_type=return_type)
+
+
 class FormatSerSchema(TypedDict, total=False):
     type: Required[Literal['format']]
     formatting_string: Required[str]
+
+
+def format_ser_schema(formatting_string: str) -> FormatSerSchema:
+    """
+    Returns a schema for serialization using python's `format` method.
+
+    Args:
+        formatting_string: String defining the format to use
+    """
+    return FormatSerSchema(type='format', formatting_string=formatting_string)
 
 
 class NewClassSerSchema(TypedDict, total=False):

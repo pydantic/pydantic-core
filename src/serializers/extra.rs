@@ -173,7 +173,13 @@ impl CollectWarnings {
         }
     }
 
-    pub(crate) fn on_fallback_py(&self, field_type: &str, value: &PyAny, error_on_fallback: bool) -> PyResult<()> {
+    pub fn custom_warning(&self, warning: String) {
+        if self.active {
+            self.add_warning(warning);
+        }
+    }
+
+    pub fn on_fallback_py(&self, field_type: &str, value: &PyAny, error_on_fallback: bool) -> PyResult<()> {
         if error_on_fallback {
             Err(PydanticSerializationUnexpectedValue::new_err(None))
         } else {
@@ -182,7 +188,7 @@ impl CollectWarnings {
         }
     }
 
-    pub(crate) fn on_fallback_ser<S: serde::ser::Serializer>(
+    pub fn on_fallback_ser<S: serde::ser::Serializer>(
         &self,
         field_type: &str,
         value: &PyAny,
@@ -217,7 +223,7 @@ impl CollectWarnings {
         }
     }
 
-    pub(crate) fn final_check(&self, py: Python) -> PyResult<()> {
+    pub fn final_check(&self, py: Python) -> PyResult<()> {
         if self.active {
             match *self.warnings.borrow() {
                 Some(ref warnings) => {

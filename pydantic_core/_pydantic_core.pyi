@@ -149,6 +149,9 @@ class PydanticOmit(Exception):
 class PydanticSerializationError(ValueError):
     def __init__(self, message: str) -> None: ...
 
+class PydanticSerializationUnexpectedValue(ValueError):
+    def __init__(self, message: 'str | None' = None) -> None: ...
+
 class ErrorTypeInfo(TypedDict):
     type: ErrorType
     message_template: str

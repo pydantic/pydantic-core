@@ -288,8 +288,8 @@ def test_tuple_var_dict_key():
         assert s.to_python({'xx': 1}) == {'xx': 1}
 
     assert s.to_python({(1, 2): 1}) == {(1, 2): 1}
-    assert s.to_python({(1, 2): 1}, mode='json') == {'(1,2)': 1}
-    assert s.to_json({(1, 2): 1}) == b'{"(1,2)":1}'
+    assert s.to_python({(1, 2): 1}, mode='json') == {'1,2': 1}
+    assert s.to_json({(1, 2): 1}) == b'{"1,2":1}'
 
 
 def test_tuple_pos_dict_key():
@@ -303,7 +303,7 @@ def test_tuple_pos_dict_key():
     )
     assert s.to_python({(1, 'a'): 1}) == {(1, 'a'): 1}
     assert s.to_python({(1, 'a', 2): 1}) == {(1, 'a', 2): 1}
-    assert s.to_python({(1, 'a'): 1}, mode='json') == {'(1,a)': 1}
-    assert s.to_python({(1, 'a', 2): 1}, mode='json') == {'(1,a,2)': 1}
-    assert s.to_json({(1, 'a'): 1}) == b'{"(1,a)":1}'
-    assert s.to_json({(1, 'a', 2): 1}) == b'{"(1,a,2)":1}'
+    assert s.to_python({(1, 'a'): 1}, mode='json') == {'1,a': 1}
+    assert s.to_python({(1, 'a', 2): 1}, mode='json') == {'1,a,2': 1}
+    assert s.to_json({(1, 'a'): 1}) == b'{"1,a":1}'
+    assert s.to_json({(1, 'a', 2): 1}) == b'{"1,a,2":1}'

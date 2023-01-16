@@ -3,22 +3,22 @@ import re
 
 import pytest
 
-from pydantic_core import SchemaSerializer, core_schema
+from pydantic_core import PydanticSerializationUnexpectedValue, SchemaSerializer, core_schema
 
 
 @pytest.mark.parametrize('input_value,expected_value', [(True, True), (False, False), (1, 1), (123, 123), (-42, -42)])
 def test_union_bool_int(input_value, expected_value):
-    v = SchemaSerializer(core_schema.union_schema(core_schema.bool_schema(), core_schema.int_schema()))
-    assert v.to_python(input_value) == expected_value
-    assert v.to_python(input_value, mode='json') == expected_value
-    assert v.to_json(input_value) == json.dumps(expected_value).encode()
+    s = SchemaSerializer(core_schema.union_schema(core_schema.bool_schema(), core_schema.int_schema()))
+    assert s.to_python(input_value) == expected_value
+    assert s.to_python(input_value, mode='json') == expected_value
+    assert s.to_json(input_value) == json.dumps(expected_value).encode()
 
 
 def test_union_error():
-    v = SchemaSerializer(core_schema.union_schema(core_schema.bool_schema(), core_schema.int_schema()))
+    s = SchemaSerializer(core_schema.union_schema(core_schema.bool_schema(), core_schema.int_schema()))
     msg = 'Expected `Union[bool, int]` but got `str` - serialized value may not be as expected'
     with pytest.warns(UserWarning, match=re.escape(msg)):
-        assert v.to_python('a string') == 'a string'
+        assert s.to_python('a string') == 'a string'
 
 
 class ModelA:
@@ -101,15 +101,35 @@ def test_model_b(model_serializer: SchemaSerializer, input_value):
 
 
 def test_keys():
-    v = SchemaSerializer(
+    s = SchemaSerializer(
         core_schema.dict_schema(
             core_schema.union_schema(
-                core_schema.int_schema(),
-                core_schema.float_schema(serialization={'type': 'format', 'formatting_string': '0.0f'}),
+                core_schema.int_schema(), core_schema.float_schema(serialization=core_schema.format_ser_schema('0.0f'))
             ),
             core_schema.int_schema(),
         )
     )
-    assert v.to_python({1: 2, 2.111: 3}) == {1: 2, '2': 3}
-    assert v.to_python({1: 2, 2.111: 3}, mode='json') == {'1': 2, '2': 3}
-    assert v.to_json({1: 2, 2.111: 3}) == b'{"1":2,"2":3}'
+    assert s.to_python({1: 2, 2.111: 3}) == {1: 2, '2': 3}
+    assert s.to_python({1: 2, 2.111: 3}, mode='json') == {'1': 2, '2': 3}
+    assert s.to_json({1: 2, 2.111: 3}) == b'{"1":2,"2":3}'
+
+
+def test_union_of_functions():
+    def repr_function(value, **kwargs):
+        if value == 'unexpected':
+            raise PydanticSerializationUnexpectedValue()
+        return f'func: {value!r}'
+
+    s = SchemaSerializer(
+        core_schema.union_schema(
+            core_schema.any_schema(serialization=core_schema.function_ser_schema(repr_function)),
+            core_schema.float_schema(serialization=core_schema.format_ser_schema('_^14')),
+        )
+    )
+    assert s.to_python('foobar') == "func: 'foobar'"
+    assert s.to_python('foobar', mode='json') == "func: 'foobar'"
+    assert s.to_json('foobar') == b'"func: \'foobar\'"'
+
+    assert s.to_python('unexpected') == '__unexpected__'
+    assert s.to_python('unexpected', mode='json') == '__unexpected__'
+    assert s.to_json('unexpected') == b'"__unexpected__"'

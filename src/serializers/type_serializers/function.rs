@@ -11,15 +11,16 @@ use crate::build_context::BuildContext;
 use crate::build_tools::{function_name, kwargs, py_error_type, SchemaDict};
 use crate::PydanticSerializationUnexpectedValue;
 
-use super::super::errors::UNEXPECTED_TYPE_SER;
 use super::{
-    infer_json_key, infer_serialize, infer_serialize_known, infer_to_python, infer_to_python_known, BuildSerializer,
-    CombinedSerializer, Extra, ObType, PydanticSerializationError, SerMode, TypeSerializer,
+    infer_json_key, infer_json_key_known, infer_serialize, infer_serialize_known, infer_to_python,
+    infer_to_python_known, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ObType,
+    PydanticSerializationError, TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
 pub struct FunctionSerializer {
     func: PyObject,
+    name: String,
     function_name: String,
     return_ob_type: Option<ObType>,
 }
@@ -36,9 +37,11 @@ impl BuildSerializer for FunctionSerializer {
         let py = schema.py();
         let function = schema.get_as_req::<&PyAny>(intern!(py, "function"))?;
         let function_name = function_name(function)?;
+        let name = format!("function[{}]", function_name);
         Ok(Self {
             func: function.into_py(py),
             function_name,
+            name,
             return_ob_type: match schema.get_as::<&str>(intern!(py, "return_type"))? {
                 Some(t) => Some(ObType::from_str(t).map_err(|_| py_error_type!("Unknown return type {:?}", t))?),
                 None => None,
@@ -54,17 +57,11 @@ impl FunctionSerializer {
         value: &PyAny,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
-        mode: &SerMode,
-    ) -> Result<PyObject, String> {
+        extra: &Extra,
+    ) -> PyResult<PyObject> {
         let py = value.py();
-        let kwargs = kwargs!(py, mode: mode.to_object(py), include: include, exclude: exclude);
-        self.func.call(py, (value,), kwargs).map_err(|err| {
-            if err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
-                format!("{}{}", UNEXPECTED_TYPE_SER, err)
-            } else {
-                format!("Error calling `{}`: {}", self.function_name, err)
-            }
-        })
+        let kwargs = kwargs!(py, mode: extra.mode.to_object(py), include: include, exclude: exclude);
+        self.func.call(py, (value,), kwargs)
     }
 }
 
@@ -77,23 +74,58 @@ impl TypeSerializer for FunctionSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        let v = self
-            .call(value, include, exclude, extra.mode)
-            .map_err(PydanticSerializationError::new_err)?;
-
-        if let Some(ref ob_type) = self.return_ob_type {
-            infer_to_python_known(ob_type, v.as_ref(py), include, exclude, extra)
-        } else {
-            infer_to_python(v.as_ref(py), include, exclude, extra)
+        match self.call(value, include, exclude, extra) {
+            Ok(v) => {
+                let next_value = v.as_ref(py);
+                match self.return_ob_type {
+                    Some(ref ob_type) => infer_to_python_known(ob_type, next_value, include, exclude, extra),
+                    None => infer_to_python(next_value, include, exclude, extra),
+                }
+            }
+            Err(err) => match err.value(py).extract::<PydanticSerializationUnexpectedValue>() {
+                Ok(ser_err) => {
+                    if extra.error_on_fallback {
+                        Err(err)
+                    } else {
+                        extra.warnings.custom_warning(ser_err.__repr__());
+                        infer_to_python(value, include, exclude, extra)
+                    }
+                }
+                Err(_) => {
+                    let new_err = py_error_type!(PydanticSerializationError; "Error calling function `{}`: {}", self.function_name, err);
+                    new_err.set_cause(py, Some(err));
+                    Err(new_err)
+                }
+            },
         }
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
-        let v = self
-            .call(key, None, None, extra.mode)
-            .map_err(PydanticSerializationError::new_err)?;
-
-        infer_json_key(v.into_ref(key.py()), extra)
+        let py = key.py();
+        match self.call(key, None, None, extra) {
+            Ok(v) => {
+                let next_key = v.into_ref(py);
+                match self.return_ob_type {
+                    Some(ref ob_type) => infer_json_key_known(ob_type, next_key, extra),
+                    None => infer_json_key(next_key, extra),
+                }
+            }
+            Err(err) => match err.value(py).extract::<PydanticSerializationUnexpectedValue>() {
+                Ok(ser_err) => {
+                    if extra.error_on_fallback {
+                        Err(err)
+                    } else {
+                        extra.warnings.custom_warning(ser_err.__repr__());
+                        infer_json_key(key, extra)
+                    }
+                }
+                Err(_) => {
+                    let new_err = py_error_type!(PydanticSerializationError; "Error calling function `{}`: {}", self.function_name, err);
+                    new_err.set_cause(py, Some(err));
+                    Err(new_err)
+                }
+            },
+        }
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -105,16 +137,34 @@ impl TypeSerializer for FunctionSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let py = value.py();
-        let return_value = self.call(value, include, exclude, extra.mode).map_err(Error::custom)?;
-
-        if let Some(ref ob_type) = self.return_ob_type {
-            infer_serialize_known(ob_type, return_value.as_ref(py), serializer, include, exclude, extra)
-        } else {
-            infer_serialize(return_value.as_ref(py), serializer, include, exclude, extra)
+        match self.call(value, include, exclude, extra) {
+            Ok(v) => {
+                let next_value = v.as_ref(py);
+                match self.return_ob_type {
+                    Some(ref ob_type) => {
+                        infer_serialize_known(ob_type, next_value, serializer, include, exclude, extra)
+                    }
+                    None => infer_serialize(next_value, serializer, include, exclude, extra),
+                }
+            }
+            Err(err) => match err.value(py).extract::<PydanticSerializationUnexpectedValue>() {
+                Ok(ser_err) => {
+                    if extra.error_on_fallback {
+                        Err(py_err_se_err(err))
+                    } else {
+                        extra.warnings.custom_warning(ser_err.__repr__());
+                        infer_serialize(value, serializer, include, exclude, extra)
+                    }
+                }
+                Err(_) => Err(Error::custom(format!(
+                    "Error calling function `{}`: {}",
+                    self.function_name, err
+                ))),
+            },
         }
     }
 
     fn get_name(&self) -> &str {
-        Self::EXPECTED_TYPE
+        &self.name
     }
 }

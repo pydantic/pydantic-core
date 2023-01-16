@@ -49,7 +49,7 @@ impl TypeSerializer for NoneSerializer {
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
         match extra.ob_type_lookup.is_type(key, ObType::None) {
-            IsType::Exact => infer_json_key_known(key, ObType::None, extra),
+            IsType::Exact => infer_json_key_known(&ObType::None, key, extra),
             _ => {
                 extra
                     .warnings
@@ -129,7 +129,7 @@ macro_rules! build_simple_serializer {
 
             fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
                 match extra.ob_type_lookup.is_type(key, $ob_type) {
-                    IsType::Exact | IsType::Subclass => infer_json_key_known(key, $ob_type, extra),
+                    IsType::Exact | IsType::Subclass => infer_json_key_known(&$ob_type, key, extra),
                     IsType::False => {
                         extra
                             .warnings

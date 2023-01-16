@@ -75,7 +75,7 @@ impl TypeSerializer for NewClassSerializer {
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
         if self.allow_value(key, extra)? {
-            infer_json_key_known(key, ObType::PydanticModel, extra)
+            infer_json_key_known(&ObType::PydanticModel, key, extra)
         } else {
             extra
                 .warnings

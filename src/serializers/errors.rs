@@ -16,17 +16,16 @@ pub(super) fn py_err_se_err<T: ser::Error, E: fmt::Display>(py_error: E) -> T {
 /// convert a serde serialization error into a `PyErr`
 pub(super) fn se_err_py_err(error: serde_json::Error) -> PyErr {
     let s = error.to_string();
-    return if s.starts_with(UNEXPECTED_TYPE_SER) {
-        if s.len() == UNEXPECTED_TYPE_SER.len() {
+    if let Some(msg) = s.strip_prefix(UNEXPECTED_TYPE_SER) {
+        if msg.is_empty() {
             PydanticSerializationUnexpectedValue::new_err(None)
         } else {
-            let msg = s[s.len()..].to_string();
-            PydanticSerializationUnexpectedValue::new_err(Some(msg))
+            PydanticSerializationUnexpectedValue::new_err(Some(msg.to_string()))
         }
     } else {
         let msg = format!("Error serializing to JSON: {s}");
         PydanticSerializationError::new_err(msg)
-    };
+    }
 }
 
 #[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
@@ -52,7 +51,7 @@ impl PydanticSerializationError {
         &self.message
     }
 
-    fn __repr__(&self) -> String {
+    pub fn __repr__(&self) -> String {
         format!("PydanticSerializationError({})", self.message)
     }
 }
@@ -83,7 +82,7 @@ impl PydanticSerializationUnexpectedValue {
         }
     }
 
-    fn __repr__(&self) -> String {
+    pub(crate) fn __repr__(&self) -> String {
         format!("PydanticSerializationUnexpectedValue({})", self.__str__())
     }
 }

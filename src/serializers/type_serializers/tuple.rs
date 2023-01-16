@@ -342,9 +342,10 @@ pub(crate) struct KeyBuilder {
 
 impl KeyBuilder {
     pub fn new() -> Self {
-        let mut key = String::with_capacity(31);
-        key.push('(');
-        Self { key, first: true }
+        Self {
+            key: String::with_capacity(31),
+            first: true,
+        }
     }
 
     pub fn push(&mut self, key: &str) {
@@ -357,8 +358,6 @@ impl KeyBuilder {
     }
 
     pub fn finish(self) -> String {
-        let mut key = self.key;
-        key.push(')');
-        key
+        self.key
     }
 }
