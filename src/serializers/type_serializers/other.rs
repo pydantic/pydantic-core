@@ -56,7 +56,7 @@ impl BuildSerializer for FunctionBuilder {
 pub struct CustomErrorBuilder;
 
 impl BuildSerializer for CustomErrorBuilder {
-    const EXPECTED_TYPE: &'static str = "custom_error";
+    const EXPECTED_TYPE: &'static str = "custom-error";
 
     fn build(
         schema: &PyDict,
@@ -65,5 +65,19 @@ impl BuildSerializer for CustomErrorBuilder {
     ) -> PyResult<CombinedSerializer> {
         let sub_schema: &PyDict = schema.get_as_req(intern!(schema.py(), "schema"))?;
         CombinedSerializer::build(sub_schema, config, build_context)
+    }
+}
+
+pub struct IsInstanceBuilder;
+
+impl BuildSerializer for IsInstanceBuilder {
+    const EXPECTED_TYPE: &'static str = "is-instance";
+
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
+        AnySerializer::build(schema, config, build_context)
     }
 }

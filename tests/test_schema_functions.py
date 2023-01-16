@@ -204,7 +204,7 @@ def args(*args, **kwargs):
             core_schema.custom_error_schema,
             args(core_schema.int_schema(), 'foobar', custom_error_message='Hello'),
             {
-                'type': 'custom_error',
+                'type': 'custom-error',
                 'schema': {'type': 'int'},
                 'custom_error_type': 'foobar',
                 'custom_error_message': 'Hello',

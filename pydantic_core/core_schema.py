@@ -2137,7 +2137,7 @@ def recursive_reference_schema(schema_ref: str) -> RecursiveReferenceSchema:
 
 
 class CustomErrorSchema(TypedDict, total=False):
-    type: Required[Literal['custom_error']]
+    type: Required[Literal['custom-error']]
     schema: Required[CoreSchema]
     custom_error_type: Required[str]
     custom_error_message: str
@@ -2179,7 +2179,7 @@ def custom_error_schema(
         serialization: Custom serialization schema
     """
     return dict_not_none(
-        type='custom_error',
+        type='custom-error',
         schema=schema,
         custom_error_type=custom_error_type,
         custom_error_message=custom_error_message,

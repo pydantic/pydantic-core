@@ -48,21 +48,21 @@ macro_rules! combined_serializer {
                 schema: &PyDict,
                 config: Option<&PyDict>,
                 build_context: &mut BuildContext<CombinedSerializer>
-            ) -> PyResult<Option<CombinedSerializer>> {
+            ) -> PyResult<CombinedSerializer> {
                 match lookup_type {
                     $(
                         <$b_serializer>::EXPECTED_TYPE => match <$b_serializer>::build(schema, config, build_context) {
-                            Ok(serializer) => Ok(Some(serializer)),
+                            Ok(serializer) => Ok(serializer),
                             Err(err) => py_err!("Error building `{}` serializer:\n  {}", lookup_type, err),
                         },
                     )*
                     $(
                         <$builder>::EXPECTED_TYPE => match <$builder>::build(schema, config, build_context) {
-                            Ok(serializer) => Ok(Some(serializer)),
+                            Ok(serializer) => Ok(serializer),
                             Err(err) => py_err!("Error building `{}` serializer:\n  {}", lookup_type, err),
                         },
                     )*
-                    _ => Ok(None),
+                    _ => py_err!("Unknown serialization schema type: `{}`", lookup_type),
                 }
             }
         }
@@ -89,6 +89,7 @@ combined_serializer! {
         super::type_serializers::other::ChainBuilder;
         super::type_serializers::other::FunctionBuilder;
         super::type_serializers::other::CustomErrorBuilder;
+        super::type_serializers::other::IsInstanceBuilder;
         super::type_serializers::literal::LiteralBuildSerializer;
     }
     // `both` means the struct is added to both the `CombinedSerializer` enum and the match statement in
@@ -152,10 +153,7 @@ impl CombinedSerializer {
                 Some(ser_type) => {
                     // otherwise if `schema.serialization.type` is defined, use that with `find_serializer`
                     // instead of `schema.type`. In this case it's an error if a serializer isn't found.
-                    return match Self::find_serializer(ser_type, ser_schema, config, build_context)? {
-                        Some(serializer) => Ok(serializer),
-                        None => py_err!("Unknown serialization schema type: `{}`", ser_type),
-                    };
+                    return Self::find_serializer(ser_type, ser_schema, config, build_context);
                 }
                 // if `schema.serialization.type` is None, fall back to `schema.type`
                 None => (),
@@ -163,10 +161,7 @@ impl CombinedSerializer {
         }
 
         let type_: &str = schema.get_as_req(type_key)?;
-        match Self::find_serializer(type_, schema, config, build_context)? {
-            Some(serializer) => Ok(serializer),
-            None => super::type_serializers::any::AnySerializer::build(schema, config, build_context),
-        }
+        Self::find_serializer(type_, schema, config, build_context)
     }
 }
 
