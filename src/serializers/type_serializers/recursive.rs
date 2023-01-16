@@ -1,12 +1,11 @@
 use std::borrow::Cow;
 
-use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_context::BuildContext;
-use crate::build_tools::{py_err, SchemaDict};
+use crate::build_tools::SchemaDict;
 
 use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
@@ -50,8 +49,8 @@ impl TypeSerializer for RecursiveRefSerializer {
         r
     }
 
-    fn json_key<'py>(&self, _key: &'py PyAny, _extra: &Extra) -> PyResult<Cow<'py, str>> {
-        py_err!(PyTypeError; "`{}` not valid as object key", Self::EXPECTED_TYPE)
+    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+        self._invalid_as_json_key(key, extra, Self::EXPECTED_TYPE)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(

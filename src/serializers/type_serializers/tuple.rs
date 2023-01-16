@@ -101,19 +101,11 @@ impl TypeSerializer for TupleVariableSerializer {
             Ok(py_tuple) => {
                 let item_serializer = self.item_serializer.as_ref();
 
-                let mut s = String::with_capacity(31);
-                s.push('(');
-                let mut first = true;
+                let mut key_builder = KeyBuilder::new();
                 for element in py_tuple.iter() {
-                    if first {
-                        first = false;
-                    } else {
-                        s.push_str(", ");
-                    }
-                    s.push_str(&item_serializer.json_key(element, extra)?);
+                    key_builder.push(&item_serializer.json_key(element, extra)?);
                 }
-                s.push(')');
-                Ok(Cow::Owned(s))
+                Ok(Cow::Owned(key_builder.finish()))
             }
             Err(_) => {
                 extra
@@ -259,29 +251,19 @@ impl TypeSerializer for TuplePositionalSerializer {
             Ok(py_tuple) => {
                 let mut py_tuple_iter = py_tuple.iter();
 
-                let mut s = String::with_capacity(31);
-                s.push('(');
-
-                let mut first = true;
+                let mut key_builder = KeyBuilder::new();
                 for serializer in self.items_serializers.iter() {
                     let element = match py_tuple_iter.next() {
                         Some(value) => value,
                         None => break,
                     };
-                    if first {
-                        first = false;
-                    } else {
-                        s.push_str(", ");
-                    }
-                    s.push_str(&serializer.json_key(element, extra)?);
+                    key_builder.push(&serializer.json_key(element, extra)?);
                 }
                 let extra_serializer = self.extra_serializer.as_ref();
                 for element in py_tuple_iter {
-                    s.push_str(", ");
-                    s.push_str(&extra_serializer.json_key(element, extra)?);
+                    key_builder.push(&extra_serializer.json_key(element, extra)?);
                 }
-                s.push(')');
-                Ok(Cow::Owned(s))
+                Ok(Cow::Owned(key_builder.finish()))
             }
             Err(_) => {
                 extra
@@ -350,5 +332,33 @@ impl TypeSerializer for TuplePositionalSerializer {
 
     fn get_name(&self) -> &str {
         &self.name
+    }
+}
+
+pub(crate) struct KeyBuilder {
+    key: String,
+    first: bool,
+}
+
+impl KeyBuilder {
+    pub fn new() -> Self {
+        let mut key = String::with_capacity(31);
+        key.push('(');
+        Self { key, first: true }
+    }
+
+    pub fn push(&mut self, key: &str) {
+        if self.first {
+            self.first = false;
+        } else {
+            self.key.push(',');
+        }
+        self.key.push_str(key);
+    }
+
+    pub fn finish(self) -> String {
+        let mut key = self.key;
+        key.push(')');
+        key
     }
 }

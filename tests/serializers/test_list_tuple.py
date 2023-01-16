@@ -274,3 +274,36 @@ def test_function_positional_tuple():
     assert s.to_json((1,)) == b'["a1"]'
     assert s.to_json((1, 2)) == b'["a1","b2"]'
     assert s.to_json((1, 2, 3)) == b'["a1","b2","extra3"]'
+
+
+def test_list_dict_key():
+    s = SchemaSerializer(core_schema.dict_schema(core_schema.list_schema(), core_schema.int_schema()))
+    with pytest.warns(UserWarning, match=r'Expected `list\[any\]` but got `str`'):
+        assert s.to_python({'xx': 1}) == {'xx': 1}
+
+
+def test_tuple_var_dict_key():
+    s = SchemaSerializer(core_schema.dict_schema(core_schema.tuple_variable_schema(), core_schema.int_schema()))
+    with pytest.warns(UserWarning, match=r'Expected `tuple\[any, ...\]` but got `str`'):
+        assert s.to_python({'xx': 1}) == {'xx': 1}
+
+    assert s.to_python({(1, 2): 1}) == {(1, 2): 1}
+    assert s.to_python({(1, 2): 1}, mode='json') == {'(1,2)': 1}
+    assert s.to_json({(1, 2): 1}) == b'{"(1,2)":1}'
+
+
+def test_tuple_pos_dict_key():
+    s = SchemaSerializer(
+        core_schema.dict_schema(
+            core_schema.tuple_positional_schema(
+                core_schema.int_schema(), core_schema.string_schema(), extra_schema=core_schema.int_schema()
+            ),
+            core_schema.int_schema(),
+        )
+    )
+    assert s.to_python({(1, 'a'): 1}) == {(1, 'a'): 1}
+    assert s.to_python({(1, 'a', 2): 1}) == {(1, 'a', 2): 1}
+    assert s.to_python({(1, 'a'): 1}, mode='json') == {'(1,a)': 1}
+    assert s.to_python({(1, 'a', 2): 1}, mode='json') == {'(1,a,2)': 1}
+    assert s.to_json({(1, 'a'): 1}) == b'{"(1,a)":1}'
+    assert s.to_json({(1, 'a', 2): 1}) == b'{"(1,a,2)":1}'

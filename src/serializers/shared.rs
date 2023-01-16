@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::fmt::Debug;
 
+use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet};
@@ -14,6 +15,8 @@ use crate::build_tools::{py_err, py_error_type, SchemaDict};
 
 use super::errors::se_err_py_err;
 use super::extra::Extra;
+use super::infer::infer_json_key;
+use super::ob_type::{IsType, ObType};
 
 pub(crate) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
@@ -203,6 +206,23 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
     ) -> PyResult<PyObject>;
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>>;
+
+    fn _invalid_as_json_key<'py>(
+        &self,
+        key: &'py PyAny,
+        extra: &Extra,
+        expected_type: &'static str,
+    ) -> PyResult<Cow<'py, str>> {
+        match extra.ob_type_lookup.is_type(key, ObType::None) {
+            IsType::Exact | IsType::Subclass => py_err!(PyTypeError; "`{}` not valid as object key", expected_type),
+            IsType::False => {
+                extra
+                    .warnings
+                    .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
+                infer_json_key(key, extra)
+            }
+        }
+    }
 
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,

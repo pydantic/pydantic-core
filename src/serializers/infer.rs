@@ -18,6 +18,7 @@ use super::extra::{Extra, SerMode};
 use super::filter::AnyFilter;
 use super::ob_type::ObType;
 use super::shared::object_to_dict;
+use super::type_serializers::tuple::KeyBuilder;
 
 pub(crate) fn infer_to_python(
     value: &PyAny,
@@ -437,19 +438,11 @@ pub(crate) fn infer_json_key_known<'py>(key: &'py PyAny, ob_type: ObType, extra:
             Ok(Cow::Owned(py_url.__str__()))
         }
         ObType::Tuple => {
-            let mut s = String::with_capacity(31);
-            s.push('(');
-            let mut first = true;
+            let mut key_build = KeyBuilder::new();
             for element in key.cast_as::<PyTuple>()?.iter() {
-                if first {
-                    first = false;
-                } else {
-                    s.push_str(", ");
-                }
-                s.push_str(&infer_json_key(element, extra)?);
+                key_build.push(&infer_json_key(element, extra)?);
             }
-            s.push(')');
-            Ok(Cow::Owned(s))
+            Ok(Cow::Owned(key_build.finish()))
         }
         ObType::List | ObType::Set | ObType::Frozenset | ObType::Dict => {
             py_err!(PyTypeError; "`{}` not valid as object key", ob_type)
