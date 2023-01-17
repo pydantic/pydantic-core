@@ -133,3 +133,30 @@ def test_union_of_functions():
     assert s.to_python('unexpected') == '__unexpected__'
     assert s.to_python('unexpected', mode='json') == '__unexpected__'
     assert s.to_json('unexpected') == b'"__unexpected__"'
+
+
+@pytest.mark.xfail(reason='Need to fix both TypedDicts and Literals, add a `check` attribute to Extra')
+def test_typed_dict():
+    s = SchemaSerializer(
+        core_schema.union_schema(
+            core_schema.typed_dict_schema(
+                dict(
+                    pet_type=core_schema.typed_dict_field(core_schema.literal_schema('cat')),
+                    meow=core_schema.typed_dict_field(
+                        core_schema.int_schema(serialization=core_schema.format_ser_schema('04d'))
+                    ),
+                )
+            ),
+            core_schema.typed_dict_schema(
+                dict(
+                    pet_type=core_schema.typed_dict_field(core_schema.literal_schema('dog')),
+                    bark=core_schema.typed_dict_field(
+                        core_schema.float_schema(serialization=core_schema.format_ser_schema('0.3f'))
+                    ),
+                )
+            ),
+        )
+    )
+
+    assert s.to_python(dict(pet_type='cat', meow=3)) == {'pet_type': 'cat', 'meow': '0003'}
+    assert s.to_python(dict(pet_type='dog', bark=3)) == {'pet_type': 'dog', 'bark': '3.000'}
