@@ -41,9 +41,7 @@ impl TypeSerializer for StrSerializer {
                 _ => Ok(value.into_py(py)),
             },
             IsType::False => {
-                extra
-                    .warnings
-                    .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
                 infer_to_python(value, include, exclude, extra)
             }
         }
@@ -53,9 +51,7 @@ impl TypeSerializer for StrSerializer {
         if let Ok(py_str) = key.cast_as::<PyString>() {
             Ok(py_str.to_string_lossy())
         } else {
-            extra
-                .warnings
-                .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
+            extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
             infer_json_key(key, extra)
         }
     }
@@ -71,9 +67,7 @@ impl TypeSerializer for StrSerializer {
         match value.cast_as::<PyString>() {
             Ok(py_str) => serialize_py_str(py_str, serializer),
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }

@@ -5,6 +5,7 @@ use std::borrow::Cow;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, SchemaDict};
+use crate::serializers::extra::SerCheck;
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::{
@@ -63,7 +64,8 @@ impl TypeSerializer for UnionSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         // try the serializers in with error_on fallback=true
-        let mut new_extra = extra.with_error_on_fallback(false);
+        let mut new_extra = extra.clone();
+        new_extra.check = SerCheck::Strict;
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
                 Ok(v) => return Ok(v),
@@ -73,8 +75,8 @@ impl TypeSerializer for UnionSerializer {
                 },
             }
         }
-        if self.retry_with_subclasses() {
-            new_extra.allow_subclasses = true;
+        if self.retry_with_lax_check() {
+            new_extra.check = SerCheck::Lax;
             for comb_serializer in &self.choices {
                 match comb_serializer.to_python(value, include, exclude, &new_extra) {
                     Ok(v) => return Ok(v),
@@ -86,14 +88,13 @@ impl TypeSerializer for UnionSerializer {
             }
         }
 
-        extra
-            .warnings
-            .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
+        extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
         infer_to_python(value, include, exclude, extra)
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
-        let mut new_extra = extra.with_error_on_fallback(false);
+        let mut new_extra = extra.clone();
+        new_extra.check = SerCheck::Strict;
         for comb_serializer in &self.choices {
             match comb_serializer.json_key(key, &new_extra) {
                 Ok(v) => return Ok(v),
@@ -103,8 +104,8 @@ impl TypeSerializer for UnionSerializer {
                 },
             }
         }
-        if self.retry_with_subclasses() {
-            new_extra.allow_subclasses = true;
+        if self.retry_with_lax_check() {
+            new_extra.check = SerCheck::Lax;
             for comb_serializer in &self.choices {
                 match comb_serializer.json_key(key, &new_extra) {
                     Ok(v) => return Ok(v),
@@ -116,9 +117,7 @@ impl TypeSerializer for UnionSerializer {
             }
         }
 
-        extra
-            .warnings
-            .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
+        extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
         infer_json_key(key, extra)
     }
 
@@ -131,7 +130,8 @@ impl TypeSerializer for UnionSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let py = value.py();
-        let mut new_extra = extra.with_error_on_fallback(false);
+        let mut new_extra = extra.clone();
+        new_extra.check = SerCheck::Strict;
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
                 Ok(v) => return infer_serialize(v.as_ref(py), serializer, None, None, extra),
@@ -141,8 +141,8 @@ impl TypeSerializer for UnionSerializer {
                 },
             }
         }
-        if self.retry_with_subclasses() {
-            new_extra.allow_subclasses = true;
+        if self.retry_with_lax_check() {
+            new_extra.check = SerCheck::Lax;
             for comb_serializer in &self.choices {
                 match comb_serializer.to_python(value, include, exclude, &new_extra) {
                     Ok(v) => return infer_serialize(v.as_ref(py), serializer, None, None, extra),
@@ -154,9 +154,7 @@ impl TypeSerializer for UnionSerializer {
             }
         }
 
-        extra
-            .warnings
-            .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
+        extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
         infer_serialize(value, serializer, include, exclude, extra)
     }
 
@@ -164,8 +162,8 @@ impl TypeSerializer for UnionSerializer {
         &self.name
     }
 
-    fn retry_with_subclasses(&self) -> bool {
-        self.choices.iter().any(|c| c.retry_with_subclasses())
+    fn retry_with_lax_check(&self) -> bool {
+        self.choices.iter().any(|c| c.retry_with_lax_check())
     }
 }
 

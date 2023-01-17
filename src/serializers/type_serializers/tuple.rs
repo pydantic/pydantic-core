@@ -88,9 +88,7 @@ impl TypeSerializer for TupleVariableSerializer {
                 }
             }
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_py(&self.name, value, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_py(&self.name, value, extra)?;
                 infer_to_python(value, include, exclude, extra)
             }
         }
@@ -108,9 +106,7 @@ impl TypeSerializer for TupleVariableSerializer {
                 Ok(Cow::Owned(key_builder.finish()))
             }
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_py(&self.name, key, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_py(&self.name, key, extra)?;
                 infer_json_key(key, extra)
             }
         }
@@ -144,9 +140,7 @@ impl TypeSerializer for TupleVariableSerializer {
                 seq.end()
             }
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_ser::<S>(&self.name, value, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_ser::<S>(&self.name, value, extra)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }
@@ -192,7 +186,7 @@ impl TuplePositionalSerializer {
             items_serializers,
             extra_serializer: Box::new(extra_serializer),
             filter: SchemaFilter::from_schema(schema)?,
-            name: format!("tuple[{}]", descr),
+            name: format!("tuple[{descr}]"),
         }
         .into())
     }
@@ -238,9 +232,7 @@ impl TypeSerializer for TuplePositionalSerializer {
                 }
             }
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_py(&self.name, value, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_py(&self.name, value, extra)?;
                 infer_to_python(value, include, exclude, extra)
             }
         }
@@ -266,9 +258,7 @@ impl TypeSerializer for TuplePositionalSerializer {
                 Ok(Cow::Owned(key_builder.finish()))
             }
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_py(&self.name, key, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_py(&self.name, key, extra)?;
                 infer_json_key(key, extra)
             }
         }
@@ -322,9 +312,7 @@ impl TypeSerializer for TuplePositionalSerializer {
                 seq.end()
             }
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_ser::<S>(&self.name, value, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_ser::<S>(&self.name, value, extra)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }

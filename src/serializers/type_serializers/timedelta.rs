@@ -37,9 +37,7 @@ impl TypeSerializer for TimeDeltaSerializer {
             SerMode::Json => match value.cast_as::<PyDelta>() {
                 Ok(py_timedelta) => extra.config.timedelta_mode.timedelta_to_json(py_timedelta),
                 Err(_) => {
-                    extra
-                        .warnings
-                        .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
+                    extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
                     infer_to_python(value, include, exclude, extra)
                 }
             },
@@ -51,9 +49,7 @@ impl TypeSerializer for TimeDeltaSerializer {
         match key.cast_as::<PyDelta>() {
             Ok(py_timedelta) => extra.config.timedelta_mode.json_key(py_timedelta),
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
                 infer_json_key(key, extra)
             }
         }
@@ -73,9 +69,7 @@ impl TypeSerializer for TimeDeltaSerializer {
                 .timedelta_mode
                 .timedelta_serialize(py_timedelta, serializer),
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }

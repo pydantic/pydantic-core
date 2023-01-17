@@ -186,10 +186,10 @@ def test_new_class_wrong_warn():
             ),
         )
     )
-    with pytest.warns(UserWarning, match='Expected `Anything` but got `int` - serialized value may not be as expected'):
-        assert s.to_python(123) == 123
-    with pytest.warns(UserWarning, match='Expected `Anything` but got `dict` - serialized value may not be as .+'):
-        assert s.to_python({'foo': 1, 'bar': b'more'}) == {'foo': 1, 'bar': b'more'}
+    with pytest.raises(AttributeError, match="'int' object has no attribute '__dict__'"):
+        s.to_python(123)
+    with pytest.raises(AttributeError, match="'dict' object has no attribute '__dict__'"):
+        s.to_python({'foo': 1, 'bar': b'more'})
 
 
 def test_exclude_none():

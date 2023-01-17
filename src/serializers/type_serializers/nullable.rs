@@ -73,7 +73,7 @@ impl TypeSerializer for NullableSerializer {
         Self::EXPECTED_TYPE
     }
 
-    fn retry_with_subclasses(&self) -> bool {
-        self.serializer.retry_with_subclasses()
+    fn retry_with_lax_check(&self) -> bool {
+        self.serializer.retry_with_lax_check()
     }
 }

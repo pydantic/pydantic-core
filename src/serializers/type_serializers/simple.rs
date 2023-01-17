@@ -39,9 +39,7 @@ impl TypeSerializer for NoneSerializer {
             IsType::Exact => Ok(py.None().into_py(py)),
             // I don't think subclasses of None can exist
             _ => {
-                extra
-                    .warnings
-                    .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
                 infer_to_python(value, include, exclude, extra)
             }
         }
@@ -51,9 +49,7 @@ impl TypeSerializer for NoneSerializer {
         match extra.ob_type_lookup.is_type(key, ObType::None) {
             IsType::Exact => infer_json_key_known(&ObType::None, key, extra),
             _ => {
-                extra
-                    .warnings
-                    .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
                 infer_json_key(key, extra)
             }
         }
@@ -70,9 +66,7 @@ impl TypeSerializer for NoneSerializer {
         match extra.ob_type_lookup.is_type(value, ObType::None) {
             IsType::Exact => serializer.serialize_none(),
             _ => {
-                extra
-                    .warnings
-                    .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }
@@ -119,9 +113,7 @@ macro_rules! build_simple_serializer {
                         _ => infer_to_python(value, include, exclude, extra),
                     },
                     IsType::False => {
-                        extra
-                            .warnings
-                            .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
+                        extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
                         infer_to_python(value, include, exclude, extra)
                     }
                 }
@@ -131,9 +123,7 @@ macro_rules! build_simple_serializer {
                 match extra.ob_type_lookup.is_type(key, $ob_type) {
                     IsType::Exact | IsType::Subclass => infer_json_key_known(&$ob_type, key, extra),
                     IsType::False => {
-                        extra
-                            .warnings
-                            .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
+                        extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
                         infer_json_key(key, extra)
                     }
                 }
@@ -152,7 +142,7 @@ macro_rules! build_simple_serializer {
                     Err(_) => {
                         extra
                             .warnings
-                            .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
+                            .on_fallback_ser::<S>(self.get_name(), value, extra)?;
                         infer_serialize(value, serializer, include, exclude, extra)
                     }
                 }

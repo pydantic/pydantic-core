@@ -6,6 +6,7 @@ use pyo3::types::{PyDict, PyType};
 
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
+use crate::serializers::extra::SerCheck;
 use crate::serializers::infer::{infer_serialize, infer_to_python};
 use crate::serializers::ob_type::ObType;
 
@@ -45,11 +46,10 @@ impl BuildSerializer for NewClassSerializer {
 
 impl NewClassSerializer {
     fn allow_value(&self, value: &PyAny, extra: &Extra) -> PyResult<bool> {
-        let class = self.class.as_ref(value.py());
-        if extra.allow_subclasses {
-            value.is_instance(class)
-        } else {
-            value.get_type().eq(class)
+        match extra.check {
+            SerCheck::Strict => value.get_type().eq(self.class.as_ref(value.py())),
+            SerCheck::Lax => value.is_instance(self.class.as_ref(value.py())),
+            SerCheck::None => Ok(true),
         }
     }
 }
@@ -66,9 +66,7 @@ impl TypeSerializer for NewClassSerializer {
             let dict = object_to_dict(value, true, extra)?;
             self.serializer.to_python(dict, include, exclude, extra)
         } else {
-            extra
-                .warnings
-                .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
+            extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
             infer_to_python(value, include, exclude, extra)
         }
     }
@@ -77,9 +75,7 @@ impl TypeSerializer for NewClassSerializer {
         if self.allow_value(key, extra)? {
             infer_json_key_known(&ObType::PydanticModel, key, extra)
         } else {
-            extra
-                .warnings
-                .on_fallback_py(&self.name, key, extra.error_on_fallback)?;
+            extra.warnings.on_fallback_py(&self.name, key, extra)?;
             infer_json_key(key, extra)
         }
     }
@@ -97,9 +93,7 @@ impl TypeSerializer for NewClassSerializer {
             self.serializer
                 .serde_serialize(dict, serializer, include, exclude, extra)
         } else {
-            extra
-                .warnings
-                .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
+            extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
             infer_serialize(value, serializer, include, exclude, extra)
         }
     }
@@ -108,7 +102,7 @@ impl TypeSerializer for NewClassSerializer {
         &self.name
     }
 
-    fn retry_with_subclasses(&self) -> bool {
+    fn retry_with_lax_check(&self) -> bool {
         true
     }
 }

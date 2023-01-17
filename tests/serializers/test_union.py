@@ -136,13 +136,13 @@ def test_union_of_functions():
 
 
 @pytest.mark.xfail(reason='Need to fix both TypedDicts and Literals, add a `check` attribute to Extra')
-def test_typed_dict():
+def test_typed_dict_literal():
     s = SchemaSerializer(
         core_schema.union_schema(
             core_schema.typed_dict_schema(
                 dict(
                     pet_type=core_schema.typed_dict_field(core_schema.literal_schema('cat')),
-                    meow=core_schema.typed_dict_field(
+                    sound=core_schema.typed_dict_field(
                         core_schema.int_schema(serialization=core_schema.format_ser_schema('04d'))
                     ),
                 )
@@ -150,7 +150,7 @@ def test_typed_dict():
             core_schema.typed_dict_schema(
                 dict(
                     pet_type=core_schema.typed_dict_field(core_schema.literal_schema('dog')),
-                    bark=core_schema.typed_dict_field(
+                    sound=core_schema.typed_dict_field(
                         core_schema.float_schema(serialization=core_schema.format_ser_schema('0.3f'))
                     ),
                 )
@@ -158,5 +158,5 @@ def test_typed_dict():
         )
     )
 
-    assert s.to_python(dict(pet_type='cat', meow=3)) == {'pet_type': 'cat', 'meow': '0003'}
-    assert s.to_python(dict(pet_type='dog', bark=3)) == {'pet_type': 'dog', 'bark': '3.000'}
+    assert s.to_python(dict(pet_type='cat', sound=3)) == {'pet_type': 'cat', 'sound': '0003'}
+    assert s.to_python(dict(pet_type='dog', sound=3)) == {'pet_type': 'dog', 'sound': '3.000'}

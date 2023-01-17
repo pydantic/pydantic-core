@@ -217,9 +217,7 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
         match extra.ob_type_lookup.is_type(key, ObType::None) {
             IsType::Exact | IsType::Subclass => py_err!(PyTypeError; "`{}` not valid as object key", expected_type),
             IsType::False => {
-                extra
-                    .warnings
-                    .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
                 infer_json_key(key, extra)
             }
         }
@@ -237,7 +235,7 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
     fn get_name(&self) -> &str;
 
     /// Used by union serializers to decide if it's worth trying again while allowing subclasses
-    fn retry_with_subclasses(&self) -> bool {
+    fn retry_with_lax_check(&self) -> bool {
         false
     }
 }

@@ -17,6 +17,7 @@ use super::shared::CombinedSerializer;
 
 /// Useful things which are passed around by type_serializers
 #[derive(Clone)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) struct Extra<'a> {
     pub mode: &'a SerMode,
     pub slots: &'a [CombinedSerializer],
@@ -30,9 +31,7 @@ pub(crate) struct Extra<'a> {
     pub config: &'a SerializationConfig,
     pub rec_guard: &'a SerRecursionGuard,
     // the next two are used for union logic
-    pub error_on_fallback: bool,
-    // "subclasses" could be generalised to some kind of "also allows similar values" in future if required
-    pub allow_subclasses: bool,
+    pub check: SerCheck,
 }
 
 impl<'a> Extra<'a> {
@@ -62,16 +61,25 @@ impl<'a> Extra<'a> {
             round_trip: round_trip.unwrap_or(false),
             config,
             rec_guard,
-            error_on_fallback: false,
-            allow_subclasses: true,
+            check: SerCheck::None,
         }
     }
+}
 
-    pub fn with_error_on_fallback(&self, allow_subclasses: bool) -> Self {
-        let mut new_extra = self.clone();
-        new_extra.error_on_fallback = true;
-        new_extra.allow_subclasses = allow_subclasses;
-        new_extra
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(debug_assertions, derive(Debug))]
+pub(crate) enum SerCheck {
+    // no checks, used everywhere except in union choices
+    None,
+    // strict means subclasses are not allowed
+    Strict,
+    // check but allow subclasses
+    Lax,
+}
+
+impl SerCheck {
+    pub fn enabled(&self) -> bool {
+        *self != SerCheck::None
     }
 }
 
@@ -88,8 +96,7 @@ pub(crate) struct ExtraOwned {
     round_trip: bool,
     config: SerializationConfig,
     rec_guard: SerRecursionGuard,
-    error_on_fallback: bool,
-    allow_subclasses: bool,
+    check: SerCheck,
 }
 
 impl ExtraOwned {
@@ -105,8 +112,7 @@ impl ExtraOwned {
             round_trip: extra.round_trip,
             config: extra.config.clone(),
             rec_guard: extra.rec_guard.clone(),
-            error_on_fallback: extra.error_on_fallback,
-            allow_subclasses: extra.allow_subclasses,
+            check: extra.check,
         }
     }
 
@@ -123,8 +129,7 @@ impl ExtraOwned {
             round_trip: self.round_trip,
             config: &self.config,
             rec_guard: &self.rec_guard,
-            error_on_fallback: self.error_on_fallback,
-            allow_subclasses: self.allow_subclasses,
+            check: self.check,
         }
     }
 }
@@ -179,8 +184,8 @@ impl CollectWarnings {
         }
     }
 
-    pub fn on_fallback_py(&self, field_type: &str, value: &PyAny, error_on_fallback: bool) -> PyResult<()> {
-        if error_on_fallback {
+    pub fn on_fallback_py(&self, field_type: &str, value: &PyAny, extra: &Extra) -> PyResult<()> {
+        if extra.check.enabled() {
             Err(PydanticSerializationUnexpectedValue::new_err(None))
         } else {
             self.fallback_warning(field_type, value);
@@ -192,9 +197,9 @@ impl CollectWarnings {
         &self,
         field_type: &str,
         value: &PyAny,
-        error_on_fallback: bool,
+        extra: &Extra,
     ) -> Result<(), S::Error> {
-        if error_on_fallback {
+        if extra.check.enabled() {
             // note: I think this should never actually happen since we use `to_python(..., mode='json')` during
             // JSON serialisation to "try" union branches, but it's here for completeness/correctness
             // in particular, in future we could allow errors instead of warnings on fallback

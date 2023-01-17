@@ -37,7 +37,7 @@ impl BuildSerializer for FunctionSerializer {
         let py = schema.py();
         let function = schema.get_as_req::<&PyAny>(intern!(py, "function"))?;
         let function_name = function_name(function)?;
-        let name = format!("function[{}]", function_name);
+        let name = format!("function[{function_name}]");
         Ok(Self {
             func: function.into_py(py),
             function_name,
@@ -84,7 +84,7 @@ impl TypeSerializer for FunctionSerializer {
             }
             Err(err) => match err.value(py).extract::<PydanticSerializationUnexpectedValue>() {
                 Ok(ser_err) => {
-                    if extra.error_on_fallback {
+                    if extra.check.enabled() {
                         Err(err)
                     } else {
                         extra.warnings.custom_warning(ser_err.__repr__());
@@ -112,7 +112,7 @@ impl TypeSerializer for FunctionSerializer {
             }
             Err(err) => match err.value(py).extract::<PydanticSerializationUnexpectedValue>() {
                 Ok(ser_err) => {
-                    if extra.error_on_fallback {
+                    if extra.check.enabled() {
                         Err(err)
                     } else {
                         extra.warnings.custom_warning(ser_err.__repr__());
@@ -149,7 +149,7 @@ impl TypeSerializer for FunctionSerializer {
             }
             Err(err) => match err.value(py).extract::<PydanticSerializationUnexpectedValue>() {
                 Ok(ser_err) => {
-                    if extra.error_on_fallback {
+                    if extra.check.enabled() {
                         Err(py_err_se_err(err))
                     } else {
                         extra.warnings.custom_warning(ser_err.__repr__());

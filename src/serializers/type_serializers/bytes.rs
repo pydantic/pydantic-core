@@ -40,9 +40,7 @@ impl TypeSerializer for BytesSerializer {
                 _ => Ok(value.into_py(py)),
             },
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_py(self.get_name(), value, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
                 infer_to_python(value, include, exclude, extra)
             }
         }
@@ -52,9 +50,7 @@ impl TypeSerializer for BytesSerializer {
         match key.cast_as::<PyBytes>() {
             Ok(py_bytes) => extra.config.bytes_mode.bytes_to_string(py_bytes),
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_py(self.get_name(), key, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
                 infer_json_key(key, extra)
             }
         }
@@ -71,9 +67,7 @@ impl TypeSerializer for BytesSerializer {
         match value.cast_as::<PyBytes>() {
             Ok(py_bytes) => extra.config.bytes_mode.serialize_bytes(py_bytes, serializer),
             Err(_) => {
-                extra
-                    .warnings
-                    .on_fallback_ser::<S>(self.get_name(), value, extra.error_on_fallback)?;
+                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
         }
