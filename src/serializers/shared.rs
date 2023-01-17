@@ -86,11 +86,17 @@ combined_serializer! {
     // but aren't actually used for serialization, e.g. their `build` method must return another serializer
     find_only: {
         super::type_serializers::tuple::TupleBuilder;
+        super::type_serializers::literal::LiteralBuildSerializer;
+        super::type_serializers::union::TaggedUnionBuilder;
         super::type_serializers::other::ChainBuilder;
         super::type_serializers::other::FunctionBuilder;
         super::type_serializers::other::CustomErrorBuilder;
+        super::type_serializers::other::CallBuilder;
+        super::type_serializers::other::LaxOrStrictBuilder;
+        super::type_serializers::other::ArgumentsBuilder;
         super::type_serializers::other::IsInstanceBuilder;
-        super::type_serializers::literal::LiteralBuildSerializer;
+        super::type_serializers::other::IsSubclassBuilder;
+        super::type_serializers::other::CallableBuilder;
     }
     // `both` means the struct is added to both the `CombinedSerializer` enum and the match statement in
     // `find_serializer` so they can be used via a `type` str.

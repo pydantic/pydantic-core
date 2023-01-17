@@ -2077,7 +2077,7 @@ def call_schema(
     serialization: SerSchema | None = None,
 ) -> CallSchema:
     """
-    Returns a schema that matches an arguments schema, e.g.:
+    Returns a schema that matches an arguments schema, then calls a function, e.g.:
 
     ```py
     from pydantic_core import SchemaValidator, core_schema

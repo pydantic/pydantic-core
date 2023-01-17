@@ -33,6 +33,12 @@ impl BuildSerializer for UnionSerializer {
             .map(|choice| CombinedSerializer::build(choice.cast_as()?, config, build_context))
             .collect::<PyResult<Vec<CombinedSerializer>>>()?;
 
+        Self::from_choices(choices)
+    }
+}
+
+impl UnionSerializer {
+    fn from_choices(choices: Vec<CombinedSerializer>) -> PyResult<CombinedSerializer> {
         match choices.len() {
             0 => py_err!("One or more union choices required"),
             1 => Ok(choices.into_iter().next().unwrap()),
@@ -160,5 +166,27 @@ impl TypeSerializer for UnionSerializer {
 
     fn retry_with_subclasses(&self) -> bool {
         self.choices.iter().any(|c| c.retry_with_subclasses())
+    }
+}
+
+pub struct TaggedUnionBuilder;
+
+impl BuildSerializer for TaggedUnionBuilder {
+    const EXPECTED_TYPE: &'static str = "tagged-union";
+
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
+        let schema_choices: &PyDict = schema.get_as_req(intern!(schema.py(), "choices"))?;
+        let mut choices: Vec<CombinedSerializer> = Vec::with_capacity(schema_choices.len());
+
+        for (_, value) in schema_choices {
+            if let Ok(choice_schema) = value.cast_as::<PyDict>() {
+                choices.push(CombinedSerializer::build(choice_schema, config, build_context)?)
+            }
+        }
+        UnionSerializer::from_choices(choices)
     }
 }
