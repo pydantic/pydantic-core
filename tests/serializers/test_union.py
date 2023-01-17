@@ -135,7 +135,6 @@ def test_union_of_functions():
     assert s.to_json('unexpected') == b'"__unexpected__"'
 
 
-@pytest.mark.xfail(reason='Need to fix both TypedDicts and Literals, add a `check` attribute to Extra')
 def test_typed_dict_literal():
     s = SchemaSerializer(
         core_schema.union_schema(

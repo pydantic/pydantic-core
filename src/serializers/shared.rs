@@ -86,7 +86,6 @@ combined_serializer! {
     // but aren't actually used for serialization, e.g. their `build` method must return another serializer
     find_only: {
         super::type_serializers::tuple::TupleBuilder;
-        super::type_serializers::literal::LiteralBuildSerializer;
         super::type_serializers::union::TaggedUnionBuilder;
         super::type_serializers::other::ChainBuilder;
         super::type_serializers::other::FunctionBuilder;
@@ -127,6 +126,7 @@ combined_serializer! {
         Json: super::type_serializers::json::JsonSerializer;
         Recursive: super::type_serializers::recursive::RecursiveRefSerializer;
         Union: super::type_serializers::union::UnionSerializer;
+        Literal: super::type_serializers::literal::LiteralSerializer;
     }
 }
 
