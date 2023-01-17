@@ -45,7 +45,7 @@ jobs:
         name: cache rust
         uses: Swatinem/rust-cache@v2
         with:
-          key: v3
+          key: v4
 
       - run: cargo install rustfilt coverage-prepare
         if: steps.cache-rust.outputs.cache-hit != 'true'
@@ -64,6 +64,7 @@ jobs:
           path: ${{ env.pythonLocation }}
           key: >
             py
+            v2
             ${{ runner.os }}
             ${{ env.pythonLocation }}
             ${{ hashFiles('tests/requirements.txt') }}
