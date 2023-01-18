@@ -33,7 +33,7 @@ impl SchemaFilter<usize> {
                 if value.is_none() {
                     Ok(None)
                 } else {
-                    let py_set: &PySet = value.cast_as()?;
+                    let py_set: &PySet = value.downcast()?;
                     let mut set: AHashSet<usize> = AHashSet::with_capacity(py_set.len());
 
                     for item in py_set {
@@ -82,7 +82,7 @@ impl SchemaFilter<isize> {
                 if value.is_none() {
                     Ok(None)
                 } else {
-                    let py_set: &PySet = value.cast_as()?;
+                    let py_set: &PySet = value.downcast()?;
                     let mut set: AHashSet<isize> = AHashSet::with_capacity(py_set.len());
 
                     for item in py_set {
@@ -124,7 +124,7 @@ trait FilterLogic<T: Eq + Copy> {
     ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
         let mut next_exclude: Option<&PyAny> = None;
         if let Some(exclude) = exclude {
-            if let Ok(exclude_dict) = exclude.cast_as::<PyDict>() {
+            if let Ok(exclude_dict) = exclude.downcast::<PyDict>() {
                 if let Some(exc_value) = exclude_dict.get_item(py_key) {
                     if exc_value.is_none() {
                         // if the index is in exclude, and the exclude value is `None`, we want to omit this index
@@ -135,7 +135,7 @@ trait FilterLogic<T: Eq + Copy> {
                         next_exclude = Some(exc_value);
                     }
                 }
-            } else if let Ok(exclude_set) = exclude.cast_as::<PySet>() {
+            } else if let Ok(exclude_set) = exclude.downcast::<PySet>() {
                 // question: should we `unwrap_or(false)` instead of raise an error here?
                 if exclude_set.contains(py_key)? {
                     // index is in the exclude set, we return Ok(None) to omit this index
@@ -147,7 +147,7 @@ trait FilterLogic<T: Eq + Copy> {
         }
 
         if let Some(include) = include {
-            if let Ok(include_dict) = include.cast_as::<PyDict>() {
+            if let Ok(include_dict) = include.downcast::<PyDict>() {
                 if let Some(inc_value) = include_dict.get_item(py_key) {
                     // if the index is in include, we definitely want to include this index
                     return if inc_value.is_none() {
@@ -160,7 +160,7 @@ trait FilterLogic<T: Eq + Copy> {
                     // this index should be omitted
                     return Ok(None);
                 }
-            } else if let Ok(include_set) = include.cast_as::<PySet>() {
+            } else if let Ok(include_set) = include.downcast::<PySet>() {
                 // question: as above
                 if include_set.contains(py_key)? {
                     return Ok(Some((None, next_exclude)));
