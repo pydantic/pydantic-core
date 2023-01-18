@@ -83,7 +83,7 @@ impl LiteralSerializer {
                 }
             }
             if !self.expected_str.is_empty() {
-                if let Ok(py_str) = value.cast_as::<PyString>() {
+                if let Ok(py_str) = value.downcast::<PyString>() {
                     let s = py_str.to_str()?;
                     if self.expected_str.contains(s) {
                         return Ok(OutputValue::OkStr(s));

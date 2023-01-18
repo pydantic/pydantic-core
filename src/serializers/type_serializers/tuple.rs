@@ -95,7 +95,7 @@ impl TypeSerializer for TupleVariableSerializer {
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
-        match key.cast_as::<PyTuple>() {
+        match key.downcast::<PyTuple>() {
             Ok(py_tuple) => {
                 let item_serializer = self.item_serializer.as_ref();
 
@@ -174,7 +174,7 @@ impl TuplePositionalSerializer {
         };
         let items_serializers: Vec<CombinedSerializer> = items
             .iter()
-            .map(|item| CombinedSerializer::build(item.cast_as()?, config, build_context))
+            .map(|item| CombinedSerializer::build(item.downcast()?, config, build_context))
             .collect::<PyResult<_>>()?;
 
         let descr = items_serializers
@@ -239,7 +239,7 @@ impl TypeSerializer for TuplePositionalSerializer {
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
-        match key.cast_as::<PyTuple>() {
+        match key.downcast::<PyTuple>() {
             Ok(py_tuple) => {
                 let mut py_tuple_iter = py_tuple.iter();
 

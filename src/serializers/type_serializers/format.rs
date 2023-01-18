@@ -68,7 +68,7 @@ impl TypeSerializer for FunctionSerializer {
 
     fn json_key<'py>(&self, key: &'py PyAny, _extra: &Extra) -> PyResult<Cow<'py, str>> {
         let v = self.call(key).map_err(PydanticSerializationError::new_err)?;
-        let py_str: &PyString = v.into_ref(key.py()).cast_as()?;
+        let py_str: &PyString = v.into_ref(key.py()).downcast()?;
         Ok(Cow::Borrowed(py_str.to_str()?))
     }
 

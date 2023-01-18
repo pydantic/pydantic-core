@@ -31,7 +31,7 @@ impl BuildSerializer for UnionSerializer {
         let choices: Vec<CombinedSerializer> = schema
             .get_as_req::<&PyList>(intern!(py, "choices"))?
             .iter()
-            .map(|choice| CombinedSerializer::build(choice.cast_as()?, config, build_context))
+            .map(|choice| CombinedSerializer::build(choice.downcast()?, config, build_context))
             .collect::<PyResult<Vec<CombinedSerializer>>>()?;
 
         Self::from_choices(choices)
@@ -181,7 +181,7 @@ impl BuildSerializer for TaggedUnionBuilder {
         let mut choices: Vec<CombinedSerializer> = Vec::with_capacity(schema_choices.len());
 
         for (_, value) in schema_choices {
-            if let Ok(choice_schema) = value.cast_as::<PyDict>() {
+            if let Ok(choice_schema) = value.downcast::<PyDict>() {
                 choices.push(CombinedSerializer::build(choice_schema, config, build_context)?)
             }
         }
