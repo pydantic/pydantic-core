@@ -54,7 +54,7 @@ macro_rules! build_serializer {
                 extra: &Extra,
             ) -> PyResult<PyObject> {
                 let py = value.py();
-                match value.cast_as::<$py_type>() {
+                match value.downcast::<$py_type>() {
                     Ok(py_set) => {
                         let item_serializer = self.item_serializer.as_ref();
 
@@ -86,7 +86,7 @@ macro_rules! build_serializer {
                 exclude: Option<&PyAny>,
                 extra: &Extra,
             ) -> Result<S::Ok, S::Error> {
-                match value.cast_as::<$py_type>() {
+                match value.downcast::<$py_type>() {
                     Ok(py_set) => {
                         let mut seq = serializer.serialize_seq(Some(py_set.len()))?;
                         let item_serializer = self.item_serializer.as_ref();

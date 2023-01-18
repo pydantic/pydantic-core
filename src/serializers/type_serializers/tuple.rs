@@ -70,7 +70,7 @@ impl TypeSerializer for TupleVariableSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        match value.cast_as::<PyTuple>() {
+        match value.downcast::<PyTuple>() {
             Ok(py_tuple) => {
                 let py = value.py();
                 let item_serializer = self.item_serializer.as_ref();
@@ -120,9 +120,9 @@ impl TypeSerializer for TupleVariableSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        match value.cast_as::<PyTuple>() {
+        match value.downcast::<PyTuple>() {
             Ok(py_tuple) => {
-                let py_tuple: &PyTuple = py_tuple.cast_as().map_err(py_err_se_err)?;
+                let py_tuple: &PyTuple = py_tuple.downcast().map_err(py_err_se_err)?;
                 let item_serializer = self.item_serializer.as_ref();
 
                 let mut seq = serializer.serialize_seq(Some(py_tuple.len()))?;
@@ -200,7 +200,7 @@ impl TypeSerializer for TuplePositionalSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        match value.cast_as::<PyTuple>() {
+        match value.downcast::<PyTuple>() {
             Ok(py_tuple) => {
                 let py = value.py();
 
@@ -272,9 +272,9 @@ impl TypeSerializer for TuplePositionalSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        match value.cast_as::<PyTuple>() {
+        match value.downcast::<PyTuple>() {
             Ok(py_tuple) => {
-                let py_tuple: &PyTuple = py_tuple.cast_as().map_err(py_err_se_err)?;
+                let py_tuple: &PyTuple = py_tuple.downcast().map_err(py_err_se_err)?;
 
                 let mut py_tuple_iter = py_tuple.iter();
                 let mut seq = serializer.serialize_seq(Some(py_tuple.len()))?;

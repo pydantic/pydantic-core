@@ -48,7 +48,7 @@ impl TypeSerializer for StrSerializer {
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
-        if let Ok(py_str) = key.cast_as::<PyString>() {
+        if let Ok(py_str) = key.downcast::<PyString>() {
             Ok(py_str.to_string_lossy())
         } else {
             extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
@@ -64,7 +64,7 @@ impl TypeSerializer for StrSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        match value.cast_as::<PyString>() {
+        match value.downcast::<PyString>() {
             Ok(py_str) => serialize_py_str(py_str, serializer),
             Err(_) => {
                 extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
