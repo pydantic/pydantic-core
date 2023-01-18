@@ -4,11 +4,12 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use serde::ser::SerializeMap;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{py_error_type, schema_or_config, SchemaDict};
+use crate::PydanticSerializationUnexpectedValue;
 
 use super::with_default::get_default;
 use super::{
@@ -22,6 +23,7 @@ struct TypedDictField {
     alias: Option<String>,
     alias_py: Option<Py<PyString>>,
     serializer: CombinedSerializer,
+    required: bool,
 }
 
 impl TypedDictField {
@@ -68,6 +70,8 @@ impl BuildSerializer for TypedDictSerializer {
             intern!(py, "extra_behavior"),
             intern!(py, "typed_dict_extra_behavior"),
         )?;
+        let total =
+            schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
 
         let include_extra = extra_behavior == Some("allow");
 
@@ -95,6 +99,8 @@ impl BuildSerializer for TypedDictSerializer {
 
             let key_py: Py<PyString> = PyString::intern(py, &key).into_py(py);
 
+            let required = field_info.get_as::<bool>(intern!(py, "required"))?.unwrap_or(total);
+
             if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
                 exclude.push(key_py.clone_ref(py));
             }
@@ -105,6 +111,7 @@ impl BuildSerializer for TypedDictSerializer {
                     alias,
                     alias_py,
                     serializer,
+                    required,
                 },
             );
         }
@@ -146,6 +153,11 @@ impl TypeSerializer for TypedDictSerializer {
             Ok(py_dict) => {
                 // NOTE! we maintain the order of the input dict assuming that's right
                 let new_dict = PyDict::new(py);
+                let mut used_fields = if extra.check.enabled() {
+                    Some(AHashSet::with_capacity(self.fields.len()))
+                } else {
+                    None
+                };
 
                 for (key, value) in py_dict {
                     if extra.exclude_none && value.is_none() {
@@ -153,20 +165,36 @@ impl TypeSerializer for TypedDictSerializer {
                     }
                     if let Some((next_include, next_exclude)) = self.filter.key_filter(key, include, exclude)? {
                         if let Ok(key_py_str) = key.downcast::<PyString>() {
-                            if let Some(field) = self.fields.get(key_py_str.to_str()?) {
+                            let key_str = key_py_str.to_str()?;
+                            if let Some(field) = self.fields.get(key_str) {
                                 if self.exclude_default(value, extra, field)? {
                                     continue;
                                 }
                                 let value = field.serializer.to_python(value, next_include, next_exclude, extra)?;
                                 let output_key = field.get_key_py(py, extra);
                                 new_dict.set_item(output_key, value)?;
+
+                                if let Some(ref mut used_fields) = used_fields {
+                                    used_fields.insert(key_str);
+                                }
                                 continue;
                             }
                         }
                         if self.include_extra {
                             let value = infer_to_python(value, include, exclude, extra)?;
                             new_dict.set_item(key, value)?;
+                        } else if extra.check.enabled() {
+                            return Err(PydanticSerializationUnexpectedValue::new_err(None));
                         }
+                    }
+                }
+                if let Some(ref used_fields) = used_fields {
+                    let unused_fields = self
+                        .fields
+                        .iter()
+                        .any(|(k, v)| v.required && !used_fields.contains(k.as_str()));
+                    if unused_fields {
+                        return Err(PydanticSerializationUnexpectedValue::new_err(None));
                     }
                 }
                 Ok(new_dict.into_py(py))

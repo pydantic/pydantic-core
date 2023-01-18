@@ -159,3 +159,30 @@ def test_typed_dict_literal():
 
     assert s.to_python(dict(pet_type='cat', sound=3)) == {'pet_type': 'cat', 'sound': '0003'}
     assert s.to_python(dict(pet_type='dog', sound=3)) == {'pet_type': 'dog', 'sound': '3.000'}
+
+
+def test_typed_dict_different_fields():
+    """
+    TODO, needs tests for each case
+    """
+    s = SchemaSerializer(
+        core_schema.union_schema(
+            core_schema.typed_dict_schema(
+                dict(
+                    foo=core_schema.typed_dict_field(core_schema.int_schema()),
+                    bar=core_schema.typed_dict_field(core_schema.int_schema()),
+                )
+            ),
+            core_schema.typed_dict_schema(
+                dict(
+                    spam=core_schema.typed_dict_field(core_schema.int_schema()),
+                    ham=core_schema.typed_dict_field(
+                        core_schema.int_schema(serialization=core_schema.format_ser_schema('04d'))
+                    ),
+                )
+            ),
+        )
+    )
+
+    assert s.to_python(dict(foo=1, bar=2)) == {'foo': 1, 'bar': 2}
+    assert s.to_python(dict(spam=1, ham=2)) == {'spam': 1, 'ham': '0002'}
