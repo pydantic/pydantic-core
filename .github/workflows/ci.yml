@@ -410,8 +410,58 @@ jobs:
          ls dist/*cp310-manylinux*x86_64.whl | head -n 1
          python -m zipfile --list `ls dist/*cp310-manylinux*x86_64.whl | head -n 1`
 
+  test-builds:
+    name: test on ${{ matrix.target }}-${{ matrix.distro }}
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64, aarch64, armv7]
+        distro: [ubuntu20.04, alpine_latest]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: get dist artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: pypi_files
+          path: dist
+
+      - uses: uraimo/run-on-arch-action@v2.5.0
+        if: matrix.distro == 'ubuntu20.04'
+        name: Install & test on Ubuntu
+        with:
+          arch: ${{ matrix.target }}
+          distro: ${{ matrix.distro }}
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update
+            apt-get install -y --no-install-recommends python3 python3-pip
+            pip3 install -U pip pytest typing-extensions
+          run: |
+            pip3 install pydantic-core --no-index --no-deps --find-links dist/ --force-reinstall
+            pytest
+
+      - uses: uraimo/run-on-arch-action@v2.5.0
+        if: matrix.distro == 'ubuntu20.04'
+        name: Install & test on Alpine
+        with:
+          arch: ${{ matrix.target }}
+          distro: ${{ matrix.distro }}
+          githubToken: ${{ github.token }}
+          install: |
+            apk update
+            apk add python3 py3-pip
+            pip3 install -U pip pytest typing-extensions
+          run: |
+            pip3 install pydantic-core --no-index --no-deps --find-links dist/ --force-reinstall
+            pytest
+
   release:
-    needs: [build, check]
+    needs: [build, test-builds, check]
     if: "success() && startsWith(github.ref, 'refs/tags/')"
     runs-on: ubuntu-latest
 
