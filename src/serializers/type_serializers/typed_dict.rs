@@ -225,6 +225,7 @@ impl TypeSerializer for TypedDictSerializer {
                     false => self.fields.len(),
                 };
                 // NOTE! As above, we maintain the order of the input dict assuming that's right
+                // we don't both with `used_fields` here because on unions, `to_python(..., mode='json')` is used
                 let mut map = serializer.serialize_map(Some(expected_len))?;
 
                 for (key, value) in py_dict {

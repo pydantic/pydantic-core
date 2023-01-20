@@ -161,6 +161,62 @@ def test_typed_dict_literal():
     assert s.to_python(dict(pet_type='dog', sound=3)) == {'pet_type': 'dog', 'sound': '3.000'}
 
 
+def test_typed_dict_missing():
+    """
+    TODO, needs tests for each case
+    """
+    s = SchemaSerializer(
+        core_schema.union_schema(
+            core_schema.typed_dict_schema(dict(foo=core_schema.typed_dict_field(core_schema.int_schema()))),
+            core_schema.typed_dict_schema(
+                dict(
+                    foo=core_schema.typed_dict_field(
+                        core_schema.int_schema(serialization=core_schema.format_ser_schema('04d'))
+                    ),
+                    bar=core_schema.typed_dict_field(core_schema.int_schema()),
+                )
+            ),
+        )
+    )
+
+    assert s.to_python(dict(foo=1)) == {'foo': 1}
+    assert s.to_python(dict(foo=1), mode='json') == {'foo': 1}
+    assert s.to_json(dict(foo=1)) == b'{"foo":1}'
+    assert s.to_python(dict(foo=1, bar=2)) == {'foo': '0001', 'bar': 2}
+    assert s.to_python(dict(foo=1, bar=2), mode='json') == {'foo': '0001', 'bar': 2}
+    assert s.to_json(dict(foo=1, bar=2)) == b'{"foo":"0001","bar":2}'
+
+
+def test_typed_dict_extra():
+    """
+    TODO, needs tests for each case
+    """
+    s = SchemaSerializer(
+        core_schema.union_schema(
+            core_schema.typed_dict_schema(
+                dict(
+                    foo=core_schema.typed_dict_field(core_schema.int_schema()),
+                    bar=core_schema.typed_dict_field(core_schema.int_schema()),
+                )
+            ),
+            core_schema.typed_dict_schema(
+                dict(
+                    foo=core_schema.typed_dict_field(
+                        core_schema.int_schema(serialization=core_schema.format_ser_schema('04d'))
+                    )
+                )
+            ),
+        )
+    )
+
+    assert s.to_python(dict(foo=1, bar=2)) == {'foo': 1, 'bar': 2}
+    assert s.to_python(dict(foo=1, bar=2), mode='json') == {'foo': 1, 'bar': 2}
+    assert s.to_json(dict(foo=1, bar=2)) == b'{"foo":1,"bar":2}'
+    assert s.to_python(dict(foo=1)) == {'foo': '0001'}
+    assert s.to_python(dict(foo=1), mode='json') == {'foo': '0001'}
+    assert s.to_json(dict(foo=1)) == b'{"foo":"0001"}'
+
+
 def test_typed_dict_different_fields():
     """
     TODO, needs tests for each case
@@ -185,4 +241,8 @@ def test_typed_dict_different_fields():
     )
 
     assert s.to_python(dict(foo=1, bar=2)) == {'foo': 1, 'bar': 2}
+    assert s.to_python(dict(foo=1, bar=2), mode='json') == {'foo': 1, 'bar': 2}
+    assert s.to_json(dict(foo=1, bar=2)) == b'{"foo":1,"bar":2}'
     assert s.to_python(dict(spam=1, ham=2)) == {'spam': 1, 'ham': '0002'}
+    assert s.to_python(dict(spam=1, ham=2), mode='json') == {'spam': 1, 'ham': '0002'}
+    assert s.to_json(dict(spam=1, ham=2)) == b'{"spam":1,"ham":"0002"}'
