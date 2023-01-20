@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::fmt::Debug;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
