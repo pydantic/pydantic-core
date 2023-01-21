@@ -45,7 +45,7 @@ jobs:
         name: cache rust
         uses: Swatinem/rust-cache@v2
         with:
-          key: v4
+          key: v5
 
       - run: cargo install rustfilt coverage-prepare
         if: steps.cache-rust.outputs.cache-hit != 'true'
@@ -63,7 +63,7 @@ jobs:
         with:
           path: ${{ env.pythonLocation }}
           key: >
-            py
+            py-v2
             ${{ runner.os }}
             ${{ env.pythonLocation }}
             ${{ hashFiles('tests/requirements.txt') }}
@@ -419,7 +419,10 @@ jobs:
       fail-fast: false
       matrix:
         target: [aarch64, armv7, s390x]
-        distro: ['ubuntu22.04', alpine_latest]
+        distro: ['ubuntu22.04']
+        include:
+          - target: aarch64
+            distro: alpine_latest
 
     steps:
       - uses: actions/checkout@v3
