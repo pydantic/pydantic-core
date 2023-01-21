@@ -311,11 +311,11 @@ jobs:
           - os: ubuntu
             platform: linux
             target: aarch64
-            container: messense/manylinux_2_24-cross:aarch64
+            # container: messense/manylinux_2_24-cross:aarch64
           - os: ubuntu
             platform: linux
             target: armv7
-            container: messense/manylinux_2_24-cross:armv7
+            # container: messense/manylinux_2_24-cross:armv7
             interpreter: 3.7 3.8 3.9 3.10 3.11
           # musllinux
           - os: ubuntu
@@ -329,12 +329,12 @@ jobs:
           - os: ubuntu
             platform: linux
             target: ppc64le
-            container: messense/manylinux_2_24-cross:ppc64le
+            # container: messense/manylinux_2_24-cross:ppc64le
             interpreter: 3.7 3.8 3.9 3.10 3.11
           - os: ubuntu
             platform: linux
             target: s390x
-            container: messense/manylinux_2_24-cross:s390x
+            # container: messense/manylinux_2_24-cross:s390x
             interpreter: 3.7 3.8 3.9 3.10 3.11
         exclude:
           # Windows on arm64 only supports Python 3.11+
