@@ -410,7 +410,7 @@ jobs:
          ls dist/*cp310-manylinux*x86_64.whl | head -n 1
          python -m zipfile --list `ls dist/*cp310-manylinux*x86_64.whl | head -n 1`
 
-  test-builds:
+  test-builds-arch:
     name: test build on ${{ matrix.target }}-${{ matrix.distro }}
     needs: [build]
     runs-on: ubuntu-latest
@@ -437,20 +437,14 @@ jobs:
           arch: ${{ matrix.target }}
           distro: ${{ matrix.distro }}
           githubToken: ${{ github.token }}
-          dockerRunArgs: '-v "${PWD}:/repo" -v "${PWD}/dist:/dist"'
           install: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install -U pip typing-extensions
           run: |
-            pwd
-            ls -lh
-            ls -lh /repo
-            ls -lh /dist
-            pip3 install -r /repo/tests/requirements.txt
-            pip3 install pydantic-core --no-index --no-deps --find-links /dist --force-reinstall
-            cd /repo
             rm -r pydantic_core
+            pip install -U pip typing-extensions
+            pip install -r tests/requirements.txt
+            pip install pydantic-core --no-index --no-deps --find-links dist/ --force-reinstall
             pytest
 
       - uses: uraimo/run-on-arch-action@v2.5.0
@@ -460,24 +454,48 @@ jobs:
           arch: ${{ matrix.target }}
           distro: ${{ matrix.distro }}
           githubToken: ${{ github.token }}
-          dockerRunArgs: '-v "${PWD}:/repo" -v "${PWD}/dist:/dist"'
           install: |
             apk update
             apk add python3 py3-pip
-            pip3 install -U pip typing-extensions
           run: |
-            pwd
-            ls -lh
-            ls -lh /repo
-            ls -lh /dist
-            pip3 install -r /repo/tests/requirements.txt
-            pip3 install pydantic-core --no-index --no-deps --find-links /dist --force-reinstall
-            cd /repo
             rm -r pydantic_core
+            pip install -U pip typing-extensions
+            pip install -r tests/requirements.txt
+            pip install pydantic-core --no-index --no-deps --find-links dist/ --force-reinstall
             pytest
 
+  test-builds-os:
+    name: test build on ${{ matrix.os }}
+    needs: [build]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu, macos, windows]
+
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: set up python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: get dist artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: pypi_files
+          path: dist
+
+      - run: rm -r pydantic_core
+      - run: pip install -U pip typing-extensions
+      - run: pip install -r tests/requirements.txt
+      - run: pip install pydantic-core --no-index --no-deps --find-links dist/ --force-reinstall
+      - run: pytest
+
   release:
-    needs: [build, test-builds, check]
+    needs: [test-builds-arch, test-builds-os, check]
     if: "success() && startsWith(github.ref, 'refs/tags/')"
     runs-on: ubuntu-latest
 
