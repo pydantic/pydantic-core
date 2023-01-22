@@ -30,6 +30,7 @@ jobs:
 
     env:
       PYTHON: ${{ matrix.python-version }}
+      COLUMNS: 120
 
     steps:
       - uses: actions/checkout@v3
@@ -110,6 +111,7 @@ jobs:
 
     env:
       PYTHON: ${{ matrix.python-version }}
+      COLUMNS: 120
 
     steps:
       - uses: actions/checkout@v3
@@ -159,6 +161,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu, macos, windows]
+
+    env:
+      COLUMNS: 120
 
     runs-on: ${{ matrix.os }}-latest
     steps:
