@@ -168,9 +168,9 @@ def args(*args, **kwargs):
             {'type': 'typed-dict', 'fields': {'foo': {'schema': {'type': 'int'}}}},
         ],
         [
-            core_schema.new_class_schema,
+            core_schema.model_schema,
             args(MyModel, {'type': 'int'}),
-            {'type': 'new-class', 'cls': MyModel, 'schema': {'type': 'int'}},
+            {'type': 'model', 'cls': MyModel, 'schema': {'type': 'int'}},
         ],
         [core_schema.arguments_parameter, args('foo', {'type': 'int'}), {'name': 'foo', 'schema': {'type': 'int'}}],
         [

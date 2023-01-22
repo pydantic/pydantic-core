@@ -143,7 +143,7 @@ class BasicModel:
 @pytest.fixture(scope='module', name='core_serializer')
 def core_serializer_fixture():
     return SchemaSerializer(
-        core_schema.new_class_schema(
+        core_schema.model_schema(
             BasicModel,
             core_schema.typed_dict_schema(
                 {
@@ -227,7 +227,7 @@ def test_model_list_v1_json(benchmark):
 @pytest.mark.benchmark(group='model-list-json')
 def test_model_list_core_json(benchmark):
     s = SchemaSerializer(
-        core_schema.new_class_schema(
+        core_schema.model_schema(
             BasicModel,
             core_schema.typed_dict_schema(
                 {

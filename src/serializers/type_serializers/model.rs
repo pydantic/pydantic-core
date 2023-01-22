@@ -8,12 +8,12 @@ use crate::build_tools::SchemaDict;
 use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
-pub struct NewClassSerializer {
+pub struct ModelSerializer {
     serializer: Box<CombinedSerializer>,
 }
 
-impl BuildSerializer for NewClassSerializer {
-    const EXPECTED_TYPE: &'static str = "new-class";
+impl BuildSerializer for ModelSerializer {
+    const EXPECTED_TYPE: &'static str = "model";
 
     fn build(
         schema: &PyDict,
@@ -28,7 +28,7 @@ impl BuildSerializer for NewClassSerializer {
     }
 }
 
-impl TypeSerializer for NewClassSerializer {
+impl TypeSerializer for ModelSerializer {
     fn to_python(
         &self,
         value: &PyAny,
