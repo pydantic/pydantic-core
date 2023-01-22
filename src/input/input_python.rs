@@ -376,6 +376,7 @@ impl<'a> Input<'a> for PyAny {
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
         } else if allow_any_iter && self.iter().is_ok() {
+            eprintln!("allow_any_iter && self.iter().is_ok()");
             Ok(self.into())
         } else if let Some(collection) = extract_shared_iter!(PyList, self) {
             Ok(collection)
