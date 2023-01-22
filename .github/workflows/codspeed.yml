@@ -26,7 +26,7 @@ jobs:
         with:
           path: ${{ env.pythonLocation }}
           key: >
-            py
+            py-v2
             ${{ env.pythonLocation }}
             ${{ hashFiles('tests/requirements.txt') }}
             ${{ hashFiles('pyproject.toml') }}
@@ -41,6 +41,7 @@ jobs:
         if: steps.cache-py.outputs.cache-hit != 'true'
 
       - run: rm rust-toolchain
+
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
 
