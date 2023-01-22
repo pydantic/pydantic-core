@@ -153,7 +153,7 @@ jobs:
       - run: pytest
 
   test-os:
-    name: test py3.11 on ${{ matrix.os }}
+    name: test on ${{ matrix.os }}
 
     strategy:
       fail-fast: false
@@ -247,7 +247,7 @@ jobs:
       - run: npm run lint
 
   bench:
-    # run the rust benchmarks
+    name: rust benchmarks
     runs-on: ubuntu-latest
 
     steps:
@@ -419,7 +419,7 @@ jobs:
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
 
-      - run: twine check dist/*
+      - run: twine check --strict dist/*
 
       - uses: actions/upload-artifact@v3
         with:
@@ -566,7 +566,7 @@ jobs:
           name: pypi_files
           path: dist
 
-      - run: twine check dist/*
+      - run: twine check --strict dist/*
 
       - name: upload to pypi
         run: twine upload dist/*
