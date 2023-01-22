@@ -34,7 +34,6 @@ macro_rules! extract_shared_iter {
             eprintln!("obj.downcast::<PyIterator>().is_ok(): {:?}", $obj);
             Some($obj.into())
         } else if is_deque($obj) {
-            eprintln!("is_deque(obj): {:?}", $obj);
             Some($obj.into())
         } else {
             None
@@ -378,7 +377,6 @@ impl<'a> Input<'a> for PyAny {
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
         } else if allow_any_iter && self.iter().is_ok() {
-            eprintln!("allow_any_iter && self.iter().is_ok()");
             Ok(self.into())
         } else if let Some(collection) = extract_shared_iter!(PyList, self) {
             Ok(collection)
