@@ -31,10 +31,10 @@ use super::{
 macro_rules! extract_shared_iter {
     ($type:ty, $obj:ident) => {
         if $obj.downcast::<PyIterator>().is_ok() {
-            eprintln!("obj.downcast::<PyIterator>().is_ok()");
+            eprintln!("obj.downcast::<PyIterator>().is_ok(): {:?}", $obj);
             Some($obj.into())
         } else if is_deque($obj) {
-            eprintln!("is_deque(obj)");
+            eprintln!("is_deque(obj): {:?}", $obj);
             Some($obj.into())
         } else {
             None
