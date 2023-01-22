@@ -292,7 +292,7 @@ impl Validator for TaggedUnionValidator {
         match self.discriminator {
             Discriminator::LookupKey(ref lookup_key) => {
                 macro_rules! find_validator {
-                    ($get_method:ident, $( $dict:ident ),+) => {{
+                    ($get_method:ident, $($dict:ident),+) => {{
                         // note all these methods return PyResult<Option<(data, data)>>, the outer Err is just for
                         // errors when getting attributes which should be "raised"
                         match lookup_key.$get_method($( $dict ),+)? {
