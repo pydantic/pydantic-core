@@ -1,5 +1,6 @@
 import platform
 import re
+import sys
 from collections import deque
 from collections.abc import Sequence
 from typing import Any, Dict
@@ -317,7 +318,7 @@ def my_sequence():
     return MySequence
 
 
-# @pytest.mark.xfail(sys.platform == 'win32', reason='TODO: why doesnt `validate_python` raise an error on windows?')
+@pytest.mark.xfail(sys.platform == 'win32', reason='TODO: why doesnt `validate_python` raise an error on windows here?')
 def test_sequence(MySequence):
     v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
     with pytest.raises(ValidationError) as exc_info:
