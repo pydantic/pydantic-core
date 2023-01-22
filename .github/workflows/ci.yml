@@ -152,6 +152,51 @@ jobs:
 
       - run: pytest
 
+  test-os:
+    name: test py3.11 on ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu, macos, windows]
+
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: cache rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}-v1
+
+      - name: set up python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - id: cache-py
+        name: cache python
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.pythonLocation }}
+          key: >
+            py
+            ${{ runner.os }}
+            ${{ env.pythonLocation }}
+            ${{ hashFiles('tests/requirements.txt') }}
+            ${{ hashFiles('pyproject.toml') }}
+
+      - run: pip install -r tests/requirements.txt
+        if: steps.cache-py.outputs.cache-hit != 'true'
+
+      - run: pip install -e .
+        env:
+          RUST_BACKTRACE: 1
+
+      - run: pip freeze
+
+      - run: pytest
+
   lint:
     runs-on: ubuntu-latest
 
@@ -271,7 +316,7 @@ jobs:
   # https://github.com/marketplace/actions/alls-green#why used for branch protection checks
   check:
     if: always()
-    needs: [test-cpython, test-pypy, lint, bench, build-wasm-emscripten]
+    needs: [test-cpython, test-pypy, test-os, lint, bench, build-wasm-emscripten]
     runs-on: ubuntu-latest
     steps:
       - name: Decide whether the needed jobs succeeded or failed
