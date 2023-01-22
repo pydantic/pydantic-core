@@ -5,11 +5,12 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 
 use ahash::AHashSet;
+use nohash_hasher::IntSet;
 
 use crate::build_tools::{py_err, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
-use crate::recursion_guard::{NoHashSet, RecursionGuard};
+use crate::recursion_guard::RecursionGuard;
 
 use super::none::NoneValidator;
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
@@ -23,14 +24,14 @@ impl BuildValidator for LiteralBuilder {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext,
+        build_context: &mut BuildContext<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let expected: &PyList = schema.get_as_req(intern!(schema.py(), "expected"))?;
         if expected.is_empty() {
             return py_err!(r#""expected" should have length > 0"#);
         } else if expected.len() == 1 {
             let first = expected.get_item(0)?;
-            if let Ok(py_str) = first.cast_as::<PyString>() {
+            if let Ok(py_str) = first.downcast::<PyString>() {
                 return Ok(LiteralSingleStringValidator::new(py_str.to_str()?.to_string()).into());
             } else if let Ok(int) = first.extract::<i64>() {
                 return Ok(LiteralSingleIntValidator::new(int).into());
@@ -194,19 +195,19 @@ impl Validator for LiteralMultipleStringsValidator {
 
 #[derive(Debug, Clone)]
 pub struct LiteralMultipleIntsValidator {
-    expected: NoHashSet<i64>,
+    expected: IntSet<i64>,
     expected_repr: String,
     name: String,
 }
 
 impl LiteralMultipleIntsValidator {
     fn new(expected_list: &PyList) -> Option<Self> {
-        let mut expected: NoHashSet<i64> = NoHashSet::with_hasher(BuildHasherDefault::default());
+        let mut expected: IntSet<i64> = IntSet::with_hasher(BuildHasherDefault::default());
         let mut repr_args = Vec::new();
         for item in expected_list.iter() {
-            if let Ok(str) = item.extract() {
-                expected.insert(str);
-                repr_args.push(str.to_string());
+            if let Ok(int) = item.extract() {
+                expected.insert(int);
+                repr_args.push(int.to_string());
             } else {
                 return None;
             }
@@ -267,7 +268,7 @@ impl LiteralGeneralValidator {
             repr_args.push(item.repr()?.extract()?);
             if let Ok(int) = item.extract::<i64>() {
                 expected_int.insert(int);
-            } else if let Ok(py_str) = item.cast_as::<PyString>() {
+            } else if let Ok(py_str) = item.downcast::<PyString>() {
                 expected_str.insert(py_str.to_str()?.to_string());
             } else {
                 expected_py.append(item)?;

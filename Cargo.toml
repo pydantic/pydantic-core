@@ -26,7 +26,7 @@ include = [
 ]
 
 [dependencies]
-pyo3 = "0.17.3"
+pyo3 = "0.18.0"
 regex = "1.6.0"
 strum = { version = "0.24.1", features = ["derive"] }
 strum_macros = "0.24.3"
@@ -41,6 +41,7 @@ nohash-hasher = "0.2.0"
 url = "2.3.1"
 # idna is already required by url, added here to be explicit
 idna = "0.3.0"
+base64 = "0.13.1"
 
 [lib]
 name = "_pydantic_core"
@@ -51,7 +52,7 @@ crate-type = ["cdylib", "rlib"]
 extension-module = ["pyo3/extension-module"]
 # required for cargo bench
 auto-initialize = ["pyo3/auto-initialize"]
-default = ["mimalloc", "extension-module"]
+default = ["mimalloc", "extension-module", "mimalloc/local_dynamic_tls"]
 
 [package.metadata.maturin]
 name = "pydantic_core._pydantic_core"
@@ -60,8 +61,9 @@ name = "pydantic_core._pydantic_core"
 lto = "fat"
 codegen-units = 1
 panic = "abort"
+strip = true
 
 [build-dependencies]
 version_check = "0.9.4"
 # used where logic has to be version/distribution specific, e.g. pypy
-pyo3-build-config = "0.17.3"
+pyo3-build-config = "0.18.0"

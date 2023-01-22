@@ -11,6 +11,7 @@ use pyo3::types::{
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
+use crate::build_tools::safe_repr;
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
 use crate::{PyMultiHostUrl, PyUrl};
 
@@ -22,14 +23,14 @@ use super::datetime::{
 use super::input_abstract::InputType;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
-    py_error_on_minusone, py_string_str, repr_string, EitherBytes, EitherString, EitherTimedelta, GenericArguments,
+    py_error_on_minusone, py_string_str, EitherBytes, EitherString, EitherTimedelta, GenericArguments,
     GenericCollection, GenericIterator, GenericMapping, Input, JsonInput, PyArgs,
 };
 
 /// Extract generators and deques into a `GenericCollection`
 macro_rules! extract_shared_iter {
     ($type:ty, $obj:ident) => {
-        if $obj.cast_as::<PyIterator>().is_ok() {
+        if $obj.downcast::<PyIterator>().is_ok() {
             Some($obj.into())
         } else if is_deque($obj) {
             Some($obj.into())
@@ -61,15 +62,12 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn as_loc_item(&self) -> LocItem {
-        if let Ok(py_str) = self.cast_as::<PyString>() {
+        if let Ok(py_str) = self.downcast::<PyString>() {
             py_str.to_string_lossy().as_ref().into()
         } else if let Ok(key_int) = self.extract::<usize>() {
             key_int.into()
         } else {
-            match repr_string(self) {
-                Ok(s) => s.into(),
-                Err(_) => format!("{self:?}").into(),
-            }
+            safe_repr(self).to_string().into()
         }
     }
 
@@ -102,7 +100,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn input_is_subclass(&self, class: &PyType) -> PyResult<bool> {
-        match self.cast_as::<PyType>() {
+        match self.downcast::<PyType>() {
             Ok(py_type) => py_type.is_subclass(class),
             Err(_) => Ok(false),
         }
@@ -121,16 +119,16 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
-        if let Ok(dict) = self.cast_as::<PyDict>() {
+        if let Ok(dict) = self.downcast::<PyDict>() {
             if let Some(args) = dict.get_item("__args__") {
                 if let Some(kwargs) = dict.get_item("__kwargs__") {
                     // we only try this logic if there are only these two items in the dict
                     if dict.len() == 2 {
-                        let args = if let Ok(tuple) = args.cast_as::<PyTuple>() {
+                        let args = if let Ok(tuple) = args.downcast::<PyTuple>() {
                             Ok(Some(tuple))
                         } else if args.is_none() {
                             Ok(None)
-                        } else if let Ok(list) = args.cast_as::<PyList>() {
+                        } else if let Ok(list) = args.downcast::<PyList>() {
                             Ok(Some(PyTuple::new(self.py(), list.iter())))
                         } else {
                             Err(ValLineError::new_with_loc(
@@ -140,7 +138,7 @@ impl<'a> Input<'a> for PyAny {
                             ))
                         };
 
-                        let kwargs = if let Ok(dict) = kwargs.cast_as::<PyDict>() {
+                        let kwargs = if let Ok(dict) = kwargs.downcast::<PyDict>() {
                             Ok(Some(dict))
                         } else if kwargs.is_none() {
                             Ok(None)
@@ -164,9 +162,9 @@ impl<'a> Input<'a> for PyAny {
                 }
             }
             Ok(PyArgs::new(None, Some(dict)).into())
-        } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(PyArgs::new(Some(tuple), None).into())
-        } else if let Ok(list) = self.cast_as::<PyList>() {
+        } else if let Ok(list) = self.downcast::<PyList>() {
             let tuple = PyTuple::new(self.py(), list.iter());
             Ok(PyArgs::new(Some(tuple), None).into())
         } else {
@@ -175,12 +173,12 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
-        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+        if let Ok(py_bytes) = self.downcast::<PyBytes>() {
             serde_json::from_slice(py_bytes.as_bytes()).map_err(|e| map_json_err(self, e))
-        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+        } else if let Ok(py_str) = self.downcast::<PyString>() {
             let str = py_str.to_str()?;
             serde_json::from_str(str).map_err(|e| map_json_err(self, e))
-        } else if let Ok(py_byte_array) = self.cast_as::<PyByteArray>() {
+        } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
             serde_json::from_slice(unsafe { py_byte_array.as_bytes() }).map_err(|e| map_json_err(self, e))
         } else {
             Err(ValError::new(ErrorType::JsonType, self))
@@ -188,7 +186,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
-        if let Ok(py_str) = self.cast_as::<PyString>() {
+        if let Ok(py_str) = self.downcast::<PyString>() {
             if is_builtin_str(py_str) {
                 Ok(py_str.into())
             } else {
@@ -200,7 +198,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
-        if let Ok(py_str) = self.cast_as::<PyString>() {
+        if let Ok(py_str) = self.downcast::<PyString>() {
             if is_builtin_str(py_str) {
                 Ok(py_str.into())
             } else {
@@ -208,13 +206,15 @@ impl<'a> Input<'a> for PyAny {
                 // rust string in StrConstrainedValidator - e.g. to_lower
                 Ok(py_string_str(py_str)?.into())
             }
-        } else if let Ok(bytes) = self.cast_as::<PyBytes>() {
+        } else if let Ok(bytes) = self.downcast::<PyBytes>() {
             let str = match from_utf8(bytes.as_bytes()) {
                 Ok(s) => s,
                 Err(_) => return Err(ValError::new(ErrorType::StringUnicode, self)),
             };
             Ok(str.into())
-        } else if let Ok(py_byte_array) = self.cast_as::<PyByteArray>() {
+        } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
+            // see https://docs.rs/pyo3/latest/pyo3/types/struct.PyByteArray.html#method.as_bytes
+            // for why this is marked unsafe
             let str = match from_utf8(unsafe { py_byte_array.as_bytes() }) {
                 Ok(s) => s,
                 Err(_) => return Err(ValError::new(ErrorType::StringUnicode, self)),
@@ -226,7 +226,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_bytes(&'a self) -> ValResult<EitherBytes<'a>> {
-        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+        if let Ok(py_bytes) = self.downcast::<PyBytes>() {
             Ok(py_bytes.into())
         } else {
             Err(ValError::new(ErrorType::BytesType, self))
@@ -234,12 +234,12 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_bytes(&'a self) -> ValResult<EitherBytes<'a>> {
-        if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+        if let Ok(py_bytes) = self.downcast::<PyBytes>() {
             Ok(py_bytes.into())
-        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+        } else if let Ok(py_str) = self.downcast::<PyString>() {
             let str = py_string_str(py_str)?;
             Ok(str.as_bytes().into())
-        } else if let Ok(py_byte_array) = self.cast_as::<PyByteArray>() {
+        } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
             Ok(py_byte_array.to_vec().into())
         } else {
             Err(ValError::new(ErrorType::BytesType, self))
@@ -318,7 +318,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_dict(&'a self) -> ValResult<GenericMapping<'a>> {
-        if let Ok(dict) = self.cast_as::<PyDict>() {
+        if let Ok(dict) = self.downcast::<PyDict>() {
             Ok(dict.into())
         } else {
             Err(ValError::new(ErrorType::DictType, self))
@@ -326,9 +326,9 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_dict(&'a self) -> ValResult<GenericMapping<'a>> {
-        if let Ok(dict) = self.cast_as::<PyDict>() {
+        if let Ok(dict) = self.downcast::<PyDict>() {
             Ok(dict.into())
-        } else if let Ok(mapping) = self.cast_as::<PyMapping>() {
+        } else if let Ok(mapping) = self.downcast::<PyMapping>() {
             Ok(mapping.into())
         } else {
             Err(ValError::new(ErrorType::DictType, self))
@@ -338,10 +338,10 @@ impl<'a> Input<'a> for PyAny {
     fn validate_typed_dict(&'a self, strict: bool, from_attributes: bool) -> ValResult<GenericMapping<'a>> {
         if from_attributes {
             // if from_attributes, first try a dict, then mapping then from_attributes
-            if let Ok(dict) = self.cast_as::<PyDict>() {
+            if let Ok(dict) = self.downcast::<PyDict>() {
                 return Ok(dict.into());
             } else if !strict {
-                if let Ok(mapping) = self.cast_as::<PyMapping>() {
+                if let Ok(mapping) = self.downcast::<PyMapping>() {
                     return Ok(mapping.into());
                 }
             }
@@ -366,7 +366,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_list(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(list) = self.cast_as::<PyList>() {
+        if let Ok(list) = self.downcast::<PyList>() {
             Ok(list.into())
         } else {
             Err(ValError::new(ErrorType::ListType, self))
@@ -375,9 +375,9 @@ impl<'a> Input<'a> for PyAny {
 
     #[cfg(not(PyPy))]
     fn lax_list(&'a self, allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
-        if let Ok(list) = self.cast_as::<PyList>() {
+        if let Ok(list) = self.downcast::<PyList>() {
             Ok(list.into())
-        } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
@@ -392,9 +392,9 @@ impl<'a> Input<'a> for PyAny {
 
     #[cfg(PyPy)]
     fn lax_list(&'a self, allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
-        if let Ok(list) = self.cast_as::<PyList>() {
+        if let Ok(list) = self.downcast::<PyList>() {
             Ok(list.into())
-        } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
         } else if allow_any_iter && self.iter().is_ok() {
             Ok(self.into())
@@ -406,7 +406,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(tuple) = self.cast_as::<PyTuple>() {
+        if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
         } else {
             Err(ValError::new(ErrorType::TupleType, self))
@@ -415,9 +415,9 @@ impl<'a> Input<'a> for PyAny {
 
     #[cfg(not(PyPy))]
     fn lax_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(tuple) = self.cast_as::<PyTuple>() {
+        if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
-        } else if let Ok(list) = self.cast_as::<PyList>() {
+        } else if let Ok(list) = self.downcast::<PyList>() {
             Ok(list.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
@@ -430,9 +430,9 @@ impl<'a> Input<'a> for PyAny {
 
     #[cfg(PyPy)]
     fn lax_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(tuple) = self.cast_as::<PyTuple>() {
+        if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
-        } else if let Ok(list) = self.cast_as::<PyList>() {
+        } else if let Ok(list) = self.downcast::<PyList>() {
             Ok(list.into())
         } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
             Ok(collection)
@@ -442,7 +442,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_set(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(set) = self.cast_as::<PySet>() {
+        if let Ok(set) = self.downcast::<PySet>() {
             Ok(set.into())
         } else {
             Err(ValError::new(ErrorType::SetType, self))
@@ -451,13 +451,13 @@ impl<'a> Input<'a> for PyAny {
 
     #[cfg(not(PyPy))]
     fn lax_set(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(set) = self.cast_as::<PySet>() {
+        if let Ok(set) = self.downcast::<PySet>() {
             Ok(set.into())
-        } else if let Ok(list) = self.cast_as::<PyList>() {
+        } else if let Ok(list) = self.downcast::<PyList>() {
             Ok(list.into())
-        } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
-        } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
+        } else if let Ok(frozen_set) = self.downcast::<PyFrozenSet>() {
             Ok(frozen_set.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
@@ -470,13 +470,13 @@ impl<'a> Input<'a> for PyAny {
 
     #[cfg(PyPy)]
     fn lax_set(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(set) = self.cast_as::<PySet>() {
+        if let Ok(set) = self.downcast::<PySet>() {
             Ok(set.into())
-        } else if let Ok(list) = self.cast_as::<PyList>() {
+        } else if let Ok(list) = self.downcast::<PyList>() {
             Ok(list.into())
-        } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
-        } else if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
+        } else if let Ok(frozen_set) = self.downcast::<PyFrozenSet>() {
             Ok(frozen_set.into())
         } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
             Ok(collection)
@@ -486,7 +486,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(set) = self.cast_as::<PyFrozenSet>() {
+        if let Ok(set) = self.downcast::<PyFrozenSet>() {
             Ok(set.into())
         } else {
             Err(ValError::new(ErrorType::FrozenSetType, self))
@@ -495,13 +495,13 @@ impl<'a> Input<'a> for PyAny {
 
     #[cfg(not(PyPy))]
     fn lax_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
+        if let Ok(frozen_set) = self.downcast::<PyFrozenSet>() {
             Ok(frozen_set.into())
-        } else if let Ok(set) = self.cast_as::<PySet>() {
+        } else if let Ok(set) = self.downcast::<PySet>() {
             Ok(set.into())
-        } else if let Ok(list) = self.cast_as::<PyList>() {
+        } else if let Ok(list) = self.downcast::<PyList>() {
             Ok(list.into())
-        } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
@@ -514,13 +514,13 @@ impl<'a> Input<'a> for PyAny {
 
     #[cfg(PyPy)]
     fn lax_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(frozen_set) = self.cast_as::<PyFrozenSet>() {
+        if let Ok(frozen_set) = self.downcast::<PyFrozenSet>() {
             Ok(frozen_set.into())
-        } else if let Ok(set) = self.cast_as::<PySet>() {
+        } else if let Ok(set) = self.downcast::<PySet>() {
             Ok(set.into())
-        } else if let Ok(list) = self.cast_as::<PyList>() {
+        } else if let Ok(list) = self.downcast::<PyList>() {
             Ok(list.into())
-        } else if let Ok(tuple) = self.cast_as::<PyTuple>() {
+        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
         } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
             Ok(collection)
@@ -538,10 +538,10 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_date(&self) -> ValResult<EitherDate> {
-        if self.cast_as::<PyDateTime>().is_ok() {
+        if self.downcast::<PyDateTime>().is_ok() {
             // have to check if it's a datetime first, otherwise the line below converts to a date
             Err(ValError::new(ErrorType::DateType, self))
-        } else if let Ok(date) = self.cast_as::<PyDate>() {
+        } else if let Ok(date) = self.downcast::<PyDate>() {
             Ok(date.into())
         } else {
             Err(ValError::new(ErrorType::DateType, self))
@@ -549,16 +549,16 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_date(&self) -> ValResult<EitherDate> {
-        if self.cast_as::<PyDateTime>().is_ok() {
+        if self.downcast::<PyDateTime>().is_ok() {
             // have to check if it's a datetime first, otherwise the line below converts to a date
             // even if we later try coercion from a datetime, we don't want to return a datetime now
             Err(ValError::new(ErrorType::DateType, self))
-        } else if let Ok(date) = self.cast_as::<PyDate>() {
+        } else if let Ok(date) = self.downcast::<PyDate>() {
             Ok(date.into())
-        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+        } else if let Ok(py_str) = self.downcast::<PyString>() {
             let str = py_string_str(py_str)?;
             bytes_as_date(self, str.as_bytes())
-        } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+        } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
             bytes_as_date(self, py_bytes.as_bytes())
         } else {
             Err(ValError::new(ErrorType::DateType, self))
@@ -566,7 +566,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_time(&self) -> ValResult<EitherTime> {
-        if let Ok(time) = self.cast_as::<PyTime>() {
+        if let Ok(time) = self.downcast::<PyTime>() {
             Ok(time.into())
         } else {
             Err(ValError::new(ErrorType::TimeType, self))
@@ -574,14 +574,14 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_time(&self) -> ValResult<EitherTime> {
-        if let Ok(time) = self.cast_as::<PyTime>() {
+        if let Ok(time) = self.downcast::<PyTime>() {
             Ok(time.into())
-        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+        } else if let Ok(py_str) = self.downcast::<PyString>() {
             let str = py_string_str(py_str)?;
             bytes_as_time(self, str.as_bytes())
-        } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+        } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
             bytes_as_time(self, py_bytes.as_bytes())
-        } else if self.cast_as::<PyBool>().is_ok() {
+        } else if self.downcast::<PyBool>().is_ok() {
             Err(ValError::new(ErrorType::TimeType, self))
         } else if let Ok(int) = self.extract::<i64>() {
             int_as_time(self, int, 0)
@@ -593,7 +593,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_datetime(&self) -> ValResult<EitherDateTime> {
-        if let Ok(dt) = self.cast_as::<PyDateTime>() {
+        if let Ok(dt) = self.downcast::<PyDateTime>() {
             Ok(dt.into())
         } else {
             Err(ValError::new(ErrorType::DatetimeType, self))
@@ -601,20 +601,20 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_datetime(&self) -> ValResult<EitherDateTime> {
-        if let Ok(dt) = self.cast_as::<PyDateTime>() {
+        if let Ok(dt) = self.downcast::<PyDateTime>() {
             Ok(dt.into())
-        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+        } else if let Ok(py_str) = self.downcast::<PyString>() {
             let str = py_string_str(py_str)?;
             bytes_as_datetime(self, str.as_bytes())
-        } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+        } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
             bytes_as_datetime(self, py_bytes.as_bytes())
-        } else if self.cast_as::<PyBool>().is_ok() {
+        } else if self.downcast::<PyBool>().is_ok() {
             Err(ValError::new(ErrorType::DatetimeType, self))
         } else if let Ok(int) = self.extract::<i64>() {
             int_as_datetime(self, int, 0)
         } else if let Ok(float) = self.extract::<f64>() {
             float_as_datetime(self, float)
-        } else if let Ok(date) = self.cast_as::<PyDate>() {
+        } else if let Ok(date) = self.downcast::<PyDate>() {
             Ok(date_as_datetime(date)?)
         } else {
             Err(ValError::new(ErrorType::DatetimeType, self))
@@ -622,7 +622,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_timedelta(&self) -> ValResult<EitherTimedelta> {
-        if let Ok(dt) = self.cast_as::<PyDelta>() {
+        if let Ok(dt) = self.downcast::<PyDelta>() {
             Ok(dt.into())
         } else {
             Err(ValError::new(ErrorType::TimeDeltaType, self))
@@ -630,12 +630,12 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_timedelta(&self) -> ValResult<EitherTimedelta> {
-        if let Ok(dt) = self.cast_as::<PyDelta>() {
+        if let Ok(dt) = self.downcast::<PyDelta>() {
             Ok(dt.into())
-        } else if let Ok(py_str) = self.cast_as::<PyString>() {
+        } else if let Ok(py_str) = self.downcast::<PyString>() {
             let str = py_string_str(py_str)?;
             bytes_as_timedelta(self, str.as_bytes())
-        } else if let Ok(py_bytes) = self.cast_as::<PyBytes>() {
+        } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
             bytes_as_timedelta(self, py_bytes.as_bytes())
         } else if let Ok(int) = self.extract::<i64>() {
             Ok(int_as_duration(self, int)?.into())
@@ -666,10 +666,10 @@ fn from_attributes_applicable(obj: &PyAny) -> bool {
 
 /// Utility for extracting a string from a PyAny, if possible.
 fn maybe_as_string(v: &PyAny, unicode_error: ErrorType) -> ValResult<Option<Cow<str>>> {
-    if let Ok(py_string) = v.cast_as::<PyString>() {
+    if let Ok(py_string) = v.downcast::<PyString>() {
         let str = py_string_str(py_string)?;
         Ok(Some(Cow::Borrowed(str)))
-    } else if let Ok(bytes) = v.cast_as::<PyBytes>() {
+    } else if let Ok(bytes) = v.downcast::<PyBytes>() {
         match from_utf8(bytes.as_bytes()) {
             Ok(s) => Ok(Some(Cow::Owned(s.to_string()))),
             Err(_) => Err(ValError::new(unicode_error, v)),
@@ -691,7 +691,7 @@ fn is_deque(v: &PyAny) -> bool {
 
 fn import_type(py: Python, module: &str, attr: &str) -> PyResult<Py<PyType>> {
     let obj = py.import(module)?.getattr(attr)?;
-    Ok(obj.cast_as::<PyType>()?.into())
+    Ok(obj.downcast::<PyType>()?.into())
 }
 
 fn is_builtin_str(py_str: &PyString) -> bool {

@@ -27,6 +27,39 @@ impl PydanticOmit {
 }
 
 #[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
+#[derive(Debug, Clone)]
+pub struct PydanticSerializationError {
+    message: String,
+}
+
+impl PydanticSerializationError {
+    pub(crate) fn new_err(msg: String) -> PyErr {
+        PyErr::new::<PydanticSerializationError, String>(msg)
+    }
+
+    pub(crate) fn json_error(error: serde_json::Error) -> PyErr {
+        let msg = format!("Error serializing to JSON: {error}");
+        PyErr::new::<PydanticSerializationError, String>(msg)
+    }
+}
+
+#[pymethods]
+impl PydanticSerializationError {
+    #[new]
+    fn py_new(message: String) -> Self {
+        Self { message }
+    }
+
+    fn __str__(&self) -> &str {
+        &self.message
+    }
+
+    fn __repr__(&self) -> String {
+        format!("PydanticSerializationError({})", self.message)
+    }
+}
+
+#[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
 #[derive(Debug, Clone, Default)]
 pub struct PydanticCustomError {
     error_type: String,
@@ -65,7 +98,7 @@ impl PydanticCustomError {
         if let Some(ref context) = self.context {
             for item in context.as_ref(py).items().iter() {
                 let (key, value): (&PyString, &PyAny) = item.extract()?;
-                if let Ok(py_str) = value.cast_as::<PyString>() {
+                if let Ok(py_str) = value.downcast::<PyString>() {
                     message = message.replace(&format!("{{{}}}", key.to_str()?), py_str.to_str()?);
                 } else if let Ok(value_int) = value.extract::<i64>() {
                     message = message.replace(&format!("{{{}}}", key.to_str()?), &value_int.to_string());
