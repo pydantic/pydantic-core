@@ -475,6 +475,7 @@ jobs:
           distro: ${{ matrix.distro }}
           githubToken: ${{ github.token }}
           install: |
+            set -x
             if command -v apt-get &> /dev/null; then
               echo "installing python & pip with apt-get..."
               apt-get update
@@ -485,14 +486,15 @@ jobs:
               apk add python3 py3-pip
             fi
           run: |
+            set -x
             # this is required so that pytest uses the installed pydantic-core package
             rm tests/__init__.py
             # typing-extensions isn't automatically installed because of `--no-index --no-deps`
-            pip install -U pip typing-extensions
-            pip install -r tests/requirements.txt
-            pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
+            python3 -m pip install -U pip typing-extensions
+            python3 -m pip install -r tests/requirements.txt
+            python3 -m pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
+            python3 -m pytest
             python3 -c 'import pydantic_core._pydantic_core; print(pydantic_core._pydantic_core.__version__)'
-            pytest
 
   test-builds-os:
     name: test build on ${{ matrix.os }}
