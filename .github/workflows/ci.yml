@@ -491,7 +491,7 @@ jobs:
             pip install -U pip typing-extensions
             pip install -r tests/requirements.txt
             pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
-            python -c 'import pydantic_core._pydantic_core; print(pydantic_core._pydantic_core.__version__)'
+            python3 -c 'import pydantic_core._pydantic_core; print(pydantic_core._pydantic_core.__version__)'
             pytest
 
   test-builds-os:
