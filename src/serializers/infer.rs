@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::str::from_utf8;
 
 use pyo3::exceptions::PyTypeError;
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{
     PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyList, PySet, PyString, PyTime, PyTuple,
@@ -53,7 +54,7 @@ pub(crate) fn infer_to_python_known(
             value
                 .downcast::<$t>()?
                 .iter()
-                .map(|v| infer_to_python(v, include, exclude, extra))
+                .map(|v| infer_to_python(v, None, None, extra))
                 .collect::<PyResult<Vec<PyObject>>>()?
         };
     }
@@ -159,6 +160,10 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Dataclass => serialize_dict(object_to_dict(value, false, extra)?)?,
             ObType::PydanticModel => serialize_dict(object_to_dict(value, true, extra)?)?,
+            ObType::Enum => {
+                let v = value.getattr(intern!(py, "value"))?;
+                infer_to_python(v, include, exclude, extra)?.into_py(py)
+            }
             ObType::Unknown => return Err(unknown_type_error(value)),
         },
         _ => match ob_type {
@@ -370,6 +375,10 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         }
         ObType::Dataclass => serialize_dict!(object_to_dict(value, false, extra).map_err(py_err_se_err)?),
         ObType::PydanticModel => serialize_dict!(object_to_dict(value, true, extra).map_err(py_err_se_err)?),
+        ObType::Enum => {
+            let v = value.getattr(intern!(value.py(), "value")).map_err(py_err_se_err)?;
+            infer_serialize(v, serializer, include, exclude, extra)
+        }
         ObType::Unknown => return Err(py_err_se_err(unknown_type_error(value))),
     };
     extra.rec_guard.pop(value_id);
@@ -452,6 +461,10 @@ pub(crate) fn infer_json_key_known<'py>(ob_type: &ObType, key: &'py PyAny, extra
             key.hash()?;
             let key = key.str()?.to_string();
             Ok(Cow::Owned(key))
+        }
+        ObType::Enum => {
+            let k = key.getattr(intern!(key.py(), "value"))?;
+            infer_json_key(k, extra)
         }
         ObType::Unknown => Err(unknown_type_error(key)),
     }
