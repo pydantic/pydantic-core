@@ -192,15 +192,15 @@ def test_tuple_fallback():
     [
         dict(include=None, exclude=None, expected=['0', '1', '2', '3']),
         dict(include={0, 1}, exclude=None, expected=['0', '1']),
-        dict(include={0: None, 1: None}, exclude=None, expected=['0', '1']),
+        dict(include={0: ..., 1: ...}, exclude=None, expected=['0', '1']),
         dict(include={0: {1}, 1: {1}}, exclude=None, expected=['0', '1']),
         dict(include=None, exclude={0, 1}, expected=['2', '3']),
-        dict(include=None, exclude={0: None, 1: None}, expected=['2', '3']),
+        dict(include=None, exclude={0: ..., 1: ...}, expected=['2', '3']),
         dict(include={0, 1}, exclude={1, 2}, expected=['0']),
         dict(include=None, exclude={3: {1}}, expected=['0', '1', '2', '3']),
         dict(include={0, 1}, exclude={3: {1}}, expected=['0', '1']),
         dict(include={0, 1}, exclude={1: {1}}, expected=['0', '1']),
-        dict(include={0, 1}, exclude={1: None}, expected=['0']),
+        dict(include={0, 1}, exclude={1: ...}, expected=['0']),
         dict(include={1}, exclude={1}, expected=[]),
         dict(include={0}, exclude={1}, expected=['0']),
         dict(include={'__all__'}, exclude={1}, expected=['0', '2', '3']),
@@ -223,6 +223,7 @@ def test_filter_args(params):
     [
         dict(include=None, exclude=None, expected=[[0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]),
         dict(include=None, exclude={1: {0}}, expected=[[0], [1], [0, 1, 2], [0, 1, 2, 3]]),
+        dict(include=None, exclude={1: {0}, 2: ...}, expected=[[0], [1], [0, 1, 2, 3]]),
         dict(include={1: {0}}, exclude=None, expected=[[0]]),
     ],
 )

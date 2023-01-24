@@ -49,7 +49,7 @@ def test_exclude():
 
     assert s.to_python({'a': 1, 'b': 2, 'c': 3, 'd': 4}, exclude={'d'}) == {'b': 2}
     assert s.to_python({'a': 1, 'b': 2, 'c': 3, 'd': 4}, exclude={'__all__'}) == {}
-    assert s.to_python({'a': 1, 'b': 2, 'c': 3, 'd': 4}, exclude={'d': None}) == {'b': 2}
+    assert s.to_python({'a': 1, 'b': 2, 'c': 3, 'd': 4}, exclude={'d': ...}) == {'b': 2}
     assert s.to_python({'a': 1, 'b': 2, 'c': 3, 'd': 4}, exclude={'d': {1}}) == {'b': 2, 'd': 4}
 
     assert s.to_json({'a': 1, 'b': 2, 'c': 3, 'd': 4}, exclude={'d'}) == b'{"b":2}'
@@ -70,15 +70,15 @@ def test_filter():
     [
         dict(include=None, exclude=None, expected={'0': 0, '1': 1, '2': 2, '3': 3}),
         dict(include={'0', '1'}, exclude=None, expected={'0': 0, '1': 1}),
-        dict(include={'0': None, '1': None}, exclude=None, expected={'0': 0, '1': 1}),
+        dict(include={'0': ..., '1': ...}, exclude=None, expected={'0': 0, '1': 1}),
         dict(include={'0': {1}, '1': {1}}, exclude=None, expected={'0': 0, '1': 1}),
         dict(include=None, exclude={'0', '1'}, expected={'2': 2, '3': 3}),
-        dict(include=None, exclude={'0': None, '1': None}, expected={'2': 2, '3': 3}),
+        dict(include=None, exclude={'0': ..., '1': ...}, expected={'2': 2, '3': 3}),
         dict(include={'0', '1'}, exclude={'1', '2'}, expected={'0': 0}),
         dict(include=None, exclude={'3': {1}}, expected={'0': 0, '1': 1, '2': 2, '3': 3}),
         dict(include={'0', '1'}, exclude={'3': {1}}, expected={'0': 0, '1': 1}),
         dict(include={'0', '1'}, exclude={'1': {1}}, expected={'0': 0, '1': 1}),
-        dict(include={'0', '1'}, exclude={'1': None}, expected={'0': 0}),
+        dict(include={'0', '1'}, exclude={'1': ...}, expected={'0': 0}),
         dict(include=None, exclude={'__all__'}, expected={}),
     ],
 )

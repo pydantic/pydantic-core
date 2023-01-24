@@ -123,15 +123,16 @@ def test_model_allow_extra():
     [
         dict(include=None, exclude=None, expected={'a': 0, 'b': 1, 'c': 2, 'd': 3}),
         dict(include={'a', 'b'}, exclude=None, expected={'a': 0, 'b': 1}),
-        dict(include={'a': None, 'b': None}, exclude=None, expected={'a': 0, 'b': 1}),
+        dict(include={'a': ..., 'b': ...}, exclude=None, expected={'a': 0, 'b': 1}),
         dict(include={'a': {1}, 'b': {1}}, exclude=None, expected={'a': 0, 'b': 1}),
         dict(include=None, exclude={'a', 'b'}, expected={'c': 2, 'd': 3}),
-        dict(include=None, exclude={'a': None, 'b': None}, expected={'c': 2, 'd': 3}),
+        dict(include=None, exclude={'a': ..., 'b': ...}, expected={'c': 2, 'd': 3}),
         dict(include={'a', 'b'}, exclude={'b', 'c'}, expected={'a': 0}),
         dict(include=None, exclude={'d': {1}}, expected={'a': 0, 'b': 1, 'c': 2, 'd': 3}),
         dict(include={'a', 'b'}, exclude={'d': {1}}, expected={'a': 0, 'b': 1}),
         dict(include={'a', 'b'}, exclude={'b': {1}}, expected={'a': 0, 'b': 1}),
-        dict(include={'a', 'b'}, exclude={'b': None}, expected={'a': 0}),
+        dict(include={'a', 'b'}, exclude={'b': ...}, expected={'a': 0}),
+        dict(include=None, exclude={'__all__'}, expected={}),
     ],
 )
 def test_include_exclude_args(params):
@@ -177,7 +178,7 @@ def test_alias():
 def test_model_wrong_warn():
     s = SchemaSerializer(
         core_schema.model_schema(
-            type('Anything', (), {}),
+            type('MyModel', (), {}),
             core_schema.typed_dict_schema(
                 {
                     'foo': core_schema.typed_dict_field(core_schema.int_schema()),
@@ -186,10 +187,19 @@ def test_model_wrong_warn():
             ),
         )
     )
-    with pytest.raises(AttributeError, match="'int' object has no attribute '__dict__'"):
-        s.to_python(123)
-    with pytest.raises(AttributeError, match="'dict' object has no attribute '__dict__'"):
-        s.to_python({'foo': 1, 'bar': b'more'})
+    assert s.to_python(None) is None
+    assert s.to_python(None, mode='json') is None
+    assert s.to_json(None) == b'null'
+
+    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` - serialized value may.+'):
+        assert s.to_python(123) == 123
+    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` - serialized value may.+'):
+        assert s.to_python(123, mode='json') == 123
+    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` - serialized value may.+'):
+        assert s.to_json(123) == b'123'
+
+    with pytest.warns(UserWarning, match='Expected `MyModel` but got `dict` - serialized value may.+'):
+        assert s.to_python({'foo': 1, 'bar': b'more'}) == {'foo': 1, 'bar': b'more'}
 
 
 def test_exclude_none():
@@ -244,12 +254,12 @@ def test_exclude_unset():
     assert s.to_python(m, exclude_unset=True) == {'bar': 2, 'spam': 3}
     assert s.to_python(m, exclude=None, exclude_unset=True) == {'bar': 2, 'spam': 3}
     assert s.to_python(m, exclude={'bar'}, exclude_unset=True) == {'spam': 3}
-    assert s.to_python(m, exclude={'bar': None}, exclude_unset=True) == {'spam': 3}
+    assert s.to_python(m, exclude={'bar': ...}, exclude_unset=True) == {'spam': 3}
     assert s.to_python(m, exclude={'bar': {}}, exclude_unset=True) == {'bar': 2, 'spam': 3}
 
     assert s.to_json(m, exclude=None, exclude_unset=True) == b'{"bar":2,"spam":3}'
     assert s.to_json(m, exclude={'bar'}, exclude_unset=True) == b'{"spam":3}'
-    assert s.to_json(m, exclude={'bar': None}, exclude_unset=True) == b'{"spam":3}'
+    assert s.to_json(m, exclude={'bar': ...}, exclude_unset=True) == b'{"spam":3}'
     assert s.to_json(m, exclude={'bar': {}}, exclude_unset=True) == b'{"bar":2,"spam":3}'
 
     m2 = FieldsSetModel(foo=1, bar=2, spam=3, __fields_set__={'bar', 'spam', 'missing'})

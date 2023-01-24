@@ -2,9 +2,10 @@ use ahash::AHashSet;
 use std::hash::Hash;
 
 use pyo3::exceptions::PyTypeError;
-use pyo3::intern;
+use pyo3::ffi::Py_Ellipsis;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString};
+use pyo3::{intern, AsPyPointer};
 
 use crate::build_tools::SchemaDict;
 
@@ -106,6 +107,10 @@ impl SchemaFilter<isize> {
     }
 }
 
+fn is_ellipsis(v: &PyAny) -> bool {
+    unsafe { v.as_ptr() == Py_Ellipsis() }
+}
+
 trait FilterLogic<T: Eq + Copy> {
     /// whether an `index`/`key` is explicitly included, this is combined with call-time `include` below
     fn explicit_include(&self, value: T) -> bool;
@@ -131,7 +136,7 @@ trait FilterLogic<T: Eq + Copy> {
                     .or_else(|| exclude_dict.get_item(intern!(exclude_dict.py(), "__all__")));
 
                 if let Some(exc_value) = op_exc_value {
-                    if exc_value.is_none() {
+                    if is_ellipsis(exc_value) {
                         // if the index is in exclude, and the exclude value is `None`, we want to omit this index/item
                         return Ok(None);
                     } else {
@@ -159,7 +164,7 @@ trait FilterLogic<T: Eq + Copy> {
 
                 if let Some(inc_value) = op_inc_value {
                     // if the index is in include, we definitely want to include this index
-                    return if inc_value.is_none() {
+                    return if is_ellipsis(inc_value) {
                         Ok(Some((None, next_exclude)))
                     } else {
                         Ok(Some((Some(inc_value), next_exclude)))

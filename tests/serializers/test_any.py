@@ -223,12 +223,12 @@ def test_exclude_unset(any_serializer):
     assert any_serializer.to_python(m, exclude_unset=True) == {'bar': 2, 'spam': 3}
     assert any_serializer.to_python(m, exclude=None, exclude_unset=True) == {'bar': 2, 'spam': 3}
     assert any_serializer.to_python(m, exclude={'bar'}, exclude_unset=True) == {'spam': 3}
-    assert any_serializer.to_python(m, exclude={'bar': None}, exclude_unset=True) == {'spam': 3}
+    assert any_serializer.to_python(m, exclude={'bar': ...}, exclude_unset=True) == {'spam': 3}
     assert any_serializer.to_python(m, exclude={'bar': {}}, exclude_unset=True) == {'bar': 2, 'spam': 3}
 
     assert any_serializer.to_json(m, exclude=None, exclude_unset=True) == b'{"bar":2,"spam":3}'
     assert any_serializer.to_json(m, exclude={'bar'}, exclude_unset=True) == b'{"spam":3}'
-    assert any_serializer.to_json(m, exclude={'bar': None}, exclude_unset=True) == b'{"spam":3}'
+    assert any_serializer.to_json(m, exclude={'bar': ...}, exclude_unset=True) == b'{"spam":3}'
     assert any_serializer.to_json(m, exclude={'bar': {}}, exclude_unset=True) == b'{"bar":2,"spam":3}'
 
     m2 = FieldsSetModel(foo=1, bar=2, spam=3, __fields_set__={'bar', 'spam', 'missing'})
