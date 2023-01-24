@@ -19,7 +19,6 @@ use super::extra::{Extra, SerMode};
 use super::filter::AnyFilter;
 use super::ob_type::ObType;
 use super::shared::object_to_dict;
-use super::type_serializers::tuple::KeyBuilder;
 
 pub(crate) fn infer_to_python(
     value: &PyAny,
@@ -396,16 +395,11 @@ pub(crate) fn infer_json_key<'py>(key: &'py PyAny, extra: &Extra) -> PyResult<Co
 
 pub(crate) fn infer_json_key_known<'py>(ob_type: &ObType, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
     match ob_type {
-        ObType::None => Ok(Cow::Borrowed("None")),
-        ObType::Int | ObType::IntSubclass | ObType::Float | ObType::FloatSubclass => Ok(key.str()?.to_string_lossy()),
-        ObType::Bool => {
-            let v = if key.is_true().unwrap_or(false) {
-                "true"
-            } else {
-                "false"
-            };
-            Ok(Cow::Borrowed(v))
+        ObType::None => super::type_serializers::simple::none_json_key(),
+        ObType::Int | ObType::IntSubclass | ObType::Float | ObType::FloatSubclass => {
+            super::type_serializers::simple::to_str_json_key(key)
         }
+        ObType::Bool => super::type_serializers::simple::bool_json_key(key),
         ObType::Str | ObType::StrSubclass => {
             let py_str: &PyString = key.downcast()?;
             Ok(Cow::Borrowed(py_str.to_str()?))
@@ -447,7 +441,7 @@ pub(crate) fn infer_json_key_known<'py>(ob_type: &ObType, key: &'py PyAny, extra
             Ok(Cow::Owned(py_url.__str__()))
         }
         ObType::Tuple => {
-            let mut key_build = KeyBuilder::new();
+            let mut key_build = super::type_serializers::tuple::KeyBuilder::new();
             for element in key.downcast::<PyTuple>()?.iter() {
                 key_build.push(&infer_json_key(element, extra)?);
             }
