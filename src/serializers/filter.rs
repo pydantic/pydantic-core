@@ -125,9 +125,14 @@ trait FilterLogic<T: Eq + Copy> {
         let mut next_exclude: Option<&PyAny> = None;
         if let Some(exclude) = exclude {
             if let Ok(exclude_dict) = exclude.downcast::<PyDict>() {
-                if let Some(exc_value) = exclude_dict.get_item(py_key) {
+                // lookup the dict, if no item is found, try looking up `__all__`
+                let op_exc_value = exclude_dict
+                    .get_item(py_key)
+                    .or_else(|| exclude_dict.get_item(intern!(exclude_dict.py(), "__all__")));
+
+                if let Some(exc_value) = op_exc_value {
                     if exc_value.is_none() {
-                        // if the index is in exclude, and the exclude value is `None`, we want to omit this index
+                        // if the index is in exclude, and the exclude value is `None`, we want to omit this index/item
                         return Ok(None);
                     } else {
                         // if the index is in exclude, and the exclude-value is not `None`,
@@ -136,8 +141,7 @@ trait FilterLogic<T: Eq + Copy> {
                     }
                 }
             } else if let Ok(exclude_set) = exclude.downcast::<PySet>() {
-                // question: should we `unwrap_or(false)` instead of raise an error here?
-                if exclude_set.contains(py_key)? {
+                if exclude_set.contains(py_key)? || exclude_set.contains(intern!(exclude_set.py(), "__all__"))? {
                     // index is in the exclude set, we return Ok(None) to omit this index
                     return Ok(None);
                 }
@@ -148,7 +152,12 @@ trait FilterLogic<T: Eq + Copy> {
 
         if let Some(include) = include {
             if let Ok(include_dict) = include.downcast::<PyDict>() {
-                if let Some(inc_value) = include_dict.get_item(py_key) {
+                // lookup the dict, if no item is found, try looking up `__all__`
+                let op_inc_value = include_dict
+                    .get_item(py_key)
+                    .or_else(|| include_dict.get_item(intern!(include_dict.py(), "__all__")));
+
+                if let Some(inc_value) = op_inc_value {
                     // if the index is in include, we definitely want to include this index
                     return if inc_value.is_none() {
                         Ok(Some((None, next_exclude)))
@@ -161,8 +170,7 @@ trait FilterLogic<T: Eq + Copy> {
                     return Ok(None);
                 }
             } else if let Ok(include_set) = include.downcast::<PySet>() {
-                // question: as above
-                if include_set.contains(py_key)? {
+                if include_set.contains(py_key)? || include_set.contains(intern!(include_set.py(), "__all__"))? {
                     return Ok(Some((None, next_exclude)));
                 } else if !self.explicit_include(int_key) {
                     // if the index is not in include, include exists, AND it's not in schema include,
