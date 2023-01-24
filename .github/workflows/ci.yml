@@ -488,7 +488,7 @@ jobs:
           run: |
             set -x
             # this is required so that pytest uses the installed pydantic-core package
-            rm tests/__init__.py
+            rm -r pydantic_core
             # typing-extensions isn't automatically installed because of `--no-index --no-deps`
             python3 -m pip install -U pip typing-extensions
             python3 -m pip install -r tests/requirements.txt
