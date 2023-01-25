@@ -11,6 +11,7 @@ use pyo3::types::{
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::build_tools::{py_err, safe_repr};
+use crate::serializers::filter::SchemaFilter;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::errors::{py_err_se_err, PydanticSerializationError};
@@ -214,6 +215,17 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Dataclass => serialize_dict(object_to_dict(value, false, extra)?)?,
             ObType::PydanticModel => serialize_dict(object_to_dict(value, true, extra)?)?,
+            ObType::Generator => {
+                let iter = super::type_serializers::generator::SerializationIterator::new(
+                    value.downcast()?,
+                    super::type_serializers::any::AnySerializer::default().into(),
+                    SchemaFilter::default(),
+                    include,
+                    exclude,
+                    extra,
+                );
+                iter.into_py(py)
+            }
             _ => value.into_py(py),
         },
     };

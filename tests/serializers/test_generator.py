@@ -33,6 +33,19 @@ def test_generator_any_iter():
     assert gen.index == 3
 
 
+def test_any_iter():
+    s = SchemaSerializer(core_schema.any_schema())
+    gen = s.to_python(gen_ok('a', b'b', 3))
+    assert repr(gen) == IsStr(regex=r'SerializationIterator\(index=0, iterator=<generator object gen_ok at 0x\w+>\)')
+    assert str(gen) == repr(gen)
+    assert next(gen) == 'a'
+    assert repr(gen) == IsStr(regex=r'SerializationIterator\(index=1, iterator=<generator object gen_ok at 0x\w+>\)')
+    assert next(gen) == b'b'
+    assert next(gen) == 3
+    with pytest.raises(StopIteration):
+        next(gen)
+
+
 def test_generator_any():
     s = SchemaSerializer(core_schema.generator_schema(core_schema.any_schema()))
     assert list(s.to_python(iter(['a', b'b', 3]))) == ['a', b'b', 3]
