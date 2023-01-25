@@ -16,14 +16,14 @@ use crate::url::{PyMultiHostUrl, PyUrl};
 use super::config::utf8_py_error;
 use super::errors::{py_err_se_err, PydanticSerializationError};
 use super::extra::{Extra, SerMode};
-use super::filter::AnyFilter;
+use super::filter::{AnyFilter, FilterValue};
 use super::ob_type::ObType;
 use super::shared::object_to_dict;
 
 pub(crate) fn infer_to_python(
     value: &PyAny,
-    include: Option<&PyAny>,
-    exclude: Option<&PyAny>,
+    include: &FilterValue,
+    exclude: &FilterValue,
     extra: &Extra,
 ) -> PyResult<PyObject> {
     infer_to_python_known(&extra.ob_type_lookup.get_type(value), value, include, exclude, extra)
@@ -32,8 +32,8 @@ pub(crate) fn infer_to_python(
 pub(crate) fn infer_to_python_known(
     ob_type: &ObType,
     value: &PyAny,
-    include: Option<&PyAny>,
-    exclude: Option<&PyAny>,
+    include: &FilterValue,
+    exclude: &FilterValue,
     extra: &Extra,
 ) -> PyResult<PyObject> {
     let py = value.py();
@@ -53,7 +53,7 @@ pub(crate) fn infer_to_python_known(
             value
                 .downcast::<$t>()?
                 .iter()
-                .map(|v| infer_to_python(v, None, None, extra))
+                .map(|v| infer_to_python(v, &FilterValue::None, &FilterValue::None, extra))
                 .collect::<PyResult<Vec<PyObject>>>()?
         };
     }
@@ -208,16 +208,16 @@ pub(crate) fn infer_to_python_known(
 
 pub(crate) struct SerializeInfer<'py> {
     value: &'py PyAny,
-    include: Option<&'py PyAny>,
-    exclude: Option<&'py PyAny>,
+    include: &'py FilterValue<'py>,
+    exclude: &'py FilterValue<'py>,
     extra: &'py Extra<'py>,
 }
 
 impl<'py> SerializeInfer<'py> {
     pub(crate) fn new(
         value: &'py PyAny,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
+        include: &'py FilterValue<'py>,
+        exclude: &'py FilterValue<'py>,
         extra: &'py Extra,
     ) -> Self {
         Self {
@@ -239,8 +239,8 @@ impl<'py> Serialize for SerializeInfer<'py> {
 pub(crate) fn infer_serialize<S: Serializer>(
     value: &PyAny,
     serializer: S,
-    include: Option<&PyAny>,
-    exclude: Option<&PyAny>,
+    include: &FilterValue,
+    exclude: &FilterValue,
     extra: &Extra,
 ) -> Result<S::Ok, S::Error> {
     infer_serialize_known(
@@ -257,8 +257,8 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
     ob_type: &ObType,
     value: &PyAny,
     serializer: S,
-    include: Option<&PyAny>,
-    exclude: Option<&PyAny>,
+    include: &FilterValue,
+    exclude: &FilterValue,
     extra: &Extra,
 ) -> Result<S::Ok, S::Error> {
     let value_id = extra.rec_guard.add(value).map_err(py_err_se_err)?;

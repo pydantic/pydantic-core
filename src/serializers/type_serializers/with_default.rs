@@ -8,7 +8,7 @@ use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 use crate::validators::DefaultType;
 
-use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer, FilterValue};
 
 #[derive(Debug, Clone)]
 pub struct WithDefaultSerializer {
@@ -49,8 +49,8 @@ impl TypeSerializer for WithDefaultSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         self.serializer.to_python(value, include, exclude, extra)
@@ -64,8 +64,8 @@ impl TypeSerializer for WithDefaultSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         self.serializer

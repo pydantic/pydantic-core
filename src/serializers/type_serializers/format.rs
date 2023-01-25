@@ -11,7 +11,7 @@ use crate::build_tools::SchemaDict;
 
 use super::simple::none_json_key;
 use super::string::serialize_py_str;
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializationError, TypeSerializer};
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializationError, TypeSerializer, FilterValue};
 
 #[derive(Debug, Clone)]
 pub struct FunctionSerializer {
@@ -60,8 +60,8 @@ impl TypeSerializer for FunctionSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        _include: Option<&PyAny>,
-        _exclude: Option<&PyAny>,
+        _include: &FilterValue,
+        _exclude: &FilterValue,
         _extra: &Extra,
     ) -> PyResult<PyObject> {
         if value.is_none() {
@@ -85,8 +85,8 @@ impl TypeSerializer for FunctionSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        _include: Option<&PyAny>,
-        _exclude: Option<&PyAny>,
+        _include: &FilterValue,
+        _exclude: &FilterValue,
         _extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         if value.is_none() {

@@ -8,7 +8,7 @@ use crate::input::{pydate_as_date, pydatetime_as_datetime, pytime_as_time};
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
-    SerMode, TypeSerializer,
+    SerMode, TypeSerializer, FilterValue
 };
 
 pub(crate) fn datetime_to_string(py_dt: &PyDateTime) -> PyResult<String> {
@@ -47,8 +47,8 @@ macro_rules! build_serializer {
             fn to_python(
                 &self,
                 value: &PyAny,
-                include: Option<&PyAny>,
-                exclude: Option<&PyAny>,
+                include: &FilterValue,
+                exclude: &FilterValue,
                 extra: &Extra,
             ) -> PyResult<PyObject> {
                 let py = value.py();
@@ -81,8 +81,8 @@ macro_rules! build_serializer {
                 &self,
                 value: &PyAny,
                 serializer: S,
-                include: Option<&PyAny>,
-                exclude: Option<&PyAny>,
+                include: &FilterValue,
+                exclude: &FilterValue,
                 extra: &Extra,
             ) -> Result<S::Ok, S::Error> {
                 match value.downcast::<$cast_as>() {

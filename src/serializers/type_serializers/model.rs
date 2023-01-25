@@ -12,7 +12,7 @@ use crate::serializers::ob_type::ObType;
 
 use super::{
     infer_json_key, infer_json_key_known, object_to_dict, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
-    TypeSerializer,
+    TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -58,8 +58,8 @@ impl TypeSerializer for ModelSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         if self.allow_value(value, extra)? {
@@ -84,8 +84,8 @@ impl TypeSerializer for ModelSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         if self.allow_value(value, extra).map_err(py_err_se_err)? {

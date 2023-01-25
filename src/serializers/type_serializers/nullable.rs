@@ -7,7 +7,7 @@ use pyo3::types::PyDict;
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
-use super::{infer_json_key_known, BuildSerializer, CombinedSerializer, Extra, IsType, ObType, TypeSerializer};
+use super::{infer_json_key_known, BuildSerializer, CombinedSerializer, Extra, IsType, ObType, TypeSerializer, FilterValue};
 
 #[derive(Debug, Clone)]
 pub struct NullableSerializer {
@@ -34,8 +34,8 @@ impl TypeSerializer for NullableSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
@@ -57,8 +57,8 @@ impl TypeSerializer for NullableSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match extra.ob_type_lookup.is_type(value, ObType::None) {

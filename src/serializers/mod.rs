@@ -11,6 +11,7 @@ pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValu
 use extra::{CollectWarnings, Extra, SerMode, SerRecursionGuard};
 pub use shared::CombinedSerializer;
 use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
+use filter::FilterValue;
 
 mod config;
 mod errors;
@@ -76,7 +77,9 @@ impl SchemaSerializer {
             &self.config,
             &rec_guard,
         );
-        let v = self.serializer.to_python(value, include, exclude, &extra)?;
+        let include = FilterValue::new(include)?;
+        let exclude = FilterValue::new(exclude)?;
+        let v = self.serializer.to_python(value, &include, &exclude, &extra)?;
         warnings.final_check(py)?;
         Ok(v)
     }
@@ -111,11 +114,13 @@ impl SchemaSerializer {
             &self.config,
             &rec_guard,
         );
+        let include = FilterValue::new(include)?;
+        let exclude = FilterValue::new(exclude)?;
         let bytes = to_json_bytes(
             value,
             &self.serializer,
-            include,
-            exclude,
+            &include,
+            &exclude,
             &extra,
             indent,
             self.json_size,

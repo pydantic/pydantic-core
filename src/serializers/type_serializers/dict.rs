@@ -12,7 +12,7 @@ use crate::build_tools::SchemaDict;
 use super::any::AnySerializer;
 use super::{
     infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer,
-    SchemaFilter, SerMode, TypeSerializer,
+    SchemaFilter, SerMode, TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -69,8 +69,8 @@ impl TypeSerializer for DictSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
@@ -84,7 +84,7 @@ impl TypeSerializer for DictSerializer {
                     if let Some((next_include, next_exclude)) = op_next {
                         let key = match extra.mode {
                             SerMode::Json => self.key_serializer.json_key(key, extra)?.into_py(py),
-                            _ => self.key_serializer.to_python(key, None, None, extra)?,
+                            _ => self.key_serializer.to_python(key, &FilterValue::None, &FilterValue::None, extra)?,
                         };
                         let value = value_serializer.to_python(value, next_include, next_exclude, extra)?;
                         new_dict.set_item(key, value)?;
@@ -107,8 +107,8 @@ impl TypeSerializer for DictSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.downcast::<PyDict>() {

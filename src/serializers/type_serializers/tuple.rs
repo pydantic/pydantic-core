@@ -11,7 +11,7 @@ use crate::build_tools::SchemaDict;
 use super::any::AnySerializer;
 use super::{
     infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
-    PydanticSerializer, SchemaFilter, SerMode, TypeSerializer,
+    PydanticSerializer, SchemaFilter, SerMode, TypeSerializer, FilterValue
 };
 
 pub struct TupleBuilder;
@@ -66,8 +66,8 @@ impl TypeSerializer for TupleVariableSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         match value.downcast::<PyTuple>() {
@@ -116,8 +116,8 @@ impl TypeSerializer for TupleVariableSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.downcast::<PyTuple>() {
@@ -196,8 +196,8 @@ impl TypeSerializer for TuplePositionalSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         match value.downcast::<PyTuple>() {
@@ -268,8 +268,8 @@ impl TypeSerializer for TuplePositionalSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.downcast::<PyTuple>() {

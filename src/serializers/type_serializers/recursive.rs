@@ -7,7 +7,7 @@ use pyo3::types::PyDict;
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
 
-use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer, FilterValue};
 
 #[derive(Debug, Clone)]
 pub struct RecursiveRefSerializer {
@@ -38,8 +38,8 @@ impl TypeSerializer for RecursiveRefSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let value_id = extra.rec_guard.add(value)?;
@@ -57,8 +57,8 @@ impl TypeSerializer for RecursiveRefSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let value_id = extra.rec_guard.add(value).map_err(py_err_se_err)?;

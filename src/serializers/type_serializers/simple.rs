@@ -8,7 +8,7 @@ use crate::build_context::BuildContext;
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, IsType, ObType,
-    SerMode, TypeSerializer,
+    SerMode, TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -34,8 +34,8 @@ impl TypeSerializer for NoneSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
@@ -63,8 +63,8 @@ impl TypeSerializer for NoneSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match extra.ob_type_lookup.is_type(value, ObType::None) {
@@ -102,8 +102,8 @@ macro_rules! build_simple_serializer {
             fn to_python(
                 &self,
                 value: &PyAny,
-                include: Option<&PyAny>,
-                exclude: Option<&PyAny>,
+                include: &FilterValue,
+                exclude: &FilterValue,
                 extra: &Extra,
             ) -> PyResult<PyObject> {
                 let py = value.py();
@@ -137,8 +137,8 @@ macro_rules! build_simple_serializer {
                 &self,
                 value: &PyAny,
                 serializer: S,
-                include: Option<&PyAny>,
-                exclude: Option<&PyAny>,
+                include: &FilterValue,
+                exclude: &FilterValue,
                 extra: &Extra,
             ) -> Result<S::Ok, S::Error> {
                 match value.extract::<$rust_type>() {

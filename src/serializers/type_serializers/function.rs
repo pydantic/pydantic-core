@@ -14,7 +14,7 @@ use crate::PydanticSerializationUnexpectedValue;
 use super::{
     infer_json_key, infer_json_key_known, infer_serialize, infer_serialize_known, infer_to_python,
     infer_to_python_known, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ObType,
-    PydanticSerializationError, TypeSerializer,
+    PydanticSerializationError, TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -55,12 +55,13 @@ impl FunctionSerializer {
     fn call(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        let kwargs = kwargs!(py, mode: extra.mode.to_object(py), include: include, exclude: exclude);
+        let kwargs = kwargs!(py, mode: extra.mode.to_object(py));
+        // let kwargs = kwargs!(py, mode: extra.mode.to_object(py), include: include, exclude: exclude);
         self.func.call(py, (value,), kwargs)
     }
 }
@@ -69,8 +70,8 @@ impl TypeSerializer for FunctionSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
@@ -102,7 +103,7 @@ impl TypeSerializer for FunctionSerializer {
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
         let py = key.py();
-        match self.call(key, None, None, extra) {
+        match self.call(key, &FilterValue::None, &FilterValue::None, extra) {
             Ok(v) => {
                 let next_key = v.into_ref(py);
                 match self.return_ob_type {
@@ -132,8 +133,8 @@ impl TypeSerializer for FunctionSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let py = value.py();

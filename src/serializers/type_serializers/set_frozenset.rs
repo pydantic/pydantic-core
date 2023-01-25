@@ -12,7 +12,7 @@ use crate::build_tools::SchemaDict;
 use super::any::AnySerializer;
 use super::{
     infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SerMode,
-    TypeSerializer,
+    TypeSerializer, FilterValue
 };
 
 macro_rules! build_serializer {
@@ -49,8 +49,8 @@ macro_rules! build_serializer {
             fn to_python(
                 &self,
                 value: &PyAny,
-                include: Option<&PyAny>,
-                exclude: Option<&PyAny>,
+                include: &FilterValue,
+                exclude: &FilterValue,
                 extra: &Extra,
             ) -> PyResult<PyObject> {
                 let py = value.py();
@@ -82,8 +82,8 @@ macro_rules! build_serializer {
                 &self,
                 value: &PyAny,
                 serializer: S,
-                include: Option<&PyAny>,
-                exclude: Option<&PyAny>,
+                include: &FilterValue,
+                exclude: &FilterValue,
                 extra: &Extra,
             ) -> Result<S::Ok, S::Error> {
                 match value.downcast::<$py_type>() {

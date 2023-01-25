@@ -8,7 +8,7 @@ use serde::ser::Serializer;
 use crate::build_context::BuildContext;
 
 use super::{
-    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, TypeSerializer,
+    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -30,8 +30,8 @@ impl TypeSerializer for AnySerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         infer_to_python(value, include, exclude, extra)
@@ -45,8 +45,8 @@ impl TypeSerializer for AnySerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         infer_serialize(value, serializer, include, exclude, extra)

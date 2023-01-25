@@ -10,7 +10,7 @@ use crate::PydanticSerializationUnexpectedValue;
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
-    TypeSerializer,
+    TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -59,8 +59,8 @@ impl TypeSerializer for UnionSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         // try the serializers in with error_on fallback=true
@@ -125,8 +125,8 @@ impl TypeSerializer for UnionSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let py = value.py();
@@ -134,7 +134,7 @@ impl TypeSerializer for UnionSerializer {
         new_extra.check = SerCheck::Strict;
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
-                Ok(v) => return infer_serialize(v.as_ref(py), serializer, None, None, extra),
+                Ok(v) => return infer_serialize(v.as_ref(py), serializer, &FilterValue::None, &FilterValue::None, extra),
                 Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
                     true => (),
                     false => return Err(py_err_se_err(err)),
@@ -145,7 +145,7 @@ impl TypeSerializer for UnionSerializer {
             new_extra.check = SerCheck::Lax;
             for comb_serializer in &self.choices {
                 match comb_serializer.to_python(value, include, exclude, &new_extra) {
-                    Ok(v) => return infer_serialize(v.as_ref(py), serializer, None, None, extra),
+                    Ok(v) => return infer_serialize(v.as_ref(py), serializer, &FilterValue::None, &FilterValue::None, extra),
                     Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
                         true => (),
                         false => return Err(py_err_se_err(err)),

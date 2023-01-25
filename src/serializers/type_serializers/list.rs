@@ -12,7 +12,7 @@ use crate::build_tools::SchemaDict;
 use super::any::AnySerializer;
 use super::{
     infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer,
-    SchemaFilter, TypeSerializer,
+    SchemaFilter, TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -49,8 +49,8 @@ impl TypeSerializer for ListSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         match value.downcast::<PyList>() {
@@ -82,8 +82,8 @@ impl TypeSerializer for ListSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.downcast::<PyList>() {

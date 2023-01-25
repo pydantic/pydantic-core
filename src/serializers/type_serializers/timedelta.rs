@@ -7,7 +7,7 @@ use crate::build_context::BuildContext;
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerMode,
-    TypeSerializer,
+    TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -29,8 +29,8 @@ impl TypeSerializer for TimeDeltaSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         match extra.mode {
@@ -59,8 +59,8 @@ impl TypeSerializer for TimeDeltaSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.downcast::<PyDelta>() {

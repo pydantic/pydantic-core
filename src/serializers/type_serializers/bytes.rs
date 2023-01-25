@@ -7,7 +7,7 @@ use crate::build_context::BuildContext;
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerMode,
-    TypeSerializer,
+    TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -29,8 +29,8 @@ impl TypeSerializer for BytesSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
@@ -60,8 +60,8 @@ impl TypeSerializer for BytesSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.downcast::<PyBytes>() {

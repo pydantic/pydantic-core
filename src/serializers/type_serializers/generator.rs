@@ -12,7 +12,7 @@ use crate::build_tools::SchemaDict;
 use super::any::AnySerializer;
 use super::{
     infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ExtraOwned,
-    PydanticSerializer, SchemaFilter, SerMode, TypeSerializer,
+    PydanticSerializer, SchemaFilter, SerMode, TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -46,8 +46,8 @@ impl TypeSerializer for GeneratorSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         match value.iter() {
@@ -77,8 +77,8 @@ impl TypeSerializer for GeneratorSerializer {
                             item_serializer: self.item_serializer.as_ref().clone(),
                             extra_owned: ExtraOwned::new(extra),
                             filter: self.filter.clone(),
-                            include_arg: include.map(|v| v.into_py(py)),
-                            exclude_arg: exclude.map(|v| v.into_py(py)),
+                            include_arg: include.clone(),
+                            exclude_arg: exclude.clone(),
                         };
                         Ok(iter.into_py(py))
                     }
@@ -99,8 +99,8 @@ impl TypeSerializer for GeneratorSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.iter() {
@@ -148,8 +148,8 @@ struct SerializationIterator {
     item_serializer: CombinedSerializer,
     extra_owned: ExtraOwned,
     filter: SchemaFilter<usize>,
-    include_arg: Option<PyObject>,
-    exclude_arg: Option<PyObject>,
+    include_arg: FilterValue,
+    exclude_arg: FilterValue,
 }
 
 #[pymethods]

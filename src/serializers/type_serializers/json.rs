@@ -13,7 +13,7 @@ use crate::build_tools::SchemaDict;
 use super::any::AnySerializer;
 use super::{
     infer_json_key, py_err_se_err, to_json_bytes, utf8_py_error, BuildSerializer, CombinedSerializer, Extra,
-    TypeSerializer,
+    TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -46,8 +46,8 @@ impl TypeSerializer for JsonSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         if extra.round_trip {
@@ -62,7 +62,7 @@ impl TypeSerializer for JsonSerializer {
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
         if extra.round_trip {
-            let bytes = to_json_bytes(key, &self.serializer, None, None, extra, None, 0)?;
+            let bytes = to_json_bytes(key, &self.serializer, &FilterValue::None, &FilterValue::None, extra, None, 0)?;
             let py = key.py();
             let s = from_utf8(&bytes).map_err(|e| utf8_py_error(py, e, &bytes))?;
             Ok(Cow::Owned(s.to_string()))
@@ -75,8 +75,8 @@ impl TypeSerializer for JsonSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         if extra.round_trip {

@@ -17,6 +17,7 @@ use super::errors::se_err_py_err;
 use super::extra::Extra;
 use super::infer::infer_json_key;
 use super::ob_type::{IsType, ObType};
+use super::filter::FilterValue;
 
 pub(crate) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
@@ -114,7 +115,7 @@ combined_serializer! {
         List: super::type_serializers::list::ListSerializer;
         Set: super::type_serializers::set_frozenset::SetSerializer;
         FrozenSet: super::type_serializers::set_frozenset::FrozenSetSerializer;
-        Generator: super::type_serializers::generator::GeneratorSerializer;
+        // Generator: super::type_serializers::generator::GeneratorSerializer;
         Dict: super::type_serializers::dict::DictSerializer;
         TypedDict: super::type_serializers::typed_dict::TypedDictSerializer;
         ModelDict: super::type_serializers::model::ModelSerializer;
@@ -201,8 +202,8 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject>;
 
@@ -227,8 +228,8 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error>;
 
@@ -243,8 +244,8 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
 pub(crate) struct PydanticSerializer<'py> {
     value: &'py PyAny,
     serializer: &'py CombinedSerializer,
-    include: Option<&'py PyAny>,
-    exclude: Option<&'py PyAny>,
+    include: &'py FilterValue<'py>,
+    exclude: &'py FilterValue<'py>,
     extra: &'py Extra<'py>,
 }
 
@@ -252,8 +253,8 @@ impl<'py> PydanticSerializer<'py> {
     pub(crate) fn new(
         value: &'py PyAny,
         serializer: &'py CombinedSerializer,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
+        include: &'py FilterValue<'py>,
+        exclude: &'py FilterValue<'py>,
         extra: &'py Extra<'py>,
     ) -> Self {
         Self {
@@ -277,8 +278,8 @@ impl<'py> Serialize for PydanticSerializer<'py> {
 pub(crate) fn to_json_bytes(
     value: &PyAny,
     serializer: &CombinedSerializer,
-    include: Option<&PyAny>,
-    exclude: Option<&PyAny>,
+    include: &FilterValue,
+    exclude: &FilterValue,
     extra: &Extra,
     indent: Option<usize>,
     json_size: usize,

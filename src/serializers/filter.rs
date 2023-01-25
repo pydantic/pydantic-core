@@ -1,11 +1,12 @@
-use ahash::AHashSet;
 use std::hash::Hash;
 
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::ffi::Py_Ellipsis;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString};
 use pyo3::{intern, AsPyPointer};
+
+use ahash::{AHashSet, AHashMap};
 
 use crate::build_tools::SchemaDict;
 
@@ -50,9 +51,9 @@ impl SchemaFilter<usize> {
     pub fn value_filter<'py>(
         &self,
         index: usize,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        include: &'py FilterValue<'py>,
+        exclude: &'py FilterValue<'py>,
+    ) -> PyResult<Option<(&'py FilterValue<'py>, &'py FilterValue<'py>)>> {
         self.filter(index, index, include, exclude)
     }
 }
@@ -99,9 +100,9 @@ impl SchemaFilter<isize> {
     pub fn key_filter<'py>(
         &self,
         key: &PyAny,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        include: &'py FilterValue<'py>,
+        exclude: &'py FilterValue<'py>,
+    ) -> PyResult<Option<(&'py FilterValue<'py>, &'py FilterValue<'py>)>> {
         let hash = key.hash()?;
         self.filter(key, hash, include, exclude)
     }
@@ -122,75 +123,32 @@ trait FilterLogic<T: Eq + Copy> {
     /// 2. or include it, in which case, what values of `include` and `exclude` should be passed to it
     fn filter<'py>(
         &self,
-        py_key: impl ToPyObject + Copy,
+        into_key: impl ToPyObject + Copy,
         int_key: T,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
-        let mut next_exclude: Option<&PyAny> = None;
-        if let Some(exclude) = exclude {
-            if let Ok(exclude_dict) = exclude.downcast::<PyDict>() {
-                // lookup the dict, if no item is found, try looking up `__all__`
-                let op_exc_value = exclude_dict
-                    .get_item(py_key)
-                    .or_else(|| exclude_dict.get_item(intern!(exclude_dict.py(), "__all__")));
-
-                if let Some(exc_value) = op_exc_value {
-                    if is_ellipsis(exc_value) {
-                        // if the index is in exclude, and the exclude value is `None`, we want to omit this index/item
-                        return Ok(None);
-                    } else {
-                        // if the index is in exclude, and the exclude-value is not `None`,
-                        // we want to return `Some((..., Some(next_exclude))`
-                        next_exclude = Some(exc_value);
-                    }
-                }
-            } else if let Ok(exclude_set) = exclude.downcast::<PySet>() {
-                if exclude_set.contains(py_key)? || exclude_set.contains(intern!(exclude_set.py(), "__all__"))? {
-                    // index is in the exclude set, we return Ok(None) to omit this index
-                    return Ok(None);
-                }
-            } else if !exclude.is_none() {
-                return Err(PyTypeError::new_err("`exclude` argument must a set or dict."));
-            }
+        include: &'py FilterValue<'py>,
+        exclude: &'py FilterValue<'py>,
+    ) -> PyResult<Option<(&'py FilterValue<'py>, &'py FilterValue<'py>)>> {
+        let key = into_key.into();
+        let next_exclude: &FilterValue = exclude.lookup(&key);
+        if next_exclude == FilterValue::Ellipsis {
+            // if the index is in exclude, and the exclude value is `...`, we want to omit this index/item
+            return Ok(None);
         }
 
-        if let Some(include) = include {
-            if let Ok(include_dict) = include.downcast::<PyDict>() {
-                // lookup the dict, if no item is found, try looking up `__all__`
-                let op_inc_value = include_dict
-                    .get_item(py_key)
-                    .or_else(|| include_dict.get_item(intern!(include_dict.py(), "__all__")));
-
-                if let Some(inc_value) = op_inc_value {
-                    // if the index is in include, we definitely want to include this index
-                    return if is_ellipsis(inc_value) {
-                        Ok(Some((None, next_exclude)))
-                    } else {
-                        Ok(Some((Some(inc_value), next_exclude)))
-                    };
-                } else if !self.explicit_include(int_key) {
-                    // if the index is not in include, include exists, AND it's not in schema include,
-                    // this index should be omitted
-                    return Ok(None);
-                }
-            } else if let Ok(include_set) = include.downcast::<PySet>() {
-                if include_set.contains(py_key)? || include_set.contains(intern!(include_set.py(), "__all__"))? {
-                    return Ok(Some((None, next_exclude)));
-                } else if !self.explicit_include(int_key) {
-                    // if the index is not in include, include exists, AND it's not in schema include,
-                    // this index should be omitted
-                    return Ok(None);
-                }
-            } else if !include.is_none() {
-                return Err(PyTypeError::new_err("`include` argument must a set or dict."));
-            }
-        }
-
-        if next_exclude.is_some() {
-            Ok(Some((None, next_exclude)))
+        let next_include: &FilterValue = include.lookup(&key);
+        if include != FilterValue::None && next_include == FilterValue::None && !self.explicit_include(int_key) {
+            // if the index is not in include, include exists, AND it's not in schema include,
+            // this index should be omitted
+            return Ok(None);
+        } else if matches!(next_include, FilterValue::Ellipsis | FilterValue::AllMap(_)) {
+            // if the index is in include, we definitely want to include this index/item
+            Ok(Some((next_include, next_exclude)))
+        } else if matches!(next_include, FilterValue::AllMap(_)) {
+            // exclude exists and is not `...`, so we want to include this index/item
+            Ok(Some((next_include, next_exclude)))
         } else if self.default_filter(int_key) {
-            Ok(Some((None, None)))
+            // otherwise we fallback to the `default_filter`
+            Ok(Some((&FilterValue::None, &FilterValue::None)))
         } else {
             Ok(None)
         }
@@ -229,9 +187,9 @@ impl AnyFilter {
     pub fn key_filter<'py>(
         &self,
         key: &PyAny,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        include: &'py FilterValue<'py>,
+        exclude: &'py FilterValue<'py>,
+    ) -> PyResult<Option<(&'py FilterValue<'py>, &'py FilterValue<'py>)>> {
         // just use 0 for the int_key, it's always ignored in the implementation here
         self.filter(key, 0, include, exclude)
     }
@@ -239,9 +197,9 @@ impl AnyFilter {
     pub fn value_filter<'py>(
         &self,
         index: usize,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        include: &'py FilterValue<'py>,
+        exclude: &'py FilterValue<'py>,
+    ) -> PyResult<Option<(&'py FilterValue<'py>, &'py FilterValue<'py>)>> {
         self.filter(index, index, include, exclude)
     }
 }
@@ -256,5 +214,127 @@ where
 
     fn default_filter(&self, _value: T) -> bool {
         true
+    }
+}
+
+// fn merge_all_value(item_value: Option<&PyAny>, all_value: Option<&PyAny>) -> Option<&PyDict> {
+//     match (item_value, all_value) {
+// (Some(item_value), Some(all_value)) => {
+//             let py = item_value.py();
+//             let merged = PyDict::new(py);
+//             merged.merge(all_value).unwrap();
+//             merged.merge(item_value).unwrap();
+//             Some(merged)
+//         }
+//         (Some(item_value), None) => item_value.downcast().ok(),
+//         (None, Some(all_value)) => all_value.downcast().ok(),
+//         (None, None) => None,
+//     }
+// }
+//
+// fn as_dict(value: &PyAny) -> &PyDict {
+//
+// }
+
+#[derive(Debug, Eq, PartialEq)]
+pub(super) enum FilterKey<'py> {
+    Int(i64),
+    Str(&'py str)
+}
+
+impl<'py> FilterKey<'py> {
+    fn from_py(py_key: impl ToPyObject + Copy) -> PyResult<Self> {
+        let py_key = py_key.to_object(py_key.py());
+        if let Ok(i) = py_key.extract::<i64>(py_key.py()) {
+            Ok(Self::Int(i))
+        } else if let Ok(py_str) = py_key.downcast::<PyString>(py_key.py()) {
+            let str_key = py_str.to_str()?;
+            Ok(Self::Str(str_key))
+        } else {
+            Err(PyKeyError::new_err("Filter keys must be integers or strings"))
+        }
+    }
+}
+
+impl<'py> From<&'py str> for FilterKey<'py> {
+    fn from(s: &'py str) -> Self {
+        Self::Str(s)
+    }
+}
+
+impl<'py> From<i64> for FilterKey<'py> {
+    fn from(i: i64) -> Self {
+        Self::Int(i)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(super) enum FilterValue<'py> {
+    None,
+    Ellipsis,
+    AllMap((Box<FilterValue<'py>>, AHashMap<FilterKey<'py>, FilterValue<'py>>)),
+}
+
+impl<'py> FilterValue<'py> {
+    pub(super) fn new(arg: Option<&'py PyAny>) -> PyResult<Self> {
+        match arg {
+            Some(arg) => Self::build_recursive(arg),
+            None => Ok(Self::None),
+        }
+    }
+
+    fn lookup(&self, key: &FilterKey<'py>) -> &Self {
+        match self {
+            Self::AllMap((all, map)) => match map.get(key) {
+                Some(value) => value,
+                None => all.lookup(key),
+            }
+            _ => self,
+        }
+    }
+
+    fn build_recursive(arg: &'py PyAny) -> PyResult<Self> {
+        if is_ellipsis(arg) || arg.extract::<bool>() == Ok(true) {
+            Ok(Self::Ellipsis)
+        } else if let Ok(arg_set) = arg.downcast::<PySet>() {
+            let mut map = AHashMap::with_capacity(arg_set.len());
+            let mut all = FilterValue::None;
+            for entry in arg_set {
+                if let Ok(key) = entry.extract::<i64>() {
+                    map.insert(key.into(), Self::Ellipsis);
+                } else if let Ok(py_key) = entry.downcast::<PyString>() {
+                    let str_key = py_key.to_str()?;
+                    if str_key == "__all__" {
+                        all = Self::Ellipsis;
+                    } else {
+                        map.insert(str_key.into(), Self::Ellipsis);
+                    }
+                } else {
+                   return Err(PyTypeError::new_err("`include` and `exclude` set values must be ints or strings."));
+                }
+            }
+            Ok(Self::AllMap((Box::new(all), map)))
+        } else if let Ok(arg_dict) = arg.downcast::<PyDict>() {
+            let mut map = AHashMap::with_capacity(arg_dict.len());
+            let mut all = FilterValue::None;
+            for (key, value) in arg_dict {
+                let filter_value = Self::build_recursive(value)?;
+                if let Ok(key) = key.extract::<i64>() {
+                    map.insert(FilterKey::Int(key), filter_value);
+                } else if let Ok(py_key) = key.downcast::<PyString>() {
+                    let str_key = py_key.to_str()?;
+                    if str_key == "__all__" {
+                        all = filter_value;
+                    } else {
+                        map.insert(FilterKey::Str(str_key), filter_value);
+                    }
+                } else {
+                   return Err(PyTypeError::new_err("`include` and `exclude` keys must be ints or strings."));
+                }
+            }
+            Ok(Self::AllMap((Box::new(all), map)))
+        } else {
+           Err(PyTypeError::new_err("`include` and `exclude` arguments must a set, dict or None."))
+        }
     }
 }

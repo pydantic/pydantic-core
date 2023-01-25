@@ -12,7 +12,7 @@ use crate::build_tools::{py_err, SchemaDict};
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
-    SerMode, TypeSerializer,
+    SerMode, TypeSerializer, FilterValue
 };
 
 #[derive(Debug, Clone)]
@@ -107,8 +107,8 @@ impl TypeSerializer for LiteralSerializer {
     fn to_python(
         &self,
         value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
@@ -145,8 +145,8 @@ impl TypeSerializer for LiteralSerializer {
         &self,
         value: &PyAny,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: &FilterValue,
+        exclude: &FilterValue,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match self.check(value, extra).map_err(py_err_se_err)? {
