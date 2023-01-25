@@ -105,9 +105,7 @@ def test_filter_args(params):
         ),
         dict(include=None, exclude={'__all__': {'__all__'}}, expected={'0': [], '1': [], '2': [], '3': []}),
         dict(include=None, exclude={'__all__': {0}}, expected={'0': [], '1': [1], '2': [1, 2], '3': [1, 2, 3]}),
-        dict(
-            include=None, exclude={'__all__': {0}, '3': {1}}, expected={'0': [], '1': [1], '2': [1, 2], '3': [0, 2, 3]}
-        ),
+        dict(include=None, exclude={'__all__': {0}, '3': {1}}, expected={'0': [], '1': [1], '2': [1, 2], '3': [2, 3]}),
     ],
 )
 def test_filter_args_nested(params):

@@ -107,10 +107,6 @@ impl SchemaFilter<isize> {
     }
 }
 
-fn is_ellipsis(v: &PyAny) -> bool {
-    unsafe { v.as_ptr() == Py_Ellipsis() }
-}
-
 trait FilterLogic<T: Eq + Copy> {
     /// whether an `index`/`key` is explicitly included, this is combined with call-time `include` below
     fn explicit_include(&self, value: T) -> bool;
@@ -130,11 +126,7 @@ trait FilterLogic<T: Eq + Copy> {
         let mut next_exclude: Option<&PyAny> = None;
         if let Some(exclude) = exclude {
             if let Ok(exclude_dict) = exclude.downcast::<PyDict>() {
-                // lookup the dict, if no item is found, try looking up `__all__`
-                let op_exc_value = exclude_dict
-                    .get_item(py_key)
-                    .or_else(|| exclude_dict.get_item(intern!(exclude_dict.py(), "__all__")));
-
+                let op_exc_value = merge_all_value(exclude_dict, py_key)?;
                 if let Some(exc_value) = op_exc_value {
                     if is_ellipsis(exc_value) {
                         // if the index is in exclude, and the exclude value is `None`, we want to omit this index/item
@@ -157,10 +149,7 @@ trait FilterLogic<T: Eq + Copy> {
 
         if let Some(include) = include {
             if let Ok(include_dict) = include.downcast::<PyDict>() {
-                // lookup the dict, if no item is found, try looking up `__all__`
-                let op_inc_value = include_dict
-                    .get_item(py_key)
-                    .or_else(|| include_dict.get_item(intern!(include_dict.py(), "__all__")));
+                let op_inc_value = merge_all_value(include_dict, py_key)?;
 
                 if let Some(inc_value) = op_inc_value {
                     // if the index is in include, we definitely want to include this index
@@ -257,4 +246,84 @@ where
     fn default_filter(&self, _value: T) -> bool {
         true
     }
+}
+
+// waiting for https://github.com/PyO3/pyo3/pull/2911
+fn is_ellipsis(v: &PyAny) -> bool {
+    unsafe { v.as_ptr() == Py_Ellipsis() }
+}
+
+#[allow(non_snake_case)]
+pub fn Ellipsis(py: Python) -> PyObject {
+    unsafe { PyObject::from_borrowed_ptr(py, Py_Ellipsis()) }
+}
+
+/// lookup the dict, for the key and "__all__" key, and merge them following the same rules as pydantic V1
+fn merge_all_value(dict: &PyDict, py_key: impl ToPyObject + Copy) -> PyResult<Option<&PyAny>> {
+    let op_item_value = dict.get_item(py_key);
+    let op_all_value = dict.get_item(intern!(dict.py(), "__all__"));
+
+    match (op_item_value, op_all_value) {
+        (Some(item_value), Some(all_value)) => {
+            if is_ellipsis(item_value) || is_ellipsis(all_value) {
+                Ok(op_item_value)
+            } else {
+                let item_dict = as_dict(item_value)?;
+                let item_dict_merged = merge_dicts(item_dict, all_value)?;
+                Ok(Some(item_dict_merged))
+            }
+        }
+        (Some(_), None) => Ok(op_item_value),
+        (None, Some(_)) => Ok(op_all_value),
+        (None, None) => Ok(None),
+    }
+}
+
+fn as_dict(value: &PyAny) -> PyResult<&PyDict> {
+    if let Ok(dict) = value.downcast::<PyDict>() {
+        dict.copy()
+    } else if let Ok(set) = value.downcast::<PySet>() {
+        let py = value.py();
+        let dict = PyDict::new(py);
+        for item in set {
+            dict.set_item(item, Ellipsis(py))?;
+        }
+        Ok(dict)
+    } else {
+        Err(PyTypeError::new_err(
+            "`include` and `exclude` must be of type `dict[str | int, <recursive> | ...] | set[str | int | ...]`",
+        ))
+    }
+}
+
+fn merge_dicts<'py>(item_dict: &'py PyDict, all_value: &'py PyAny) -> PyResult<&'py PyDict> {
+    let item_dict = item_dict.copy()?;
+    if let Ok(all_dict) = all_value.downcast::<PyDict>() {
+        for (all_key, all_value) in all_dict {
+            if let Some(item_value) = item_dict.get_item(all_key) {
+                if is_ellipsis(item_value) {
+                    continue;
+                } else {
+                    let item_value_dict = as_dict(item_value)?;
+                    // if the all value is an ellipsis, we don't overwrite the item value
+                    if !is_ellipsis(all_value) {
+                        item_dict.set_item(all_key, merge_dicts(item_value_dict, all_value)?)?;
+                    }
+                }
+            } else {
+                item_dict.set_item(all_key, all_value)?;
+            }
+        }
+    } else if let Ok(set) = all_value.downcast::<PySet>() {
+        for item in set {
+            if !item_dict.contains(item)? {
+                item_dict.set_item(item, Ellipsis(set.py()))?;
+            }
+        }
+    } else {
+        return Err(PyTypeError::new_err(
+            "'__all__' key of `include` and `exclude` must be of type `dict[str | int, <recursive> | ...] | set[str | int | ...]`",
+        ));
+    }
+    Ok(item_dict)
 }

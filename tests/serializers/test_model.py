@@ -265,3 +265,128 @@ def test_exclude_unset():
     m2 = FieldsSetModel(foo=1, bar=2, spam=3, __fields_set__={'bar', 'spam', 'missing'})
     assert s.to_python(m2) == {'foo': 1, 'bar': 2, 'spam': 3}
     assert s.to_python(m2, exclude_unset=True) == {'bar': 2, 'spam': 3}
+
+
+@pytest.mark.parametrize(
+    'exclude,expected',
+    [
+        pytest.param(
+            {'subs': {'__all__': {'subsubs': {'__all__': {'i'}}}}},
+            {'subs': [{'k': 1, 'subsubs': [{'j': 1}, {'j': 2}]}, {'k': 2, 'subsubs': [{'j': 3}]}]},
+            id='Normal nested __all__',
+        ),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs': {'__all__': {'i'}}}, 0: {'subsubs': {'__all__': {'j'}}}}},
+            {'subs': [{'k': 1, 'subsubs': [{}, {}]}, {'k': 2, 'subsubs': [{'j': 3}]}]},
+            id='Merge sub dicts 1',
+        ),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs': ...}, 0: {'subsubs': {'__all__': {'j'}}}}},
+            {'subs': [{'k': 1, 'subsubs': [{'i': 1}, {'i': 2}]}, {'k': 2}]},
+            # {'subs': [{'k': 1                                 }, {'k': 2}]}
+            id='Merge sub sets 2',
+        ),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs': {'__all__': {'j'}}}, 0: {'subsubs': ...}}},
+            {'subs': [{'k': 1}, {'k': 2, 'subsubs': [{'i': 3}]}]},
+            id='Merge sub sets 3',
+        ),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs': {0}}, 0: {'subsubs': {1}}}},
+            {'subs': [{'k': 1, 'subsubs': []}, {'k': 2, 'subsubs': []}]},
+            id='Merge sub sets 1',
+        ),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs': {0: {'i'}}}, 0: {'subsubs': {1}}}},
+            {'subs': [{'k': 1, 'subsubs': [{'j': 1}]}, {'k': 2, 'subsubs': [{'j': 3}]}]},
+            id='Merge sub dict-set',
+        ),
+        pytest.param({'subs': {'__all__': {'subsubs'}, 0: {'k'}}}, {'subs': [{}, {'k': 2}]}, id='Different keys 1'),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs': ...}, 0: {'k'}}}, {'subs': [{}, {'k': 2}]}, id='Different keys 2'
+        ),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs'}, 0: {'k': ...}}}, {'subs': [{}, {'k': 2}]}, id='Different keys 3'
+        ),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs': {'__all__': {'i'}, 0: {'j'}}}}},
+            {'subs': [{'k': 1, 'subsubs': [{}, {'j': 2}]}, {'k': 2, 'subsubs': [{}]}]},
+            id='Nested different keys 1',
+        ),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs': {'__all__': {'i': ...}, 0: {'j'}}}}},
+            {'subs': [{'k': 1, 'subsubs': [{}, {'j': 2}]}, {'k': 2, 'subsubs': [{}]}]},
+            id='Nested different keys 2',
+        ),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs': {'__all__': {'i'}, 0: {'j': ...}}}}},
+            {'subs': [{'k': 1, 'subsubs': [{}, {'j': 2}]}, {'k': 2, 'subsubs': [{}]}]},
+            id='Nested different keys 3',
+        ),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs'}, 0: {'subsubs': {'__all__': {'j'}}}}},
+            {'subs': [{'k': 1, 'subsubs': [{'i': 1}, {'i': 2}]}, {'k': 2}]},
+            id='Ignore __all__ for index with defined exclude 1',
+        ),
+        pytest.param(
+            {'subs': {'__all__': {'subsubs': {'__all__': {'j'}}}, 0: ...}},
+            {'subs': [{'k': 2, 'subsubs': [{'i': 3}]}]},
+            id='Ignore __all__ for index with defined exclude 2',
+        ),
+        pytest.param(
+            {'subs': {'__all__': ..., 0: {'subsubs'}}},
+            {'subs': [{'k': 1}]},
+            id='Ignore __all__ for index with defined exclude 3',
+        ),
+    ],
+)
+def test_advanced_exclude_nested_lists(exclude, expected):
+    """
+    Taken from pydantic and modified to generate the schema directly.
+    """
+    # class SubSubModel(BaseModel):
+    #     i: int
+    #     j: int
+
+    sub_sub_model_schema = core_schema.model_schema(
+        type('SubSubModel', (), {}),
+        core_schema.typed_dict_schema(
+            dict(
+                i=core_schema.typed_dict_field(core_schema.int_schema(), required=True),
+                j=core_schema.typed_dict_field(core_schema.int_schema(), required=True),
+            )
+        ),
+    )
+
+    # class SubModel(BaseModel):
+    #     k: int
+    #     subsubs: List[SubSubModel]
+
+    sub_model_schema = core_schema.model_schema(
+        type('SubModel', (), {}),
+        core_schema.typed_dict_schema(
+            dict(
+                k=core_schema.typed_dict_field(core_schema.int_schema(), required=True),
+                subsubs=core_schema.typed_dict_field(core_schema.list_schema(sub_sub_model_schema), required=True),
+            )
+        ),
+    )
+
+    # class Model(BaseModel):
+    #     subs: List[SubModel]
+
+    model_schema = core_schema.model_schema(
+        BasicModel,
+        core_schema.typed_dict_schema(
+            dict(subs=core_schema.typed_dict_field(core_schema.list_schema(sub_model_schema), required=True))
+        ),
+    )
+    v = SchemaValidator(model_schema)
+
+    data = v.validate_python(
+        dict(subs=[dict(k=1, subsubs=[dict(i=1, j=1), dict(i=2, j=2)]), dict(k=2, subsubs=[dict(i=3, j=3)])])
+    )
+
+    s = SchemaSerializer(model_schema)
+
+    assert s.to_python(data, exclude=exclude) == expected
