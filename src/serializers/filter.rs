@@ -2,10 +2,9 @@ use ahash::AHashSet;
 use std::hash::Hash;
 
 use pyo3::exceptions::PyTypeError;
-use pyo3::ffi::Py_Ellipsis;
+use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySet, PyString};
-use pyo3::{intern, AsPyPointer};
+use pyo3::types::{PyBool, PyDict, PySet, PyString};
 
 use crate::build_tools::SchemaDict;
 
@@ -128,7 +127,7 @@ trait FilterLogic<T: Eq + Copy> {
             if let Ok(exclude_dict) = exclude.downcast::<PyDict>() {
                 let op_exc_value = merge_all_value(exclude_dict, py_key)?;
                 if let Some(exc_value) = op_exc_value {
-                    if is_ellipsis(exc_value) {
+                    if is_ellipsis_like(exc_value) {
                         // if the index is in exclude, and the exclude value is `None`, we want to omit this index/item
                         return Ok(None);
                     } else {
@@ -153,7 +152,7 @@ trait FilterLogic<T: Eq + Copy> {
 
                 if let Some(inc_value) = op_inc_value {
                     // if the index is in include, we definitely want to include this index
-                    return if is_ellipsis(inc_value) {
+                    return if is_ellipsis_like(inc_value) {
                         Ok(Some((None, next_exclude)))
                     } else {
                         Ok(Some((Some(inc_value), next_exclude)))
@@ -248,14 +247,13 @@ where
     }
 }
 
-// waiting for https://github.com/PyO3/pyo3/pull/2911
-fn is_ellipsis(v: &PyAny) -> bool {
-    unsafe { v.as_ptr() == Py_Ellipsis() }
-}
-
-#[allow(non_snake_case)]
-pub fn Ellipsis(py: Python) -> PyObject {
-    unsafe { PyObject::from_borrowed_ptr(py, Py_Ellipsis()) }
+/// detect both ellipsis and `True` to be compatible with pydantic V1
+fn is_ellipsis_like(v: &PyAny) -> bool {
+    v.is_ellipsis()
+        || match v.downcast::<PyBool>() {
+            Ok(b) => b.is_true(),
+            Err(_) => false,
+        }
 }
 
 /// lookup the dict, for the key and "__all__" key, and merge them following the same rules as pydantic V1
@@ -265,7 +263,7 @@ fn merge_all_value(dict: &PyDict, py_key: impl ToPyObject + Copy) -> PyResult<Op
 
     match (op_item_value, op_all_value) {
         (Some(item_value), Some(all_value)) => {
-            if is_ellipsis(item_value) || is_ellipsis(all_value) {
+            if is_ellipsis_like(item_value) || is_ellipsis_like(all_value) {
                 Ok(op_item_value)
             } else {
                 let item_dict = as_dict(item_value)?;
@@ -286,7 +284,7 @@ fn as_dict(value: &PyAny) -> PyResult<&PyDict> {
         let py = value.py();
         let dict = PyDict::new(py);
         for item in set {
-            dict.set_item(item, Ellipsis(py))?;
+            dict.set_item(item, py.Ellipsis())?;
         }
         Ok(dict)
     } else {
@@ -301,12 +299,12 @@ fn merge_dicts<'py>(item_dict: &'py PyDict, all_value: &'py PyAny) -> PyResult<&
     if let Ok(all_dict) = all_value.downcast::<PyDict>() {
         for (all_key, all_value) in all_dict {
             if let Some(item_value) = item_dict.get_item(all_key) {
-                if is_ellipsis(item_value) {
+                if is_ellipsis_like(item_value) {
                     continue;
                 } else {
                     let item_value_dict = as_dict(item_value)?;
                     // if the all value is an ellipsis, we don't overwrite the item value
-                    if !is_ellipsis(all_value) {
+                    if !is_ellipsis_like(all_value) {
                         item_dict.set_item(all_key, merge_dicts(item_value_dict, all_value)?)?;
                     }
                 }
@@ -317,7 +315,7 @@ fn merge_dicts<'py>(item_dict: &'py PyDict, all_value: &'py PyAny) -> PyResult<&
     } else if let Ok(set) = all_value.downcast::<PySet>() {
         for item in set {
             if !item_dict.contains(item)? {
-                item_dict.set_item(item, Ellipsis(set.py()))?;
+                item_dict.set_item(item, set.py().Ellipsis())?;
             }
         }
     } else {
