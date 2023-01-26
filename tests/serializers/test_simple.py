@@ -55,7 +55,6 @@ def test_simple_serializers(schema_type, value, expected_python, expected_json, 
     assert type(v_json) == type(v_json_expected)
 
 
-@pytest.mark.xfail(sys.platform == 'win32', reason='https://github.com/PyO3/pyo3/issues/2913', strict=False)
 @pytest.mark.parametrize('schema_type', ['int', 'bool', 'float', 'none'])
 def test_simple_serializers_fallback(schema_type):
     s = SchemaSerializer({'type': schema_type})
