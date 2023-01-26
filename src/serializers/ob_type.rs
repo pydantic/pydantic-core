@@ -223,8 +223,11 @@ impl ObTypeLookup {
         // only test on the type itself, not base types
         if op_value.is_some() {
             // see https://github.com/PyO3/pyo3/issues/2905 for details
-            let meta_type = unsafe { (*type_ptr).ob_base.ob_base.ob_type } as usize;
-            meta_type == self.enum_type
+            #[cfg(all(PyPy, not(Py_3_9)))]
+            let meta_type = unsafe { (*type_ptr).ob_type };
+            #[cfg(any(not(PyPy), Py_3_9))]
+            let meta_type = unsafe { (*type_ptr).ob_base.ob_base.ob_type };
+            meta_type as usize == self.enum_type
         } else {
             false
         }
