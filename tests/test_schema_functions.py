@@ -251,7 +251,7 @@ def test_invalid_custom_error_type():
         SchemaValidator(s)
 
 
-def repr_function(value, **kwargs):
+def repr_function(value, _info):
     return repr(value)
 
 

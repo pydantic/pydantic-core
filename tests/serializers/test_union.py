@@ -123,7 +123,7 @@ def test_keys():
 
 
 def test_union_of_functions():
-    def repr_function(value, **kwargs):
+    def repr_function(value, _info):
         if value == 'unexpected':
             raise PydanticSerializationUnexpectedValue()
         return f'func: {value!r}'

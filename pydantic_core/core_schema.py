@@ -50,8 +50,25 @@ class CoreConfig(TypedDict, total=False):
 IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
 
 
+class SerializationInfo(Protocol):
+    include: IncExCall
+    exclude: IncExCall
+    mode: str
+    by_alias: bool
+    exclude_unset: bool
+    exclude_defaults: bool
+    exclude_none: bool
+    round_trip: bool
+
+    def __str__(self) -> str:
+        ...
+
+    def __repr__(self) -> str:
+        ...
+
+
 class SerializeFunction(Protocol):  # pragma: no cover
-    def __call__(self, __input_value: Any, *, mode: str, include: IncExCall | None, exclude: IncExCall | None) -> Any:
+    def __call__(self, __input_value: Any, __info: SerializationInfo) -> Any:
         ...
 
 

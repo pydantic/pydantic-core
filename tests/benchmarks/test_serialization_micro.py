@@ -93,7 +93,7 @@ def test_date_format(benchmark):
 
 @pytest.mark.benchmark(group='date-format')
 def test_date_format_function(benchmark):
-    def fmt(value, **kwargs):
+    def fmt(value, info):
         return value.strftime('%Y-%m-%d')
 
     serializer = SchemaSerializer(

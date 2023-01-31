@@ -8,7 +8,7 @@ use pyo3::types::PyDict;
 use serde::ser::Error;
 
 use crate::build_context::BuildContext;
-use crate::build_tools::{function_name, kwargs, py_error_type, SchemaDict};
+use crate::build_tools::{function_name, py_error_type, SchemaDict};
 use crate::serializers::extra::SerMode;
 use crate::PydanticSerializationUnexpectedValue;
 
@@ -61,8 +61,17 @@ impl FunctionSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        let kwargs = kwargs!(py, mode: extra.mode.to_object(py), include: include, exclude: exclude);
-        self.func.call(py, (value,), kwargs)
+        let info = SerializationInfo {
+            include: include.map(|i| i.into_py(py)),
+            exclude: exclude.map(|e| e.into_py(py)),
+            _mode: extra.mode.clone(),
+            by_alias: extra.by_alias,
+            exclude_unset: extra.exclude_unset,
+            exclude_defaults: extra.exclude_defaults,
+            exclude_none: extra.exclude_none,
+            round_trip: extra.round_trip,
+        };
+        self.func.call1(py, (value, info))
     }
 }
 
@@ -170,5 +179,83 @@ impl TypeSerializer for FunctionSerializer {
 
     fn get_name(&self) -> &str {
         &self.name
+    }
+}
+
+#[pyclass(module = "pydantic_core._pydantic_core")]
+#[cfg_attr(debug_assertions, derive(Debug))]
+struct SerializationInfo {
+    #[pyo3(get)]
+    include: Option<PyObject>,
+    #[pyo3(get)]
+    exclude: Option<PyObject>,
+    _mode: SerMode,
+    #[pyo3(get)]
+    by_alias: bool,
+    #[pyo3(get)]
+    exclude_unset: bool,
+    #[pyo3(get)]
+    exclude_defaults: bool,
+    #[pyo3(get)]
+    exclude_none: bool,
+    #[pyo3(get)]
+    round_trip: bool,
+}
+
+#[pymethods]
+impl SerializationInfo {
+    #[getter]
+    fn mode(&self, py: Python) -> PyObject {
+        self._mode.to_object(py)
+    }
+
+    #[getter]
+    fn __dict__<'py>(&'py self, py: Python<'py>) -> PyResult<&'py PyDict> {
+        let d = PyDict::new(py);
+        if let Some(ref include) = self.include {
+            d.set_item("include", include)?;
+        }
+        if let Some(ref exclude) = self.exclude {
+            d.set_item("exclude", exclude)?;
+        }
+        d.set_item("mode", self.mode(py))?;
+        d.set_item("by_alias", self.by_alias)?;
+        d.set_item("exclude_unset", self.exclude_unset)?;
+        d.set_item("exclude_defaults", self.exclude_defaults)?;
+        d.set_item("exclude_none", self.exclude_none)?;
+        d.set_item("round_trip", self.round_trip)?;
+        Ok(d)
+    }
+
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        Ok(format!(
+            "SerializationInfo(include={}, exclude={}, mode='{}', by_alias={}, exclude_unset={}, exclude_defaults={}, exclude_none={}, round_trip={})",
+            match self.include {
+                Some(ref include) => include.as_ref(py).repr()?.to_str()?,
+                None => "None",
+            },
+            match self.exclude {
+                Some(ref exclude) => exclude.as_ref(py).repr()?.to_str()?,
+                None => "None",
+            },
+            self._mode,
+            py_bool(self.by_alias),
+            py_bool(self.exclude_unset),
+            py_bool(self.exclude_defaults),
+            py_bool(self.exclude_none),
+            py_bool(self.round_trip),
+        ))
+    }
+
+    fn __str__(&self, py: Python) -> PyResult<String> {
+        self.__repr__(py)
+    }
+}
+
+fn py_bool(value: bool) -> &'static str {
+    if value {
+        "True"
+    } else {
+        "False"
     }
 }

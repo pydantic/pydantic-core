@@ -10,7 +10,7 @@ from pydantic_core import PydanticSerializationError, SchemaError, SchemaSeriali
     [(None, 'None', b'"None"'), (1, '1', b'"1"'), ([1, 2, 3], '[1, 2, 3]', b'"[1, 2, 3]"')],
 )
 def test_function(value, expected_python, expected_json):
-    def repr_function(value, **kwargs):
+    def repr_function(value, _info):
         return repr(value)
 
     s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.function_ser_schema(repr_function)))
@@ -20,33 +20,75 @@ def test_function(value, expected_python, expected_json):
 
 
 def test_function_args():
-    f_kwargs = None
+    f_info = None
 
-    def double(value, **kwargs):
-        nonlocal f_kwargs
-        f_kwargs = kwargs
+    def double(value, info):
+        nonlocal f_info
+        f_info = vars(info)
         return value * 2
 
     s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.function_ser_schema(double)))
     assert s.to_python(4) == 8
-    assert f_kwargs == {'mode': 'python', 'include': None, 'exclude': None}
+    # insert_assert(f_info)
+    assert f_info == {
+        'mode': 'python',
+        'by_alias': True,
+        'exclude_unset': False,
+        'exclude_defaults': False,
+        'exclude_none': False,
+        'round_trip': False,
+    }
     assert s.to_python('x') == 'xx'
 
     assert s.to_python(4, mode='foobar') == 8
-    assert f_kwargs == {'mode': 'foobar', 'include': None, 'exclude': None}
+    # insert_assert(f_info)
+    assert f_info == {
+        'mode': 'foobar',
+        'by_alias': True,
+        'exclude_unset': False,
+        'exclude_defaults': False,
+        'exclude_none': False,
+        'round_trip': False,
+    }
 
     assert s.to_json(42) == b'84'
-    assert f_kwargs == {'mode': 'json', 'include': None, 'exclude': None}
+    # insert_assert(f_info)
+    assert f_info == {
+        'mode': 'json',
+        'by_alias': True,
+        'exclude_unset': False,
+        'exclude_defaults': False,
+        'exclude_none': False,
+        'round_trip': False,
+    }
 
-    assert s.to_python(7, mode='json') == 14
-    assert f_kwargs == {'mode': 'json', 'include': None, 'exclude': None}
+    assert s.to_python(7, mode='json', by_alias=False, exclude_unset=True) == 14
+    # insert_assert(f_info)
+    assert f_info == {
+        'mode': 'json',
+        'by_alias': False,
+        'exclude_unset': True,
+        'exclude_defaults': False,
+        'exclude_none': False,
+        'round_trip': False,
+    }
 
     assert s.to_python(1, include={1, 2, 3}, exclude={'foo': {'bar'}}) == 2
-    assert f_kwargs == {'mode': 'python', 'include': {1, 2, 3}, 'exclude': {'foo': {'bar'}}}
+    # insert_assert(f_info)
+    assert f_info == {
+        'include': {3, 2, 1},
+        'exclude': {'foo': {'bar'}},
+        'mode': 'python',
+        'by_alias': True,
+        'exclude_unset': False,
+        'exclude_defaults': False,
+        'exclude_none': False,
+        'round_trip': False,
+    }
 
 
 def test_function_error():
-    def raise_error(value, **kwargs):
+    def raise_error(value, _info):
         raise TypeError('foo')
 
     s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.function_ser_schema(raise_error)))
@@ -65,7 +107,7 @@ def test_function_error():
 
 
 def test_function_error_keys():
-    def raise_error(value, **kwargs):
+    def raise_error(value, _info):
         raise TypeError('foo')
 
     s = SchemaSerializer(
@@ -88,7 +130,7 @@ def test_function_error_keys():
 
 
 def test_function_known_type():
-    def append_42(value, **kwargs):
+    def append_42(value, _info):
         if isinstance(value, list):
             value.append(42)
         return value
@@ -111,17 +153,32 @@ def test_function_known_type():
 
 
 def test_function_args_str():
-    def append_args(value, mode, include, exclude):
-        return f'{value} mode={mode} include={include} exclude={exclude}'
+    def append_args(value, info):
+        return f'{value} info={info}'
 
     s = SchemaSerializer(
         core_schema.any_schema(serialization=core_schema.function_ser_schema(append_args, json_return_type='str'))
     )
-    assert s.to_python(123) == '123 mode=python include=None exclude=None'
-    assert s.to_python(123, mode='other') == '123 mode=other include=None exclude=None'
-    assert s.to_python(123, include={'x'}) == "123 mode=python include={'x'} exclude=None"
-    assert s.to_python(123, mode='json', exclude={1: {2}}) == '123 mode=json include=None exclude={1: {2}}'
-    assert s.to_json(123) == b'"123 mode=json include=None exclude=None"'
+    assert s.to_python(123) == (
+        "123 info=SerializationInfo(include=None, exclude=None, mode='python', by_alias=True, exclude_unset=False, "
+        "exclude_defaults=False, exclude_none=False, round_trip=False)"  # noqa: Q000
+    )
+    assert s.to_python(123, mode='other') == (
+        "123 info=SerializationInfo(include=None, exclude=None, mode='other', by_alias=True, exclude_unset=False, "
+        "exclude_defaults=False, exclude_none=False, round_trip=False)"  # noqa: Q000
+    )
+    assert s.to_python(123, include={'x'}) == (
+        "123 info=SerializationInfo(include={'x'}, exclude=None, mode='python', by_alias=True, exclude_unset=False, "
+        "exclude_defaults=False, exclude_none=False, round_trip=False)"  # noqa: Q000
+    )
+    assert s.to_python(123, mode='json', exclude={1: {2}}) == (
+        "123 info=SerializationInfo(include=None, exclude={1: {2}}, mode='json', by_alias=True, exclude_unset=False, "
+        "exclude_defaults=False, exclude_none=False, round_trip=False)"  # noqa: Q000
+    )
+    assert s.to_json(123) == (
+        b'"123 info=SerializationInfo(include=None, exclude=None, mode=\'json\', by_alias=True, exclude_unset=False, '
+        b'exclude_defaults=False, exclude_none=False, round_trip=False)"'
+    )
 
 
 def test_invalid_return_type():
@@ -134,7 +191,7 @@ def test_invalid_return_type():
 
 
 def test_dict_keys():
-    def fmt(value, **kwargs):
+    def fmt(value, _info):
         return f'<{value}>'
 
     s = SchemaSerializer(
@@ -144,7 +201,7 @@ def test_dict_keys():
 
 
 def test_function_as_key():
-    def repr_function(value, **kwargs):
+    def repr_function(value, _info):
         return repr(value)
 
     s = SchemaSerializer(

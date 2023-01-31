@@ -181,13 +181,13 @@ def test_type_error():
 
 
 def test_ser_function():
-    def f(__input_value: Any, *, mode: str, include: core_schema.IncExCall, exclude: core_schema.IncExCall) -> str:
-        return f'{__input_value} mode={mode} include={include} exclude={exclude}'
+    def f(__input: Any, __info: core_schema.SerializationInfo) -> str:
+        return str(__info)
 
     s = SchemaSerializer(
         core_schema.any_schema(serialization=core_schema.function_ser_schema(f, json_return_type='str'))
     )
-    assert s.to_python(123) == '123 mode=python include=None exclude=None'
-    assert s.to_python(123, mode='json') == '123 mode=json include=None exclude=None'
-    assert s.to_python(123, mode='xx', include={'a'}, exclude={1: {2}}) == "123 mode=xx include={'a'} exclude={1: {2}}"
-    assert s.to_json(123) == b'"123 mode=json include=None exclude=None"'
+    assert s.to_python(123) == (
+        "SerializationInfo(include=None, exclude=None, mode='python', by_alias=True, exclude_unset=False, "
+        "exclude_defaults=False, exclude_none=False, round_trip=False)"  # noqa: Q000
+    )
