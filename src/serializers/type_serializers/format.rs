@@ -133,7 +133,7 @@ impl TypeSerializer for ToStringSerializer {
         if value.is_none() {
             Ok(value.into_py(value.py()))
         } else {
-            Ok(value.to_string().to_object(value.py()))
+            value.str().map(|s| s.into_py(value.py()))
         }
     }
 
@@ -141,7 +141,7 @@ impl TypeSerializer for ToStringSerializer {
         if key.is_none() {
             none_json_key()
         } else {
-            Ok(Cow::Owned(key.to_string()))
+            Ok(key.str()?.to_string_lossy())
         }
     }
 
@@ -156,7 +156,8 @@ impl TypeSerializer for ToStringSerializer {
         if value.is_none() {
             serializer.serialize_none()
         } else {
-            serializer.serialize_str(&value.to_string())
+            let s = value.str().map_err(py_err_se_err)?;
+            serialize_py_str(s, serializer)
         }
     }
 
