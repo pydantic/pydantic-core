@@ -67,20 +67,31 @@ ExpectedSerializationTypes = Literal[
     'tuple',
     'set',
     'frozenset',
+    'generator',
     'dict',
     'datetime',
     'date',
     'time',
     'timedelta',
     'url',
-    'multi_host_url',
+    'multi-host-url',
     'json',
     'to-string',
 ]
 
 
-class AltTypeSerSchema(TypedDict, total=False):
+class SimpleSerSchema(TypedDict, total=False):
     type: Required[ExpectedSerializationTypes]
+
+
+def simple_ser_schema(type: ExpectedSerializationTypes) -> SimpleSerSchema:
+    """
+    Returns a schema for serialization with a custom type.
+
+    Args:
+        type: The type to use for serialization
+    """
+    return SimpleSerSchema(type=type)
 
 
 # must match `src/serializers/ob_type.rs::ObType`
@@ -99,6 +110,7 @@ JsonReturnTypes = Literal[
     'tuple',
     'set',
     'frozenset',
+    'generator',
     'dict',
     'datetime',
     'date',
@@ -109,7 +121,6 @@ JsonReturnTypes = Literal[
     'dataclass',
     'model',
     'enum',
-    'generator',
 ]
 
 
@@ -153,7 +164,18 @@ class ModelSerSchema(TypedDict, total=False):
     schema: Required[CoreSchema]
 
 
-SerSchema = Union[AltTypeSerSchema, FunctionSerSchema, FormatSerSchema, ModelSerSchema]
+def model_ser_schema(cls: Type[Any], schema: CoreSchema) -> ModelSerSchema:
+    """
+    Returns a schema for serialization using a model.
+
+    Args:
+        cls: The expected class type, used to generate warnings if the wrong type is passed
+        schema: Internal schema to use to serialize the model dict
+    """
+    return ModelSerSchema(type='model', cls=cls, schema=schema)
+
+
+SerSchema = Union[SimpleSerSchema, FunctionSerSchema, FormatSerSchema, ModelSerSchema]
 
 
 class AnySchema(TypedDict, total=False):
