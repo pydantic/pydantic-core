@@ -11,16 +11,16 @@ from pydantic_core import PydanticSerializationError, SchemaSerializer, core_sch
 @pytest.mark.parametrize(
     'value,formatting_string,expected_python,expected_json',
     [
-        (42.12345, '0.4f', '42.1234', b'"42.1234"'),
-        (42.12, '0.4f', '42.1200', b'"42.1200"'),
-        (42.12, '', '42.12', b'"42.12"'),
-        (42.1234567, '', '42.1234567', b'"42.1234567"'),
-        (date(2022, 11, 20), '%Y-%m-%d', '2022-11-20', b'"2022-11-20"'),
-        ('foo', '^5s', ' foo ', b'" foo "'),
+        (42.12345, '0.4f', 42.12345, b'"42.1234"'),
+        (42.12, '0.4f', 42.12, b'"42.1200"'),
+        (42.12, '', 42.12, b'"42.12"'),
+        (42.1234567, '', 42.1234567, b'"42.1234567"'),
+        (date(2022, 11, 20), '%Y-%m-%d', date(2022, 11, 20), b'"2022-11-20"'),
+        ('foo', '^5s', 'foo', b'" foo "'),
         (
             UUID('ebcdab58-6eb8-46fb-a190-d07a33e9eac8'),
             '',
-            'ebcdab58-6eb8-46fb-a190-d07a33e9eac8',
+            UUID('ebcdab58-6eb8-46fb-a190-d07a33e9eac8'),
             b'"ebcdab58-6eb8-46fb-a190-d07a33e9eac8"',
         ),
     ],
@@ -32,14 +32,34 @@ def test_format(value, formatting_string, expected_python, expected_json):
     assert s.to_python(value, mode='json') == json.loads(expected_json)
 
 
+def test_format_to_python():
+    s = SchemaSerializer(
+        core_schema.any_schema(serialization=core_schema.format_ser_schema('0.1f', format_to_python=True))
+    )
+    assert 'FormatSerializer' in repr(s)
+    assert 'ToStringSerializer' not in repr(s)
+    assert s.to_python(42.12345) == '42.1'
+    assert s.to_python(42.12345, mode='json') == '42.1'
+    assert s.to_json(42.12345) == b'"42.1"'
+
+
+def test_format_to_python_plain():
+    s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.format_ser_schema('', format_to_python=True)))
+    assert 'ToStringSerializer' in repr(s)
+    assert 'FormatSerializer' not in repr(s)
+    assert s.to_python(42) == '42'
+    assert s.to_python(42, mode='json') == '42'
+    assert s.to_json(42) == b'"42"'
+
+
 def test_format_error():
     s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.format_ser_schema('^5d')))
-    assert s.to_python(123) == ' 123 '
+    assert s.to_python(123) == 123
 
     # the actual error message differs slightly between cpython and pypy
     msg = "Error calling `format(value, '^5d')`: ValueError:"
     with pytest.raises(PydanticSerializationError, match=re.escape(msg)):
-        s.to_python('x')
+        s.to_python('x', mode='json')
 
     with pytest.raises(PydanticSerializationError, match=re.escape(msg)):
         s.to_json('x')
@@ -49,12 +69,12 @@ def test_dict_keys():
     s = SchemaSerializer(
         core_schema.dict_schema(core_schema.float_schema(serialization=core_schema.format_ser_schema('0.4f')))
     )
-    assert s.to_python({1: True}) == {'1.0000': True}
+    assert s.to_python({1: True}, mode='json') == {'1.0000': True}
 
 
 def test_format_fallback():
     s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.format_ser_schema('^5s')))
-    assert s.to_python('abc') == ' abc '
+    assert s.to_python('abc') == 'abc'
     assert s.to_python('abc', mode='json') == ' abc '
     assert s.to_json('abc') == b'" abc "'
 

@@ -17,6 +17,7 @@ use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticS
 pub struct FormatSerializer {
     format_func: PyObject,
     formatting_string: Py<PyString>,
+    format_to_python: bool,
 }
 
 impl BuildSerializer for FormatSerializer {
@@ -24,18 +25,24 @@ impl BuildSerializer for FormatSerializer {
 
     fn build(
         schema: &PyDict,
-        _config: Option<&PyDict>,
-        _build_context: &mut BuildContext<CombinedSerializer>,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
-        Ok(Self {
-            format_func: py
-                .import(intern!(py, "builtins"))?
-                .getattr(intern!(py, "format"))?
-                .into_py(py),
-            formatting_string: schema.get_as_req(intern!(py, "formatting_string"))?,
+        let formatting_string: &str = schema.get_as_req(intern!(py, "formatting_string"))?;
+        if formatting_string.is_empty() {
+            ToStringSerializer::build(schema, config, build_context)
+        } else {
+            Ok(Self {
+                format_func: py
+                    .import(intern!(py, "builtins"))?
+                    .getattr(intern!(py, "format"))?
+                    .into_py(py),
+                formatting_string: PyString::new(py, formatting_string).into_py(py),
+                format_to_python: schema.get_as(intern!(py, "format_to_python"))?.unwrap_or(false),
+            }
+            .into())
         }
-        .into())
     }
 }
 impl FormatSerializer {
@@ -62,12 +69,16 @@ impl TypeSerializer for FormatSerializer {
         value: &PyAny,
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
-        _extra: &Extra,
+        extra: &Extra,
     ) -> PyResult<PyObject> {
-        if value.is_none() {
-            Ok(value.into_py(value.py()))
+        if extra.mode.is_json() || self.format_to_python {
+            if value.is_none() {
+                Ok(value.into_py(value.py()))
+            } else {
+                self.call(value).map_err(PydanticSerializationError::new_err)
+            }
         } else {
-            self.call(value).map_err(PydanticSerializationError::new_err)
+            Ok(value.into_py(value.py()))
         }
     }
 
@@ -108,17 +119,24 @@ impl TypeSerializer for FormatSerializer {
 }
 
 #[derive(Debug, Clone)]
-pub struct ToStringSerializer;
+pub struct ToStringSerializer {
+    format_to_python: bool,
+}
 
 impl BuildSerializer for ToStringSerializer {
     const EXPECTED_TYPE: &'static str = "to-string";
 
     fn build(
-        _schema: &PyDict,
+        schema: &PyDict,
         _config: Option<&PyDict>,
         _build_context: &mut BuildContext<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        Ok(Self {}.into())
+        Ok(Self {
+            format_to_python: schema
+                .get_as(intern!(schema.py(), "format_to_python"))?
+                .unwrap_or(false),
+        }
+        .into())
     }
 }
 
@@ -128,12 +146,16 @@ impl TypeSerializer for ToStringSerializer {
         value: &PyAny,
         _include: Option<&PyAny>,
         _exclude: Option<&PyAny>,
-        _extra: &Extra,
+        extra: &Extra,
     ) -> PyResult<PyObject> {
-        if value.is_none() {
-            Ok(value.into_py(value.py()))
+        if extra.mode.is_json() || self.format_to_python {
+            if value.is_none() {
+                Ok(value.into_py(value.py()))
+            } else {
+                value.str().map(|s| s.into_py(value.py()))
+            }
         } else {
-            value.str().map(|s| s.into_py(value.py()))
+            Ok(value.into_py(value.py()))
         }
     }
 

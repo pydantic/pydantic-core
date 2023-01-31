@@ -146,16 +146,18 @@ def function_ser_schema(
 class FormatSerSchema(TypedDict, total=False):
     type: Required[Literal['format']]
     formatting_string: Required[str]
+    format_to_python: bool  # default: False
 
 
-def format_ser_schema(formatting_string: str) -> FormatSerSchema:
+def format_ser_schema(formatting_string: str, *, format_to_python: bool | None = None) -> FormatSerSchema:
     """
     Returns a schema for serialization using python's `format` method.
 
     Args:
         formatting_string: String defining the format to use
+        format_to_python: If True, format the value even in "python" mode
     """
-    return FormatSerSchema(type='format', formatting_string=formatting_string)
+    return dict_not_none(type='format', formatting_string=formatting_string, format_to_python=format_to_python)
 
 
 class ModelSerSchema(TypedDict, total=False):

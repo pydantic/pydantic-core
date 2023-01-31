@@ -1,6 +1,5 @@
 from datetime import date, datetime
 from typing import List
-from uuid import UUID
 
 import pytest
 
@@ -83,7 +82,9 @@ def test_python_json_list_none(benchmark):
 
 @pytest.mark.benchmark(group='date-format')
 def test_date_format(benchmark):
-    serializer = SchemaSerializer({'type': 'any', 'serialization': {'type': 'format', 'formatting_string': '%Y-%m-%d'}})
+    serializer = SchemaSerializer(
+        {'type': 'any', 'serialization': {'type': 'format', 'formatting_string': '%Y-%m-%d', 'format_to_python': True}}
+    )
     d = date(2022, 11, 20)
     assert serializer.to_python(d) == '2022-11-20'
 
@@ -289,17 +290,15 @@ def test_datetime(benchmark):
 
 @pytest.mark.benchmark(group='to-string')
 def test_to_string_format(benchmark):
-    s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.format_ser_schema('')))
-    uuid = UUID('ebcdab58-6eb8-46fb-a190-d07a33e9eac8')
-    assert s.to_json(uuid) == b'"%s"' % str(uuid).encode('utf-8')
+    s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.format_ser_schema('d')))
+    assert s.to_json(123) == b'"123"'
 
-    benchmark(s.to_json, uuid)
+    benchmark(s.to_json, 123)
 
 
 @pytest.mark.benchmark(group='to-string')
 def test_to_string_direct(benchmark):
     s = SchemaSerializer(core_schema.any_schema(serialization={'type': 'to-string'}))
-    uuid = UUID('ebcdab58-6eb8-46fb-a190-d07a33e9eac8')
-    assert s.to_json(uuid) == b'"%s"' % str(uuid).encode('utf-8')
+    assert s.to_json(123) == b'"123"'
 
-    benchmark(s.to_json, uuid)
+    benchmark(s.to_json, 123)

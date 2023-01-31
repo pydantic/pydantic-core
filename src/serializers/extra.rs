@@ -141,6 +141,12 @@ pub(crate) enum SerMode {
     Other(String),
 }
 
+impl SerMode {
+    pub fn is_json(&self) -> bool {
+        matches!(self, SerMode::Json)
+    }
+}
+
 impl From<Option<&str>> for SerMode {
     fn from(s: Option<&str>) -> Self {
         match s {
