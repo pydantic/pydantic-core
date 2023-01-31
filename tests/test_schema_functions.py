@@ -249,3 +249,16 @@ def test_invalid_custom_error_type():
     msg = "custom_error.message should not be provided if 'custom_error_type' matches a known error"
     with pytest.raises(SchemaError, match=msg):
         SchemaValidator(s)
+
+
+def repr_function(value, **kwargs):
+    return repr(value)
+
+
+@pytest.mark.parametrize('json_return_type', core_schema.JsonReturnTypes.__args__)
+def test_expected_serialization_types(json_return_type):
+    SchemaSerializer(
+        core_schema.any_schema(
+            serialization=core_schema.function_ser_schema(repr_function, json_return_type=json_return_type)
+        )
+    )

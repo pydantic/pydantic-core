@@ -51,7 +51,7 @@ IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
 
 
 class SerializeFunction(Protocol):  # pragma: no cover
-    def __call__(self, __input_value: Any, *, format: str, include: IncExCall | None, exclude: IncExCall | None) -> Any:
+    def __call__(self, __input_value: Any, *, mode: str, include: IncExCall | None, exclude: IncExCall | None) -> Any:
         ...
 
 
@@ -75,6 +75,7 @@ ExpectedSerializationTypes = Literal[
     'url',
     'multi_host_url',
     'json',
+    'to-string',
 ]
 
 
@@ -82,23 +83,53 @@ class AltTypeSerSchema(TypedDict, total=False):
     type: Required[ExpectedSerializationTypes]
 
 
+# must match `src/serializers/ob_type.rs::ObType`
+JsonReturnTypes = Literal[
+    'int',
+    'int_subclass',
+    'bool',
+    'float',
+    'float_subclass',
+    'decimal',
+    'str',
+    'str_subclass',
+    'bytes',
+    'bytearray',
+    'list',
+    'tuple',
+    'set',
+    'frozenset',
+    'dict',
+    'datetime',
+    'date',
+    'time',
+    'timedelta',
+    'url',
+    'multi_host_url',
+    'dataclass',
+    'model',
+    'enum',
+    'generator',
+]
+
+
 class FunctionSerSchema(TypedDict, total=False):
     type: Required[Literal['function']]
     function: Required[SerializeFunction]
-    return_type: ExpectedSerializationTypes
+    json_return_type: JsonReturnTypes
 
 
 def function_ser_schema(
-    function: SerializeFunction, return_type: ExpectedSerializationTypes | None = None
+    function: SerializeFunction, json_return_type: JsonReturnTypes | None = None
 ) -> FunctionSerSchema:
     """
     Returns a schema for serialization with a function.
 
     Args:
         function: The function to use for serialization
-        return_type: The type that the function returns
+        json_return_type: The type that the function returns if `mode='json'`
     """
-    return dict_not_none(type='function', function=function, return_type=return_type)
+    return dict_not_none(type='function', function=function, json_return_type=json_return_type)
 
 
 class FormatSerSchema(TypedDict, total=False):

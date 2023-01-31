@@ -14,12 +14,12 @@ use super::string::serialize_py_str;
 use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializationError, TypeSerializer};
 
 #[derive(Debug, Clone)]
-pub struct FunctionSerializer {
+pub struct FormatSerializer {
     format_func: PyObject,
     formatting_string: Py<PyString>,
 }
 
-impl BuildSerializer for FunctionSerializer {
+impl BuildSerializer for FormatSerializer {
     const EXPECTED_TYPE: &'static str = "format";
 
     fn build(
@@ -38,7 +38,7 @@ impl BuildSerializer for FunctionSerializer {
         .into())
     }
 }
-impl FunctionSerializer {
+impl FormatSerializer {
     fn call(&self, value: &PyAny) -> Result<PyObject, String> {
         let py = value.py();
         self.format_func
@@ -56,7 +56,7 @@ impl FunctionSerializer {
     }
 }
 
-impl TypeSerializer for FunctionSerializer {
+impl TypeSerializer for FormatSerializer {
     fn to_python(
         &self,
         value: &PyAny,
@@ -99,6 +99,64 @@ impl TypeSerializer for FunctionSerializer {
                 }
                 Err(e) => Err(S::Error::custom(e)),
             }
+        }
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ToStringSerializer;
+
+impl BuildSerializer for ToStringSerializer {
+    const EXPECTED_TYPE: &'static str = "to-string";
+
+    fn build(
+        _schema: &PyDict,
+        _config: Option<&PyDict>,
+        _build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
+        Ok(Self {}.into())
+    }
+}
+
+impl TypeSerializer for ToStringSerializer {
+    fn to_python(
+        &self,
+        value: &PyAny,
+        _include: Option<&PyAny>,
+        _exclude: Option<&PyAny>,
+        _extra: &Extra,
+    ) -> PyResult<PyObject> {
+        if value.is_none() {
+            Ok(value.into_py(value.py()))
+        } else {
+            Ok(value.to_string().to_object(value.py()))
+        }
+    }
+
+    fn json_key<'py>(&self, key: &'py PyAny, _extra: &Extra) -> PyResult<Cow<'py, str>> {
+        if key.is_none() {
+            none_json_key()
+        } else {
+            Ok(Cow::Owned(key.to_string()))
+        }
+    }
+
+    fn serde_serialize<S: serde::ser::Serializer>(
+        &self,
+        value: &PyAny,
+        serializer: S,
+        _include: Option<&PyAny>,
+        _exclude: Option<&PyAny>,
+        _extra: &Extra,
+    ) -> Result<S::Ok, S::Error> {
+        if value.is_none() {
+            serializer.serialize_none()
+        } else {
+            serializer.serialize_str(&value.to_string())
         }
     }
 

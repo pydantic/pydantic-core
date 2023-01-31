@@ -121,7 +121,8 @@ combined_serializer! {
         Url: super::type_serializers::url::UrlSerializer;
         MultiHostUrl: super::type_serializers::url::MultiHostUrlSerializer;
         Any: super::type_serializers::any::AnySerializer;
-        Format: super::type_serializers::format::FunctionSerializer;
+        Format: super::type_serializers::format::FormatSerializer;
+        ToString: super::type_serializers::format::ToStringSerializer;
         WithDefault: super::type_serializers::with_default::WithDefaultSerializer;
         Json: super::type_serializers::json::JsonSerializer;
         Recursive: super::type_serializers::recursive::RecursiveRefSerializer;

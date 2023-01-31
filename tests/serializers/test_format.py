@@ -61,3 +61,12 @@ def test_format_fallback():
     assert s.to_python(None) is None
     assert s.to_python(None, mode='json') is None
     assert s.to_json(None) == b'null'
+
+
+def test_to_string():
+    s = SchemaSerializer(core_schema.any_schema(serialization={'type': 'to-string'}))
+    # assert s.to_python('abc') == 'abc'
+    assert s.to_python(123, mode='json') == '123'
+    uuid = UUID('ebcdab58-6eb8-46fb-a190-d07a33e9eac8')
+    assert s.to_python(uuid, mode='json') == str(uuid)
+    assert s.to_json(uuid) == b'"%s"' % str(uuid).encode('utf-8')

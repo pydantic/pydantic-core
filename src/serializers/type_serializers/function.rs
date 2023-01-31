@@ -9,6 +9,7 @@ use serde::ser::Error;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{function_name, kwargs, py_error_type, SchemaDict};
+use crate::serializers::extra::SerMode;
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::{
@@ -22,7 +23,7 @@ pub struct FunctionSerializer {
     func: PyObject,
     name: String,
     function_name: String,
-    return_ob_type: Option<ObType>,
+    json_return_ob_type: Option<ObType>,
 }
 
 impl BuildSerializer for FunctionSerializer {
@@ -42,7 +43,7 @@ impl BuildSerializer for FunctionSerializer {
             func: function.into_py(py),
             function_name,
             name,
-            return_ob_type: match schema.get_as::<&str>(intern!(py, "return_type"))? {
+            json_return_ob_type: match schema.get_as::<&str>(intern!(py, "json_return_type"))? {
                 Some(t) => Some(ObType::from_str(t).map_err(|_| py_error_type!("Unknown return type {:?}", t))?),
                 None => None,
             },
@@ -77,9 +78,12 @@ impl TypeSerializer for FunctionSerializer {
         match self.call(value, include, exclude, extra) {
             Ok(v) => {
                 let next_value = v.as_ref(py);
-                match self.return_ob_type {
-                    Some(ref ob_type) => infer_to_python_known(ob_type, next_value, include, exclude, extra),
-                    None => infer_to_python(next_value, include, exclude, extra),
+                match extra.mode {
+                    SerMode::Json => match self.json_return_ob_type {
+                        Some(ref ob_type) => infer_to_python_known(ob_type, next_value, include, exclude, extra),
+                        None => infer_to_python(next_value, include, exclude, extra),
+                    },
+                    _ => Ok(next_value.to_object(py)),
                 }
             }
             Err(err) => match err.value(py).extract::<PydanticSerializationUnexpectedValue>() {
@@ -105,7 +109,7 @@ impl TypeSerializer for FunctionSerializer {
         match self.call(key, None, None, extra) {
             Ok(v) => {
                 let next_key = v.into_ref(py);
-                match self.return_ob_type {
+                match self.json_return_ob_type {
                     Some(ref ob_type) => infer_json_key_known(ob_type, next_key, extra),
                     None => infer_json_key(next_key, extra),
                 }
@@ -140,7 +144,7 @@ impl TypeSerializer for FunctionSerializer {
         match self.call(value, include, exclude, extra) {
             Ok(v) => {
                 let next_value = v.as_ref(py);
-                match self.return_ob_type {
+                match self.json_return_ob_type {
                     Some(ref ob_type) => {
                         infer_serialize_known(ob_type, next_value, serializer, include, exclude, extra)
                     }

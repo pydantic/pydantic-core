@@ -94,14 +94,13 @@ def test_function_known_type():
         return value
 
     s = SchemaSerializer(
-        core_schema.any_schema(serialization=core_schema.function_ser_schema(append_42, return_type='list'))
+        core_schema.any_schema(serialization=core_schema.function_ser_schema(append_42, json_return_type='list'))
     )
     assert s.to_python([1, 2, 3]) == [1, 2, 3, 42]
     assert s.to_python([1, 2, 3], mode='json') == [1, 2, 3, 42]
     assert s.to_json([1, 2, 3]) == b'[1,2,3,42]'
 
-    with pytest.raises(TypeError, match="'str' object cannot be converted to 'PyList'"):
-        s.to_python('abc')
+    assert s.to_python('abc') == 'abc'
 
     with pytest.raises(TypeError, match="'str' object cannot be converted to 'PyList'"):
         s.to_python('abc', mode='json')
@@ -111,10 +110,26 @@ def test_function_known_type():
         s.to_json('abc')
 
 
+def test_function_args_str():
+    def append_args(value, mode, include, exclude):
+        return f'{value} mode={mode} include={include} exclude={exclude}'
+
+    s = SchemaSerializer(
+        core_schema.any_schema(serialization=core_schema.function_ser_schema(append_args, json_return_type='str'))
+    )
+    assert s.to_python(123) == '123 mode=python include=None exclude=None'
+    assert s.to_python(123, mode='other') == '123 mode=other include=None exclude=None'
+    assert s.to_python(123, include={'x'}) == "123 mode=python include={'x'} exclude=None"
+    assert s.to_python(123, mode='json', exclude={1: {2}}) == '123 mode=json include=None exclude={1: {2}}'
+    assert s.to_json(123) == b'"123 mode=json include=None exclude=None"'
+
+
 def test_invalid_return_type():
-    with pytest.raises(SchemaError, match='function -> return_type\n  Input should be'):
+    with pytest.raises(SchemaError, match='function -> json_return_type\n  Input should be'):
         SchemaSerializer(
-            core_schema.any_schema(serialization=core_schema.function_ser_schema(lambda _: 1, return_type='different'))
+            core_schema.any_schema(
+                serialization=core_schema.function_ser_schema(lambda _: 1, json_return_type='different')
+            )
         )
 
 
