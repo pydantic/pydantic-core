@@ -189,5 +189,5 @@ def test_ser_function():
     )
     assert s.to_python(123) == (
         "SerializationInfo(include=None, exclude=None, mode='python', by_alias=True, exclude_unset=False, "
-        "exclude_defaults=False, exclude_none=False, round_trip=False)"  # noqa: Q000
+        "exclude_defaults=False, exclude_none=False, round_trip=False)"
     )
