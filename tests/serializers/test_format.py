@@ -32,9 +32,9 @@ def test_format(value, formatting_string, expected_python, expected_json):
     assert s.to_python(value, mode='json') == json.loads(expected_json)
 
 
-def test_format_to_python():
+def test_format_when_used_unless_none():
     s = SchemaSerializer(
-        core_schema.any_schema(serialization=core_schema.format_ser_schema('0.1f', format_to_python=True))
+        core_schema.any_schema(serialization=core_schema.format_ser_schema('0.1f', when_used='unless-none'))
     )
     assert 'FormatSerializer' in repr(s)
     assert 'ToStringSerializer' not in repr(s)
@@ -43,8 +43,31 @@ def test_format_to_python():
     assert s.to_json(42.12345) == b'"42.1"'
 
 
-def test_format_to_python_plain():
-    s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.format_ser_schema('', format_to_python=True)))
+def test_format_when_used_json():
+    s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.format_ser_schema('0.1f', when_used='json')))
+    assert s.to_python(42.12345) == 42.12345
+    assert s.to_python(None) is None
+    assert s.to_python(42.12345, mode='json') == '42.1'
+    assert s.to_json(42.12345) == b'"42.1"'
+    # fails because you can't format `None`
+    with pytest.raises(PydanticSerializationError, match=r'Error calling `format\(value, \'0.1f\'\)`: TypeError:'):
+        s.to_json(None)
+
+
+def test_to_string_when_used_always():
+    s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.format_ser_schema('', when_used='always')))
+    assert s.to_python(123) == '123'
+    assert s.to_python(None) == 'None'
+    assert s.to_python(123, mode='json') == '123'
+    assert s.to_python(None, mode='json') == 'None'
+    assert s.to_json(None) == b'"None"'
+    assert s.to_json(123) == b'"123"'
+
+
+def test_to_string_when_used_unless_none():
+    s = SchemaSerializer(
+        core_schema.any_schema(serialization=core_schema.format_ser_schema('', when_used='unless-none'))
+    )
     assert 'ToStringSerializer' in repr(s)
     assert 'FormatSerializer' not in repr(s)
     assert s.to_python(42) == '42'

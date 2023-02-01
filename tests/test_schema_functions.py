@@ -162,7 +162,7 @@ all_schema_functions = [
         args(
             core_schema.arguments_parameter('foo', {'type': 'int'}),
             core_schema.arguments_parameter('bar', {'type': 'str'}),
-            serialization=core_schema.format_ser_schema('s'),
+            serialization=core_schema.format_ser_schema('d'),
         ),
         {
             'type': 'arguments',
@@ -170,7 +170,7 @@ all_schema_functions = [
                 {'name': 'foo', 'schema': {'type': 'int'}},
                 {'name': 'bar', 'schema': {'type': 'str'}},
             ),
-            'serialization': {'type': 'format', 'formatting_string': 's'},
+            'serialization': {'type': 'format', 'formatting_string': 'd'},
         },
     ),
     (

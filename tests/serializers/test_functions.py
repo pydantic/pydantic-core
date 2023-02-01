@@ -213,3 +213,33 @@ def test_function_as_key():
     assert s.to_python({123: 4}) == {'123': 4}
     assert s.to_python({123: 4}, mode='json') == {'123': 4}
     assert s.to_json({123: 4}) == b'{"123":4}'
+
+
+def test_function_only_json():
+    def double(value, _):
+        return value * 2
+
+    s = SchemaSerializer(
+        core_schema.any_schema(serialization=core_schema.function_ser_schema(double, when_used='json'))
+    )
+    assert s.to_python(4) == 4
+    assert s.to_python(4, mode='foobar') == 4
+
+    assert s.to_python(4, mode='json') == 8
+    assert s.to_json(4) == b'8'
+
+
+def test_function_unless_none():
+    def to_repr(value, _):
+        return repr(value)
+
+    s = SchemaSerializer(
+        core_schema.any_schema(serialization=core_schema.function_ser_schema(to_repr, when_used='unless-none'))
+    )
+    assert s.to_python(4) == '4'
+    assert s.to_python(None) is None
+
+    assert s.to_python(4, mode='json') == '4'
+    assert s.to_python(None, mode='json') is None
+    assert s.to_json(4) == b'"4"'
+    assert s.to_json(None) == b'null'

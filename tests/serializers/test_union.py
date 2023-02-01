@@ -53,7 +53,7 @@ def model_serializer() -> SchemaSerializer:
                                     'serialization': {
                                         'type': 'format',
                                         'formatting_string': '0.1f',
-                                        'format_to_python': True,
+                                        'when_used': 'unless-none',
                                     },
                                 }
                             },
@@ -74,7 +74,7 @@ def model_serializer() -> SchemaSerializer:
                                     'serialization': {
                                         'type': 'format',
                                         'formatting_string': '0.2f',
-                                        'format_to_python': True,
+                                        'when_used': 'unless-none',
                                     },
                                 }
                             },

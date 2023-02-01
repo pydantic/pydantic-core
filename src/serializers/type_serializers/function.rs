@@ -12,6 +12,8 @@ use crate::build_tools::{function_name, py_error_type, SchemaDict};
 use crate::serializers::extra::SerMode;
 use crate::PydanticSerializationUnexpectedValue;
 
+use super::format::WhenUsed;
+
 use super::{
     infer_json_key, infer_json_key_known, infer_serialize, infer_serialize_known, infer_to_python,
     infer_to_python_known, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ObType,
@@ -24,6 +26,7 @@ pub struct FunctionSerializer {
     name: String,
     function_name: String,
     json_return_ob_type: Option<ObType>,
+    when_used: WhenUsed,
 }
 
 impl BuildSerializer for FunctionSerializer {
@@ -47,6 +50,7 @@ impl BuildSerializer for FunctionSerializer {
                 Some(t) => Some(ObType::from_str(t).map_err(|_| py_error_type!("Unknown return type {:?}", t))?),
                 None => None,
             },
+            when_used: WhenUsed::new(schema, WhenUsed::Always)?,
         }
         .into())
     }
@@ -61,17 +65,21 @@ impl FunctionSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        let info = SerializationInfo {
-            include: include.map(|i| i.into_py(py)),
-            exclude: exclude.map(|e| e.into_py(py)),
-            _mode: extra.mode.clone(),
-            by_alias: extra.by_alias,
-            exclude_unset: extra.exclude_unset,
-            exclude_defaults: extra.exclude_defaults,
-            exclude_none: extra.exclude_none,
-            round_trip: extra.round_trip,
-        };
-        self.func.call1(py, (value, info))
+        if self.when_used.should_use(value, extra) {
+            let info = SerializationInfo {
+                include: include.map(|i| i.into_py(py)),
+                exclude: exclude.map(|e| e.into_py(py)),
+                _mode: extra.mode.clone(),
+                by_alias: extra.by_alias,
+                exclude_unset: extra.exclude_unset,
+                exclude_defaults: extra.exclude_defaults,
+                exclude_none: extra.exclude_none,
+                round_trip: extra.round_trip,
+            };
+            self.func.call1(py, (value, info))
+        } else {
+            Ok(value.into_py(py))
+        }
     }
 }
 

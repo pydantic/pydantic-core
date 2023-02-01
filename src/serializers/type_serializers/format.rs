@@ -7,17 +7,56 @@ use pyo3::types::{PyDict, PyString};
 use serde::ser::Error;
 
 use crate::build_context::BuildContext;
-use crate::build_tools::SchemaDict;
+use crate::build_tools::{py_err, SchemaDict};
 
 use super::simple::none_json_key;
 use super::string::serialize_py_str;
 use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializationError, TypeSerializer};
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(super) enum WhenUsed {
+    Always,
+    UnlessNone,
+    Json,
+    JsonUnlessNone,
+}
+
+impl WhenUsed {
+    pub fn new(schema: &PyDict, default: Self) -> PyResult<Self> {
+        let when_used = schema.get_as(intern!(schema.py(), "when_used"))?;
+        match when_used {
+            Some("always") => Ok(Self::Always),
+            Some("unless-none") => Ok(Self::UnlessNone),
+            Some("json") => Ok(Self::Json),
+            Some("json-unless-none") => Ok(Self::JsonUnlessNone),
+            Some(s) => py_err!("Invalid value for `when_used`: {:?}", s),
+            None => Ok(default),
+        }
+    }
+
+    pub fn should_use(&self, value: &PyAny, extra: &Extra) -> bool {
+        match self {
+            Self::Always => true,
+            Self::UnlessNone => !value.is_none(),
+            Self::Json => extra.mode.is_json(),
+            Self::JsonUnlessNone => extra.mode.is_json() && !value.is_none(),
+        }
+    }
+
+    /// Equivalent to `self.should_use` when we already know we're in JSON mode
+    pub fn should_use_json(&self, value: &PyAny) -> bool {
+        match self {
+            Self::Always | Self::Json => true,
+            _ => !value.is_none(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FormatSerializer {
     format_func: PyObject,
     formatting_string: Py<PyString>,
-    format_to_python: bool,
+    when_used: WhenUsed,
 }
 
 impl BuildSerializer for FormatSerializer {
@@ -39,7 +78,7 @@ impl BuildSerializer for FormatSerializer {
                     .getattr(intern!(py, "format"))?
                     .into_py(py),
                 formatting_string: PyString::new(py, formatting_string).into_py(py),
-                format_to_python: schema.get_as(intern!(py, "format_to_python"))?.unwrap_or(false),
+                when_used: WhenUsed::new(schema, WhenUsed::JsonUnlessNone)?,
             }
             .into())
         }
@@ -71,24 +110,20 @@ impl TypeSerializer for FormatSerializer {
         _exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        if extra.mode.is_json() || self.format_to_python {
-            if value.is_none() {
-                Ok(value.into_py(value.py()))
-            } else {
-                self.call(value).map_err(PydanticSerializationError::new_err)
-            }
+        if self.when_used.should_use(value, extra) {
+            self.call(value).map_err(PydanticSerializationError::new_err)
         } else {
             Ok(value.into_py(value.py()))
         }
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, _extra: &Extra) -> PyResult<Cow<'py, str>> {
-        if key.is_none() {
-            none_json_key()
-        } else {
+        if self.when_used.should_use_json(key) {
             let v = self.call(key).map_err(PydanticSerializationError::new_err)?;
             let py_str: &PyString = v.into_ref(key.py()).downcast()?;
             Ok(Cow::Borrowed(py_str.to_str()?))
+        } else {
+            none_json_key()
         }
     }
 
@@ -100,9 +135,7 @@ impl TypeSerializer for FormatSerializer {
         _exclude: Option<&PyAny>,
         _extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        if value.is_none() {
-            serializer.serialize_none()
-        } else {
+        if self.when_used.should_use_json(value) {
             match self.call(value) {
                 Ok(v) => {
                     let py_str: &PyString = v.downcast(value.py()).map_err(py_err_se_err)?;
@@ -110,6 +143,8 @@ impl TypeSerializer for FormatSerializer {
                 }
                 Err(e) => Err(S::Error::custom(e)),
             }
+        } else {
+            serializer.serialize_none()
         }
     }
 
@@ -120,7 +155,7 @@ impl TypeSerializer for FormatSerializer {
 
 #[derive(Debug, Clone)]
 pub struct ToStringSerializer {
-    format_to_python: bool,
+    when_used: WhenUsed,
 }
 
 impl BuildSerializer for ToStringSerializer {
@@ -132,9 +167,7 @@ impl BuildSerializer for ToStringSerializer {
         _build_context: &mut BuildContext<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         Ok(Self {
-            format_to_python: schema
-                .get_as(intern!(schema.py(), "format_to_python"))?
-                .unwrap_or(false),
+            when_used: WhenUsed::new(schema, WhenUsed::JsonUnlessNone)?,
         }
         .into())
     }
@@ -148,22 +181,18 @@ impl TypeSerializer for ToStringSerializer {
         _exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        if extra.mode.is_json() || self.format_to_python {
-            if value.is_none() {
-                Ok(value.into_py(value.py()))
-            } else {
-                value.str().map(|s| s.into_py(value.py()))
-            }
+        if self.when_used.should_use(value, extra) {
+            value.str().map(|s| s.into_py(value.py()))
         } else {
             Ok(value.into_py(value.py()))
         }
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, _extra: &Extra) -> PyResult<Cow<'py, str>> {
-        if key.is_none() {
-            none_json_key()
-        } else {
+        if self.when_used.should_use_json(key) {
             Ok(key.str()?.to_string_lossy())
+        } else {
+            none_json_key()
         }
     }
 
@@ -175,11 +204,11 @@ impl TypeSerializer for ToStringSerializer {
         _exclude: Option<&PyAny>,
         _extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        if value.is_none() {
-            serializer.serialize_none()
-        } else {
+        if self.when_used.should_use_json(value) {
             let s = value.str().map_err(py_err_se_err)?;
             serialize_py_str(s, serializer)
+        } else {
+            serializer.serialize_none()
         }
     }
 

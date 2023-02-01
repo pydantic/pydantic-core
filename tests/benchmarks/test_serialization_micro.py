@@ -83,7 +83,7 @@ def test_python_json_list_none(benchmark):
 @pytest.mark.benchmark(group='date-format')
 def test_date_format(benchmark):
     serializer = SchemaSerializer(
-        {'type': 'any', 'serialization': {'type': 'format', 'formatting_string': '%Y-%m-%d', 'format_to_python': True}}
+        {'type': 'any', 'serialization': {'type': 'format', 'formatting_string': '%Y-%m-%d', 'when_used': 'always'}}
     )
     d = date(2022, 11, 20)
     assert serializer.to_python(d) == '2022-11-20'
