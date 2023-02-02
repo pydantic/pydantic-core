@@ -233,7 +233,8 @@ impl FunctionWrapSerializer {
 function_type_serializer!(FunctionWrapSerializer);
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) struct SerializationCallable {
     serializer: CombinedSerializer,
     extra_owned: ExtraOwned,
