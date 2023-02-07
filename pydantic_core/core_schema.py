@@ -281,7 +281,11 @@ SerSchema = Union[
 ]
 
 
-class AnySchema(TypedDict, total=False):
+class CoreSchemaBase(TypedDict):
+    ...
+
+
+class AnySchema(CoreSchemaBase, total=False):
     type: Required[Literal['any']]
     ref: str
     extra: Any
@@ -307,7 +311,7 @@ def any_schema(*, ref: str | None = None, extra: Any = None, serialization: SerS
     return dict_not_none(type='any', ref=ref, extra=extra, serialization=serialization)
 
 
-class NoneSchema(TypedDict, total=False):
+class NoneSchema(CoreSchemaBase, total=False):
     type: Required[Literal['none']]
     ref: str
     extra: Any
@@ -333,7 +337,7 @@ def none_schema(*, ref: str | None = None, extra: Any = None, serialization: Ser
     return dict_not_none(type='none', ref=ref, extra=extra, serialization=serialization)
 
 
-class BoolSchema(TypedDict, total=False):
+class BoolSchema(CoreSchemaBase, total=False):
     type: Required[Literal['bool']]
     strict: bool
     ref: str
@@ -363,7 +367,7 @@ def bool_schema(
     return dict_not_none(type='bool', strict=strict, ref=ref, extra=extra, serialization=serialization)
 
 
-class IntSchema(TypedDict, total=False):
+class IntSchema(CoreSchemaBase, total=False):
     type: Required[Literal['int']]
     multiple_of: int
     le: int
@@ -423,7 +427,7 @@ def int_schema(
     )
 
 
-class FloatSchema(TypedDict, total=False):
+class FloatSchema(CoreSchemaBase, total=False):
     type: Required[Literal['float']]
     allow_inf_nan: bool  # whether 'NaN', '+inf', '-inf' should be forbidden. default: True
     multiple_of: float
@@ -487,7 +491,7 @@ def float_schema(
     )
 
 
-class StringSchema(TypedDict, total=False):
+class StringSchema(CoreSchemaBase, total=False):
     type: Required[Literal['str']]
     pattern: str
     max_length: int
@@ -551,7 +555,7 @@ def str_schema(
     )
 
 
-class BytesSchema(TypedDict, total=False):
+class BytesSchema(CoreSchemaBase, total=False):
     type: Required[Literal['bytes']]
     max_length: int
     min_length: int
@@ -599,7 +603,7 @@ def bytes_schema(
     )
 
 
-class DateSchema(TypedDict, total=False):
+class DateSchema(CoreSchemaBase, total=False):
     type: Required[Literal['date']]
     strict: bool
     le: date
@@ -666,7 +670,7 @@ def date_schema(
     )
 
 
-class TimeSchema(TypedDict, total=False):
+class TimeSchema(CoreSchemaBase, total=False):
     type: Required[Literal['time']]
     strict: bool
     le: time
@@ -715,7 +719,7 @@ def time_schema(
     )
 
 
-class DatetimeSchema(TypedDict, total=False):
+class DatetimeSchema(CoreSchemaBase, total=False):
     type: Required[Literal['datetime']]
     strict: bool
     le: datetime
@@ -787,7 +791,7 @@ def datetime_schema(
     )
 
 
-class TimedeltaSchema(TypedDict, total=False):
+class TimedeltaSchema(CoreSchemaBase, total=False):
     type: Required[Literal['timedelta']]
     strict: bool
     le: timedelta
@@ -836,7 +840,7 @@ def timedelta_schema(
     )
 
 
-class LiteralSchema(TypedDict, total=False):
+class LiteralSchema(CoreSchemaBase, total=False):
     type: Required[Literal['literal']]
     expected: Required[List[Any]]
     ref: str
@@ -870,7 +874,7 @@ def literal_schema(
 JsonType = Literal['null', 'bool', 'int', 'float', 'str', 'list', 'dict']
 
 
-class IsInstanceSchema(TypedDict, total=False):
+class IsInstanceSchema(CoreSchemaBase, total=False):
     type: Required[Literal['is-instance']]
     cls: Required[Any]
     cls_repr: str
@@ -927,7 +931,7 @@ def is_instance_schema(
     )
 
 
-class IsSubclassSchema(TypedDict, total=False):
+class IsSubclassSchema(CoreSchemaBase, total=False):
     type: Required[Literal['is-subclass']]
     cls: Required[Type[Any]]
     cls_repr: str
@@ -973,7 +977,7 @@ def is_subclass_schema(
     )
 
 
-class CallableSchema(TypedDict, total=False):
+class CallableSchema(CoreSchemaBase, total=False):
     type: Required[Literal['callable']]
     ref: str
     extra: Any
@@ -1014,7 +1018,7 @@ def filter_seq_schema(*, include: Set[int] | None = None, exclude: Set[int] | No
 IncExSeqOrElseSerSchema = Union[IncExSeqSerSchema, SerSchema]
 
 
-class ListSchema(TypedDict, total=False):
+class ListSchema(CoreSchemaBase, total=False):
     type: Required[Literal['list']]
     items_schema: CoreSchema
     min_length: int
@@ -1070,7 +1074,7 @@ def list_schema(
     )
 
 
-class TuplePositionalSchema(TypedDict, total=False):
+class TuplePositionalSchema(CoreSchemaBase, total=False):
     type: Required[Literal['tuple']]
     mode: Required[Literal['positional']]
     items_schema: Required[List[CoreSchema]]
@@ -1119,7 +1123,7 @@ def tuple_positional_schema(
     )
 
 
-class TupleVariableSchema(TypedDict, total=False):
+class TupleVariableSchema(CoreSchemaBase, total=False):
     type: Required[Literal['tuple']]
     mode: Literal['variable']
     items_schema: CoreSchema
@@ -1173,7 +1177,7 @@ def tuple_variable_schema(
     )
 
 
-class SetSchema(TypedDict, total=False):
+class SetSchema(CoreSchemaBase, total=False):
     type: Required[Literal['set']]
     items_schema: CoreSchema
     min_length: int
@@ -1229,7 +1233,7 @@ def set_schema(
     )
 
 
-class FrozenSetSchema(TypedDict, total=False):
+class FrozenSetSchema(CoreSchemaBase, total=False):
     type: Required[Literal['frozenset']]
     items_schema: CoreSchema
     min_length: int
@@ -1285,7 +1289,7 @@ def frozenset_schema(
     )
 
 
-class GeneratorSchema(TypedDict, total=False):
+class GeneratorSchema(CoreSchemaBase, total=False):
     type: Required[Literal['generator']]
     items_schema: CoreSchema
     max_length: int
@@ -1350,7 +1354,7 @@ def filter_dict_schema(*, include: IncExDict | None = None, exclude: IncExDict |
 IncExDictOrElseSerSchema = Union[IncExDictSerSchema, SerSchema]
 
 
-class DictSchema(TypedDict, total=False):
+class DictSchema(CoreSchemaBase, total=False):
     type: Required[Literal['dict']]
     keys_schema: CoreSchema  # default: AnySchema
     values_schema: CoreSchema  # default: AnySchema
@@ -1415,7 +1419,7 @@ class ValidatorFunction(Protocol):
         ...
 
 
-class FunctionSchema(TypedDict, total=False):
+class FunctionSchema(CoreSchemaBase, total=False):
     type: Required[Literal['function']]
     mode: Required[Literal['before', 'after']]
     function: Required[ValidatorFunction]
@@ -1528,7 +1532,7 @@ class WrapValidatorFunction(Protocol):
         ...
 
 
-class FunctionWrapSchema(TypedDict, total=False):
+class FunctionWrapSchema(CoreSchemaBase, total=False):
     type: Required[Literal['function']]
     mode: Required[Literal['wrap']]
     function: Required[WrapValidatorFunction]
@@ -1580,7 +1584,7 @@ def function_wrap_schema(
     )
 
 
-class FunctionPlainSchema(TypedDict, total=False):
+class FunctionPlainSchema(CoreSchemaBase, total=False):
     type: Required[Literal['function']]
     mode: Required[Literal['plain']]
     function: Required[ValidatorFunction]
@@ -1618,7 +1622,7 @@ def function_plain_schema(
     )
 
 
-class WithDefaultSchema(TypedDict, total=False):
+class WithDefaultSchema(CoreSchemaBase, total=False):
     type: Required[Literal['default']]
     schema: Required[CoreSchema]
     default: Any
@@ -1682,7 +1686,7 @@ def with_default_schema(
     return s
 
 
-class NullableSchema(TypedDict, total=False):
+class NullableSchema(CoreSchemaBase, total=False):
     type: Required[Literal['nullable']]
     schema: Required[CoreSchema]
     strict: bool
@@ -1721,7 +1725,7 @@ def nullable_schema(
     )
 
 
-class UnionSchema(TypedDict, total=False):
+class UnionSchema(CoreSchemaBase, total=False):
     type: Required[Literal['union']]
     choices: Required[List[CoreSchema]]
     # default true, whether to automatically collapse unions with one element to the inner validator
@@ -1782,7 +1786,7 @@ def union_schema(
     )
 
 
-class TaggedUnionSchema(TypedDict, total=False):
+class TaggedUnionSchema(CoreSchemaBase, total=False):
     type: Required[Literal['tagged-union']]
     choices: Required[Dict[str, Union[str, CoreSchema]]]
     discriminator: Required[
@@ -1863,7 +1867,7 @@ def tagged_union_schema(
     )
 
 
-class ChainSchema(TypedDict, total=False):
+class ChainSchema(CoreSchemaBase, total=False):
     type: Required[Literal['chain']]
     steps: Required[List[CoreSchema]]
     ref: str
@@ -1899,7 +1903,7 @@ def chain_schema(
     return dict_not_none(type='chain', steps=steps, ref=ref, extra=extra, serialization=serialization)
 
 
-class LaxOrStrictSchema(TypedDict, total=False):
+class LaxOrStrictSchema(CoreSchemaBase, total=False):
     type: Required[Literal['lax-or-strict']]
     lax_schema: Required[CoreSchema]
     strict_schema: Required[CoreSchema]
@@ -1959,7 +1963,7 @@ def lax_or_strict_schema(
     )
 
 
-class TypedDictField(TypedDict, total=False):
+class TypedDictField(CoreSchemaBase, total=False):
     schema: Required[CoreSchema]
     required: bool
     validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
@@ -2001,7 +2005,7 @@ def typed_dict_field(
     )
 
 
-class TypedDictSchema(TypedDict, total=False):
+class TypedDictSchema(CoreSchemaBase, total=False):
     type: Required[Literal['typed-dict']]
     fields: Required[Dict[str, TypedDictField]]
     strict: bool
@@ -2071,7 +2075,7 @@ def typed_dict_schema(
     )
 
 
-class ModelSchema(TypedDict, total=False):
+class ModelSchema(CoreSchemaBase, total=False):
     type: Required[Literal['model']]
     cls: Required[Type[Any]]
     schema: Required[CoreSchema]
@@ -2174,7 +2178,7 @@ def arguments_parameter(
     return dict_not_none(name=name, schema=schema, mode=mode, alias=alias)
 
 
-class ArgumentsSchema(TypedDict, total=False):
+class ArgumentsSchema(CoreSchemaBase, total=False):
     type: Required[Literal['arguments']]
     arguments_schema: Required[List[ArgumentsParameter]]
     populate_by_name: bool
@@ -2227,7 +2231,7 @@ def arguments_schema(
     )
 
 
-class CallSchema(TypedDict, total=False):
+class CallSchema(CoreSchemaBase, total=False):
     type: Required[Literal['call']]
     arguments_schema: Required[CoreSchema]
     function: Required[Callable[..., Any]]
@@ -2283,7 +2287,7 @@ def call_schema(
     )
 
 
-class RecursiveReferenceSchema(TypedDict, total=False):
+class RecursiveReferenceSchema(CoreSchemaBase, total=False):
     type: Required[Literal['recursive-ref']]
     schema_ref: Required[str]
     extra: Any
@@ -2312,7 +2316,7 @@ def recursive_reference_schema(
     return dict_not_none(type='recursive-ref', schema_ref=schema_ref, extra=extra, serialization=serialization)
 
 
-class CustomErrorSchema(TypedDict, total=False):
+class CustomErrorSchema(CoreSchemaBase, total=False):
     type: Required[Literal['custom-error']]
     schema: Required[CoreSchema]
     custom_error_type: Required[str]
@@ -2366,7 +2370,7 @@ def custom_error_schema(
     )
 
 
-class JsonSchema(TypedDict, total=False):
+class JsonSchema(CoreSchemaBase, total=False):
     type: Required[Literal['json']]
     schema: CoreSchema
     ref: str
@@ -2414,7 +2418,7 @@ def json_schema(
     return dict_not_none(type='json', schema=schema, ref=ref, extra=extra, serialization=serialization)
 
 
-class UrlSchema(TypedDict, total=False):
+class UrlSchema(CoreSchemaBase, total=False):
     type: Required[Literal['url']]
     max_length: int
     allowed_schemes: List[str]
@@ -2479,7 +2483,7 @@ def url_schema(
     )
 
 
-class MultiHostUrlSchema(TypedDict, total=False):
+class MultiHostUrlSchema(CoreSchemaBase, total=False):
     type: Required[Literal['multi-host-url']]
     max_length: int
     allowed_schemes: List[str]
