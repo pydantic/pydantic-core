@@ -191,7 +191,7 @@ class SerializeWrapFunction(Protocol):  # pragma: no cover
 class FunctionWrapSerSchema(TypedDict, total=False):
     type: Required[Literal['function-wrap']]
     function: Required[SerializeWrapFunction]
-    schema: Required[CoreSchema]
+    schema: Required[CoreSchemaBase]
     json_return_type: JsonReturnTypes
     when_used: WhenUsed  # default: 'always'
 
@@ -262,7 +262,7 @@ def to_string_ser_schema(*, when_used: WhenUsed = 'json-unless-none') -> ToStrin
 class ModelSerSchema(TypedDict, total=False):
     type: Required[Literal['model']]
     cls: Required[Type[Any]]
-    schema: Required[CoreSchema]
+    schema: Required[CoreSchemaBase]
 
 
 def model_ser_schema(cls: Type[Any], schema: CoreSchema) -> ModelSerSchema:
@@ -1020,7 +1020,7 @@ IncExSeqOrElseSerSchema = Union[IncExSeqSerSchema, SerSchema]
 
 class ListSchema(CoreSchemaBase, total=False):
     type: Required[Literal['list']]
-    items_schema: CoreSchema
+    items_schema: CoreSchemaBase
     min_length: int
     max_length: int
     strict: bool
@@ -1077,8 +1077,8 @@ def list_schema(
 class TuplePositionalSchema(CoreSchemaBase, total=False):
     type: Required[Literal['tuple']]
     mode: Required[Literal['positional']]
-    items_schema: Required[List[CoreSchema]]
-    extra_schema: CoreSchema
+    items_schema: Required[List[CoreSchemaBase]]
+    extra_schema: CoreSchemaBase
     strict: bool
     ref: str
     extra: Any
@@ -1126,7 +1126,7 @@ def tuple_positional_schema(
 class TupleVariableSchema(CoreSchemaBase, total=False):
     type: Required[Literal['tuple']]
     mode: Literal['variable']
-    items_schema: CoreSchema
+    items_schema: CoreSchemaBase
     min_length: int
     max_length: int
     strict: bool
@@ -1179,7 +1179,7 @@ def tuple_variable_schema(
 
 class SetSchema(CoreSchemaBase, total=False):
     type: Required[Literal['set']]
-    items_schema: CoreSchema
+    items_schema: CoreSchemaBase
     min_length: int
     max_length: int
     generator_max_length: int
@@ -1235,7 +1235,7 @@ def set_schema(
 
 class FrozenSetSchema(CoreSchemaBase, total=False):
     type: Required[Literal['frozenset']]
-    items_schema: CoreSchema
+    items_schema: CoreSchemaBase
     min_length: int
     max_length: int
     generator_max_length: int
@@ -1291,7 +1291,7 @@ def frozenset_schema(
 
 class GeneratorSchema(CoreSchemaBase, total=False):
     type: Required[Literal['generator']]
-    items_schema: CoreSchema
+    items_schema: CoreSchemaBase
     max_length: int
     ref: str
     extra: Any
@@ -1356,8 +1356,8 @@ IncExDictOrElseSerSchema = Union[IncExDictSerSchema, SerSchema]
 
 class DictSchema(CoreSchemaBase, total=False):
     type: Required[Literal['dict']]
-    keys_schema: CoreSchema  # default: AnySchema
-    values_schema: CoreSchema  # default: AnySchema
+    keys_schema: CoreSchemaBase  # default: AnySchema
+    values_schema: CoreSchemaBase  # default: AnySchema
     min_length: int
     max_length: int
     strict: bool
@@ -1423,7 +1423,7 @@ class FunctionSchema(CoreSchemaBase, total=False):
     type: Required[Literal['function']]
     mode: Required[Literal['before', 'after']]
     function: Required[ValidatorFunction]
-    schema: Required[CoreSchema]
+    schema: Required[CoreSchemaBase]
     ref: str
     extra: Any
     serialization: SerSchema
@@ -1536,7 +1536,7 @@ class FunctionWrapSchema(CoreSchemaBase, total=False):
     type: Required[Literal['function']]
     mode: Required[Literal['wrap']]
     function: Required[WrapValidatorFunction]
-    schema: Required[CoreSchema]
+    schema: Required[CoreSchemaBase]
     ref: str
     extra: Any
     serialization: SerSchema
@@ -1624,7 +1624,7 @@ def function_plain_schema(
 
 class WithDefaultSchema(CoreSchemaBase, total=False):
     type: Required[Literal['default']]
-    schema: Required[CoreSchema]
+    schema: Required[CoreSchemaBase]
     default: Any
     default_factory: Callable[[], Any]
     on_error: Literal['raise', 'omit', 'default']  # default: 'raise'
@@ -1688,7 +1688,7 @@ def with_default_schema(
 
 class NullableSchema(CoreSchemaBase, total=False):
     type: Required[Literal['nullable']]
-    schema: Required[CoreSchema]
+    schema: Required[CoreSchemaBase]
     strict: bool
     ref: str
     extra: Any
@@ -1727,7 +1727,7 @@ def nullable_schema(
 
 class UnionSchema(CoreSchemaBase, total=False):
     type: Required[Literal['union']]
-    choices: Required[List[CoreSchema]]
+    choices: Required[List[CoreSchemaBase]]
     # default true, whether to automatically collapse unions with one element to the inner validator
     auto_collapse: bool
     custom_error_type: str
@@ -1788,7 +1788,7 @@ def union_schema(
 
 class TaggedUnionSchema(CoreSchemaBase, total=False):
     type: Required[Literal['tagged-union']]
-    choices: Required[Dict[str, Union[str, CoreSchema]]]
+    choices: Required[Dict[str, Union[str, CoreSchemaBase]]]
     discriminator: Required[
         Union[str, List[Union[str, int]], List[List[Union[str, int]]], Callable[[Any], Optional[str]]]
     ]
@@ -1869,7 +1869,7 @@ def tagged_union_schema(
 
 class ChainSchema(CoreSchemaBase, total=False):
     type: Required[Literal['chain']]
-    steps: Required[List[CoreSchema]]
+    steps: Required[List[CoreSchemaBase]]
     ref: str
     extra: Any
     serialization: SerSchema
@@ -1905,8 +1905,8 @@ def chain_schema(
 
 class LaxOrStrictSchema(CoreSchemaBase, total=False):
     type: Required[Literal['lax-or-strict']]
-    lax_schema: Required[CoreSchema]
-    strict_schema: Required[CoreSchema]
+    lax_schema: Required[CoreSchemaBase]
+    strict_schema: Required[CoreSchemaBase]
     strict: bool
     ref: str
     extra: Any
@@ -1964,7 +1964,7 @@ def lax_or_strict_schema(
 
 
 class TypedDictField(CoreSchemaBase, total=False):
-    schema: Required[CoreSchema]
+    schema: Required[CoreSchemaBase]
     required: bool
     validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
     serialization_alias: str
@@ -2009,7 +2009,7 @@ class TypedDictSchema(CoreSchemaBase, total=False):
     type: Required[Literal['typed-dict']]
     fields: Required[Dict[str, TypedDictField]]
     strict: bool
-    extra_validator: CoreSchema
+    extra_validator: CoreSchemaBase
     return_fields_set: bool
     # all these values can be set via config, equivalent fields have `typed_dict_` prefix
     extra_behavior: Literal['allow', 'forbid', 'ignore']
@@ -2078,7 +2078,7 @@ def typed_dict_schema(
 class ModelSchema(CoreSchemaBase, total=False):
     type: Required[Literal['model']]
     cls: Required[Type[Any]]
-    schema: Required[CoreSchema]
+    schema: Required[CoreSchemaBase]
     call_after_init: str
     strict: bool
     config: CoreConfig
@@ -2149,7 +2149,7 @@ def model_schema(
 
 class ArgumentsParameter(TypedDict, total=False):
     name: Required[str]
-    schema: Required[CoreSchema]
+    schema: Required[CoreSchemaBase]
     mode: Literal['positional_only', 'positional_or_keyword', 'keyword_only']  # default positional_or_keyword
     alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
 
@@ -2182,8 +2182,8 @@ class ArgumentsSchema(CoreSchemaBase, total=False):
     type: Required[Literal['arguments']]
     arguments_schema: Required[List[ArgumentsParameter]]
     populate_by_name: bool
-    var_args_schema: CoreSchema
-    var_kwargs_schema: CoreSchema
+    var_args_schema: CoreSchemaBase
+    var_kwargs_schema: CoreSchemaBase
     ref: str
     extra: Any
     serialization: SerSchema
@@ -2233,9 +2233,9 @@ def arguments_schema(
 
 class CallSchema(CoreSchemaBase, total=False):
     type: Required[Literal['call']]
-    arguments_schema: Required[CoreSchema]
+    arguments_schema: Required[CoreSchemaBase]
     function: Required[Callable[..., Any]]
-    return_schema: CoreSchema
+    return_schema: CoreSchemaBase
     ref: str
     extra: Any
     serialization: SerSchema
@@ -2318,7 +2318,7 @@ def recursive_reference_schema(
 
 class CustomErrorSchema(CoreSchemaBase, total=False):
     type: Required[Literal['custom-error']]
-    schema: Required[CoreSchema]
+    schema: Required[CoreSchemaBase]
     custom_error_type: Required[str]
     custom_error_message: str
     custom_error_context: Dict[str, Union[str, int, float]]
@@ -2372,7 +2372,7 @@ def custom_error_schema(
 
 class JsonSchema(CoreSchemaBase, total=False):
     type: Required[Literal['json']]
-    schema: CoreSchema
+    schema: CoreSchemaBase
     ref: str
     extra: Any
     serialization: SerSchema

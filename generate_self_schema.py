@@ -122,14 +122,14 @@ def type_dict_schema(typed_dict) -> dict[str, Any]:  # noqa: C901
             if matched:
                 required = True
 
-            if 'CoreSchema' == fr_arg or re.search('[^a-zA-Z]CoreSchema', fr_arg):
-                if fr_arg == 'CoreSchema':
+            if 'CoreSchemaBase' == fr_arg or re.search('[^a-zA-Z]CoreSchemaBase', fr_arg):
+                if fr_arg == 'CoreSchemaBase':
                     schema = schema_ref_validator
-                elif fr_arg == 'List[CoreSchema]':
+                elif fr_arg == 'List[CoreSchemaBase]':
                     schema = {'type': 'list', 'items_schema': schema_ref_validator}
-                elif fr_arg == 'Dict[str, CoreSchema]':
+                elif fr_arg == 'Dict[str, CoreSchemaBase]':
                     schema = {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': schema_ref_validator}
-                elif fr_arg == 'Dict[str, Union[str, CoreSchema]]':
+                elif fr_arg == 'Dict[str, Union[str, CoreSchemaBase]]':
                     schema = {
                         'type': 'dict',
                         'keys_schema': {'type': 'str'},
