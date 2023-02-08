@@ -253,7 +253,6 @@ def test_exclude_unset(any_serializer):
     assert any_serializer.to_python(m2, exclude_unset=True) == {'bar': 2, 'spam': 3}
 
 
-@pytest.mark.xfail(sys.platform == 'win32', reason='https://github.com/PyO3/pyo3/issues/2913')
 def test_unknown_type(any_serializer):
     class Foobar:
         def __repr__(self):

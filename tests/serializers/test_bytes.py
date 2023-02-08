@@ -74,7 +74,6 @@ class BytesEnum(bytes, Enum):
     bar = b'bar-value'
 
 
-@pytest.mark.xfail(sys.platform == 'win32', reason='https://github.com/PyO3/pyo3/issues/2913', strict=False)
 @pytest.mark.parametrize('schema_type', ['bytes', 'any'])
 @pytest.mark.parametrize(
     'input_value,expected_json',
