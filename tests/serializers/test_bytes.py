@@ -1,6 +1,5 @@
 import base64
 import json
-import sys
 from enum import Enum
 
 import pytest

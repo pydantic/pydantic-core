@@ -1,6 +1,5 @@
 import platform
 import re
-import sys
 from collections import deque
 from collections.abc import Sequence
 from typing import Any, Dict

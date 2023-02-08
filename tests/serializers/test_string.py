@@ -1,5 +1,4 @@
 import json
-import sys
 from enum import Enum
 
 import pytest
