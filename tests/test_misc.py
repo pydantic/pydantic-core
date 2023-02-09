@@ -1,9 +1,9 @@
 import re
 import sys
 from pathlib import Path
-from typing import get_args
 
 import pytest
+from typing_extensions import get_args
 
 from pydantic_core import CoreSchema, CoreSchemaType, core_schema
 from pydantic_core._pydantic_core import (
