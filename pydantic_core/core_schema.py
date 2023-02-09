@@ -1288,6 +1288,7 @@ def frozenset_schema(
 class GeneratorSchema(TypedDict, total=False):
     type: Required[Literal['generator']]
     items_schema: CoreSchema
+    min_length: int
     max_length: int
     ref: str
     extra: Any
@@ -1297,6 +1298,7 @@ class GeneratorSchema(TypedDict, total=False):
 def generator_schema(
     items_schema: CoreSchema | None = None,
     *,
+    min_length: int | None = None,
     max_length: int | None = None,
     ref: str | None = None,
     extra: Any = None,
@@ -1319,6 +1321,7 @@ def generator_schema(
 
     Args:
         items_schema: The value must be a generator with items that match this schema
+        min_length: The value must be a generator that yields at least this many items
         max_length: The value must be a generator that yields at most this many items
         ref: See [TODO] for details
         extra: See [TODO] for details
@@ -1327,6 +1330,7 @@ def generator_schema(
     return dict_not_none(
         type='generator',
         items_schema=items_schema,
+        min_length=min_length,
         max_length=max_length,
         ref=ref,
         extra=extra,

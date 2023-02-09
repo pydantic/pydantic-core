@@ -114,3 +114,21 @@ def test_too_long(py_and_json: PyAndJson):
             'ctx': {'field_type': 'Generator', 'max_length': 2, 'actual_length': 3},
         }
     ]
+
+
+def test_too_short(py_and_json: PyAndJson):
+    v = py_and_json({'type': 'generator', 'items_schema': {'type': 'int'}, 'min_length': 2})
+    assert list(v.validate_test([1, 2, 3])) == [1, 2, 3]
+    assert list(v.validate_test([1, 2])) == [1, 2]
+    with pytest.raises(ValidationError) as exc_info:
+        list(v.validate_test([1]))
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'type': 'too_short',
+            'loc': (),
+            'msg': 'Generator should have at least 2 items after validation, not 1',
+            'input': [1],
+            'ctx': {'field_type': 'Generator', 'min_length': 2, 'actual_length': 1},
+        }
+    ]
