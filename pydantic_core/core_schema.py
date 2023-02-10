@@ -1319,6 +1319,10 @@ def generator_schema(
     v.validate_python(gen())
     ```
 
+    Unlike other types, validated generators do not raise ValidationErrors eagerly,
+    but instead will raise a ValidationError when a violating value is actually read from the generator.
+    This is to ensure that "validated" generators retain the benefit of lazy evaluation.
+
     Args:
         items_schema: The value must be a generator with items that match this schema
         min_length: The value must be a generator that yields at least this many items

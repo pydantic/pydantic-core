@@ -1,8 +1,9 @@
 import re
+from typing import Iterator
 
 import pytest
 
-from pydantic_core import ValidationError
+from pydantic_core import SchemaValidator, ValidationError
 
 from ..conftest import Err, PyAndJson
 
@@ -130,5 +131,66 @@ def test_too_short(py_and_json: PyAndJson):
             'msg': 'Generator should have at least 2 items after validation, not 1',
             'input': [1],
             'ctx': {'field_type': 'Generator', 'min_length': 2, 'actual_length': 1},
+        }
+    ]
+
+
+def test_generator_too_long():
+    v = SchemaValidator({'type': 'generator', 'items_schema': {'type': 'int'}, 'max_length': 2})
+
+    def gen() -> Iterator[int]:
+        yield 1
+        yield 2
+        yield 3
+
+    validating_iterator = v.validate_python(gen())
+
+    # Ensure the error happens at exactly the right step:
+    next(validating_iterator)
+    next(validating_iterator)
+    with pytest.raises(ValidationError) as exc_info:
+        next(validating_iterator)
+
+    errors = exc_info.value.errors()
+    for error in errors:
+        del error['input']  # this doesn't display nicely for a generator
+    # insert_assert(errors)
+    assert errors == [
+        {
+            'type': 'too_long',
+            'loc': (),
+            'msg': 'Generator should have at most 2 items after validation, not 3',
+            'ctx': {'field_type': 'Generator', 'max_length': 2, 'actual_length': 3},
+        }
+    ]
+
+
+def test_generator_too_short():
+    v = SchemaValidator({'type': 'generator', 'items_schema': {'type': 'int'}, 'min_length': 4})
+
+    def gen() -> Iterator[int]:
+        yield 1
+        yield 2
+        yield 3
+
+    validating_iterator = v.validate_python(gen())
+
+    # Ensure the error happens at exactly the right step:
+    next(validating_iterator)
+    next(validating_iterator)
+    next(validating_iterator)
+    with pytest.raises(ValidationError) as exc_info:
+        next(validating_iterator)
+
+    errors = exc_info.value.errors()
+    for error in errors:
+        del error['input']  # this doesn't display nicely for a generator
+    # insert_assert(errors)
+    assert errors == [
+        {
+            'type': 'too_short',
+            'loc': (),
+            'msg': 'Generator should have at least 4 items after validation, not 3',
+            'ctx': {'field_type': 'Generator', 'min_length': 4, 'actual_length': 3},
         }
     ]
