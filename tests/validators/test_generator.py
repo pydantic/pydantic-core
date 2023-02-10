@@ -1,5 +1,4 @@
 import re
-from typing import Iterator
 
 import pytest
 
@@ -138,7 +137,7 @@ def test_too_short(py_and_json: PyAndJson):
 def test_generator_too_long():
     v = SchemaValidator({'type': 'generator', 'items_schema': {'type': 'int'}, 'max_length': 2})
 
-    def gen() -> Iterator[int]:
+    def gen():
         yield 1
         yield 2
         yield 3
@@ -168,7 +167,7 @@ def test_generator_too_long():
 def test_generator_too_short():
     v = SchemaValidator({'type': 'generator', 'items_schema': {'type': 'int'}, 'min_length': 4})
 
-    def gen() -> Iterator[int]:
+    def gen():
         yield 1
         yield 2
         yield 3
