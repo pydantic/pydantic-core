@@ -90,6 +90,7 @@ ExpectedSerializationTypes = Literal[
     'timedelta',
     'url',
     'multi-host-url',
+    'name-email',
     'json',
 ]
 
@@ -1721,6 +1722,38 @@ def nullable_schema(
     )
 
 
+class NameEmailSchema(TypedDict, total=False):
+    type: Required[Literal['name-email']]
+    strict: bool
+    ref: str
+    extra: Any
+    serialization: SerSchema
+
+
+def name_email_schema(
+    *, strict: bool | None = None, ref: str | None = None, extra: Any = None, serialization: SerSchema | None = None
+) -> NameEmailSchema:
+
+    # TODO: fix docs
+    """
+    Returns a schema that matches a NameEmail value, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.name_email_schema()
+    v = SchemaValidator(schema)
+    assert v.validate_python("abc <abc@gmail.com>") == "abc@gmail.com"
+    ```
+
+    Args:
+        strict: Whether the underlying schema should be validated with strict mode
+        ref: See [TODO] for details
+        extra: See [TODO] for details
+        serialization: Custom serialization schema
+    """
+    return dict_not_none(type='name-email', strict=strict, ref=ref, extra=extra, serialization=serialization)
+
+
 class UnionSchema(TypedDict, total=False):
     type: Required[Literal['union']]
     choices: Required[List[CoreSchema]]
@@ -2554,6 +2587,7 @@ CoreSchema = Union[
     BytesSchema,
     DateSchema,
     TimeSchema,
+    NameEmailSchema,
     DatetimeSchema,
     TimedeltaSchema,
     LiteralSchema,
@@ -2636,6 +2670,7 @@ ErrorType = Literal[
     'value_error',
     'assertion_error',
     'literal_error',
+    'email_name_type',
     'date_type',
     'date_parsing',
     'date_from_datetime_parsing',

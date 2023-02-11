@@ -46,6 +46,7 @@ all_schema_functions = [
     (core_schema.str_schema, args(min_length=5, max_length=10), {'type': 'str', 'min_length': 5, 'max_length': 10}),
     (core_schema.bytes_schema, args(), {'type': 'bytes'}),
     (core_schema.bytes_schema, args(min_length=5, ref='xx'), {'type': 'bytes', 'min_length': 5, 'ref': 'xx'}),
+    (core_schema.name_email_schema, args(), {'type': 'name-email'}),
     (core_schema.date_schema, args(), {'type': 'date'}),
     (core_schema.date_schema, args(gt=date(2020, 1, 1)), {'type': 'date', 'gt': date(2020, 1, 1)}),
     (core_schema.time_schema, args(), {'type': 'time'}),

@@ -1,12 +1,12 @@
 use std::fmt;
 
+use crate::errors::{InputValue, LocItem, ValResult};
+use crate::{PyMultiHostUrl, PyUrl};
 use pyo3::prelude::*;
 use pyo3::types::{PyString, PyType};
 
-use crate::errors::{InputValue, LocItem, ValResult};
-use crate::{PyMultiHostUrl, PyUrl};
-
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
+use super::email::NameEmail;
 use super::return_enums::{EitherBytes, EitherString};
 use super::{GenericArguments, GenericCollection, GenericIterator, GenericMapping, JsonInput};
 
@@ -218,6 +218,19 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_date(&self) -> ValResult<EitherDate> {
         self.strict_date()
+    }
+
+    fn validate_name_email(&self, strict: bool) -> ValResult<NameEmail> {
+        if strict {
+            self.strict_name_email()
+        } else {
+            self.lax_name_email()
+        }
+    }
+    fn strict_name_email(&self) -> ValResult<NameEmail>;
+    #[cfg_attr(has_no_coverage, no_coverage)]
+    fn lax_name_email(&self) -> ValResult<NameEmail> {
+        self.strict_name_email()
     }
 
     fn validate_time(&self, strict: bool) -> ValResult<EitherTime> {

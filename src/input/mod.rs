@@ -3,6 +3,7 @@ use std::os::raw::c_int;
 use pyo3::prelude::*;
 
 mod datetime;
+mod email;
 mod input_abstract;
 mod input_json;
 mod input_python;
@@ -14,6 +15,8 @@ pub(crate) use datetime::{
     pydate_as_date, pydatetime_as_datetime, pytime_as_time, pytimedelta_as_duration, EitherDate, EitherDateTime,
     EitherTime, EitherTimedelta,
 };
+
+pub(crate) use email::NameEmail;
 pub(crate) use input_abstract::Input;
 pub(crate) use parse_json::{JsonInput, JsonObject, JsonType};
 pub(crate) use return_enums::{

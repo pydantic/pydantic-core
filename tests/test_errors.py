@@ -262,6 +262,8 @@ all_errors = [
     ('url_syntax_violation', 'Input violated strict URL syntax rules, Foobar', {'error': 'Foobar'}),
     ('url_too_long', 'URL should have at most 42 characters', {'max_length': 42}),
     ('url_scheme', 'URL scheme should be "foo", "bar" or "spam"', {'expected_schemes': '"foo", "bar" or "spam"'}),
+    # TODO: fix
+    ('email_name_type', 'Input should be a valid Email Name', None),
 ]
 
 

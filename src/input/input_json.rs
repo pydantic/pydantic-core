@@ -6,6 +6,7 @@ use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
     float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
+use super::email::{bytes_as_email_name, NameEmail};
 use super::input_abstract::InputType;
 use super::parse_json::JsonArray;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
@@ -261,6 +262,13 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
+    fn strict_name_email(&self) -> ValResult<NameEmail> {
+        match self {
+            JsonInput::String(v) => bytes_as_email_name(self, v.as_bytes()),
+            _ => Err(ValError::new(ErrorType::EmailNameType, self)),
+        }
+    }
+
     fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
         match self {
             JsonInput::String(v) => bytes_as_date(self, v.as_bytes()),
@@ -446,6 +454,10 @@ impl<'a> Input<'a> for String {
 
     fn validate_iter(&self) -> ValResult<GenericIterator> {
         Ok(string_to_vec(self).into())
+    }
+
+    fn strict_name_email(&self) -> ValResult<NameEmail> {
+        bytes_as_email_name(self, self.as_bytes())
     }
 
     fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {

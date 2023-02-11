@@ -20,6 +20,7 @@ use super::datetime::{
     float_as_duration, float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime,
     EitherTime,
 };
+use super::email::{bytes_as_email_name, NameEmail};
 use super::input_abstract::InputType;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
@@ -562,6 +563,16 @@ impl<'a> Input<'a> for PyAny {
             bytes_as_date(self, py_bytes.as_bytes())
         } else {
             Err(ValError::new(ErrorType::DateType, self))
+        }
+    }
+
+    // TODO: support bytes input?
+    fn strict_name_email(&self) -> ValResult<NameEmail> {
+        if let Ok(py_str) = self.downcast::<PyString>() {
+            let str = py_string_str(py_str)?;
+            bytes_as_email_name(self, str.as_bytes())
+        } else {
+            Err(ValError::new(ErrorType::EmailNameType, self))
         }
     }
 

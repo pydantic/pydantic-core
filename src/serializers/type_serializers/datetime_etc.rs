@@ -108,4 +108,5 @@ macro_rules! build_serializer {
 
 build_serializer!(DatetimeSerializer, "datetime", PyDateTime, datetime_to_string);
 build_serializer!(DateSerializer, "date", PyDate, date_to_string);
+build_serializer!(NameEmailSerializer, "name-email", PyDate, date_to_string);
 build_serializer!(TimeSerializer, "time", PyTime, time_to_string);

@@ -111,6 +111,8 @@ combined_serializer! {
         Datetime: super::type_serializers::datetime_etc::DatetimeSerializer;
         TimeDelta: super::type_serializers::timedelta::TimeDeltaSerializer;
         Date: super::type_serializers::datetime_etc::DateSerializer;
+        // TODO: fix
+        NameEmail: super::type_serializers::datetime_etc::NameEmailSerializer;
         Time: super::type_serializers::datetime_etc::TimeSerializer;
         List: super::type_serializers::list::ListSerializer;
         Set: super::type_serializers::set_frozenset::SetSerializer;

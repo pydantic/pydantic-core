@@ -37,6 +37,7 @@ mod lax_or_strict;
 mod list;
 mod literal;
 mod model;
+mod name_email;
 mod none;
 mod nullable;
 mod recursive;
@@ -368,6 +369,8 @@ pub fn build_validator<'a>(
         date::DateValidator,
         // times
         time::TimeValidator,
+        // email
+        name_email::NameEmailValidator,
         // datetimes
         datetime::DateTimeValidator,
         // frozensets
@@ -488,6 +491,8 @@ pub enum CombinedValidator {
     // bytes
     Bytes(bytes::BytesValidator),
     ConstrainedBytes(bytes::BytesConstrainedValidator),
+    // email
+    NameEmail(name_email::NameEmailValidator),
     // dates
     Date(date::DateValidator),
     // times

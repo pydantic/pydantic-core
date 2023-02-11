@@ -220,6 +220,10 @@ pub enum ErrorType {
         expected: String,
     },
     // ---------------------
+    // emailname errors
+    #[strum(message = "Input should be a valid Email Name")]
+    EmailNameType,
+    // ---------------------
     // date errors
     #[strum(message = "Input should be a valid date")]
     DateType,
@@ -238,7 +242,7 @@ pub enum ErrorType {
     #[strum(message = "Date should be in the future")]
     DateFuture,
     // ---------------------
-    // date errors
+    // time errors
     #[strum(message = "Input should be a valid time")]
     TimeType,
     #[strum(message = "Input should be in a valid time format, {error}")]
