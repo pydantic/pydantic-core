@@ -1,6 +1,7 @@
 import re
 
 import pytest
+from dirty_equals import HasRepr, IsStr
 
 from pydantic_core import SchemaValidator, ValidationError
 
@@ -134,13 +135,14 @@ def test_too_short(py_and_json: PyAndJson):
     ]
 
 
+def gen():
+    yield 1
+    yield 2
+    yield 3
+
+
 def test_generator_too_long():
     v = SchemaValidator({'type': 'generator', 'items_schema': {'type': 'int'}, 'max_length': 2})
-
-    def gen():
-        yield 1
-        yield 2
-        yield 3
 
     validating_iterator = v.validate_python(gen())
 
@@ -151,13 +153,12 @@ def test_generator_too_long():
         next(validating_iterator)
 
     errors = exc_info.value.errors()
-    for error in errors:
-        del error['input']  # this doesn't display nicely for a generator
     # insert_assert(errors)
     assert errors == [
         {
             'type': 'too_long',
             'loc': (),
+            'input': HasRepr(IsStr(regex='<generator object gen at .+>')),
             'msg': 'Generator should have at most 2 items after validation, not 3',
             'ctx': {'field_type': 'Generator', 'max_length': 2, 'actual_length': 3},
         }
@@ -167,11 +168,6 @@ def test_generator_too_long():
 def test_generator_too_short():
     v = SchemaValidator({'type': 'generator', 'items_schema': {'type': 'int'}, 'min_length': 4})
 
-    def gen():
-        yield 1
-        yield 2
-        yield 3
-
     validating_iterator = v.validate_python(gen())
 
     # Ensure the error happens at exactly the right step:
@@ -182,12 +178,11 @@ def test_generator_too_short():
         next(validating_iterator)
 
     errors = exc_info.value.errors()
-    for error in errors:
-        del error['input']  # this doesn't display nicely for a generator
     # insert_assert(errors)
     assert errors == [
         {
             'type': 'too_short',
+            'input': HasRepr(IsStr(regex='<generator object gen at .+>')),
             'loc': (),
             'msg': 'Generator should have at least 4 items after validation, not 3',
             'ctx': {'field_type': 'Generator', 'min_length': 4, 'actual_length': 3},
