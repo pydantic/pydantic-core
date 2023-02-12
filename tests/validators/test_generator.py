@@ -147,8 +147,8 @@ def test_generator_too_long():
     validating_iterator = v.validate_python(gen())
 
     # Ensure the error happens at exactly the right step:
-    next(validating_iterator)
-    next(validating_iterator)
+    assert next(validating_iterator) == 1
+    assert next(validating_iterator) == 2
     with pytest.raises(ValidationError) as exc_info:
         next(validating_iterator)
 
@@ -171,9 +171,9 @@ def test_generator_too_short():
     validating_iterator = v.validate_python(gen())
 
     # Ensure the error happens at exactly the right step:
-    next(validating_iterator)
-    next(validating_iterator)
-    next(validating_iterator)
+    assert next(validating_iterator) == 1
+    assert next(validating_iterator) == 2
+    assert next(validating_iterator) == 3
     with pytest.raises(ValidationError) as exc_info:
         next(validating_iterator)
 
