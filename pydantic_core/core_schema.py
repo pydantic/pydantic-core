@@ -1808,6 +1808,7 @@ class TaggedUnionSchema(TypedDict, total=False):
     custom_error_message: str
     custom_error_context: Dict[str, Union[str, int, float]]
     strict: bool
+    from_attributes: bool
     ref: str
     metadata: Any
     serialization: SerSchema
@@ -1821,6 +1822,7 @@ def tagged_union_schema(
     custom_error_message: str | None = None,
     custom_error_context: dict[str, int | str | float] | None = None,
     strict: bool | None = None,
+    from_attributes: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
@@ -1873,6 +1875,7 @@ def tagged_union_schema(
         custom_error_message=custom_error_message,
         custom_error_context=custom_error_context,
         strict=strict,
+        from_attributes=from_attributes,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
