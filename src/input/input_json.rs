@@ -14,6 +14,16 @@ use super::{
     Input, JsonArgs, JsonInput, JsonType,
 };
 
+impl JsonInput {
+    pub fn laxer_str(&self) -> ValResult<String> {
+        match self {
+            JsonInput::String(s) => Ok(s.as_str().into()),
+            JsonInput::Int(i) => Ok(i.to_string()),
+            _ => Err(ValError::new(ErrorType::StringType, self)),
+        }
+    }
+}
+
 impl<'a> Input<'a> for JsonInput {
     fn get_type(&self) -> &'static InputType {
         &InputType::Json

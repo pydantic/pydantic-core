@@ -9,7 +9,7 @@ use ahash::AHashMap;
 
 use crate::build_tools::{is_strict, py_err, schema_or_config, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input};
+use crate::input::{EitherString, GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
@@ -298,7 +298,7 @@ impl Validator for TaggedUnionValidator {
     ) -> ValResult<'data, PyObject> {
         match self.discriminator {
             Discriminator::LookupKey(ref lookup_key) => {
-                macro_rules! find_validator {
+                macro_rules! find_json_validator {
                     ($get_method:ident, $($dict:ident),+) => {{
                         // note all these methods return PyResult<Option<(data, data)>>, the outer Err is just for
                         // errors when getting attributes which should be "raised"
@@ -307,7 +307,33 @@ impl Validator for TaggedUnionValidator {
                                 if self.strict {
                                     value.strict_str()
                                 } else {
-                                    value.lax_str()
+                                    match value.laxer_str() {
+                                        Ok(s) => Ok(EitherString::Cow(Cow::Owned(s))),
+                                        _ => Err(ValError::new(ErrorType::StringType, value)),
+
+                                    }
+                                }
+                            }
+                            None => Err(self.tag_not_found(input)),
+                        }
+                    }};
+                }
+                macro_rules! find_py_validator {
+                    ($get_method:ident, $($dict:ident),+) => {{
+                        // note all these methods return PyResult<Option<(data, data)>>, the outer Err is just for
+                        // errors when getting attributes which should be "raised"
+                        match lookup_key.$get_method($( $dict ),+)? {
+                            Some((_, value)) => {
+                                if self.strict {
+                                    value.strict_str()
+                                } else {
+                                    match value.lax_str() {
+                                        Ok(tag) => Ok(tag),
+                                        Err(_) => match value.str() {
+                                            Ok(s) => Ok(s.into()),
+                                            Err(_) => Err(ValError::new(ErrorType::StringType, value)),
+                                        }
+                                    }
                                 }
                             }
                             None => Err(self.tag_not_found(input)),
@@ -316,10 +342,10 @@ impl Validator for TaggedUnionValidator {
                 }
                 let dict = input.validate_typed_dict(self.strict, self.from_attributes)?;
                 let tag = match dict {
-                    GenericMapping::PyDict(dict) => find_validator!(py_get_dict_item, dict),
-                    GenericMapping::PyGetAttr(obj, kwargs) => find_validator!(py_get_attr, obj, kwargs),
-                    GenericMapping::PyMapping(mapping) => find_validator!(py_get_mapping_item, mapping),
-                    GenericMapping::JsonObject(mapping) => find_validator!(json_get, mapping),
+                    GenericMapping::PyDict(dict) => find_py_validator!(py_get_dict_item, dict),
+                    GenericMapping::PyGetAttr(obj, kwargs) => find_py_validator!(py_get_attr, obj, kwargs),
+                    GenericMapping::PyMapping(mapping) => find_py_validator!(py_get_mapping_item, mapping),
+                    GenericMapping::JsonObject(mapping) => find_json_validator!(json_get, mapping),
                 }?;
                 self.find_call_validator(py, tag.as_cow()?, input, extra, slots, recursion_guard)
             }
