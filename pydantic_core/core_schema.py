@@ -1102,9 +1102,9 @@ def tuple_positional_schema(
     Args:
         items_schema: The value must be a tuple with items that match these schemas
         extra_schema: The value must be a tuple with items that match this schema
-            This was inspired by JSON schema's 'prefixItems' and 'items' fields.
-            In python's typing.Tuple, you can't specify a type for "extra" items -- they must all be the same type
-            if the length is variable. So this field won't be set from a typing.Tuple annotation on a pydantic model.
+            This was inspired by JSON schema's `prefixItems` and `items` fields.
+            In python's `typing.Tuple`, you can't specify a type for "extra" items -- they must all be the same type
+            if the length is variable. So this field won't be set from a `typing.Tuple` annotation on a pydantic model.
         strict: The value must be a tuple with exactly this many items
         ref: See [TODO] for details
         extra: See [TODO] for details
@@ -1215,7 +1215,7 @@ def set_schema(
         max_length: The value must be a set with at most this many items
         generator_max_length: At most this many items will be read from a generator before failing validation
             This is important because generators can be infinite, and even with a max_length on the set,
-            an infinite generator could run forever producing a finite set of distinct values.
+            an infinite generator could run forever without producing more than max_length distinct items.
         strict: The value must be a set with exactly this many items
         ref: See [TODO] for details
         extra: See [TODO] for details
