@@ -1805,7 +1805,7 @@ def union_schema(
 
 class TaggedUnionSchema(TypedDict, total=False):
     type: Required[Literal['tagged-union']]
-    choices: Required[Dict[str, Union[str, CoreSchema]]]
+    choices: Required[Dict[Union[str, int], Union[str, int, CoreSchema]]]
     discriminator: Required[
         Union[str, List[Union[str, int]], List[List[Union[str, int]]], Callable[[Any], Optional[str]]]
     ]

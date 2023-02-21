@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt;
 use std::fmt::Write;
 
 use pyo3::intern;
@@ -189,10 +190,37 @@ impl Discriminator {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+enum ChoiceKey {
+    Int(i64),
+    Str(String),
+}
+
+impl ChoiceKey {
+    fn from_py(raw: &PyAny) -> PyResult<Self> {
+        if let Ok(py_int) = raw.extract::<i64>() {
+            Ok(Self::Int(py_int))
+        } else if let Ok(py_str) = raw.downcast::<PyString>() {
+            Ok(Self::Str(py_str.to_str()?.to_string()))
+        } else {
+            py_err!(format!("Expected int or str, got {}", raw.get_type().name()?))
+        }
+    }
+}
+
+impl fmt::Display for ChoiceKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Int(i) => write!(f, "{i}"),
+            Self::Str(s) => write!(f, "{s}"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TaggedUnionValidator {
-    choices: AHashMap<String, CombinedValidator>,
-    repeat_choices: Option<AHashMap<String, String>>,
+    choices: AHashMap<ChoiceKey, CombinedValidator>,
+    repeat_choices: Option<AHashMap<ChoiceKey, ChoiceKey>>,
     discriminator: Discriminator,
     from_attributes: bool,
     strict: bool,
@@ -216,18 +244,23 @@ impl BuildValidator for TaggedUnionValidator {
 
         let schema_choices: &PyDict = schema.get_as_req(intern!(py, "choices"))?;
         let mut choices = AHashMap::with_capacity(schema_choices.len());
-        let mut repeat_choices_vec: Vec<(String, String)> = Vec::new();
+        let mut repeat_choices_vec: Vec<(ChoiceKey, ChoiceKey)> = Vec::new();
         let mut first = true;
         let mut tags_repr = String::with_capacity(50);
         let mut descr = String::with_capacity(50);
 
         for (key, value) in schema_choices {
-            let tag: String = key.extract()?;
-            if let Ok(py_str) = value.downcast::<PyString>() {
-                let repeat_tag = py_str.to_str()?.to_string();
+            let tag = if let Ok(choice_key) = ChoiceKey::from_py(key) {
+                choice_key
+            } else {
+                return py_err!("Keys of schema must be int or string but got: {}", key);
+            };
+
+            if let Ok(repeat_tag) = ChoiceKey::from_py(value) {
                 repeat_choices_vec.push((tag, repeat_tag));
                 continue;
             }
+
             let validator = build_validator(value, config, build_context)?;
             if first {
                 first = false;
@@ -246,7 +279,7 @@ impl BuildValidator for TaggedUnionValidator {
             let mut wrong_values = Vec::with_capacity(repeat_choices_vec.len());
             let mut repeat_choices = AHashMap::with_capacity(repeat_choices_vec.len());
             for (tag, repeat_tag) in repeat_choices_vec {
-                match choices.get(repeat_tag.as_str()) {
+                match choices.get(&repeat_tag) {
                     Some(validator) => {
                         write!(tags_repr, ", '{tag}'").unwrap();
                         write!(descr, ",{}", validator.get_name()).unwrap();
@@ -265,7 +298,7 @@ impl BuildValidator for TaggedUnionValidator {
         };
 
         let key = intern!(py, "from_attributes");
-        let from_attributes = schema_or_config(schema, config, key, key)?.unwrap_or(false);
+        let from_attributes = schema_or_config(schema, config, key, key)?.unwrap_or(true);
 
         let descr = match discriminator {
             Discriminator::SelfSchema => "self-schema".to_string(),
@@ -305,9 +338,17 @@ impl Validator for TaggedUnionValidator {
                         match lookup_key.$get_method($( $dict ),+)? {
                             Some((_, value)) => {
                                 if self.strict {
-                                    value.strict_str()
+                                    if let Ok(val_int) = value.strict_int() {
+                                        Ok(ChoiceKey::Int(val_int))
+                                    } else {
+                                        Ok(ChoiceKey::Str(value.strict_str()?.as_cow()?.as_ref().to_string()))
+                                    }
                                 } else {
-                                    value.lax_str()
+                                    if let Ok(val_int) = value.lax_int() {
+                                        Ok(ChoiceKey::Int(val_int))
+                                    } else {
+                                        Ok(ChoiceKey::Str(value.lax_str()?.as_cow()?.as_ref().to_string()))
+                                    }
                                 }
                             }
                             None => Err(self.tag_not_found(input)),
@@ -321,7 +362,7 @@ impl Validator for TaggedUnionValidator {
                     GenericMapping::PyMapping(mapping) => find_validator!(py_get_mapping_item, mapping),
                     GenericMapping::JsonObject(mapping) => find_validator!(json_get, mapping),
                 }?;
-                self.find_call_validator(py, tag.as_cow()?, input, extra, slots, recursion_guard)
+                self.find_call_validator(py, Cow::Borrowed(&tag), input, extra, slots, recursion_guard)
             }
             Discriminator::Function(ref func) => {
                 let tag = func.call1(py, (input.to_object(py),))?;
@@ -329,12 +370,19 @@ impl Validator for TaggedUnionValidator {
                     Err(self.tag_not_found(input))
                 } else {
                     let tag: &PyString = tag.downcast(py)?;
-                    self.find_call_validator(py, tag.to_string_lossy(), input, extra, slots, recursion_guard)
+                    self.find_call_validator(
+                        py,
+                        Cow::Owned(ChoiceKey::Str(tag.to_string_lossy().into_owned())),
+                        input,
+                        extra,
+                        slots,
+                        recursion_guard,
+                    )
                 }
             }
             Discriminator::SelfSchema => self.find_call_validator(
                 py,
-                self.self_schema_tag(py, input)?,
+                Cow::Owned(ChoiceKey::Str(self.self_schema_tag(py, input)?.into_owned())),
                 input,
                 extra,
                 slots,
@@ -407,7 +455,7 @@ impl TaggedUnionValidator {
     fn find_call_validator<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        tag: Cow<str>,
+        tag: Cow<ChoiceKey>,
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
@@ -416,14 +464,20 @@ impl TaggedUnionValidator {
         if let Some(validator) = self.choices.get(tag.as_ref()) {
             return match validator.validate(py, input, extra, slots, recursion_guard) {
                 Ok(res) => Ok(res),
-                Err(err) => Err(err.with_outer_location(tag.as_ref().into())),
+                Err(err) => match tag.as_ref() {
+                    ChoiceKey::Str(s) => Err(err.with_outer_location((*s).clone().into())),
+                    ChoiceKey::Int(i) => Err(err.with_outer_location((*i).clone().to_string().into())),
+                },
             };
         } else if let Some(ref repeat_choices) = self.repeat_choices {
             if let Some(choice_tag) = repeat_choices.get(tag.as_ref()) {
                 let validator = &self.choices[choice_tag];
                 return match validator.validate(py, input, extra, slots, recursion_guard) {
                     Ok(res) => Ok(res),
-                    Err(err) => Err(err.with_outer_location(tag.as_ref().into())),
+                    Err(err) => match tag.as_ref() {
+                        ChoiceKey::Str(s) => Err(err.with_outer_location((*s).clone().into())),
+                        ChoiceKey::Int(i) => Err(err.with_outer_location((*i).clone().to_string().into())),
+                    },
                 };
             }
         }
