@@ -1214,8 +1214,8 @@ def set_schema(
         min_length: The value must be a set with at least this many items
         max_length: The value must be a set with at most this many items
         generator_max_length: At most this many items will be read from a generator before failing validation
-            This is important because generators can be infinite, and even with a max_length on the set,
-            an infinite generator could run forever without producing more than max_length distinct items.
+            This is important because generators can be infinite, and even with a `max_length` on the set,
+            an infinite generator could run forever without producing more than `max_length` distinct items.
         strict: The value must be a set with exactly this many items
         ref: See [TODO] for details
         extra: See [TODO] for details
