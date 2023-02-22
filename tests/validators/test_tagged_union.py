@@ -105,6 +105,76 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
         assert v.validate_test(input_value) == expected
 
 
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ({'foo': 123, 'bar': '123'}, {'foo': 123, 'bar': 123}),
+        ({'foo': '123', 'bar': '123'}, {'foo': 123, 'bar': 123}),
+        ({'foo': 'banana', 'spam': [1, 2, '3']}, {'foo': 'banana', 'spam': [1, 2, 3]}),
+        (
+            {'foo': 123, 'bar': 'wrong'},
+            Err(
+                'Input should be a valid integer',
+                [
+                    {
+                        'type': 'int_parsing',
+                        'loc': ('123', 'bar'),
+                        'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                        'input': 'wrong',
+                    }
+                ],
+            ),
+        ),
+        (
+            {'foo': 1234567, 'bar': '123'},
+            Err(
+                'union_tag_invalid',
+                [
+                    {
+                        'type': 'union_tag_invalid',
+                        'loc': (),
+                        'msg': (
+                            "Input tag '1234567' found using 'foo' does not match any of the "
+                            "expected tags: '123', 'banana'",
+                        ),
+                        'input': {'foo': 1234567, 'bar': '123'},
+                        'ctx': {'discriminator': "'foo'", 'tag': '1234567', 'expected_tags': "'123', 'banana'"},
+                    }
+                ],
+            ),
+        ),
+    ],
+)
+def test_int_choice_keys(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {
+            'type': 'tagged-union',
+            'discriminator': 'foo',
+            'choices': {
+                123: {
+                    'type': 'typed-dict',
+                    'fields': {'foo': {'schema': {'type': 'int'}}, 'bar': {'schema': {'type': 'int'}}},
+                },
+                'banana': {
+                    'type': 'typed-dict',
+                    'fields': {
+                        'foo': {'schema': {'type': 'str'}},
+                        'spam': {'schema': {'type': 'list', 'items_schema': {'type': 'int'}}},
+                    },
+                },
+            },
+        }
+    )
+    assert 'discriminator: LookupKey' in repr(v.validator)
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=expected.message) as exc_info:
+            v.validate_test(input_value)
+        # debug(exc_info.value.errors())
+        assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_test(input_value) == expected
+
+
 def test_discriminator_path(py_and_json: PyAndJson):
     v = py_and_json(
         {
