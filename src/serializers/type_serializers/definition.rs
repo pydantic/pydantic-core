@@ -28,9 +28,14 @@ impl BuildSerializer for DefinitionRefSerializer {
         _config: Option<&PyDict>,
         build_context: &mut BuildContext<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        let name: String = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
-        let (serializer_id, _) = build_context.find_slot_id_answer(&name)?;
-        Ok(Self { serializer_id }.into())
+        let schema_ref: String = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
+        let (serializer_id, op_serializer) = build_context.find_slot(&schema_ref)?;
+
+        if let Some(serializer) = op_serializer {
+            Ok(serializer)
+        } else {
+            Ok(Self { serializer_id }.into())
+        }
     }
 }
 

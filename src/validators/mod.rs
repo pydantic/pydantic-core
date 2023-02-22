@@ -303,7 +303,7 @@ fn build_specific_validator<'a, T: BuildValidator>(
 ) -> PyResult<CombinedValidator> {
     let py = schema_dict.py();
     if let Some(schema_ref) = schema_dict.get_as::<String>(intern!(py, "ref"))? {
-        // we only want to use a RecursiveContainerValidator if the ref is actually used,
+        // we only want to use a DefinitionRefValidator if the ref is actually used elsewhere,
         // this means refs can always be set without having an effect on the validator which is generated
         // unless it's used/referenced
         if build_context.ref_used(&schema_ref) {

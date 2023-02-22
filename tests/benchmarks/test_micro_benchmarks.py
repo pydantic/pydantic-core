@@ -1102,3 +1102,21 @@ def test_int_error(benchmark):
             validator.validate_python('foobar', strict=True)
         except ValidationError as e:
             e.errors()
+
+
+@pytest.mark.benchmark(group='definition')
+def test_definition_in_tree(benchmark):
+    validator = SchemaValidator(core_schema.list_schema(core_schema.int_schema()))
+    values = [1, 2, 3.0, '4', '5', '6'] * 1000
+    benchmark(validator.validate_python, values)
+
+
+@pytest.mark.benchmark(group='definition')
+def test_definition_out_of_tree(benchmark):
+    validator = SchemaValidator(
+        core_schema.list_schema(core_schema.definition_reference_schema('foobar')),
+        None,
+        [core_schema.int_schema(ref='foobar')],
+    )
+    values = [1, 2, 3.0, '4', '5', '6'] * 1000
+    benchmark(validator.validate_python, values)
