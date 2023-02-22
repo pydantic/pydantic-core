@@ -1,3 +1,5 @@
+from enum import Enum
+
 import pytest
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError
@@ -173,6 +175,49 @@ def test_int_choice_keys(py_and_json: PyAndJson, input_value, expected):
         assert exc_info.value.errors() == expected.errors
     else:
         assert v.validate_test(input_value) == expected
+
+
+def test_enum_keys():
+    class FooEnum(str, Enum):
+        APPLE = 'apple'
+        BANANA = 'banana'
+
+    class BarEnum(int, Enum):
+        ONE = 1
+
+    v = SchemaValidator(
+        {
+            'type': 'tagged-union',
+            'discriminator': 'foo',
+            'choices': {
+                1: {
+                    'type': 'typed-dict',
+                    'fields': {'foo': {'schema': {'type': 'int'}}, 'bar': {'schema': {'type': 'int'}}},
+                },
+                'banana': {
+                    'type': 'typed-dict',
+                    'fields': {
+                        'foo': {'schema': {'type': 'str'}},
+                        'spam': {'schema': {'type': 'list', 'items_schema': {'type': 'int'}}},
+                    },
+                },
+            },
+        }
+    )
+
+    assert v.validate_python({'foo': FooEnum.BANANA, 'spam': [1, 2, '3']}) == {'foo': 'banana', 'spam': [1, 2, 3]}
+    assert v.validate_python({'foo': BarEnum.ONE, 'bar': '123'}) == {'foo': 1, 'bar': 123}
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python({'foo': FooEnum.APPLE, 'spam': [1, 2, '3']})
+    assert exc_info.value.errors() == [
+        {
+            'type': 'union_tag_invalid',
+            'loc': (),
+            'msg': "Input tag 'apple' found using 'foo' does not match any of the expected tags: '1', 'banana'",
+            'input': {'foo': FooEnum.APPLE, 'spam': [1, 2, '3']},
+            'ctx': {'discriminator': "'foo'", 'tag': 'apple', 'expected_tags': "'1', 'banana'"},
+        }
+    ]
 
 
 def test_discriminator_path(py_and_json: PyAndJson):
