@@ -203,7 +203,7 @@ impl ChoiceKey {
         } else if let Ok(py_str) = raw.downcast::<PyString>() {
             Ok(Self::Str(py_str.to_str()?.to_string()))
         } else {
-            py_err!(format!("Expected int or str, got {}", raw.get_type().name()?))
+            py_err!(PyTypeError; "Expected int or str, got {}", raw.get_type().name().unwrap_or("<unknown python object>"))
         }
     }
 }
