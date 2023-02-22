@@ -135,7 +135,7 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
                         'loc': (),
                         'msg': (
                             "Input tag '1234567' found using 'foo' does not match any of the "
-                            "expected tags: '123', 'banana'",
+                            "expected tags: '123', 'banana'"
                         ),
                         'input': {'foo': 1234567, 'bar': '123'},
                         'ctx': {'discriminator': "'foo'", 'tag': '1234567', 'expected_tags': "'123', 'banana'"},
