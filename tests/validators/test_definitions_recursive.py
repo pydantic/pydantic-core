@@ -19,7 +19,7 @@ def test_branch_nullable():
                 'sub_branch': {
                     'schema': {
                         'type': 'default',
-                        'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                        'schema': {'type': 'nullable', 'schema': {'type': 'definition-ref', 'schema_ref': 'Branch'}},
                         'default': None,
                     }
                 },
@@ -29,7 +29,7 @@ def test_branch_nullable():
     assert 'return_fields_set:false' in plain_repr(v)
 
     assert v.validate_python({'name': 'root'}) == {'name': 'root', 'sub_branch': None}
-    assert plain_repr(v).startswith('SchemaValidator(name="typed-dict",validator=RecursiveRef(RecursiveRefValidator{')
+    assert plain_repr(v).startswith('SchemaValidator(name="typed-dict",validator=DefinitionRef(DefinitionRefValidator{')
     assert ',slots=[TypedDict(TypedDictValidator{' in plain_repr(v)
 
     assert v.validate_python({'name': 'root', 'sub_branch': {'name': 'b1'}}) == (
@@ -42,7 +42,7 @@ def test_branch_nullable():
 
 def test_branch_nullable_definitions():
     v = SchemaValidator(
-        {'type': 'recursive-ref', 'schema_ref': 'Branch'},
+        {'type': 'definition-ref', 'schema_ref': 'Branch'},
         None,
         [
             {
@@ -53,7 +53,10 @@ def test_branch_nullable_definitions():
                     'sub_branch': {
                         'schema': {
                             'type': 'default',
-                            'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                            'schema': {
+                                'type': 'nullable',
+                                'schema': {'type': 'definition-ref', 'schema_ref': 'Branch'},
+                            },
                             'default': None,
                         }
                     },
@@ -96,7 +99,7 @@ def test_nullable_error():
                         'type': 'default',
                         'schema': {
                             'type': 'union',
-                            'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'schema_ref': 'Branch'}],
+                            'choices': [{'type': 'none'}, {'type': 'definition-ref', 'schema_ref': 'Branch'}],
                         },
                         'default': None,
                     }
@@ -137,7 +140,7 @@ def test_list():
                         'type': 'default',
                         'schema': {
                             'type': 'list',
-                            'items_schema': {'type': 'recursive-ref', 'schema_ref': 'BranchList'},
+                            'items_schema': {'type': 'definition-ref', 'schema_ref': 'BranchList'},
                         },
                         'default': None,
                     }
@@ -183,7 +186,7 @@ def test_multiple_intertwined():
                                     'type': 'default',
                                     'schema': {
                                         'type': 'list',
-                                        'items_schema': {'type': 'recursive-ref', 'schema_ref': 'Bar'},
+                                        'items_schema': {'type': 'definition-ref', 'schema_ref': 'Bar'},
                                     },
                                     'default': None,
                                 }
@@ -193,7 +196,7 @@ def test_multiple_intertwined():
                                     'type': 'default',
                                     'schema': {
                                         'type': 'union',
-                                        'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'schema_ref': 'Foo'}],
+                                        'choices': [{'type': 'none'}, {'type': 'definition-ref', 'schema_ref': 'Foo'}],
                                     },
                                     'default': None,
                                 }
@@ -239,7 +242,7 @@ def test_model_class():
                             'type': 'default',
                             'schema': {
                                 'type': 'union',
-                                'choices': [{'type': 'none'}, {'type': 'recursive-ref', 'schema_ref': 'Branch'}],
+                                'choices': [{'type': 'none'}, {'type': 'definition-ref', 'schema_ref': 'Branch'}],
                             },
                             'default': None,
                         }
@@ -278,7 +281,7 @@ def test_invalid_schema():
                                 'type': 'default',
                                 'schema': {
                                     'type': 'nullable',
-                                    'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'},
+                                    'schema': {'type': 'definition-ref', 'schema_ref': 'Branch'},
                                 },
                                 'default': None,
                             }
@@ -302,7 +305,7 @@ def test_outside_parent():
                         'ref': 'tuple-iis',
                     }
                 },
-                'tuple2': {'schema': {'type': 'recursive-ref', 'schema_ref': 'tuple-iis'}},
+                'tuple2': {'schema': {'type': 'definition-ref', 'schema_ref': 'tuple-iis'}},
             },
         }
     )
@@ -323,7 +326,7 @@ def test_recursion_branch():
                 'branch': {
                     'schema': {
                         'type': 'default',
-                        'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                        'schema': {'type': 'nullable', 'schema': {'type': 'definition-ref', 'schema_ref': 'Branch'}},
                         'default': None,
                     }
                 },
@@ -369,9 +372,9 @@ def test_recursion_branch():
     ]
 
 
-def test_recursive_list():
+def test_definition_list():
     v = SchemaValidator(
-        {'type': 'list', 'ref': 'the-list', 'items_schema': {'type': 'recursive-ref', 'schema_ref': 'the-list'}}
+        {'type': 'list', 'ref': 'the-list', 'items_schema': {'type': 'definition-ref', 'schema_ref': 'the-list'}}
     )
     assert v.validate_python([]) == []
     assert v.validate_python([[]]) == [[]]
@@ -403,7 +406,7 @@ def multiple_tuple_schema() -> SchemaValidator:
                         'mode': 'positional',
                         'items_schema': [
                             {'type': 'int'},
-                            {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 't'}},
+                            {'type': 'nullable', 'schema': {'type': 'definition-ref', 'schema_ref': 't'}},
                         ],
                         'ref': 't',
                     }
@@ -411,7 +414,7 @@ def multiple_tuple_schema() -> SchemaValidator:
                 'f2': {
                     'schema': {
                         'type': 'default',
-                        'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 't'}},
+                        'schema': {'type': 'nullable', 'schema': {'type': 'definition-ref', 'schema_ref': 't'}},
                         'default': None,
                     }
                 },
@@ -497,7 +500,7 @@ def test_multiple_tuple_recursion_once(multiple_tuple_schema: SchemaValidator):
     ]
 
 
-def test_recursive_wrap():
+def test_definition_wrap():
     def wrap_func(input_value, *, validator, **kwargs):
         return validator(input_value) + (42,)
 
@@ -512,7 +515,7 @@ def test_recursive_wrap():
                 'mode': 'positional',
                 'items_schema': [
                     {'type': 'int'},
-                    {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'wrapper'}},
+                    {'type': 'nullable', 'schema': {'type': 'definition-ref', 'schema_ref': 'wrapper'}},
                 ],
             },
         }
@@ -541,7 +544,7 @@ def test_union_ref_strictness():
                 'b': {
                     'schema': {
                         'type': 'union',
-                        'choices': [{'type': 'recursive-ref', 'schema_ref': 'int-type'}, {'type': 'str'}],
+                        'choices': [{'type': 'definition-ref', 'schema_ref': 'int-type'}, {'type': 'str'}],
                     }
                 },
             },
@@ -565,7 +568,7 @@ def test_union_container_strictness():
         {
             'fields': {
                 'b': {'schema': {'type': 'union', 'choices': [{'type': 'int', 'ref': 'int-type'}, {'type': 'str'}]}},
-                'a': {'schema': {'type': 'recursive-ref', 'schema_ref': 'int-type'}},
+                'a': {'schema': {'type': 'definition-ref', 'schema_ref': 'int-type'}},
             },
             'type': 'typed-dict',
         }
@@ -591,7 +594,7 @@ def test_union_cycle(strict: bool):
                     'fields': {
                         'foobar': {
                             'schema': {
-                                'items_schema': {'schema_ref': 'root-schema', 'type': 'recursive-ref'},
+                                'items_schema': {'schema_ref': 'root-schema', 'type': 'definition-ref'},
                                 'type': 'list',
                             }
                         }
@@ -632,7 +635,7 @@ def test_function_name():
                     'type': 'function',
                     'mode': 'after',
                     'function': f,
-                    'schema': {'schema_ref': 'root-schema', 'type': 'recursive-ref'},
+                    'schema': {'schema_ref': 'root-schema', 'type': 'definition-ref'},
                 },
                 {'type': 'int'},
             ],
@@ -675,7 +678,7 @@ def test_function_change_id(strict: bool):
                     'type': 'function',
                     'mode': 'before',
                     'function': f,
-                    'schema': {'schema_ref': 'root-schema', 'type': 'recursive-ref'},
+                    'schema': {'schema_ref': 'root-schema', 'type': 'definition-ref'},
                 }
             ],
             'auto_collapse': False,
@@ -709,7 +712,7 @@ def test_many_uses_of_ref():
                 'other_names': {
                     'schema': {
                         'type': 'list',
-                        'items_schema': {'type': 'recursive-ref', 'schema_ref': 'limited-string'},
+                        'items_schema': {'type': 'definition-ref', 'schema_ref': 'limited-string'},
                     }
                 },
             },
@@ -728,7 +731,7 @@ def test_many_uses_of_ref():
     assert v.validate_python(long_input) == long_input
 
 
-def test_error_inside_recursive_wrapper():
+def test_error_inside_definition_wrapper():
     with pytest.raises(SchemaError) as exc_info:
         SchemaValidator(
             {
@@ -738,7 +741,10 @@ def test_error_inside_recursive_wrapper():
                     'sub_branch': {
                         'schema': {
                             'type': 'default',
-                            'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                            'schema': {
+                                'type': 'nullable',
+                                'schema': {'type': 'definition-ref', 'schema_ref': 'Branch'},
+                            },
                             'default': None,
                             'default_factory': lambda x: 'foobar',
                         }
@@ -773,7 +779,7 @@ def test_model_td_recursive():
                                 {
                                     'type': 'model',
                                     'cls': Foobar,
-                                    'schema': {'type': 'recursive-ref', 'schema_ref': '__main__.Foobar'},
+                                    'schema': {'type': 'definition-ref', 'schema_ref': '__main__.Foobar'},
                                 },
                                 {'type': 'none'},
                             ],

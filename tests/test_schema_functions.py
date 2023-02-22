@@ -185,7 +185,7 @@ all_schema_functions = [
             },
         },
     ),
-    (core_schema.recursive_reference_schema, args('foo'), {'type': 'recursive-ref', 'schema_ref': 'foo'}),
+    (core_schema.definition_reference_schema, args('foo'), {'type': 'definition-ref', 'schema_ref': 'foo'}),
     (
         core_schema.custom_error_schema,
         args(core_schema.int_schema(), 'foobar', custom_error_message='Hello'),
@@ -213,7 +213,7 @@ def test_schema_functions(function, args_kwargs, expected_schema):
     args, kwargs = args_kwargs
     schema = function(*args, **kwargs)
     assert schema == expected_schema
-    if schema.get('type') in {None, 'recursive-ref'}:
+    if schema.get('type') in {None, 'definition-ref'}:
         return
 
     v = SchemaValidator(schema)

@@ -126,7 +126,7 @@ combined_serializer! {
         ToString: super::type_serializers::format::ToStringSerializer;
         WithDefault: super::type_serializers::with_default::WithDefaultSerializer;
         Json: super::type_serializers::json::JsonSerializer;
-        Recursive: super::type_serializers::recursive::RecursiveRefSerializer;
+        Recursive: super::type_serializers::definition::DefinitionRefSerializer;
         Union: super::type_serializers::union::UnionSerializer;
         Literal: super::type_serializers::literal::LiteralSerializer;
     }
@@ -192,7 +192,7 @@ impl BuildSerializer for CombinedSerializer {
                 let slot_id = build_context.prepare_slot(schema_ref, None)?;
                 let inner_ser = Self::_build(schema, config, build_context)?;
                 build_context.complete_slot(slot_id, inner_ser)?;
-                return Ok(super::type_serializers::recursive::RecursiveRefSerializer::from_id(
+                return Ok(super::type_serializers::definition::DefinitionRefSerializer::from_id(
                     slot_id,
                 ));
             }

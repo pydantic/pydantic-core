@@ -11,14 +11,14 @@ use crate::recursion_guard::RecursionGuard;
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
-pub struct RecursiveRefValidator {
+pub struct DefinitionRefValidator {
     validator_id: usize,
     inner_name: String,
     // we have to record the answers to `Question`s as we can't access the validator when `ask()` is called
     answers: Answers,
 }
 
-impl RecursiveRefValidator {
+impl DefinitionRefValidator {
     pub fn from_id(validator_id: usize, inner_name: String, answers: Answers) -> CombinedValidator {
         Self {
             validator_id,
@@ -29,8 +29,8 @@ impl RecursiveRefValidator {
     }
 }
 
-impl BuildValidator for RecursiveRefValidator {
-    const EXPECTED_TYPE: &'static str = "recursive-ref";
+impl BuildValidator for DefinitionRefValidator {
+    const EXPECTED_TYPE: &'static str = "definition-ref";
 
     fn build(
         schema: &PyDict,
@@ -48,7 +48,7 @@ impl BuildValidator for RecursiveRefValidator {
     }
 }
 
-impl Validator for RecursiveRefValidator {
+impl Validator for DefinitionRefValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,

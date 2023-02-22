@@ -10,18 +10,18 @@ use crate::build_tools::SchemaDict;
 use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
-pub struct RecursiveRefSerializer {
+pub struct DefinitionRefSerializer {
     serializer_id: usize,
 }
 
-impl RecursiveRefSerializer {
+impl DefinitionRefSerializer {
     pub fn from_id(serializer_id: usize) -> CombinedSerializer {
         Self { serializer_id }.into()
     }
 }
 
-impl BuildSerializer for RecursiveRefSerializer {
-    const EXPECTED_TYPE: &'static str = "recursive-ref";
+impl BuildSerializer for DefinitionRefSerializer {
+    const EXPECTED_TYPE: &'static str = "definition-ref";
 
     fn build(
         schema: &PyDict,
@@ -34,7 +34,7 @@ impl BuildSerializer for RecursiveRefSerializer {
     }
 }
 
-impl TypeSerializer for RecursiveRefSerializer {
+impl TypeSerializer for DefinitionRefSerializer {
     fn to_python(
         &self,
         value: &PyAny,

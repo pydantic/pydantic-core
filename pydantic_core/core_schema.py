@@ -2314,33 +2314,34 @@ def call_schema(
     )
 
 
-class RecursiveReferenceSchema(TypedDict, total=False):
-    type: Required[Literal['recursive-ref']]
+class DefinitionReferenceSchema(TypedDict, total=False):
+    type: Required[Literal['definition-ref']]
     schema_ref: Required[str]
     metadata: Any
     serialization: SerSchema
 
 
-def recursive_reference_schema(
+def definition_reference_schema(
     schema_ref: str, metadata: Any = None, serialization: SerSchema | None = None
-) -> RecursiveReferenceSchema:
+) -> DefinitionReferenceSchema:
     """
-    Returns a schema that matches a recursive reference value, e.g.:
+    Returns a schema that points to a schema stored in "definitions", this is useful for nested recursive
+    models and also when you want to define validators separately from the main schema, e.g.:
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
-    schema_recursive = core_schema.recursive_reference_schema('list-schema')
-    schema = core_schema.list_schema(items_schema=schema_recursive, ref='list-schema')
+    schema_definition = core_schema.definition_reference_schema('list-schema')
+    schema = core_schema.list_schema(items_schema=schema_definition, ref='list-schema')
     v = SchemaValidator(schema)
     assert v.validate_python([[]]) == [[]]
     ```
 
     Args:
-        schema_ref: The schema ref to use for the recursive reference schema
+        schema_ref: The schema ref to use for the definition reference schema
         metadata: See [TODO] for details
         serialization: Custom serialization schema
     """
-    return dict_not_none(type='recursive-ref', schema_ref=schema_ref, metadata=metadata, serialization=serialization)
+    return dict_not_none(type='definition-ref', schema_ref=schema_ref, metadata=metadata, serialization=serialization)
 
 
 class CustomErrorSchema(TypedDict, total=False):
@@ -2611,7 +2612,7 @@ CoreSchema = Union[
     ModelSchema,
     ArgumentsSchema,
     CallSchema,
-    RecursiveReferenceSchema,
+    DefinitionReferenceSchema,
     CustomErrorSchema,
     JsonSchema,
     UrlSchema,
@@ -2652,7 +2653,7 @@ CoreSchemaType = Literal[
     'model',
     'arguments',
     'call',
-    'recursive-ref',
+    'definition-ref',
     'custom-error',
     'json',
     'url',

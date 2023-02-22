@@ -24,6 +24,7 @@ mod chain;
 mod custom_error;
 mod date;
 mod datetime;
+mod definition;
 mod dict;
 mod float;
 mod frozenset;
@@ -39,7 +40,6 @@ mod literal;
 mod model;
 mod none;
 mod nullable;
-mod recursive;
 mod set;
 mod string;
 mod time;
@@ -312,7 +312,7 @@ fn build_specific_validator<'a, T: BuildValidator>(
             let inner_val = T::build(schema_dict, config, build_context)?;
             let name = inner_val.get_name().to_string();
             build_context.complete_slot(slot_id, inner_val)?;
-            return Ok(recursive::RecursiveRefValidator::from_id(slot_id, name, answers));
+            return Ok(definition::DefinitionRefValidator::from_id(slot_id, name, answers));
         }
     }
 
@@ -376,7 +376,7 @@ pub fn build_validator<'a>(
         // function call - validation around a function call
         call::CallValidator,
         // recursive (self-referencing) models
-        recursive::RecursiveRefValidator,
+        definition::DefinitionRefValidator,
         // literals
         literal::LiteralBuilder,
         // any
@@ -494,8 +494,8 @@ pub enum CombinedValidator {
     FunctionWrap(function::FunctionWrapValidator),
     // function call - validation around a function call
     FunctionCall(call::CallValidator),
-    // recursive (self-referencing) models
-    RecursiveRef(recursive::RecursiveRefValidator),
+    // reference to definition, useful for recursive (self-referencing) models
+    DefinitionRef(definition::DefinitionRefValidator),
     // literals
     LiteralSingleString(literal::LiteralSingleStringValidator),
     LiteralSingleInt(literal::LiteralSingleIntValidator),

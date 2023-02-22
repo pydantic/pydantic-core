@@ -144,7 +144,7 @@ impl BuildContext<CombinedSerializer> {
 fn extract_used_refs(schema: &PyAny, refs: &mut AHashSet<String>) -> PyResult<()> {
     if let Ok(dict) = schema.downcast::<PyDict>() {
         let py = schema.py();
-        if matches!(dict.get_as(intern!(py, "type")), Ok(Some("recursive-ref"))) {
+        if matches!(dict.get_as(intern!(py, "type")), Ok(Some("definition-ref"))) {
             refs.insert(dict.get_as_req(intern!(py, "schema_ref"))?);
         } else {
             for (_, value) in dict.iter() {
