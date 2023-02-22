@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Write;
 
+use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
@@ -250,7 +251,7 @@ impl BuildValidator for TaggedUnionValidator {
         let mut descr = String::with_capacity(50);
 
         for (key, value) in schema_choices {
-            let tag = choice_key ChoiceKey::from_py(key)?;
+            let tag = ChoiceKey::from_py(key)?;
 
             if let Ok(repeat_tag) = ChoiceKey::from_py(value) {
                 repeat_choices_vec.push((tag, repeat_tag));
@@ -333,18 +334,10 @@ impl Validator for TaggedUnionValidator {
                         // errors when getting attributes which should be "raised"
                         match lookup_key.$get_method($( $dict ),+)? {
                             Some((_, value)) => {
-                                if self.strict {
-                                    if let Ok(val_int) = value.strict_int() {
-                                        Ok(ChoiceKey::Int(val_int))
-                                    } else {
-                                        Ok(ChoiceKey::Str(value.strict_str()?.as_cow()?.as_ref().to_string()))
-                                    }
+                                if let Ok(int) = value.validate_int(self.strict) {
+                                    Ok(ChoiceKey::Int(int))
                                 } else {
-                                    if let Ok(val_int) = value.lax_int() {
-                                        Ok(ChoiceKey::Int(val_int))
-                                    } else {
-                                        Ok(ChoiceKey::Str(value.lax_str()?.as_cow()?.as_ref().to_string()))
-                                    }
+                                    Ok(ChoiceKey::Str(value.validate_str(self.strict)?.as_cow()?.as_ref().to_string()))
                                 }
                             }
                             None => Err(self.tag_not_found(input)),
@@ -471,7 +464,7 @@ impl TaggedUnionValidator {
                 return match validator.validate(py, input, extra, slots, recursion_guard) {
                     Ok(res) => Ok(res),
                     Err(err) => match tag.as_ref() {
-                        ChoiceKey::Str(s) => Err(err.with_outer_location(s.into())),
+                        ChoiceKey::Str(s) => Err(err.with_outer_location((*s).clone().into())),
                         ChoiceKey::Int(i) => Err(err.with_outer_location((*i).clone().to_string().into())),
                     },
                 };
