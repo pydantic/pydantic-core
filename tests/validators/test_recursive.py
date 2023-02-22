@@ -40,6 +40,38 @@ def test_branch_nullable():
     )
 
 
+def test_branch_nullable_definitions():
+    v = SchemaValidator(
+        {'type': 'recursive-ref', 'schema_ref': 'Branch'},
+        None,
+        [
+            {
+                'type': 'typed-dict',
+                'ref': 'Branch',
+                'fields': {
+                    'name': {'schema': {'type': 'str'}},
+                    'sub_branch': {
+                        'schema': {
+                            'type': 'default',
+                            'schema': {'type': 'nullable', 'schema': {'type': 'recursive-ref', 'schema_ref': 'Branch'}},
+                            'default': None,
+                        }
+                    },
+                },
+            }
+        ],
+    )
+
+    assert v.validate_python({'name': 'root'}) == {'name': 'root', 'sub_branch': None}
+
+    assert v.validate_python({'name': 'root', 'sub_branch': {'name': 'b1'}}) == (
+        {'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': None}}
+    )
+    assert v.validate_python({'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': {'name': 'b2'}}}) == (
+        {'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': {'name': 'b2', 'sub_branch': None}}}
+    )
+
+
 def test_unused_ref():
     v = SchemaValidator(
         {

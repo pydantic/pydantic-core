@@ -5,7 +5,7 @@ use enum_dispatch::enum_dispatch;
 use pyo3::intern;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::types::{PyAny, PyDict, PyList};
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, py_error_type, SchemaDict, SchemaError};
@@ -65,10 +65,25 @@ pub struct SchemaValidator {
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
-        let schema = Self::validate_schema(py, schema)?;
+    pub fn py_new(
+        py: Python,
+        schema: &PyAny,
+        config: Option<&PyDict>,
+        extra_definitions: Option<&PyList>,
+    ) -> PyResult<Self> {
+        let self_validator = SelfValidator::new(py)?;
+        let schema = self_validator.validate_schema(py, schema)?;
 
-        let mut build_context = BuildContext::for_schema(schema)?;
+        let mut build_context = BuildContext::new(schema, extra_definitions)?;
+
+        if let Some(extra_definitions) = extra_definitions {
+            for def_item in extra_definitions {
+                let def_schema = self_validator.validate_schema(py, def_item)?;
+                let mut validator = build_validator(def_schema, config, &mut build_context)?;
+                validator.complete(&build_context)?;
+                // no need to store the validator here, it has already been stored in slots if necessary
+            }
+        }
 
         let mut validator = build_validator(schema, config, &mut build_context)?;
         validator.complete(&build_context)?;
@@ -212,16 +227,33 @@ impl SchemaValidator {
     }
 }
 
+impl SchemaValidator {
+    fn prepare_validation_err(&self, py: Python, error: ValError) -> PyErr {
+        ValidationError::from_val_error(py, self.title.clone_ref(py), error, None)
+    }
+}
+
 static SCHEMA_DEFINITION: GILOnceCell<SchemaValidator> = GILOnceCell::new();
 
-impl SchemaValidator {
-    pub(crate) fn validate_schema<'py>(py: Python<'py>, schema: &'py PyAny) -> PyResult<&'py PyAny> {
-        let self_schema = Self::get_self_schema(py);
-        match self_schema.validator.validate(
+pub(crate) struct SelfValidator<'py> {
+    validator: &'py SchemaValidator,
+}
+
+impl<'py> SelfValidator<'py> {
+    pub fn new(py: Python<'py>) -> PyResult<Self> {
+        let validator = SCHEMA_DEFINITION.get_or_init(py, || match Self::build(py) {
+            Ok(schema) => schema,
+            Err(e) => panic!("Error building schema validator:\n  {e}"),
+        });
+        Ok(Self { validator })
+    }
+
+    pub fn validate_schema(&self, py: Python<'py>, schema: &'py PyAny) -> PyResult<&'py PyAny> {
+        match self.validator.validator.validate(
             py,
             schema,
             &Extra::default(),
-            &self_schema.slots,
+            &self.validator.slots,
             &mut RecursionGuard::default(),
         ) {
             Ok(schema_obj) => Ok(schema_obj.into_ref(py)),
@@ -229,16 +261,7 @@ impl SchemaValidator {
         }
     }
 
-    fn get_self_schema(py: Python) -> &Self {
-        SCHEMA_DEFINITION.get_or_init(py, || match Self::build_self_schema(py) {
-            Ok(schema) => schema,
-            Err(e) => {
-                panic!("Error building schema validator:\n  {e}");
-            }
-        })
-    }
-
-    fn build_self_schema(py: Python) -> PyResult<Self> {
+    fn build(py: Python) -> PyResult<SchemaValidator> {
         let code = include_str!("../self_schema.py");
         let locals = PyDict::new(py);
         py.run(code, None, Some(locals))?;
@@ -250,16 +273,12 @@ impl SchemaValidator {
             Ok(v) => v,
             Err(err) => return py_err!("Error building self-schema:\n  {}", err),
         };
-        Ok(Self {
+        Ok(SchemaValidator {
             validator,
             slots: build_context.into_slots_val()?,
             schema: py.None(),
             title: "Self Schema".into_py(py),
         })
-    }
-
-    fn prepare_validation_err(&self, py: Python, error: ValError) -> PyErr {
-        ValidationError::from_val_error(py, self.title.clone_ref(py), error, None)
     }
 }
 

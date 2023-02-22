@@ -1,10 +1,10 @@
 use std::fmt::Debug;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::{PyBytes, PyDict, PyList};
 
 use crate::build_context::BuildContext;
-use crate::SchemaValidator;
+use crate::validators::SelfValidator;
 
 use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
@@ -33,9 +33,15 @@ pub struct SchemaSerializer {
 #[pymethods]
 impl SchemaSerializer {
     #[new]
-    pub fn py_new(py: Python, schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
-        let schema = SchemaValidator::validate_schema(py, schema)?;
-        let mut build_context = BuildContext::for_schema(schema)?;
+    pub fn py_new(
+        py: Python,
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        extra_definitions: Option<&PyList>,
+    ) -> PyResult<Self> {
+        let self_validator = SelfValidator::new(py)?;
+        let schema = self_validator.validate_schema(py, schema)?;
+        let mut build_context = BuildContext::new(schema, extra_definitions)?;
         let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut build_context)?;
         Ok(Self {
             serializer,

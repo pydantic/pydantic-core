@@ -26,16 +26,12 @@ pub struct BuildContext<T> {
 }
 
 impl<T: Clone> BuildContext<T> {
-    pub fn new(used_refs: AHashSet<String>) -> Self {
-        Self {
-            used_refs,
-            slots: Vec::new(),
-        }
-    }
-
-    pub fn for_schema(schema: &PyAny) -> PyResult<Self> {
+    pub fn new(schema: &PyAny, extra_definitions: Option<&PyList>) -> PyResult<Self> {
         let mut used_refs = AHashSet::new();
         extract_used_refs(schema, &mut used_refs)?;
+        if let Some(extra_definitions) = extra_definitions {
+            extract_used_refs(extra_definitions, &mut used_refs)?;
+        }
         Ok(Self {
             used_refs,
             slots: Vec::new(),
