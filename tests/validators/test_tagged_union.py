@@ -498,14 +498,21 @@ def test_tag_repeated(py_and_json: PyAndJson):
                 },
                 'cherry': 'banana',
                 'durian': 'apple',
+                1: {
+                    'type': 'typed-dict',
+                    'fields': {'a': {'schema': {'type': 'int'}}, 'b': {'schema': {'type': 'int'}}},
+                },
+                2: 1,
             },
         }
     )
     assert v.validate_test({'food': 'apple', 'a': 'ap', 'b': '13'}) == {'a': 'ap', 'b': 13}
     assert v.validate_test({'food': 'durian', 'a': 'ap', 'b': '13'}) == {'a': 'ap', 'b': 13}
+    assert v.validate_test({'food': 1, 'a': 123, 'b': '13'}) == {'a': 123, 'b': 13}
 
     assert v.validate_test({'food': 'banana', 'c': 'C', 'd': [1, '2']}) == {'c': 'C', 'd': [1, 2]}
     assert v.validate_test({'food': 'cherry', 'c': 'C', 'd': [1, '2']}) == {'c': 'C', 'd': [1, 2]}
+    assert v.validate_test({'food': 2, 'a': 123, 'b': '13'}) == {'a': 123, 'b': 13}
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test({'food': 'wrong'})
     # insert_assert(exc_info.value.errors())
@@ -515,13 +522,13 @@ def test_tag_repeated(py_and_json: PyAndJson):
             'loc': (),
             'msg': (
                 "Input tag 'wrong' found using 'food' does not match any of the expected tags: "
-                "'apple', 'banana', 'cherry', 'durian'"
+                "'apple', 'banana', '1', 'cherry', 'durian', '2'"
             ),
             'input': {'food': 'wrong'},
             'ctx': {
                 'discriminator': "'food'",
                 'tag': 'wrong',
-                'expected_tags': "'apple', 'banana', 'cherry', 'durian'",
+                'expected_tags': "'apple', 'banana', '1', 'cherry', 'durian', '2'",
             },
         }
     ]

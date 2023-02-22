@@ -1819,7 +1819,7 @@ class TaggedUnionSchema(TypedDict, total=False):
 
 
 def tagged_union_schema(
-    choices: Dict[str, str | CoreSchema],
+    choices: Dict[Union[int, str], int | str | CoreSchema],
     discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], str | None],
     *,
     custom_error_type: str | None = None,
