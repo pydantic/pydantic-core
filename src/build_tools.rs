@@ -132,9 +132,15 @@ impl SchemaError {
         PyErr::new::<SchemaError, A>(args)
     }
 
-    pub fn from_val_error(py: Python, error: ValError) -> PyErr {
+    pub fn from_val_error(py: Python, error: ValError, definition_index: Option<usize>) -> PyErr {
         match error {
-            ValError::LineErrors(line_errors) => {
+            ValError::LineErrors(mut line_errors) => {
+                if let Some(def_index) = definition_index {
+                    for line_error in &mut line_errors.iter_mut() {
+                        line_error.location.with_outer(def_index.into());
+                        line_error.location.with_outer("definitions".into());
+                    }
+                }
                 let details = pretty_line_errors(py, line_errors);
                 SchemaError::new_err(format!("Invalid Schema:\n{details}"))
             }

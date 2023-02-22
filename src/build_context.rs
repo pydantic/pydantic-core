@@ -88,7 +88,7 @@ impl<T: Clone + std::fmt::Debug> BuildContext<T> {
 
     /// find a slot by `slot_ref`, if the slot is used exactly once, we return the validator/serializer
     /// to be used directly but DON'T remove it from slots, otherwise we will use the ID
-    pub fn find_slot(&self, slot_ref: &str) -> PyResult<(usize, Option<T>)> {
+    pub fn find_slot(&mut self, slot_ref: &str) -> PyResult<(usize, Option<T>)> {
         let id = match self.slots.iter().position(|slot: &Slot<T>| slot.slot_ref == slot_ref) {
             Some(id) => id,
             None => return py_err!("Slots Error: ref '{}' not found", slot_ref),

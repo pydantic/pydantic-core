@@ -72,13 +72,13 @@ impl SchemaValidator {
         extra_definitions: Option<&PyList>,
     ) -> PyResult<Self> {
         let self_validator = SelfValidator::new(py)?;
-        let schema = self_validator.validate_schema(py, schema)?;
+        let schema = self_validator.validate_schema(py, schema, None)?;
 
         let mut build_context = BuildContext::new(schema, extra_definitions)?;
 
         if let Some(extra_definitions) = extra_definitions {
-            for def_item in extra_definitions {
-                let def_schema = self_validator.validate_schema(py, def_item)?;
+            for (index, def_item) in extra_definitions.iter().enumerate() {
+                let def_schema = self_validator.validate_schema(py, def_item, Some(index))?;
                 let mut validator = build_validator(def_schema, config, &mut build_context)?;
                 validator.complete(&build_context)?;
                 // no need to store the validator here, it has already been stored in slots if necessary
@@ -248,7 +248,12 @@ impl<'py> SelfValidator<'py> {
         Ok(Self { validator })
     }
 
-    pub fn validate_schema(&self, py: Python<'py>, schema: &'py PyAny) -> PyResult<&'py PyAny> {
+    pub fn validate_schema(
+        &self,
+        py: Python<'py>,
+        schema: &'py PyAny,
+        definition_index: Option<usize>,
+    ) -> PyResult<&'py PyAny> {
         match self.validator.validator.validate(
             py,
             schema,
@@ -257,7 +262,7 @@ impl<'py> SelfValidator<'py> {
             &mut RecursionGuard::default(),
         ) {
             Ok(schema_obj) => Ok(schema_obj.into_ref(py)),
-            Err(e) => Err(SchemaError::from_val_error(py, e)),
+            Err(e) => Err(SchemaError::from_val_error(py, e, definition_index)),
         }
     }
 

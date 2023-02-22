@@ -40,8 +40,17 @@ impl SchemaSerializer {
         extra_definitions: Option<&PyList>,
     ) -> PyResult<Self> {
         let self_validator = SelfValidator::new(py)?;
-        let schema = self_validator.validate_schema(py, schema)?;
+        let schema = self_validator.validate_schema(py, schema, None)?;
         let mut build_context = BuildContext::new(schema, extra_definitions)?;
+
+        if let Some(extra_definitions) = extra_definitions {
+            for (index, def_item) in extra_definitions.iter().enumerate() {
+                let def_schema = self_validator.validate_schema(py, def_item, Some(index))?;
+                CombinedSerializer::build(def_schema.downcast()?, config, &mut build_context)?;
+                // no need to store the serializer here, it has already been stored in slots if necessary
+            }
+        }
+
         let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut build_context)?;
         Ok(Self {
             serializer,
