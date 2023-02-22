@@ -471,7 +471,7 @@ impl TaggedUnionValidator {
                 return match validator.validate(py, input, extra, slots, recursion_guard) {
                     Ok(res) => Ok(res),
                     Err(err) => match tag.as_ref() {
-                        ChoiceKey::Str(s) => Err(err.with_outer_location((*s).clone().into())),
+                        ChoiceKey::Str(s) => Err(err.with_outer_location(s.into())),
                         ChoiceKey::Int(i) => Err(err.with_outer_location((*i).clone().to_string().into())),
                     },
                 };
