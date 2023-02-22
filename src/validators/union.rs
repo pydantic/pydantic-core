@@ -250,11 +250,7 @@ impl BuildValidator for TaggedUnionValidator {
         let mut descr = String::with_capacity(50);
 
         for (key, value) in schema_choices {
-            let tag = if let Ok(choice_key) = ChoiceKey::from_py(key) {
-                choice_key
-            } else {
-                return py_err!("Keys of schema must be int or string but got: {}", key);
-            };
+            let tag = choice_key ChoiceKey::from_py(key)?;
 
             if let Ok(repeat_tag) = ChoiceKey::from_py(value) {
                 repeat_choices_vec.push((tag, repeat_tag));
