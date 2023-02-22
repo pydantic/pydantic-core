@@ -351,27 +351,20 @@ impl Validator for TaggedUnionValidator {
                     GenericMapping::PyMapping(mapping) => find_validator!(py_get_mapping_item, mapping),
                     GenericMapping::JsonObject(mapping) => find_validator!(json_get, mapping),
                 }?;
-                self.find_call_validator(py, Cow::Borrowed(&tag), input, extra, slots, recursion_guard)
+                self.find_call_validator(py, &tag, input, extra, slots, recursion_guard)
             }
             Discriminator::Function(ref func) => {
                 let tag = func.call1(py, (input.to_object(py),))?;
                 if tag.is_none(py) {
                     Err(self.tag_not_found(input))
                 } else {
-                    let tag: &PyString = tag.downcast(py)?;
-                    self.find_call_validator(
-                        py,
-                        Cow::Owned(ChoiceKey::Str(tag.to_string_lossy().into_owned())),
-                        input,
-                        extra,
-                        slots,
-                        recursion_guard,
-                    )
+                    let tag: &PyAny = tag.downcast(py)?;
+                    self.find_call_validator(py, &(ChoiceKey::from_py(tag)?), input, extra, slots, recursion_guard)
                 }
             }
             Discriminator::SelfSchema => self.find_call_validator(
                 py,
-                Cow::Owned(ChoiceKey::Str(self.self_schema_tag(py, input)?.into_owned())),
+                &ChoiceKey::Str(self.self_schema_tag(py, input)?.into_owned()),
                 input,
                 extra,
                 slots,
@@ -444,26 +437,26 @@ impl TaggedUnionValidator {
     fn find_call_validator<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        tag: Cow<ChoiceKey>,
+        tag: &ChoiceKey,
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        if let Some(validator) = self.choices.get(tag.as_ref()) {
+        if let Some(validator) = self.choices.get(tag) {
             return match validator.validate(py, input, extra, slots, recursion_guard) {
                 Ok(res) => Ok(res),
-                Err(err) => match tag.as_ref() {
+                Err(err) => match tag {
                     ChoiceKey::Str(s) => Err(err.with_outer_location((*s).clone().into())),
                     ChoiceKey::Int(i) => Err(err.with_outer_location((*i).clone().to_string().into())),
                 },
             };
         } else if let Some(ref repeat_choices) = self.repeat_choices {
-            if let Some(choice_tag) = repeat_choices.get(tag.as_ref()) {
+            if let Some(choice_tag) = repeat_choices.get(tag) {
                 let validator = &self.choices[choice_tag];
                 return match validator.validate(py, input, extra, slots, recursion_guard) {
                     Ok(res) => Ok(res),
-                    Err(err) => match tag.as_ref() {
+                    Err(err) => match tag {
                         ChoiceKey::Str(s) => Err(err.with_outer_location((*s).clone().into())),
                         ChoiceKey::Int(i) => Err(err.with_outer_location((*i).clone().to_string().into())),
                     },
