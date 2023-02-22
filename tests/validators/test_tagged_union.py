@@ -271,8 +271,16 @@ def test_use_ref():
 
 def test_downcast_error():
     v = SchemaValidator({'type': 'tagged-union', 'discriminator': lambda x: 123, 'choices': {'str': {'type': 'str'}}})
-    with pytest.raises(TypeError, match="'int' object cannot be converted to 'PyString'"):
+    with pytest.raises(ValidationError) as exc_info:
         v.validate_python('x')
+        assert exc_info.value.errors() == [
+            {
+                'type': 'union_tag_invalid',
+                'loc': (),
+                'msg': "Input tag '123' found using <lambda>() does not match any of the expected tags: 'str'",
+                'input': 'x',
+            }
+        ]
 
 
 def test_custom_error():

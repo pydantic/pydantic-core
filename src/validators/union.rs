@@ -295,7 +295,7 @@ impl BuildValidator for TaggedUnionValidator {
         };
 
         let key = intern!(py, "from_attributes");
-        let from_attributes = schema_or_config(schema, config, key, key)?.unwrap_or(true);
+        let from_attributes = schema_or_config(schema, config, key, key)?.unwrap_or(false);
 
         let descr = match discriminator {
             Discriminator::SelfSchema => "self-schema".to_string(),
