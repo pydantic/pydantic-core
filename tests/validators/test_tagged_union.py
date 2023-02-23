@@ -82,6 +82,7 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
         {
             'type': 'tagged-union',
             'discriminator': 'foo',
+            'from_attributes': False,
             'choices': {
                 'apple': {
                     'type': 'typed-dict',
