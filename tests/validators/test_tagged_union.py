@@ -480,7 +480,40 @@ def test_custom_error_type():
     ]
 
 
-def test_tag_repeated(py_and_json: PyAndJson):
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ({'food': 'apple', 'a': 'ap', 'b': '13'}, {'a': 'ap', 'b': 13}),
+        ({'food': 'durian', 'a': 'ap', 'b': '13'}, {'a': 'ap', 'b': 13}),
+        ({'food': 1, 'a': 123, 'b': '13'}, {'a': 123, 'b': 13}),
+        ({'food': 'banana', 'c': 'C', 'd': [1, '2']}, {'c': 'C', 'd': [1, 2]}),
+        ({'food': 'cherry', 'c': 'C', 'd': [1, '2']}, {'c': 'C', 'd': [1, 2]}),
+        ({'food': 2, 'a': 123, 'b': '13'}, {'a': 123, 'b': 13}),
+        (
+            {'food': 'wrong'},
+            Err(
+                'union_tag_invalid',
+                [
+                    {
+                        'type': 'union_tag_invalid',
+                        'loc': (),
+                        'msg': (
+                            "Input tag 'wrong' found using 'food' does not match any of the expected tags: "
+                            "'apple', 'banana', 1, 'cherry', 'durian', 2"
+                        ),
+                        'input': {'food': 'wrong'},
+                        'ctx': {
+                            'discriminator': "'food'",
+                            'tag': 'wrong',
+                            'expected_tags': "'apple', 'banana', 1, 'cherry', 'durian', 2",
+                        },
+                    }
+                ],
+            ),
+        ),
+    ],
+)
+def test_tag_repeated(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'tagged-union',
@@ -507,32 +540,15 @@ def test_tag_repeated(py_and_json: PyAndJson):
             },
         }
     )
-    assert v.validate_test({'food': 'apple', 'a': 'ap', 'b': '13'}) == {'a': 'ap', 'b': 13}
-    assert v.validate_test({'food': 'durian', 'a': 'ap', 'b': '13'}) == {'a': 'ap', 'b': 13}
-    assert v.validate_test({'food': 1, 'a': 123, 'b': '13'}) == {'a': 123, 'b': 13}
+    if isinstance(expected, Err):
+        # insert_assert(exc_info.value.errors())
+        with pytest.raises(ValidationError, match=expected.message) as exc_info:
+            v.validate_test(input_value)
+        # debug(exc_info.value.errors())
+        assert exc_info.value.errors() == expected.errors
 
-    assert v.validate_test({'food': 'banana', 'c': 'C', 'd': [1, '2']}) == {'c': 'C', 'd': [1, 2]}
-    assert v.validate_test({'food': 'cherry', 'c': 'C', 'd': [1, '2']}) == {'c': 'C', 'd': [1, 2]}
-    assert v.validate_test({'food': 2, 'a': 123, 'b': '13'}) == {'a': 123, 'b': 13}
-    with pytest.raises(ValidationError) as exc_info:
-        v.validate_test({'food': 'wrong'})
-    # insert_assert(exc_info.value.errors())
-    assert exc_info.value.errors() == [
-        {
-            'type': 'union_tag_invalid',
-            'loc': (),
-            'msg': (
-                "Input tag 'wrong' found using 'food' does not match any of the expected tags: "
-                "'apple', 'banana', 1, 'cherry', 'durian', 2"
-            ),
-            'input': {'food': 'wrong'},
-            'ctx': {
-                'discriminator': "'food'",
-                'tag': 'wrong',
-                'expected_tags': "'apple', 'banana', 1, 'cherry', 'durian', 2",
-            },
-        }
-    ]
+    else:
+        assert v.validate_test(input_value) == expected
 
 
 def test_tag_repeated_invalid():
