@@ -1,6 +1,6 @@
-use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
+use pyo3::{intern, AsPyPointer};
 
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
@@ -86,6 +86,14 @@ impl Validator for TupleVariableValidator {
                 GenericCollection::Tuple(tuple) => {
                     length_check!(input, "Tuple", self.min_length, self.max_length, tuple);
                     return Ok(tuple.into_py(py));
+                }
+                GenericCollection::List(list) => {
+                    length_check!(input, "Tuple", self.min_length, self.max_length, list);
+                    unsafe {
+                        let list_ptr = list.as_ptr();
+                        let tuple_ptr = pyo3::ffi::PyList_AsTuple(list_ptr);
+                        return Ok(Py::from_owned_ptr(py, tuple_ptr));
+                    }
                 }
                 _ => seq.to_vec(py, input, "Tuple", self.max_length)?,
             },

@@ -1,8 +1,11 @@
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
+use pyo3::AsPyPointer;
+use std::cmp::Ordering;
 
 use crate::build_tools::SchemaDict;
-use crate::errors::ValResult;
+use crate::errors::{ValError, ValLineError, ValResult};
 use crate::input::{GenericCollection, Input};
 use crate::recursion_guard::RecursionGuard;
 
@@ -93,6 +96,55 @@ impl BuildValidator for ListValidator {
     }
 }
 
+struct PyListCreator {
+    len: pyo3::ffi::Py_ssize_t,
+    list: Py<PyList>,
+    counter: pyo3::ffi::Py_ssize_t,
+}
+
+impl PyListCreator {
+    fn with_capacity(py: Python, capacity: usize) -> PyResult<Self> {
+        let len: pyo3::ffi::Py_ssize_t = capacity
+            .try_into()
+            .map_err(|_| PyValueError::new_err("list len out of range"))?;
+        unsafe {
+            let ptr = pyo3::ffi::PyList_New(len);
+            let list: Py<PyList> = Py::from_owned_ptr(py, ptr);
+            Ok(Self { len, list, counter: 0 })
+        }
+    }
+
+    fn push(&mut self, item: PyObject) -> PyResult<()> {
+        if self.counter == self.len {
+            return Err(PyValueError::new_err("too many items added"));
+        }
+        let ptr = self.list.as_ptr();
+        unsafe {
+            #[cfg(not(Py_LIMITED_API))]
+            pyo3::ffi::PyList_SET_ITEM(ptr, self.counter, item.into_ptr());
+            #[cfg(Py_LIMITED_API)]
+            pyo3::ffi::PyList_SetItem(ptr, self.counter, item.into_ptr());
+        }
+        self.counter += 1;
+        Ok(())
+    }
+
+    fn complete(self, py: Python) -> PyResult<Py<PyList>> {
+        match self.counter.cmp(&self.len) {
+            Ordering::Equal => Ok(self.list),
+            Ordering::Less => unsafe {
+                let ptr = self.list.as_ptr();
+                let slice_ptr = pyo3::ffi::PyList_GetSlice(ptr, 0, self.counter);
+                Ok(Py::from_owned_ptr(py, slice_ptr))
+            },
+            Ordering::Greater => Err(PyValueError::new_err(format!(
+                "list len mismatch {} != {}",
+                self.counter, self.len
+            ))),
+        }
+    }
+}
+
 impl Validator for ListValidator {
     fn validate<'s, 'data>(
         &'s self,
@@ -105,17 +157,42 @@ impl Validator for ListValidator {
         let seq = input.validate_list(extra.strict.unwrap_or(self.strict), self.allow_any_iter)?;
 
         let output = match self.item_validator {
-            Some(ref v) => seq.validate_to_vec(
-                py,
-                input,
-                self.max_length,
-                "List",
-                self.max_length,
-                v,
-                extra,
-                slots,
-                recursion_guard,
-            )?,
+            Some(ref v) => match seq {
+                GenericCollection::List(list) => {
+                    let mut list_creator = PyListCreator::with_capacity(py, list.len())?;
+                    let mut errors: Vec<ValLineError> = Vec::new();
+                    for (index, item) in list.iter().enumerate() {
+                        match v.validate(py, item, extra, slots, recursion_guard) {
+                            Ok(item) => list_creator.push(item)?,
+                            Err(ValError::LineErrors(line_errors)) => {
+                                errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
+                            }
+                            Err(ValError::Omit) => (),
+                            Err(err) => return Err(err),
+                        }
+                    }
+
+                    return if errors.is_empty() {
+                        let list = list_creator.complete(py)?;
+                        let list_ref = list.as_ref(py);
+                        length_check!(input, "List", self.min_length, self.max_length, list_ref);
+                        Ok(list.into_py(py))
+                    } else {
+                        Err(ValError::LineErrors(errors))
+                    };
+                }
+                _ => seq.validate_to_vec(
+                    py,
+                    input,
+                    self.max_length,
+                    "List",
+                    self.max_length,
+                    v,
+                    extra,
+                    slots,
+                    recursion_guard,
+                )?,
+            },
             None => match seq {
                 GenericCollection::List(list) => {
                     length_check!(input, "List", self.min_length, self.max_length, list);

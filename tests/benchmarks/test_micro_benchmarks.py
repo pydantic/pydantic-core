@@ -358,46 +358,40 @@ def test_list_of_ints_pyd_py(benchmark):
     class PydanticModel(BaseModel):
         __root__: List[int]
 
-    @benchmark
-    def t():
-        PydanticModel.parse_obj(list_of_ints_data[0])
-        PydanticModel.parse_obj(list_of_ints_data[1])
+    benchmark(PydanticModel.parse_obj, list_of_ints_data[0])
 
 
 @pytest.mark.benchmark(group='List[int]')
 def test_list_of_ints_core_py(benchmark):
     v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
 
-    @benchmark
-    def t():
-        v.validate_python(list_of_ints_data[0])
-        v.validate_python(list_of_ints_data[1])
+    benchmark(v.validate_python, list_of_ints_data[0])
 
 
-@skip_pydantic
-@pytest.mark.benchmark(group='List[int] JSON')
-def test_list_of_ints_pyd_json(benchmark):
-    class PydanticModel(BaseModel):
-        __root__: List[int]
-
-    json_data = [json.dumps(d) for d in list_of_ints_data]
-
-    @benchmark
-    def t():
-        PydanticModel.parse_obj(json.loads(json_data[0]))
-        PydanticModel.parse_obj(json.loads(json_data[1]))
-
-
-@pytest.mark.benchmark(group='List[int] JSON')
-def test_list_of_ints_core_json(benchmark):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
-
-    json_data = [json.dumps(d) for d in list_of_ints_data]
-
-    @benchmark
-    def t():
-        v.validate_json(json_data[0])
-        v.validate_json(json_data[1])
+# @skip_pydantic
+# @pytest.mark.benchmark(group='List[int] JSON')
+# def test_list_of_ints_pyd_json(benchmark):
+#     class PydanticModel(BaseModel):
+#         __root__: List[int]
+#
+#     json_data = [json.dumps(d) for d in list_of_ints_data]
+#
+#     @benchmark
+#     def t():
+#         PydanticModel.parse_obj(json.loads(json_data[0]))
+#         PydanticModel.parse_obj(json.loads(json_data[1]))
+#
+#
+# @pytest.mark.benchmark(group='List[int] JSON')
+# def test_list_of_ints_core_json(benchmark):
+#     v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
+#
+#     json_data = [json.dumps(d) for d in list_of_ints_data]
+#
+#     @benchmark
+#     def t():
+#         v.validate_json(json_data[0])
+#         v.validate_json(json_data[1])
 
 
 @skip_pydantic
