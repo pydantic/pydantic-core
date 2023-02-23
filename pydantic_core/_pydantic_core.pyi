@@ -30,10 +30,7 @@ build_profile: str
 class SchemaValidator:
     title: str
     def __init__(
-        self,
-        schema: CoreSchema,
-        config: 'CoreConfig | None' = None,
-        extra_definitions: 'list[CoreSchema] | None' = None,
+        self, schema: CoreSchema, config: 'CoreConfig | None' = None, definitions: 'list[CoreSchema] | None' = None
     ) -> None: ...
     def validate_python(self, input: Any, strict: 'bool | None' = None, context: Any = None) -> Any: ...
     def isinstance_python(self, input: Any, strict: 'bool | None' = None, context: Any = None) -> bool: ...
@@ -51,10 +48,7 @@ IncEx: TypeAlias = 'set[int] | set[str] | dict[int, IncEx] | dict[str, IncEx] | 
 
 class SchemaSerializer:
     def __init__(
-        self,
-        schema: CoreSchema,
-        config: 'CoreConfig | None' = None,
-        extra_definitions: 'list[CoreSchema] | None' = None,
+        self, schema: CoreSchema, config: 'CoreConfig | None' = None, definitions: 'list[CoreSchema] | None' = None
     ) -> None: ...
     def to_python(
         self,

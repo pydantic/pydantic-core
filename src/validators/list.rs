@@ -18,7 +18,7 @@ pub struct ListValidator {
     name: String,
 }
 
-pub(crate) fn get_items_schema(
+pub fn get_items_schema(
     schema: &PyDict,
     config: Option<&PyDict>,
     build_context: &mut BuildContext<CombinedValidator>,

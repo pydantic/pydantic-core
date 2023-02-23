@@ -9,7 +9,7 @@ use crate::questions::Answers;
 use crate::serializers::CombinedSerializer;
 use crate::validators::{CombinedValidator, Validator};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct Slot<T> {
     slot_ref: String,
     op_val_ser: Option<T>,
@@ -21,17 +21,20 @@ pub enum ThingOrId<T> {
     Id(usize),
 }
 
-/// `BuildContext` is used to store extra information while building validators and type_serializers,
-/// currently it just holds a vec "slots" which holds validators/type_serializers which need to be accessed from
-/// multiple other validators/type_serializers and therefore can't be owned by them directly.
+/// `BuildContext` is used to store extra information while building validators and type_serializers
 #[derive(Clone)]
 pub struct BuildContext<T> {
+    /// set of used refs, useful to see if a `ref` is actually used elsewhere in the schema
     used_refs: AHashSet<String>,
+    /// holds validators/type_serializers which reference themselves and therefore can't be cloned and owned
+    /// in one or multiple places.
     slots: Vec<Slot<T>>,
-    resuable: AHashMap<String, T>,
+    /// holds validators/type_serializers which need to be accessed from multiple other validators/type_serializers
+    /// and therefore can't be owned by them directly.
+    reusable: AHashMap<String, T>,
 }
 
-impl<T: Clone + std::fmt::Debug> BuildContext<T> {
+impl<T: Clone> BuildContext<T> {
     pub fn new(schema: &PyAny, extra_definitions: Option<&PyList>) -> PyResult<Self> {
         let mut used_refs = AHashSet::new();
         extract_used_refs(schema, &mut used_refs)?;
@@ -41,7 +44,7 @@ impl<T: Clone + std::fmt::Debug> BuildContext<T> {
         Ok(Self {
             used_refs,
             slots: Vec::new(),
-            resuable: AHashMap::new(),
+            reusable: AHashMap::new(),
         })
     }
 
@@ -56,7 +59,7 @@ impl<T: Clone + std::fmt::Debug> BuildContext<T> {
         Self {
             used_refs,
             slots: Vec::new(),
-            resuable: AHashMap::new(),
+            reusable: AHashMap::new(),
         }
     }
 
@@ -70,8 +73,9 @@ impl<T: Clone + std::fmt::Debug> BuildContext<T> {
         check_ref_used(schema_dict, ref_)
     }
 
+    /// add a validator/serializer to `reusable` so it can be cloned and used again elsewhere
     pub fn store_reusable(&mut self, ref_: String, val_ser: T) {
-        self.resuable.insert(ref_, val_ser);
+        self.reusable.insert(ref_, val_ser);
     }
 
     /// First of two part process to add a new validator/serializer slot, we add the `slot_ref` to the array,
@@ -106,7 +110,7 @@ impl<T: Clone + std::fmt::Debug> BuildContext<T> {
     /// find validator/serializer by `ref`, if the `ref` is in `resuable` return a clone of the validator/serializer,
     /// otherwise return the id of the slot.
     pub fn find(&mut self, ref_: &str) -> PyResult<ThingOrId<T>> {
-        if let Some(val_ser) = self.resuable.get(ref_) {
+        if let Some(val_ser) = self.reusable.get(ref_) {
             Ok(ThingOrId::Thing(val_ser.clone()))
         } else {
             let id = match self.slots.iter().position(|slot: &Slot<T>| slot.slot_ref == ref_) {
@@ -172,8 +176,7 @@ impl BuildContext<CombinedSerializer> {
 fn extract_used_refs(schema: &PyAny, refs: &mut AHashSet<String>) -> PyResult<()> {
     if let Ok(dict) = schema.downcast::<PyDict>() {
         if is_definition_ref(dict)? {
-            let key: String = dict.get_as_req(intern!(schema.py(), "schema_ref"))?;
-            refs.insert(key);
+            refs.insert(dict.get_as_req(intern!(schema.py(), "schema_ref"))?);
         } else {
             for (_, value) in dict.iter() {
                 extract_used_refs(value, refs)?;

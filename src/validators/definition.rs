@@ -93,7 +93,6 @@ impl Validator for DefinitionRefValidator {
     /// don't need to call complete on the inner validator here, complete_validators takes care of that.
     fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
         let validator = build_context.find_validator(self.validator_id)?;
-        // dbg!(&validator);
         self.inner_name = validator.get_name().to_string();
         Ok(())
     }

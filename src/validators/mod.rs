@@ -65,23 +65,18 @@ pub struct SchemaValidator {
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(
-        py: Python,
-        schema: &PyAny,
-        config: Option<&PyDict>,
-        extra_definitions: Option<&PyList>,
-    ) -> PyResult<Self> {
+    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>, definitions: Option<&PyList>) -> PyResult<Self> {
         let self_validator = SelfValidator::new(py)?;
         let schema = self_validator.validate_schema(py, schema, None)?;
 
-        let mut build_context = BuildContext::new(schema, extra_definitions)?;
+        let mut build_context = BuildContext::new(schema, definitions)?;
 
-        if let Some(extra_definitions) = extra_definitions {
-            for (index, def_item) in extra_definitions.iter().enumerate() {
+        if let Some(definitions) = definitions {
+            for (index, def_item) in definitions.iter().enumerate() {
                 let def_schema = self_validator.validate_schema(py, def_item, Some(index))?;
                 let mut validator = build_validator(def_schema, config, &mut build_context)?;
                 validator.complete(&build_context)?;
-                // no need to store the validator here, it has already been stored in slots if necessary
+                // no need to store the validator here, it has already been stored in build_context if necessary
             }
         }
 
