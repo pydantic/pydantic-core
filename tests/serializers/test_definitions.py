@@ -12,6 +12,7 @@ def test_custom_ser():
         [core_schema.int_schema(ref='foobar', serialization=core_schema.to_string_ser_schema(when_used='always'))],
     )
     assert s.to_python([1, 2, 3]) == ['1', '2', '3']
+    assert plain_repr(s).endswith('slots=[])')
 
 
 def test_ignored_def():

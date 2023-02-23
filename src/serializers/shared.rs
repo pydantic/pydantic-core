@@ -187,14 +187,30 @@ impl BuildSerializer for CombinedSerializer {
         build_context: &mut BuildContext<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         if let Some(schema_ref) = schema.get_as::<String>(intern!(schema.py(), "ref"))? {
-            // as with validators, only use a recursive reference if the ref is used
+            // as with validators, if there's a ref,
+            // we **might** want to store the serializer in slots and return a DefinitionRefSerializer:
+            // * if the ref isn't used at all, we just want to return a normal serializer, and ignore the ref completely
+            // * if the ref is used inside itself, we have to store the serializer in slots,
+            //   and return a DefinitionRefSerializer - two step process with `prepare_slot` and `complete_slot`
+            // * if the ref is used elsewhere, we want to clone it each time it's used
             if build_context.ref_used(&schema_ref) {
-                let slot_id = build_context.prepare_slot(schema_ref, None)?;
-                let inner_ser = Self::_build(schema, config, build_context)?;
-                build_context.complete_slot(slot_id, inner_ser)?;
-                return Ok(super::type_serializers::definition::DefinitionRefSerializer::from_id(
-                    slot_id,
-                ));
+                // the ref is used somewhere
+
+                return if build_context.ref_used_within(schema, &schema_ref)? {
+                    // the ref is used within itself, so we have to store the serializer in slots
+                    // and return a DefinitionRefSerializer
+                    let slot_id = build_context.prepare_slot(schema_ref, None)?;
+                    let inner_ser = Self::_build(schema, config, build_context)?;
+                    build_context.complete_slot(slot_id, inner_ser)?;
+                    Ok(super::type_serializers::definition::DefinitionRefSerializer::from_id(
+                        slot_id,
+                    ))
+                } else {
+                    // the ref is used elsewhere, so we want to clone it each time it's used
+                    let serializer = Self::_build(schema, config, build_context)?;
+                    build_context.store_reusable(schema_ref, serializer.clone());
+                    Ok(serializer)
+                };
             }
         }
 
