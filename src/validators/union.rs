@@ -10,7 +10,7 @@ use pyo3::types::{PyDict, PyList, PyString};
 use ahash::AHashMap;
 
 use crate::build_tools::{is_strict, py_err, schema_or_config, SchemaDict};
-use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
+use crate::errors::{ErrorType, LocItem, ValError, ValLineError, ValResult};
 use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::questions::Question;
@@ -221,6 +221,15 @@ impl fmt::Display for ChoiceKey {
         match self {
             Self::Int(i) => write!(f, "{i}"),
             Self::Str(s) => write!(f, "{s}"),
+        }
+    }
+}
+
+impl From<&ChoiceKey> for LocItem {
+    fn from(key: &ChoiceKey) -> Self {
+        match key {
+            ChoiceKey::Str(s) => s.as_str().into(),
+            ChoiceKey::Int(i) => (*i).into(),
         }
     }
 }
@@ -455,20 +464,14 @@ impl TaggedUnionValidator {
         if let Some(validator) = self.choices.get(tag) {
             return match validator.validate(py, input, extra, slots, recursion_guard) {
                 Ok(res) => Ok(res),
-                Err(err) => match tag {
-                    ChoiceKey::Str(s) => Err(err.with_outer_location((*s).clone().into())),
-                    ChoiceKey::Int(i) => Err(err.with_outer_location((*i).clone().to_string().into())),
-                },
+                Err(err) => Err(err.with_outer_location(tag.into())),
             };
         } else if let Some(ref repeat_choices) = self.repeat_choices {
             if let Some(choice_tag) = repeat_choices.get(tag) {
                 let validator = &self.choices[choice_tag];
                 return match validator.validate(py, input, extra, slots, recursion_guard) {
                     Ok(res) => Ok(res),
-                    Err(err) => match tag {
-                        ChoiceKey::Str(s) => Err(err.with_outer_location((*s).clone().into())),
-                        ChoiceKey::Int(i) => Err(err.with_outer_location((*i).clone().to_string().into())),
-                    },
+                    Err(err) => Err(err.with_outer_location(tag.into())),
                 };
             }
         }

@@ -121,7 +121,7 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
                 [
                     {
                         'type': 'int_parsing',
-                        'loc': ('123', 'bar'),
+                        'loc': (123, 'bar'),
                         'msg': 'Input should be a valid integer, unable to parse string as an integer',
                         'input': 'wrong',
                     }
