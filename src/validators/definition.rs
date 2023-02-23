@@ -2,13 +2,14 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::build_context::{BuildContext, ThingOrId};
 use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::questions::{Answers, Question};
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DefinitionRefValidator {
@@ -38,18 +39,18 @@ impl BuildValidator for DefinitionRefValidator {
         build_context: &mut BuildContext<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let schema_ref: String = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
-        let (validator_id, op_validator) = build_context.find_slot(&schema_ref)?;
 
-        if let Some(validator) = op_validator {
-            Ok(validator)
-        } else {
-            let answers = build_context.get_slot_answer(validator_id)?;
-            Ok(Self {
-                validator_id,
-                inner_name: "...".to_string(),
-                answers: answers.unwrap(),
+        match build_context.find(&schema_ref)? {
+            ThingOrId::Thing(validator) => Ok(validator),
+            ThingOrId::Id(validator_id) => {
+                let answers = build_context.get_slot_answer(validator_id)?;
+                Ok(Self {
+                    validator_id,
+                    inner_name: "...".to_string(),
+                    answers: answers.unwrap(),
+                }
+                .into())
             }
-            .into())
         }
     }
 }

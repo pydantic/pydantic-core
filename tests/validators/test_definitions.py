@@ -15,7 +15,8 @@ def test_list_with_def():
     assert v.validate_json(b'[1, 2, "3"]') == [1, 2, 3]
     r = plain_repr(v)
     assert r.startswith('SchemaValidator(name="list[int]",')
-    assert r.endswith('slots=[Int(IntValidator{strict:false}),])')
+    # definitions aren't used in slots
+    assert r.endswith('slots=[])')
 
 
 def test_ignored_def():
@@ -23,6 +24,7 @@ def test_ignored_def():
     assert v.validate_python([1, 2, '3']) == [1, 2, 3]
     r = plain_repr(v)
     assert r.startswith('SchemaValidator(name="list[int]",')
+    # definitions aren't used in slots
     assert r.endswith('slots=[])')
 
 
@@ -37,3 +39,16 @@ def test_def_error():
     assert exc_info.value.args[0].startswith(
         "Invalid Schema:\ndefinitions -> 1\n  Input tag 'wrong' found using self-schema"
     )
+
+
+def test_dict_repeat():
+    v = SchemaValidator(
+        core_schema.dict_schema(
+            core_schema.definition_reference_schema('foobar'), core_schema.definition_reference_schema('foobar')
+        ),
+        None,
+        [core_schema.int_schema(ref='foobar')],
+    )
+    assert v.validate_python({'1': '2', 3: '4'}) == {1: 2, 3: 4}
+    assert v.validate_json(b'{"1": 2, "3": "4"}') == {1: 2, 3: 4}
+    assert plain_repr(v).endswith('slots=[])')

@@ -2,7 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 
 use crate::build_tools::{py_err, py_error_type, SchemaDict};
 use crate::questions::Answers;
@@ -16,18 +16,24 @@ struct Slot<T> {
     answers: Option<Answers>,
 }
 
+pub enum ThingOrId<T> {
+    Thing(T),
+    Id(usize),
+}
+
 /// `BuildContext` is used to store extra information while building validators and type_serializers,
 /// currently it just holds a vec "slots" which holds validators/type_serializers which need to be accessed from
 /// multiple other validators/type_serializers and therefore can't be owned by them directly.
 #[derive(Clone)]
 pub struct BuildContext<T> {
-    used_refs: AHashMap<String, usize>,
+    used_refs: AHashSet<String>,
     slots: Vec<Slot<T>>,
+    resuable: AHashMap<String, T>,
 }
 
 impl<T: Clone + std::fmt::Debug> BuildContext<T> {
     pub fn new(schema: &PyAny, extra_definitions: Option<&PyList>) -> PyResult<Self> {
-        let mut used_refs = AHashMap::new();
+        let mut used_refs = AHashSet::new();
         extract_used_refs(schema, &mut used_refs)?;
         if let Some(extra_definitions) = extra_definitions {
             extract_used_refs(extra_definitions, &mut used_refs)?;
@@ -35,26 +41,37 @@ impl<T: Clone + std::fmt::Debug> BuildContext<T> {
         Ok(Self {
             used_refs,
             slots: Vec::new(),
+            resuable: AHashMap::new(),
         })
     }
 
     pub fn for_self_schema() -> Self {
-        let mut used_refs = AHashMap::with_capacity(3);
+        let mut used_refs = AHashSet::with_capacity(3);
         // NOTE: we don't call `extract_used_refs` for performance reasons, if more recursive references
         // are used, they would need to be manually added here.
         // we use `2` as count to avoid `find_slot` pulling the validator out of slots and returning it directly
-        used_refs.insert("root-schema".to_string(), 2);
-        used_refs.insert("ser-schema".to_string(), 2);
-        used_refs.insert("inc-ex-type".to_string(), 2);
+        used_refs.insert("root-schema".to_string());
+        used_refs.insert("ser-schema".to_string());
+        used_refs.insert("inc-ex-type".to_string());
         Self {
             used_refs,
             slots: Vec::new(),
+            resuable: AHashMap::new(),
         }
     }
 
     /// check if a ref is used elsewhere in the schema
     pub fn ref_used(&self, ref_: &str) -> bool {
-        self.used_refs.contains_key(ref_)
+        self.used_refs.contains(ref_)
+    }
+
+    /// check if a ref is used within a given schema
+    pub fn ref_used_within(&self, schema_dict: &PyAny, ref_: &str) -> PyResult<bool> {
+        check_ref_used(schema_dict, ref_)
+    }
+
+    pub fn store_reusable(&mut self, ref_: String, val_ser: T) {
+        self.resuable.insert(ref_, val_ser);
     }
 
     /// First of two part process to add a new validator/serializer slot, we add the `slot_ref` to the array,
@@ -86,23 +103,17 @@ impl<T: Clone + std::fmt::Debug> BuildContext<T> {
         }
     }
 
-    /// find a slot by `slot_ref`, if the slot is used exactly once, we return the validator/serializer
-    /// to be used directly but DON'T remove it from slots, otherwise we will use the ID
-    pub fn find_slot(&mut self, slot_ref: &str) -> PyResult<(usize, Option<T>)> {
-        let id = match self.slots.iter().position(|slot: &Slot<T>| slot.slot_ref == slot_ref) {
-            Some(id) => id,
-            None => return py_err!("Slots Error: ref '{}' not found", slot_ref),
-        };
-        match self.used_refs.get(slot_ref) {
-            Some(1) => {
-                // this would be nice, but it breaks in a few places
-                // let slot = self.slots.get_mut(id).unwrap();
-                // Ok((id, slot.op_val_ser.take()))
-                let slot = self.slots.get(id).unwrap();
-                Ok((id, slot.op_val_ser.clone()))
-            }
-            Some(0) | None => py_err!("Slots Error: ref '{}' not found", slot_ref),
-            Some(_) => Ok((id, None)),
+    /// find validator/serializer by `ref`, if the `ref` is in `resuable` return a clone of the validator/serializer,
+    /// otherwise return the id of the slot.
+    pub fn find(&mut self, ref_: &str) -> PyResult<ThingOrId<T>> {
+        if let Some(val_ser) = self.resuable.get(ref_) {
+            Ok(ThingOrId::Thing(val_ser.clone()))
+        } else {
+            let id = match self.slots.iter().position(|slot: &Slot<T>| slot.slot_ref == ref_) {
+                Some(id) => id,
+                None => return py_err!("Slots Error: ref '{}' not found", ref_),
+            };
+            Ok(ThingOrId::Id(id))
         }
     }
 
@@ -158,17 +169,11 @@ impl BuildContext<CombinedSerializer> {
     }
 }
 
-fn extract_used_refs(schema: &PyAny, refs: &mut AHashMap<String, usize>) -> PyResult<()> {
+fn extract_used_refs(schema: &PyAny, refs: &mut AHashSet<String>) -> PyResult<()> {
     if let Ok(dict) = schema.downcast::<PyDict>() {
-        let py = schema.py();
-
-        let is_definition_ref = match dict.get_item(intern!(py, "type")) {
-            Some(value) => value.eq(intern!(py, "definition-ref"))?,
-            None => false,
-        };
-        if is_definition_ref {
-            let key: String = dict.get_as_req(intern!(py, "schema_ref"))?;
-            refs.entry(key).and_modify(|counter| *counter += 1).or_insert(1);
+        if is_definition_ref(dict)? {
+            let key: String = dict.get_as_req(intern!(schema.py(), "schema_ref"))?;
+            refs.insert(key);
         } else {
             for (_, value) in dict.iter() {
                 extract_used_refs(value, refs)?;
@@ -180,4 +185,33 @@ fn extract_used_refs(schema: &PyAny, refs: &mut AHashMap<String, usize>) -> PyRe
         }
     }
     Ok(())
+}
+
+fn check_ref_used(schema: &PyAny, ref_: &str) -> PyResult<bool> {
+    if let Ok(dict) = schema.downcast::<PyDict>() {
+        if is_definition_ref(dict)? {
+            let key: &str = dict.get_as_req(intern!(schema.py(), "schema_ref"))?;
+            return Ok(key == ref_);
+        } else {
+            for (_, value) in dict.iter() {
+                if check_ref_used(value, ref_)? {
+                    return Ok(true);
+                }
+            }
+        }
+    } else if let Ok(list) = schema.downcast::<PyList>() {
+        for item in list.iter() {
+            if check_ref_used(item, ref_)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn is_definition_ref(dict: &PyDict) -> PyResult<bool> {
+    match dict.get_item(intern!(dict.py(), "type")) {
+        Some(type_value) => type_value.eq(intern!(dict.py(), "definition-ref")),
+        None => Ok(false),
+    }
 }

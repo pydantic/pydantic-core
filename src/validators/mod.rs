@@ -235,7 +235,7 @@ impl SchemaValidator {
 
 static SCHEMA_DEFINITION: GILOnceCell<SchemaValidator> = GILOnceCell::new();
 
-pub(crate) struct SelfValidator<'py> {
+pub struct SelfValidator<'py> {
     validator: &'py SchemaValidator,
 }
 
@@ -308,16 +308,29 @@ fn build_specific_validator<'a, T: BuildValidator>(
 ) -> PyResult<CombinedValidator> {
     let py = schema_dict.py();
     if let Some(schema_ref) = schema_dict.get_as::<String>(intern!(py, "ref"))? {
-        // we only want to use a DefinitionRefValidator if the ref is actually used elsewhere,
-        // this means refs can always be set without having an effect on the validator which is generated
-        // unless it's used/referenced
+        // if there's a ref, we **might** want to store the validator in slots and return a DefinitionRefValidator:
+        // * if the ref isn't used at all, we just want to return a normal validator, and ignore the ref completely
+        // * if the ref is used inside itself, we have to store the validator in slots,
+        //   and return a DefinitionRefValidator - two step process with `prepare_slot` and `complete_slot`
+        // * if the ref is used elsewhere, we want to clone it each time it's used
         if build_context.ref_used(&schema_ref) {
-            let answers = Answers::new(schema_dict)?;
-            let slot_id = build_context.prepare_slot(schema_ref, Some(answers.clone()))?;
-            let inner_val = T::build(schema_dict, config, build_context)?;
-            let name = inner_val.get_name().to_string();
-            build_context.complete_slot(slot_id, inner_val)?;
-            return Ok(definition::DefinitionRefValidator::from_id(slot_id, name, answers));
+            // the ref is used somewhere
+
+            return if build_context.ref_used_within(schema_dict, &schema_ref)? {
+                // the ref is used within itself, so we have to store the validator in slots
+                // and return a DefinitionRefValidator
+                let answers = Answers::new(schema_dict)?;
+                let slot_id = build_context.prepare_slot(schema_ref, Some(answers.clone()))?;
+                let inner_val = T::build(schema_dict, config, build_context)?;
+                let name = inner_val.get_name().to_string();
+                build_context.complete_slot(slot_id, inner_val)?;
+                Ok(definition::DefinitionRefValidator::from_id(slot_id, name, answers))
+            } else {
+                // ref is used, but only out side itself, we want to clone it everywhere it's used
+                let validator = T::build(schema_dict, config, build_context)?;
+                build_context.store_reusable(schema_ref, validator.clone());
+                Ok(validator)
+            };
         }
     }
 

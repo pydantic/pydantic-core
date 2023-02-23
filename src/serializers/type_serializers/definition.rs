@@ -4,7 +4,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_context::BuildContext;
+use crate::build_context::{BuildContext, ThingOrId};
 use crate::build_tools::SchemaDict;
 
 use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
@@ -29,12 +29,10 @@ impl BuildSerializer for DefinitionRefSerializer {
         build_context: &mut BuildContext<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let schema_ref: String = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
-        let (serializer_id, op_serializer) = build_context.find_slot(&schema_ref)?;
 
-        if let Some(serializer) = op_serializer {
-            Ok(serializer)
-        } else {
-            Ok(Self { serializer_id }.into())
+        match build_context.find(&schema_ref)? {
+            ThingOrId::Thing(serializer) => Ok(serializer),
+            ThingOrId::Id(serializer_id) => Ok(Self { serializer_id }.into()),
         }
     }
 }

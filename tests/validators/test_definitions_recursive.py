@@ -73,6 +73,7 @@ def test_branch_nullable_definitions():
     assert v.validate_python({'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': {'name': 'b2'}}}) == (
         {'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': {'name': 'b2', 'sub_branch': None}}}
     )
+    assert ',slots=[TypedDict(TypedDictValidator{' in plain_repr(v)
 
 
 def test_unused_ref():
@@ -85,6 +86,7 @@ def test_unused_ref():
     )
     assert plain_repr(v).startswith('SchemaValidator(name="typed-dict",validator=TypedDict(TypedDictValidator')
     assert v.validate_python({'name': 'root', 'other': '4'}) == {'name': 'root', 'other': 4}
+    assert ',slots=[]' in plain_repr(v)
 
 
 def test_nullable_error():
@@ -154,6 +156,7 @@ def test_list():
             'branches': [{'width': 2, 'branches': None}, {'width': 3, 'branches': [{'width': 4, 'branches': None}]}],
         }
     )
+    assert ',slots=[TypedDict(TypedDictValidator{' in plain_repr(v)
 
 
 def test_multiple_intertwined():
@@ -314,6 +317,8 @@ def test_outside_parent():
         'tuple1': (1, 1, 'frog'),
         'tuple2': (2, 2, 'toad'),
     }
+    # the definition goes into reusable and gets "inlined" into the schema
+    assert ',slots=[]' in plain_repr(v)
 
 
 def test_recursion_branch():
@@ -334,6 +339,8 @@ def test_recursion_branch():
         },
         {'from_attributes': True},
     )
+    assert ',slots=[TypedDict(TypedDictValidator{' in plain_repr(v)
+
     assert v.validate_python({'name': 'root'}) == {'name': 'root', 'branch': None}
     assert v.validate_python({'name': 'root', 'branch': {'name': 'b1', 'branch': None}}) == {
         'name': 'root',
@@ -376,6 +383,7 @@ def test_definition_list():
     v = SchemaValidator(
         {'type': 'list', 'ref': 'the-list', 'items_schema': {'type': 'definition-ref', 'schema_ref': 'the-list'}}
     )
+    assert ',slots=[List(ListValidator{' in plain_repr(v)
     assert v.validate_python([]) == []
     assert v.validate_python([[]]) == [[]]
 
