@@ -207,6 +207,13 @@ impl ChoiceKey {
             py_err!(PyTypeError; "Expected int or str, got {}", raw.get_type().name().unwrap_or("<unknown python object>"))
         }
     }
+
+    fn repr(&self) -> String {
+        match self {
+            Self::Int(i) => i.to_string(),
+            Self::Str(s) => format!("'{s}'"),
+        }
+    }
 }
 
 impl fmt::Display for ChoiceKey {
@@ -259,12 +266,13 @@ impl BuildValidator for TaggedUnionValidator {
             }
 
             let validator = build_validator(value, config, build_context)?;
+            let tag_repr = tag.repr();
             if first {
                 first = false;
-                write!(tags_repr, "'{tag}'").unwrap();
+                write!(tags_repr, "{tag_repr}").unwrap();
                 descr.push_str(validator.get_name());
             } else {
-                write!(tags_repr, ", '{tag}'").unwrap();
+                write!(tags_repr, ", {tag_repr}").unwrap();
                 // no spaces in get_name() output to make loc easy to read
                 write!(descr, ",{}", validator.get_name()).unwrap();
             }
@@ -278,7 +286,8 @@ impl BuildValidator for TaggedUnionValidator {
             for (tag, repeat_tag) in repeat_choices_vec {
                 match choices.get(&repeat_tag) {
                     Some(validator) => {
-                        write!(tags_repr, ", '{tag}'").unwrap();
+                        let tag_repr = tag.repr();
+                        write!(tags_repr, ", {tag_repr}").unwrap();
                         write!(descr, ",{}", validator.get_name()).unwrap();
                         repeat_choices.insert(tag, repeat_tag);
                     }

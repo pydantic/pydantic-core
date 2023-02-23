@@ -138,10 +138,10 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
                         'loc': (),
                         'msg': (
                             "Input tag '1234567' found using 'foo' does not match any of the "
-                            "expected tags: '123', 'banana'"
+                            "expected tags: 123, 'banana'"
                         ),
                         'input': {'foo': 1234567, 'bar': '123'},
-                        'ctx': {'discriminator': "'foo'", 'tag': '1234567', 'expected_tags': "'123', 'banana'"},
+                        'ctx': {'discriminator': "'foo'", 'tag': '1234567', 'expected_tags': "123, 'banana'"},
                     }
                 ],
             ),
@@ -214,9 +214,9 @@ def test_enum_keys():
         {
             'type': 'union_tag_invalid',
             'loc': (),
-            'msg': "Input tag 'apple' found using 'foo' does not match any of the expected tags: '1', 'banana'",
+            'msg': "Input tag 'apple' found using 'foo' does not match any of the expected tags: 1, 'banana'",
             'input': {'foo': FooEnum.APPLE, 'spam': [1, 2, '3']},
-            'ctx': {'discriminator': "'foo'", 'tag': 'apple', 'expected_tags': "'1', 'banana'"},
+            'ctx': {'discriminator': "'foo'", 'tag': 'apple', 'expected_tags': "1, 'banana'"},
         }
     ]
 
@@ -523,13 +523,13 @@ def test_tag_repeated(py_and_json: PyAndJson):
             'loc': (),
             'msg': (
                 "Input tag 'wrong' found using 'food' does not match any of the expected tags: "
-                "'apple', 'banana', '1', 'cherry', 'durian', '2'"
+                "'apple', 'banana', 1, 'cherry', 'durian', 2"
             ),
             'input': {'food': 'wrong'},
             'ctx': {
                 'discriminator': "'food'",
                 'tag': 'wrong',
-                'expected_tags': "'apple', 'banana', '1', 'cherry', 'durian', '2'",
+                'expected_tags': "'apple', 'banana', 1, 'cherry', 'durian', 2",
             },
         }
     ]
