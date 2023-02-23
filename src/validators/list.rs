@@ -1,4 +1,4 @@
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use pyo3::AsPyPointer;
@@ -115,18 +115,16 @@ impl PyListCreator {
     }
 
     fn push(&mut self, item: PyObject) -> PyResult<()> {
-        if self.counter == self.len {
-            return Err(PyValueError::new_err("too many items added"));
-        }
         let ptr = self.list.as_ptr();
         unsafe {
-            #[cfg(not(Py_LIMITED_API))]
-            pyo3::ffi::PyList_SET_ITEM(ptr, self.counter, item.into_ptr());
-            #[cfg(Py_LIMITED_API)]
-            pyo3::ffi::PyList_SetItem(ptr, self.counter, item.into_ptr());
+            match pyo3::ffi::PyList_SetItem(ptr, self.counter, item.into_ptr()) {
+                0 => {
+                    self.counter += 1;
+                    Ok(())
+                }
+                _ => Err(PyIndexError::new_err("push() exceeded list capacity")),
+            }
         }
-        self.counter += 1;
-        Ok(())
     }
 
     fn complete(self, py: Python) -> PyResult<Py<PyList>> {
@@ -137,10 +135,7 @@ impl PyListCreator {
                 let slice_ptr = pyo3::ffi::PyList_GetSlice(ptr, 0, self.counter);
                 Ok(Py::from_owned_ptr(py, slice_ptr))
             },
-            Ordering::Greater => Err(PyValueError::new_err(format!(
-                "list len mismatch {} != {}",
-                self.counter, self.len
-            ))),
+            Ordering::Greater => Err(PyIndexError::new_err("complete() exceeded list capacity")),
         }
     }
 }
