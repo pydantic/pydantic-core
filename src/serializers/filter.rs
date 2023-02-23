@@ -141,8 +141,16 @@ trait FilterLogic<T: Eq + Copy> {
                     // index is in the exclude set, we return Ok(None) to omit this index
                     return Ok(None);
                 }
+            } else if let Ok(contains) = exclude.call_method1("__contains__", (py_key.to_object(exclude.py()),)) {
+                if contains.is_true()?
+                    || exclude
+                        .call_method1("__contains__", (intern!(exclude.py(), "__all__"),))?
+                        .is_true()?
+                {
+                    return Ok(None);
+                }
             } else if !exclude.is_none() {
-                return Err(PyTypeError::new_err("`exclude` argument must a set or dict."));
+                return Err(PyTypeError::new_err("`exclude` argument must be a set or dict."));
             }
         }
 
@@ -170,8 +178,20 @@ trait FilterLogic<T: Eq + Copy> {
                     // this index should be omitted
                     return Ok(None);
                 }
+            } else if let Ok(contains) = include.call_method1("__contains__", (py_key.to_object(include.py()),)) {
+                if contains.is_true()?
+                    || include
+                        .call_method1("__contains__", (intern!(include.py(), "__all__"),))?
+                        .is_true()?
+                {
+                    return Ok(Some((None, next_exclude)));
+                } else if !self.explicit_include(int_key) {
+                    // if the index is not in include, include exists, AND it's not in schema include,
+                    // this index should be omitted
+                    return Ok(None);
+                }
             } else if !include.is_none() {
-                return Err(PyTypeError::new_err("`include` argument must a set or dict."));
+                return Err(PyTypeError::new_err("`include` argument must be a set or dict."));
             }
         }
 
