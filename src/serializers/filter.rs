@@ -124,7 +124,9 @@ trait FilterLogic<T: Eq + Copy> {
     ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
         let mut next_exclude: Option<&PyAny> = None;
         if let Some(exclude) = exclude {
-            if let Ok(exclude_dict) = exclude.downcast::<PyDict>() {
+            if exclude.is_none() {
+                // Do nothing; place this check at the top for performance in the common case
+            } else if let Ok(exclude_dict) = exclude.downcast::<PyDict>() {
                 let op_exc_value = merge_all_value(exclude_dict, py_key)?;
                 if let Some(exc_value) = op_exc_value {
                     if is_ellipsis_like(exc_value) {
@@ -149,13 +151,15 @@ trait FilterLogic<T: Eq + Copy> {
                 {
                     return Ok(None);
                 }
-            } else if !exclude.is_none() {
+            } else {
                 return Err(PyTypeError::new_err("`exclude` argument must be a set or dict."));
             }
         }
 
         if let Some(include) = include {
-            if let Ok(include_dict) = include.downcast::<PyDict>() {
+            if include.is_none() {
+                // Do nothing; place this check at the top for performance in the common case
+            } else if let Ok(include_dict) = include.downcast::<PyDict>() {
                 let op_inc_value = merge_all_value(include_dict, py_key)?;
 
                 if let Some(inc_value) = op_inc_value {
@@ -190,7 +194,7 @@ trait FilterLogic<T: Eq + Copy> {
                     // this index should be omitted
                     return Ok(None);
                 }
-            } else if !include.is_none() {
+            } else {
                 return Err(PyTypeError::new_err("`include` argument must be a set or dict."));
             }
         }
