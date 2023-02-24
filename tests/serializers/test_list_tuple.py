@@ -179,6 +179,7 @@ def test_include_error(schema_func, include_value, error_msg):
         (ExplicitContains(), set(), ['c', 'f']),
         (ExplicitContains(), {5}, ['c']),
         ({2, 3}, ExplicitContains(), ['d']),
+        ([1, 2, 3], [2, 3], ['b']),
     ],
 )
 def test_filter_runtime_more(include, exclude, expected):
