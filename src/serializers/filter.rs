@@ -124,7 +124,6 @@ trait FilterLogic<T: Eq + Copy> {
     ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
         let mut next_exclude: Option<&PyAny> = None;
         if let Some(exclude) = exclude {
-            let py = exclude.py();
             if exclude.is_none() {
                 // Do nothing; place this check at the top for performance in the common case
             } else if let Ok(exclude_dict) = exclude.downcast::<PyDict>() {
@@ -140,12 +139,12 @@ trait FilterLogic<T: Eq + Copy> {
                     }
                 }
             } else if let Ok(exclude_set) = exclude.downcast::<PySet>() {
-                if exclude_set.contains(py_key)? || exclude_set.contains(intern!(py, "__all__"))? {
+                if exclude_set.contains(py_key)? || exclude_set.contains(intern!(exclude.py(), "__all__"))? {
                     // index is in the exclude set, we return Ok(None) to omit this index
                     return Ok(None);
                 }
-            } else if let Ok(contains_method) = exclude.getattr(intern!(py, "__contains__")) && let Ok(result) = contains_method.call1((py_key.to_object(py),)) {
-                if result.is_true()? || contains_method.call1((intern!(py, "__all__"),))?.is_true()? {
+            } else if let Some(contains) = check_contains(exclude, py_key)? {
+                if contains {
                     return Ok(None);
                 }
             } else {
@@ -154,7 +153,6 @@ trait FilterLogic<T: Eq + Copy> {
         }
 
         if let Some(include) = include {
-            let py = include.py();
             if include.is_none() {
                 // Do nothing; place this check at the top for performance in the common case
             } else if let Ok(include_dict) = include.downcast::<PyDict>() {
@@ -173,15 +171,15 @@ trait FilterLogic<T: Eq + Copy> {
                     return Ok(None);
                 }
             } else if let Ok(include_set) = include.downcast::<PySet>() {
-                if include_set.contains(py_key)? || include_set.contains(intern!(py, "__all__"))? {
+                if include_set.contains(py_key)? || include_set.contains(intern!(include.py(), "__all__"))? {
                     return Ok(Some((None, next_exclude)));
                 } else if !self.explicit_include(int_key) {
                     // if the index is not in include, include exists, AND it's not in schema include,
                     // this index should be omitted
                     return Ok(None);
                 }
-            } else if let Ok(contains_method) = include.getattr(intern!(py, "__contains__")) && let Ok(result) = contains_method.call1((py_key.to_object(py),)) {
-                if result.is_true()? || contains_method.call1((intern!(py, "__all__"),))?.is_true()? {
+            } else if let Some(contains) = check_contains(include, py_key)? {
+                if contains {
                     return Ok(Some((None, next_exclude)));
                 } else if !self.explicit_include(int_key) {
                     // if the index is not in include, include exists, AND it's not in schema include,
@@ -249,6 +247,24 @@ impl AnyFilter {
         exclude: Option<&'py PyAny>,
     ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
         self.filter(index, index, include, exclude)
+    }
+}
+
+/// if a `__contains__` method exists, call it with the key and `__all__`, and return the result
+/// if it doesn't exist, or calling it fails (e.g. it's not a function), return `None`
+fn check_contains(obj: &PyAny, py_key: impl ToPyObject + Copy) -> PyResult<Option<bool>> {
+    let py = obj.py();
+    match obj.getattr(intern!(py, "__contains__")) {
+        Ok(contains_method) => {
+            if let Ok(result) = contains_method.call1((py_key.to_object(py),)) {
+                Ok(Some(
+                    result.is_true()? || contains_method.call1((intern!(py, "__all__"),))?.is_true()?,
+                ))
+            } else {
+                Ok(None)
+            }
+        }
+        Err(_) => Ok(None),
     }
 }
 
