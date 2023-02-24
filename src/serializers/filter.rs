@@ -144,10 +144,8 @@ trait FilterLogic<T: Eq + Copy> {
                     // index is in the exclude set, we return Ok(None) to omit this index
                     return Ok(None);
                 }
-            } else if let Ok(contains_method) = exclude.getattr(intern!(py, "__contains__")) {
-                if contains_method.call1((py_key.to_object(py),))?.is_true()?
-                    || contains_method.call1((intern!(py, "__all__"),))?.is_true()?
-                {
+            } else if let Ok(contains_method) = exclude.getattr(intern!(py, "__contains__")) && let Ok(result) = contains_method.call1((py_key.to_object(py),)) {
+                if result.is_true()? || contains_method.call1((intern!(py, "__all__"),))?.is_true()? {
                     return Ok(None);
                 }
             } else {
@@ -182,10 +180,8 @@ trait FilterLogic<T: Eq + Copy> {
                     // this index should be omitted
                     return Ok(None);
                 }
-            } else if let Ok(contains_method) = include.getattr(intern!(py, "__contains__")) {
-                if contains_method.call1((py_key.to_object(py),))?.is_true()?
-                    || contains_method.call1((intern!(py, "__all__"),))?.is_true()?
-                {
+            } else if let Ok(contains_method) = include.getattr(intern!(py, "__contains__")) && let Ok(result) = contains_method.call1((py_key.to_object(py),)) {
+                if result.is_true()? || contains_method.call1((intern!(py, "__all__"),))?.is_true()? {
                     return Ok(Some((None, next_exclude)));
                 } else if !self.explicit_include(int_key) {
                     // if the index is not in include, include exists, AND it's not in schema include,

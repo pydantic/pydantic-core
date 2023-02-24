@@ -136,6 +136,20 @@ def test_filter_runtime():
     assert v.to_python([0, 1, 2, 3], include={1, 2}) == [1, 2]
 
 
+class ImplicitContains:
+    def __iter__(self):
+        return iter([1, 2, 5])
+
+
+class ExplicitContains(ImplicitContains):
+    def __contains__(self, item):
+        return item in {2, 5}
+
+
+class RemovedContains(ImplicitContains):
+    __contains__ = None  # This might be done to explicitly force the `x in RemovedContains()` check to not be allowed
+
+
 @pytest.mark.parametrize(
     'include_value,error_msg',
     [
@@ -143,6 +157,9 @@ def test_filter_runtime():
         ({'a': 'dict'}, 'Input should be a valid set'),
         ({4.2}, 'Input should be a valid integer, got a number with a fractional part'),
         ({'a'}, 'Input should be a valid integer, unable to parse string as an integer'),
+        (ImplicitContains(), re.compile('.*Invalid Schema:.*Input should be a valid set.*', re.DOTALL)),
+        (ExplicitContains(), re.compile('.*Invalid Schema:.*Input should be a valid set.*', re.DOTALL)),
+        (RemovedContains(), re.compile('.*Invalid Schema:.*Input should be a valid set.*', re.DOTALL)),
     ],
 )
 @pytest.mark.parametrize('schema_func', [core_schema.list_schema, core_schema.tuple_variable_schema])
@@ -154,12 +171,40 @@ def test_include_error(schema_func, include_value, error_msg):
 
 
 @pytest.mark.parametrize(
+    'include,exclude,expected',
+    [
+        ({1, 3}, None, ['b', 'd']),
+        ({1, 3, 5}, {5}, ['b', 'd']),
+        ({2: None, 3: None, 5: None}.keys(), {5}, ['c', 'd']),
+        (ExplicitContains(), set(), ['c', 'f']),
+        (ExplicitContains(), {5}, ['c']),
+        ({2, 3}, ExplicitContains(), ['d']),
+    ],
+)
+def test_filter_runtime_more(include, exclude, expected):
+    v = SchemaSerializer(core_schema.list_schema(core_schema.any_schema()))
+    assert v.to_python(list('abcdefgh'), include=include, exclude=exclude) == expected
+
+
+@pytest.mark.parametrize(
     'schema_func,seq_f', [(core_schema.list_schema, as_list), (core_schema.tuple_variable_schema, as_tuple)]
 )
-def test_include_error_call_time(schema_func, seq_f):
+@pytest.mark.parametrize(
+    'include,exclude',
+    [
+        (ImplicitContains(), None),
+        (RemovedContains(), None),
+        (1, None),
+        (None, ImplicitContains()),
+        (None, RemovedContains()),
+        (None, 1),
+    ],
+)
+def test_include_error_call_time(schema_func, seq_f, include, exclude):
+    kind = 'include' if include is not None else 'exclude'
     v = SchemaSerializer(schema_func(core_schema.any_schema()))
-    with pytest.raises(TypeError, match='`include` argument must be a set or dict.'):
-        v.to_python(seq_f(0, 1, 2, 3), include=1)
+    with pytest.raises(TypeError, match=f'`{kind}` argument must be a set or dict.'):
+        v.to_python(seq_f(0, 1, 2, 3), include=include, exclude=exclude)
 
 
 def test_tuple_fallback():
