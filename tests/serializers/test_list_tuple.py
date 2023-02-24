@@ -84,6 +84,7 @@ def test_include(schema_func, seq_f):
     assert v.to_json(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == b'["b","d","f"]'
     # the two include lists are now combined via UNION! unlike in pydantic v1
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), include={6}) == seq_f('b', 'd', 'f', 'g')
+    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), include=[6]) == seq_f('b', 'd', 'f', 'g')
     assert v.to_json(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), include={6}) == b'["b","d","f","g"]'
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), include={6: None}) == seq_f('b', 'd', 'f', 'g')
 
@@ -118,10 +119,11 @@ def test_exclude(schema_func, seq_f):
     assert v.to_json(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), exclude={6}) == b'["a","c","e","h"]'
 
 
-def test_filter():
+@pytest.mark.parametrize('include,exclude', [({1, 3, 5}, {5, 6}), ([1, 3, 5], [5, 6])])
+def test_filter(include, exclude):
     v = SchemaSerializer(
         core_schema.list_schema(
-            core_schema.any_schema(), serialization=core_schema.filter_seq_schema(include={1, 3, 5}, exclude={5, 6})
+            core_schema.any_schema(), serialization=core_schema.filter_seq_schema(include=include, exclude=exclude)
         )
     )
     assert v.to_python([0, 1, 2, 3, 4, 5, 6, 7]) == [1, 3]
@@ -157,7 +159,7 @@ class RemovedContains(ImplicitContains):
         ({'a': 'dict'}, 'Input should be a valid set'),
         ({4.2}, 'Input should be a valid integer, got a number with a fractional part'),
         ({'a'}, 'Input should be a valid integer, unable to parse string as an integer'),
-        (ImplicitContains(), re.compile('.*Invalid Schema:.*Input should be a valid set.*', re.DOTALL)),
+        (ImplicitContains(), 'Input should be a valid set'),
         (ExplicitContains(), re.compile('.*Invalid Schema:.*Input should be a valid set.*', re.DOTALL)),
         (RemovedContains(), re.compile('.*Invalid Schema:.*Input should be a valid set.*', re.DOTALL)),
     ],
