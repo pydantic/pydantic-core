@@ -296,6 +296,10 @@ fn build_specific_validator<'a, T: BuildValidator>(
         // * if the ref is used elsewhere, we want to clone it each time it's used
         if build_context.ref_used(&schema_ref) {
             // the ref is used somewhere
+            // check the ref is unique
+            if build_context.ref_already_used(&schema_ref) {
+                return py_err!("Duplicate ref: `{}`", schema_ref);
+            }
 
             return if build_context.ref_used_within(schema_dict, &schema_ref)? {
                 // the ref is used within itself, so we have to store the validator in slots

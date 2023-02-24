@@ -58,3 +58,62 @@ def test_dict_repeat():
     assert v.validate_python({'1': '2', 3: '4'}) == {1: 2, 3: 4}
     assert v.validate_json(b'{"1": 2, "3": "4"}') == {1: 2, 3: 4}
     assert plain_repr(v).endswith('slots=[])')
+
+
+def test_repeated_ref():
+    with pytest.raises(SchemaError, match='SchemaError: Duplicate ref: `foobar`'):
+        SchemaValidator(
+            core_schema.tuple_positional_schema(
+                core_schema.int_schema(ref='foobar'),
+                # the definition has to be used for it to go into slots/reusable and therefore trigger the error
+                core_schema.definition_reference_schema('foobar'),
+                core_schema.int_schema(ref='foobar'),
+            )
+        )
+
+
+def test_repeat_after():
+    with pytest.raises(SchemaError, match='SchemaError: Duplicate ref: `foobar`'):
+        SchemaValidator(
+            core_schema.tuple_positional_schema(
+                core_schema.definitions_schema(
+                    core_schema.list_schema(core_schema.definition_reference_schema('foobar')),
+                    [core_schema.int_schema(ref='foobar')],
+                ),
+                core_schema.int_schema(ref='foobar'),
+            )
+        )
+
+
+def test_deep():
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            {
+                'a': core_schema.typed_dict_field(core_schema.int_schema()),
+                'b': core_schema.typed_dict_field(
+                    core_schema.definitions_schema(
+                        core_schema.typed_dict_schema(
+                            {
+                                'c': core_schema.typed_dict_field(core_schema.int_schema()),
+                                'd': core_schema.typed_dict_field(core_schema.definition_reference_schema('foobar')),
+                            }
+                        ),
+                        [core_schema.str_schema(ref='foobar')],
+                    )
+                ),
+            }
+        )
+    )
+    assert v.validate_python({'a': 1, 'b': {'c': 2, 'd': b'dd'}}) == {'a': 1, 'b': {'c': 2, 'd': 'dd'}}
+
+
+def test_use_after():
+    v = SchemaValidator(
+        core_schema.tuple_positional_schema(
+            core_schema.definitions_schema(
+                core_schema.definition_reference_schema('foobar'), [core_schema.int_schema(ref='foobar')]
+            ),
+            core_schema.definition_reference_schema('foobar'),
+        )
+    )
+    assert v.validate_python(['1', '2']) == (1, 2)

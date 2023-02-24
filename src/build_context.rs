@@ -9,7 +9,7 @@ use crate::questions::Answers;
 use crate::serializers::CombinedSerializer;
 use crate::validators::{CombinedValidator, Validator};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Slot<T> {
     slot_ref: String,
     op_val_ser: Option<T>,
@@ -34,7 +34,7 @@ pub struct BuildContext<T> {
     reusable: AHashMap<String, T>,
 }
 
-impl<T: Clone> BuildContext<T> {
+impl<T: Clone + std::fmt::Debug> BuildContext<T> {
     pub fn new(schema: &PyAny) -> PyResult<Self> {
         let mut used_refs = AHashSet::new();
         extract_used_refs(schema, &mut used_refs)?;
@@ -58,6 +58,11 @@ impl<T: Clone> BuildContext<T> {
             slots: Vec::new(),
             reusable: AHashMap::new(),
         }
+    }
+
+    /// Check whether a ref is already in `reusable` or `slots`, we shouldn't allow repeated refs
+    pub fn ref_already_used(&self, ref_: &str) -> bool {
+        self.reusable.contains_key(ref_) || self.slots.iter().any(|slot| slot.slot_ref == ref_)
     }
 
     /// check if a ref is used elsewhere in the schema
@@ -110,7 +115,7 @@ impl<T: Clone> BuildContext<T> {
         if let Some(val_ser) = self.reusable.get(ref_) {
             Ok(ThingOrId::Thing(val_ser.clone()))
         } else {
-            let id = match self.slots.iter().position(|slot: &Slot<T>| slot.slot_ref == ref_) {
+            let id = match self.slots.iter().position(|slot| slot.slot_ref == ref_) {
                 Some(id) => id,
                 None => return py_err!("Slots Error: ref '{}' not found", ref_),
             };
