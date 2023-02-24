@@ -27,6 +27,7 @@ pub struct ArgumentsValidator {
     positional_params_count: usize,
     var_args_validator: Option<Box<CombinedValidator>>,
     var_kwargs_validator: Option<Box<CombinedValidator>>,
+    return_dict_only: bool,
 }
 
 impl BuildValidator for ArgumentsValidator {
@@ -103,17 +104,24 @@ impl BuildValidator for ArgumentsValidator {
             });
         }
 
+        let var_args_validator = match schema.get_item(intern!(py, "var_args_schema")) {
+            Some(v) => Some(Box::new(build_validator(v, config, build_context)?)),
+            None => None,
+        };
+        let return_dict_only = schema.get_as(intern!(py, "return_dict_only"))?.unwrap_or(false);
+        if return_dict_only && var_args_validator.is_some() {
+            return py_err!("return_dict_only cannot be used with var_args_schema");
+        }
+
         Ok(Self {
             parameters,
             positional_params_count,
-            var_args_validator: match schema.get_item(intern!(py, "var_args_schema")) {
-                Some(v) => Some(Box::new(build_validator(v, config, build_context)?)),
-                None => None,
-            },
+            var_args_validator,
             var_kwargs_validator: match schema.get_item(intern!(py, "var_kwargs_schema")) {
                 Some(v) => Some(Box::new(build_validator(v, config, build_context)?)),
                 None => None,
             },
+            return_dict_only,
         }
         .into())
     }
@@ -154,22 +162,27 @@ impl Validator for ArgumentsValidator {
     ) -> ValResult<'data, PyObject> {
         let args = input.validate_args()?;
 
-        let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_params_count);
+        let mut output_args: Option<Vec<PyObject>> = if self.return_dict_only {
+            None
+        } else {
+            Some(Vec::with_capacity(self.positional_params_count))
+        };
+
         let output_kwargs = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let mut used_kwargs: AHashSet<&str> = AHashSet::with_capacity(self.parameters.len());
 
         macro_rules! process {
             ($args:ident, $get_method:ident, $get_macro:ident, $slice_macro:ident) => {{
-                // go through arguments getting the value from args or kwargs and validating it
+                // go through parameters getting the value from args or kwargs and validating it
                 for (index, parameter) in self.parameters.iter().enumerate() {
                     let mut pos_value = None;
+                    let mut kw_value = None;
                     if let Some(args) = $args.args {
                         if parameter.positional {
                             pos_value = $get_macro!(args, index);
                         }
                     }
-                    let mut kw_value = None;
                     if let Some(kwargs) = $args.kwargs {
                         if let Some(ref lookup_key) = parameter.kw_lookup_key {
                             if let Some((key, value)) = lookup_key.$get_method(kwargs)? {
@@ -192,7 +205,13 @@ impl Validator for ArgumentsValidator {
                                 .validator
                                 .validate(py, pos_value, extra, slots, recursion_guard)
                             {
-                                Ok(value) => output_args.push(value),
+                                Ok(value) => {
+                                    if let Some(ref mut output_args) = output_args {
+                                        output_args.push(value)
+                                    } else {
+                                        output_kwargs.set_item(parameter.name.clone(), value)?;
+                                    }
+                                },
                                 Err(ValError::LineErrors(line_errors)) => {
                                     errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
                                 }
@@ -219,8 +238,10 @@ impl Validator for ArgumentsValidator {
                             if let Some(value) = get_default(py, &parameter.validator)? {
                                 if let Some(ref kwarg_key) = parameter.kwarg_key {
                                     output_kwargs.set_item(kwarg_key, value.as_ref())?;
-                                } else {
+                                } else if let Some(ref mut output_args) = output_args {
                                     output_args.push(value.as_ref().clone_ref(py));
+                                } else {
+                                    output_kwargs.set_item(parameter.name.clone(), value.as_ref())?;
                                 }
                             } else if parameter.kwarg_key.is_some() {
                                 errors.push(ValLineError::new_with_loc(
@@ -241,7 +262,7 @@ impl Validator for ArgumentsValidator {
                         if let Some(ref validator) = self.var_args_validator {
                             for (index, item) in $slice_macro!(args, self.positional_params_count, len).iter().enumerate() {
                                 match validator.validate(py, item, extra, slots, recursion_guard) {
-                                    Ok(value) => output_args.push(value),
+                                    Ok(value) => output_args.as_mut().unwrap().push(value),
                                     Err(ValError::LineErrors(line_errors)) => {
                                         errors.extend(
                                             line_errors
