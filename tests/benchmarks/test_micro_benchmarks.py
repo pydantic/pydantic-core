@@ -1114,9 +1114,10 @@ def test_definition_in_tree(benchmark):
 @pytest.mark.benchmark(group='definition')
 def test_definition_out_of_tree(benchmark):
     validator = SchemaValidator(
-        core_schema.list_schema(core_schema.definition_reference_schema('foobar')),
-        None,
-        [core_schema.int_schema(ref='foobar')],
+        core_schema.definitions_schema(
+            core_schema.list_schema(core_schema.definition_reference_schema('foobar')),
+            [core_schema.int_schema(ref='foobar')],
+        )
     )
     values = [1, 2, 3.0, '4', '5', '6'] * 1000
     benchmark(validator.validate_python, values)

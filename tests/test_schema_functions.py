@@ -185,7 +185,6 @@ all_schema_functions = [
             },
         },
     ),
-    (core_schema.definition_reference_schema, args('foo'), {'type': 'definition-ref', 'schema_ref': 'foo'}),
     (
         core_schema.custom_error_schema,
         args(core_schema.int_schema(), 'foobar', custom_error_message='Hello'),
@@ -205,6 +204,12 @@ all_schema_functions = [
         {'type': 'lax-or-strict', 'lax_schema': {'type': 'int'}, 'strict_schema': {'type': 'int'}},
     ),
     (core_schema.is_subclass_schema, args(MyModel), {'type': 'is-subclass', 'cls': MyModel}),
+    (
+        core_schema.definitions_schema,
+        args({'type': 'int'}, [{'type': 'int'}]),
+        {'type': 'definitions', 'schema': {'type': 'int'}, 'definitions': [{'type': 'int'}]},
+    ),
+    (core_schema.definition_reference_schema, args('foo'), {'type': 'definition-ref', 'schema_ref': 'foo'}),
 ]
 
 

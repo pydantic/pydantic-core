@@ -1,7 +1,7 @@
 pub mod any;
 pub mod bytes;
 pub mod datetime_etc;
-pub mod definition;
+pub mod definitions;
 pub mod dict;
 pub mod format;
 pub mod function;

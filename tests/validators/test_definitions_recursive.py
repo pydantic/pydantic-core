@@ -3,7 +3,7 @@ from typing import Optional
 import pytest
 from dirty_equals import AnyThing, HasAttributes, IsInstance, IsList, IsPartialDict, IsStr, IsTuple
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, plain_repr
 from .test_typed_dict import Cls
@@ -42,27 +42,28 @@ def test_branch_nullable():
 
 def test_branch_nullable_definitions():
     v = SchemaValidator(
-        {'type': 'definition-ref', 'schema_ref': 'Branch'},
-        None,
-        [
-            {
-                'type': 'typed-dict',
-                'ref': 'Branch',
-                'fields': {
-                    'name': {'schema': {'type': 'str'}},
-                    'sub_branch': {
-                        'schema': {
-                            'type': 'default',
+        core_schema.definitions_schema(
+            {'type': 'definition-ref', 'schema_ref': 'Branch'},
+            [
+                {
+                    'type': 'typed-dict',
+                    'ref': 'Branch',
+                    'fields': {
+                        'name': {'schema': {'type': 'str'}},
+                        'sub_branch': {
                             'schema': {
-                                'type': 'nullable',
-                                'schema': {'type': 'definition-ref', 'schema_ref': 'Branch'},
-                            },
-                            'default': None,
-                        }
+                                'type': 'default',
+                                'schema': {
+                                    'type': 'nullable',
+                                    'schema': {'type': 'definition-ref', 'schema_ref': 'Branch'},
+                                },
+                                'default': None,
+                            }
+                        },
                     },
-                },
-            }
-        ],
+                }
+            ],
+        )
     )
 
     assert v.validate_python({'name': 'root'}) == {'name': 'root', 'sub_branch': None}

@@ -1,6 +1,6 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 
 use crate::build_context::{BuildContext, ThingOrId};
 use crate::build_tools::SchemaDict;
@@ -9,7 +9,32 @@ use crate::input::Input;
 use crate::questions::{Answers, Question};
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Extra, Validator};
+
+#[derive(Debug, Clone)]
+pub struct DefinitionsBuilder;
+
+impl BuildValidator for DefinitionsBuilder {
+    const EXPECTED_TYPE: &'static str = "definitions";
+
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedValidator>,
+    ) -> PyResult<CombinedValidator> {
+        let py = schema.py();
+
+        let definitions: &PyList = schema.get_as_req(intern!(py, "definitions"))?;
+
+        for def_schema in definitions {
+            build_validator(def_schema, config, build_context)?;
+            // no need to store the validator here, it has already been stored in build_context if necessary
+        }
+
+        let inner_schema: &PyAny = schema.get_as_req(intern!(py, "schema"))?;
+        build_validator(inner_schema, config, build_context)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct DefinitionRefValidator {

@@ -5,7 +5,7 @@ use enum_dispatch::enum_dispatch;
 use pyo3::intern;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyList};
+use pyo3::types::{PyAny, PyDict};
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, py_error_type, SchemaDict, SchemaError};
@@ -24,7 +24,7 @@ mod chain;
 mod custom_error;
 mod date;
 mod datetime;
-mod definition;
+mod definitions;
 mod dict;
 mod float;
 mod frozenset;
@@ -65,20 +65,11 @@ pub struct SchemaValidator {
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>, definitions: Option<&PyList>) -> PyResult<Self> {
+    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
         let self_validator = SelfValidator::new(py)?;
-        let schema = self_validator.validate_schema(py, schema, None)?;
+        let schema = self_validator.validate_schema(py, schema)?;
 
-        let mut build_context = BuildContext::new(schema, definitions)?;
-
-        if let Some(definitions) = definitions {
-            for (index, def_item) in definitions.iter().enumerate() {
-                let def_schema = self_validator.validate_schema(py, def_item, Some(index))?;
-                let mut validator = build_validator(def_schema, config, &mut build_context)?;
-                validator.complete(&build_context)?;
-                // no need to store the validator here, it has already been stored in build_context if necessary
-            }
-        }
+        let mut build_context = BuildContext::new(schema)?;
 
         let mut validator = build_validator(schema, config, &mut build_context)?;
         validator.complete(&build_context)?;
@@ -243,12 +234,7 @@ impl<'py> SelfValidator<'py> {
         Ok(Self { validator })
     }
 
-    pub fn validate_schema(
-        &self,
-        py: Python<'py>,
-        schema: &'py PyAny,
-        definition_index: Option<usize>,
-    ) -> PyResult<&'py PyAny> {
+    pub fn validate_schema(&self, py: Python<'py>, schema: &'py PyAny) -> PyResult<&'py PyAny> {
         match self.validator.validator.validate(
             py,
             schema,
@@ -257,7 +243,7 @@ impl<'py> SelfValidator<'py> {
             &mut RecursionGuard::default(),
         ) {
             Ok(schema_obj) => Ok(schema_obj.into_ref(py)),
-            Err(e) => Err(SchemaError::from_val_error(py, e, definition_index)),
+            Err(e) => Err(SchemaError::from_val_error(py, e)),
         }
     }
 
@@ -319,7 +305,7 @@ fn build_specific_validator<'a, T: BuildValidator>(
                 let inner_val = T::build(schema_dict, config, build_context)?;
                 let name = inner_val.get_name().to_string();
                 build_context.complete_slot(slot_id, inner_val)?;
-                Ok(definition::DefinitionRefValidator::from_id(slot_id, name, answers))
+                Ok(definitions::DefinitionRefValidator::from_id(slot_id, name, answers))
             } else {
                 // ref is used, but only out side itself, we want to clone it everywhere it's used
                 let validator = T::build(schema_dict, config, build_context)?;
@@ -388,8 +374,6 @@ pub fn build_validator<'a>(
         function::FunctionBuilder,
         // function call - validation around a function call
         call::CallValidator,
-        // recursive (self-referencing) models
-        definition::DefinitionRefValidator,
         // literals
         literal::LiteralBuilder,
         // any
@@ -427,6 +411,9 @@ pub fn build_validator<'a>(
         // url types
         url::UrlValidator,
         url::MultiHostUrlValidator,
+        // recursive (self-referencing) models
+        definitions::DefinitionRefValidator,
+        definitions::DefinitionsBuilder,
     )
 }
 
@@ -507,8 +494,6 @@ pub enum CombinedValidator {
     FunctionWrap(function::FunctionWrapValidator),
     // function call - validation around a function call
     FunctionCall(call::CallValidator),
-    // reference to definition, useful for recursive (self-referencing) models
-    DefinitionRef(definition::DefinitionRefValidator),
     // literals
     LiteralSingleString(literal::LiteralSingleStringValidator),
     LiteralSingleInt(literal::LiteralSingleIntValidator),
@@ -551,6 +536,8 @@ pub enum CombinedValidator {
     // url types
     Url(url::UrlValidator),
     MultiHostUrl(url::MultiHostUrlValidator),
+    // reference to definition, useful for recursive (self-referencing) models
+    DefinitionRef(definitions::DefinitionRefValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

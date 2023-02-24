@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyList};
+use pyo3::types::{PyBytes, PyDict};
 
 use crate::build_context::BuildContext;
 use crate::validators::SelfValidator;
@@ -33,23 +33,10 @@ pub struct SchemaSerializer {
 #[pymethods]
 impl SchemaSerializer {
     #[new]
-    pub fn py_new(
-        py: Python,
-        schema: &PyDict,
-        config: Option<&PyDict>,
-        definitions: Option<&PyList>,
-    ) -> PyResult<Self> {
+    pub fn py_new(py: Python, schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
         let self_validator = SelfValidator::new(py)?;
-        let schema = self_validator.validate_schema(py, schema, None)?;
-        let mut build_context = BuildContext::new(schema, definitions)?;
-
-        if let Some(definitions) = definitions {
-            for (index, def_item) in definitions.iter().enumerate() {
-                let def_schema = self_validator.validate_schema(py, def_item, Some(index))?;
-                CombinedSerializer::build(def_schema.downcast()?, config, &mut build_context)?;
-                // no need to store the serializer here, it has already been stored in build_context if necessary
-            }
-        }
+        let schema = self_validator.validate_schema(py, schema)?;
+        let mut build_context = BuildContext::new(schema)?;
 
         let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut build_context)?;
         Ok(Self {

@@ -97,6 +97,7 @@ combined_serializer! {
         super::type_serializers::other::IsInstanceBuilder;
         super::type_serializers::other::IsSubclassBuilder;
         super::type_serializers::other::CallableBuilder;
+        super::type_serializers::definitions::DefinitionsBuilder;
     }
     // `both` means the struct is added to both the `CombinedSerializer` enum and the match statement in
     // `find_serializer` so they can be used via a `type` str.
@@ -126,9 +127,9 @@ combined_serializer! {
         ToString: super::type_serializers::format::ToStringSerializer;
         WithDefault: super::type_serializers::with_default::WithDefaultSerializer;
         Json: super::type_serializers::json::JsonSerializer;
-        Recursive: super::type_serializers::definition::DefinitionRefSerializer;
         Union: super::type_serializers::union::UnionSerializer;
         Literal: super::type_serializers::literal::LiteralSerializer;
+        Recursive: super::type_serializers::definitions::DefinitionRefSerializer;
     }
 }
 
@@ -202,7 +203,7 @@ impl BuildSerializer for CombinedSerializer {
                     let slot_id = build_context.prepare_slot(schema_ref, None)?;
                     let inner_ser = Self::_build(schema, config, build_context)?;
                     build_context.complete_slot(slot_id, inner_ser)?;
-                    Ok(super::type_serializers::definition::DefinitionRefSerializer::from_id(
+                    Ok(super::type_serializers::definitions::DefinitionRefSerializer::from_id(
                         slot_id,
                     ))
                 } else {

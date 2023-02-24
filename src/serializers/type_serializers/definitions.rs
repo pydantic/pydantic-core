@@ -2,12 +2,37 @@ use std::borrow::Cow;
 
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 
 use crate::build_context::{BuildContext, ThingOrId};
 use crate::build_tools::SchemaDict;
 
 use super::{py_err_se_err, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+
+#[derive(Debug, Clone)]
+pub struct DefinitionsBuilder;
+
+impl BuildSerializer for DefinitionsBuilder {
+    const EXPECTED_TYPE: &'static str = "definitions";
+
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
+        let py = schema.py();
+
+        let definitions: &PyList = schema.get_as_req(intern!(py, "definitions"))?;
+
+        for def_schema in definitions {
+            CombinedSerializer::build(def_schema.downcast()?, config, build_context)?;
+            // no need to store the serializer here, it has already been stored in build_context if necessary
+        }
+
+        let inner_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
+        CombinedSerializer::build(inner_schema, config, build_context)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct DefinitionRefSerializer {
