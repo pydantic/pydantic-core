@@ -2219,6 +2219,7 @@ class ArgumentsSchema(TypedDict, total=False):
     populate_by_name: bool
     var_args_schema: CoreSchema
     var_kwargs_schema: CoreSchema
+    return_dict_only: bool
     ref: str
     metadata: Any
     serialization: SerSchema
@@ -2229,6 +2230,7 @@ def arguments_schema(
     populate_by_name: bool | None = None,
     var_args_schema: CoreSchema | None = None,
     var_kwargs_schema: CoreSchema | None = None,
+    return_dict_only: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
@@ -2260,6 +2262,7 @@ def arguments_schema(
         populate_by_name=populate_by_name,
         var_args_schema=var_args_schema,
         var_kwargs_schema=var_kwargs_schema,
+        return_dict_only=return_dict_only,
         ref=ref,
         metadata=metadata,
         serialization=serialization,

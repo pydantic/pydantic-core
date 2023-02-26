@@ -156,6 +156,7 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
             ],
         }
     )
+    # debug(v.validator)
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
@@ -1006,5 +1007,133 @@ def test_invalid_schema():
                         },
                     }
                 ],
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        [(1, 'a', True), {'a': 1, 'b': 'a', 'c': True}],
+        [[1, 'a', True], {'a': 1, 'b': 'a', 'c': True}],
+        [{'__args__': (1, 'a', True), '__kwargs__': {}}, {'a': 1, 'b': 'a', 'c': True}],
+        [(1, 'a', 'true'), {'a': 1, 'b': 'a', 'c': True}],
+        [
+            {'__args__': [1, 'a', True], '__kwargs__': {'x': 1}},
+            Err(
+                '',
+                [
+                    {
+                        'type': 'unexpected_keyword_argument',
+                        'loc': ('x',),
+                        'msg': 'Unexpected keyword argument',
+                        'input': 1,
+                    }
+                ],
+            ),
+        ],
+        [
+            [1],
+            Err(
+                '',
+                [
+                    {
+                        'type': 'missing_positional_argument',
+                        'loc': (1,),
+                        'msg': 'Missing required positional argument',
+                        'input': [1],
+                    },
+                    {
+                        'type': 'missing_positional_argument',
+                        'loc': (2,),
+                        'msg': 'Missing required positional argument',
+                        'input': [1],
+                    },
+                ],
+            ),
+        ],
+    ],
+    ids=repr,
+)
+def test_return_dict_positional_only(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {
+            'type': 'arguments',
+            'arguments_schema': [
+                {'name': 'a', 'mode': 'positional_only', 'schema': {'type': 'int'}},
+                {'name': 'b', 'mode': 'positional_only', 'schema': {'type': 'str'}},
+                {'name': 'c', 'mode': 'positional_only', 'schema': {'type': 'bool'}},
+            ],
+            'return_dict_only': True,
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_test(input_value)
+        # debug(exc_info.value.errors())
+        if expected.errors is not None:
+            assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_test(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        [{'__args__': (1, 'a'), '__kwargs__': {'c': True}}, {'a': 1, 'b': 'a', 'c': True}],
+        [{'__args__': (1,), '__kwargs__': {'b': 'a', 'c': True}}, {'a': 1, 'b': 'a', 'c': True}],
+        [{'__args__': (1,), '__kwargs__': {'b': 'a', 'c': True, 'd': 'x'}}, {'a': 1, 'b': 'a', 'c': True, 'd': b'x'}],
+        [
+            {'a': '1', 'b': 'a', 'c': True},
+            Err(
+                '',
+                [
+                    {
+                        'type': 'missing_positional_argument',
+                        'loc': (0,),
+                        'msg': 'Missing required positional argument',
+                        'input': {'a': '1', 'b': 'a', 'c': True},
+                    }
+                ],
+            ),
+        ],
+        [
+            {'__args__': (1,), '__kwargs__': {'b': 'a', 'c': True, 'd': 123}},
+            Err('', [{'type': 'bytes_type', 'loc': ('d',), 'msg': 'Input should be a valid bytes', 'input': 123}]),
+        ],
+    ],
+    ids=repr,
+)
+def test_return_dict(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {
+            'type': 'arguments',
+            'arguments_schema': [
+                {'name': 'a', 'mode': 'positional_only', 'schema': {'type': 'int'}},
+                {'name': 'b', 'mode': 'positional_or_keyword', 'schema': {'type': 'str'}},
+                {'name': 'c', 'mode': 'keyword_only', 'schema': {'type': 'bool'}},
+            ],
+            'return_dict_only': True,
+            'var_kwargs_schema': {'type': 'bytes'},
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_test(input_value)
+        # debug(exc_info.value.errors())
+        if expected.errors is not None:
+            assert exc_info.value.errors() == expected.errors
+    else:
+        assert v.validate_test(input_value) == expected
+
+
+def test_return_dict_with_var_args():
+    with pytest.raises(SchemaError, match='`return_dict_only` cannot be used with `var_args_schema`'):
+        SchemaValidator(
+            {
+                'type': 'arguments',
+                'arguments_schema': [{'name': 'a', 'mode': 'positional_only', 'schema': {'type': 'int'}}],
+                'return_dict_only': True,
+                'var_args_schema': {'type': 'bytes'},
             }
         )

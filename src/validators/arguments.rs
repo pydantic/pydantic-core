@@ -17,6 +17,7 @@ struct Parameter {
     positional: bool,
     name: String,
     kw_lookup_key: Option<LookupKey>,
+    accept_kwarg: bool,
     kwarg_key: Option<Py<PyString>>,
     validator: CombinedValidator,
 }
@@ -40,6 +41,8 @@ impl BuildValidator for ArgumentsValidator {
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
+        let return_dict_only = schema.get_as(intern!(py, "return_dict_only"))?.unwrap_or(false);
+
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
         let arguments_schema: &PyList = schema.get_as_req(intern!(py, "arguments_schema"))?;
@@ -60,18 +63,24 @@ impl BuildValidator for ArgumentsValidator {
                 positional_params_count = arg_index + 1;
             }
 
-            let mut kw_lookup_key = None;
-            let mut kwarg_key = None;
-            if mode == "keyword_only" || mode == "positional_or_keyword" {
-                kw_lookup_key = match arg.get_item(intern!(py, "alias")) {
+            let accept_kwarg = mode == "keyword_only" || mode == "positional_or_keyword";
+            let kw_lookup_key = if accept_kwarg {
+                match arg.get_item(intern!(py, "alias")) {
                     Some(alias) => {
                         let alt_alias = if populate_by_name { Some(name.as_str()) } else { None };
                         Some(LookupKey::from_py(py, alias, alt_alias)?)
                     }
                     None => Some(LookupKey::from_string(py, &name)),
-                };
-                kwarg_key = Some(PyString::intern(py, &name).into());
-            }
+                }
+            } else {
+                None
+            };
+
+            let kwarg_key = if accept_kwarg || return_dict_only {
+                Some(PyString::intern(py, &name).into())
+            } else {
+                None
+            };
 
             let schema: &PyAny = arg.get_as_req(intern!(py, "schema"))?;
 
@@ -99,6 +108,7 @@ impl BuildValidator for ArgumentsValidator {
                 positional,
                 kw_lookup_key,
                 name,
+                accept_kwarg,
                 kwarg_key,
                 validator,
             });
@@ -108,9 +118,8 @@ impl BuildValidator for ArgumentsValidator {
             Some(v) => Some(Box::new(build_validator(v, config, build_context)?)),
             None => None,
         };
-        let return_dict_only = schema.get_as(intern!(py, "return_dict_only"))?.unwrap_or(false);
         if return_dict_only && var_args_validator.is_some() {
-            return py_err!("return_dict_only cannot be used with var_args_schema");
+            return py_err!("`return_dict_only` cannot be used with `var_args_schema`");
         }
 
         Ok(Self {
@@ -209,7 +218,7 @@ impl Validator for ArgumentsValidator {
                                     if let Some(ref mut output_args) = output_args {
                                         output_args.push(value)
                                     } else {
-                                        output_kwargs.set_item(parameter.name.clone(), value)?;
+                                        output_kwargs.set_item(parameter.kwarg_key.as_ref().unwrap(), value)?;
                                     }
                                 },
                                 Err(ValError::LineErrors(line_errors)) => {
@@ -238,12 +247,10 @@ impl Validator for ArgumentsValidator {
                             if let Some(value) = get_default(py, &parameter.validator)? {
                                 if let Some(ref kwarg_key) = parameter.kwarg_key {
                                     output_kwargs.set_item(kwarg_key, value.as_ref())?;
-                                } else if let Some(ref mut output_args) = output_args {
-                                    output_args.push(value.as_ref().clone_ref(py));
                                 } else {
-                                    output_kwargs.set_item(parameter.name.clone(), value.as_ref())?;
+                                    output_args.as_mut().unwrap().push(value.as_ref().clone_ref(py));
                                 }
-                            } else if parameter.kwarg_key.is_some() {
+                            } else if parameter.accept_kwarg {
                                 errors.push(ValLineError::new_with_loc(
                                     ErrorType::MissingKeywordArgument,
                                     input,
@@ -330,8 +337,10 @@ impl Validator for ArgumentsValidator {
         }
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
-        } else {
+        } else if let Some(ref output_args) = output_args {
             Ok((PyTuple::new(py, output_args), output_kwargs).to_object(py))
+        } else {
+            Ok(output_kwargs.to_object(py))
         }
     }
 
