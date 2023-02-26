@@ -9,10 +9,11 @@ use pyo3::types::{
 };
 #[cfg(not(PyPy))]
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
-use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
+use pyo3::{ffi, intern, AsPyPointer};
 
 use crate::build_tools::safe_repr;
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
+use crate::ob_type::{ObType, ObTypeLookup};
 use crate::{PyMultiHostUrl, PyUrl};
 
 use super::datetime::{
@@ -185,43 +186,37 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
-        if let Ok(py_str) = self.downcast::<PyString>() {
-            if is_builtin_str(py_str) {
-                Ok(py_str.into())
-            } else {
-                Err(ValError::new(ErrorType::StringSubType, self))
-            }
-        } else {
-            Err(ValError::new(ErrorType::StringType, self))
+    fn strict_str(&'a self, ob_type_lookup: &ObTypeLookup) -> ValResult<EitherString<'a>> {
+        match ob_type_lookup.get_type(self) {
+            ObType::Str => Ok(self.downcast::<PyString>()?.into()),
+            ObType::StrSubclass => Err(ValError::new(ErrorType::StringSubType, self)),
+            _ => Err(ValError::new(ErrorType::StringType, self)),
         }
     }
 
-    fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
-        if let Ok(py_str) = self.downcast::<PyString>() {
-            if is_builtin_str(py_str) {
-                Ok(py_str.into())
-            } else {
-                // force to a rust string to make sure behaviour is consistent whether or not we go via a
-                // rust string in StrConstrainedValidator - e.g. to_lower
-                Ok(py_string_str(py_str)?.into())
+    fn lax_str(&'a self, ob_type_lookup: &ObTypeLookup) -> ValResult<EitherString<'a>> {
+        match ob_type_lookup.get_type(self) {
+            ObType::Str => Ok(self.downcast::<PyString>()?.into()),
+            ObType::StrSubclass => Ok(py_string_str(self.downcast::<PyString>()?)?.into()),
+            ObType::Bytes => {
+                let bytes: &PyBytes = self.downcast()?;
+                let str = match from_utf8(bytes.as_bytes()) {
+                    Ok(s) => s,
+                    Err(_) => return Err(ValError::new(ErrorType::StringUnicode, self)),
+                };
+                Ok(str.into())
             }
-        } else if let Ok(bytes) = self.downcast::<PyBytes>() {
-            let str = match from_utf8(bytes.as_bytes()) {
-                Ok(s) => s,
-                Err(_) => return Err(ValError::new(ErrorType::StringUnicode, self)),
-            };
-            Ok(str.into())
-        } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
-            // see https://docs.rs/pyo3/latest/pyo3/types/struct.PyByteArray.html#method.as_bytes
-            // for why this is marked unsafe
-            let str = match from_utf8(unsafe { py_byte_array.as_bytes() }) {
-                Ok(s) => s,
-                Err(_) => return Err(ValError::new(ErrorType::StringUnicode, self)),
-            };
-            Ok(str.into())
-        } else {
-            Err(ValError::new(ErrorType::StringType, self))
+            ObType::Bytearray => {
+                let py_byte_array: &PyByteArray = self.downcast()?;
+                // see https://docs.rs/pyo3/latest/pyo3/types/struct.PyByteArray.html#method.as_bytes
+                // for why this is marked unsafe
+                let str = match from_utf8(unsafe { py_byte_array.as_bytes() }) {
+                    Ok(s) => s,
+                    Err(_) => return Err(ValError::new(ErrorType::StringUnicode, self)),
+                };
+                Ok(str.into())
+            }
+            _ => Err(ValError::new(ErrorType::StringType, self)),
         }
     }
 
@@ -694,6 +689,6 @@ fn import_type(py: Python, module: &str, attr: &str) -> PyResult<Py<PyType>> {
     Ok(obj.downcast::<PyType>()?.into())
 }
 
-fn is_builtin_str(py_str: &PyString) -> bool {
-    py_str.get_type().is(PyString::type_object(py_str.py()))
-}
+// fn is_builtin_str(py_str: &PyString) -> bool {
+//     py_str.get_type().is(PyString::type_object(py_str.py()))
+// }

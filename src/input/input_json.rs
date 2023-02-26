@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
+use crate::ob_type::ObTypeLookup;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
@@ -105,13 +106,13 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
-    fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
+    fn strict_str(&'a self, _ob_type_lookup: &ObTypeLookup) -> ValResult<EitherString<'a>> {
         match self {
             JsonInput::String(s) => Ok(s.as_str().into()),
             _ => Err(ValError::new(ErrorType::StringType, self)),
         }
     }
-    fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
+    fn lax_str(&'a self, _ob_type_lookup: &ObTypeLookup) -> ValResult<EitherString<'a>> {
         match self {
             JsonInput::String(s) => Ok(s.as_str().into()),
             _ => Err(ValError::new(ErrorType::StringType, self)),
@@ -356,11 +357,11 @@ impl<'a> Input<'a> for String {
         serde_json::from_str(self.as_str()).map_err(|e| map_json_err(self, e))
     }
 
-    fn validate_str(&'a self, _strict: bool) -> ValResult<EitherString<'a>> {
+    fn validate_str(&'a self, _ob_type_lookup: &ObTypeLookup, _strict: bool) -> ValResult<EitherString<'a>> {
         Ok(self.as_str().into())
     }
-    fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
-        self.validate_str(false)
+    fn strict_str(&'a self, ob_type_lookup: &ObTypeLookup) -> ValResult<EitherString<'a>> {
+        self.validate_str(ob_type_lookup, false)
     }
 
     fn validate_bytes(&'a self, _strict: bool) -> ValResult<EitherBytes<'a>> {

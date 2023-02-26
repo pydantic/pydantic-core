@@ -188,6 +188,7 @@ impl Validator for TypedDictValidator {
             field: None,
             strict: extra.strict,
             context: extra.context,
+            ob_type_lookup: extra.ob_type_lookup,
         };
 
         macro_rules! process {
@@ -245,7 +246,7 @@ impl Validator for TypedDictValidator {
                 if let Some(ref mut used_keys) = used_keys {
                     for item_result in <$iter>::new($dict)? {
                         let (raw_key, value) = item_result?;
-                        let either_str = match raw_key.strict_str() {
+                        let either_str = match raw_key.strict_str(extra.ob_type_lookup) {
                             Ok(k) => k,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {

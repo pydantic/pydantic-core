@@ -11,6 +11,7 @@ use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, py_error_type, SchemaDict, SchemaError};
 use crate::errors::{ValError, ValResult, ValidationError};
 use crate::input::Input;
+use crate::ob_type::ObTypeLookup;
 use crate::questions::{Answers, Question};
 use crate::recursion_guard::RecursionGuard;
 
@@ -105,7 +106,7 @@ impl SchemaValidator {
         let r = self.validator.validate(
             py,
             input,
-            &Extra::new(strict, context),
+            &Extra::new(py, strict, context),
             &self.slots,
             &mut RecursionGuard::default(),
         );
@@ -122,7 +123,7 @@ impl SchemaValidator {
         match self.validator.validate(
             py,
             input,
-            &Extra::new(strict, context),
+            &Extra::new(py, strict, context),
             &self.slots,
             &mut RecursionGuard::default(),
         ) {
@@ -145,7 +146,7 @@ impl SchemaValidator {
                 let r = self.validator.validate(
                     py,
                     &input,
-                    &Extra::new(strict, context),
+                    &Extra::new(py, strict, context),
                     &self.slots,
                     &mut RecursionGuard::default(),
                 );
@@ -167,7 +168,7 @@ impl SchemaValidator {
                 match self.validator.validate(
                     py,
                     &input,
-                    &Extra::new(strict, context),
+                    &Extra::new(py, strict, context),
                     &self.slots,
                     &mut RecursionGuard::default(),
                 ) {
@@ -195,6 +196,7 @@ impl SchemaValidator {
             field: Some(field.as_str()),
             strict,
             context,
+            ob_type_lookup: ObTypeLookup::cached(py),
         };
         let r = self
             .validator
@@ -220,7 +222,7 @@ impl SchemaValidator {
         match self_schema.validator.validate(
             py,
             schema,
-            &Extra::default(),
+            &Extra::default(py),
             &self_schema.slots,
             &mut RecursionGuard::default(),
         ) {
@@ -400,7 +402,7 @@ pub fn build_validator<'a>(
 
 /// More (mostly immutable) data to pass between validators, should probably be class `Context`,
 /// but that would confuse it with context as per pydantic/pydantic#1549
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Extra<'a> {
     /// This is used as the `data` kwargs to validator functions, it also represents the current model
     /// data when validating assignment
@@ -411,14 +413,28 @@ pub struct Extra<'a> {
     pub strict: Option<bool>,
     /// context used in validator functions
     pub context: Option<&'a PyAny>,
+    /// used for ob_type lookups
+    pub ob_type_lookup: &'a ObTypeLookup,
 }
 
 impl<'a> Extra<'a> {
-    pub fn new(strict: Option<bool>, context: Option<&'a PyAny>) -> Self {
+    pub fn new(py: Python<'a>, strict: Option<bool>, context: Option<&'a PyAny>) -> Self {
         Extra {
+            data: None,
+            field: None,
             strict,
             context,
-            ..Default::default()
+            ob_type_lookup: ObTypeLookup::cached(py),
+        }
+    }
+
+    pub fn default(py: Python<'a>) -> Self {
+        Extra {
+            data: None,
+            field: None,
+            strict: None,
+            context: None,
+            ob_type_lookup: ObTypeLookup::cached(py),
         }
     }
 }
@@ -430,6 +446,7 @@ impl<'a> Extra<'a> {
             field: self.field,
             strict: Some(true),
             context: self.context,
+            ob_type_lookup: self.ob_type_lookup,
         }
     }
 }

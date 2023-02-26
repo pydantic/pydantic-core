@@ -65,7 +65,7 @@ impl Validator for UrlValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let mut lib_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
+        let mut lib_url = self.get_url(input, extra)?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(lib_url.scheme()) {
@@ -92,8 +92,9 @@ impl Validator for UrlValidator {
 }
 
 impl UrlValidator {
-    fn get_url<'s, 'data>(&'s self, input: &'data impl Input<'data>, strict: bool) -> ValResult<'data, Url> {
-        match input.validate_str(strict) {
+    fn get_url<'s, 'data>(&'s self, input: &'data impl Input<'data>, extra: &Extra) -> ValResult<'data, Url> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        match input.validate_str(extra.ob_type_lookup, strict) {
             Ok(either_str) => {
                 let cow = either_str.as_cow()?;
                 let url_str = cow.as_ref();
@@ -182,7 +183,7 @@ impl Validator for MultiHostUrlValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let mut multi_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
+        let mut multi_url = self.get_url(input, extra)?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(multi_url.scheme()) {
@@ -208,8 +209,13 @@ impl Validator for MultiHostUrlValidator {
 }
 
 impl MultiHostUrlValidator {
-    fn get_url<'s, 'data>(&'s self, input: &'data impl Input<'data>, strict: bool) -> ValResult<'data, PyMultiHostUrl> {
-        match input.validate_str(strict) {
+    fn get_url<'s, 'data>(
+        &'s self,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+    ) -> ValResult<'data, PyMultiHostUrl> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        match input.validate_str(extra.ob_type_lookup, strict) {
             Ok(either_str) => {
                 let cow = either_str.as_cow()?;
                 let url_str = cow.as_ref();

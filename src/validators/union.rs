@@ -355,7 +355,7 @@ impl Validator for TaggedUnionValidator {
                                 if let Ok(int) = value.validate_int(self.strict) {
                                     Ok(ChoiceKey::Int(int))
                                 } else {
-                                    Ok(ChoiceKey::Str(value.validate_str(self.strict)?.as_cow()?.as_ref().to_string()))
+                                    Ok(ChoiceKey::Str(value.validate_str(extra.ob_type_lookup, self.strict)?.as_cow()?.as_ref().to_string()))
                                 }
                             }
                             None => Err(self.tag_not_found(input)),
@@ -382,7 +382,7 @@ impl Validator for TaggedUnionValidator {
             }
             Discriminator::SelfSchema => self.find_call_validator(
                 py,
-                &ChoiceKey::Str(self.self_schema_tag(py, input)?.into_owned()),
+                &ChoiceKey::Str(self.self_schema_tag(py, input, extra)?.into_owned()),
                 input,
                 extra,
                 slots,
@@ -411,11 +411,12 @@ impl TaggedUnionValidator {
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
+        extra: &Extra,
     ) -> ValResult<'data, Cow<'data, str>> {
         let dict = input.strict_dict()?;
         let either_tag = match dict {
             GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "type")) {
-                Some(t) => t.strict_str()?,
+                Some(t) => t.strict_str(extra.ob_type_lookup)?,
                 None => return Err(self.tag_not_found(input)),
             },
             _ => unreachable!(),
@@ -426,7 +427,7 @@ impl TaggedUnionValidator {
         if tag == "function" || tag == "tuple" {
             let mode = match dict {
                 GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "mode")) {
-                    Some(m) => Some(m.strict_str()?),
+                    Some(m) => Some(m.strict_str(extra.ob_type_lookup)?),
                     None => None,
                 },
                 _ => unreachable!(),

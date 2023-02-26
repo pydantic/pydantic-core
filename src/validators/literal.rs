@@ -75,7 +75,7 @@ impl Validator for LiteralSingleStringValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_str = input.validate_str(extra.strict.unwrap_or(false))?;
+        let either_str = input.validate_str(extra.ob_type_lookup, extra.strict.unwrap_or(false))?;
         if either_str.as_cow()?.as_ref() == self.expected.as_str() {
             Ok(input.to_object(py))
         } else {
@@ -172,7 +172,7 @@ impl Validator for LiteralMultipleStringsValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_str = input.validate_str(extra.strict.unwrap_or(false))?;
+        let either_str = input.validate_str(extra.ob_type_lookup, extra.strict.unwrap_or(false))?;
         if self.expected.contains(either_str.as_cow()?.as_ref()) {
             Ok(input.to_object(py))
         } else {
@@ -300,7 +300,7 @@ impl Validator for LiteralGeneralValidator {
             }
         }
         if !self.expected_str.is_empty() {
-            if let Ok(either_str) = input.validate_str(strict) {
+            if let Ok(either_str) = input.validate_str(extra.ob_type_lookup, strict) {
                 if self.expected_str.contains(either_str.as_cow()?.as_ref()) {
                     return Ok(input.to_object(py));
                 }

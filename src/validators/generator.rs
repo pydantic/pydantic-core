@@ -6,6 +6,7 @@ use pyo3::types::PyDict;
 use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorType, LocItem, ValError, ValResult};
 use crate::input::{GenericIterator, Input};
+use crate::ob_type::ObTypeLookup;
 use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
 use crate::ValidationError;
@@ -239,6 +240,7 @@ impl InternalValidator {
             field: self.field.as_deref(),
             strict: self.strict,
             context: self.context.as_ref().map(|data| data.as_ref(py)),
+            ob_type_lookup: ObTypeLookup::cached(py),
         };
         self.validator
             .validate(py, input, &extra, &self.slots, &mut self.recursion_guard)

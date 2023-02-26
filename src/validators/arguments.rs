@@ -266,7 +266,7 @@ impl Validator for ArgumentsValidator {
                 // if there are kwargs check any that haven't been processed yet
                 if let Some(kwargs) = $args.kwargs {
                     for (raw_key, value) in kwargs.iter() {
-                        let either_str = match raw_key.strict_str() {
+                        let either_str = match raw_key.strict_str(extra.ob_type_lookup) {
                             Ok(k) => k,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {

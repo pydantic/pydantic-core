@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyString, PyType};
 
 use crate::errors::{InputValue, LocItem, ValResult};
+use crate::ob_type::ObTypeLookup;
 use crate::{PyMultiHostUrl, PyUrl};
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
@@ -71,17 +72,17 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn parse_json(&'a self) -> ValResult<'a, JsonInput>;
 
-    fn validate_str(&'a self, strict: bool) -> ValResult<EitherString<'a>> {
+    fn validate_str(&'a self, ob_type_lookup: &ObTypeLookup, strict: bool) -> ValResult<EitherString<'a>> {
         if strict {
-            self.strict_str()
+            self.strict_str(ob_type_lookup)
         } else {
-            self.lax_str()
+            self.lax_str(ob_type_lookup)
         }
     }
-    fn strict_str(&'a self) -> ValResult<EitherString<'a>>;
+    fn strict_str(&'a self, _ob_type_lookup: &ObTypeLookup) -> ValResult<EitherString<'a>>;
     #[cfg_attr(has_no_coverage, no_coverage)]
-    fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
-        self.strict_str()
+    fn lax_str(&'a self, ob_type_lookup: &ObTypeLookup) -> ValResult<EitherString<'a>> {
+        self.strict_str(ob_type_lookup)
     }
 
     fn validate_bytes(&'a self, strict: bool) -> ValResult<EitherBytes<'a>> {
