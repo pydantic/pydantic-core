@@ -4,10 +4,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
 use crate::build_context::BuildContext;
+use crate::ob_type::{IsType, ObType};
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
-    IsType, ObType, SerMode, TypeSerializer,
+    SerMode, TypeSerializer,
 };
 
 #[derive(Debug, Clone)]

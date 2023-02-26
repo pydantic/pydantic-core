@@ -6,8 +6,9 @@ use pyo3::types::PyDict;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
+use crate::ob_type::{IsType, ObType};
 
-use super::{infer_json_key_known, BuildSerializer, CombinedSerializer, Extra, IsType, ObType, TypeSerializer};
+use super::{infer_json_key_known, BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
 #[derive(Debug, Clone)]
 pub struct NullableSerializer {

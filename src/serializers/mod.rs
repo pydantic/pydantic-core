@@ -17,7 +17,6 @@ mod errors;
 mod extra;
 mod filter;
 mod infer;
-mod ob_type;
 mod shared;
 mod type_serializers;
 

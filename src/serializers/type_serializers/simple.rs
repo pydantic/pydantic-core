@@ -5,10 +5,11 @@ use std::borrow::Cow;
 use serde::Serialize;
 
 use crate::build_context::BuildContext;
+use crate::ob_type::{IsType, ObType};
 
 use super::{
-    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, IsType, ObType,
-    SerMode, TypeSerializer,
+    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerMode,
+    TypeSerializer,
 };
 
 #[derive(Debug, Clone)]

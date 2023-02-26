@@ -9,6 +9,7 @@ use serde::ser::Error;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{function_name, py_error_type, SchemaDict};
+use crate::ob_type::ObType;
 use crate::serializers::extra::{ExtraOwned, SerMode};
 use crate::serializers::filter::AnyFilter;
 use crate::{PydanticOmit, PydanticSerializationUnexpectedValue};
@@ -17,8 +18,8 @@ use super::format::WhenUsed;
 
 use super::{
     infer_json_key, infer_json_key_known, infer_serialize, infer_serialize_known, infer_to_python,
-    infer_to_python_known, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ObType,
-    PydanticSerializationError, TypeSerializer,
+    infer_to_python_known, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializationError,
+    TypeSerializer,
 };
 
 #[derive(Debug, Clone)]

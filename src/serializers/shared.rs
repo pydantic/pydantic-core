@@ -12,11 +12,11 @@ use serde_json::ser::PrettyFormatter;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{py_err, py_error_type, SchemaDict};
+use crate::ob_type::{IsType, ObType};
 
 use super::errors::se_err_py_err;
 use super::extra::Extra;
 use super::infer::infer_json_key;
-use super::ob_type::{IsType, ObType};
 
 pub(crate) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;

@@ -6,9 +6,9 @@ use pyo3::types::{PyDict, PyType};
 
 use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
+use crate::ob_type::ObType;
 use crate::serializers::extra::SerCheck;
 use crate::serializers::infer::{infer_serialize, infer_to_python};
-use crate::serializers::ob_type::ObType;
 
 use super::{
     infer_json_key, infer_json_key_known, object_to_dict, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,

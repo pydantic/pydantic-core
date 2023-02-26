@@ -30,7 +30,6 @@ pub(self) use super::infer::{
     infer_json_key, infer_json_key_known, infer_serialize, infer_serialize_known, infer_to_python,
     infer_to_python_known, SerializeInfer,
 };
-pub(self) use super::ob_type::{IsType, ObType};
 pub(self) use super::shared::{
     object_to_dict, to_json_bytes, BuildSerializer, CombinedSerializer, PydanticSerializer, TypeSerializer,
 };

@@ -9,10 +9,10 @@ use ahash::AHashSet;
 use serde::ser::Error;
 
 use crate::build_tools::py_err;
+use crate::ob_type::ObTypeLookup;
 
 use super::config::SerializationConfig;
 use super::errors::{PydanticSerializationUnexpectedValue, UNEXPECTED_TYPE_SER};
-use super::ob_type::ObTypeLookup;
 use super::shared::CombinedSerializer;
 
 /// Useful things which are passed around by type_serializers

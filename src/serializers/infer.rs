@@ -11,13 +11,13 @@ use pyo3::types::{
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::build_tools::{py_err, safe_repr};
+use crate::ob_type::ObType;
 use crate::serializers::filter::SchemaFilter;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::errors::{py_err_se_err, PydanticSerializationError};
 use super::extra::{Extra, SerMode};
 use super::filter::AnyFilter;
-use super::ob_type::ObType;
 use super::shared::object_to_dict;
 
 pub(crate) fn infer_to_python(
