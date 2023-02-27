@@ -2550,6 +2550,11 @@ class DefinitionsSchema(TypedDict, total=False):
     type: Required[Literal['definitions']]
     schema: Required[CoreSchema]
     definitions: Required[List[CoreSchema]]
+    # The following attributes should generally not be used, but their presence makes certain
+    # schema-type-agnostic code easier to write in a type-safe way
+    ref: str
+    metadata: Any
+    serialization: SerSchema
 
 
 def definitions_schema(schema: CoreSchema, definitions: list[CoreSchema]) -> DefinitionsSchema:
@@ -2577,6 +2582,7 @@ def definitions_schema(schema: CoreSchema, definitions: list[CoreSchema]) -> Def
 class DefinitionReferenceSchema(TypedDict, total=False):
     type: Required[Literal['definition-ref']]
     schema_ref: Required[str]
+    ref: str  # This should almost certainly not be used, but its presence some schema-type-agnostic code
     metadata: Any
     serialization: SerSchema
 
