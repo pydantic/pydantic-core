@@ -95,6 +95,7 @@ def to_json(
 
 class Email:
     scheme: str
+    original_email: str
     domain: 'str | None'
     local_part: 'str | None'
     name: 'str | None'

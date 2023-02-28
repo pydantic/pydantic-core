@@ -2581,10 +2581,41 @@ def multi_host_url_schema(
 
 class EmailSchema(TypedDict, total=False):
     type: Required[Literal['email']]
+    """The email address that was passed to validate_email. (If passed as bytes, this will be a string.)
+
+    Example: Simple Name <simple@example.com> => Simple Name <simple@example.com>
+    """
+    original_email: str
+
+    """The normalized email address, which should always be used in preference to the original address.
+    The normalized address converts an IDNA ASCII domain name to Unicode, if possible, and performs
+    Unicode normalization on the local part and on the domain (if originally Unicode). It is the
+    concatenation of the local_part and domain attributes, separated by an @-sign.
+
+    Example: Simple Name <simple@example.com> => simple@example.com
+    """
+    email: str
+
+    """The local part of the email address after Unicode normalization.
+
+    Example: Simple Name <simple@example.com> => simple
+    """
+    local_part: str
+
+    """The domain part of the email address after Unicode normalization or conversion to
+    Unicode from IDNA ascii.
+
+    Example: Simple Name <simple@example.com> => example.com
+    """
+    domain: str
+
+    """The domain part of the email address after Unicode normalization or conversion to
+    Unicode from IDNA ascii.
+
+    Example: Simple Name <simple@example.com> => Simple Name
+    """
     name: str  # Simple Name <simple@example.com> => Simple Name
-    domain: str  # Simple Name <simple@example.com> => example.com
-    local_part: str  # Simple Name <simple@example.com> => simple
-    email: str  # Simple Name <simple@example.com> => simple@example.com
+
     strict: bool
     ref: str
     metadata: Any

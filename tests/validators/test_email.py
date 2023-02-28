@@ -91,7 +91,26 @@ def generate_random_length_str(n: int) -> str:
     'email,expected',
     [
         ('simple@example.com', {'str()': 'simple@example.com', 'domain': 'example.com', 'local_part': 'simple'}),
-        # Failing, email_address doesnt support this
+        (
+            'simple@example.com',
+            {
+                'str()': 'simple@example.com',
+                'domain': 'example.com',
+                'local_part': 'simple',
+                'name': '',
+                'original_email': 'simple@example.com',
+            },
+        ),
+        (
+            's <simple@example.com>',
+            {
+                'str()': 's <simple@example.com>',
+                'domain': 'example.com',
+                'local_part': 'simple',
+                'name': 's',
+                'original_email': 's <simple@example.com>',
+            },
+        ),
         (
             's <simple@example.com>',
             {'str()': 's <simple@example.com>', 'domain': 'example.com', 'local_part': 'simple'},
@@ -199,6 +218,148 @@ def generate_random_length_str(n: int) -> str:
         # ('@example.com', Err('Invalid IP Address specified for domain.')),
         # ('@example.com', Err('Quotes around the local-part are unbalanced.')),
         # ('@example.com', Err('A comment was badly formed.')),
+        # Additional
+        ('(comment)john.smith@example.com', Err('Invalid character.')),  # TODO: Support comments
+        # Tests derived from python-email-validator
+        # Positive cases
+        ('Abc@example.tld', {'local_part': 'Abc', 'domain': 'example.tld', 'email': 'Abc@example.tld'}),
+        (
+            'Abc.123@test-example.com',
+            {'local_part': 'Abc.123', 'domain': 'test-example.com', 'email': 'Abc.123@test-example.com'},
+        ),
+        # TODO: Commented out = Erroring
+        # (
+        #     'user+mailbox/department:shipping@example.tld',
+        #     {
+        #         'local_part': 'user+mailbox/department:shipping',
+        #         'domain': 'example.tld',
+        #         'email': 'user+mailbox/department:shipping@example.tld',
+        #     },
+        # ),
+        # (
+        #     "!#$%&'*+-/:?^_`.{|}~@example.tld",
+        #     {
+        #         'local_part': "!#$%&'*+-/:?^_`.{|}~",
+        #         'domain': 'example.tld',
+        #         'email': "!#$%&'*+-/:?^_`.{|}~@example.tld",
+        #     },
+        # ),
+        ('伊昭傑@郵件.商務', {'local_part': '伊昭傑', 'domain': '郵件.商務', 'email': '伊昭傑@郵件.商務'}),
+        ('राम@मोहन.ईन्फो', {'local_part': 'राम', 'domain': 'मोहन.ईन्फो', 'email': 'राम@मोहन.ईन्फो'}),
+        ('юзер@екзампл.ком', {'local_part': 'юзер', 'domain': 'екзампл.ком', 'email': 'юзер@екзампл.ком'}),
+        ('θσερ@εχαμπλε.ψομ', {'local_part': 'θσερ', 'domain': 'εχαμπλε.ψομ', 'email': 'θσερ@εχαμπλε.ψομ'}),
+        # ('葉士豪@臺網中心.tw', {'local_part': '葉士豪', 'domain': '臺網中心.tw', 'email': '葉士豪@臺網中心.tw'}),
+        ('jeff@臺網中心.tw', {'local_part': 'jeff', 'domain': '臺網中心.tw', 'email': 'jeff@臺網中心.tw'}),
+        # ('葉士豪@臺網中心.台灣', {'local_part': '葉士豪', 'domain': '臺網中心.台灣', 'email': '葉士豪@臺網中心.台灣'}),
+        # ('jeff葉@臺網中心.tw', {'local_part': 'jeff葉', 'domain': '臺網中心.tw', 'email': 'jeff葉@臺網中心.tw'}),
+        ('ñoñó@example.tld', {'local_part': 'ñoñó', 'domain': 'example.tld', 'email': 'ñoñó@example.tld'}),
+        ('我買@example.tld', {'local_part': '我買', 'domain': 'example.tld', 'email': '我買@example.tld'}),
+        ('甲斐黒川日本@example.tld', {'local_part': '甲斐黒川日本', 'domain': 'example.tld', 'email': '甲斐黒川日本@example.tld'}),
+        (
+            'чебурашкаящик-с-апельсинами.рф@example.tld',
+            {
+                'local_part': 'чебурашкаящик-с-апельсинами.рф',
+                'domain': 'example.tld',
+                'email': 'чебурашкаящик-с-апельсинами.рф@example.tld',
+            },
+        ),
+        # (
+        #     'उदाहरण.परीक्ष@"domain".with.idn.tld',
+        #     {
+        #         'local_part': 'उदाहरण.परीक्ष',
+        #         'domain': '"domain".with.idn.tld',
+        #         'email': 'उदाहरण.परीक्ष@"domain".with.idn.tld',
+        #     },
+        # ),
+        ('ιωάννης@εεττ.gr', {'local_part': 'ιωάννης', 'domain': 'εεττ.gr', 'email': 'ιωάννης@εεττ.gr'}),
+        ## Negative cases
+        ('white space@test', Err('Invalid character.')),
+        ('\n@test', Err('Invalid character.')),
+        ## TODO: Cannot find any reference in RFC's to these "invalid characters"
+        # ('\u2005@test', Err('Invalid character.')),  # four-per-em space (Zs)
+        # ('\u009C@test', Err('Invalid character.')),  # string terminator (Cc)
+        # ('\u200B@test', Err('Invalid character.')),  # zero-width space (Cf)
+        # ('\u202Dforward-\u202Ereversed@test', Err('Invalid character.')),  # BIDI (Cf)
+        # ('\uD800@test', Err('Invalid character.')),  # surrogate (Cs)
+        # ('\uE000@test', Err('Invalid character.')),  # private use (Co)
+        # ('\uFDEF@test', Err('Invalid character.')),  # unassigned (Cn)
+        # ('\u0300@test', Err('Invalid character.')),  # grave accent (M)
+        ## TODO: These domains are currently explicitly rejected
+        # ('me@anything.arpa', Err('Invalid character.')),
+        # ('me@valid.invalid', Err('Invalid character.')),
+        # ('me@link.local', Err('Invalid character.')),
+        # ('me@host.localhost', Err('Invalid character.')),
+        # ('me@onion.onion.onion', Err('Invalid character.')),
+        # ('me@test.test.test', Err('Invalid character.')),
+        ##
+        # TODO: This is a valid test case, but expected
+        # "The part after the @-sign is not valid. It should have a period."
+        # ('my@localhost', Err('Invalid character.')),
+        ('my@.leadingdot.com', Err('Invalid character.')),
+        # TODO: Assuming this is todo with utf-8/ascii issues
+        # ('my@．leadingfwdot.com', Err('Invalid character.')),
+        ('my@twodots..com', Err('Invalid character.')),
+        # TODO: Assuming this is todo with utf-8/ascii issues
+        # ('my@twofwdots．．.com', Err('Invalid character.')),
+        ('my@trailingdot.com.', Err('Invalid character.')),
+        # TODO: Assuming this is todo with utf-8/ascii issues
+        # ('my@trailingfwdot.com．', Err('Invalid character.')),
+        # TODO: Not in RFC - An email address cannot have a hyphen immediately after the @-sign.
+        # ('me@-leadingdash', Err('Invalid character.')),
+        # ('me@－leadingdashfw', Err('Invalid character.')),
+        # TODO: Not in RFC - An email address cannot end with a hyphen.
+        # ('me@trailingdash-', Err('Invalid character.')),
+        # ('me@trailingdashfw－', Err('Invalid character.')),
+        # TODO: Not in RFC - An email address cannot have a period and a hyphen next to each other
+        # ('my@baddash.-.com', Err('Invalid character.')),
+        # ('my@baddash.-a.com', Err('Invalid character.')),
+        # ('my@baddash.b-.com', Err('Invalid character.')),
+        # ('my@baddashfw.－.com', Err('Invalid character.')),
+        # ('my@baddashfw.－a.com', Err('Invalid character.')),
+        # ('my@baddashfw.b－.com', Err('Invalid character.')),
+        ('my@example.com\n', Err('Invalid character.')),
+        ('my@example\n.com', Err('Invalid character.')),
+        ('.leadingdot@domain.com', Err('Invalid character.')),
+        ('..twodots@domain.com', Err('Invalid character.')),
+        ('twodots..here@domain.com', Err('Invalid character.')),
+        # ('me@⒈wouldbeinvalid.com', Err('Invalid character.')), # TODO: No reference to RFC
+        ('@example.com', Err('Local part is empty.')),
+        ('\nmy@example.com', Err('Invalid character.')),
+        ('m\ny@example.com', Err('Invalid character.')),
+        ('my\n@example.com', Err('Invalid character.')),
+        (
+            '11111111112222222222333333333344444444445555555555666666666677777@example.com',
+            Err('Local part is too long. Length limit: 64'),
+        ),
+        (
+            '111111111122222222223333333333444444444455555555556666666666777777@example.com',
+            Err('Local part is too long. Length limit: 64'),
+        ),
+        (
+            'me@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.111111111122222222223333333333444444444455555555556.com',
+            Err('Domain is too long. Length limit: 254'),
+        ),
+        (
+            'me@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555566.com',
+            Err('Domain is too long. Length limit: 254'),
+        ),
+        (
+            'me@中1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555566.com',
+            Err('Domain is too long. Length limit: 254'),
+        ),
+        # TODO: These seem to be valid...
+        # ('my.long.address@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.11111111112222222222333333333344444.info', Err('Domain is too long. Length limit: 254')),  # noqa: E501
+        # ('my.long.address@λ111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.11111111112222222222333333.info', Err('Domain is too long. Length limit: 254')),  # noqa: E501
+        # ('my.long.address@λ111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444.info'.encode(), Err('Domain is too long. Length limit: 254')),  # noqa: E501
+        # ('my.λong.address@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.111111111122222222223333333333444.info', Err('Domain is too long. Length limit: 254')),  # noqa: E501
+        # ('my.λong.address@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444.info', Err('Domain is too long. Length limit: 254')),  # noqa: E501
+        # TODO: Unsure why these are invalid...
+        # ('me@bad-tld-1', Err('Invalid character.')),
+        # ('me@bad.tld-2', Err('Invalid character.')),
+        # ('me@x!', Err('Invalid character.')),
+        # ('me@xn--0.tld', Err('Invalid character.')),
+        # ('me@yy--0.tld', Err('Invalid character.')),
+        # ('me@yy－－0.tld', Err('Invalid character.')),
     ],
 )
 def test_email_cases(email_validator, email, expected, mode):

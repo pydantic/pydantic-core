@@ -60,6 +60,11 @@ impl PyEmail {
         self.lib_email.local_part()
     }
 
+    #[getter]
+    pub fn original_email(&self) -> &str {
+        self.lib_email.as_str()
+    }
+
     pub fn __str__(&self) -> &str {
         self.lib_email.as_str()
     }
