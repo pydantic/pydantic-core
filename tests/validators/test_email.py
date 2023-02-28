@@ -91,6 +91,8 @@ def generate_random_length_str(n: int) -> str:
     'email,expected',
     [
         ('simple@example.com', {'str()': 'simple@example.com', 'domain': 'example.com', 'local_part': 'simple'}),
+        # Failing, email_address doesnt support this
+        # ('s <simple@example.com>', {'str()': 'simple@example.com', 'domain': 'example.com', 'local_part': 'simple'}),
         (
             'very.common@example.com',
             {'str()': 'very.common@example.com', 'domain': 'example.com', 'local_part': 'very.common'},
