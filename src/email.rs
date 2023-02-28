@@ -1,8 +1,8 @@
-use email_address::EmailAddress;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::vendored::email_address::EmailAddress;
 use crate::SchemaValidator;
 
 static SCHEMA_DEFINITION_EMAIL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
@@ -41,8 +41,13 @@ impl PyEmail {
     }
 
     #[getter]
+    pub fn name(&self) -> &str {
+        self.lib_email.display_part()
+    }
+
+    #[getter]
     pub fn email(&self) -> String {
-        format!("{}@{}", self.lib_email.local_part(), self.lib_email.domain())
+        self.lib_email.email()
     }
 
     #[getter]

@@ -97,6 +97,8 @@ class Email:
     scheme: str
     domain: 'str | None'
     local_part: 'str | None'
+    name: 'str | None'
+    email: 'str | None'
 
     def __init__(self, email: str): ...
     def __str__(self) -> str: ...

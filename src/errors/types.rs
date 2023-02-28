@@ -342,11 +342,10 @@ pub enum ErrorType {
     UrlScheme {
         expected_schemes: String,
     },
-    #[strum(message = "Email input should be a string or Email")]
+    #[strum(message = "Input should be a string or email address")]
     EmailType,
-    #[strum(message = "Input should be a valid Email, {error}")]
+    #[strum(message = "Input should be a valid email address, error: {error}")]
     EmailParsing {
-        // would be great if this could be a static cow, waiting for https://github.com/servo/rust-url/issues/801
         error: String,
     },
 }

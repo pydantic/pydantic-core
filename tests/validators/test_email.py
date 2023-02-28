@@ -92,7 +92,10 @@ def generate_random_length_str(n: int) -> str:
     [
         ('simple@example.com', {'str()': 'simple@example.com', 'domain': 'example.com', 'local_part': 'simple'}),
         # Failing, email_address doesnt support this
-        # ('s <simple@example.com>', {'str()': 'simple@example.com', 'domain': 'example.com', 'local_part': 'simple'}),
+        (
+            's <simple@example.com>',
+            {'str()': 's <simple@example.com>', 'domain': 'example.com', 'local_part': 'simple'},
+        ),
         (
             'very.common@example.com',
             {'str()': 'very.common@example.com', 'domain': 'example.com', 'local_part': 'very.common'},
@@ -210,11 +213,11 @@ def strict_email_validator_fixture():
 def test_wrong_type_lax(email_validator):
     assert str(email_validator.validate_python('simple@example.com')) == 'simple@example.com'
     assert str(email_validator.validate_python(b'simple@example.com')) == 'simple@example.com'
-    with pytest.raises(ValidationError, match=r'Email input should be a string or Email \[type=email_type,'):
+    with pytest.raises(ValidationError, match=r'Input should be a string or email address \[type=email_type,'):
         email_validator.validate_python(123)
 
     # runtime strict
-    with pytest.raises(ValidationError, match=r'Email input should be a string or Email \[type=email_type,'):
+    with pytest.raises(ValidationError, match=r'Input should be a string or email address \[type=email_type,'):
         email_validator.validate_python(b'simple@example.com', strict=True)
 
 
@@ -222,7 +225,7 @@ def test_wrong_type_strict(strict_email_validator):
     email = strict_email_validator.validate_python('simple@example.com')
     assert str(email) == 'simple@example.com'
     assert str(strict_email_validator.validate_python(email)) == 'simple@example.com'
-    with pytest.raises(ValidationError, match=r'Email input should be a string or Email \[type=email_type,'):
+    with pytest.raises(ValidationError, match=r'Input should be a string or email address \[type=email_type,'):
         strict_email_validator.validate_python(b'simple@example.com')
-    with pytest.raises(ValidationError, match=r'Email input should be a string or Email \[type=email_type,'):
+    with pytest.raises(ValidationError, match=r'Input should be a string or email address \[type=email_type,'):
         strict_email_validator.validate_python(123)

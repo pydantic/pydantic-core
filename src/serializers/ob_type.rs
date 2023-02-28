@@ -14,6 +14,7 @@ use strum_macros::EnumString;
 
 use crate::email::PyEmail;
 use crate::url::{PyMultiHostUrl, PyUrl};
+use crate::vendored::email_address::EmailAddress;
 
 #[derive(Debug, Clone)]
 pub struct ObTypeLookup {
@@ -60,7 +61,7 @@ pub enum IsType {
 impl ObTypeLookup {
     fn new(py: Python) -> Self {
         let lib_url = url::Url::parse("https://example.com").unwrap();
-        let lib_email = email_address::EmailAddress::from_str("john.doe@example.com").unwrap();
+        let lib_email = EmailAddress::from_str("john.doe@example.com").unwrap();
         Self {
             none: py.None().as_ref(py).get_type_ptr() as usize,
             int: 0i32.into_py(py).as_ref(py).get_type_ptr() as usize,

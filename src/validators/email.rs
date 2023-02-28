@@ -1,4 +1,3 @@
-use email_address::EmailAddress;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::str::FromStr;
@@ -8,6 +7,7 @@ use crate::email::PyEmail;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
+use crate::vendored::email_address::EmailAddress;
 
 use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -22,7 +22,8 @@ impl EmailValidator {
             Ok(either_str) => {
                 let cow = either_str.as_cow()?;
                 let email_str = cow.as_ref();
-                parse_email(email_str, input)
+                EmailAddress::from_str(email_str)
+                    .map_err(move |e| ValError::new(ErrorType::EmailParsing { error: e.to_string() }, input))
             }
             Err(_) => {
                 if let Some(py_email) = input.input_as_email() {
@@ -34,14 +35,6 @@ impl EmailValidator {
             }
         }
     }
-}
-
-fn parse_email<'email, 'input>(
-    email_str: &'email str,
-    input: &'input impl Input<'input>,
-) -> ValResult<'input, EmailAddress> {
-    EmailAddress::from_str(email_str)
-        .map_err(move |e| ValError::new(ErrorType::EmailParsing { error: e.to_string() }, input))
 }
 
 impl BuildValidator for EmailValidator {

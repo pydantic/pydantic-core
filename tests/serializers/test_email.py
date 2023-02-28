@@ -21,6 +21,26 @@ def test_email():
         assert s.to_python('john.doe@example.com', mode='json') == 'john.doe@example.com'
 
 
+def test_email_with_name():
+    v = SchemaValidator(core_schema.email_schema())
+    s = SchemaSerializer(core_schema.email_schema())
+
+    email = v.validate_python('John Doe <john.doe@example.com>')
+    assert isinstance(email, Email)
+    assert email.domain == 'example.com'
+    assert email.local_part == 'john.doe'
+    assert email.name == 'John Doe'
+    assert email.email == 'john.doe@example.com'
+    assert str(email) == 'John Doe <john.doe@example.com>'
+
+    assert s.to_python(email) == email
+    assert s.to_python(email, mode='json') == 'John Doe <john.doe@example.com>'
+    assert s.to_json(email) == b'"John Doe <john.doe@example.com>"'
+
+    with pytest.warns(UserWarning, match='Expected `email` but got `str` - serialized value may not be as expected'):
+        assert s.to_python('John Doe <john.doe@example.com>', mode='json') == 'John Doe <john.doe@example.com>'
+
+
 def test_email_dict_keys():
     v = SchemaValidator(core_schema.email_schema())
 

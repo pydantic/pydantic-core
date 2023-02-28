@@ -2514,29 +2514,6 @@ def url_schema(
     )
 
 
-def email_schema(
-    *, strict: bool | None = None, ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
-) -> EmailSchema:
-    """
-    Returns a schema that matches a Email value, e.g.:
-
-    ```py
-    from pydantic_core import SchemaValidator, core_schema
-    schema = core_schema.email_schema()
-    v = SchemaValidator(schema)
-    # TODO: Assert this is equal to a constructed URL object
-    v.validate_python('john.doe@example.com')
-    ```
-
-    Args:
-        strict: Whether to use strict URL parsing
-        ref: See [TODO] for details
-        metadata: See [TODO] for details
-        serialization: Custom serialization schema
-    """
-    return dict_not_none(type='email', strict=strict, ref=ref, metadata=metadata, serialization=serialization)
-
-
 class MultiHostUrlSchema(TypedDict, total=False):
     type: Required[Literal['multi-host-url']]
     max_length: int
@@ -2545,16 +2522,6 @@ class MultiHostUrlSchema(TypedDict, total=False):
     default_host: str
     default_port: int
     default_path: str
-    strict: bool
-    ref: str
-    metadata: Any
-    serialization: SerSchema
-
-
-class EmailSchema(TypedDict, total=False):
-    type: Required[Literal['email']]
-    domain: str
-    local_part: str
     strict: bool
     ref: str
     metadata: Any
@@ -2610,6 +2577,46 @@ def multi_host_url_schema(
         metadata=metadata,
         serialization=serialization,
     )
+
+
+class EmailSchema(TypedDict, total=False):
+    type: Required[Literal['email']]
+    name: str  # Simple Name <simple@example.com> => Simple Name
+    domain: str  # Simple Name <simple@example.com> => example.com
+    local_part: str  # Simple Name <simple@example.com> => simple
+    email: str  # Simple Name <simple@example.com> => simple@example.com
+    strict: bool
+    ref: str
+    metadata: Any
+    serialization: SerSchema
+
+
+def email_schema(
+    *, strict: bool | None = None, ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
+) -> EmailSchema:
+    """
+    Returns a schema that matches a Email value, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+    schema = core_schema.email_schema()
+    v = SchemaValidator(schema)
+
+    email = v.validate_python('John Doe <john.doe@example.com>')
+    assert email.local_part == 'john.doe'
+    assert email.domain == 'example.com'
+    assert email.name == 'John Doe'
+    assert email.email == 'john.doe@example.com'
+    assert str(email) == 'John Doe <john.doe@example.com>'
+    ```
+
+    Args:
+        strict: Whether to use strict Email parsing
+        ref: See [TODO] for details
+        metadata: See [TODO] for details
+        serialization: Custom serialization schema
+    """
+    return dict_not_none(type='email', strict=strict, ref=ref, metadata=metadata, serialization=serialization)
 
 
 CoreSchema = Union[

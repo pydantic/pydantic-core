@@ -2,8 +2,8 @@ import sys as _sys
 from typing import Any as _Any
 
 from ._pydantic_core import (
-    Email as Email,
-    MultiHostUrl as MultiHostUrl,
+    Email,
+    MultiHostUrl,
     PydanticCustomError,
     PydanticKnownError,
     PydanticOmit,
@@ -37,7 +37,8 @@ __all__ = (
     'SchemaValidator',
     'SchemaSerializer',
     'Url',
-    'Email' 'MultiHostUrl',
+    'Email',
+    'MultiHostUrl',
     'SchemaError',
     'ErrorDetails',
     'ValidationError',

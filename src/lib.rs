@@ -20,6 +20,7 @@ mod recursion_guard;
 mod serializers;
 mod url;
 mod validators;
+mod vendored;
 
 // required for benchmarks
 pub use self::email::PyEmail;
