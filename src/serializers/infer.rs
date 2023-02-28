@@ -11,6 +11,7 @@ use pyo3::types::{
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::build_tools::{py_err, safe_repr};
+use crate::email::PyEmail;
 use crate::serializers::filter::SchemaFilter;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
@@ -150,6 +151,10 @@ pub(crate) fn infer_to_python_known(
             ObType::Timedelta => {
                 let py_timedelta: &PyDelta = value.downcast()?;
                 extra.config.timedelta_mode.timedelta_to_json(py_timedelta)?
+            }
+            ObType::Email => {
+                let py_email: PyEmail = value.extract()?;
+                py_email.__str__().into_py(py)
             }
             ObType::Url => {
                 let py_url: PyUrl = value.extract()?;
@@ -389,6 +394,10 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 .timedelta_mode
                 .timedelta_serialize(py_timedelta, serializer)
         }
+        ObType::Email => {
+            let py_email: PyEmail = value.extract().map_err(py_err_se_err)?;
+            serializer.serialize_str(py_email.__str__())
+        }
         ObType::Url => {
             let py_url: PyUrl = value.extract().map_err(py_err_se_err)?;
             serializer.serialize_str(py_url.__str__())
@@ -471,6 +480,10 @@ pub(crate) fn infer_json_key_known<'py>(ob_type: &ObType, key: &'py PyAny, extra
         ObType::Timedelta => {
             let py_timedelta: &PyDelta = key.downcast()?;
             extra.config.timedelta_mode.json_key(py_timedelta)
+        }
+        ObType::Email => {
+            let py_email: PyEmail = key.extract()?;
+            Ok(Cow::Owned(py_email.__str__().to_string()))
         }
         ObType::Url => {
             let py_url: PyUrl = key.extract()?;

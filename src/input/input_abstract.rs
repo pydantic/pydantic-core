@@ -3,6 +3,7 @@ use std::fmt;
 use pyo3::prelude::*;
 use pyo3::types::{PyString, PyType};
 
+use crate::email::PyEmail;
 use crate::errors::{InputValue, LocItem, ValResult};
 use crate::{PyMultiHostUrl, PyUrl};
 
@@ -56,6 +57,10 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
     }
 
     fn input_as_url(&self) -> Option<PyUrl> {
+        None
+    }
+
+    fn input_as_email(&self) -> Option<PyEmail> {
         None
     }
 

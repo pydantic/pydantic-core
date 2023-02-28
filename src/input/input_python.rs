@@ -12,6 +12,7 @@ use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
 use crate::build_tools::safe_repr;
+use crate::email::PyEmail;
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValLineError, ValResult};
 use crate::{PyMultiHostUrl, PyUrl};
 
@@ -108,6 +109,10 @@ impl<'a> Input<'a> for PyAny {
 
     fn input_as_url(&self) -> Option<PyUrl> {
         self.extract::<PyUrl>().ok()
+    }
+
+    fn input_as_email(&self) -> Option<PyEmail> {
+        self.extract::<PyEmail>().ok()
     }
 
     fn input_as_multi_host_url(&self) -> Option<PyMultiHostUrl> {

@@ -11,6 +11,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 mod build_context;
 mod build_tools;
+mod email;
 mod errors;
 mod input;
 mod lookup_key;
@@ -21,6 +22,7 @@ mod url;
 mod validators;
 
 // required for benchmarks
+pub use self::email::PyEmail;
 pub use self::url::{PyMultiHostUrl, PyUrl};
 pub use build_tools::SchemaError;
 pub use errors::{list_all_errors, PydanticCustomError, PydanticKnownError, PydanticOmit, ValidationError};
@@ -50,6 +52,7 @@ fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PydanticSerializationError>()?;
     m.add_class::<PydanticSerializationUnexpectedValue>()?;
     m.add_class::<PyUrl>()?;
+    m.add_class::<PyEmail>()?;
     m.add_class::<PyMultiHostUrl>()?;
     m.add_class::<SchemaSerializer>()?;
     m.add_function(wrap_pyfunction!(to_json, m)?)?;

@@ -2,6 +2,7 @@ pub mod any;
 pub mod bytes;
 pub mod datetime_etc;
 pub mod dict;
+pub mod email;
 pub mod format;
 pub mod function;
 pub mod generator;

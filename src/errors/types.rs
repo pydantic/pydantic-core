@@ -342,6 +342,13 @@ pub enum ErrorType {
     UrlScheme {
         expected_schemes: String,
     },
+    #[strum(message = "Email input should be a string or Email")]
+    EmailType,
+    #[strum(message = "Input should be a valid Email, {error}")]
+    EmailParsing {
+        // would be great if this could be a static cow, waiting for https://github.com/servo/rust-url/issues/801
+        error: String,
+    },
 }
 
 macro_rules! render {
@@ -475,6 +482,7 @@ impl ErrorType {
             ),
             Self::UnionTagNotFound { .. } => extract_context!(UnionTagNotFound, ctx, discriminator: String),
             Self::UrlParsing { .. } => extract_context!(UrlParsing, ctx, error: String),
+            Self::EmailParsing { .. } => extract_context!(EmailParsing, ctx, error: String),
             Self::UrlSyntaxViolation { .. } => extract_context!(Cow::Owned, UrlSyntaxViolation, ctx, error: String),
             Self::UrlTooLong { .. } => extract_context!(UrlTooLong, ctx, max_length: usize),
             Self::UrlScheme { .. } => extract_context!(UrlScheme, ctx, expected_schemes: String),
@@ -566,6 +574,7 @@ impl ErrorType {
             } => render!(self, discriminator, tag, expected_tags),
             Self::UnionTagNotFound { discriminator } => render!(self, discriminator),
             Self::UrlParsing { error } => render!(self, error),
+            Self::EmailParsing { error } => render!(self, error),
             Self::UrlSyntaxViolation { error } => render!(self, error),
             Self::UrlTooLong { max_length } => to_string_render!(self, max_length),
             Self::UrlScheme { expected_schemes } => render!(self, expected_schemes),
@@ -618,6 +627,7 @@ impl ErrorType {
                 expected_tags,
             } => py_dict!(py, discriminator, tag, expected_tags),
             Self::UnionTagNotFound { discriminator } => py_dict!(py, discriminator),
+            Self::EmailParsing { error } => py_dict!(py, error),
             Self::UrlParsing { error } => py_dict!(py, error),
             Self::UrlSyntaxViolation { error } => py_dict!(py, error),
             Self::UrlTooLong { max_length } => py_dict!(py, max_length),

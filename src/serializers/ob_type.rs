@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use pyo3::ffi::PyTypeObject;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
@@ -10,6 +12,7 @@ use pyo3::{intern, AsPyPointer};
 use strum::Display;
 use strum_macros::EnumString;
 
+use crate::email::PyEmail;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 #[derive(Debug, Clone)]
@@ -37,6 +40,7 @@ pub struct ObTypeLookup {
     time: usize,
     timedelta: usize,
     // types from this package
+    email: usize,
     url: usize,
     multi_host_url: usize,
     // enum type
@@ -56,6 +60,7 @@ pub enum IsType {
 impl ObTypeLookup {
     fn new(py: Python) -> Self {
         let lib_url = url::Url::parse("https://example.com").unwrap();
+        let lib_email = email_address::EmailAddress::from_str("john.doe@example.com").unwrap();
         Self {
             none: py.None().as_ref(py).get_type_ptr() as usize,
             int: 0i32.into_py(py).as_ref(py).get_type_ptr() as usize,
@@ -76,6 +81,7 @@ impl ObTypeLookup {
             date: PyDate::new(py, 2000, 1, 1).unwrap().get_type_ptr() as usize,
             time: PyTime::new(py, 0, 0, 0, 0, None).unwrap().get_type_ptr() as usize,
             timedelta: PyDelta::new(py, 0, 0, 0, false).unwrap().get_type_ptr() as usize,
+            email: PyEmail::new(lib_email).into_py(py).as_ref(py).get_type_ptr() as usize,
             url: PyUrl::new(lib_url.clone()).into_py(py).as_ref(py).get_type_ptr() as usize,
             multi_host_url: PyMultiHostUrl::new(lib_url, None).into_py(py).as_ref(py).get_type_ptr() as usize,
             enum_type: py.import("enum").unwrap().getattr("Enum").unwrap().get_type_ptr() as usize,
@@ -121,6 +127,7 @@ impl ObTypeLookup {
             ObType::Timedelta => self.timedelta == ob_type,
             ObType::Bytearray => self.bytearray == ob_type,
             ObType::Url => self.url == ob_type,
+            ObType::Email => self.email == ob_type,
             ObType::MultiHostUrl => self.multi_host_url == ob_type,
             ObType::Dataclass => is_dataclass(op_value),
             ObType::Model => is_pydantic_model(op_value),
@@ -200,6 +207,8 @@ impl ObTypeLookup {
             ObType::Timedelta
         } else if ob_type == self.bytearray {
             ObType::Bytearray
+        } else if ob_type == self.email {
+            ObType::Email
         } else if ob_type == self.url {
             ObType::Url
         } else if ob_type == self.multi_host_url {
@@ -297,6 +306,7 @@ pub enum ObType {
     Time,
     Timedelta,
     // types from this package
+    Email,
     Url,
     MultiHostUrl,
     // dataclasses and pydantic models

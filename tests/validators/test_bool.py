@@ -81,6 +81,11 @@ def test_bool_repr():
     assert plain_repr(v) == 'SchemaValidator(name="bool",validator=Bool(BoolValidator{strict:true}),slots=[])'
 
 
+def test_email_repr():
+    v = SchemaValidator({'type': 'email'})
+    assert plain_repr(v) == 'SchemaValidator(name="email",validator=Email(EmailValidator{strict:false}),slots=[])'
+
+
 def test_bool_key(py_and_json: PyAndJson):
     v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'bool'}, 'values_schema': {'type': 'int'}})
     assert v.validate_test({True: 1, False: 2}) == {True: 1, False: 2}

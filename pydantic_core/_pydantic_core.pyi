@@ -20,6 +20,7 @@ __all__ = (
     'build_profile',
     'SchemaValidator',
     'SchemaSerializer',
+    'Email',
     'Url',
     'MultiHostUrl',
     'SchemaError',
@@ -91,6 +92,15 @@ def to_json(
     timedelta_mode: Literal['iso8601', 'float'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64'] = 'utf8',
 ) -> bytes: ...
+
+class Email:
+    scheme: str
+    domain: 'str | None'
+    local_part: 'str | None'
+
+    def __init__(self, email: str): ...
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
 
 class Url:
     scheme: str

@@ -205,6 +205,7 @@ all_schema_functions = [
         {'type': 'lax-or-strict', 'lax_schema': {'type': 'int'}, 'strict_schema': {'type': 'int'}},
     ),
     (core_schema.is_subclass_schema, args(MyModel), {'type': 'is-subclass', 'cls': MyModel}),
+    (core_schema.email_schema, args(), {'type': 'email'}),
 ]
 
 

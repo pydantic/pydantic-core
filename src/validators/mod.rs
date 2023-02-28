@@ -25,6 +25,7 @@ mod custom_error;
 mod date;
 mod datetime;
 mod dict;
+mod email;
 mod float;
 mod frozenset;
 mod function;
@@ -395,6 +396,7 @@ pub fn build_validator<'a>(
         // url types
         url::UrlValidator,
         url::MultiHostUrlValidator,
+        email::EmailValidator,
     )
 }
 
@@ -519,6 +521,7 @@ pub enum CombinedValidator {
     // url types
     Url(url::UrlValidator),
     MultiHostUrl(url::MultiHostUrlValidator),
+    Email(email::EmailValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

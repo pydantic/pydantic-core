@@ -120,6 +120,7 @@ combined_serializer! {
         TypedDict: super::type_serializers::typed_dict::TypedDictSerializer;
         Model: super::type_serializers::model::ModelSerializer;
         Url: super::type_serializers::url::UrlSerializer;
+        Email: super::type_serializers::email::EmailSerializer;
         MultiHostUrl: super::type_serializers::url::MultiHostUrlSerializer;
         Any: super::type_serializers::any::AnySerializer;
         Format: super::type_serializers::format::FormatSerializer;
