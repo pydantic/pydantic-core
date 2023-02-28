@@ -93,6 +93,7 @@ include_trailing_comma = true
 force_grid_wrap = 0
 combine_as_imports = true
 color_output = true
+skip = ["pydantic_core/__init__.py"]
 
 [tool.pyright]
 include = ['pydantic_core', 'tests/test_typing.py']
