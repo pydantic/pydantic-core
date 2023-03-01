@@ -22,7 +22,7 @@ pub enum ThingOrId<T> {
 }
 
 /// `BuildContext` is used to store extra information while building validators and type_serializers
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BuildContext<T> {
     /// set of used refs, useful to see if a `ref` is actually used elsewhere in the schema
     used_refs: AHashSet<String>,
