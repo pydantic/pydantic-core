@@ -238,6 +238,7 @@ An informal description can be found on [Wikipedia](https://en.wikipedia.org/wik
 
 */
 
+use idna::domain_to_unicode;
 use regex::Regex;
 
 #[cfg(feature = "serde_support")]
@@ -664,10 +665,12 @@ fn parse_address(address: &str) -> Result<EmailAddress, Error> {
     // Deals with cases of '@' in `local-part`, if it is quoted they are legal, if
     // not then they'll return an `InvalidCharacter` error later.
     //
-    let (local_part, domain, _) = split_parts(address)?;
+    let idna_address = &domain_to_unicode(address).0;
+    let (local_part, domain, _) = split_parts(idna_address)?;
+
     parse_local_part(local_part)?;
     parse_domain(domain)?;
-    validate_email_length(address)?;
+    validate_email_length(idna_address)?;
     Ok(EmailAddress(address.to_owned()))
 }
 

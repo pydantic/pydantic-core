@@ -181,14 +181,7 @@ def generate_random_length_str(n: int) -> str:
             },
         ),
         ('用户@例子.广告', {'str()': '用户@例子.广告', 'domain': '例子.广告', 'local_part': '用户'}),  # Chinese
-        # ( # Hindi -> TODO: Not working... assuming something to do with encoding between python/rust
-        #     'अजय@डाटा.भारत',
-        #     {
-        #         'str()': 'अजय@डाटा.भारत',
-        #         'domain': 'अजय',
-        #         'local_part': 'डाटा.भारत',
-        #     },
-        # ),
+        ('अजय@डाटा.भारत', {'str()': 'अजय@डाटा.भारत', 'domain': 'डाटा.भारत', 'local_part': 'अजय'}),
         (  # Ukranian
             'квіточка@пошта.укр',
             {'str()': 'квіточка@пошта.укр', 'domain': 'пошта.укр', 'local_part': 'квіточка'},
@@ -265,21 +258,16 @@ def generate_random_length_str(n: int) -> str:
                 'email': 'чебурашкаящик-с-апельсинами.рф@example.tld',
             },
         ),
-        # TODO: Unsure why is this broken
-        # ( # Hindi
-        #     'उदाहरण.परीक्ष@"domain".with.idn.tld',
-        #     {
-        #         'local_part': 'उदाहरण.परीक्ष',
-        #         'domain': '"domain".with.idn.tld',
-        #         'email': 'उदाहरण.परीक्ष@"domain".with.idn.tld',
-        #     },
-        # ),
+        (
+            'उदाहरण.परीक्ष@with.idn.tld',
+            {'local_part': 'उदाहरण.परीक्ष', 'domain': 'with.idn.tld', 'email': 'उदाहरण.परीक्ष@with.idn.tld'},
+        ),
         ('ιωάννης@εεττ.gr', {'local_part': 'ιωάννης', 'domain': 'εεττ.gr', 'email': 'ιωάννης@εεττ.gr'}),
         ## Negative cases
         ('white space@test', Err('Invalid character.')),
         ('\n@test', Err('Invalid character.')),
         ## TODO: Cannot find any reference in RFC's to these "invalid characters" assuming idna.uts46_remap will fix
-        # ('\u2005@test', Err('Invalid character.')),  # four-per-em space (Zs)
+        ('\u2005@test', Err('Invalid character.')),  # four-per-em space (Zs)
         # ('\u009C@test', Err('Invalid character.')),  # string terminator (Cc)
         # ('\u200B@test', Err('Invalid character.')),  # zero-width space (Cf)
         # ('\u202Dforward-\u202Ereversed@test', Err('Invalid character.')),  # BIDI (Cf)
@@ -295,27 +283,24 @@ def generate_random_length_str(n: int) -> str:
         # ('me@onion.onion.onion', Err('Invalid character.')),
         # ('me@test.test.test', Err('Invalid character.')),
         ##
-        # TODO: This is a valid test case, but expected
-        # "The part after the @-sign is not valid. It should have a period." globally_deliverable flag
+        # "The part after the @-sign is not valid. It should have a period." TODO: globally_deliverable flag
         ('my@localhost', Err('Too few parts in the domain')),
         ('my@.leadingdot.com', Err('Invalid character.')),
         ('my@twodots..com', Err('Invalid character.')),
         ('my@trailingdot.com.', Err('Invalid character.')),
         ('me@-leadingdash', Err('Invalid character.')),
         ('me@trailingdash-', Err('Invalid character.')),
-        # TODO: idna.uts46_remap
-        # ('my@．leadingfwdot.com', Err('Invalid character.')),
-        # ('my@twofwdots．．.com', Err('Invalid character.')),
-        # ('my@trailingfwdot.com．', Err('Invalid character.')),
-        # ('me@－leadingdashfw', Err('Invalid character.')),
-        # ('me@trailingdashfw－', Err('Invalid character.')),
+        ('my@．leadingfwdot.com', Err('Invalid character.')),
+        ('my@twofwdots．．.com', Err('Invalid character.')),
+        ('my@trailingfwdot.com．', Err('Invalid character.')),
+        ('me@－leadingdashfw', Err('Invalid character.')),
+        ('me@trailingdashfw－', Err('Invalid character.')),
         ('my@baddash.-.com', Err('Invalid character.')),
         ('my@baddash.-a.com', Err('Invalid character.')),
         ('my@baddash.b-.com', Err('Invalid character.')),
-        # TODO: idna.uts46_remap
-        # ('my@baddashfw.－.com', Err('Invalid character.')),
-        # ('my@baddashfw.－a.com', Err('Invalid character.')),
-        # ('my@baddashfw.b－.com', Err('Invalid character.')),
+        ('my@baddashfw.－.com', Err('Invalid character.')),
+        ('my@baddashfw.－a.com', Err('Invalid character.')),
+        ('my@baddashfw.b－.com', Err('Invalid character.')),
         ('my@example.com\n', Err('Invalid character.')),
         ('my@example\n.com', Err('Invalid character.')),
         ('.leadingdot@domain.com', Err('Invalid character.')),
@@ -346,12 +331,12 @@ def generate_random_length_str(n: int) -> str:
             'me@中1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555566.com',
             Err('Domain is too long. Length limit: 254'),
         ),
-        # TODO: These seem to be valid... - len(email.encode(idna) > 255)
+        # TODO: These seem to be when we need to encode to punycode, then length is exceeded?
         (
             'my.long.address@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.11111111112222222222333333333344444.info',
             Err('The Address is too long. Length limit: 254'),
         ),
-        # ('my.long.address@λ111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.11111111112222222222333333.info', Err('The Address is too long. Length limit: 254')),  # noqa: E501
+        # ('my.long.address@111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.11111111112222222222333333.info', Err('The Address is too long. Length limit: 254')),  # noqa: E501
         (
             'my.long.address@λ111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444.info',
             Err('The Address is too long. Length limit: 254'),
@@ -367,14 +352,10 @@ def generate_random_length_str(n: int) -> str:
             'me@x!',
             Err('Invalid character.'),
         ),  # A "name" (Net, Host, Gateway, or Domain name) is a text string up to 24 characters drawn from the alphabet (A-Z), digits (0-9), minus sign (-), and period (.).   # noqa: E501
-        # ('me@xn--0.tld', Err('Invalid character.')), # => Cannot be decoded by punnycode
+        # ('me@xn--0.tld', Err('Invalid character.')), # => TODO: Cannot be decoded by punnycode
         # Labels within the class of R-LDH labels that are not prefixed with "xn--" are also not valid IDNA labels.  To allow for future use of mechanisms similar to IDNA, those labels MUST NOT be processed   # noqa: E501
         ('me@yy--0.tld', Err('Invalid label.')),
-        # ('me@yy－－0.tld', Err('Invalid character.')),
-        # ^1        The labels must follow the rules for ARPANET host names.  They must
-        # start with a letter, end with a letter or digit, and have as interior
-        # characters only letters, digits, and hyphen.  There are also some
-        # restrictions on the length.  Labels must be 63 characters or less.
+        ('me@yy－－0.tld', Err('Invalid label.')),
     ],
 )
 def test_email_cases(email_validator, email, expected, mode):
