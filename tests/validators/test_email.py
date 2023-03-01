@@ -209,12 +209,13 @@ def generate_random_length_str(n: int) -> str:
         ('john.doe@', Err('Domain is empty.')),
         (f'john.doe@{generate_random_length_str(63)}.example.com', {'local_part': 'john.doe'}),
         (f'john.doe@{generate_random_length_str(64)}.example.com', Err('A sub-domain is too long. Length limit: 63')),
-        (f'john.doe@example.{generate_random_length_str(254-len("john.doe@example."))}', {'local_part': 'john.doe'}),
+        (f'john.doe@example.{generate_random_length_str(63)}', {'local_part': 'john.doe'}),
+        (f'john.doe@example.{generate_random_length_str(64)}', Err('A sub-domain is too long. Length limit: 63')),
         (
             f'john.doe@example.{generate_random_length_str(255-len("example."))}',
             Err('Domain is too long. Length limit: 254'),
         ),
-        (f'john.doe@e.{generate_random_length_str(250)}', Err('The Address is too long. Length limit: 254')),
+        (f'john.doe@e.{generate_random_length_str(250)}', Err('A sub-domain is too long. Length limit: 63')),
         # Error available but not used in email_address rust package
         ('john.doe@com', Err('Too few parts in the domain')),
         # ('@example.com', Err('Invalid placement of the domain separator')),
