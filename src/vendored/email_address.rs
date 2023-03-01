@@ -238,6 +238,8 @@ An informal description can be found on [Wikipedia](https://en.wikipedia.org/wik
 
 */
 
+use regex::Regex;
+
 #[cfg(feature = "serde_support")]
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
@@ -271,12 +273,15 @@ pub enum Error {
     DomainTooFew,
     /// Invalid placement of the domain separator (character: '.').
     DomainInvalidSeparator,
+    /// The overall address is too long
+    AddressTooLong,
     /// The quotes (character: '"') around `local-part` are unbalanced.
     UnbalancedQuotes,
     /// A Comment within the either the `local-part`, or `domain`, was malformed.
     InvalidComment,
     /// An IP address in a `domain-literal` was malformed.
     InvalidIPAddress,
+    InvalidLabel,
 }
 
 ///
@@ -296,6 +301,7 @@ pub struct EmailAddress(String);
 const LOCAL_PART_MAX_LENGTH: usize = 64;
 const DOMAIN_MAX_LENGTH: usize = 254; // see: https://www.rfc-editor.org/errata_search.php?rfc=3696&eid=1690
 const SUB_DOMAIN_MAX_LENGTH: usize = 63;
+const ADDRESS_MAX_LENGTH: usize = 254;
 
 #[allow(dead_code)]
 const CR: char = '\r';
@@ -314,6 +320,7 @@ const RBRACKET: char = ']';
 const LPAREN: char = '(';
 #[allow(dead_code)]
 const RPAREN: char = ')';
+const HYPHEN: char = '-';
 
 const UTF8_START: char = '\u{0080}';
 
@@ -335,9 +342,13 @@ impl Display for Error {
             Error::DomainInvalidSeparator => {
                 write!(f, "Invalid placement of the domain separator '{:?}", DOT)
             }
+            Error::AddressTooLong => {
+                write!(f, "The Address is too long. Length limit: {}", ADDRESS_MAX_LENGTH)
+            }
             Error::InvalidIPAddress => write!(f, "Invalid IP Address specified for domain."),
             Error::UnbalancedQuotes => write!(f, "Quotes around the local-part are unbalanced."),
             Error::InvalidComment => write!(f, "A comment was badly formed."),
+            Error::InvalidLabel => write!(f, "Invalid label."),
         }
     }
 }
@@ -656,7 +667,15 @@ fn parse_address(address: &str) -> Result<EmailAddress, Error> {
     let (local_part, domain, _) = split_parts(address)?;
     parse_local_part(local_part)?;
     parse_domain(domain)?;
+    validate_email_length(address)?;
     Ok(EmailAddress(address.to_owned()))
+}
+
+fn validate_email_length(address: &str) -> Result<(), Error> {
+    if address.len() <= ADDRESS_MAX_LENGTH {
+        return Ok(());
+    }
+    Error::AddressTooLong.into()
 }
 
 fn split_parts(address: &str) -> Result<(&str, &str, &str), Error> {
@@ -703,7 +722,6 @@ fn parse_local_part(part: &str) -> Result<(), Error> {
 fn parse_quoted_local_part(part: &str) -> Result<(), Error> {
     if is_qcontent(part) {
         return Ok(());
-    } else {
     }
     Error::InvalidCharacter.into()
 }
@@ -720,6 +738,10 @@ fn parse_domain(part: &str) -> Result<(), Error> {
         Error::DomainEmpty.into()
     } else if part.len() > DOMAIN_MAX_LENGTH {
         Error::DomainTooLong.into()
+    } else if part.starts_with(HYPHEN) || part.ends_with(HYPHEN) || part.contains("-.") || part.contains(".-") {
+        // An email address cannot have a period and a hyphen next to each other
+        // An email address cannot have a {} immediately after the @-sign.', 'An email address cannot end with a {}.'
+        Error::InvalidCharacter.into()
     } else if part.starts_with(LBRACKET) && part.ends_with(RBRACKET) {
         parse_literal_domain(&part[1..part.len() - 1])
     } else {
@@ -728,20 +750,38 @@ fn parse_domain(part: &str) -> Result<(), Error> {
 }
 
 fn parse_text_domain(part: &str) -> Result<(), Error> {
+    if !part.ends_with(char::is_alphabetic) {
+        return Error::InvalidCharacter.into(); // TODO
+    }
     if is_dot_atom_text(part) {
-        for sub_part in part.split(DOT) {
+        let sub_parts: Vec<&str> = part.split(DOT).collect();
+        if sub_parts.len() < 2 {
+            return Error::DomainTooFew.into();
+        }
+        for sub_part in sub_parts {
             if sub_part.len() > SUB_DOMAIN_MAX_LENGTH {
                 return Error::SubDomainTooLong.into();
             }
+            is_valid_label(sub_part)?;
         }
         return Ok(());
     }
     Error::InvalidCharacter.into()
 }
 
+fn is_valid_label(label: &str) -> Result<(), Error> {
+    let re = Regex::new(r"..--").unwrap();
+    for capture in re.find_iter(label) {
+        if capture.as_str() != "xn--" {
+            return Error::InvalidLabel.into(); // TODO: Better error
+        }
+    }
+    Ok(())
+}
+
 fn parse_literal_domain(part: &str) -> Result<(), Error> {
     if part.chars().all(is_dtext_char) {
-        return Ok(());
+        return is_valid_label(part);
     }
     Error::InvalidCharacter.into()
 }

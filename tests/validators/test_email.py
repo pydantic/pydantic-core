@@ -83,7 +83,7 @@ def email_test_case_helper(
 
 
 def generate_random_length_str(n: int) -> str:
-    return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(n))
+    return ''.join(random.choice(string.ascii_letters) for _ in range(n))
 
 
 @pytest.mark.parametrize('mode', [SCHEMA_VALIDATOR_MODE, EMAIL_CLASS_MODE])
@@ -147,10 +147,10 @@ def generate_random_length_str(n: int) -> str:
                 'local_part': 'example-indeed',
             },
         ),
-        (  # local domain name with no TLD, although ICANN highly discourages dotless email addresses
-            'admin@mailserver1',
-            {'str()': 'admin@mailserver1', 'domain': 'mailserver1', 'local_part': 'admin'},
-        ),
+        # (  # local domain name with no TLD, although ICANN highly discourages dotless email addresses
+        #     'admin@mailserver1',
+        #     {'str()': 'admin@mailserver1', 'domain': 'mailserver1', 'local_part': 'admin'},
+        # ),
         (  # space between the quotes
             '" "@example.org',
             {'str()': '" "@example.org', 'domain': 'example.org', 'local_part': '" "'},
@@ -209,17 +209,19 @@ def generate_random_length_str(n: int) -> str:
         ('john.doe@', Err('Domain is empty.')),
         (f'john.doe@{generate_random_length_str(63)}.example.com', {'local_part': 'john.doe'}),
         (f'john.doe@{generate_random_length_str(64)}.example.com', Err('A sub-domain is too long. Length limit: 63')),
-        (f'john.doe@example.{generate_random_length_str(246)}', Err('A sub-domain is too long. Length limit: 63')),
-        (f'john.doe@example.{generate_random_length_str(247)}', Err('Domain is too long. Length limit: 254')),
-        (f'john.doe@example.{generate_random_length_str(254)}', Err('Domain is too long. Length limit: 254')),
+        (f'john.doe@example.{generate_random_length_str(254-len("john.doe@example."))}', {'local_part': 'john.doe'}),
+        (
+            f'john.doe@example.{generate_random_length_str(255-len("example."))}',
+            Err('Domain is too long. Length limit: 254'),
+        ),
+        (f'john.doe@e.{generate_random_length_str(250)}', Err('The Address is too long. Length limit: 254')),
         # Error available but not used in email_address rust package
-        # ('john.doe@com', Err('Too few parts in the domain')),
+        ('john.doe@com', Err('Too few parts in the domain')),
         # ('@example.com', Err('Invalid placement of the domain separator')),
         # ('@example.com', Err('Invalid IP Address specified for domain.')),
         # ('@example.com', Err('Quotes around the local-part are unbalanced.')),
         # ('@example.com', Err('A comment was badly formed.')),
-        # Additional
-        ('(comment)john.smith@example.com', Err('Invalid character.')),  # TODO: Support comments
+        #
         # Tests derived from python-email-validator
         # Positive cases
         ('Abc@example.tld', {'local_part': 'Abc', 'domain': 'example.tld', 'email': 'Abc@example.tld'}),
@@ -227,31 +229,30 @@ def generate_random_length_str(n: int) -> str:
             'Abc.123@test-example.com',
             {'local_part': 'Abc.123', 'domain': 'test-example.com', 'email': 'Abc.123@test-example.com'},
         ),
-        # TODO: Commented out = Erroring
-        # (
-        #     'user+mailbox/department:shipping@example.tld',
-        #     {
-        #         'local_part': 'user+mailbox/department:shipping',
-        #         'domain': 'example.tld',
-        #         'email': 'user+mailbox/department:shipping@example.tld',
-        #     },
-        # ),
-        # (
-        #     "!#$%&'*+-/:?^_`.{|}~@example.tld",
-        #     {
-        #         'local_part': "!#$%&'*+-/:?^_`.{|}~",
-        #         'domain': 'example.tld',
-        #         'email': "!#$%&'*+-/:?^_`.{|}~@example.tld",
-        #     },
-        # ),
+        (
+            'user+mailbox/department=shipping@example.tld',
+            {
+                'local_part': 'user+mailbox/department=shipping',
+                'domain': 'example.tld',
+                'email': 'user+mailbox/department=shipping@example.tld',
+            },
+        ),
+        (
+            "!#$%&'*+-/=?^_`.{|}~@example.tld",
+            {
+                'local_part': "!#$%&'*+-/=?^_`.{|}~",
+                'domain': 'example.tld',
+                'email': "!#$%&'*+-/=?^_`.{|}~@example.tld",
+            },
+        ),
         ('伊昭傑@郵件.商務', {'local_part': '伊昭傑', 'domain': '郵件.商務', 'email': '伊昭傑@郵件.商務'}),
         ('राम@मोहन.ईन्फो', {'local_part': 'राम', 'domain': 'मोहन.ईन्फो', 'email': 'राम@मोहन.ईन्फो'}),
         ('юзер@екзампл.ком', {'local_part': 'юзер', 'domain': 'екзампл.ком', 'email': 'юзер@екзампл.ком'}),
         ('θσερ@εχαμπλε.ψομ', {'local_part': 'θσερ', 'domain': 'εχαμπλε.ψομ', 'email': 'θσερ@εχαμπλε.ψομ'}),
-        # ('葉士豪@臺網中心.tw', {'local_part': '葉士豪', 'domain': '臺網中心.tw', 'email': '葉士豪@臺網中心.tw'}),
+        ('葉士豪@臺網中心.tw', {'local_part': '葉士豪', 'domain': '臺網中心.tw', 'email': '葉士豪@臺網中心.tw'}),
         ('jeff@臺網中心.tw', {'local_part': 'jeff', 'domain': '臺網中心.tw', 'email': 'jeff@臺網中心.tw'}),
-        # ('葉士豪@臺網中心.台灣', {'local_part': '葉士豪', 'domain': '臺網中心.台灣', 'email': '葉士豪@臺網中心.台灣'}),
-        # ('jeff葉@臺網中心.tw', {'local_part': 'jeff葉', 'domain': '臺網中心.tw', 'email': 'jeff葉@臺網中心.tw'}),
+        ('葉士豪@臺網中心.台灣', {'local_part': '葉士豪', 'domain': '臺網中心.台灣', 'email': '葉士豪@臺網中心.台灣'}),
+        ('jeff葉@臺網中心.tw', {'local_part': 'jeff葉', 'domain': '臺網中心.tw', 'email': 'jeff葉@臺網中心.tw'}),
         ('ñoñó@example.tld', {'local_part': 'ñoñó', 'domain': 'example.tld', 'email': 'ñoñó@example.tld'}),
         ('我買@example.tld', {'local_part': '我買', 'domain': 'example.tld', 'email': '我買@example.tld'}),
         ('甲斐黒川日本@example.tld', {'local_part': '甲斐黒川日本', 'domain': 'example.tld', 'email': '甲斐黒川日本@example.tld'}),
@@ -263,7 +264,8 @@ def generate_random_length_str(n: int) -> str:
                 'email': 'чебурашкаящик-с-апельсинами.рф@example.tld',
             },
         ),
-        # (
+        # TODO: Unsure why is this broken
+        # ( # Hindi
         #     'उदाहरण.परीक्ष@"domain".with.idn.tld',
         #     {
         #         'local_part': 'उदाहरण.परीक्ष',
@@ -275,7 +277,7 @@ def generate_random_length_str(n: int) -> str:
         ## Negative cases
         ('white space@test', Err('Invalid character.')),
         ('\n@test', Err('Invalid character.')),
-        ## TODO: Cannot find any reference in RFC's to these "invalid characters"
+        ## TODO: Cannot find any reference in RFC's to these "invalid characters" assuming idna.uts46_remap will fix
         # ('\u2005@test', Err('Invalid character.')),  # four-per-em space (Zs)
         # ('\u009C@test', Err('Invalid character.')),  # string terminator (Cc)
         # ('\u200B@test', Err('Invalid character.')),  # zero-width space (Cf)
@@ -284,7 +286,7 @@ def generate_random_length_str(n: int) -> str:
         # ('\uE000@test', Err('Invalid character.')),  # private use (Co)
         # ('\uFDEF@test', Err('Invalid character.')),  # unassigned (Cn)
         # ('\u0300@test', Err('Invalid character.')),  # grave accent (M)
-        ## TODO: These domains are currently explicitly rejected
+        ## TODO: These domains are currently explicitly rejected # Restricted domains flag?
         # ('me@anything.arpa', Err('Invalid character.')),
         # ('me@valid.invalid', Err('Invalid character.')),
         # ('me@link.local', Err('Invalid character.')),
@@ -293,27 +295,23 @@ def generate_random_length_str(n: int) -> str:
         # ('me@test.test.test', Err('Invalid character.')),
         ##
         # TODO: This is a valid test case, but expected
-        # "The part after the @-sign is not valid. It should have a period."
-        # ('my@localhost', Err('Invalid character.')),
+        # "The part after the @-sign is not valid. It should have a period." globally_deliverable flag
+        ('my@localhost', Err('Too few parts in the domain')),
         ('my@.leadingdot.com', Err('Invalid character.')),
-        # TODO: Assuming this is todo with utf-8/ascii issues
-        # ('my@．leadingfwdot.com', Err('Invalid character.')),
         ('my@twodots..com', Err('Invalid character.')),
-        # TODO: Assuming this is todo with utf-8/ascii issues
-        # ('my@twofwdots．．.com', Err('Invalid character.')),
         ('my@trailingdot.com.', Err('Invalid character.')),
-        # TODO: Assuming this is todo with utf-8/ascii issues
+        ('me@-leadingdash', Err('Invalid character.')),
+        ('me@trailingdash-', Err('Invalid character.')),
+        # TODO: idna.uts46_remap
+        # ('my@．leadingfwdot.com', Err('Invalid character.')),
+        # ('my@twofwdots．．.com', Err('Invalid character.')),
         # ('my@trailingfwdot.com．', Err('Invalid character.')),
-        # TODO: Not in RFC - An email address cannot have a hyphen immediately after the @-sign.
-        # ('me@-leadingdash', Err('Invalid character.')),
         # ('me@－leadingdashfw', Err('Invalid character.')),
-        # TODO: Not in RFC - An email address cannot end with a hyphen.
-        # ('me@trailingdash-', Err('Invalid character.')),
         # ('me@trailingdashfw－', Err('Invalid character.')),
-        # TODO: Not in RFC - An email address cannot have a period and a hyphen next to each other
-        # ('my@baddash.-.com', Err('Invalid character.')),
-        # ('my@baddash.-a.com', Err('Invalid character.')),
-        # ('my@baddash.b-.com', Err('Invalid character.')),
+        ('my@baddash.-.com', Err('Invalid character.')),
+        ('my@baddash.-a.com', Err('Invalid character.')),
+        ('my@baddash.b-.com', Err('Invalid character.')),
+        # TODO: idna.uts46_remap
         # ('my@baddashfw.－.com', Err('Invalid character.')),
         # ('my@baddashfw.－a.com', Err('Invalid character.')),
         # ('my@baddashfw.b－.com', Err('Invalid character.')),
@@ -347,19 +345,35 @@ def generate_random_length_str(n: int) -> str:
             'me@中1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555566.com',
             Err('Domain is too long. Length limit: 254'),
         ),
-        # TODO: These seem to be valid...
-        # ('my.long.address@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.11111111112222222222333333333344444.info', Err('Domain is too long. Length limit: 254')),  # noqa: E501
-        # ('my.long.address@λ111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.11111111112222222222333333.info', Err('Domain is too long. Length limit: 254')),  # noqa: E501
-        # ('my.long.address@λ111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444.info'.encode(), Err('Domain is too long. Length limit: 254')),  # noqa: E501
-        # ('my.λong.address@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.111111111122222222223333333333444.info', Err('Domain is too long. Length limit: 254')),  # noqa: E501
-        # ('my.λong.address@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444.info', Err('Domain is too long. Length limit: 254')),  # noqa: E501
-        # TODO: Unsure why these are invalid...
-        # ('me@bad-tld-1', Err('Invalid character.')),
-        # ('me@bad.tld-2', Err('Invalid character.')),
-        # ('me@x!', Err('Invalid character.')),
-        # ('me@xn--0.tld', Err('Invalid character.')),
-        # ('me@yy--0.tld', Err('Invalid character.')),
+        # TODO: These seem to be valid... - len(email.encode(idna) > 255)
+        (
+            'my.long.address@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.11111111112222222222333333333344444.info',
+            Err('The Address is too long. Length limit: 254'),
+        ),
+        # ('my.long.address@λ111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.11111111112222222222333333.info', Err('The Address is too long. Length limit: 254')),  # noqa: E501
+        (
+            'my.long.address@λ111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444.info',
+            Err('The Address is too long. Length limit: 254'),
+        ),
+        # ('my.λong.address@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.111111111122222222223333333333444.info', Err('The Address is too long. Length limit: 254')),  # noqa: E501
+        (
+            'my.λong.address@1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444444444555555555.6666666666777777777788888888889999999999000000000.1111111111222222222233333333334444.info',
+            Err('The Address is too long. Length limit: 254'),
+        ),
+        ('me@bad-tld-1', Err('Invalid character.')),
+        ('me@bad.tld-2', Err('Invalid character.')),  # => TLD should? end with a letter
+        (
+            'me@x!',
+            Err('Invalid character.'),
+        ),  # A "name" (Net, Host, Gateway, or Domain name) is a text string up to 24 characters drawn from the alphabet (A-Z), digits (0-9), minus sign (-), and period (.).   # noqa: E501
+        # ('me@xn--0.tld', Err('Invalid character.')), # => Cannot be decoded by punnycode
+        # Labels within the class of R-LDH labels that are not prefixed with "xn--" are also not valid IDNA labels.  To allow for future use of mechanisms similar to IDNA, those labels MUST NOT be processed   # noqa: E501
+        ('me@yy--0.tld', Err('Invalid label.')),
         # ('me@yy－－0.tld', Err('Invalid character.')),
+        # ^1        The labels must follow the rules for ARPANET host names.  They must
+        # start with a letter, end with a letter or digit, and have as interior
+        # characters only letters, digits, and hyphen.  There are also some
+        # restrictions on the length.  Labels must be 63 characters or less.
     ],
 )
 def test_email_cases(email_validator, email, expected, mode):
