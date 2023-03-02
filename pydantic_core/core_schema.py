@@ -2554,6 +2554,8 @@ class DefinitionsSchema(TypedDict, total=False):
     type: Required[Literal['definitions']]
     schema: Required[CoreSchema]
     definitions: Required[List[CoreSchema]]
+    metadata: Any
+    serialization: SerSchema
 
 
 def definitions_schema(schema: CoreSchema, definitions: list[CoreSchema]) -> DefinitionsSchema:
