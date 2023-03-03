@@ -150,9 +150,7 @@ impl SchemaSerializer {
         Ok(())
     }
 
-    fn __clear__(&mut self) {
-        self.slots.clear()
-    }
+    fn __clear__(&mut self) {}
 }
 
 #[allow(clippy::too_many_arguments)]
