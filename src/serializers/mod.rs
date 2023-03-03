@@ -137,6 +137,7 @@ impl SchemaSerializer {
             self.serializer, self.slots
         )
     }
+
     fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
         self.serializer.py_gc_traverse(&visit)?;
         for slot in self.slots.iter() {
@@ -144,6 +145,7 @@ impl SchemaSerializer {
         }
         Ok(())
     }
+
     fn __clear__(&mut self) {
         self.serializer.py_gc_clear();
         for slot in self.slots.iter_mut() {
