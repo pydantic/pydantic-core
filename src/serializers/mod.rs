@@ -22,6 +22,20 @@ mod shared;
 mod type_serializers;
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
+pub struct PythonReferenceHolder {
+    #[pyo3(get)]
+    pyobj: Py<PyAny>
+}
+
+#[pymethods]
+impl PythonReferenceHolder {
+    #[new]
+    pub fn py_new(pyobj: Py<PyAny>) -> Self {
+        Self { pyobj }
+    }
+}
+
+#[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
 pub struct SchemaSerializer {
     serializer: CombinedSerializer,
