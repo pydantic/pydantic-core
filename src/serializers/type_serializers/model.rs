@@ -17,7 +17,7 @@ use super::{
 
 #[derive(Debug, Clone)]
 pub struct ModelSerializer {
-    class: Py<PyType>,
+    pub class: Py<PyType>,
     serializer: Box<CombinedSerializer>,
     name: String,
 }

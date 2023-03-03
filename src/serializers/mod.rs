@@ -1,7 +1,9 @@
 use std::fmt::Debug;
 
+use pyo3::gc::PyVisit;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
+use pyo3::PyTraverseError;
 
 use crate::build_context::BuildContext;
 use crate::validators::SelfValidator;
@@ -135,6 +137,21 @@ impl SchemaSerializer {
             "SchemaSerializer(serializer={:#?}, slots={:#?})",
             self.serializer, self.slots
         )
+    }
+
+    #[allow(clippy::single_match)] // presumably this will eventually be a bigger match..
+    fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
+        match &self.serializer {
+            CombinedSerializer::Model(x) => {
+                visit.call(&x.class)?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn __clear__(&mut self) {
+        self.slots.clear()
     }
 }
 
