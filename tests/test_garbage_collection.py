@@ -8,8 +8,8 @@ import pytest
 from pydantic_core import SchemaSerializer, SchemaValidator, core_schema
 
 
-@pytest.mark.skipif(
-    platform.python_implementation() == 'PyPy', reason='https://foss.heptapod.net/pypy/pypy/-/issues/3899'
+@pytest.mark.xfail(
+    condition=platform.python_implementation() == 'PyPy', reason='https://foss.heptapod.net/pypy/pypy/-/issues/3899'
 )
 def test_gc_schema_serializer() -> None:
     # test for https://github.com/pydantic/pydantic/issues/5136
@@ -37,8 +37,8 @@ def test_gc_schema_serializer() -> None:
     assert len(cache) == 0
 
 
-@pytest.mark.skipif(
-    platform.python_implementation() == 'PyPy', reason='https://foss.heptapod.net/pypy/pypy/-/issues/3899'
+@pytest.mark.xfail(
+    condition=platform.python_implementation() == 'PyPy', reason='https://foss.heptapod.net/pypy/pypy/-/issues/3899'
 )
 def test_gc_schema_validator() -> None:
     # test for https://github.com/pydantic/pydantic/issues/5136
