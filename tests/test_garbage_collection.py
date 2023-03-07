@@ -17,7 +17,15 @@ def test_gc_schema_serializer() -> None:
         __schema__: SchemaSerializer
 
         def __init_subclass__(cls) -> None:
-            cls.__schema__ = SchemaSerializer(core_schema.model_schema(cls, core_schema.typed_dict_schema({})))
+            cls.__schema__ = SchemaSerializer(
+                core_schema.model_schema(
+                    cls,
+                    core_schema.typed_dict_schema(
+                        {'x': core_schema.typed_dict_field(core_schema.definition_reference_schema('model'))}
+                    ),
+                    ref='model',
+                )
+            )
 
     cache: 'WeakValueDictionary[int, Any]' = WeakValueDictionary()
 
@@ -46,7 +54,15 @@ def test_gc_schema_validator() -> None:
         __validator__: SchemaValidator
 
         def __init_subclass__(cls) -> None:
-            cls.__validator__ = SchemaValidator(core_schema.model_schema(cls, core_schema.typed_dict_schema({})))
+            cls.__validator__ = SchemaValidator(
+                core_schema.model_schema(
+                    cls,
+                    core_schema.typed_dict_schema(
+                        {'x': core_schema.typed_dict_field(core_schema.definition_reference_schema('model'))}
+                    ),
+                    ref='model',
+                )
+            )
 
     cache: 'WeakValueDictionary[int, Any]' = WeakValueDictionary()
 
