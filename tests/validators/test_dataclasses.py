@@ -177,3 +177,6 @@ def test_dataclass_init_only_no_fields(py_and_json: PyAndJson, input_value, expe
             assert exc_info.value.errors() == expected.errors
     else:
         assert v.validate_test(input_value) == expected
+
+
+# TODO test aliases

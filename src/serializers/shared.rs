@@ -98,6 +98,7 @@ combined_serializer! {
         super::type_serializers::other::IsSubclassBuilder;
         super::type_serializers::other::CallableBuilder;
         super::type_serializers::definitions::DefinitionsBuilder;
+        super::type_serializers::dataclass::DataclassArgsBuilder;
     }
     // `both` means the struct is added to both the `CombinedSerializer` enum and the match statement in
     // `find_serializer` so they can be used via a `type` str.

@@ -2029,7 +2029,9 @@ def typed_dict_field(
     Args:
         schema: The schema to use for the field
         required: Whether the field is required
-        alias: The alias(es) to use for the field
+        validation_alias: The alias(es) to use to find the field in the validation data
+        serialization_alias: The alias to use as a key when serializing
+        serialization_exclude: Whether to exclude the field when serializing
         frozen: Whether the field is frozen
     """
     return dict_not_none(
@@ -2190,7 +2192,9 @@ class DataclassField(TypedDict, total=False):
     schema: Required[CoreSchema]
     positional: bool  # default: False
     init_only: bool  # default: False
-    alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
+    validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
+    serialization_alias: str
+    serialization_exclude: bool  # default: False
 
 
 def dataclass_field(
@@ -2199,7 +2203,9 @@ def dataclass_field(
     *,
     positional: bool | None = None,
     init_only: bool | None = None,
-    alias: str | list[str | int] | list[list[str | int]] | None = None,
+    validation_alias: str | list[str | int] | list[list[str | int]] | None = None,
+    serialization_alias: str | None = None,
+    serialization_exclude: bool | None = None,
 ) -> DataclassField:
     """
     Returns a schema for a dataclass field, e.g.:
@@ -2217,9 +2223,19 @@ def dataclass_field(
         schema: The schema to use for the argument parameter
         positional: Whether the field can be set with a positional argument as well as a keyword argument
         init_only: Whether the field should be omitted  from `__dict__` and passed to `__post_init__`
-        alias: The alias to use for the argument parameter
+        validation_alias: The alias(es) to use to find the field in the validation data
+        serialization_alias: The alias to use as a key when serializing
+        serialization_exclude: Whether to exclude the field when serializing
     """
-    return dict_not_none(name=name, schema=schema, positional=positional, init_only=init_only, alias=alias)
+    return dict_not_none(
+        name=name,
+        schema=schema,
+        positional=positional,
+        init_only=init_only,
+        validation_alias=validation_alias,
+        serialization_alias=serialization_alias,
+        serialization_exclude=serialization_exclude,
+    )
 
 
 class DataclassArgsSchema(TypedDict, total=False):

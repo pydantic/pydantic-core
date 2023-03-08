@@ -54,7 +54,7 @@ impl BuildValidator for DataclassArgsValidator {
             let py_name: &PyString = field.get_as_req(intern!(py, "name"))?;
             let name: String = py_name.extract()?;
 
-            let lookup_key = match field.get_item(intern!(py, "alias")) {
+            let lookup_key = match field.get_item(intern!(py, "validation_alias")) {
                 Some(alias) => {
                     let alt_alias = if populate_by_name { Some(name.as_str()) } else { None };
                     LookupKey::from_py(py, alias, alt_alias)?
