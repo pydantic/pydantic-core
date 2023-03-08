@@ -2,7 +2,7 @@ from __future__ import annotations as _annotations
 
 import sys
 from datetime import date, datetime, time, timedelta
-from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Type, Union
 
 if sys.version_info < (3, 11):
     from typing_extensions import Protocol, Required, TypeAlias
@@ -14,7 +14,8 @@ if sys.version_info < (3, 9):
 else:
     from typing import Literal, TypedDict
 
-from pydantic_core._pydantic_core import ValidatorInfo
+if TYPE_CHECKING:
+    from pydantic_core._pydantic_core import ValidatorInfo
 
 
 def dict_not_none(**kwargs: Any) -> Any:
