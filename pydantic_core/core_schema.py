@@ -1557,6 +1557,7 @@ class FunctionWrapSchema(TypedDict, total=False):
     ref: str
     metadata: Any
     serialization: SerSchema
+    some_new_key: str
 
 
 def function_wrap_schema(
