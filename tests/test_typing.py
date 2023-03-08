@@ -4,15 +4,16 @@ from datetime import date, datetime, time
 from typing import Any, Callable
 
 from pydantic_core import (
+    CoreSchema,
     ErrorDetails,
     PydanticKnownError,
     SchemaError,
     SchemaSerializer,
     SchemaValidator,
     ValidationError,
+    ValidatorInfo,
     core_schema,
 )
-from pydantic_core.core_schema import CoreSchema, ValidatorInfo
 
 
 class Foo:

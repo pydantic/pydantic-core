@@ -5,8 +5,7 @@ from typing import Any, Dict, Type
 
 import pytest
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError
-from pydantic_core.core_schema import ValidatorInfo
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, ValidatorInfo
 
 from ..conftest import plain_repr
 

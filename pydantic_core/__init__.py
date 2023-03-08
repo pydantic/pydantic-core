@@ -13,6 +13,7 @@ from ._pydantic_core import (
     SchemaValidator,
     Url,
     ValidationError,
+    ValidatorInfo,
     __version__,
     to_json,
 )
@@ -45,6 +46,7 @@ __all__ = (
     'PydanticOmit',
     'PydanticSerializationError',
     'PydanticSerializationUnexpectedValue',
+    'ValidatorInfo',
     'to_json',
 )
 
