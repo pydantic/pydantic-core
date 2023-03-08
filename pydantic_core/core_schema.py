@@ -2189,6 +2189,7 @@ class DataclassField(TypedDict, total=False):
     name: Required[str]
     schema: Required[CoreSchema]
     positional: bool  # default: False
+    init_only: bool  # default: False
     alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
 
 
@@ -2197,6 +2198,7 @@ def dataclass_field(
     schema: CoreSchema,
     *,
     positional: bool | None = None,
+    init_only: bool | None = None,
     alias: str | list[str | int] | list[list[str | int]] | None = None,
 ) -> DataclassField:
     """
@@ -2205,59 +2207,64 @@ def dataclass_field(
     ```py
     from pydantic_core import SchemaValidator, core_schema
     field = core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), positional=True)
-    schema = core_schema.dataclass_schema(field)
+    schema = core_schema.dataclass_args_schema(field)
     v = SchemaValidator(schema)
-    assert v.validate_python(('hello',)) == {'a': 'hello'}
+    assert v.validate_python(('hello',)) == ({'a': 'hello'}, None)
     ```
 
     Args:
         name: The name to use for the argument parameter
         schema: The schema to use for the argument parameter
         positional: Whether the field can be set with a positional argument as well as a keyword argument
+        init_only: Whether the field should be omitted  from `__dict__` and passed to `__post_init__`
         alias: The alias to use for the argument parameter
     """
-    return dict_not_none(name=name, schema=schema, positional=positional, alias=alias)
+    return dict_not_none(name=name, schema=schema, positional=positional, init_only=init_only, alias=alias)
 
 
-class DataclassSchema(TypedDict, total=False):
-    type: Required[Literal['dataclass']]
+class DataclassArgsSchema(TypedDict, total=False):
+    type: Required[Literal['dataclass-args']]
     fields: Required[List[DataclassField]]
-    populate_by_name: bool
+    populate_by_name: bool  # default: False
+    collect_init_only: bool  # default: False
     ref: str
     metadata: Any
     serialization: SerSchema
 
 
-def dataclass_schema(
+def dataclass_args_schema(
     *fields: DataclassField,
     populate_by_name: bool | None = None,
+    collect_init_only: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> DataclassSchema:
+) -> DataclassArgsSchema:
     """
-    Returns a schema that matches an arguments schema, e.g.:
+    Returns a schema for validating dataclass arguments, e.g.:
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
     field_a = core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), positional=True)
     field_b = core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), positional=True)
-    schema = core_schema.dataclass_schema(field_a, field_b)
+    schema = core_schema.dataclass_args_schema(field_a, field_b)
     v = SchemaValidator(schema)
-    assert v.validate_python(('hello', True)) == {'a': 'hello', 'b': True}
+    assert v.validate_python(('hello', True)) == ({'a': 'hello', 'b': True}, None)
     ```
 
     Args:
         fields: The fields to use for the dataclass
         populate_by_name: Whether to populate by name
+        collect_init_only: Whether to collect init only fields into a dict to pass to `__post_init__`
         ref: See [TODO] for details
         metadata: See [TODO] for details
         serialization: Custom serialization schema
     """
     return dict_not_none(
-        type='dataclass',
+        type='dataclass-args',
         fields=fields,
         populate_by_name=populate_by_name,
+        collect_init_only=collect_init_only,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
@@ -2733,7 +2740,7 @@ CoreSchema = Union[
     LaxOrStrictSchema,
     TypedDictSchema,
     ModelSchema,
-    DataclassSchema,
+    DataclassArgsSchema,
     ArgumentsSchema,
     CallSchema,
     CustomErrorSchema,
@@ -2776,7 +2783,7 @@ CoreSchemaType = Literal[
     'lax-or-strict',
     'typed-dict',
     'model',
-    'dataclass',
+    'dataclass-args',
     'arguments',
     'call',
     'custom-error',

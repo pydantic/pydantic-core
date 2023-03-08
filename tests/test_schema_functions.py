@@ -208,6 +208,11 @@ all_schema_functions = [
         {'type': 'definitions', 'schema': {'type': 'int'}, 'definitions': [{'type': 'int'}]},
     ),
     (core_schema.definition_reference_schema, args('foo'), {'type': 'definition-ref', 'schema_ref': 'foo'}),
+    (
+        core_schema.dataclass_args_schema,
+        args({'name': 'foo', 'schema': {'type': 'int'}}),
+        {'type': 'dataclass-args', 'fields': ({'name': 'foo', 'schema': {'type': 'int'}},)},
+    ),
 ]
 
 

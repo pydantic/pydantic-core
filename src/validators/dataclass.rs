@@ -19,18 +19,20 @@ struct Field {
     positional: bool,
     name: String,
     py_name: Py<PyString>,
+    init_only: bool,
     lookup_key: LookupKey,
     validator: CombinedValidator,
 }
 
 #[derive(Debug, Clone)]
-pub struct DataclassValidator {
+pub struct DataclassArgsValidator {
     fields: Vec<Field>,
     positional_count: usize,
+    collect_init_only: bool,
 }
 
-impl BuildValidator for DataclassValidator {
-    const EXPECTED_TYPE: &'static str = "dataclass";
+impl BuildValidator for DataclassArgsValidator {
+    const EXPECTED_TYPE: &'static str = "dataclass-args";
 
     fn build(
         schema: &PyDict,
@@ -84,18 +86,20 @@ impl BuildValidator for DataclassValidator {
                 py_name: py_name.into(),
                 lookup_key,
                 validator,
+                init_only: field.get_as(intern!(py, "init_only"))?.unwrap_or(false),
             });
         }
 
         Ok(Self {
-            positional_count,
             fields,
+            positional_count,
+            collect_init_only: schema.get_as(intern!(py, "collect_init_only"))?.unwrap_or(false),
         }
         .into())
     }
 }
 
-impl Validator for DataclassValidator {
+impl Validator for DataclassArgsValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -107,8 +111,25 @@ impl Validator for DataclassValidator {
         let args = input.validate_args()?;
 
         let output_dict = PyDict::new(py);
+        let init_only_dict = match self.collect_init_only {
+            true => Some(PyDict::new(py)),
+            false => None,
+        };
         let mut errors: Vec<ValLineError> = Vec::new();
         let mut used_keys: AHashSet<&str> = AHashSet::with_capacity(self.fields.len());
+
+        macro_rules! set_item {
+            ($field:ident, $value:expr) => {{
+                let py_name = $field.py_name.as_ref(py);
+                if $field.init_only {
+                    if let Some(ref init_only_dict) = init_only_dict {
+                        init_only_dict.set_item(py_name, $value)?;
+                    }
+                } else {
+                    output_dict.set_item(py_name, $value)?;
+                }
+            }};
+        }
 
         macro_rules! process {
             ($args:ident, $get_method:ident, $get_macro:ident, $slice_macro:ident) => {{
@@ -128,7 +149,6 @@ impl Validator for DataclassValidator {
                             kw_value = Some(value);
                         }
                     }
-                    let py_name = field.py_name.as_ref(py);
 
                     match (pos_value, kw_value) {
                         // found both positional and keyword arguments, error
@@ -145,7 +165,7 @@ impl Validator for DataclassValidator {
                                 .validator
                                 .validate(py, pos_value, extra, slots, recursion_guard)
                             {
-                                Ok(value) => output_dict.set_item(py_name, value)?,
+                                Ok(value) => set_item!(field, value),
                                 Err(ValError::LineErrors(line_errors)) => {
                                     errors.extend(
                                         line_errors
@@ -162,7 +182,7 @@ impl Validator for DataclassValidator {
                                 .validator
                                 .validate(py, kw_value, extra, slots, recursion_guard)
                             {
-                                Ok(value) => output_dict.set_item(py_name, value)?,
+                                Ok(value) => set_item!(field, value),
                                 Err(ValError::LineErrors(line_errors)) => {
                                     errors.extend(
                                         line_errors
@@ -176,7 +196,7 @@ impl Validator for DataclassValidator {
                         // found neither, check if there is a default value, otherwise error
                         (None, None) => {
                             if let Some(value) = get_default(py, &field.validator)? {
-                                output_dict.set_item(py_name, value.as_ref())?;
+                                set_item!(field, value.as_ref());
                             } else {
                                 errors.push(ValLineError::new_with_loc(
                                     ErrorType::MissingKeywordArgument,
@@ -236,7 +256,7 @@ impl Validator for DataclassValidator {
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
         } else {
-            Ok(output_dict.to_object(py))
+            Ok((output_dict, init_only_dict).to_object(py))
         }
     }
 

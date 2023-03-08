@@ -374,7 +374,7 @@ pub fn build_validator<'a>(
         // model classes
         model::ModelValidator,
         // dataclasses
-        dataclass::DataclassValidator,
+        dataclass::DataclassArgsValidator,
         // strings
         string::StrValidator,
         // integers
@@ -489,7 +489,7 @@ pub enum CombinedValidator {
     // create new model classes
     Model(model::ModelValidator),
     // dataclasses
-    Dataclass(dataclass::DataclassValidator),
+    Dataclass(dataclass::DataclassArgsValidator),
     // strings
     Str(string::StrValidator),
     StrConstrained(string::StrConstrainedValidator),
