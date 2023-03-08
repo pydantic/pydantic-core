@@ -3,7 +3,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
-use crate::build_tools::{function_name, kwargs, py_err, SchemaDict};
+use crate::build_tools::{function_name, py_err, SchemaDict};
 use crate::errors::{
     ErrorType, LocItem, PydanticCustomError, PydanticKnownError, PydanticOmit, ValError, ValResult, ValidationError,
 };
@@ -12,7 +12,7 @@ use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
 
 use super::generator::InternalValidator;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator, ValidatorInfo};
 
 pub struct FunctionBuilder;
 
@@ -86,10 +86,14 @@ impl Validator for FunctionBeforeValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let kwargs = kwargs!(py, data: extra.data, config: self.config.clone_ref(py), context: extra.context);
+        let info = ValidatorInfo {
+            data: extra.data.map(|v| v.into()),
+            config: self.config.clone_ref(py),
+            context: extra.context.map(|v| v.into()),
+        };
         let value = self
             .func
-            .call(py, (input.to_object(py),), kwargs)
+            .call1(py, (input.to_object(py), info))
             .map_err(|e| convert_err(py, e, input))?;
 
         self.validator
@@ -129,8 +133,12 @@ impl Validator for FunctionAfterValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let v = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-        let kwargs = kwargs!(py, data: extra.data, config: self.config.clone_ref(py), context: extra.context);
-        self.func.call(py, (v,), kwargs).map_err(|e| convert_err(py, e, input))
+        let info = ValidatorInfo {
+            data: extra.data.map(|v| v.into()),
+            config: self.config.clone_ref(py),
+            context: extra.context.map(|v| v.into()),
+        };
+        self.func.call1(py, (v, info)).map_err(|e| convert_err(py, e, input))
     }
 
     fn get_name(&self) -> &str {
@@ -178,9 +186,13 @@ impl Validator for FunctionPlainValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let kwargs = kwargs!(py, data: extra.data, config: self.config.clone_ref(py), context: extra.context);
+        let info = ValidatorInfo {
+            data: extra.data.map(|v| v.into()),
+            config: self.config.clone_ref(py),
+            context: extra.context.map(|v| v.into()),
+        };
         self.func
-            .call(py, (input.to_object(py),), kwargs)
+            .call1(py, (input.to_object(py), info))
             .map_err(|e| convert_err(py, e, input))
     }
 
@@ -208,18 +220,16 @@ impl Validator for FunctionWrapValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let validator_kwarg = ValidatorCallable {
+        let call_next_validator = ValidatorCallable {
             validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
         };
-        let kwargs = kwargs!(
-            py,
-            validator: validator_kwarg,
-            data: extra.data,
+        let info = ValidatorInfo {
+            data: extra.data.map(|v| v.into()),
             config: self.config.clone_ref(py),
-            context: extra.context,
-        );
+            context: extra.context.map(|v| v.into()),
+        };
         self.func
-            .call(py, (input.to_object(py),), kwargs)
+            .call1(py, (input.to_object(py), call_next_validator, info))
             .map_err(|e| convert_err(py, e, input))
     }
 

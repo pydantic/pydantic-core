@@ -14,6 +14,8 @@ if sys.version_info < (3, 9):
 else:
     from typing import Literal, TypedDict
 
+from pydantic_core._pydantic_core import ValidatorInfo
+
 
 def dict_not_none(**kwargs: Any) -> Any:
     return {k: v for k, v in kwargs.items() if v is not None}
@@ -1430,9 +1432,7 @@ def dict_schema(
 
 
 class ValidatorFunction(Protocol):
-    def __call__(
-        self, __input_value: Any, *, data: Any, config: CoreConfig | None, context: Any, **future_kwargs: Any
-    ) -> Any:  # pragma: no cover
+    def __call__(self, __input_value: Any, info: ValidatorInfo) -> Any:  # pragma: no cover
         ...
 
 
@@ -1461,7 +1461,7 @@ def function_before_schema(
     from typing import Any
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: Any, **kwargs) -> str:
+    def fn(v: Any, info: core_schema.ValidatorInfo) -> str:
         v_str = str(v)
         assert 'hello' in v_str
         return v_str + 'world'
@@ -1503,7 +1503,7 @@ def function_after_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, **kwargs) -> str:
+    def fn(v: str, info: core_schema.ValidatorInfo) -> str:
         assert 'hello' in v
         return v + 'world'
 
@@ -1537,14 +1537,7 @@ class CallableValidator(Protocol):
 
 class WrapValidatorFunction(Protocol):
     def __call__(
-        self,
-        __input_value: Any,
-        *,
-        validator: CallableValidator,
-        data: Any,
-        config: CoreConfig | None,
-        context: Any,
-        **future_kwargs: Any,
+        self, __input_value: Any, __validator: CallableValidator, info: ValidatorInfo
     ) -> Any:  # pragma: no cover
         ...
 
@@ -1575,7 +1568,7 @@ def function_wrap_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, *, validator, **kwargs) -> str:
+    def fn(v: str, validator, info: core_schema.ValidatorInfo) -> str:
         return validator(input_value=v) + 'world'
 
     schema = core_schema.function_wrap_schema(function=fn, schema=core_schema.str_schema())
@@ -1619,7 +1612,7 @@ def function_plain_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, **kwargs) -> str:
+    def fn(v: str, info: core_schema.ValidatorInfo) -> str:
         assert 'hello' in v
         return v + 'world'
 
@@ -1912,7 +1905,7 @@ def chain_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, **kwargs) -> str:
+    def fn(v: str, info: core_schema.ValidatorInfo) -> str:
         assert 'hello' in v
         return v + ' world'
 
@@ -1956,7 +1949,7 @@ def lax_or_strict_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, **kwargs) -> str:
+    def fn(v: str, info: core_schema.ValidatorInfo) -> str:
         assert 'hello' in v
         return v + ' world'
 

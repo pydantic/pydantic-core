@@ -1,6 +1,6 @@
 import decimal
 import sys
-from typing import Any
+from typing import Any, Dict
 
 from pydantic_core import ErrorDetails
 from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
@@ -174,3 +174,17 @@ def list_all_errors() -> 'list[ErrorTypeInfo]':
     """
     Get information about all built-in errors.
     """
+
+class ValidatorInfo:
+    """
+    Argument passed to validation functions.
+    """
+
+    field: str
+    """The field being assigned to when validating assignment."""
+    data: Dict[str, Any]
+    """All of the fields and data being validated for this model."""
+    context: Dict[str, Any]
+    """Current validation context."""
+    config: CoreConfig | None
+    """The CoreConfig that applies to this validation."""

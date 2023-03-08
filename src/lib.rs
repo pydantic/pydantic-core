@@ -52,6 +52,7 @@ fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyUrl>()?;
     m.add_class::<PyMultiHostUrl>()?;
     m.add_class::<SchemaSerializer>()?;
+    m.add_class::<validators::ValidatorInfo>()?;
     m.add_function(wrap_pyfunction!(to_json, m)?)?;
     m.add_function(wrap_pyfunction!(list_all_errors, m)?)?;
     Ok(())
