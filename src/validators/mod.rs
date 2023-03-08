@@ -584,5 +584,5 @@ pub struct ValidatorInfo {
     #[pyo3(get)]
     config: PyObject,
     #[pyo3(get)]
-    context: Option<Py<PyAny>>,
+    context: Option<PyObject>,
 }
