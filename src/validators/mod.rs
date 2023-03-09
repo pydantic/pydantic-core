@@ -578,7 +578,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
 }
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
-pub struct ValidatorInfo {
+pub struct ValidationInfo {
     #[pyo3(get)]
     data: Option<Py<PyDict>>,
     #[pyo3(get)]

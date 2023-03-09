@@ -12,7 +12,7 @@ use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
 
 use super::generator::InternalValidator;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator, ValidatorInfo};
+use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, ValidationInfo, Validator};
 
 pub struct FunctionBuilder;
 
@@ -86,7 +86,7 @@ impl Validator for FunctionBeforeValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let info = ValidatorInfo {
+        let info = ValidationInfo {
             data: extra.data.map(|v| v.into()),
             config: self.config.clone_ref(py),
             context: extra.context.map(|v| v.into()),
@@ -133,7 +133,7 @@ impl Validator for FunctionAfterValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let v = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-        let info = ValidatorInfo {
+        let info = ValidationInfo {
             data: extra.data.map(|v| v.into()),
             config: self.config.clone_ref(py),
             context: extra.context.map(|v| v.into()),
@@ -186,7 +186,7 @@ impl Validator for FunctionPlainValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let info = ValidatorInfo {
+        let info = ValidationInfo {
             data: extra.data.map(|v| v.into()),
             config: self.config.clone_ref(py),
             context: extra.context.map(|v| v.into()),
@@ -223,7 +223,7 @@ impl Validator for FunctionWrapValidator {
         let call_next_validator = ValidatorCallable {
             validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
         };
-        let info = ValidatorInfo {
+        let info = ValidationInfo {
             data: extra.data.map(|v| v.into()),
             config: self.config.clone_ref(py),
             context: extra.context.map(|v| v.into()),
