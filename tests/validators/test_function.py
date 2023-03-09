@@ -5,12 +5,12 @@ from typing import Any, Dict, Type
 
 import pytest
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError, ValidatorInfo
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import plain_repr
 
 
-def deepcopy_info(info: ValidatorInfo) -> Dict[str, Any]:
+def deepcopy_info(info: core_schema.ValidatorInfo) -> Dict[str, Any]:
     return {'context': deepcopy(info.context), 'data': deepcopy(info.data), 'config': deepcopy(info.config)}
 
 
@@ -239,7 +239,7 @@ def test_function_after_config():
 def test_config_no_model():
     f_kwargs = None
 
-    def f(input_value, info: ValidatorInfo):
+    def f(input_value, info: core_schema.ValidatorInfo):
         nonlocal f_kwargs
         f_kwargs = deepcopy_info(info)
         return input_value + ' Changed'

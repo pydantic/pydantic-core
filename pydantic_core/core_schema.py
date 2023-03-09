@@ -2,7 +2,7 @@ from __future__ import annotations as _annotations
 
 import sys
 from datetime import date, datetime, time, timedelta
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
 
 if sys.version_info < (3, 11):
     from typing_extensions import Protocol, Required, TypeAlias
@@ -13,9 +13,6 @@ if sys.version_info < (3, 9):
     from typing_extensions import Literal, TypedDict
 else:
     from typing import Literal, TypedDict
-
-if TYPE_CHECKING:
-    from pydantic_core._pydantic_core import ValidatorInfo
 
 
 def dict_not_none(**kwargs: Any) -> Any:
@@ -71,6 +68,19 @@ class SerializationInfo(Protocol):
 
     def __repr__(self) -> str:
         ...
+
+
+class ValidatorInfo(Protocol):
+    """
+    Argument passed to validation functions.
+    """
+
+    data: Dict[str, Any]
+    """All of the fields and data being validated for this model."""
+    context: Dict[str, Any]
+    """Current validation context."""
+    config: CoreConfig | None
+    """The CoreConfig that applies to this validation."""
 
 
 ExpectedSerializationTypes = Literal[
@@ -1460,9 +1470,9 @@ def function_before_schema(
 
     ```py
     from typing import Any
-    from pydantic_core import SchemaValidator, ValidatorInfo, core_schema
+    from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: Any, info: ValidatorInfo) -> str:
+    def fn(v: Any, info: core_schema.ValidatorInfo) -> str:
         v_str = str(v)
         assert 'hello' in v_str
         return v_str + 'world'
@@ -1502,9 +1512,9 @@ def function_after_schema(
     Returns a schema that calls a validator function after validating the provided schema, e.g.:
 
     ```py
-    from pydantic_core import SchemaValidator, ValidatorInfo, core_schema
+    from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, info: ValidatorInfo) -> str:
+    def fn(v: str, info: core_schema.ValidatorInfo) -> str:
         assert 'hello' in v
         return v + 'world'
 
@@ -1567,9 +1577,9 @@ def function_wrap_schema(
     "onion" implementation of middleware in many popular web frameworks, e.g.:
 
     ```py
-    from pydantic_core import SchemaValidator, ValidatorInfo, core_schema
+    from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, validator: core_schema.CallableValidator, info: ValidatorInfo) -> str:
+    def fn(v: str, validator: core_schema.CallableValidator, info: core_schema.ValidatorInfo) -> str:
         return validator(input_value=v) + 'world'
 
     schema = core_schema.function_wrap_schema(function=fn, schema=core_schema.str_schema())
@@ -1611,9 +1621,9 @@ def function_plain_schema(
     Returns a schema that uses the provided function for validation, e.g.:
 
     ```py
-    from pydantic_core import SchemaValidator, ValidatorInfo, core_schema
+    from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, info: ValidatorInfo) -> str:
+    def fn(v: str, info: core_schema.ValidatorInfo) -> str:
         assert 'hello' in v
         return v + 'world'
 
@@ -1904,9 +1914,9 @@ def chain_schema(
     Returns a schema that chains the provided validation schemas, e.g.:
 
     ```py
-    from pydantic_core import SchemaValidator, ValidatorInfo, core_schema
+    from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, info: ValidatorInfo) -> str:
+    def fn(v: str, info: core_schema.ValidatorInfo) -> str:
         assert 'hello' in v
         return v + ' world'
 
@@ -1948,9 +1958,9 @@ def lax_or_strict_schema(
     Returns a schema that uses the lax or strict schema, e.g.:
 
     ```py
-    from pydantic_core import SchemaValidator, ValidatorInfo, core_schema
+    from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, info: ValidatorInfo) -> str:
+    def fn(v: str, info: core_schema.ValidatorInfo) -> str:
         assert 'hello' in v
         return v + ' world'
 

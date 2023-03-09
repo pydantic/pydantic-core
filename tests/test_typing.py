@@ -11,7 +11,6 @@ from pydantic_core import (
     SchemaSerializer,
     SchemaValidator,
     ValidationError,
-    ValidatorInfo,
     core_schema,
 )
 
@@ -24,11 +23,11 @@ def foo(bar: str) -> None:
     ...
 
 
-def validator(value: Any, info: ValidatorInfo) -> None:
+def validator(value: Any, info: core_schema.ValidatorInfo) -> None:
     ...
 
 
-def wrap_validator(value: Any, call_next: Callable[[Any], Any], info: ValidatorInfo) -> None:
+def wrap_validator(value: Any, call_next: Callable[[Any], Any], info: core_schema.ValidatorInfo) -> None:
     ...
 
 
