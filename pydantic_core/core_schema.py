@@ -1443,7 +1443,7 @@ def dict_schema(
 
 
 class ValidatorFunction(Protocol):
-    def __call__(self, __input_value: Any, info: ValidationInfo) -> Any:  # pragma: no cover
+    def __call__(self, __input_value: Any, __info: ValidationInfo) -> Any:  # pragma: no cover
         ...
 
 
@@ -1548,7 +1548,7 @@ class CallableValidator(Protocol):
 
 class WrapValidatorFunction(Protocol):
     def __call__(
-        self, __input_value: Any, __validator: CallableValidator, info: ValidationInfo
+        self, __input_value: Any, __validator: CallableValidator, __info: ValidationInfo
     ) -> Any:  # pragma: no cover
         ...
 
