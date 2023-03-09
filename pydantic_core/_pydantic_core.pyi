@@ -180,8 +180,6 @@ class ValidatorInfo:
     Argument passed to validation functions.
     """
 
-    field: str
-    """The field being assigned to when validating assignment."""
     data: Dict[str, Any]
     """All of the fields and data being validated for this model."""
     context: Dict[str, Any]
