@@ -1,6 +1,6 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyString, PyType};
+use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
 
 use ahash::AHashSet;
 
@@ -30,7 +30,7 @@ struct Field {
 pub struct DataclassArgsValidator {
     fields: Vec<Field>,
     positional_count: usize,
-    collect_init_only: bool,
+    init_only_count: Option<usize>,
 }
 
 impl BuildValidator for DataclassArgsValidator {
@@ -92,10 +92,16 @@ impl BuildValidator for DataclassArgsValidator {
             });
         }
 
+        let init_only_count = if schema.get_as(intern!(py, "collect_init_only"))?.unwrap_or(false) {
+            Some(fields.iter().filter(|f| f.init_only).count())
+        } else {
+            None
+        };
+
         Ok(Self {
             fields,
             positional_count,
-            collect_init_only: schema.get_as(intern!(py, "collect_init_only"))?.unwrap_or(false),
+            init_only_count,
         }
         .into())
     }
@@ -113,10 +119,8 @@ impl Validator for DataclassArgsValidator {
         let args = input.validate_args()?;
 
         let output_dict = PyDict::new(py);
-        let init_only_dict = match self.collect_init_only {
-            true => Some(PyDict::new(py)),
-            false => None,
-        };
+        let mut init_only_args = self.init_only_count.map(Vec::with_capacity);
+
         let mut errors: Vec<ValLineError> = Vec::new();
         let mut used_keys: AHashSet<&str> = AHashSet::with_capacity(self.fields.len());
 
@@ -124,8 +128,8 @@ impl Validator for DataclassArgsValidator {
             ($field:ident, $value:expr) => {{
                 let py_name = $field.py_name.as_ref(py);
                 if $field.init_only {
-                    if let Some(ref init_only_dict) = init_only_dict {
-                        init_only_dict.set_item(py_name, $value)?;
+                    if let Some(ref mut init_only_args) = init_only_args {
+                        init_only_args.push($value);
                     }
                 } else {
                     output_dict.set_item(py_name, $value)?;
@@ -198,7 +202,7 @@ impl Validator for DataclassArgsValidator {
                         // found neither, check if there is a default value, otherwise error
                         (None, None) => {
                             if let Some(value) = get_default(py, &field.validator)? {
-                                set_item!(field, value.as_ref());
+                                set_item!(field, value.as_ref().clone_ref(py));
                             } else {
                                 errors.push(ValLineError::new_with_loc(
                                     ErrorType::MissingKeywordArgument,
@@ -256,7 +260,11 @@ impl Validator for DataclassArgsValidator {
             GenericArguments::Json(a) => process!(a, json_get, json_get, json_slice),
         }
         if errors.is_empty() {
-            Ok((output_dict, init_only_dict).to_object(py))
+            if let Some(init_only_args) = init_only_args {
+                Ok((output_dict, PyTuple::new(py, init_only_args)).to_object(py))
+            } else {
+                Ok((output_dict, py.None()).to_object(py))
+            }
         } else {
             Err(ValError::LineErrors(errors))
         }
@@ -335,13 +343,13 @@ impl Validator for DataclassValidator {
 
             if let Some(ref post_init) = self.post_init {
                 let post_init = post_init.as_ref(py);
-                let kwargs = if post_init_kwargs.is_none() {
-                    None
+                let r = if post_init_kwargs.is_none() {
+                    dc.call_method0(py, post_init)
                 } else {
-                    Some(post_init_kwargs.downcast::<PyDict>()?)
+                    let args = post_init_kwargs.downcast::<PyTuple>()?;
+                    dc.call_method1(py, post_init, args)
                 };
-                dc.call_method(py, post_init, (), kwargs)
-                    .map_err(|e| convert_err(py, e, input))?;
+                r.map_err(|e| convert_err(py, e, input))?;
             }
             Ok(dc)
         }

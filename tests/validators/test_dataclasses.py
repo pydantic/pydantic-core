@@ -68,11 +68,11 @@ def test_dataclass_args(py_and_json: PyAndJson, input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        (('hello', True), ({'a': 'hello'}, {'b': True})),
-        (['hello', True], ({'a': 'hello'}, {'b': True})),
-        (('hello', 'true'), ({'a': 'hello'}, {'b': True})),
-        ({'__args__': ('hello', True), '__kwargs__': {}}, ({'a': 'hello'}, {'b': True})),
-        ({'__args__': (), '__kwargs__': {'a': 'hello', 'b': True}}, ({'a': 'hello'}, {'b': True})),
+        (('hello', True), ({'a': 'hello'}, (True,))),
+        (['hello', True], ({'a': 'hello'}, (True,))),
+        (('hello', 'true'), ({'a': 'hello'}, (True,))),
+        ({'__args__': ('hello', True), '__kwargs__': {}}, ({'a': 'hello'}, (True,))),
+        ({'__args__': (), '__kwargs__': {'a': 'hello', 'b': True}}, ({'a': 'hello'}, (True,))),
         (
             {'__args__': ('hello',), '__kwargs__': {'a': 'hello', 'b': True}},
             Err(
@@ -139,8 +139,8 @@ def test_dataclass_args_init_only(py_and_json: PyAndJson, input_value, expected)
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        ({'a': 'hello'}, ({'a': 'hello'}, {})),
-        ({'__args__': (), '__kwargs__': {'a': 'hello'}}, ({'a': 'hello'}, {})),
+        ({'a': 'hello'}, ({'a': 'hello'}, ())),
+        ({'__args__': (), '__kwargs__': {'a': 'hello'}}, ({'a': 'hello'}, ())),
         (
             ('hello',),
             Err(
@@ -192,7 +192,7 @@ def test_aliases(py_and_json: PyAndJson):
     v = py_and_json(schema)
     assert v.validate_test({'Apple': 'a', 'Banana': ['x', 'false'], 'Carrot': {'v': '42'}}) == (
         {'a': 'a', 'b': False},
-        {'c': 42},
+        (42,),
     )
 
 
@@ -287,3 +287,33 @@ def test_dataclass_post_init_args():
     assert foo.b is True
     assert not hasattr(foo, 'c')
     assert c_value == 42
+
+
+def test_dataclass_post_init_args_multiple():
+    dc_args = None
+
+    @dataclasses.dataclass
+    class Foo:
+        a: str
+        b: dataclasses.InitVar[bool]
+        c: dataclasses.InitVar[int]
+
+        def __post_init__(self, *args):
+            nonlocal dc_args
+            dc_args = args
+
+    schema = core_schema.dataclass_schema(
+        Foo,
+        core_schema.dataclass_args_schema(
+            core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), init_only=True),
+            core_schema.dataclass_field(name='c', schema=core_schema.int_schema(), init_only=True),
+            collect_init_only=True,
+        ),
+        post_init=True,
+    )
+
+    v = SchemaValidator(schema)
+    foo = v.validate_python({'a': b'hello', 'b': 'true', 'c': '42'})
+    assert dataclasses.asdict(foo) == {'a': 'hello'}
+    assert dc_args == (True, 42)
