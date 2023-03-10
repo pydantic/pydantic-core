@@ -255,10 +255,10 @@ impl Validator for DataclassArgsValidator {
             GenericArguments::Py(a) => process!(a, py_get_dict_item, py_get, py_slice),
             GenericArguments::Json(a) => process!(a, json_get, json_get, json_slice),
         }
-        if !errors.is_empty() {
-            Err(ValError::LineErrors(errors))
-        } else {
+        if errors.is_empty() {
             Ok((output_dict, init_only_dict).to_object(py))
+        } else {
+            Err(ValError::LineErrors(errors))
         }
     }
 

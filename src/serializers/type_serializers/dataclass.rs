@@ -1,7 +1,8 @@
-use ahash::AHashMap;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
+
+use ahash::AHashMap;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{py_error_type, SchemaDict};
