@@ -2287,6 +2287,43 @@ def dataclass_args_schema(
     )
 
 
+class DataclassSchema(TypedDict, total=False):
+    type: Required[Literal['dataclass']]
+    cls: Required[Type[Any]]
+    schema: Required[CoreSchema]
+    post_init: bool  # default: False
+    strict: bool  # default: False
+    ref: str
+    metadata: Any
+    serialization: SerSchema
+
+
+def dataclass_schema(
+    cls: Type[Any],
+    schema: CoreSchema,
+    *,
+    post_init: bool | None = None,
+    strict: bool | None = None,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
+) -> DataclassSchema:
+    """
+    Returns a schema for a dataclass. As with `ModelSchema`, this schema can only be used as a field within
+    another schema, not as the root type.
+    """
+    return dict_not_none(
+        type='dataclass',
+        cls=cls,
+        schema=schema,
+        post_init=post_init,
+        strict=strict,
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
+    )
+
+
 class ArgumentsParameter(TypedDict, total=False):
     name: Required[str]
     schema: Required[CoreSchema]
@@ -2757,6 +2794,7 @@ CoreSchema = Union[
     TypedDictSchema,
     ModelSchema,
     DataclassArgsSchema,
+    DataclassSchema,
     ArgumentsSchema,
     CallSchema,
     CustomErrorSchema,
@@ -2800,6 +2838,7 @@ CoreSchemaType = Literal[
     'typed-dict',
     'model',
     'dataclass-args',
+    'dataclass',
     'arguments',
     'call',
     'custom-error',

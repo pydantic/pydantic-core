@@ -1,16 +1,18 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyString};
+use pyo3::types::{PyDict, PyList, PyString, PyType};
 
 use ahash::AHashSet;
 
-use crate::build_tools::{py_err, schema_or_config_same, SchemaDict};
+use crate::build_tools::{is_strict, py_err, schema_or_config_same, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{GenericArguments, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
+use crate::validators::function::convert_err;
 
 use super::arguments::{json_get, json_slice, py_get, py_slice};
+use super::model::create_class;
 use super::with_default::get_default;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -262,5 +264,90 @@ impl Validator for DataclassArgsValidator {
 
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DataclassValidator {
+    strict: bool,
+    validator: Box<CombinedValidator>,
+    class: Py<PyType>,
+    post_init: Option<Py<PyString>>,
+    name: String,
+}
+
+impl BuildValidator for DataclassValidator {
+    const EXPECTED_TYPE: &'static str = "dataclass";
+
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedValidator>,
+    ) -> PyResult<CombinedValidator> {
+        let py = schema.py();
+
+        let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
+        let sub_schema: &PyAny = schema.get_as_req(intern!(py, "schema"))?;
+        let validator = build_validator(sub_schema, config, build_context)?;
+
+        let post_init = if schema.get_as::<bool>(intern!(py, "post_init"))?.unwrap_or(false) {
+            Some(PyString::intern(py, "__post_init__").into_py(py))
+        } else {
+            None
+        };
+
+        Ok(Self {
+            strict: is_strict(schema, config)?,
+            validator: Box::new(validator),
+            class: class.into(),
+            post_init,
+            // as with model, get the class's `__name__`, not using `class.name()` since it uses `__qualname__`
+            // which is not what we want here
+            name: class.getattr(intern!(py, "__name__"))?.extract()?,
+        }
+        .into())
+    }
+}
+
+impl Validator for DataclassValidator {
+    fn validate<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        let class = self.class.as_ref(py);
+        if input.is_exact_instance(class)? {
+            Ok(input.to_object(py))
+        } else if extra.strict.unwrap_or(self.strict) {
+            Err(ValError::new(
+                ErrorType::ModelClassType {
+                    class_name: self.get_name().to_string(),
+                },
+                input,
+            ))
+        } else {
+            let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
+            let (dc_dict, post_init_kwargs): (&PyAny, &PyAny) = output.extract(py)?;
+            let dc = create_class(self.class.as_ref(py), dc_dict, None)?;
+
+            if let Some(ref post_init) = self.post_init {
+                let post_init = post_init.as_ref(py);
+                let kwargs = if post_init_kwargs.is_none() {
+                    None
+                } else {
+                    Some(post_init_kwargs.downcast::<PyDict>()?)
+                };
+                dc.call_method(py, post_init, (), kwargs)
+                    .map_err(|e| convert_err(py, e, input))?;
+            }
+            Ok(dc)
+        }
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
     }
 }

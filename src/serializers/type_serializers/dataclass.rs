@@ -8,6 +8,7 @@ use crate::build_tools::{py_error_type, SchemaDict};
 use crate::serializers::filter::SchemaFilter;
 use crate::serializers::shared::CombinedSerializer;
 
+use super::model::ModelSerializer;
 use super::typed_dict::{TypedDictField, TypedDictSerializer};
 use super::BuildSerializer;
 
@@ -48,5 +49,19 @@ impl BuildSerializer for DataclassArgsBuilder {
         let filter = SchemaFilter::from_vec_hash(py, exclude)?;
 
         Ok(TypedDictSerializer::new(fields, false, filter).into())
+    }
+}
+
+pub struct DataclassBuilder;
+
+impl BuildSerializer for DataclassBuilder {
+    const EXPECTED_TYPE: &'static str = "dataclass";
+
+    fn build(
+        schema: &PyDict,
+        config: Option<&PyDict>,
+        build_context: &mut BuildContext<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
+        ModelSerializer::build(schema, config, build_context)
     }
 }

@@ -1,9 +1,10 @@
+import dataclasses
 import re
 
 import pytest
 from dirty_equals import IsListOrTuple
 
-from pydantic_core import ValidationError, core_schema
+from pydantic_core import SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -47,7 +48,7 @@ from ..conftest import Err, PyAndJson
         ),
     ],
 )
-def test_dataclass(py_and_json: PyAndJson, input_value, expected):
+def test_dataclass_args(py_and_json: PyAndJson, input_value, expected):
     schema = core_schema.dataclass_args_schema(
         core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), positional=True),
         core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), positional=True),
@@ -116,7 +117,7 @@ def test_dataclass(py_and_json: PyAndJson, input_value, expected):
         ),
     ],
 )
-def test_dataclass_init_only(py_and_json: PyAndJson, input_value, expected):
+def test_dataclass_args_init_only(py_and_json: PyAndJson, input_value, expected):
     schema = core_schema.dataclass_args_schema(
         core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), positional=True),
         core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), positional=True, init_only=True),
@@ -162,7 +163,7 @@ def test_dataclass_init_only(py_and_json: PyAndJson, input_value, expected):
         ),
     ],
 )
-def test_dataclass_init_only_no_fields(py_and_json: PyAndJson, input_value, expected):
+def test_dataclass_args_init_only_no_fields(py_and_json: PyAndJson, input_value, expected):
     schema = core_schema.dataclass_args_schema(
         core_schema.dataclass_field(name='a', schema=core_schema.str_schema()), collect_init_only=True
     )
@@ -180,3 +181,96 @@ def test_dataclass_init_only_no_fields(py_and_json: PyAndJson, input_value, expe
 
 
 # TODO test aliases
+
+
+def test_dataclass():
+    @dataclasses.dataclass
+    class Foo:
+        a: str
+        b: bool
+
+    schema = core_schema.dataclass_schema(
+        Foo,
+        core_schema.dataclass_args_schema(
+            core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+        ),
+    )
+
+    v = SchemaValidator(schema)
+    foo = v.validate_python({'a': 'hello', 'b': True})
+    assert dataclasses.is_dataclass(foo)
+    assert foo.a == 'hello'
+    assert foo.b is True
+
+    assert dataclasses.asdict(v.validate_python(Foo(a='hello', b=True))) == {'a': 'hello', 'b': True}
+
+    with pytest.raises(ValidationError, match='Input should be an instance of Foo') as exc_info:
+        v.validate_python({'a': 'hello', 'b': True}, strict=True)
+
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'type': 'model_class_type',
+            'loc': (),
+            'msg': 'Input should be an instance of Foo',
+            'input': {'a': 'hello', 'b': True},
+            'ctx': {'class_name': 'Foo'},
+        }
+    ]
+
+
+def test_dataclass_post_init():
+    @dataclasses.dataclass
+    class Foo:
+        a: str
+        b: bool
+
+        def __post_init__(self):
+            self.a = self.a.upper()
+
+    schema = core_schema.dataclass_schema(
+        Foo,
+        core_schema.dataclass_args_schema(
+            core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+        ),
+        post_init=True,
+    )
+
+    v = SchemaValidator(schema)
+    foo = v.validate_python({'a': 'hello', 'b': True})
+    assert foo.a == 'HELLO'
+    assert foo.b is True
+
+
+def test_dataclass_post_init_args():
+    c_value = None
+
+    @dataclasses.dataclass
+    class Foo:
+        a: str
+        b: bool
+        c: dataclasses.InitVar[int]
+
+        def __post_init__(self, c: int):
+            nonlocal c_value
+            c_value = c
+
+    schema = core_schema.dataclass_schema(
+        Foo,
+        core_schema.dataclass_args_schema(
+            core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+            core_schema.dataclass_field(name='c', schema=core_schema.int_schema(), init_only=True),
+            collect_init_only=True,
+        ),
+        post_init=True,
+    )
+
+    v = SchemaValidator(schema)
+    foo = v.validate_python({'a': b'hello', 'b': 'true', 'c': '42'})
+    assert foo.a == 'hello'
+    assert foo.b is True
+    assert not hasattr(foo, 'c')
+    assert c_value == 42
