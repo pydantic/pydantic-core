@@ -18,7 +18,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 
 #[derive(Debug, Clone)]
 struct Field {
-    positional: bool,
+    kw_only: bool,
     name: String,
     py_name: Py<PyString>,
     init_only: bool,
@@ -50,7 +50,7 @@ impl BuildValidator for DataclassArgsValidator {
 
         let mut positional_count = 0;
 
-        for (arg_index, field) in fields_schema.iter().enumerate() {
+        for field in fields_schema {
             let field: &PyDict = field.downcast()?;
 
             let py_name: &PyString = field.get_as_req(intern!(py, "name"))?;
@@ -77,13 +77,13 @@ impl BuildValidator for DataclassArgsValidator {
                 }
             }
 
-            let positional = field.get_as(intern!(py, "positional"))?.unwrap_or(false);
-            if positional {
-                positional_count = arg_index + 1;
+            let kw_only = field.get_as(intern!(py, "kw_only"))?.unwrap_or(true);
+            if !kw_only {
+                positional_count += 1;
             }
 
             fields.push(Field {
-                positional,
+                kw_only,
                 name,
                 py_name: py_name.into(),
                 lookup_key,
@@ -143,7 +143,7 @@ impl Validator for DataclassArgsValidator {
                 for (index, field) in self.fields.iter().enumerate() {
                     let mut pos_value = None;
                     if let Some(args) = $args.args {
-                        if field.positional {
+                        if !field.kw_only {
                             pos_value = $get_macro!(args, index);
                         }
                     }

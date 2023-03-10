@@ -2190,7 +2190,7 @@ def model_schema(
 class DataclassField(TypedDict, total=False):
     name: Required[str]
     schema: Required[CoreSchema]
-    positional: bool  # default: False
+    kw_only: bool  # default: True
     init_only: bool  # default: False
     validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
     serialization_alias: str
@@ -2201,7 +2201,7 @@ def dataclass_field(
     name: str,
     schema: CoreSchema,
     *,
-    positional: bool | None = None,
+    kw_only: bool | None = None,
     init_only: bool | None = None,
     validation_alias: str | list[str | int] | list[list[str | int]] | None = None,
     serialization_alias: str | None = None,
@@ -2212,7 +2212,7 @@ def dataclass_field(
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
-    field = core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), positional=True)
+    field = core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False)
     schema = core_schema.dataclass_args_schema(field)
     v = SchemaValidator(schema)
     assert v.validate_python(('hello',)) == ({'a': 'hello'}, None)
@@ -2221,7 +2221,7 @@ def dataclass_field(
     Args:
         name: The name to use for the argument parameter
         schema: The schema to use for the argument parameter
-        positional: Whether the field can be set with a positional argument as well as a keyword argument
+        kw_only: Whether the field can be set with a positional argument as well as a keyword argument
         init_only: Whether the field should be omitted  from `__dict__` and passed to `__post_init__`
         validation_alias: The alias(es) to use to find the field in the validation data
         serialization_alias: The alias to use as a key when serializing
@@ -2230,7 +2230,7 @@ def dataclass_field(
     return dict_not_none(
         name=name,
         schema=schema,
-        positional=positional,
+        kw_only=kw_only,
         init_only=init_only,
         validation_alias=validation_alias,
         serialization_alias=serialization_alias,
@@ -2261,8 +2261,8 @@ def dataclass_args_schema(
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
-    field_a = core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), positional=True)
-    field_b = core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), positional=True)
+    field_a = core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False)
+    field_b = core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False)
     schema = core_schema.dataclass_args_schema(field_a, field_b)
     v = SchemaValidator(schema)
     assert v.validate_python(('hello', True)) == ({'a': 'hello', 'b': True}, None)
