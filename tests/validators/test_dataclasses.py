@@ -180,7 +180,20 @@ def test_dataclass_args_init_only_no_fields(py_and_json: PyAndJson, input_value,
         assert v.validate_test(input_value) == expected
 
 
-# TODO test aliases
+def test_aliases(py_and_json: PyAndJson):
+    schema = core_schema.dataclass_args_schema(
+        core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), validation_alias='Apple'),
+        core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), validation_alias=['Banana', 1]),
+        core_schema.dataclass_field(
+            name='c', schema=core_schema.int_schema(), validation_alias=['Carrot', 'v'], init_only=True
+        ),
+        collect_init_only=True,
+    )
+    v = py_and_json(schema)
+    assert v.validate_test({'Apple': 'a', 'Banana': ['x', 'false'], 'Carrot': {'v': '42'}}) == (
+        {'a': 'a', 'b': False},
+        {'c': 42},
+    )
 
 
 def test_dataclass():
