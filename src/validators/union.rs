@@ -85,6 +85,17 @@ impl Validator for UnionValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if extra.strict.unwrap_or(self.strict) {
+            // 1st pass: non exhaustive
+            let non_exhaustive_extra = extra.with_exhaustiveness(false);
+            if let Some(res) = self
+                .choices
+                .iter()
+                .map(|validator| validator.validate(py, input, &non_exhaustive_extra, slots, recursion_guard))
+                .find(ValResult::is_ok)
+            {
+                return res;
+            }
+
             let mut errors: Option<Vec<ValLineError>> = match self.custom_error {
                 None => Some(Vec::with_capacity(self.choices.len())),
                 _ => None,
@@ -110,7 +121,7 @@ impl Validator for UnionValidator {
         } else {
             // 1st pass: check if the value is an exact instance of one of the Union types,
             // e.g. use validate in strict mode
-            let strict_extra = extra.as_strict();
+            let strict_extra = extra.as_strict().with_exhaustiveness(false);
             if let Some(res) = self
                 .choices
                 .iter()

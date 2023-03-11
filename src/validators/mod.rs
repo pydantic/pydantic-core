@@ -196,6 +196,7 @@ impl SchemaValidator {
             field: Some(field.as_str()),
             strict,
             context,
+            exhaustive: true,
         };
         let r = self
             .validator
@@ -450,6 +451,8 @@ pub struct Extra<'a> {
     pub strict: Option<bool>,
     /// context used in validator functions
     pub context: Option<&'a PyAny>,
+    // if we should do exhaustive validation
+    pub exhaustive: bool,
 }
 
 impl<'a> Extra<'a> {
@@ -457,6 +460,7 @@ impl<'a> Extra<'a> {
         Extra {
             strict,
             context,
+            exhaustive: true,
             ..Default::default()
         }
     }
@@ -469,6 +473,16 @@ impl<'a> Extra<'a> {
             field: self.field,
             strict: Some(true),
             context: self.context,
+            exhaustive: self.exhaustive,
+        }
+    }
+    pub fn with_exhaustiveness(&self, exhaustive: bool) -> Self {
+        Self {
+            data: self.data,
+            field: self.field,
+            strict: Some(true),
+            context: self.context,
+            exhaustive,
         }
     }
 }

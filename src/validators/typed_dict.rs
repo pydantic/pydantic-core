@@ -188,6 +188,7 @@ impl Validator for TypedDictValidator {
             field: None,
             strict: extra.strict,
             context: extra.context,
+            exhaustive: true,
         };
 
         macro_rules! process {
