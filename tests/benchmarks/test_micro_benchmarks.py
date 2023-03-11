@@ -837,6 +837,20 @@ class TestBenchmarkUnion:
 
         benchmark(v.validate_python, 1)
 
+    @pytest.mark.benchmark(group='smart-union')
+    def test_smart_union_deep(self, benchmark):
+        v = SchemaValidator(
+            {
+                'type': 'union',
+                'choices': [
+                    {'type': 'list', 'items_schema': {'type': 'str'}},
+                    {'type': 'list', 'items_schema': {'type': 'int'}},
+                ],
+            }
+        )
+        data = [1] * 1_000
+        benchmark(v.validate_python, data)
+
     @skip_pydantic
     @pytest.mark.benchmark(group='smart-union')
     def test_smart_union_pyd(self, benchmark):
