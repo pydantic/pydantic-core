@@ -1,5 +1,6 @@
-use pyo3::intern;
+use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
+use pyo3::{create_exception, intern};
 
 use ahash::AHashSet;
 use pyo3::types::{PyDict, PySet, PyString};
@@ -27,6 +28,12 @@ struct TypedDictField {
     frozen: bool,
 }
 
+#[pyclass(module = "pydantic_core._pydantic_core")]
+#[derive(Debug)]
+pub struct UninitializedField;
+
+create_exception!(module, FieldUnsetError, pyo3::exceptions::PyKeyError);
+
 #[derive(Debug, Clone)]
 pub struct TypedDictValidator {
     fields: Vec<TypedDictField>,
@@ -36,7 +43,10 @@ pub struct TypedDictValidator {
     strict: bool,
     from_attributes: bool,
     return_fields_set: bool,
+    empty: Py<PyDict>,
 }
+
+static UNINITIALIZED_FIELD: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
 impl BuildValidator for TypedDictValidator {
     const EXPECTED_TYPE: &'static str = "typed-dict";
@@ -85,6 +95,9 @@ impl BuildValidator for TypedDictValidator {
 
         let fields_dict: &PyDict = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: Vec<TypedDictField> = Vec::with_capacity(fields_dict.len());
+        let empty = PyDict::new(py);
+        let uninitialized =
+            UNINITIALIZED_FIELD.get_or_init(py, || Py::new(py, UninitializedField {}).unwrap().into_ref(py).into());
 
         for (key, value) in fields_dict.iter() {
             let field_info: &PyDict = value.downcast()?;
@@ -138,6 +151,9 @@ impl BuildValidator for TypedDictValidator {
                 required,
                 frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
             });
+            if required {
+                empty.set_item(field_name, uninitialized.clone_ref(py))?;
+            }
         }
 
         Ok(Self {
@@ -148,6 +164,7 @@ impl BuildValidator for TypedDictValidator {
             strict,
             from_attributes,
             return_fields_set,
+            empty: empty.into(),
         }
         .into())
     }
@@ -169,7 +186,7 @@ impl Validator for TypedDictValidator {
         let strict = extra.strict.unwrap_or(self.strict);
         let dict = input.validate_typed_dict(strict, self.from_attributes)?;
 
-        let output_dict = PyDict::new(py);
+        let output_dict = self.empty.as_ref(py).copy()?;
         let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
         let mut fields_set_vec: Option<Vec<Py<PyString>>> = match self.return_fields_set {
             true => Some(Vec::with_capacity(self.fields.len())),
