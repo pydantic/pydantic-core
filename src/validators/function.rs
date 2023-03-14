@@ -1,7 +1,7 @@
 use pyo3::exceptions::{PyAssertionError, PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyString};
+use pyo3::types::{PyAny, PyDict};
 
 use crate::build_tools::{function_name, py_err, SchemaDict};
 use crate::errors::{
@@ -307,7 +307,7 @@ pub struct ValidationInfo {
     #[pyo3(get)]
     context: Option<PyObject>,
     #[pyo3(get)]
-    field: Option<Py<PyString>>,
+    field: Option<String>,
 }
 
 impl ValidationInfo {
@@ -316,7 +316,7 @@ impl ValidationInfo {
             data: extra.data.map(|v| v.into()),
             config: config.clone_ref(py),
             context: extra.context.map(|v| v.into()),
-            field: extra.field.map(|v| PyString::new(py, v).into()),
+            field: extra.field.map(|v| v.to_string()),
         }
     }
 }
