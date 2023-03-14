@@ -69,6 +69,8 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>>;
 
+    fn validate_dc_args(&'a self) -> ValResult<'a, GenericArguments<'a>>;
+
     fn parse_json(&'a self) -> ValResult<'a, JsonInput>;
 
     fn validate_str(&'a self, strict: bool) -> ValResult<EitherString<'a>> {

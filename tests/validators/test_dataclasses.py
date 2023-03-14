@@ -4,22 +4,32 @@ import re
 import pytest
 from dirty_equals import IsListOrTuple
 
-from pydantic_core import SchemaValidator, ValidationError, core_schema
+from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
+
+
+def test_args_kwargs():
+    ak = ArgsKwargs(('hello', True))
+    assert repr(ak) == "ArgsKwargs(args=('hello', True), kwargs={})"
+    assert ak.args == ('hello', True)
+    assert ak.kwargs is None
+    ak2 = ArgsKwargs((), {'a': 123})
+    assert repr(ak2) == "ArgsKwargs(args=(), kwargs={'a': 123})"
+    assert ak2.args == ()
+    assert ak2.kwargs == {'a': 123}
 
 
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        (('hello', True), ({'a': 'hello', 'b': True}, None)),
-        (['hello', True], ({'a': 'hello', 'b': True}, None)),
+        (ArgsKwargs(('hello', True)), ({'a': 'hello', 'b': True}, None)),
         ({'a': 'hello', 'b': True}, ({'a': 'hello', 'b': True}, None)),
         ({'a': 'hello', 'b': 'true'}, ({'a': 'hello', 'b': True}, None)),
-        ({'__args__': ('hello', True), '__kwargs__': {}}, ({'a': 'hello', 'b': True}, None)),
-        ({'__args__': (), '__kwargs__': {'a': 'hello', 'b': True}}, ({'a': 'hello', 'b': True}, None)),
+        (ArgsKwargs(('hello', True)), ({'a': 'hello', 'b': True}, None)),
+        (ArgsKwargs((), {'a': 'hello', 'b': True}), ({'a': 'hello', 'b': True}, None)),
         (
-            {'__args__': ('hello',), '__kwargs__': {'a': 'hello', 'b': True}},
+            ArgsKwargs(('hello',), {'a': 'hello', 'b': True}),
             Err(
                 'Got multiple values for argument',
                 errors=[
@@ -68,13 +78,12 @@ def test_dataclass_args(py_and_json: PyAndJson, input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        (('hello', True), ({'a': 'hello'}, (True,))),
-        (['hello', True], ({'a': 'hello'}, (True,))),
-        (('hello', 'true'), ({'a': 'hello'}, (True,))),
-        ({'__args__': ('hello', True), '__kwargs__': {}}, ({'a': 'hello'}, (True,))),
-        ({'__args__': (), '__kwargs__': {'a': 'hello', 'b': True}}, ({'a': 'hello'}, (True,))),
+        (ArgsKwargs(('hello', True)), ({'a': 'hello'}, (True,))),
+        (ArgsKwargs(('hello', 'true')), ({'a': 'hello'}, (True,))),
+        (ArgsKwargs(('hello', True)), ({'a': 'hello'}, (True,))),
+        (ArgsKwargs((), {'a': 'hello', 'b': True}), ({'a': 'hello'}, (True,))),
         (
-            {'__args__': ('hello',), '__kwargs__': {'a': 'hello', 'b': True}},
+            ArgsKwargs(('hello',), {'a': 'hello', 'b': True}),
             Err(
                 'Got multiple values for argument',
                 errors=[
@@ -140,24 +149,18 @@ def test_dataclass_args_init_only(py_and_json: PyAndJson, input_value, expected)
     'input_value,expected',
     [
         ({'a': 'hello'}, ({'a': 'hello'}, ())),
-        ({'__args__': (), '__kwargs__': {'a': 'hello'}}, ({'a': 'hello'}, ())),
+        (ArgsKwargs((), {'a': 'hello'}), ({'a': 'hello'}, ())),
         (
             ('hello',),
             Err(
-                '2 validation errors for dataclass-args',
+                'Dataclass input must be a dictionary or dataclass instance',
                 errors=[
                     {
-                        'type': 'missing_keyword_argument',
-                        'loc': ('a',),
-                        'msg': 'Missing required keyword argument',
+                        'type': 'dataclass_type',
+                        'loc': (),
+                        'msg': 'Dataclass input must be a dictionary or dataclass instance',
                         'input': IsListOrTuple('hello'),
-                    },
-                    {
-                        'type': 'unexpected_positional_argument',
-                        'loc': (0,),
-                        'msg': 'Unexpected positional argument',
-                        'input': 'hello',
-                    },
+                    }
                 ],
             ),
         ),

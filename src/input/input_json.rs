@@ -98,6 +98,13 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
+    fn validate_dc_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
+        match self {
+            JsonInput::Object(object) => Ok(JsonArgs::new(None, Some(object)).into()),
+            _ => Err(ValError::new(ErrorType::DataclassType, self)),
+        }
+    }
+
     fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
         match self {
             JsonInput::String(s) => serde_json::from_str(s.as_str()).map_err(|e| map_json_err(self, e)),
@@ -350,6 +357,11 @@ impl<'a> Input<'a> for String {
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
         Err(ValError::new(ErrorType::ArgumentsType, self))
+    }
+
+    #[cfg_attr(has_no_coverage, no_coverage)]
+    fn validate_dc_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
+        Err(ValError::new(ErrorType::DataclassType, self))
     }
 
     fn parse_json(&'a self) -> ValResult<'a, JsonInput> {

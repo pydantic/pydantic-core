@@ -2215,7 +2215,7 @@ def dataclass_field(
     field = core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False)
     schema = core_schema.dataclass_args_schema(field)
     v = SchemaValidator(schema)
-    assert v.validate_python(('hello',)) == ({'a': 'hello'}, None)
+    assert v.validate_python({'a': 'hello'}) == ({'a': 'hello'}, None)
     ```
 
     Args:
@@ -2265,7 +2265,7 @@ def dataclass_args_schema(
     field_b = core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False)
     schema = core_schema.dataclass_args_schema(field_a, field_b)
     v = SchemaValidator(schema)
-    assert v.validate_python(('hello', True)) == ({'a': 'hello', 'b': True}, None)
+    assert v.validate_python({'a': 'hello', 'b': True}) == ({'a': 'hello', 'b': True}, None)
     ```
 
     Args:
@@ -2930,6 +2930,7 @@ ErrorType = Literal[
     'unexpected_positional_argument',
     'missing_positional_argument',
     'multiple_argument_values',
+    'dataclass_type',
     'url_type',
     'url_parsing',
     'url_syntax_violation',

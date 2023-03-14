@@ -257,6 +257,7 @@ all_errors = [
     ('unexpected_positional_argument', 'Unexpected positional argument', None),
     ('missing_positional_argument', 'Missing required positional argument', None),
     ('multiple_argument_values', 'Got multiple values for argument', None),
+    ('dataclass_type', 'Dataclass input must be a dictionary or dataclass instance', None),
     ('url_type', 'URL input should be a string or URL', None),
     ('url_parsing', 'Input should be a valid URL, Foobar', {'error': 'Foobar'}),
     ('url_syntax_violation', 'Input violated strict URL syntax rules, Foobar', {'error': 'Foobar'}),

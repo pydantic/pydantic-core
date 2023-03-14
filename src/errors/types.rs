@@ -322,6 +322,10 @@ pub enum ErrorType {
     #[strum(message = "Got multiple values for argument")]
     MultipleArgumentValues,
     // ---------------------
+    // dataclass errors
+    #[strum(message = "Dataclass input must be a dictionary or dataclass instance")]
+    DataclassType,
+    // ---------------------
     // URL errors
     #[strum(message = "URL input should be a string or URL")]
     UrlType,

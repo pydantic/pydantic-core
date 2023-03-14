@@ -116,7 +116,7 @@ impl Validator for DataclassArgsValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let args = input.validate_args()?;
+        let args = input.validate_dc_args()?;
 
         let output_dict = PyDict::new(py);
         let mut init_only_args = self.init_only_count.map(Vec::with_capacity);
