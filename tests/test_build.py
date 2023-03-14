@@ -77,7 +77,7 @@ def test_wrong_type():
 
 def test_function_no_mode():
     with pytest.raises(SchemaError, match='Unable to extract tag using discriminator self-schema'):
-        SchemaValidator({'type': 'function', 'is_model_field_validator': False})
+        SchemaValidator({'type': 'function'})
 
 
 def test_try_self_schema_discriminator():

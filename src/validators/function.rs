@@ -116,6 +116,7 @@ pub struct FunctionAfterValidator {
     config: PyObject,
     name: String,
 }
+
 impl_build!(FunctionAfterValidator, "function-after");
 
 impl Validator for FunctionAfterValidator {
@@ -151,6 +152,7 @@ pub struct FunctionPlainValidator {
     config: PyObject,
     name: String,
 }
+
 impl FunctionPlainValidator {
     pub fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedValidator> {
         let py = schema.py();
