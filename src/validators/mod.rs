@@ -197,6 +197,7 @@ impl SchemaValidator {
             field: Some(field.as_str()),
             strict,
             context,
+            field_name: None,
         };
         let r = self
             .validator
@@ -445,9 +446,12 @@ pub fn build_validator<'a>(
 /// but that would confuse it with context as per pydantic/pydantic#1549
 #[derive(Debug, Default)]
 pub struct Extra<'a> {
-    /// This is used as the `data` kwargs to validator functions, it also represents the current model
-    /// data when validating assignment
+    /// Represents the fields of the model we are currently validating
+    /// If there is no model this will be None
     pub data: Option<&'a PyDict>,
+    /// Represents the fields of the model we are currently validating
+    /// If there is no model this will be None
+    pub field_name: Option<&'a str>,
     /// The field being assigned to when validating assignment
     pub field: Option<&'a str>,
     /// whether we're in strict or lax mode
@@ -473,6 +477,7 @@ impl<'a> Extra<'a> {
             field: self.field,
             strict: Some(true),
             context: self.context,
+            field_name: self.field_name,
         }
     }
 }

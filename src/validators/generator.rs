@@ -239,6 +239,7 @@ impl InternalValidator {
             field: self.field.as_deref(),
             strict: self.strict,
             context: self.context.as_ref().map(|data| data.as_ref(py)),
+            field_name: None,
         };
         self.validator
             .validate(py, input, &extra, &self.slots, &mut self.recursion_guard)

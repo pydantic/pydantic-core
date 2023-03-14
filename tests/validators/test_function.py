@@ -404,8 +404,8 @@ def test_model_field_before_validator() -> None:
             self.__dict__.update(kwargs)
 
     def f(input_value: Any, info: core_schema.ModelFieldValidationInfo) -> Any:
-        assert info.field is not None
-        assert info.data is not None
+        assert info.field_name == 'x'
+        assert info.data == {}
         return f'input: {input_value}'
 
     v = SchemaValidator(
@@ -417,4 +417,74 @@ def test_model_field_before_validator() -> None:
         )
     )
 
-    assert v.validate_python({'x': 'foo'}) == Model(x='input: foo')
+    assert v.validate_python({'x': 'foo'}).x == 'input: foo'
+
+
+def test_model_field_after_validator() -> None:
+    class Model:
+        x: str
+
+        def __init__(self, **kwargs: Any) -> None:
+            self.__dict__.update(kwargs)
+
+    def f(input_value: Any, info: core_schema.ModelFieldValidationInfo) -> Any:
+        assert info.field_name == 'x'
+        assert info.data == {}
+        return f'input: {input_value}'
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {'x': core_schema.typed_dict_field(core_schema.function_after_schema(f, core_schema.any_schema()))}
+            ),
+        )
+    )
+
+    assert v.validate_python({'x': 'foo'}).x == 'input: foo'
+
+
+def test_model_field_plain_validator() -> None:
+    class Model:
+        x: str
+
+        def __init__(self, **kwargs: Any) -> None:
+            self.__dict__.update(kwargs)
+
+    def f(input_value: Any, info: core_schema.ModelFieldValidationInfo) -> Any:
+        assert info.field_name == 'x'
+        assert info.data == {}
+        return f'input: {input_value}'
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema({'x': core_schema.typed_dict_field(core_schema.function_plain_schema(f))}),
+        )
+    )
+
+    assert v.validate_python({'x': 'foo'}).x == 'input: foo'
+
+
+def test_model_field_wrap_validator() -> None:
+    class Model:
+        x: str
+
+        def __init__(self, **kwargs: Any) -> None:
+            self.__dict__.update(kwargs)
+
+    def f(input_value: Any, val: core_schema.CallableValidator, info: core_schema.ModelFieldValidationInfo) -> Any:
+        assert info.field_name == 'x'
+        assert info.data == {}
+        return f'input: {val(input_value)}'
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {'x': core_schema.typed_dict_field(core_schema.function_wrap_schema(f, core_schema.any_schema()))}
+            ),
+        )
+    )
+
+    assert v.validate_python({'x': 'foo'}).x == 'input: foo'

@@ -120,7 +120,7 @@ class ModelFieldValidationInfo(ValidationInfo, Protocol):
         ...
 
     @property
-    def field(self) -> str | None:
+    def field_name(self) -> str:
         """
         The name of the current field being validated if this validator is
         attached to a model field.

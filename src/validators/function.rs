@@ -307,7 +307,7 @@ pub struct ValidationInfo {
     #[pyo3(get)]
     context: Option<PyObject>,
     #[pyo3(get)]
-    field: Option<String>,
+    field_name: Option<String>,
 }
 
 impl ValidationInfo {
@@ -316,7 +316,7 @@ impl ValidationInfo {
             data: extra.data.map(|v| v.into()),
             config: config.clone_ref(py),
             context: extra.context.map(|v| v.into()),
-            field: extra.field.map(|v| v.to_string()),
+            field_name: extra.field_name.map(|v| v.to_string()),
         }
     }
 }

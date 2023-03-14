@@ -188,7 +188,8 @@ impl Validator for TypedDictValidator {
                 for field in &self.fields {
                     let extra = Extra {
                         data: Some(output_dict),
-                        field: Some(&field.name),
+                        field: None,
+                        field_name: Some(&field.name),
                         strict: extra.strict,
                         context: extra.context,
                     };

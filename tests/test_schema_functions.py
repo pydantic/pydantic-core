@@ -92,7 +92,7 @@ all_schema_functions = [
     ),
     (
         core_schema.function_after_schema,
-        args({'type': 'int'}, val_function),
+        args(val_function, {'type': 'int'}),
         {'type': 'function', 'mode': 'after', 'function': val_function, 'schema': {'type': 'int'}},
     ),
     (
