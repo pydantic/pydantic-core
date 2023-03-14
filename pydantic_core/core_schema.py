@@ -51,14 +51,37 @@ IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
 
 
 class SerializationInfo(Protocol):
-    include: IncExCall
-    exclude: IncExCall
-    mode: str
-    by_alias: bool
-    exclude_unset: bool
-    exclude_defaults: bool
-    exclude_none: bool
-    round_trip: bool
+    @property
+    def include(self) -> IncExCall:
+        ...
+
+    @property
+    def exclude(self) -> IncExCall:
+        ...
+
+    @property
+    def mode(self) -> str:
+        ...
+
+    @property
+    def by_alias(self) -> bool:
+        ...
+
+    @property
+    def exclude_unset(self) -> bool:
+        ...
+
+    @property
+    def exclude_defaults(self) -> bool:
+        ...
+
+    @property
+    def exclude_none(self) -> bool:
+        ...
+
+    @property
+    def round_trip(self) -> bool:
+        ...
 
     def mode_is_json(self) -> bool:
         ...
@@ -75,12 +98,34 @@ class ValidationInfo(Protocol):
     Argument passed to validation functions.
     """
 
-    data: Dict[str, Any]
-    """All of the fields and data being validated for this model."""
-    context: Dict[str, Any]
-    """Current validation context."""
-    config: CoreConfig | None
-    """The CoreConfig that applies to this validation."""
+    @property
+    def context(self) -> Dict[str, Any]:
+        """Current validation context."""
+        ...
+
+    @property
+    def config(self) -> CoreConfig | None:
+        """The CoreConfig that applies to this validation."""
+        ...
+
+
+class ModelFieldValidationInfo(ValidationInfo, Protocol):
+    """
+    Argument passed to model field validation functions.
+    """
+
+    @property
+    def data(self) -> Dict[str, Any]:
+        """All of the fields and data being validated for this model."""
+        ...
+
+    @property
+    def field(self) -> str | None:
+        """
+        The name of the current field being validated if this validator is
+        attached to a model field.
+        """
+        ...
 
 
 ExpectedSerializationTypes = Literal[
@@ -1449,18 +1494,72 @@ class ValidatorFunction(Protocol):
         ...
 
 
-class FunctionSchema(TypedDict, total=False):
+class ModelFieldValidatorFunction(Protocol):
+    def __call__(self, __input_value: Any, __info: ModelFieldValidationInfo) -> Any:  # pragma: no cover
+        ...
+
+
+class _FunctionSchema(TypedDict, total=False):
     type: Required[Literal['function']]
     mode: Required[Literal['before', 'after']]
-    function: Required[ValidatorFunction]
     schema: Required[CoreSchema]
     ref: str
     metadata: Any
     serialization: SerSchema
 
 
+class FunctionSchema(_FunctionSchema, total=False):
+    function: Required[ValidatorFunction]
+
+class ModelFieldFunctionSchema(_FunctionSchema, total=False):
+    function: Required[ModelFieldValidatorFunction]
+
+
+def model_field_function_before_schema(
+    function: ModelFieldValidatorFunction,
+    schema: CoreSchema,
+    *,
+    ref: str | None = ...,
+    metadata: Any = ...,
+    serialization: SerSchema | None = ...,
+) -> ModelFieldFunctionSchema:
+    """
+    Returns a schema that calls a validator function before validating the provided schema, e.g.:
+
+    ```py
+    from typing import Any
+    from pydantic_core import SchemaValidator, core_schema
+
+    def fn(v: Any, info: core_schema.ValidationInfo) -> str:
+        v_str = str(v)
+        assert 'hello' in v_str
+        return v_str + 'world'
+
+    schema = core_schema.function_before_schema(function=fn, schema=core_schema.str_schema())
+    v = SchemaValidator(schema)
+    assert v.validate_python(b"hello ") == "b'hello 'world"
+    ```
+
+    Args:
+        function: The validator function to call
+        schema: The schema to validate the output of the validator function
+        ref: See [TODO] for details
+        metadata: See [TODO] for details
+        serialization: Custom serialization schema
+    """
+    return dict_not_none(
+        type='function',
+        mode='before',
+        function=function,
+        schema=schema,
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
+    )
+
+
 def function_before_schema(
-    function: ValidatorFunction,
+    function: ValidatorFunction | ModelFieldValidatorFunction,
     schema: CoreSchema,
     *,
     ref: str | None = None,
@@ -1502,10 +1601,52 @@ def function_before_schema(
     )
 
 
-def function_after_schema(
+def model_field_function_after_schema(
+    function: ModelFieldValidatorFunction,
     schema: CoreSchema,
-    function: ValidatorFunction,
     *,
+    ref: str | None = ...,
+    metadata: Any = ...,
+    serialization: SerSchema | None = ...,
+) -> ModelFieldFunctionSchema:
+    """
+    Returns a schema that calls a validator function after validating the provided schema, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    def fn(v: str, info: core_schema.ValidationInfo) -> str:
+        assert 'hello' in v
+        return v + 'world'
+
+    schema = core_schema.function_after_schema(schema=core_schema.str_schema(), function=fn)
+    v = SchemaValidator(schema)
+    assert v.validate_python('hello ') == 'hello world'
+    ```
+
+    Args:
+        schema: The schema to validate before the validator function
+        function: The validator function to call after the schema is validated
+        ref: See [TODO] for details
+        metadata: See [TODO] for details
+        serialization: Custom serialization schema
+    """
+    return dict_not_none(
+        type='function',
+        mode='after',
+        function=function,
+        schema=schema,
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
+    )
+
+
+def function_after_schema(
+    function: ValidatorFunction | ModelFieldValidatorFunction,
+    schema: CoreSchema,
+    *,
+    is_model_field: bool,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
@@ -1555,20 +1696,35 @@ class WrapValidatorFunction(Protocol):
         ...
 
 
-class FunctionWrapSchema(TypedDict, total=False):
+class ModelFieldWrapValidatorFunction(Protocol):
+    def __call__(
+        self, __input_value: Any, __validator: CallableValidator, __info: ModelFieldValidationInfo
+    ) -> Any:  # pragma: no cover
+        ...
+
+
+class _FunctionWrapSchema(TypedDict, total=False):
     type: Required[Literal['function']]
     mode: Required[Literal['wrap']]
-    function: Required[WrapValidatorFunction]
     schema: Required[CoreSchema]
     ref: str
     metadata: Any
     serialization: SerSchema
 
 
+class FunctionWrapSchema(_FunctionWrapSchema, total=False):
+    function: Required[WrapValidatorFunction]
+
+
+class ModelFieldFunctionWrapSchema(_FunctionWrapSchema, total=False):
+    function: Required[ModelFieldWrapValidatorFunction]
+
+
 def function_wrap_schema(
-    function: WrapValidatorFunction,
+    function: WrapValidatorFunction | ModelFieldWrapValidatorFunction,
     schema: CoreSchema,
     *,
+    is_model_field: bool,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
@@ -1607,18 +1763,104 @@ def function_wrap_schema(
     )
 
 
-class FunctionPlainSchema(TypedDict, total=False):
+def model_field_function_wrap_schema(
+    function: ModelFieldWrapValidatorFunction,
+    schema: CoreSchema,
+    *,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
+) -> ModelFieldFunctionWrapSchema:
+    """
+    Returns a schema which calls a function with a `validator` callable argument which can
+    optionally be used to call inner validation with the function logic, this is much like the
+    "onion" implementation of middleware in many popular web frameworks, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    def fn(v: str, validator: core_schema.CallableValidator, info: core_schema.ValidationInfo) -> str:
+        return validator(input_value=v) + 'world'
+
+    schema = core_schema.function_wrap_schema(function=fn, schema=core_schema.str_schema())
+    v = SchemaValidator(schema)
+    assert v.validate_python('hello ') == 'hello world'
+    ```
+
+    Args:
+        function: The validator function to call
+        schema: The schema to validate the output of the validator function
+        ref: See [TODO] for details
+        metadata: See [TODO] for details
+        serialization: Custom serialization schema
+    """
+    return dict_not_none(
+        type='function',
+        mode='wrap',
+        function=function,
+        schema=schema,
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
+    )
+
+
+class _FunctionPlainSchema(TypedDict, total=False):
     type: Required[Literal['function']]
     mode: Required[Literal['plain']]
-    function: Required[ValidatorFunction]
     ref: str
     metadata: Any
     serialization: SerSchema
 
 
+class FunctionPlainSchema(_FunctionPlainSchema, total=False):
+    function: Required[ValidatorFunction]
+
+
+class ModelFieldFunctionPlainSchema(_FunctionPlainSchema, total=False):
+    function: Required[ModelFieldValidatorFunction]
+
+
 def function_plain_schema(
-    function: ValidatorFunction, *, ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
+    function: ValidatorFunction | ModelFieldValidatorFunction,
+    *,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
 ) -> FunctionPlainSchema:
+    """
+    Returns a schema that uses the provided function for validation, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    def fn(v: str, info: core_schema.ValidationInfo) -> str:
+        assert 'hello' in v
+        return v + 'world'
+
+    schema = core_schema.function_plain_schema(function=fn)
+    v = SchemaValidator(schema)
+    assert v.validate_python("hello ") == 'hello world'
+    ```
+
+    Args:
+        function: The validator function to call
+        ref: See [TODO] for details
+        metadata: See [TODO] for details
+        serialization: Custom serialization schema
+    """
+    return dict_not_none(
+        type='function', mode='plain', function=function, ref=ref, metadata=metadata, serialization=serialization
+    )
+
+
+def model_field_function_plain_schema(
+    function: ModelFieldValidatorFunction,
+    *,
+    ref: str | None = ...,
+    metadata: Any = ...,
+    serialization: SerSchema | None = ...,
+) -> ModelFieldFunctionPlainSchema:
     """
     Returns a schema that uses the provided function for validation, e.g.:
 
@@ -2798,6 +3040,9 @@ CoreSchema = Union[
     FunctionSchema,
     FunctionWrapSchema,
     FunctionPlainSchema,
+    ModelFieldFunctionSchema,
+    ModelFieldFunctionWrapSchema,
+    ModelFieldFunctionPlainSchema,
     WithDefaultSchema,
     NullableSchema,
     UnionSchema,

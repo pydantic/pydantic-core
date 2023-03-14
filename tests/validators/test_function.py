@@ -2,6 +2,7 @@ import platform
 import re
 from copy import deepcopy
 from typing import Any, Dict, Type
+from typing_extensions import Literal
 
 import pytest
 
@@ -394,3 +395,36 @@ def test_raise_type_error():
 
     with pytest.raises(TypeError, match='^foobar$'):
         v.validate_python('input value')
+
+
+def test_model_field_before_validator() -> None:
+    class Model:
+        x: str
+        def __init__(self, **kwargs: Any) -> None:
+            self.__dict__.update(kwargs)
+
+    def f(input_value: Any, info: core_schema.ModelFieldValidationInfo) -> Any:
+        assert info.field is not None
+        assert info.data is not None
+        return f'input: {input_value}'
+
+    data: core_schema.ModelFieldFunctionSchema = {'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'str'}}
+    SchemaValidator(data)
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {
+                    "x": core_schema.typed_dict_field(
+                        core_schema.function_before_schema(
+                            f,
+                            core_schema.any_schema()
+                        )
+                    )
+                }
+            )
+        )
+    )
+
+    assert v.validate_python({'x': 'foo'}) == Model(x='input: foo')

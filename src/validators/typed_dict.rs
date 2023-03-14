@@ -193,6 +193,7 @@ impl Validator for TypedDictValidator {
         macro_rules! process {
             ($dict:ident, $get_method:ident, $iter:ty $(,$kwargs:ident)?) => {{
                 for field in &self.fields {
+                    let extra = extra.with_field(Some(&field.name));
                     let op_key_value = match field.lookup_key.$get_method($dict $(, $kwargs )? ) {
                         Ok(v) => v,
                         Err(err) => {
