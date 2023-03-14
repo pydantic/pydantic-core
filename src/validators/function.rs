@@ -1,4 +1,4 @@
-use pyo3::exceptions::{PyAssertionError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyAssertionError, PyAttributeError, PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
@@ -60,6 +60,7 @@ macro_rules! impl_build {
                         None => py.None(),
                     },
                     name,
+                    is_model_field_validator: schema.get_as_req::<bool>(intern!(py, "is_model_field_validator"))?,
                 }
                 .into())
             }
@@ -73,6 +74,7 @@ pub struct FunctionBeforeValidator {
     func: PyObject,
     config: PyObject,
     name: String,
+    is_model_field_validator: bool,
 }
 
 impl_build!(FunctionBeforeValidator, "function-before");
@@ -86,7 +88,7 @@ impl Validator for FunctionBeforeValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let info = ValidationInfo::new(py, extra, &self.config);
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_model_field_validator);
         let value = self
             .func
             .call1(py, (input.to_object(py), info))
@@ -115,6 +117,7 @@ pub struct FunctionAfterValidator {
     func: PyObject,
     config: PyObject,
     name: String,
+    is_model_field_validator: bool,
 }
 
 impl_build!(FunctionAfterValidator, "function-after");
@@ -129,7 +132,7 @@ impl Validator for FunctionAfterValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let v = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-        let info = ValidationInfo::new(py, extra, &self.config);
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_model_field_validator);
         self.func.call1(py, (v, info)).map_err(|e| convert_err(py, e, input))
     }
 
@@ -151,6 +154,7 @@ pub struct FunctionPlainValidator {
     func: PyObject,
     config: PyObject,
     name: String,
+    is_model_field_validator: bool,
 }
 
 impl FunctionPlainValidator {
@@ -164,6 +168,7 @@ impl FunctionPlainValidator {
                 None => py.None(),
             },
             name: format!("function-plain[{}()]", function_name(function)?),
+            is_model_field_validator: schema.get_as_req::<bool>(intern!(py, "is_model_field_validator"))?,
         }
         .into())
     }
@@ -178,7 +183,7 @@ impl Validator for FunctionPlainValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let info = ValidationInfo::new(py, extra, &self.config);
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_model_field_validator);
         self.func
             .call1(py, (input.to_object(py), info))
             .map_err(|e| convert_err(py, e, input))
@@ -195,6 +200,7 @@ pub struct FunctionWrapValidator {
     func: PyObject,
     config: PyObject,
     name: String,
+    is_model_field_validator: bool,
 }
 
 impl_build!(FunctionWrapValidator, "function-wrap");
@@ -211,7 +217,7 @@ impl Validator for FunctionWrapValidator {
         let call_next_validator = ValidatorCallable {
             validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
         };
-        let info = ValidationInfo::new(py, extra, &self.config);
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_model_field_validator);
         self.func
             .call1(py, (input.to_object(py), call_next_validator, info))
             .map_err(|e| convert_err(py, e, input))
@@ -301,22 +307,45 @@ pub fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) ->
 #[pyclass(module = "pydantic_core._pydantic_core")]
 pub struct ValidationInfo {
     #[pyo3(get)]
-    data: Option<Py<PyDict>>,
-    #[pyo3(get)]
     config: PyObject,
     #[pyo3(get)]
     context: Option<PyObject>,
-    #[pyo3(get)]
+    data: Option<Py<PyDict>>,
     field_name: Option<String>,
 }
 
 impl ValidationInfo {
-    fn new(py: Python, extra: &Extra, config: &PyObject) -> Self {
-        Self {
-            data: extra.data.map(|v| v.into()),
-            config: config.clone_ref(py),
-            context: extra.context.map(|v| v.into()),
-            field_name: extra.field_name.map(|v| v.to_string()),
+    fn new(py: Python, extra: &Extra, config: &PyObject, is_model_field_validator: bool) -> Self {
+        if is_model_field_validator {
+            Self {
+                config: config.clone_ref(py),
+                context: extra.context.map(|v| v.into()),
+                field_name: Some(extra.field_name.unwrap().to_string()),
+                data: extra.data.map(|v| v.into()),
+            }
+        } else {
+            Self {
+                config: config.clone_ref(py),
+                context: extra.context.map(|v| v.into()),
+                field_name: None,
+                data: None,
+            }
         }
+    }
+}
+
+#[pymethods]
+impl ValidationInfo {
+    #[getter]
+    fn get_data(&self) -> PyResult<Py<PyDict>> {
+        self.data
+            .clone()
+            .ok_or_else(|| PyAttributeError::new_err("No attribute named 'data'"))
+    }
+    #[getter]
+    fn get_field_name(&self) -> PyResult<String> {
+        self.field_name
+            .clone()
+            .ok_or_else(|| PyAttributeError::new_err("No attribute named 'field_name'"))
     }
 }

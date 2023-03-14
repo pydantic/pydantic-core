@@ -1500,7 +1500,6 @@ class ModelFieldValidatorFunction(Protocol):
 
 
 class _FunctionSchema(TypedDict, total=False):
-    type: Required[Literal['function']]
     mode: Required[Literal['before', 'after']]
     schema: Required[CoreSchema]
     ref: str
@@ -1509,11 +1508,15 @@ class _FunctionSchema(TypedDict, total=False):
 
 
 class FunctionSchema(_FunctionSchema, total=False):
+    type: Required[Literal['function']]
     function: Required[ValidatorFunction]
+    is_model_field_validator: Literal[False]
 
 
 class ModelFieldFunctionSchema(_FunctionSchema, total=False):
+    type: Required[Literal['function']]
     function: Required[ModelFieldValidatorFunction]
+    is_model_field_validator: Literal[True]
 
 
 def model_field_function_before_schema(
@@ -1556,6 +1559,7 @@ def model_field_function_before_schema(
         ref=ref,
         metadata=metadata,
         serialization=serialization,
+        is_model_field_validator=True,
     )
 
 
@@ -1599,6 +1603,7 @@ def function_before_schema(
         ref=ref,
         metadata=metadata,
         serialization=serialization,
+        is_model_field_validator=False,
     )
 
 
@@ -1640,6 +1645,7 @@ def model_field_function_after_schema(
         ref=ref,
         metadata=metadata,
         serialization=serialization,
+        is_model_field_validator=True,
     )
 
 
@@ -1681,6 +1687,7 @@ def function_after_schema(
         ref=ref,
         metadata=metadata,
         serialization=serialization,
+        is_model_field_validator=False,
     )
 
 
@@ -1714,10 +1721,12 @@ class _FunctionWrapSchema(TypedDict, total=False):
 
 class FunctionWrapSchema(_FunctionWrapSchema, total=False):
     function: Required[WrapValidatorFunction]
+    is_model_field_validator: Literal[False]
 
 
 class ModelFieldFunctionWrapSchema(_FunctionWrapSchema, total=False):
     function: Required[ModelFieldWrapValidatorFunction]
+    is_model_field_validator: Literal[True]
 
 
 def function_wrap_schema(
@@ -1759,6 +1768,7 @@ def function_wrap_schema(
         ref=ref,
         metadata=metadata,
         serialization=serialization,
+        is_model_field_validator=True,
     )
 
 
@@ -1801,6 +1811,7 @@ def model_field_function_wrap_schema(
         ref=ref,
         metadata=metadata,
         serialization=serialization,
+        is_model_field_validator=True,
     )
 
 
@@ -1814,10 +1825,12 @@ class _FunctionPlainSchema(TypedDict, total=False):
 
 class FunctionPlainSchema(_FunctionPlainSchema, total=False):
     function: Required[ValidatorFunction]
+    is_model_field_validator: Literal[False]
 
 
 class ModelFieldFunctionPlainSchema(_FunctionPlainSchema, total=False):
     function: Required[ModelFieldValidatorFunction]
+    is_model_field_validator: Literal[True]
 
 
 def function_plain_schema(

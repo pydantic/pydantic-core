@@ -198,12 +198,17 @@ def test_function_after_data():
         f_kwargs = deepcopy_info(info)
         return input_value + ' Changed'
 
+    f_schema = core_schema.model_field_function_after_schema(
+            f,
+            core_schema.any_schema(),
+    )
+
     v = SchemaValidator(
         {
             'type': 'typed-dict',
             'fields': {
                 'field_a': {'schema': {'type': 'int'}},
-                'field_b': {'schema': {'type': 'function', 'mode': 'after', 'function': f, 'schema': {'type': 'str'}}},
+                'field_b': {'schema': f_schema},
             },
         }
     )
@@ -477,6 +482,112 @@ def test_model_field_plain_validator() -> None:
 
 
 def test_model_field_wrap_validator() -> None:
+    class Model:
+        x: str
+
+        def __init__(self, **kwargs: Any) -> None:
+            self.__dict__.update(kwargs)
+
+    def f(input_value: Any, val: core_schema.CallableValidator, info: core_schema.ModelFieldValidationInfo) -> Any:
+        assert info.field_name == 'x'
+        assert info.data == {}
+        return f'input: {val(input_value)}'
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {
+                    'x': core_schema.typed_dict_field(
+                        core_schema.model_field_function_wrap_schema(f, core_schema.any_schema())
+                    )
+                }
+            ),
+        )
+    )
+
+    assert v.validate_python({'x': 'foo'}).x == 'input: foo'
+
+
+def test_non_model_field_before_validator_tries_to_access_field_info() -> None:
+    class Model:
+        x: str
+
+        def __init__(self, **kwargs: Any) -> None:
+            self.__dict__.update(kwargs)
+
+    def f(input_value: Any, info: core_schema.ModelFieldValidationInfo) -> Any:
+        assert info.field_name == 'x'
+        assert info.data == {}
+        return f'input: {input_value}'
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {
+                    'x': core_schema.typed_dict_field(
+                        core_schema.model_field_function_before_schema(f, core_schema.any_schema())
+                    )
+                }
+            ),
+        )
+    )
+
+    assert v.validate_python({'x': 'foo'}).x == 'input: foo'
+
+
+def test_non_model_field_after_validator_tries_to_access_field_info() -> None:
+    class Model:
+        x: str
+
+        def __init__(self, **kwargs: Any) -> None:
+            self.__dict__.update(kwargs)
+
+    def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
+        with pytest.raises(AttributeError, match="No attribute named 'field_name'"):
+            info.field_name  # type: ignore[attr-defined]
+        with pytest.raises(AttributeError, match="No attribute named 'data'"):
+            info.data  # type: ignore[attr-defined]
+        return f'input: {input_value}'
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {'x': core_schema.typed_dict_field(core_schema.function_after_schema(f, core_schema.any_schema()))}
+            ),
+        )
+    )
+
+    assert v.validate_python({'x': 'foo'}).x == 'input: foo'
+
+
+def test_non_model_field_plain_validator_tries_to_access_field_info() -> None:
+    class Model:
+        x: str
+
+        def __init__(self, **kwargs: Any) -> None:
+            self.__dict__.update(kwargs)
+
+    def f(input_value: Any, info: core_schema.ModelFieldValidationInfo) -> Any:
+        assert info.field_name == 'x'
+        assert info.data == {}
+        return f'input: {input_value}'
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {'x': core_schema.typed_dict_field(core_schema.model_field_function_plain_schema(f))}
+            ),
+        )
+    )
+
+    assert v.validate_python({'x': 'foo'}).x == 'input: foo'
+
+
+def test_non_model_field_wrap_validator_tries_to_access_field_info() -> None:
     class Model:
         x: str
 

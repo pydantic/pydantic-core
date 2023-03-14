@@ -190,7 +190,7 @@ def main() -> None:
     schema_union = core_schema.CoreSchema
     assert get_origin(schema_union) is Union, 'expected core_schema.CoreSchema to be a Union'
 
-    choices = {}
+    choices = []
     for s in schema_union.__args__:
         type_ = s.__annotations__['type']
         m = re.search(r"Literal\['(.+?)']", type_.__forward_arg__)
@@ -199,22 +199,24 @@ def main() -> None:
         value = get_schema(s)
         if key == 'function':
             mode = value['fields']['mode']['schema']['expected']
+            is_model_field = value['fields']['is_model_field_validator']['schema']['expected']
             if mode == ['plain']:
                 key = 'function-plain'
             elif mode == ['wrap']:
                 key = 'function-wrap'
+            if is_model_field == [True]:
+                key = 'model-field-' + key
         elif key == 'tuple':
             if value['fields']['mode']['schema']['expected'] == ['positional']:
                 key = 'tuple-positional'
             else:
                 key = 'tuple-variable'
 
-        choices[key] = value
+        choices.append(value)
 
     schema = {
-        'type': 'tagged-union',
+        'type': 'union',
         'ref': 'root-schema',
-        'discriminator': 'self-schema-discriminator',
         'choices': choices,
     }
     python_code = (
