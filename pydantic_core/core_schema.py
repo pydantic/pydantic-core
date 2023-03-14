@@ -1511,6 +1511,7 @@ class _FunctionSchema(TypedDict, total=False):
 class FunctionSchema(_FunctionSchema, total=False):
     function: Required[ValidatorFunction]
 
+
 class ModelFieldFunctionSchema(_FunctionSchema, total=False):
     function: Required[ModelFieldValidatorFunction]
 
@@ -1646,7 +1647,6 @@ def function_after_schema(
     function: ValidatorFunction | ModelFieldValidatorFunction,
     schema: CoreSchema,
     *,
-    is_model_field: bool,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
@@ -1724,7 +1724,6 @@ def function_wrap_schema(
     function: WrapValidatorFunction | ModelFieldWrapValidatorFunction,
     schema: CoreSchema,
     *,
-    is_model_field: bool,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,

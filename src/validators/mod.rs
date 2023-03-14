@@ -475,14 +475,6 @@ impl<'a> Extra<'a> {
             context: self.context,
         }
     }
-    pub fn with_field<'b: 'a>(&'a self, field: Option<&'b str>) -> Self {
-        Self {
-            data: self.data,
-            field,
-            strict: self.strict,
-            context: self.context,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

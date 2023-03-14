@@ -183,17 +183,15 @@ impl Validator for TypedDictValidator {
             false => None,
         };
 
-        let extra = Extra {
-            data: Some(output_dict),
-            field: None,
-            strict: extra.strict,
-            context: extra.context,
-        };
-
         macro_rules! process {
             ($dict:ident, $get_method:ident, $iter:ty $(,$kwargs:ident)?) => {{
                 for field in &self.fields {
-                    let extra = extra.with_field(Some(&field.name));
+                    let extra = Extra {
+                        data: Some(output_dict),
+                        field: Some(&field.name),
+                        strict: extra.strict,
+                        context: extra.context,
+                    };
                     let op_key_value = match field.lookup_key.$get_method($dict $(, $kwargs )? ) {
                         Ok(v) => v,
                         Err(err) => {

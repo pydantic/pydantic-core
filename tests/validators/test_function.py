@@ -2,7 +2,6 @@ import platform
 import re
 from copy import deepcopy
 from typing import Any, Dict, Type
-from typing_extensions import Literal
 
 import pytest
 
@@ -400,6 +399,7 @@ def test_raise_type_error():
 def test_model_field_before_validator() -> None:
     class Model:
         x: str
+
         def __init__(self, **kwargs: Any) -> None:
             self.__dict__.update(kwargs)
 
@@ -408,22 +408,12 @@ def test_model_field_before_validator() -> None:
         assert info.data is not None
         return f'input: {input_value}'
 
-    data: core_schema.ModelFieldFunctionSchema = {'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'str'}}
-    SchemaValidator(data)
-
     v = SchemaValidator(
         core_schema.model_schema(
             Model,
             core_schema.typed_dict_schema(
-                {
-                    "x": core_schema.typed_dict_field(
-                        core_schema.function_before_schema(
-                            f,
-                            core_schema.any_schema()
-                        )
-                    )
-                }
-            )
+                {'x': core_schema.typed_dict_field(core_schema.function_before_schema(f, core_schema.any_schema()))}
+            ),
         )
     )
 
