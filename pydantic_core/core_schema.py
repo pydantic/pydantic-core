@@ -1520,9 +1520,9 @@ def model_field_function_before_schema(
     function: ModelFieldValidatorFunction,
     schema: CoreSchema,
     *,
-    ref: str | None = ...,
-    metadata: Any = ...,
-    serialization: SerSchema | None = ...,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
 ) -> ModelFieldFunctionSchema:
     """
     Returns a schema that calls a validator function before validating the provided schema, e.g.:
@@ -1606,9 +1606,9 @@ def model_field_function_after_schema(
     function: ModelFieldValidatorFunction,
     schema: CoreSchema,
     *,
-    ref: str | None = ...,
-    metadata: Any = ...,
-    serialization: SerSchema | None = ...,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
 ) -> ModelFieldFunctionSchema:
     """
     Returns a schema that calls a validator function after validating the provided schema, e.g.:
@@ -1852,9 +1852,9 @@ def function_plain_schema(
 def model_field_function_plain_schema(
     function: ModelFieldValidatorFunction,
     *,
-    ref: str | None = ...,
-    metadata: Any = ...,
-    serialization: SerSchema | None = ...,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
 ) -> ModelFieldFunctionPlainSchema:
     """
     Returns a schema that uses the provided function for validation, e.g.:
