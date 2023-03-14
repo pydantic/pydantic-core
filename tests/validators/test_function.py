@@ -412,7 +412,11 @@ def test_model_field_before_validator() -> None:
         core_schema.model_schema(
             Model,
             core_schema.typed_dict_schema(
-                {'x': core_schema.typed_dict_field(core_schema.function_before_schema(f, core_schema.any_schema()))}
+                {
+                    'x': core_schema.typed_dict_field(
+                        core_schema.model_field_function_before_schema(f, core_schema.any_schema())
+                    )
+                }
             ),
         )
     )
@@ -436,7 +440,11 @@ def test_model_field_after_validator() -> None:
         core_schema.model_schema(
             Model,
             core_schema.typed_dict_schema(
-                {'x': core_schema.typed_dict_field(core_schema.function_after_schema(f, core_schema.any_schema()))}
+                {
+                    'x': core_schema.typed_dict_field(
+                        core_schema.model_field_function_after_schema(f, core_schema.any_schema())
+                    )
+                }
             ),
         )
     )
@@ -459,7 +467,9 @@ def test_model_field_plain_validator() -> None:
     v = SchemaValidator(
         core_schema.model_schema(
             Model,
-            core_schema.typed_dict_schema({'x': core_schema.typed_dict_field(core_schema.function_plain_schema(f))}),
+            core_schema.typed_dict_schema(
+                {'x': core_schema.typed_dict_field(core_schema.model_field_function_plain_schema(f))}
+            ),
         )
     )
 
@@ -482,7 +492,11 @@ def test_model_field_wrap_validator() -> None:
         core_schema.model_schema(
             Model,
             core_schema.typed_dict_schema(
-                {'x': core_schema.typed_dict_field(core_schema.function_wrap_schema(f, core_schema.any_schema()))}
+                {
+                    'x': core_schema.typed_dict_field(
+                        core_schema.model_field_function_wrap_schema(f, core_schema.any_schema())
+                    )
+                }
             ),
         )
     )

@@ -1560,7 +1560,7 @@ def model_field_function_before_schema(
 
 
 def function_before_schema(
-    function: ValidatorFunction | ModelFieldValidatorFunction,
+    function: ValidatorFunction,
     schema: CoreSchema,
     *,
     ref: str | None = None,
@@ -1644,7 +1644,7 @@ def model_field_function_after_schema(
 
 
 def function_after_schema(
-    function: ValidatorFunction | ModelFieldValidatorFunction,
+    function: ValidatorFunction,
     schema: CoreSchema,
     *,
     ref: str | None = None,
@@ -1721,7 +1721,7 @@ class ModelFieldFunctionWrapSchema(_FunctionWrapSchema, total=False):
 
 
 def function_wrap_schema(
-    function: WrapValidatorFunction | ModelFieldWrapValidatorFunction,
+    function: WrapValidatorFunction,
     schema: CoreSchema,
     *,
     ref: str | None = None,
@@ -1821,11 +1821,7 @@ class ModelFieldFunctionPlainSchema(_FunctionPlainSchema, total=False):
 
 
 def function_plain_schema(
-    function: ValidatorFunction | ModelFieldValidatorFunction,
-    *,
-    ref: str | None = None,
-    metadata: Any = None,
-    serialization: SerSchema | None = None,
+    function: ValidatorFunction, *, ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
 ) -> FunctionPlainSchema:
     """
     Returns a schema that uses the provided function for validation, e.g.:
