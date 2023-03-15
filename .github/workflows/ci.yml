@@ -303,10 +303,31 @@ jobs:
           name: wasm_wheels
           path: dist
 
+  build-stubs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: set up python
+        id: setup-python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - run: pip install hatch
+
+      - name: build wheels
+        run: cd pydantic-core-stubs && hatch build
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: pypi_files
+          path: pydantic-core-stubs/dist
+
   # https://github.com/marketplace/actions/alls-green#why used for branch protection checks
   check:
     if: always()
-    needs: [test-cpython, test-pypy, test-os, lint, bench, build-wasm-emscripten]
+    needs: [test-cpython, test-pypy, test-os, lint, bench, build-wasm-emscripten, build-stubs]
     runs-on: ubuntu-latest
     steps:
       - name: Decide whether the needed jobs succeeded or failed

@@ -5,6 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pydantic-core-stubs"
+version = "0.1.0"
 
 [tool.hatch.build.targets.sdist]
 packages = ["pydantic_core-stubs"]
