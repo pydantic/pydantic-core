@@ -141,14 +141,8 @@ def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
         ((1, 2, '3'), (1, 2, 3)),
         ([1, 2, '3'], (1, 2, 3)),
         (deque((1, 2, '3')), (1, 2, 3)),
-        (
-            {1: 10, 2: 20, '3': '30'}.keys(),
-            (1, 2, 3),
-        ),
-        (
-            {1: 10, 2: 20, '3': '30'}.values(),
-            (10, 20, 30),
-        ),
+        ({1: 10, 2: 20, '3': '30'}.keys(), (1, 2, 3)),
+        ({1: 10, 2: 20, '3': '30'}.values(), (10, 20, 30)),
         ({1: 10, 2: 20, '3': '30'}, Err('Input should be a valid tuple [type=tuple_type,')),
         ({1, 2, '3'}, Err('Input should be a valid tuple [type=tuple_type,')),
         (frozenset([1, 2, '3']), Err('Input should be a valid tuple [type=tuple_type,')),

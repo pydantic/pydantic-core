@@ -634,7 +634,13 @@ static DICT_KEYS_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 fn is_dict_keys_type(v: &PyAny) -> bool {
     let py = v.py();
     let keys_type = DICT_KEYS_TYPE
-        .get_or_init(py, || py.eval("type({}.keys())", None, None).unwrap().extract::<&PyType>().unwrap().into())
+        .get_or_init(py, || {
+            py.eval("type({}.keys())", None, None)
+                .unwrap()
+                .extract::<&PyType>()
+                .unwrap()
+                .into()
+        })
         .as_ref(py);
     v.is_instance(keys_type).unwrap_or(false)
 }
@@ -644,7 +650,13 @@ static DICT_VALUES_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 fn is_dict_values_type(v: &PyAny) -> bool {
     let py = v.py();
     let values_type = DICT_VALUES_TYPE
-        .get_or_init(py, || py.eval("type({}.values())", None, None).unwrap().extract::<&PyType>().unwrap().into())
+        .get_or_init(py, || {
+            py.eval("type({}.values())", None, None)
+                .unwrap()
+                .extract::<&PyType>()
+                .unwrap()
+                .into()
+        })
         .as_ref(py);
     v.is_instance(values_type).unwrap_or(false)
 }
@@ -654,7 +666,13 @@ static DICT_ITEMS_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 fn is_dict_items_type(v: &PyAny) -> bool {
     let py = v.py();
     let items_type = DICT_ITEMS_TYPE
-        .get_or_init(py, || py.eval("type({}.items())", None, None).unwrap().extract::<&PyType>().unwrap().into())
+        .get_or_init(py, || {
+            py.eval("type({}.items())", None, None)
+                .unwrap()
+                .extract::<&PyType>()
+                .unwrap()
+                .into()
+        })
         .as_ref(py);
     v.is_instance(items_type).unwrap_or(false)
 }

@@ -56,14 +56,8 @@ def gen_ints():
         ({1, 2, '3'}, Err('Input should be a valid list/array [type=list_type,')),
         (gen_ints(), [1, 2, 3]),
         (frozenset({1, 2, '3'}), Err('Input should be a valid list/array [type=list_type,')),
-        (
-            {1: 10, 2: 20, '3': '30'}.keys(),
-            [1, 2, 3],
-        ),
-        (
-            {1: 10, 2: 20, '3': '30'}.values(),
-            [10, 20, 30],
-        ),
+        ({1: 10, 2: 20, '3': '30'}.keys(), [1, 2, 3]),
+        ({1: 10, 2: 20, '3': '30'}.values(), [10, 20, 30]),
         ({1: 10, 2: 20, '3': '30'}, Err('Input should be a valid list/array [type=list_type,')),
         ((x for x in [1, 2, '3']), [1, 2, 3]),
         ('456', Err("Input should be a valid list/array [type=list_type, input_value='456', input_type=str]")),

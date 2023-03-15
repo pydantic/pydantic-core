@@ -72,14 +72,8 @@ def test_frozenset_no_validators_both(py_and_json: PyAndJson, input_value, expec
         (deque((1, 2, '3')), frozenset({1, 2, 3})),
         ((), frozenset()),
         (frozenset([1, 2, 3, 2, 3]), frozenset({1, 2, 3})),
-        (
-            {1: 10, 2: 20, '3': '30'}.keys(),
-            frozenset({1, 2, 3}),
-        ),
-        (
-            {1: 10, 2: 20, '3': '30'}.values(),
-            frozenset({10, 20, 30}),
-        ),
+        ({1: 10, 2: 20, '3': '30'}.keys(), frozenset({1, 2, 3})),
+        ({1: 10, 2: 20, '3': '30'}.values(), frozenset({10, 20, 30})),
         ({1: 10, 2: 20, '3': '30'}, Err('Input should be a valid frozenset [type=frozen_set_type,')),
         ((x for x in [1, 2, '3']), frozenset({1, 2, 3})),
         ({'abc'}, Err('0\n  Input should be a valid integer')),
