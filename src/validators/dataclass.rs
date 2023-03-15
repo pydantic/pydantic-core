@@ -333,9 +333,13 @@ impl Validator for DataclassValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let class = self.class.as_ref(py);
-        if input.is_exact_instance(class)? {
-            Ok(input.to_object(py))
-        } else if extra.strict.unwrap_or(self.strict) {
+
+        // we only do the is_exact_instance in strict mode
+        // we run validation even if input is an exact class to cover the case where a vanilla dataclass has been
+        // created with invalid types
+        // in theory we could have a flag to skip validation for an exact type in some scenarios, but I'm not sure
+        // that's a good idea
+        if extra.strict.unwrap_or(self.strict) && !input.is_exact_instance(class)? {
             Err(ValError::new(
                 ErrorType::ModelClassType {
                     class_name: self.get_name().to_string(),

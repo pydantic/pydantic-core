@@ -395,3 +395,29 @@ def test_dataclass_post_init_args_multiple():
     foo = v.validate_python({'a': b'hello', 'b': 'true', 'c': '42'})
     assert dataclasses.asdict(foo) == {'a': 'hello'}
     assert dc_args == (True, 42)
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ({'a': b'hello', 'b': 'true'}, {'a': 'hello', 'b': True}),
+        (FooDataclass(a='hello', b=True), {'a': 'hello', 'b': True}),
+        (FooDataclass(a=b'hello', b='true'), {'a': 'hello', 'b': True}),
+    ],
+)
+def test_dataclass_exact_validation(input_value, expected):
+
+    schema = core_schema.dataclass_schema(
+        FooDataclass,
+        core_schema.dataclass_args_schema(
+            'FooDataclass',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+                core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+            ],
+        ),
+    )
+
+    v = SchemaValidator(schema)
+    foo = v.validate_python(input_value)
+    assert dataclasses.asdict(foo) == expected
