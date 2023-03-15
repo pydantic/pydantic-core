@@ -1531,17 +1531,20 @@ def model_field_function_before_schema(
     Returns a schema that calls a validator function before validating the provided schema, e.g.:
 
     ```py
-    from typing import Any
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: Any, info: core_schema.ValidationInfo) -> str:
-        v_str = str(v)
-        assert 'hello' in v_str
-        return v_str + 'world'
+    def fn(v: bytes, info: core_schema.ModelFieldValidationInfo) -> str:
+        assert info.data is not None
+        assert info.field is not None
+        return v.decode() + ' world'
 
-    schema = core_schema.function_before_schema(function=fn, schema=core_schema.str_schema())
+    func_schema = core_schema.function_before_schema(function=fn, schema=core_schema.str_schema())
+    schema = core_schema.typed_dict_schema(
+        {'a': core_schema.typed_dict_field(func_schema)}
+    )
+
     v = SchemaValidator(schema)
-    assert v.validate_python(b"hello ") == "b'hello 'world"
+    assert v.validate_python(b"hello ") == "hello world"
     ```
 
     Args:
@@ -1619,13 +1622,18 @@ def model_field_function_after_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, info: core_schema.ValidationInfo) -> str:
-        assert 'hello' in v
-        return v + 'world'
+    def fn(v: str, info: core_schema.ModelFieldValidationInfo) -> str:
+        assert info.data is not None
+        assert info.field is not None
+        return v + ' world'
 
-    schema = core_schema.function_after_schema(schema=core_schema.str_schema(), function=fn)
+    func_schema = core_schema.function_before_schema(function=fn, schema=core_schema.str_schema())
+    schema = core_schema.typed_dict_schema(
+        {'a': core_schema.typed_dict_field(func_schema)}
+    )
+
     v = SchemaValidator(schema)
-    assert v.validate_python('hello ') == 'hello world'
+    assert v.validate_python(b"hello ") == "hello world"
     ```
 
     Args:
@@ -1784,12 +1792,16 @@ def model_field_function_wrap_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, validator: core_schema.CallableValidator, info: core_schema.ValidationInfo) -> str:
-        return validator(input_value=v) + 'world'
+    def fn(v: bytes, validator: core_schema.CallableValidator, info: core_schema.ModelFieldValidationInfo) -> str:
+        return validator(v) + ' world'
 
-    schema = core_schema.function_wrap_schema(function=fn, schema=core_schema.str_schema())
+    func_schema = core_schema.function_wrap_schema(function=fn, schema=core_schema.str_schema())
+    schema = core_schema.typed_dict_schema(
+        {'a': core_schema.typed_dict_field(func_schema)}
+    )
+
     v = SchemaValidator(schema)
-    assert v.validate_python('hello ') == 'hello world'
+    assert v.validate_python(b"hello ") == "hello world"
     ```
 
     Args:
@@ -1864,15 +1876,19 @@ def model_field_function_plain_schema(
     Returns a schema that uses the provided function for validation, e.g.:
 
     ```py
+    from typing import Any
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, info: core_schema.ValidationInfo) -> str:
-        assert 'hello' in v
-        return v + 'world'
+    def fn(v: Any, info: core_schema.ModelFieldValidationInfo) -> str:
+        return str(v) + ' world'
 
-    schema = core_schema.function_plain_schema(function=fn)
+    func_schema = core_schema.function_plain_schema(function=fn)
+    schema = core_schema.typed_dict_schema(
+        {'a': core_schema.typed_dict_field(func_schema)}
+    )
+
     v = SchemaValidator(schema)
-    assert v.validate_python("hello ") == 'hello world'
+    assert v.validate_python("hello ") == "hello world"
     ```
 
     Args:
