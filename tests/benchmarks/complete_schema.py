@@ -110,7 +110,7 @@ def schema(*, strict: bool = False) -> dict:
                                 'schema': {
                                     'type': 'function',
                                     'mode': 'before',
-                                    'function': append_func,
+                                    'function': {'type': 'function', 'call': append_func},
                                     'schema': {'type': 'str'},
                                 }
                             },
@@ -118,7 +118,7 @@ def schema(*, strict: bool = False) -> dict:
                                 'schema': {
                                     'type': 'function',
                                     'mode': 'after',
-                                    'function': append_func,
+                                    'function': {'type': 'function', 'call': append_func},
                                     'schema': {'type': 'str'},
                                 }
                             },
@@ -126,11 +126,17 @@ def schema(*, strict: bool = False) -> dict:
                                 'schema': {
                                     'type': 'function',
                                     'mode': 'wrap',
-                                    'function': wrap_function,
+                                    'function': {'type': 'function', 'call': wrap_function},
                                     'schema': {'type': 'str'},
                                 }
                             },
-                            'field_plain': {'schema': {'type': 'function', 'mode': 'plain', 'function': append_func}},
+                            'field_plain': {
+                                'schema': {
+                                    'type': 'function',
+                                    'mode': 'plain',
+                                    'function': {'type': 'function', 'call': append_func},
+                                }
+                            },
                         },
                     }
                 },

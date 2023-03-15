@@ -88,22 +88,37 @@ all_schema_functions = [
     (
         core_schema.function_before_schema,
         args(val_function, {'type': 'int'}),
-        {'type': 'function', 'mode': 'before', 'function': val_function, 'schema': {'type': 'int'}},
+        {
+            'type': 'function',
+            'mode': 'before',
+            'function': {'type': 'function', 'call': val_function},
+            'schema': {'type': 'int'},
+        },
     ),
     (
         core_schema.function_after_schema,
         args(val_function, {'type': 'int'}),
-        {'type': 'function', 'mode': 'after', 'function': val_function, 'schema': {'type': 'int'}},
+        {
+            'type': 'function',
+            'mode': 'after',
+            'function': {'type': 'function', 'call': val_function},
+            'schema': {'type': 'int'},
+        },
     ),
     (
         core_schema.function_wrap_schema,
         args(val_function, {'type': 'int'}),
-        {'type': 'function', 'mode': 'wrap', 'function': val_function, 'schema': {'type': 'int'}},
+        {
+            'type': 'function',
+            'mode': 'wrap',
+            'function': {'type': 'function', 'call': val_function},
+            'schema': {'type': 'int'},
+        },
     ),
     (
         core_schema.function_plain_schema,
         args(val_function),
-        {'type': 'function', 'mode': 'plain', 'function': val_function},
+        {'type': 'function', 'mode': 'plain', 'function': {'type': 'function', 'call': val_function}},
     ),
     (
         core_schema.with_default_schema,

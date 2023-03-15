@@ -91,9 +91,14 @@ def test_schema_typing() -> None:
         },
     }
     SchemaValidator(schema)
-    schema: CoreSchema = {'type': 'function', 'mode': 'wrap', 'function': wrap_validator, 'schema': {'type': 'str'}}
+    schema: CoreSchema = {
+        'type': 'function',
+        'mode': 'wrap',
+        'function': {'type': 'function', 'call': wrap_validator},
+        'schema': {'type': 'str'},
+    }
     SchemaValidator(schema)
-    schema: CoreSchema = {'type': 'function', 'mode': 'plain', 'function': validator}
+    schema: CoreSchema = {'type': 'function', 'mode': 'plain', 'function': {'type': 'function', 'call': validator}}
     SchemaValidator(schema)
     schema: CoreSchema = {
         'ref': 'Branch',

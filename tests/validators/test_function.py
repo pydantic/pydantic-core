@@ -11,14 +11,20 @@ from ..conftest import plain_repr
 
 
 def deepcopy_info(info: core_schema.ValidationInfo) -> Dict[str, Any]:
-    return {'context': deepcopy(info.context), 'data': deepcopy(info.data), 'config': deepcopy(info.config)}
+    return {
+        'context': deepcopy(info.context),
+        'data': deepcopy(getattr(info, 'data', None)),
+        'config': deepcopy(getattr(info, 'config', None)),
+    }
 
 
 def test_function_before():
     def f(input_value, info):
         return input_value + ' Changed'
 
-    v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'str'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'before', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'str'}}
+    )
 
     assert v.validate_python('input value') == 'input value Changed'
 
@@ -27,7 +33,9 @@ def test_function_before_raise():
     def f(input_value, info):
         raise ValueError('foobar')
 
-    v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'str'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'before', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'str'}}
+    )
 
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python('input value') == 'input value Changed'
@@ -48,7 +56,12 @@ def test_function_before_error():
         return input_value + 'x'
 
     v = SchemaValidator(
-        {'type': 'function', 'mode': 'before', 'function': my_function, 'schema': {'type': 'str', 'max_length': 5}}
+        {
+            'type': 'function',
+            'mode': 'before',
+            'function': {'type': 'function', 'call': my_function},
+            'schema': {'type': 'str', 'max_length': 5},
+        }
     )
 
     assert v.validate_python('1234') == '1234x'
@@ -76,7 +89,7 @@ def test_function_before_error_model():
         {
             'type': 'function',
             'mode': 'before',
-            'function': f,
+            'function': {'type': 'function', 'call': f},
             'schema': {'type': 'typed-dict', 'fields': {'my_field': {'schema': {'type': 'str', 'max_length': 5}}}},
         }
     )
@@ -99,7 +112,9 @@ def test_function_wrap():
     def f(input_value, validator, info):
         return validator(input_value=input_value) + ' Changed'
 
-    v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': {'type': 'str'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'wrap', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'str'}}
+    )
 
     assert v.validate_python('input value') == 'input value Changed'
 
@@ -109,7 +124,9 @@ def test_function_wrap_repr():
         assert repr(validator) == str(validator)
         return plain_repr(validator)
 
-    v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': {'type': 'str'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'wrap', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'str'}}
+    )
 
     assert v.validate_python('input value') == 'ValidatorCallable(Str(StrValidator{strict:false}))'
 
@@ -118,14 +135,25 @@ def test_function_wrap_str():
     def f(input_value, validator, info):
         return plain_repr(validator)
 
-    v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': {'type': 'str'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'wrap', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'str'}}
+    )
 
     assert v.validate_python('input value') == 'ValidatorCallable(Str(StrValidator{strict:false}))'
 
 
 def test_function_wrap_not_callable():
-    with pytest.raises(SchemaError, match='function-wrap -> function\n  Input should be callable'):
-        SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': [], 'schema': {'type': 'str'}})
+    with pytest.raises(
+        SchemaError, match='function-wrap -> function -> typed-dict -> call\n  Input should be callable'
+    ):
+        SchemaValidator(
+            {
+                'type': 'function',
+                'mode': 'wrap',
+                'function': {'type': 'function', 'call': []},
+                'schema': {'type': 'str'},
+            }
+        )
 
     with pytest.raises(SchemaError, match='function-wrap -> function\n  Field required'):
         SchemaValidator({'type': 'function', 'mode': 'wrap', 'schema': {'type': 'str'}})
@@ -140,7 +168,9 @@ def test_wrap_error():
             assert str(e).startswith('1 validation error for ValidatorCallable\n')
             raise e
 
-    v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': {'type': 'int'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'wrap', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'int'}}
+    )
 
     assert v.validate_python('42') == 84
     with pytest.raises(ValidationError) as exc_info:
@@ -159,7 +189,9 @@ def test_function_wrap_location():
     def f(input_value, validator, info):
         return validator(input_value, outer_location='foo') + 2
 
-    v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': {'type': 'int'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'wrap', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'int'}}
+    )
 
     assert v.validate_python(4) == 6
     with pytest.raises(ValidationError) as exc_info:
@@ -179,7 +211,9 @@ def test_function_wrap_invalid_location():
     def f(input_value, validator, info):
         return validator(input_value, ('4',)) + 2
 
-    v = SchemaValidator({'type': 'function', 'mode': 'wrap', 'function': f, 'schema': {'type': 'int'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'wrap', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'int'}}
+    )
 
     with pytest.raises(TypeError, match='^ValidatorCallable outer_location must be a str or int$'):
         v.validate_python(4)
@@ -198,19 +232,10 @@ def test_function_after_data():
         f_kwargs = deepcopy_info(info)
         return input_value + ' Changed'
 
-    f_schema = core_schema.model_field_function_after_schema(
-            f,
-            core_schema.any_schema(),
-    )
+    f_schema = core_schema.model_field_function_after_schema(f, core_schema.str_schema())
 
     v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'fields': {
-                'field_a': {'schema': {'type': 'int'}},
-                'field_b': {'schema': f_schema},
-            },
-        }
+        {'type': 'typed-dict', 'fields': {'field_a': {'schema': {'type': 'int'}}, 'field_b': {'schema': f_schema}}}
     )
 
     assert v.validate_python({'field_a': '123', 'field_b': b'321'}) == {'field_a': 123, 'field_b': '321 Changed'}
@@ -230,7 +255,12 @@ def test_function_after_config():
             'type': 'typed-dict',
             'fields': {
                 'test_field': {
-                    'schema': {'type': 'function', 'mode': 'after', 'function': f, 'schema': {'type': 'str'}}
+                    'schema': {
+                        'type': 'function',
+                        'mode': 'after',
+                        'function': {'type': 'method', 'call': f},
+                        'schema': {'type': 'str'},
+                    }
                 }
             },
         },
@@ -249,7 +279,9 @@ def test_config_no_model():
         f_kwargs = deepcopy_info(info)
         return input_value + ' Changed'
 
-    v = SchemaValidator({'type': 'function', 'mode': 'after', 'function': f, 'schema': {'type': 'str'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'after', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'str'}}
+    )
 
     assert v.validate_python(b'abc') == 'abc Changed'
     assert f_kwargs == {'data': None, 'config': None, 'context': None}
@@ -259,7 +291,7 @@ def test_function_plain():
     def f(input_value, info):
         return input_value * 2
 
-    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': f})
+    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': {'type': 'function', 'call': f}})
 
     assert v.validate_python(1) == 2
     assert v.validate_python('x') == 'xx'
@@ -267,7 +299,14 @@ def test_function_plain():
 
 def test_plain_with_schema():
     with pytest.raises(SchemaError, match='function-plain -> schema\n  Extra inputs are not permitted'):
-        SchemaValidator({'type': 'function', 'mode': 'plain', 'function': lambda x: x, 'schema': {'type': 'str'}})
+        SchemaValidator(
+            {
+                'type': 'function',
+                'mode': 'plain',
+                'function': {'type': 'function', 'call': lambda x: x},
+                'schema': {'type': 'str'},
+            }
+        )
 
 
 def test_validate_assignment():
@@ -279,7 +318,7 @@ def test_validate_assignment():
         {
             'type': 'function',
             'mode': 'after',
-            'function': f,
+            'function': {'type': 'function', 'call': f},
             'schema': {'type': 'typed-dict', 'fields': {'field_a': {'schema': {'type': 'str'}}}},
         }
     )
@@ -293,7 +332,9 @@ def test_function_wrong_sig():
     def f(input_value):
         return input_value + ' Changed'
 
-    v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'str'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'before', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'str'}}
+    )
 
     # exception messages differ between python and pypy
     if platform.python_implementation() == 'PyPy':
@@ -317,7 +358,12 @@ def test_class_with_validator():
             return Foobar(input_value * 2)
 
     v = SchemaValidator(
-        {'type': 'function', 'mode': 'after', 'function': Foobar.__validate__, 'schema': {'type': 'str'}}
+        {
+            'type': 'function',
+            'mode': 'after',
+            'function': {'type': 'function', 'call': Foobar.__validate__},
+            'schema': {'type': 'str'},
+        }
     )
 
     f = v.validate_python('foo')
@@ -340,7 +386,9 @@ def test_raise_assertion_error():
     def f(input_value, info):
         raise AssertionError('foobar')
 
-    v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'str'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'before', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'str'}}
+    )
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('input value')
@@ -360,7 +408,9 @@ def test_raise_assertion_error_plain():
     def f(input_value, info):
         raise AssertionError
 
-    v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'str'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'before', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'str'}}
+    )
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('input value')
@@ -385,7 +435,9 @@ def test_error_with_error(base_error: Type[Exception]):
     def f(input_value, info):
         raise MyError()
 
-    v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'str'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'before', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'str'}}
+    )
 
     with pytest.raises(RuntimeError, match='internal error'):
         v.validate_python('input value')
@@ -395,7 +447,9 @@ def test_raise_type_error():
     def f(input_value, info):
         raise TypeError('foobar')
 
-    v = SchemaValidator({'type': 'function', 'mode': 'before', 'function': f, 'schema': {'type': 'str'}})
+    v = SchemaValidator(
+        {'type': 'function', 'mode': 'before', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'str'}}
+    )
 
     with pytest.raises(TypeError, match='^foobar$'):
         v.validate_python('input value')
@@ -613,3 +667,16 @@ def test_non_model_field_wrap_validator_tries_to_access_field_info() -> None:
     )
 
     assert v.validate_python({'x': 'foo'}).x == 'input: foo'
+
+
+def test_method_function_no_model():
+    def f(*args: Any, **kwargs: Any) -> Any:  # pragma: no cover
+        raise AssertionError('Should not be called')
+
+    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': {'type': 'method', 'call': f}})
+
+    with pytest.raises(
+        RuntimeError,
+        match='This validator expected to be run inside the context of a model field but not model field was found',
+    ):
+        v.validate_python(123)

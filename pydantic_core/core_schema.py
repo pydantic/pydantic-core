@@ -1499,24 +1499,24 @@ class ModelFieldValidatorFunction(Protocol):
         ...
 
 
-class _FunctionSchema(TypedDict, total=False):
+class ModelFieldValidatorFunctionSchema(TypedDict):
+    call: Required[ModelFieldValidatorFunction]
+    type: Literal['method']
+
+
+class ValidatorFunctionSchema(TypedDict):
+    call: Required[ValidatorFunction]
+    type: Literal['function']
+
+
+class FunctionSchema(TypedDict, total=False):
+    function: Required[Union[ModelFieldValidatorFunctionSchema, ValidatorFunctionSchema]]
+    type: Required[Literal['function']]
     mode: Required[Literal['before', 'after']]
     schema: Required[CoreSchema]
     ref: str
     metadata: Any
     serialization: SerSchema
-
-
-class FunctionSchema(_FunctionSchema, total=False):
-    type: Required[Literal['function']]
-    function: Required[ValidatorFunction]
-    is_model_field_validator: Literal[False]
-
-
-class ModelFieldFunctionSchema(_FunctionSchema, total=False):
-    type: Required[Literal['function']]
-    function: Required[ModelFieldValidatorFunction]
-    is_model_field_validator: Literal[True]
 
 
 def model_field_function_before_schema(
@@ -1526,7 +1526,7 @@ def model_field_function_before_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> ModelFieldFunctionSchema:
+) -> FunctionSchema:
     """
     Returns a schema that calls a validator function before validating the provided schema, e.g.:
 
@@ -1554,12 +1554,11 @@ def model_field_function_before_schema(
     return dict_not_none(
         type='function',
         mode='before',
-        function=function,
+        function={'type': 'method', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
-        is_model_field_validator=True,
     )
 
 
@@ -1598,12 +1597,11 @@ def function_before_schema(
     return dict_not_none(
         type='function',
         mode='before',
-        function=function,
+        function={'type': 'function', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
-        is_model_field_validator=False,
     )
 
 
@@ -1614,7 +1612,7 @@ def model_field_function_after_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> ModelFieldFunctionSchema:
+) -> FunctionSchema:
     """
     Returns a schema that calls a validator function after validating the provided schema, e.g.:
 
@@ -1640,12 +1638,11 @@ def model_field_function_after_schema(
     return dict_not_none(
         type='function',
         mode='after',
-        function=function,
+        function={'type': 'method', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
-        is_model_field_validator=True,
     )
 
 
@@ -1682,12 +1679,11 @@ def function_after_schema(
     return dict_not_none(
         type='function',
         mode='after',
-        function=function,
+        function={'type': 'function', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
-        is_model_field_validator=False,
     )
 
 
@@ -1710,23 +1706,24 @@ class ModelFieldWrapValidatorFunction(Protocol):
         ...
 
 
-class _FunctionWrapSchema(TypedDict, total=False):
+class ModelFieldWrapValidatorFunctionSchema(TypedDict):
+    call: Required[ModelFieldWrapValidatorFunction]
+    type: Literal['method']
+
+
+class WrapValidatorFunctionSchema(TypedDict):
+    call: Required[WrapValidatorFunction]
+    type: Literal['function']
+
+
+class FunctionWrapSchema(TypedDict, total=False):
+    function: Required[Union[WrapValidatorFunctionSchema, ModelFieldWrapValidatorFunctionSchema]]
     type: Required[Literal['function']]
     mode: Required[Literal['wrap']]
     schema: Required[CoreSchema]
     ref: str
     metadata: Any
     serialization: SerSchema
-
-
-class FunctionWrapSchema(_FunctionWrapSchema, total=False):
-    function: Required[WrapValidatorFunction]
-    is_model_field_validator: Literal[False]
-
-
-class ModelFieldFunctionWrapSchema(_FunctionWrapSchema, total=False):
-    function: Required[ModelFieldWrapValidatorFunction]
-    is_model_field_validator: Literal[True]
 
 
 def function_wrap_schema(
@@ -1763,12 +1760,11 @@ def function_wrap_schema(
     return dict_not_none(
         type='function',
         mode='wrap',
-        function=function,
+        function={'type': 'function', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
-        is_model_field_validator=True,
     )
 
 
@@ -1779,7 +1775,7 @@ def model_field_function_wrap_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> ModelFieldFunctionWrapSchema:
+) -> FunctionWrapSchema:
     """
     Returns a schema which calls a function with a `validator` callable argument which can
     optionally be used to call inner validation with the function logic, this is much like the
@@ -1806,31 +1802,21 @@ def model_field_function_wrap_schema(
     return dict_not_none(
         type='function',
         mode='wrap',
-        function=function,
+        function={'type': 'method', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
-        is_model_field_validator=True,
     )
 
 
-class _FunctionPlainSchema(TypedDict, total=False):
+class FunctionPlainSchema(TypedDict, total=False):
     type: Required[Literal['function']]
     mode: Required[Literal['plain']]
+    function: Required[Union[ModelFieldValidatorFunctionSchema, ValidatorFunctionSchema]]
     ref: str
     metadata: Any
     serialization: SerSchema
-
-
-class FunctionPlainSchema(_FunctionPlainSchema, total=False):
-    function: Required[ValidatorFunction]
-    is_model_field_validator: Literal[False]
-
-
-class ModelFieldFunctionPlainSchema(_FunctionPlainSchema, total=False):
-    function: Required[ModelFieldValidatorFunction]
-    is_model_field_validator: Literal[True]
 
 
 def function_plain_schema(
@@ -1858,7 +1844,12 @@ def function_plain_schema(
         serialization: Custom serialization schema
     """
     return dict_not_none(
-        type='function', mode='plain', function=function, ref=ref, metadata=metadata, serialization=serialization
+        type='function',
+        mode='plain',
+        function={'type': 'function', 'call': function},
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
     )
 
 
@@ -1868,7 +1859,7 @@ def model_field_function_plain_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> ModelFieldFunctionPlainSchema:
+) -> FunctionPlainSchema:
     """
     Returns a schema that uses the provided function for validation, e.g.:
 
@@ -1891,7 +1882,12 @@ def model_field_function_plain_schema(
         serialization: Custom serialization schema
     """
     return dict_not_none(
-        type='function', mode='plain', function=function, ref=ref, metadata=metadata, serialization=serialization
+        type='function',
+        mode='plain',
+        function={'type': 'method', 'call': function},
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
     )
 
 
@@ -3048,9 +3044,6 @@ CoreSchema = Union[
     FunctionSchema,
     FunctionWrapSchema,
     FunctionPlainSchema,
-    ModelFieldFunctionSchema,
-    ModelFieldFunctionWrapSchema,
-    ModelFieldFunctionPlainSchema,
     WithDefaultSchema,
     NullableSchema,
     UnionSchema,
