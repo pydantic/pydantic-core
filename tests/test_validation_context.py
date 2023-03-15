@@ -118,7 +118,7 @@ def test_validate_assignment_with_context():
         }
     )
 
-    m1 = v.validate_python({'f1': '1', 'f2': '2'}, None, {'x': 'y'})
+    m1 = v.validate_python({'f1': '1', 'f2': '2'}, strict=None, context={'x': 'y'})
     assert m1 == {'f1': "1| context: {'x': 'y', 'f1': '1'}", 'f2': "2| context: {'x': 'y', 'f1': '1', 'f2': '2'}"}
 
     m2 = v.validate_assignment('f1', '3', m1, None, {'x': 'y'})

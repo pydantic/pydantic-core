@@ -70,6 +70,7 @@ impl Validator for ModelValidator {
         self.validator.py_gc_traverse(visit)?;
         Ok(())
     }
+
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -118,6 +119,18 @@ impl Validator for ModelValidator {
             }
             Ok(instance)
         }
+    }
+
+    /// here we just call the inner validator and return the result of that
+    fn validate_init<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        self.validator.validate(py, input, extra, slots, recursion_guard)
     }
 
     fn get_name(&self) -> &str {

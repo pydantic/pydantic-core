@@ -571,7 +571,7 @@ def test_call_after_init_validation_error():
     assert m.field_a == 'test'
 
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_python({'field_a': 'test'}, None, {'error': 1})
+        v.validate_python({'field_a': 'test'}, strict=None, context={'error': 1})
     assert exc_info.value.errors() == [
         {
             'type': 'value_error',
@@ -635,3 +635,74 @@ def test_call_after_init_mutate():
     assert m.field_b == 12
     assert m.__fields_set__ == {'field_a'}
     assert m.__dict__ == {'field_a': 'testtest', 'field_b': 12}
+
+
+def test_model_init():
+    class MyModel:
+        # this is not required, but it avoids `__fields_set__` being included in `__dict__`
+        __slots__ = '__dict__', '__fields_set__'
+        field_a: str
+        field_b: int
+
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'cls': MyModel,
+            'schema': {
+                'type': 'typed-dict',
+                'return_fields_set': True,
+                'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
+            },
+        }
+    )
+    m = v.validate_python({'field_a': 'test', 'field_b': 12})
+    assert isinstance(m, MyModel)
+    assert m.field_a == 'test'
+    assert m.field_b == 12
+    d, fields_set = v.validate_python({'field_a': 'test', 'field_b': 12}, in_init=True)
+    assert d == {'field_a': 'test', 'field_b': 12}
+    assert fields_set == {'field_a', 'field_b'}
+
+
+def test_model_init_nested():
+    class MyModel:
+        # this is not required, but it avoids `__fields_set__` being included in `__dict__`
+        __slots__ = '__dict__', '__fields_set__'
+
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'cls': MyModel,
+            'schema': {
+                'type': 'typed-dict',
+                'return_fields_set': True,
+                'fields': {
+                    'field_a': {'schema': {'type': 'str'}},
+                    'field_b': {
+                        'schema': {
+                            'type': 'model',
+                            'cls': MyModel,
+                            'schema': {
+                                'type': 'typed-dict',
+                                'return_fields_set': True,
+                                'fields': {'x_a': {'schema': {'type': 'str'}}, 'x_b': {'schema': {'type': 'int'}}},
+                            },
+                        }
+                    },
+                },
+            },
+        }
+    )
+    m = v.validate_python({'field_a': 'test', 'field_b': {'x_a': 'foo', 'x_b': 12}})
+    assert isinstance(m, MyModel)
+    assert m.field_a == 'test'
+    assert isinstance(m.field_b, MyModel)
+    assert m.field_b.x_a == 'foo'
+    assert m.field_b.x_b == 12
+    d, fields_set = v.validate_python({'field_a': 'test', 'field_b': {'x_a': 'foo', 'x_b': 12}}, in_init=True)
+    assert d['field_a'] == 'test'
+    assert isinstance(d['field_b'], MyModel)
+    assert d['field_b'].x_a == 'foo'
+    assert d['field_b'].x_b == 12
+
+    assert fields_set == {'field_a', 'field_b'}

@@ -11,6 +11,8 @@ def test_isinstance():
     assert v.isinstance_python(123) is True
     assert v.validate_python('123') == 123
     assert v.isinstance_python('123') is True
+    assert v.validate_python('123', in_init=True) == 123
+    assert v.isinstance_python('123', in_init=True) is True
 
     with pytest.raises(ValidationError, match='Input should be a valid integer'):
         v.validate_python('foo')

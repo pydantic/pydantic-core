@@ -37,13 +37,27 @@ class SchemaValidator:
     @property
     def title(self) -> str: ...
     def __init__(self, schema: CoreSchema, config: 'CoreConfig | None' = None) -> None: ...
-    def validate_python(self, input: Any, strict: 'bool | None' = None, context: Any = None) -> Any: ...
-    def isinstance_python(self, input: Any, strict: 'bool | None' = None, context: Any = None) -> bool: ...
+    def validate_python(
+        self, input: Any, *, strict: 'bool | None' = None, context: Any = None, in_init: bool = False
+    ) -> Any: ...
+    def isinstance_python(
+        self, input: Any, *, strict: 'bool | None' = None, context: Any = None, in_init: bool = False
+    ) -> bool: ...
     def validate_json(
-        self, input: 'str | bytes | bytearray', strict: 'bool | None' = None, context: Any = None
+        self,
+        input: 'str | bytes | bytearray',
+        *,
+        strict: 'bool | None' = None,
+        context: Any = None,
+        in_init: bool = False,
     ) -> Any: ...
     def isinstance_json(
-        self, input: 'str | bytes | bytearray', strict: 'bool | None' = None, context: Any = None
+        self,
+        input: 'str | bytes | bytearray',
+        *,
+        strict: 'bool | None' = None,
+        context: Any = None,
+        in_init: bool = False,
     ) -> bool: ...
     def validate_assignment(
         self, field: str, input: Any, data: 'dict[str, Any]', strict: 'bool | None' = None, context: Any = None
