@@ -1,4 +1,3 @@
-import platform
 import re
 from collections import deque
 from collections.abc import Sequence
@@ -260,7 +259,6 @@ def test_generator_error():
     ]
 
 
-@pytest.mark.skipif(platform.python_implementation() == 'PyPy', reason='dict views not implemented in pyo3 for pypy')
 @pytest.mark.parametrize(
     'input_value,items_schema,expected',
     [

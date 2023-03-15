@@ -7,6 +7,8 @@ use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList, PyMapping,
     PySet, PyString, PyTime, PyTuple, PyType,
 };
+#[cfg(not(PyPy))]
+use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
 use crate::build_tools::safe_repr;
@@ -39,6 +41,22 @@ macro_rules! extract_shared_iter {
 }
 
 /// Extract dict keys, values and items into a `GenericCollection`
+#[cfg(not(PyPy))]
+macro_rules! extract_dict_iter {
+    ($obj:ident) => {
+        if $obj.is_instance_of::<PyDictKeys>().unwrap_or(false) {
+            Some($obj.into())
+        } else if $obj.is_instance_of::<PyDictValues>().unwrap_or(false) {
+            Some($obj.into())
+        } else if $obj.is_instance_of::<PyDictItems>().unwrap_or(false) {
+            Some($obj.into())
+        } else {
+            None
+        }
+    };
+}
+
+#[cfg(PyPy)]
 macro_rules! extract_dict_iter {
     ($obj:ident) => {
         if is_dict_keys_type($obj) {
@@ -629,50 +647,38 @@ fn is_builtin_str(py_str: &PyString) -> bool {
     py_str.get_type().is(PyString::type_object(py_str.py()))
 }
 
+#[cfg(PyPy)]
 static DICT_KEYS_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 
+#[cfg(PyPy)]
 fn is_dict_keys_type(v: &PyAny) -> bool {
     let py = v.py();
     let keys_type = DICT_KEYS_TYPE
-        .get_or_init(py, || {
-            py.eval("type({}.keys())", None, None)
-                .unwrap()
-                .extract::<&PyType>()
-                .unwrap()
-                .into()
-        })
+        .get_or_init(py, || py.eval("type({}.keys())", None, None).unwrap().extract::<&PyType>().unwrap().into())
         .as_ref(py);
     v.is_instance(keys_type).unwrap_or(false)
 }
 
+#[cfg(PyPy)]
 static DICT_VALUES_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 
+#[cfg(PyPy)]
 fn is_dict_values_type(v: &PyAny) -> bool {
     let py = v.py();
     let values_type = DICT_VALUES_TYPE
-        .get_or_init(py, || {
-            py.eval("type({}.values())", None, None)
-                .unwrap()
-                .extract::<&PyType>()
-                .unwrap()
-                .into()
-        })
+        .get_or_init(py, || py.eval("type({}.values())", None, None).unwrap().extract::<&PyType>().unwrap().into())
         .as_ref(py);
     v.is_instance(values_type).unwrap_or(false)
 }
 
+#[cfg(PyPy)]
 static DICT_ITEMS_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 
+#[cfg(PyPy)]
 fn is_dict_items_type(v: &PyAny) -> bool {
     let py = v.py();
     let items_type = DICT_ITEMS_TYPE
-        .get_or_init(py, || {
-            py.eval("type({}.items())", None, None)
-                .unwrap()
-                .extract::<&PyType>()
-                .unwrap()
-                .into()
-        })
+        .get_or_init(py, || py.eval("type({}.items())", None, None).unwrap().extract::<&PyType>().unwrap().into())
         .as_ref(py);
     v.is_instance(items_type).unwrap_or(false)
 }
