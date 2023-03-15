@@ -61,8 +61,10 @@ def test_args_kwargs():
 def test_dataclass_args(py_and_json: PyAndJson, input_value, expected):
     schema = core_schema.dataclass_args_schema(
         'MyDataclass',
-        core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False),
-        core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False),
+        [
+            core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False),
+            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False),
+        ],
     )
     v = py_and_json(schema)
     if isinstance(expected, Err):
@@ -130,8 +132,10 @@ def test_dataclass_args(py_and_json: PyAndJson, input_value, expected):
 def test_dataclass_args_init_only(py_and_json: PyAndJson, input_value, expected):
     schema = core_schema.dataclass_args_schema(
         'MyDataclass',
-        core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False),
-        core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False, init_only=True),
+        [
+            core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False),
+            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False, init_only=True),
+        ],
         collect_init_only=True,
     )
     v = py_and_json(schema)
@@ -171,7 +175,7 @@ def test_dataclass_args_init_only(py_and_json: PyAndJson, input_value, expected)
 )
 def test_dataclass_args_init_only_no_fields(py_and_json: PyAndJson, input_value, expected):
     schema = core_schema.dataclass_args_schema(
-        'MyDataclass', core_schema.dataclass_field(name='a', schema=core_schema.str_schema()), collect_init_only=True
+        'MyDataclass', [core_schema.dataclass_field(name='a', schema=core_schema.str_schema())], collect_init_only=True
     )
     v = py_and_json(schema)
 
@@ -189,11 +193,13 @@ def test_dataclass_args_init_only_no_fields(py_and_json: PyAndJson, input_value,
 def test_aliases(py_and_json: PyAndJson):
     schema = core_schema.dataclass_args_schema(
         'MyDataclass',
-        core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), validation_alias='Apple'),
-        core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), validation_alias=['Banana', 1]),
-        core_schema.dataclass_field(
-            name='c', schema=core_schema.int_schema(), validation_alias=['Carrot', 'v'], init_only=True
-        ),
+        [
+            core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), validation_alias='Apple'),
+            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), validation_alias=['Banana', 1]),
+            core_schema.dataclass_field(
+                name='c', schema=core_schema.int_schema(), validation_alias=['Carrot', 'v'], init_only=True
+            ),
+        ],
         collect_init_only=True,
     )
     v = py_and_json(schema)
@@ -214,8 +220,10 @@ def test_dataclass():
         FooDataclass,
         core_schema.dataclass_args_schema(
             'FooDataclass',
-            core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
-            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+                core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+            ],
         ),
     )
 
@@ -273,8 +281,10 @@ def test_dataclass_subclass(input_value, expected):
         FooDataclass,
         core_schema.dataclass_args_schema(
             'FooDataclass',
-            core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
-            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+                core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+            ],
         ),
     )
     v = SchemaValidator(schema)
@@ -305,8 +315,10 @@ def test_dataclass_post_init():
         Foo,
         core_schema.dataclass_args_schema(
             'Foo',
-            core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
-            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+                core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+            ],
         ),
         post_init=True,
     )
@@ -334,9 +346,11 @@ def test_dataclass_post_init_args():
         Foo,
         core_schema.dataclass_args_schema(
             'Foo',
-            core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
-            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
-            core_schema.dataclass_field(name='c', schema=core_schema.int_schema(), init_only=True),
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+                core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+                core_schema.dataclass_field(name='c', schema=core_schema.int_schema(), init_only=True),
+            ],
             collect_init_only=True,
         ),
         post_init=True,
@@ -367,9 +381,11 @@ def test_dataclass_post_init_args_multiple():
         Foo,
         core_schema.dataclass_args_schema(
             'Foo',
-            core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
-            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), init_only=True),
-            core_schema.dataclass_field(name='c', schema=core_schema.int_schema(), init_only=True),
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+                core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), init_only=True),
+                core_schema.dataclass_field(name='c', schema=core_schema.int_schema(), init_only=True),
+            ],
             collect_init_only=True,
         ),
         post_init=True,

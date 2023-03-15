@@ -2213,7 +2213,7 @@ def dataclass_field(
     ```py
     from pydantic_core import SchemaValidator, core_schema
     field = core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False)
-    schema = core_schema.dataclass_args_schema('Foobar', field)
+    schema = core_schema.dataclass_args_schema('Foobar', [field])
     v = SchemaValidator(schema)
     assert v.validate_python({'a': 'hello'}) == ({'a': 'hello'}, None)
     ```
@@ -2251,7 +2251,7 @@ class DataclassArgsSchema(TypedDict, total=False):
 
 def dataclass_args_schema(
     dataclass_name: str,
-    *fields: DataclassField,
+    fields: list[DataclassField],
     populate_by_name: bool | None = None,
     collect_init_only: bool | None = None,
     ref: str | None = None,
@@ -2265,7 +2265,7 @@ def dataclass_args_schema(
     from pydantic_core import SchemaValidator, core_schema
     field_a = core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False)
     field_b = core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False)
-    schema = core_schema.dataclass_args_schema('Foobar', field_a, field_b)
+    schema = core_schema.dataclass_args_schema('Foobar', [field_a, field_b])
     v = SchemaValidator(schema)
     assert v.validate_python({'a': 'hello', 'b': True}) == ({'a': 'hello', 'b': True}, None)
     ```
