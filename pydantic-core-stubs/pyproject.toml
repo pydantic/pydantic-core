@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "pydantic_core-stubs"
+version = "0.1.0"
+description = ""
+authors = []
+packages = [{include = "pydantic_core-stubs"}]
+
+[tool.poetry.dependencies]
+python = ">=3.7"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

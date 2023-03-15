@@ -1,0 +1,1 @@
+../../pydantic_core/_pydantic_core.pyi
