@@ -7,8 +7,6 @@ use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList, PyMapping,
     PySet, PyString, PyTime, PyTuple, PyType,
 };
-#[cfg(not(PyPy))]
-use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
 use crate::build_tools::safe_repr;
@@ -396,7 +394,6 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    #[cfg(not(PyPy))]
     fn lax_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
         if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
@@ -404,19 +401,6 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
-        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
-            Ok(collection)
-        } else {
-            Err(ValError::new(ErrorType::TupleType, self))
-        }
-    }
-
-    #[cfg(PyPy)]
-    fn lax_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(tuple) = self.downcast::<PyTuple>() {
-            Ok(tuple.into())
-        } else if let Ok(list) = self.downcast::<PyList>() {
-            Ok(list.into())
         } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
             Ok(collection)
         } else {
@@ -432,7 +416,6 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    #[cfg(not(PyPy))]
     fn lax_set(&'a self) -> ValResult<GenericCollection<'a>> {
         if let Ok(set) = self.downcast::<PySet>() {
             Ok(set.into())
@@ -444,23 +427,6 @@ impl<'a> Input<'a> for PyAny {
             Ok(frozen_set.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
-        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
-            Ok(collection)
-        } else {
-            Err(ValError::new(ErrorType::SetType, self))
-        }
-    }
-
-    #[cfg(PyPy)]
-    fn lax_set(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(set) = self.downcast::<PySet>() {
-            Ok(set.into())
-        } else if let Ok(list) = self.downcast::<PyList>() {
-            Ok(list.into())
-        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
-            Ok(tuple.into())
-        } else if let Ok(frozen_set) = self.downcast::<PyFrozenSet>() {
-            Ok(frozen_set.into())
         } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
             Ok(collection)
         } else {
@@ -476,7 +442,6 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    #[cfg(not(PyPy))]
     fn lax_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
         if let Ok(frozen_set) = self.downcast::<PyFrozenSet>() {
             Ok(frozen_set.into())
@@ -488,23 +453,6 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
-        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
-            Ok(collection)
-        } else {
-            Err(ValError::new(ErrorType::FrozenSetType, self))
-        }
-    }
-
-    #[cfg(PyPy)]
-    fn lax_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(frozen_set) = self.downcast::<PyFrozenSet>() {
-            Ok(frozen_set.into())
-        } else if let Ok(set) = self.downcast::<PySet>() {
-            Ok(set.into())
-        } else if let Ok(list) = self.downcast::<PyList>() {
-            Ok(list.into())
-        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
-            Ok(tuple.into())
         } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
             Ok(collection)
         } else {
