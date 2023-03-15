@@ -2213,7 +2213,7 @@ def dataclass_field(
     ```py
     from pydantic_core import SchemaValidator, core_schema
     field = core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False)
-    schema = core_schema.dataclass_args_schema(field)
+    schema = core_schema.dataclass_args_schema('Foobar', field)
     v = SchemaValidator(schema)
     assert v.validate_python({'a': 'hello'}) == ({'a': 'hello'}, None)
     ```
@@ -2240,6 +2240,7 @@ def dataclass_field(
 
 class DataclassArgsSchema(TypedDict, total=False):
     type: Required[Literal['dataclass-args']]
+    dataclass_name: Required[str]
     fields: Required[List[DataclassField]]
     populate_by_name: bool  # default: False
     collect_init_only: bool  # default: False
@@ -2249,6 +2250,7 @@ class DataclassArgsSchema(TypedDict, total=False):
 
 
 def dataclass_args_schema(
+    dataclass_name: str,
     *fields: DataclassField,
     populate_by_name: bool | None = None,
     collect_init_only: bool | None = None,
@@ -2263,12 +2265,13 @@ def dataclass_args_schema(
     from pydantic_core import SchemaValidator, core_schema
     field_a = core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False)
     field_b = core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False)
-    schema = core_schema.dataclass_args_schema(field_a, field_b)
+    schema = core_schema.dataclass_args_schema('Foobar', field_a, field_b)
     v = SchemaValidator(schema)
     assert v.validate_python({'a': 'hello', 'b': True}) == ({'a': 'hello', 'b': True}, None)
     ```
 
     Args:
+        dataclass_name: The name of the dataclass being validated
         fields: The fields to use for the dataclass
         populate_by_name: Whether to populate by name
         collect_init_only: Whether to collect init only fields into a dict to pass to `__post_init__`
@@ -2278,6 +2281,7 @@ def dataclass_args_schema(
     """
     return dict_not_none(
         type='dataclass-args',
+        dataclass_name=dataclass_name,
         fields=fields,
         populate_by_name=populate_by_name,
         collect_init_only=collect_init_only,
@@ -2311,6 +2315,15 @@ def dataclass_schema(
     """
     Returns a schema for a dataclass. As with `ModelSchema`, this schema can only be used as a field within
     another schema, not as the root type.
+
+    Args:
+        cls: The dataclass type, used to to perform subclass checks
+        schema: The schema to use for the dataclass fields
+        post_init: Whether to call `__post_init__` after validation
+        strict: Whether to require an exact instance of `cls`
+        ref: See [TODO] for details
+        metadata: See [TODO] for details
+        serialization: Custom serialization schema
     """
     return dict_not_none(
         type='dataclass',

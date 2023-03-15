@@ -31,6 +31,8 @@ pub struct DataclassArgsValidator {
     fields: Vec<Field>,
     positional_count: usize,
     init_only_count: Option<usize>,
+    dataclass_name: String,
+    validator_name: String,
 }
 
 impl BuildValidator for DataclassArgsValidator {
@@ -97,11 +99,15 @@ impl BuildValidator for DataclassArgsValidator {
         } else {
             None
         };
+        let dataclass_name: String = schema.get_as_req(intern!(py, "dataclass_name"))?;
+        let validator_name = format!("dataclass-args[{dataclass_name}]");
 
         Ok(Self {
             fields,
             positional_count,
             init_only_count,
+            dataclass_name,
+            validator_name,
         }
         .into())
     }
@@ -116,7 +122,7 @@ impl Validator for DataclassArgsValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let args = input.validate_dc_args()?;
+        let args = input.validate_dataclass_args(&self.dataclass_name)?;
 
         let output_dict = PyDict::new(py);
         let mut init_only_args = self.init_only_count.map(Vec::with_capacity);
@@ -271,7 +277,7 @@ impl Validator for DataclassArgsValidator {
     }
 
     fn get_name(&self) -> &str {
-        Self::EXPECTED_TYPE
+        &self.validator_name
     }
 }
 
@@ -337,6 +343,7 @@ impl Validator for DataclassValidator {
                 input,
             ))
         } else {
+            let input = input.maybe_subclass_dict(class)?;
             let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
             let (dc_dict, post_init_kwargs): (&PyAny, &PyAny) = output.extract(py)?;
             let dc = create_class(self.class.as_ref(py), dc_dict, None)?;

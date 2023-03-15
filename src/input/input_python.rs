@@ -121,6 +121,14 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
+    fn maybe_subclass_dict(&self, class: &PyType) -> PyResult<&Self> {
+        if matches!(self.is_instance(class), Ok(true)) {
+            self.getattr(intern!(self.py(), "__dict__"))
+        } else {
+            Ok(self)
+        }
+    }
+
     fn input_as_url(&self) -> Option<PyUrl> {
         self.extract::<PyUrl>().ok()
     }
@@ -187,23 +195,16 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn validate_dc_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
+    fn validate_dataclass_args(&'a self, dataclass_name: &str) -> ValResult<'a, GenericArguments<'a>> {
         if let Ok(dict) = self.downcast::<PyDict>() {
             Ok(PyArgs::new(None, Some(dict)).into())
         } else if let Ok(args_kwargs) = self.extract::<ArgsKwargs>() {
             let args = args_kwargs.args.into_ref(self.py());
             let kwargs = args_kwargs.kwargs.map(|d| d.into_ref(self.py()));
             Ok(PyArgs::new(Some(args), kwargs).into())
-        // } else if self
-        //     .hasattr(intern!(self.py(), "__dataclass_fields__"))
-        //     .unwrap_or(false)
-        // {
-        //     // seems to be a dataclass
-        //     let dict_attr = self.getattr(intern!(self.py(), "__dict__"))?;
-        //     let dict: &PyDict = dict_attr.downcast()?;
-        //     Ok(PyArgs::new(None, Some(dict)).into())
         } else {
-            Err(ValError::new(ErrorType::DataclassType, self))
+            let dataclass_name = dataclass_name.to_string();
+            Err(ValError::new(ErrorType::DataclassType { dataclass_name }, self))
         }
     }
 

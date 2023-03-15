@@ -60,6 +60,7 @@ def test_args_kwargs():
 )
 def test_dataclass_args(py_and_json: PyAndJson, input_value, expected):
     schema = core_schema.dataclass_args_schema(
+        'MyDataclass',
         core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False),
         core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False),
     )
@@ -128,6 +129,7 @@ def test_dataclass_args(py_and_json: PyAndJson, input_value, expected):
 )
 def test_dataclass_args_init_only(py_and_json: PyAndJson, input_value, expected):
     schema = core_schema.dataclass_args_schema(
+        'MyDataclass',
         core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False),
         core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False, init_only=True),
         collect_init_only=True,
@@ -153,13 +155,14 @@ def test_dataclass_args_init_only(py_and_json: PyAndJson, input_value, expected)
         (
             ('hello',),
             Err(
-                'Dataclass input must be a dictionary or dataclass instance',
+                'Input should be a dictionary or an instance of MyDataclass',
                 errors=[
                     {
                         'type': 'dataclass_type',
                         'loc': (),
-                        'msg': 'Dataclass input must be a dictionary or dataclass instance',
+                        'msg': 'Input should be a dictionary or an instance of MyDataclass',
                         'input': IsListOrTuple('hello'),
+                        'ctx': {'dataclass_name': 'MyDataclass'},
                     }
                 ],
             ),
@@ -168,7 +171,7 @@ def test_dataclass_args_init_only(py_and_json: PyAndJson, input_value, expected)
 )
 def test_dataclass_args_init_only_no_fields(py_and_json: PyAndJson, input_value, expected):
     schema = core_schema.dataclass_args_schema(
-        core_schema.dataclass_field(name='a', schema=core_schema.str_schema()), collect_init_only=True
+        'MyDataclass', core_schema.dataclass_field(name='a', schema=core_schema.str_schema()), collect_init_only=True
     )
     v = py_and_json(schema)
 
@@ -185,6 +188,7 @@ def test_dataclass_args_init_only_no_fields(py_and_json: PyAndJson, input_value,
 
 def test_aliases(py_and_json: PyAndJson):
     schema = core_schema.dataclass_args_schema(
+        'MyDataclass',
         core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), validation_alias='Apple'),
         core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), validation_alias=['Banana', 1]),
         core_schema.dataclass_field(
@@ -199,15 +203,17 @@ def test_aliases(py_and_json: PyAndJson):
     )
 
 
-def test_dataclass():
-    @dataclasses.dataclass
-    class Foo:
-        a: str
-        b: bool
+@dataclasses.dataclass
+class FooDataclass:
+    a: str
+    b: bool
 
+
+def test_dataclass():
     schema = core_schema.dataclass_schema(
-        Foo,
+        FooDataclass,
         core_schema.dataclass_args_schema(
+            'FooDataclass',
             core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
             core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
         ),
@@ -219,9 +225,9 @@ def test_dataclass():
     assert foo.a == 'hello'
     assert foo.b is True
 
-    assert dataclasses.asdict(v.validate_python(Foo(a='hello', b=True))) == {'a': 'hello', 'b': True}
+    assert dataclasses.asdict(v.validate_python(FooDataclass(a='hello', b=True))) == {'a': 'hello', 'b': True}
 
-    with pytest.raises(ValidationError, match='Input should be an instance of Foo') as exc_info:
+    with pytest.raises(ValidationError, match='Input should be an instance of FooDataclass') as exc_info:
         v.validate_python({'a': 'hello', 'b': True}, strict=True)
 
     # insert_assert(exc_info.value.errors())
@@ -229,11 +235,61 @@ def test_dataclass():
         {
             'type': 'model_class_type',
             'loc': (),
-            'msg': 'Input should be an instance of Foo',
+            'msg': 'Input should be an instance of FooDataclass',
             'input': {'a': 'hello', 'b': True},
-            'ctx': {'class_name': 'Foo'},
+            'ctx': {'class_name': 'FooDataclass'},
         }
     ]
+
+
+@dataclasses.dataclass
+class FooDataclassSame(FooDataclass):
+    pass
+
+
+@dataclasses.dataclass
+class FooDataclassMore(FooDataclass):
+    c: str
+
+
+@dataclasses.dataclass
+class DuplicateDifferent:
+    a: str
+    b: bool
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ({'a': 'hello', 'b': True}, {'a': 'hello', 'b': True}),
+        (FooDataclass(a='hello', b=True), {'a': 'hello', 'b': True}),
+        (FooDataclassSame(a='hello', b=True), {'a': 'hello', 'b': True}),
+        (FooDataclassMore(a='hello', b=True, c='more'), Err(r'c\s+Unexpected keyword argument')),
+        (DuplicateDifferent(a='hello', b=True), Err('Input should be a dictionary or an instance of FooDataclass')),
+    ],
+)
+def test_dataclass_subclass(input_value, expected):
+    schema = core_schema.dataclass_schema(
+        FooDataclass,
+        core_schema.dataclass_args_schema(
+            'FooDataclass',
+            core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+            core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+        ),
+    )
+    v = SchemaValidator(schema)
+
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=expected.message) as exc_info:
+            v.validate_python(input_value)
+
+        # debug(exc_info.value.errors())
+        if expected.errors is not None:
+            assert exc_info.value.errors() == expected.errors
+    else:
+        dc = v.validate_python(input_value)
+        assert dataclasses.is_dataclass(dc)
+        assert dataclasses.asdict(dc) == expected
 
 
 def test_dataclass_post_init():
@@ -248,6 +304,7 @@ def test_dataclass_post_init():
     schema = core_schema.dataclass_schema(
         Foo,
         core_schema.dataclass_args_schema(
+            'Foo',
             core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
             core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
         ),
@@ -276,6 +333,7 @@ def test_dataclass_post_init_args():
     schema = core_schema.dataclass_schema(
         Foo,
         core_schema.dataclass_args_schema(
+            'Foo',
             core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
             core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
             core_schema.dataclass_field(name='c', schema=core_schema.int_schema(), init_only=True),
@@ -308,6 +366,7 @@ def test_dataclass_post_init_args_multiple():
     schema = core_schema.dataclass_schema(
         Foo,
         core_schema.dataclass_args_schema(
+            'Foo',
             core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
             core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), init_only=True),
             core_schema.dataclass_field(name='c', schema=core_schema.int_schema(), init_only=True),

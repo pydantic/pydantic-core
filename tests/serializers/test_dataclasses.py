@@ -22,6 +22,7 @@ def test_dataclass():
     schema = core_schema.dataclass_schema(
         Foo,
         core_schema.dataclass_args_schema(
+            'Foo',
             core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
             core_schema.dataclass_field(name='b', schema=core_schema.bytes_schema()),
         ),
@@ -44,6 +45,7 @@ def test_serialization_exclude():
     schema = core_schema.dataclass_schema(
         Foo,
         core_schema.dataclass_args_schema(
+            'Foo',
             core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
             core_schema.dataclass_field(name='b', schema=core_schema.bytes_schema(), serialization_exclude=True),
         ),
@@ -63,6 +65,7 @@ def test_serialization_alias():
     schema = core_schema.dataclass_schema(
         Foo,
         core_schema.dataclass_args_schema(
+            'Foo',
             core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
             core_schema.dataclass_field(name='b', schema=core_schema.bytes_schema(), serialization_alias='BAR'),
         ),
