@@ -97,29 +97,29 @@ impl SchemaValidator {
         Ok((cls, args).into_py(py))
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, in_init=false))]
+    #[pyo3(signature = (input, *, strict=None, context=None, init_mode=false))]
     pub fn validate_python(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        in_init: bool,
+        init_mode: bool,
     ) -> PyResult<PyObject> {
-        let r = self._validate(py, input, strict, context, in_init);
+        let r = self._validate(py, input, strict, context, init_mode);
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, in_init=false))]
+    #[pyo3(signature = (input, *, strict=None, context=None, init_mode=false))]
     pub fn isinstance_python(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        in_init: bool,
+        init_mode: bool,
     ) -> PyResult<bool> {
-        match self._validate(py, input, strict, context, in_init) {
+        match self._validate(py, input, strict, context, init_mode) {
             Ok(_) => Ok(true),
             Err(ValError::InternalErr(err)) => Err(err),
             Err(ValError::Omit) => Err(ValidationError::omit_error()),
@@ -127,35 +127,35 @@ impl SchemaValidator {
         }
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, in_init=false))]
+    #[pyo3(signature = (input, *, strict=None, context=None, init_mode=false))]
     pub fn validate_json(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        in_init: bool,
+        init_mode: bool,
     ) -> PyResult<PyObject> {
         match input.parse_json() {
             Ok(input) => {
-                let r = self._validate(py, &input, strict, context, in_init);
+                let r = self._validate(py, &input, strict, context, init_mode);
                 r.map_err(|e| self.prepare_validation_err(py, e))
             }
             Err(err) => Err(self.prepare_validation_err(py, err)),
         }
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, in_init=false))]
+    #[pyo3(signature = (input, *, strict=None, context=None, init_mode=false))]
     pub fn isinstance_json(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        in_init: bool,
+        init_mode: bool,
     ) -> PyResult<bool> {
         match input.parse_json() {
-            Ok(input) => match self._validate(py, &input, strict, context, in_init) {
+            Ok(input) => match self._validate(py, &input, strict, context, init_mode) {
                 Ok(_) => Ok(true),
                 Err(ValError::InternalErr(err)) => Err(err),
                 Err(ValError::Omit) => Err(ValidationError::omit_error()),
@@ -220,12 +220,12 @@ impl SchemaValidator {
         input: &'data impl Input<'data>,
         strict: Option<bool>,
         context: Option<&'data PyAny>,
-        in_init: bool,
+        init_mode: bool,
     ) -> ValResult<'data, PyObject>
     where
         's: 'data,
     {
-        if in_init {
+        if init_mode {
             self.validator.validate_init(
                 py,
                 input,

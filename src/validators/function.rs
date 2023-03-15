@@ -90,6 +90,24 @@ impl Validator for FunctionBeforeValidator {
             .validate(py, value.into_ref(py), extra, slots, recursion_guard)
     }
 
+    fn validate_init<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        let info = ValidationInfo::new(py, extra, &self.config);
+        let value = self
+            .func
+            .call1(py, (input.to_object(py), info))
+            .map_err(|e| convert_err(py, e, input))?;
+
+        self.validator
+            .validate_init(py, value.into_ref(py), extra, slots, recursion_guard)
+    }
+
     fn get_name(&self) -> &str {
         &self.name
     }
@@ -125,6 +143,19 @@ impl Validator for FunctionAfterValidator {
     ) -> ValResult<'data, PyObject> {
         let v = self.validator.validate(py, input, extra, slots, recursion_guard)?;
         let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
+        self.func.call1(py, (v, info)).map_err(|e| convert_err(py, e, input))
+    }
+
+    fn validate_init<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        let v = self.validator.validate_init(py, input, extra, slots, recursion_guard)?;
+        let info = ValidationInfo::new(py, extra, &self.config);
         self.func.call1(py, (v, info)).map_err(|e| convert_err(py, e, input))
     }
 
@@ -213,7 +244,40 @@ impl Validator for FunctionWrapValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let call_next_validator = ValidatorCallable {
-            validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
+            validator: InternalValidator::new(
+                py,
+                "ValidatorCallable",
+                &self.validator,
+                slots,
+                extra,
+                recursion_guard,
+                false,
+            ),
+        };
+        let info = ValidationInfo::new(py, extra, &self.config);
+        self.func
+            .call1(py, (input.to_object(py), call_next_validator, info))
+            .map_err(|e| convert_err(py, e, input))
+    }
+
+    fn validate_init<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        let call_next_validator = ValidatorCallable {
+            validator: InternalValidator::new(
+                py,
+                "ValidatorCallable",
+                &self.validator,
+                slots,
+                extra,
+                recursion_guard,
+                true,
+            ),
         };
         let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
         self.func

@@ -38,10 +38,10 @@ class SchemaValidator:
     def title(self) -> str: ...
     def __init__(self, schema: CoreSchema, config: 'CoreConfig | None' = None) -> None: ...
     def validate_python(
-        self, input: Any, *, strict: 'bool | None' = None, context: Any = None, in_init: bool = False
+        self, input: Any, *, strict: 'bool | None' = None, context: Any = None, init_mode: bool = False
     ) -> Any: ...
     def isinstance_python(
-        self, input: Any, *, strict: 'bool | None' = None, context: Any = None, in_init: bool = False
+        self, input: Any, *, strict: 'bool | None' = None, context: Any = None, init_mode: bool = False
     ) -> bool: ...
     def validate_json(
         self,
@@ -49,7 +49,7 @@ class SchemaValidator:
         *,
         strict: 'bool | None' = None,
         context: Any = None,
-        in_init: bool = False,
+        init_mode: bool = False,
     ) -> Any: ...
     def isinstance_json(
         self,
@@ -57,7 +57,7 @@ class SchemaValidator:
         *,
         strict: 'bool | None' = None,
         context: Any = None,
-        in_init: bool = False,
+        init_mode: bool = False,
     ) -> bool: ...
     def validate_assignment(
         self, field: str, input: Any, data: 'dict[str, Any]', strict: 'bool | None' = None, context: Any = None
