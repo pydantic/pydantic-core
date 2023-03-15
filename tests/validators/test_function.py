@@ -1,7 +1,7 @@
 import platform
 import re
 from copy import deepcopy
-from typing import Any, Dict, Type
+from typing import Any, Dict, Type, Union
 
 import pytest
 
@@ -10,7 +10,7 @@ from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_sc
 from ..conftest import plain_repr
 
 
-def deepcopy_info(info: core_schema.ValidationInfo | core_schema.ModelFieldValidationInfo) -> Dict[str, Any]:
+def deepcopy_info(info: Union[core_schema.ValidationInfo, core_schema.ModelFieldValidationInfo]) -> Dict[str, Any]:
     return {
         'context': deepcopy(info.context),
         'data': deepcopy(getattr(info, 'data', None)),
