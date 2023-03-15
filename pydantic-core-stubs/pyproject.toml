@@ -1,14 +1,12 @@
-[tool.poetry]
-name = "pydantic_core-stubs"
-version = "0.1.0"
-description = ""
-authors = []
-packages = [{include = "pydantic_core-stubs"}]
-
-[tool.poetry.dependencies]
-python = ">=3.7"
-
-
+[tool.hatch]
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pydantic-core-stubs"
+
+[tool.hatch.build.targets.sdist]
+packages = ["pydantic_core-stubs"]
+[tool.hatch.build.targets.wheel]
+packages = ["pydantic_core-stubs"]

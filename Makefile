@@ -9,6 +9,7 @@ install:
 	pip install -r tests/requirements.txt
 	pip install -r tests/requirements-linting.txt
 	pip install -e .
+	pip install -e ./pydantic-core-stubs
 	pre-commit install
 
 .PHONY: install-rust-coverage
