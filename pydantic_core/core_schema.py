@@ -1500,13 +1500,13 @@ class ModelFieldValidatorFunction(Protocol):
 
 
 class ModelFieldValidatorFunctionSchema(TypedDict):
-    call: Required[ModelFieldValidatorFunction]
     type: Literal['method']
+    call: ModelFieldValidatorFunction
 
 
 class ValidatorFunctionSchema(TypedDict):
-    call: Required[ValidatorFunction]
     type: Literal['function']
+    call: ValidatorFunction
 
 
 class FunctionSchema(TypedDict, total=False):
@@ -1519,7 +1519,7 @@ class FunctionSchema(TypedDict, total=False):
     serialization: SerSchema
 
 
-def model_field_function_before_schema(
+def method_before_schema(
     function: ModelFieldValidatorFunction,
     schema: CoreSchema,
     *,
@@ -1538,7 +1538,7 @@ def model_field_function_before_schema(
         assert info.field_name is not None
         return v.decode() + 'world'
 
-    func_schema = core_schema.model_field_function_before_schema(function=fn, schema=core_schema.str_schema())
+    func_schema = core_schema.method_before_schema(function=fn, schema=core_schema.str_schema())
     schema = core_schema.typed_dict_schema(
         {'a': core_schema.typed_dict_field(func_schema)}
     )
@@ -1715,13 +1715,13 @@ class ModelFieldWrapValidatorFunction(Protocol):
 
 
 class ModelFieldWrapValidatorFunctionSchema(TypedDict):
-    call: Required[ModelFieldWrapValidatorFunction]
     type: Literal['method']
+    call: ModelFieldWrapValidatorFunction
 
 
 class WrapValidatorFunctionSchema(TypedDict):
-    call: Required[WrapValidatorFunction]
     type: Literal['function']
+    call: WrapValidatorFunction
 
 
 class FunctionWrapSchema(TypedDict, total=False):
@@ -1776,7 +1776,7 @@ def function_wrap_schema(
     )
 
 
-def model_field_function_wrap_schema(
+def method_wrap_schema(
     function: ModelFieldWrapValidatorFunction,
     schema: CoreSchema,
     *,
@@ -1797,7 +1797,7 @@ def model_field_function_wrap_schema(
         assert info.field_name is not None
         return validator(v) + 'world'
 
-    func_schema = core_schema.model_field_function_wrap_schema(function=fn, schema=core_schema.str_schema())
+    func_schema = core_schema.method_wrap_schema(function=fn, schema=core_schema.str_schema())
     schema = core_schema.typed_dict_schema(
         {'a': core_schema.typed_dict_field(func_schema)}
     )

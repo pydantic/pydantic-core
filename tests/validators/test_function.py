@@ -460,11 +460,7 @@ def test_model_field_before_validator() -> None:
         core_schema.model_schema(
             Model,
             core_schema.typed_dict_schema(
-                {
-                    'x': core_schema.typed_dict_field(
-                        core_schema.model_field_function_before_schema(f, core_schema.str_schema())
-                    )
-                }
+                {'x': core_schema.typed_dict_field(core_schema.method_before_schema(f, core_schema.str_schema()))}
             ),
         )
     )
@@ -543,11 +539,7 @@ def test_model_field_wrap_validator() -> None:
         core_schema.model_schema(
             Model,
             core_schema.typed_dict_schema(
-                {
-                    'x': core_schema.typed_dict_field(
-                        core_schema.model_field_function_wrap_schema(f, core_schema.str_schema())
-                    )
-                }
+                {'x': core_schema.typed_dict_field(core_schema.method_wrap_schema(f, core_schema.str_schema()))}
             ),
         )
     )
