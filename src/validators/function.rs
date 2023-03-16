@@ -16,11 +16,16 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 
 pub struct FunctionBuilder;
 
-fn destructure_function_schema(schema: &PyDict) -> PyResult<(&str, &PyAny)> {
+fn destructure_function_schema(schema: &PyDict) -> PyResult<(bool, &PyAny)> {
     let func: &PyDict = schema.get_as_req(intern!(schema.py(), "function"))?;
     let call: &PyAny = func.get_as_req(intern!(schema.py(), "call"))?;
     let func_type: &str = func.get_as_req(intern!(schema.py(), "type"))?;
-    Ok((func_type, call))
+    let is_model_instance_method = match func_type {
+        "method" => true,
+        "function" => false,
+        _ => unreachable!(),
+    };
+    Ok((is_model_instance_method, call))
 }
 
 impl BuildValidator for FunctionBuilder {
@@ -52,12 +57,7 @@ macro_rules! impl_build {
             ) -> PyResult<CombinedValidator> {
                 let py = schema.py();
                 let validator = build_validator(schema.get_as_req(intern!(py, "schema"))?, config, build_context)?;
-                let (func_type, function) = destructure_function_schema(schema)?;
-                let is_model_instance_method = match func_type {
-                    "method" => true,
-                    "function" => false,
-                    _ => unreachable!(),
-                };
+                let (is_model_instance_method, function) = destructure_function_schema(schema)?;
                 let name = format!(
                     "{}[{}(), {}]",
                     $name,
@@ -172,12 +172,7 @@ pub struct FunctionPlainValidator {
 impl FunctionPlainValidator {
     pub fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let (func_type, function) = destructure_function_schema(schema)?;
-        let is_model_instance_method = match func_type {
-            "method" => true,
-            "function" => false,
-            _ => unreachable!(),
-        };
+        let (is_model_instance_method, function) = destructure_function_schema(schema)?;
         Ok(Self {
             func: function.into_py(py),
             config: match config {
