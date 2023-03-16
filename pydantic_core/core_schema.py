@@ -1867,7 +1867,7 @@ def function_plain_schema(
     )
 
 
-def model_field_function_plain_schema(
+def method_plain_schema(
     function: ModelFieldValidatorFunction,
     *,
     ref: str | None = None,
@@ -1886,7 +1886,7 @@ def model_field_function_plain_schema(
         assert info.field_name is not None
         return str(v) + 'world'
 
-    func_schema = core_schema.model_field_function_plain_schema(function=fn)
+    func_schema = core_schema.method_plain_schema(function=fn)
     schema = core_schema.typed_dict_schema(
         {'a': core_schema.typed_dict_field(func_schema)}
     )

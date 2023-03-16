@@ -513,9 +513,7 @@ def test_model_field_plain_validator() -> None:
     v = SchemaValidator(
         core_schema.model_schema(
             Model,
-            core_schema.typed_dict_schema(
-                {'x': core_schema.typed_dict_field(core_schema.model_field_function_plain_schema(f))}
-            ),
+            core_schema.typed_dict_schema({'x': core_schema.typed_dict_field(core_schema.method_plain_schema(f))}),
         )
     )
 
