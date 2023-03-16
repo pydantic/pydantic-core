@@ -194,7 +194,7 @@ impl SchemaValidator {
     ) -> PyResult<PyObject> {
         let extra = Extra {
             data: Some(data),
-            field: Some(field.as_str()),
+            field_we_are_currently_assigning_to: Some(field.as_str()),
             strict,
             context,
             field_name: None,
@@ -453,7 +453,7 @@ pub struct Extra<'a> {
     /// If there is no model this will be None
     pub field_name: Option<&'a str>,
     /// The field being assigned to when validating assignment
-    pub field: Option<&'a str>,
+    pub field_we_are_currently_assigning_to: Option<&'a str>,
     /// whether we're in strict or lax mode
     pub strict: Option<bool>,
     /// context used in validator functions
@@ -474,7 +474,7 @@ impl<'a> Extra<'a> {
     pub fn as_strict(&self) -> Self {
         Self {
             data: self.data,
-            field: self.field,
+            field_we_are_currently_assigning_to: self.field_we_are_currently_assigning_to,
             strict: Some(true),
             context: self.context,
             field_name: self.field_name,

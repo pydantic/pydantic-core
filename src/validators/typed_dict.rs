@@ -162,7 +162,7 @@ impl Validator for TypedDictValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        if let Some(field) = extra.field {
+        if let Some(field) = extra.field_we_are_currently_assigning_to {
             // we're validating assignment, completely different logic
             return self.validate_assignment(py, field, input, extra, slots, recursion_guard);
         }
@@ -188,7 +188,7 @@ impl Validator for TypedDictValidator {
                 for field in &self.fields {
                     let extra = Extra {
                         data: Some(output_dict),
-                        field: None,
+                        field_we_are_currently_assigning_to: None,
                         field_name: Some(&field.name),
                         strict: extra.strict,
                         context: extra.context,
