@@ -97,8 +97,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - run: rm rust-toolchain
-
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
 
@@ -176,7 +174,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - run: rm rust-toolchain
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -226,7 +223,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - run: rm rust-toolchain
       - name: install rust nightly
         uses: dtolnay/rust-toolchain@nightly
 
