@@ -356,13 +356,15 @@ impl ValidationInfo {
     #[getter]
     fn get_data(&self) -> PyResult<Py<PyDict>> {
         self.data
-            .clone()
+            .as_ref()
+            .cloned()
             .ok_or_else(|| PyAttributeError::new_err("No attribute named 'data'"))
     }
     #[getter]
     fn get_field_name(&self) -> PyResult<String> {
         self.field_name
-            .clone()
+            .as_ref()
+            .cloned()
             .ok_or_else(|| PyAttributeError::new_err("No attribute named 'field_name'"))
     }
 }
