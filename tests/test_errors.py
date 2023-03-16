@@ -36,7 +36,7 @@ def test_pydantic_value_error_usage():
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'this is a custom error {foo} {bar}', {'foo': 'FOOBAR', 'bar': 42})
 
-    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': {'type': 'function', 'call': f}})
+    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': {'type': 'general', 'call': f}})
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(42)
@@ -56,7 +56,7 @@ def test_pydantic_value_error_invalid_dict():
     def my_function(input_value, info):
         raise PydanticCustomError('my_error', 'this is a custom error {foo}', {(): 'foobar'})
 
-    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': {'type': 'function', 'call': my_function}})
+    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': {'type': 'general', 'call': my_function}})
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(42)
@@ -74,7 +74,7 @@ def test_pydantic_value_error_invalid_type():
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'this is a custom error {foo}', [('foo', 123)])
 
-    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': {'type': 'function', 'call': f}})
+    v = SchemaValidator({'type': 'function', 'mode': 'plain', 'function': {'type': 'general', 'call': f}})
 
     with pytest.raises(TypeError, match="argument 'context': 'list' object cannot be converted to 'PyDict'"):
         v.validate_python(42)
@@ -95,7 +95,7 @@ def test_validator_instance_plain():
             'type': 'function',
             'mode': 'plain',
             'metadata': {'instance': c},
-            'function': {'type': 'function', 'call': c.validate},
+            'function': {'type': 'general', 'call': c.validate},
         }
     )
     c.foo += 1
@@ -120,7 +120,7 @@ def test_validator_instance_after():
             'type': 'function',
             'mode': 'after',
             'metadata': {'instance': c},
-            'function': {'type': 'function', 'call': c.validate},
+            'function': {'type': 'general', 'call': c.validate},
             'schema': {'type': 'str'},
         }
     )
@@ -144,7 +144,7 @@ def test_pydantic_error_type_raise_no_ctx():
         raise PydanticKnownError('finite_number')
 
     v = SchemaValidator(
-        {'type': 'function', 'mode': 'before', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'int'}}
+        {'type': 'function', 'mode': 'before', 'function': {'type': 'general', 'call': f}, 'schema': {'type': 'int'}}
     )
 
     with pytest.raises(ValidationError) as exc_info:
@@ -160,7 +160,7 @@ def test_pydantic_error_type_raise_ctx():
         raise PydanticKnownError('greater_than', {'gt': 42})
 
     v = SchemaValidator(
-        {'type': 'function', 'mode': 'before', 'function': {'type': 'function', 'call': f}, 'schema': {'type': 'int'}}
+        {'type': 'function', 'mode': 'before', 'function': {'type': 'general', 'call': f}, 'schema': {'type': 'int'}}
     )
 
     with pytest.raises(ValidationError) as exc_info:
@@ -310,7 +310,7 @@ def test_pydantic_value_error_plain(py_and_json: PyAndJson):
     def f(input_value, info):
         raise PydanticCustomError
 
-    v = py_and_json({'type': 'function', 'mode': 'plain', 'function': {'type': 'function', 'call': f}})
+    v = py_and_json({'type': 'function', 'mode': 'plain', 'function': {'type': 'general', 'call': f}})
     with pytest.raises(TypeError, match='missing 2 required positional arguments'):
         v.validate_test('4')
 
@@ -329,7 +329,7 @@ def test_list_omit_exception(py_and_json: PyAndJson, exception):
                 'type': 'function',
                 'schema': {'type': 'int'},
                 'mode': 'after',
-                'function': {'type': 'function', 'call': f},
+                'function': {'type': 'general', 'call': f},
             },
         }
     )

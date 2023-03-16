@@ -21,8 +21,8 @@ fn destructure_function_schema(schema: &PyDict) -> PyResult<(bool, &PyAny)> {
     let call: &PyAny = func.get_as_req(intern!(schema.py(), "call"))?;
     let func_type: &str = func.get_as_req(intern!(schema.py(), "type"))?;
     let is_model_instance_method = match func_type {
-        "method" => true,
-        "function" => false,
+        "field" => true,
+        "general" => false,
         _ => unreachable!(),
     };
     Ok((is_model_instance_method, call))

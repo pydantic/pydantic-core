@@ -294,7 +294,7 @@ def test_validate_assignment_functions():
                     'schema': {
                         'type': 'function',
                         'mode': 'after',
-                        'function': {'type': 'function', 'call': func_a},
+                        'function': {'type': 'general', 'call': func_a},
                         'schema': {'type': 'str'},
                     }
                 },
@@ -302,7 +302,7 @@ def test_validate_assignment_functions():
                     'schema': {
                         'type': 'function',
                         'mode': 'after',
-                        'function': {'type': 'function', 'call': func_b},
+                        'function': {'type': 'general', 'call': func_b},
                         'schema': {'type': 'int'},
                     }
                 },
@@ -1399,7 +1399,7 @@ class TestOnError:
                             'schema': {
                                 'type': 'function',
                                 'mode': 'wrap',
-                                'function': {'type': 'function', 'call': wrap_function},
+                                'function': {'type': 'general', 'call': wrap_function},
                                 'schema': {'type': 'str'},
                             },
                         }

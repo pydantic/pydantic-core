@@ -209,7 +209,7 @@ def test_list_function():
     v = SchemaValidator(
         {
             'type': 'list',
-            'items_schema': {'type': 'function', 'mode': 'plain', 'function': {'type': 'function', 'call': f}},
+            'items_schema': {'type': 'function', 'mode': 'plain', 'function': {'type': 'general', 'call': f}},
         }
     )
 
@@ -223,7 +223,7 @@ def test_list_function_val_error():
     v = SchemaValidator(
         {
             'type': 'list',
-            'items_schema': {'type': 'function', 'mode': 'plain', 'function': {'type': 'function', 'call': f}},
+            'items_schema': {'type': 'function', 'mode': 'plain', 'function': {'type': 'general', 'call': f}},
         }
     )
 
@@ -242,7 +242,7 @@ def test_list_function_internal_error():
     v = SchemaValidator(
         {
             'type': 'list',
-            'items_schema': {'type': 'function', 'mode': 'plain', 'function': {'type': 'function', 'call': f}},
+            'items_schema': {'type': 'function', 'mode': 'plain', 'function': {'type': 'general', 'call': f}},
         }
     )
 

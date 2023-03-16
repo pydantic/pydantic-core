@@ -1489,28 +1489,28 @@ def dict_schema(
     )
 
 
-class ValidatorFunction(Protocol):
+class GeneralValidatorCallback(Protocol):
     def __call__(self, __input_value: Any, __info: ValidationInfo) -> Any:  # pragma: no cover
         ...
 
 
-class ModelFieldValidatorFunction(Protocol):
+class FieldValidatorCallback(Protocol):
     def __call__(self, __input_value: Any, __info: ModelFieldValidationInfo) -> Any:  # pragma: no cover
         ...
 
 
-class ModelFieldValidatorFunctionSchema(TypedDict):
-    type: Literal['method']
-    call: ModelFieldValidatorFunction
+class FieldValidatorCallbackSchema(TypedDict):
+    type: Literal['field']
+    call: FieldValidatorCallback
 
 
-class ValidatorFunctionSchema(TypedDict):
-    type: Literal['function']
-    call: ValidatorFunction
+class GeneralCallbackSchema(TypedDict):
+    type: Literal['general']
+    call: GeneralValidatorCallback
 
 
-class FunctionSchema(TypedDict, total=False):
-    function: Required[Union[ModelFieldValidatorFunctionSchema, ValidatorFunctionSchema]]
+class CallbackSchema(TypedDict, total=False):
+    function: Required[Union[FieldValidatorCallbackSchema, GeneralCallbackSchema]]
     type: Required[Literal['function']]
     mode: Required[Literal['before', 'after']]
     schema: Required[CoreSchema]
@@ -1519,16 +1519,17 @@ class FunctionSchema(TypedDict, total=False):
     serialization: SerSchema
 
 
-def method_before_schema(
-    function: ModelFieldValidatorFunction,
+def field_before_validation_callback(
+    function: FieldValidatorCallback,
     schema: CoreSchema,
     *,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> FunctionSchema:
+) -> CallbackSchema:
     """
-    Returns a schema that calls a validator function before validating the provided schema, e.g.:
+    Returns a schema that calls a validator function before validating
+    the provided **model field** schema, e.g.:
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
@@ -1538,7 +1539,7 @@ def method_before_schema(
         assert info.field_name is not None
         return v.decode() + 'world'
 
-    func_schema = core_schema.method_before_schema(function=fn, schema=core_schema.str_schema())
+    func_schema = core_schema.field_before_validation_callback(function=fn, schema=core_schema.str_schema())
     schema = core_schema.typed_dict_schema(
         {'a': core_schema.typed_dict_field(func_schema)}
     )
@@ -1557,7 +1558,7 @@ def method_before_schema(
     return dict_not_none(
         type='function',
         mode='before',
-        function={'type': 'method', 'call': function},
+        function={'type': 'field', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
@@ -1565,14 +1566,14 @@ def method_before_schema(
     )
 
 
-def function_before_schema(
-    function: ValidatorFunction,
+def general_before_validation_callback(
+    function: GeneralValidatorCallback,
     schema: CoreSchema,
     *,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> FunctionSchema:
+) -> CallbackSchema:
     """
     Returns a schema that calls a validator function before validating the provided schema, e.g.:
 
@@ -1585,7 +1586,7 @@ def function_before_schema(
         assert 'hello' in v_str
         return v_str + 'world'
 
-    schema = core_schema.function_before_schema(function=fn, schema=core_schema.str_schema())
+    schema = core_schema.general_before_validation_callback(function=fn, schema=core_schema.str_schema())
     v = SchemaValidator(schema)
     assert v.validate_python(b'hello ') == "b'hello 'world"
     ```
@@ -1600,7 +1601,7 @@ def function_before_schema(
     return dict_not_none(
         type='function',
         mode='before',
-        function={'type': 'function', 'call': function},
+        function={'type': 'general', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
@@ -1608,16 +1609,17 @@ def function_before_schema(
     )
 
 
-def model_field_function_after_schema(
-    function: ModelFieldValidatorFunction,
+def field_after_validation_callback(
+    function: FieldValidatorCallback,
     schema: CoreSchema,
     *,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> FunctionSchema:
+) -> CallbackSchema:
     """
-    Returns a schema that calls a validator function after validating the provided schema, e.g.:
+    Returns a schema that calls a validator function after validating
+    the provided **model field** schema, e.g.:
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
@@ -1627,7 +1629,7 @@ def model_field_function_after_schema(
         assert info.field_name is not None
         return v + 'world'
 
-    func_schema = core_schema.model_field_function_after_schema(function=fn, schema=core_schema.str_schema())
+    func_schema = core_schema.field_after_validation_callback(function=fn, schema=core_schema.str_schema())
     schema = core_schema.typed_dict_schema(
         {'a': core_schema.typed_dict_field(func_schema)}
     )
@@ -1646,7 +1648,7 @@ def model_field_function_after_schema(
     return dict_not_none(
         type='function',
         mode='after',
-        function={'type': 'method', 'call': function},
+        function={'type': 'field', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
@@ -1654,14 +1656,14 @@ def model_field_function_after_schema(
     )
 
 
-def function_after_schema(
-    function: ValidatorFunction,
+def general_after_validation_callback(
+    function: GeneralValidatorCallback,
     schema: CoreSchema,
     *,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> FunctionSchema:
+) -> CallbackSchema:
     """
     Returns a schema that calls a validator function after validating the provided schema, e.g.:
 
@@ -1672,7 +1674,7 @@ def function_after_schema(
         assert 'hello' in v
         return v + 'world'
 
-    schema = core_schema.function_after_schema(schema=core_schema.str_schema(), function=fn)
+    schema = core_schema.general_after_validation_callback(schema=core_schema.str_schema(), function=fn)
     v = SchemaValidator(schema)
     assert v.validate_python('hello ') == 'hello world'
     ```
@@ -1687,7 +1689,7 @@ def function_after_schema(
     return dict_not_none(
         type='function',
         mode='after',
-        function={'type': 'function', 'call': function},
+        function={'type': 'general', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
@@ -1700,32 +1702,32 @@ class CallableValidator(Protocol):
         ...
 
 
-class WrapValidatorFunction(Protocol):
+class GeneralWrapValidatorCallback(Protocol):
     def __call__(
         self, __input_value: Any, __validator: CallableValidator, __info: ValidationInfo
     ) -> Any:  # pragma: no cover
         ...
 
 
-class ModelFieldWrapValidatorFunction(Protocol):
+class FieldWrapValidatorCallback(Protocol):
     def __call__(
         self, __input_value: Any, __validator: CallableValidator, __info: ModelFieldValidationInfo
     ) -> Any:  # pragma: no cover
         ...
 
 
-class ModelFieldWrapValidatorFunctionSchema(TypedDict):
-    type: Literal['method']
-    call: ModelFieldWrapValidatorFunction
+class FieldWrapValidatorCallbackSchema(TypedDict):
+    type: Literal['field']
+    call: FieldWrapValidatorCallback
 
 
-class WrapValidatorFunctionSchema(TypedDict):
-    type: Literal['function']
-    call: WrapValidatorFunction
+class GeneralWrapValidatorCallbackSchema(TypedDict):
+    type: Literal['general']
+    call: GeneralWrapValidatorCallback
 
 
-class FunctionWrapSchema(TypedDict, total=False):
-    function: Required[Union[WrapValidatorFunctionSchema, ModelFieldWrapValidatorFunctionSchema]]
+class WrapCallbackSchema(TypedDict, total=False):
+    function: Required[Union[GeneralWrapValidatorCallbackSchema, FieldWrapValidatorCallbackSchema]]
     type: Required[Literal['function']]
     mode: Required[Literal['wrap']]
     schema: Required[CoreSchema]
@@ -1734,14 +1736,14 @@ class FunctionWrapSchema(TypedDict, total=False):
     serialization: SerSchema
 
 
-def function_wrap_schema(
-    function: WrapValidatorFunction,
+def general_wrap_validation_callback(
+    function: GeneralWrapValidatorCallback,
     schema: CoreSchema,
     *,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> FunctionWrapSchema:
+) -> WrapCallbackSchema:
     """
     Returns a schema which calls a function with a `validator` callable argument which can
     optionally be used to call inner validation with the function logic, this is much like the
@@ -1753,7 +1755,7 @@ def function_wrap_schema(
     def fn(v: str, validator: core_schema.CallableValidator, info: core_schema.ValidationInfo) -> str:
         return validator(input_value=v) + 'world'
 
-    schema = core_schema.function_wrap_schema(function=fn, schema=core_schema.str_schema())
+    schema = core_schema.general_wrap_validation_callback(function=fn, schema=core_schema.str_schema())
     v = SchemaValidator(schema)
     assert v.validate_python('hello ') == 'hello world'
     ```
@@ -1768,7 +1770,7 @@ def function_wrap_schema(
     return dict_not_none(
         type='function',
         mode='wrap',
-        function={'type': 'function', 'call': function},
+        function={'type': 'general', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
@@ -1776,16 +1778,17 @@ def function_wrap_schema(
     )
 
 
-def method_wrap_schema(
-    function: ModelFieldWrapValidatorFunction,
+def field_wrap_validation_callback(
+    function: FieldWrapValidatorCallback,
     schema: CoreSchema,
     *,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> FunctionWrapSchema:
+) -> WrapCallbackSchema:
     """
-    Returns a schema which calls a function with a `validator` callable argument which can
+    Returns a schema applicable to **fields**
+    which calls a function with a `validator` callable argument which can
     optionally be used to call inner validation with the function logic, this is much like the
     "onion" implementation of middleware in many popular web frameworks, e.g.:
 
@@ -1797,7 +1800,7 @@ def method_wrap_schema(
         assert info.field_name is not None
         return validator(v) + 'world'
 
-    func_schema = core_schema.method_wrap_schema(function=fn, schema=core_schema.str_schema())
+    func_schema = core_schema.field_wrap_validation_callback(function=fn, schema=core_schema.str_schema())
     schema = core_schema.typed_dict_schema(
         {'a': core_schema.typed_dict_field(func_schema)}
     )
@@ -1816,7 +1819,7 @@ def method_wrap_schema(
     return dict_not_none(
         type='function',
         mode='wrap',
-        function={'type': 'method', 'call': function},
+        function={'type': 'field', 'call': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
@@ -1824,18 +1827,22 @@ def method_wrap_schema(
     )
 
 
-class FunctionPlainSchema(TypedDict, total=False):
+class PlainCallbackSchema(TypedDict, total=False):
     type: Required[Literal['function']]
     mode: Required[Literal['plain']]
-    function: Required[Union[ModelFieldValidatorFunctionSchema, ValidatorFunctionSchema]]
+    function: Required[Union[FieldValidatorCallbackSchema, GeneralCallbackSchema]]
     ref: str
     metadata: Any
     serialization: SerSchema
 
 
-def function_plain_schema(
-    function: ValidatorFunction, *, ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
-) -> FunctionPlainSchema:
+def general_plain_validation_callback(
+    function: GeneralValidatorCallback,
+    *,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
+) -> PlainCallbackSchema:
     """
     Returns a schema that uses the provided function for validation, e.g.:
 
@@ -1846,7 +1853,7 @@ def function_plain_schema(
         assert 'hello' in v
         return v + 'world'
 
-    schema = core_schema.function_plain_schema(function=fn)
+    schema = core_schema.general_plain_validation_callback(function=fn)
     v = SchemaValidator(schema)
     assert v.validate_python("hello ") == 'hello world'
     ```
@@ -1860,20 +1867,20 @@ def function_plain_schema(
     return dict_not_none(
         type='function',
         mode='plain',
-        function={'type': 'function', 'call': function},
+        function={'type': 'general', 'call': function},
         ref=ref,
         metadata=metadata,
         serialization=serialization,
     )
 
 
-def method_plain_schema(
-    function: ModelFieldValidatorFunction,
+def field_plain_validation_callback(
+    function: FieldValidatorCallback,
     *,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> FunctionPlainSchema:
+) -> PlainCallbackSchema:
     """
     Returns a schema that uses the provided function for validation, e.g.:
 
@@ -1886,7 +1893,7 @@ def method_plain_schema(
         assert info.field_name is not None
         return str(v) + 'world'
 
-    func_schema = core_schema.method_plain_schema(function=fn)
+    func_schema = core_schema.field_plain_validation_callback(function=fn)
     schema = core_schema.typed_dict_schema(
         {'a': core_schema.typed_dict_field(func_schema)}
     )
@@ -1904,7 +1911,7 @@ def method_plain_schema(
     return dict_not_none(
         type='function',
         mode='plain',
-        function={'type': 'method', 'call': function},
+        function={'type': 'field', 'call': function},
         ref=ref,
         metadata=metadata,
         serialization=serialization,
@@ -2189,7 +2196,7 @@ def chain_schema(
         assert 'hello' in v
         return v + ' world'
 
-    fn_schema = core_schema.function_plain_schema(function=fn)
+    fn_schema = core_schema.general_plain_validation_callback(function=fn)
     schema = core_schema.chain_schema(fn_schema, fn_schema, fn_schema, core_schema.str_schema())
     v = SchemaValidator(schema)
     assert v.validate_python("hello") == 'hello world world world'
@@ -3061,9 +3068,9 @@ CoreSchema = Union[
     FrozenSetSchema,
     GeneratorSchema,
     DictSchema,
-    FunctionSchema,
-    FunctionWrapSchema,
-    FunctionPlainSchema,
+    CallbackSchema,
+    WrapCallbackSchema,
+    PlainCallbackSchema,
     WithDefaultSchema,
     NullableSchema,
     UnionSchema,
