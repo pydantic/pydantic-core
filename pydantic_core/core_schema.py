@@ -1504,13 +1504,13 @@ class FieldValidatorCallbackSchema(TypedDict):
     call: FieldValidatorCallback
 
 
-class GeneralCallbackSchema(TypedDict):
+class GeneralValidatorCallbackSchema(TypedDict):
     type: Literal['general']
     call: GeneralValidatorCallback
 
 
 class CallbackSchema(TypedDict, total=False):
-    function: Required[Union[FieldValidatorCallbackSchema, GeneralCallbackSchema]]
+    function: Required[Union[FieldValidatorCallbackSchema, GeneralValidatorCallbackSchema]]
     type: Required[Literal['function']]
     mode: Required[Literal['before', 'after']]
     schema: Required[CoreSchema]
@@ -1830,7 +1830,7 @@ def field_wrap_validation_callback(
 class PlainCallbackSchema(TypedDict, total=False):
     type: Required[Literal['function']]
     mode: Required[Literal['plain']]
-    function: Required[Union[FieldValidatorCallbackSchema, GeneralCallbackSchema]]
+    function: Required[Union[FieldValidatorCallbackSchema, GeneralValidatorCallbackSchema]]
     ref: str
     metadata: Any
     serialization: SerSchema
