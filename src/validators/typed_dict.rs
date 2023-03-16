@@ -348,6 +348,13 @@ impl TypedDictValidator {
     where
         'data: 's,
     {
+        let extra = Extra {
+            data: extra.data,
+            field_name: Some(field),
+            assignee_field: None,
+            strict: extra.strict,
+            context: extra.context,
+        };
         // TODO probably we should set location on errors here
         let data = match extra.data {
             Some(data) => data,
@@ -380,12 +387,12 @@ impl TypedDictValidator {
             if field.frozen {
                 Err(ValError::new_with_loc(ErrorType::Frozen, input, field.name.to_string()))
             } else {
-                prepare_result(field.validator.validate(py, input, extra, slots, recursion_guard))
+                prepare_result(field.validator.validate(py, input, &extra, slots, recursion_guard))
             }
         } else if self.check_extra && !self.forbid_extra {
             // this is the "allow" case of extra_behavior
             match self.extra_validator {
-                Some(ref validator) => prepare_result(validator.validate(py, input, extra, slots, recursion_guard)),
+                Some(ref validator) => prepare_result(validator.validate(py, input, &extra, slots, recursion_guard)),
                 None => prepare_tuple(input.to_object(py)),
             }
         } else {

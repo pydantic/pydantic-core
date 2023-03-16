@@ -20,12 +20,12 @@ fn destructure_function_schema(schema: &PyDict) -> PyResult<(bool, &PyAny)> {
     let func: &PyDict = schema.get_as_req(intern!(schema.py(), "function"))?;
     let call: &PyAny = func.get_as_req(intern!(schema.py(), "call"))?;
     let func_type: &str = func.get_as_req(intern!(schema.py(), "type"))?;
-    let is_model_instance_method = match func_type {
+    let is_field_validator = match func_type {
         "field" => true,
         "general" => false,
         _ => unreachable!(),
     };
-    Ok((is_model_instance_method, call))
+    Ok((is_field_validator, call))
 }
 
 impl BuildValidator for FunctionBuilder {
@@ -57,7 +57,7 @@ macro_rules! impl_build {
             ) -> PyResult<CombinedValidator> {
                 let py = schema.py();
                 let validator = build_validator(schema.get_as_req(intern!(py, "schema"))?, config, build_context)?;
-                let (is_model_instance_method, function) = destructure_function_schema(schema)?;
+                let (is_field_validator, function) = destructure_function_schema(schema)?;
                 let name = format!(
                     "{}[{}(), {}]",
                     $name,
@@ -72,7 +72,7 @@ macro_rules! impl_build {
                         None => py.None(),
                     },
                     name,
-                    is_model_instance_method,
+                    is_field_validator,
                 }
                 .into())
             }
@@ -86,7 +86,7 @@ pub struct FunctionBeforeValidator {
     func: PyObject,
     config: PyObject,
     name: String,
-    is_model_instance_method: bool,
+    is_field_validator: bool,
 }
 
 impl_build!(FunctionBeforeValidator, "function-before");
@@ -100,7 +100,7 @@ impl Validator for FunctionBeforeValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let info = ValidationInfo::new(py, extra, &self.config, self.is_model_instance_method)?;
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
         let value = self
             .func
             .call1(py, (input.to_object(py), info))
@@ -129,7 +129,7 @@ pub struct FunctionAfterValidator {
     func: PyObject,
     config: PyObject,
     name: String,
-    is_model_instance_method: bool,
+    is_field_validator: bool,
 }
 
 impl_build!(FunctionAfterValidator, "function-after");
@@ -144,7 +144,7 @@ impl Validator for FunctionAfterValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let v = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-        let info = ValidationInfo::new(py, extra, &self.config, self.is_model_instance_method)?;
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
         self.func.call1(py, (v, info)).map_err(|e| convert_err(py, e, input))
     }
 
@@ -166,13 +166,13 @@ pub struct FunctionPlainValidator {
     func: PyObject,
     config: PyObject,
     name: String,
-    is_model_instance_method: bool,
+    is_field_validator: bool,
 }
 
 impl FunctionPlainValidator {
     pub fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let (is_model_instance_method, function) = destructure_function_schema(schema)?;
+        let (is_field_validator, function) = destructure_function_schema(schema)?;
         Ok(Self {
             func: function.into_py(py),
             config: match config {
@@ -180,7 +180,7 @@ impl FunctionPlainValidator {
                 None => py.None(),
             },
             name: format!("function-plain[{}()]", function_name(function)?),
-            is_model_instance_method,
+            is_field_validator,
         }
         .into())
     }
@@ -195,7 +195,7 @@ impl Validator for FunctionPlainValidator {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let info = ValidationInfo::new(py, extra, &self.config, self.is_model_instance_method)?;
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
         self.func
             .call1(py, (input.to_object(py), info))
             .map_err(|e| convert_err(py, e, input))
@@ -212,7 +212,7 @@ pub struct FunctionWrapValidator {
     func: PyObject,
     config: PyObject,
     name: String,
-    is_model_instance_method: bool,
+    is_field_validator: bool,
 }
 
 impl_build!(FunctionWrapValidator, "function-wrap");
@@ -229,7 +229,7 @@ impl Validator for FunctionWrapValidator {
         let call_next_validator = ValidatorCallable {
             validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
         };
-        let info = ValidationInfo::new(py, extra, &self.config, self.is_model_instance_method)?;
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
         self.func
             .call1(py, (input.to_object(py), call_next_validator, info))
             .map_err(|e| convert_err(py, e, input))
@@ -327,11 +327,11 @@ pub struct ValidationInfo {
 }
 
 impl ValidationInfo {
-    fn new(py: Python, extra: &Extra, config: &PyObject, is_model_instance_method: bool) -> PyResult<Self> {
-        let res = if is_model_instance_method {
+    fn new(py: Python, extra: &Extra, config: &PyObject, is_field_validator: bool) -> PyResult<Self> {
+        let res = if is_field_validator {
             let field_name = match extra.field_name {
-                Some(v) => v,
-                None => return Err(PyRuntimeError::new_err("This validator expected to be run inside the context of a model field but not model field was found")),
+                Some(field_name) => field_name,
+                _ => return Err(PyRuntimeError::new_err("This validator expected to be run inside the context of a model field but not model field was found")),
             };
             Self {
                 config: config.clone_ref(py),
