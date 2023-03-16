@@ -1544,7 +1544,7 @@ def model_field_function_before_schema(
     )
 
     v = SchemaValidator(schema)
-    assert v.validate_python({"a": b"hello "}) == {"a": "hello world"}
+    assert v.validate_python({'a': b'hello '}) == {'a': 'hello world'}
     ```
 
     Args:
@@ -1587,7 +1587,7 @@ def function_before_schema(
 
     schema = core_schema.function_before_schema(function=fn, schema=core_schema.str_schema())
     v = SchemaValidator(schema)
-    assert v.validate_python(b"hello ") == "b'hello 'world"
+    assert v.validate_python(b'hello ') == "b'hello 'world"
     ```
 
     Args:
@@ -1633,7 +1633,7 @@ def model_field_function_after_schema(
     )
 
     v = SchemaValidator(schema)
-    assert v.validate_python({"a": b"hello "}) == {"a": "hello world"}
+    assert v.validate_python({'a': b'hello '}) == {'a': 'hello world'}
     ```
 
     Args:
@@ -1803,7 +1803,7 @@ def model_field_function_wrap_schema(
     )
 
     v = SchemaValidator(schema)
-    assert v.validate_python({"a": b"hello "}) == {"a": "hello world"}
+    assert v.validate_python({'a': b'hello '}) == {'a': 'hello world'}
     ```
 
     Args:
@@ -1892,7 +1892,7 @@ def model_field_function_plain_schema(
     )
 
     v = SchemaValidator(schema)
-    assert v.validate_python({"a": "hello "}) == {"a": "hello world"}
+    assert v.validate_python({'a': "hello "}) == {'a': 'hello world'}
     ```
 
     Args:
