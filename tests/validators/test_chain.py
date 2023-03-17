@@ -17,7 +17,7 @@ def test_chain():
                 {
                     'type': 'function',
                     'mode': 'plain',
-                    'function': {'type': 'general', 'call': lambda v, info: Decimal(v)},
+                    'function': {'type': 'general', 'function': lambda v, info: Decimal(v)},
                 },
             ],
         }
@@ -35,22 +35,22 @@ def test_chain_many():
                 {
                     'type': 'function',
                     'mode': 'plain',
-                    'function': {'type': 'general', 'call': lambda v, info: f'{v}-1'},
+                    'function': {'type': 'general', 'function': lambda v, info: f'{v}-1'},
                 },
                 {
                     'type': 'function',
                     'mode': 'plain',
-                    'function': {'type': 'general', 'call': lambda v, info: f'{v}-2'},
+                    'function': {'type': 'general', 'function': lambda v, info: f'{v}-2'},
                 },
                 {
                     'type': 'function',
                     'mode': 'plain',
-                    'function': {'type': 'general', 'call': lambda v, info: f'{v}-3'},
+                    'function': {'type': 'general', 'function': lambda v, info: f'{v}-3'},
                 },
                 {
                     'type': 'function',
                     'mode': 'plain',
-                    'function': {'type': 'general', 'call': lambda v, info: f'{v}-4'},
+                    'function': {'type': 'general', 'function': lambda v, info: f'{v}-4'},
                 },
             ],
         }
@@ -90,7 +90,7 @@ def test_json(py_and_json: PyAndJson, input_value, expected):
                 {
                     'type': 'function',
                     'mode': 'plain',
-                    'function': {'type': 'general', 'call': lambda v, info: Decimal(v)},
+                    'function': {'type': 'general', 'function': lambda v, info: Decimal(v)},
                 },
             ],
         }
@@ -108,7 +108,7 @@ def test_flatten():
                 {
                     'type': 'function',
                     'mode': 'plain',
-                    'function': {'type': 'general', 'call': lambda v, info: f'{v}-1'},
+                    'function': {'type': 'general', 'function': lambda v, info: f'{v}-1'},
                 },
                 {
                     'type': 'chain',
@@ -116,12 +116,12 @@ def test_flatten():
                         {
                             'type': 'function',
                             'mode': 'plain',
-                            'function': {'type': 'general', 'call': lambda v, info: f'{v}-2'},
+                            'function': {'type': 'general', 'function': lambda v, info: f'{v}-2'},
                         },
                         {
                             'type': 'function',
                             'mode': 'plain',
-                            'function': {'type': 'general', 'call': lambda v, info: f'{v}-3'},
+                            'function': {'type': 'general', 'function': lambda v, info: f'{v}-3'},
                         },
                     ],
                 },
@@ -143,7 +143,11 @@ def test_chain_one():
         {
             'type': 'chain',
             'steps': [
-                {'type': 'function', 'mode': 'plain', 'function': {'type': 'general', 'call': lambda v, info: f'{v}-1'}}
+                {
+                    'type': 'function',
+                    'mode': 'plain',
+                    'function': {'type': 'general', 'function': lambda v, info: f'{v}-1'},
+                }
             ],
         }
     )
@@ -173,7 +177,7 @@ def test_ask():
                         'return_fields_set': True,
                         'fields': {'field_a': {'schema': {'type': 'str'}}},
                     },
-                    {'type': 'function', 'mode': 'plain', 'function': {'type': 'general', 'call': f}},
+                    {'type': 'function', 'mode': 'plain', 'function': {'type': 'general', 'function': f}},
                 ],
             },
         }

@@ -17,15 +17,15 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 pub struct FunctionBuilder;
 
 fn destructure_function_schema(schema: &PyDict) -> PyResult<(bool, &PyAny)> {
-    let func: &PyDict = schema.get_as_req(intern!(schema.py(), "function"))?;
-    let call: &PyAny = func.get_as_req(intern!(schema.py(), "call"))?;
-    let func_type: &str = func.get_as_req(intern!(schema.py(), "type"))?;
+    let func_dict: &PyDict = schema.get_as_req(intern!(schema.py(), "function"))?;
+    let function: &PyAny = func_dict.get_as_req(intern!(schema.py(), "function"))?;
+    let func_type: &str = func_dict.get_as_req(intern!(schema.py(), "type"))?;
     let is_field_validator = match func_type {
         "field" => true,
         "general" => false,
         _ => unreachable!(),
     };
-    Ok((is_field_validator, call))
+    Ok((is_field_validator, function))
 }
 
 impl BuildValidator for FunctionBuilder {
@@ -328,26 +328,26 @@ pub struct ValidationInfo {
 
 impl ValidationInfo {
     fn new(py: Python, extra: &Extra, config: &PyObject, is_field_validator: bool) -> PyResult<Self> {
-        let res = if is_field_validator {
-            let field_name = match extra.field_name {
-                Some(field_name) => field_name,
-                _ => return Err(PyRuntimeError::new_err("This validator expected to be run inside the context of a model field but not model field was found")),
-            };
-            Self {
-                config: config.clone_ref(py),
-                context: extra.context.map(|v| v.into()),
-                field_name: Some(field_name.to_string()),
-                data: extra.data.map(|v| v.into()),
+        if is_field_validator {
+            match extra.field_name {
+                Some(field_name) => Ok(
+                    Self {
+                        config: config.clone_ref(py),
+                        context: extra.context.map(|v| v.into()),
+                        field_name: Some(field_name.to_string()),
+                        data: extra.data.map(|v| v.into()),
+                    }
+                ),
+                _ => Err(PyRuntimeError::new_err("This validator expected to be run inside the context of a model field but no model field was found")),
             }
         } else {
-            Self {
+            Ok(Self {
                 config: config.clone_ref(py),
                 context: extra.context.map(|v| v.into()),
                 field_name: None,
                 data: None,
-            }
-        };
-        Ok(res)
+            })
+        }
     }
 }
 

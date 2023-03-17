@@ -188,10 +188,8 @@ impl Validator for TypedDictValidator {
                 for field in &self.fields {
                     let extra = Extra {
                         data: Some(output_dict),
-                        assignee_field: None,
                         field_name: Some(&field.name),
-                        strict: extra.strict,
-                        context: extra.context,
+                        ..*extra
                     };
                     let op_key_value = match field.lookup_key.$get_method($dict $(, $kwargs )? ) {
                         Ok(v) => v,
@@ -349,11 +347,9 @@ impl TypedDictValidator {
         'data: 's,
     {
         let extra = Extra {
-            data: extra.data,
             field_name: Some(field),
             assignee_field: None,
-            strict: extra.strict,
-            context: extra.context,
+            ..*extra
         };
         // TODO probably we should set location on errors here
         let data = match extra.data {

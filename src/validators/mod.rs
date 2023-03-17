@@ -446,8 +446,8 @@ pub fn build_validator<'a>(
 /// but that would confuse it with context as per pydantic/pydantic#1549
 #[derive(Debug, Default)]
 pub struct Extra<'a> {
-    /// Represents the fields of the model we are currently validating
-    /// If there is no model this will be None
+    /// This is used as the `data` kwargs to validator functions, it also represents the current model
+    /// data when validating assignment
     pub data: Option<&'a PyDict>,
     /// Represents the fields of the model we are currently validating
     /// If there is no model this will be None
