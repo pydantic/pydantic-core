@@ -346,18 +346,8 @@ impl TypedDictValidator {
     where
         'data: 's,
     {
-        let extra = Extra {
-            field_name: Some(field),
-            assignee_field: None,
-            ..*extra
-        };
-        // TODO probably we should set location on errors here
-        let data = match extra.data {
-            Some(data) => data,
-            None => unreachable!(),
-        };
-
         let prepare_tuple = |output: PyObject| {
+            let data = extra.data.unwrap();
             data.set_item(field, output)?;
             if self.return_fields_set {
                 let fields_set = PySet::new(py, &[field])?;
@@ -377,6 +367,12 @@ impl TypedDictValidator {
                 Err(ValError::LineErrors(errors))
             }
             Err(err) => Err(err),
+        };
+
+        let extra = Extra {
+            field_name: Some(field),
+            assignee_field: None,
+            ..*extra
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field) {
