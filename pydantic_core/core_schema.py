@@ -270,7 +270,7 @@ def field_function_plain_ser_schema(
     when_used: WhenUsed = 'always',
 ) -> FunctionPlainSerSchema:
     """
-    Returns a schema for serialization with a function.
+    Returns a schema to serialize a field from a model, TypedDict or dataclass.
 
     Args:
         function: The function to use for serialization
@@ -359,7 +359,7 @@ def field_function_wrap_ser_schema(
     when_used: WhenUsed = 'always',
 ) -> FunctionWrapSerSchema:
     """
-    Returns a schema for serialization with a function for a model field.
+    Returns a schema to serialize a field from a model, TypedDict or dataclass.
 
     Args:
         function: The function to use for serialization
