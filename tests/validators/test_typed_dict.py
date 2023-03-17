@@ -8,7 +8,7 @@ from typing import Mapping
 import pytest
 from dirty_equals import FunctionCheck, HasRepr, IsStr
 
-from pydantic_core import CoreConfig, SchemaError, SchemaValidator, ValidationError
+from pydantic_core import CoreConfig, SchemaError, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -1436,3 +1436,26 @@ def test_frozen_field():
     assert exc_info.value.errors() == [
         {'type': 'frozen', 'loc': ('is_developer',), 'msg': 'Field is frozen', 'input': False}
     ]
+
+
+def test_field_before_function():
+    """A field cannot be required and have a default value"""
+
+    def f(v: str, info: core_schema.ModelFieldValidationInfo) -> str:
+        assert v == 'hello'
+        assert info.data == {'x': 'hello'}
+        assert info.field_name == 'x'
+        return 'hello world!'
+
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            {
+                'a': core_schema.typed_dict_field(core_schema.int_schema()),
+                'c': core_schema.typed_dict_field(
+                    core_schema.field_before_validation_function(f, core_schema.str_schema())
+                ),
+            }
+        )
+    )
+
+    assert v.validate_python({'a': 1, 'c': 'hello'}) == {'a': 1, 'c': 'hello world!'}
