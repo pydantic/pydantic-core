@@ -91,7 +91,7 @@ def test_function_before():
         {
             'type': 'function',
             'mode': 'before',
-            'function': f,
+            'function': {'type': 'general', 'function': f},
             'schema': {
                 'type': 'model',
                 'cls': MyModel,
@@ -126,7 +126,7 @@ def test_function_after():
         {
             'type': 'function',
             'mode': 'after',
-            'function': f,
+            'function': {'type': 'general', 'function': f},
             'schema': {
                 'type': 'model',
                 'cls': MyModel,
@@ -163,7 +163,7 @@ def test_function_wrap():
         {
             'type': 'function',
             'mode': 'wrap',
-            'function': f,
+            'function': {'type': 'general', 'function': f},
             'schema': {
                 'type': 'model',
                 'cls': MyModel,
