@@ -1,7 +1,7 @@
 use pyo3::exceptions::{PyAssertionError, PyAttributeError, PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::types::{PyAny, PyDict, PyString};
 
 use crate::build_tools::{function_name, py_err, SchemaDict};
 use crate::errors::{
@@ -354,17 +354,18 @@ impl ValidationInfo {
 #[pymethods]
 impl ValidationInfo {
     #[getter]
-    fn get_data(&self) -> PyResult<Py<PyDict>> {
-        self.data
-            .as_ref()
-            .cloned()
-            .ok_or_else(|| PyAttributeError::new_err("No attribute named 'data'"))
+    fn get_data(&self, py: Python) -> PyResult<Py<PyDict>> {
+        match self.data {
+            Some(ref data) => Ok(data.clone_ref(py)),
+            None => Err(PyAttributeError::new_err("No attribute named 'data'")),
+        }
     }
+
     #[getter]
-    fn get_field_name(&self) -> PyResult<String> {
-        self.field_name
-            .as_ref()
-            .cloned()
-            .ok_or_else(|| PyAttributeError::new_err("No attribute named 'field_name'"))
+    fn get_field_name<'py>(&self, py: Python<'py>) -> PyResult<&'py PyString> {
+        match self.field_name {
+            Some(ref field_name) => Ok(PyString::new(py, field_name)),
+            None => Err(PyAttributeError::new_err("No attribute named 'field_name'")),
+        }
     }
 }

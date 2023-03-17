@@ -716,3 +716,36 @@ def test_method_function_no_model():
         match='This validator expected to be run inside the context of a model field but no model field was found',
     ):
         v.validate_python(123)
+
+
+def test_typed_dict_data() -> None:
+    info_stuff = None
+
+    def f(input_value: Any, info: core_schema.ModelFieldValidationInfo) -> Any:
+        nonlocal info_stuff
+        info_stuff = {'field_name': info.field_name, 'data': info.data.copy()}
+        assert isinstance(input_value, str)
+        return f'input: {input_value}'
+
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            {
+                'a': core_schema.typed_dict_field(core_schema.int_schema()),
+                'b': core_schema.typed_dict_field(core_schema.int_schema()),
+                'c': core_schema.typed_dict_field(
+                    core_schema.field_after_validation_function(f, core_schema.str_schema())
+                ),
+            }
+        )
+    )
+
+    data = v.validate_python({'a': 1, 'b': '2', 'c': b'foo'})
+    assert data == {'a': 1, 'b': 2, 'c': 'input: foo'}
+    assert info_stuff == {'field_name': 'c', 'data': {'a': 1, 'b': 2}}
+
+    info_stuff = None
+
+    with pytest.raises(ValidationError, match=r'b\s+Input should be a valid integer'):
+        v.validate_python({'a': 1, 'b': 'wrong', 'c': b'foo'})
+
+    assert info_stuff == {'field_name': 'c', 'data': {'a': 1}}
