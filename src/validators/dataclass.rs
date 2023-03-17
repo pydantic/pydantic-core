@@ -12,7 +12,7 @@ use crate::recursion_guard::RecursionGuard;
 use crate::validators::function::convert_err;
 
 use super::arguments::{json_get, json_slice, py_get, py_slice};
-use super::model::create_class;
+use super::model::{create_class, force_setattr};
 use super::with_default::get_default;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
@@ -359,7 +359,8 @@ impl Validator for DataclassValidator {
             let input = input.maybe_subclass_dict(class)?;
             let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
             let (dc_dict, post_init_kwargs): (&PyAny, &PyAny) = output.extract(py)?;
-            let dc = create_class(self.class.as_ref(py), dc_dict, None)?;
+            let dc = create_class(self.class.as_ref(py))?;
+            force_setattr(py, dc.as_ref(py), intern!(py, "__dict__"), dc_dict)?;
 
             if let Some(ref post_init) = self.post_init {
                 let post_init = post_init.as_ref(py);

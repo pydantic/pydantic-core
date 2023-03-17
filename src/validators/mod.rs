@@ -97,29 +97,29 @@ impl SchemaValidator {
         Ok((cls, args).into_py(py))
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, init_mode=false))]
+    #[pyo3(signature = (input, *, strict=None, context=None, init_self=None))]
     pub fn validate_python(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        init_mode: bool,
+        init_self: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        let r = self._validate(py, input, strict, context, init_mode);
+        let r = self._validate(py, input, strict, context, init_self);
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, init_mode=false))]
+    #[pyo3(signature = (input, *, strict=None, context=None, init_self=None))]
     pub fn isinstance_python(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        init_mode: bool,
+        init_self: Option<&PyAny>,
     ) -> PyResult<bool> {
-        match self._validate(py, input, strict, context, init_mode) {
+        match self._validate(py, input, strict, context, init_self) {
             Ok(_) => Ok(true),
             Err(ValError::InternalErr(err)) => Err(err),
             Err(ValError::Omit) => Err(ValidationError::omit_error()),
@@ -127,35 +127,35 @@ impl SchemaValidator {
         }
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, init_mode=false))]
+    #[pyo3(signature = (input, *, strict=None, context=None, init_self=None))]
     pub fn validate_json(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        init_mode: bool,
+        init_self: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         match input.parse_json() {
             Ok(input) => {
-                let r = self._validate(py, &input, strict, context, init_mode);
+                let r = self._validate(py, &input, strict, context, init_self);
                 r.map_err(|e| self.prepare_validation_err(py, e))
             }
             Err(err) => Err(self.prepare_validation_err(py, err)),
         }
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, init_mode=false))]
+    #[pyo3(signature = (input, *, strict=None, context=None, init_self=None))]
     pub fn isinstance_json(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        init_mode: bool,
+        init_self: Option<&PyAny>,
     ) -> PyResult<bool> {
         match input.parse_json() {
-            Ok(input) => match self._validate(py, &input, strict, context, init_mode) {
+            Ok(input) => match self._validate(py, &input, strict, context, init_self) {
                 Ok(_) => Ok(true),
                 Err(ValError::InternalErr(err)) => Err(err),
                 Err(ValError::Omit) => Err(ValidationError::omit_error()),
@@ -180,6 +180,7 @@ impl SchemaValidator {
             strict,
             context,
             field_name: None,
+            init_self: None,
         };
         let r = self
             .validator
@@ -220,28 +221,18 @@ impl SchemaValidator {
         input: &'data impl Input<'data>,
         strict: Option<bool>,
         context: Option<&'data PyAny>,
-        init_mode: bool,
+        init_self: Option<&PyAny>,
     ) -> ValResult<'data, PyObject>
     where
         's: 'data,
     {
-        if init_mode {
-            self.validator.validate_init(
-                py,
-                input,
-                &Extra::new(strict, context),
-                &self.slots,
-                &mut RecursionGuard::default(),
-            )
-        } else {
-            self.validator.validate(
-                py,
-                input,
-                &Extra::new(strict, context),
-                &self.slots,
-                &mut RecursionGuard::default(),
-            )
-        }
+        self.validator.validate(
+            py,
+            input,
+            &Extra::new(strict, context, init_self),
+            &self.slots,
+            &mut RecursionGuard::default(),
+        )
     }
 
     fn prepare_validation_err(&self, py: Python, error: ValError) -> PyErr {
@@ -474,13 +465,16 @@ pub struct Extra<'a> {
     pub strict: Option<bool>,
     /// context used in validator functions
     pub context: Option<&'a PyAny>,
+    /// This is an instance of the model or dataclass being validated, when validation is performed from `__init__`
+    init_self: Option<&'a PyAny>,
 }
 
 impl<'a> Extra<'a> {
-    pub fn new(strict: Option<bool>, context: Option<&'a PyAny>) -> Self {
+    pub fn new(strict: Option<bool>, context: Option<&'a PyAny>, init_self: Option<&'a PyAny>) -> Self {
         Extra {
             strict,
             context,
+            init_self,
             ..Default::default()
         }
     }
@@ -494,6 +488,7 @@ impl<'a> Extra<'a> {
             strict: Some(true),
             context: self.context,
             field_name: self.field_name,
+            init_self: self.init_self,
         }
     }
 }
@@ -596,6 +591,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         Ok(())
     }
     fn py_gc_clear(&mut self) {}
+
     /// Do the actual validation for this schema/type
     fn validate<'s, 'data>(
         &'s self,
@@ -605,18 +601,6 @@ pub trait Validator: Send + Sync + Clone + Debug {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject>;
-
-    /// Do validation but skip the root model or dataclass validator
-    fn validate_init<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        extra: &Extra,
-        slots: &'data [CombinedValidator],
-        recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        self.validate(py, input, extra, slots, recursion_guard)
-    }
 
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`

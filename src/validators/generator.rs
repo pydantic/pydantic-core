@@ -57,7 +57,7 @@ impl Validator for GeneratorValidator {
         let validator = self
             .item_validator
             .as_ref()
-            .map(|v| InternalValidator::new(py, "ValidatorIterator", v, slots, extra, recursion_guard, false));
+            .map(|v| InternalValidator::new(py, "ValidatorIterator", v, slots, extra, recursion_guard));
 
         let v_iterator = ValidatorIterator {
             iterator,
@@ -195,8 +195,8 @@ pub struct InternalValidator {
     field: Option<String>,
     strict: Option<bool>,
     context: Option<PyObject>,
+    init_self: Option<PyObject>,
     recursion_guard: RecursionGuard,
-    init_mode: bool,
 }
 
 impl fmt::Debug for InternalValidator {
@@ -213,7 +213,6 @@ impl InternalValidator {
         slots: &[CombinedValidator],
         extra: &Extra,
         recursion_guard: &RecursionGuard,
-        init_mode: bool,
     ) -> Self {
         Self {
             name: name.to_string(),
@@ -223,8 +222,8 @@ impl InternalValidator {
             field: extra.assignee_field.map(|f| f.to_string()),
             strict: extra.strict,
             context: extra.context.map(|d| d.into_py(py)),
+            init_self: extra.init_self.map(|d| d.into_py(py)),
             recursion_guard: recursion_guard.clone(),
-            init_mode,
         }
     }
 
@@ -243,14 +242,10 @@ impl InternalValidator {
             strict: self.strict,
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             field_name: None,
+            init_self: self.init_self.as_ref().map(|data| data.as_ref(py)),
         };
-        let r = if self.init_mode {
-            self.validator
-                .validate_init(py, input, &extra, &self.slots, &mut self.recursion_guard)
-        } else {
-            self.validator
-                .validate(py, input, &extra, &self.slots, &mut self.recursion_guard)
-        };
-        r.map_err(|e| ValidationError::from_val_error(py, self.name.to_object(py), e, outer_location))
+        self.validator
+            .validate(py, input, &extra, &self.slots, &mut self.recursion_guard)
+            .map_err(|e| ValidationError::from_val_error(py, self.name.to_object(py), e, outer_location))
     }
 }
