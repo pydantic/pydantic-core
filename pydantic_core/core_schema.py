@@ -1489,29 +1489,29 @@ def dict_schema(
     )
 
 
-class GeneralValidatorCallback(Protocol):
+class GeneralValidatorFunction(Protocol):
     def __call__(self, __input_value: Any, __info: ValidationInfo) -> Any:  # pragma: no cover
         ...
 
 
-class FieldValidatorCallback(Protocol):
+class FieldValidatorFunction(Protocol):
     def __call__(self, __input_value: Any, __info: ModelFieldValidationInfo) -> Any:  # pragma: no cover
         ...
 
 
 class FieldValidatorFunctionSchema(TypedDict):
     type: Literal['field']
-    function: FieldValidatorCallback
+    function: FieldValidatorFunction
 
 
 class GeneralValidatorFunctionSchema(TypedDict):
     type: Literal['general']
-    function: GeneralValidatorCallback
+    function: GeneralValidatorFunction
 
 
 class FunctionSchema(TypedDict, total=False):
-    function: Required[Union[FieldValidatorFunctionSchema, GeneralValidatorFunctionSchema]]
     type: Required[Literal['function']]
+    function: Required[Union[FieldValidatorFunctionSchema, GeneralValidatorFunctionSchema]]
     mode: Required[Literal['before', 'after']]
     schema: Required[CoreSchema]
     ref: str
@@ -1520,7 +1520,7 @@ class FunctionSchema(TypedDict, total=False):
 
 
 def field_before_validation_function(
-    function: FieldValidatorCallback,
+    function: FieldValidatorFunction,
     schema: CoreSchema,
     *,
     ref: str | None = None,
@@ -1567,7 +1567,7 @@ def field_before_validation_function(
 
 
 def general_before_validation_function(
-    function: GeneralValidatorCallback,
+    function: GeneralValidatorFunction,
     schema: CoreSchema,
     *,
     ref: str | None = None,
@@ -1610,7 +1610,7 @@ def general_before_validation_function(
 
 
 def field_after_validation_function(
-    function: FieldValidatorCallback,
+    function: FieldValidatorFunction,
     schema: CoreSchema,
     *,
     ref: str | None = None,
@@ -1657,7 +1657,7 @@ def field_after_validation_function(
 
 
 def general_after_validation_function(
-    function: GeneralValidatorCallback,
+    function: GeneralValidatorFunction,
     schema: CoreSchema,
     *,
     ref: str | None = None,
@@ -1702,14 +1702,14 @@ class CallableValidator(Protocol):
         ...
 
 
-class GeneralWrapValidatorCallback(Protocol):
+class GeneralWrapValidatorFunction(Protocol):
     def __call__(
         self, __input_value: Any, __validator: CallableValidator, __info: ValidationInfo
     ) -> Any:  # pragma: no cover
         ...
 
 
-class FieldWrapValidatorCallback(Protocol):
+class FieldWrapValidatorFunction(Protocol):
     def __call__(
         self, __input_value: Any, __validator: CallableValidator, __info: ModelFieldValidationInfo
     ) -> Any:  # pragma: no cover
@@ -1718,17 +1718,17 @@ class FieldWrapValidatorCallback(Protocol):
 
 class FieldWrapValidatorFunctionSchema(TypedDict):
     type: Literal['field']
-    function: FieldWrapValidatorCallback
+    function: FieldWrapValidatorFunction
 
 
 class GeneralWrapValidatorFunctionSchema(TypedDict):
     type: Literal['general']
-    function: GeneralWrapValidatorCallback
+    function: GeneralWrapValidatorFunction
 
 
 class WrapFunctionSchema(TypedDict, total=False):
-    function: Required[Union[GeneralWrapValidatorFunctionSchema, FieldWrapValidatorFunctionSchema]]
     type: Required[Literal['function']]
+    function: Required[Union[GeneralWrapValidatorFunctionSchema, FieldWrapValidatorFunctionSchema]]
     mode: Required[Literal['wrap']]
     schema: Required[CoreSchema]
     ref: str
@@ -1737,7 +1737,7 @@ class WrapFunctionSchema(TypedDict, total=False):
 
 
 def general_wrap_validation_function(
-    function: GeneralWrapValidatorCallback,
+    function: GeneralWrapValidatorFunction,
     schema: CoreSchema,
     *,
     ref: str | None = None,
@@ -1779,7 +1779,7 @@ def general_wrap_validation_function(
 
 
 def field_wrap_validation_function(
-    function: FieldWrapValidatorCallback,
+    function: FieldWrapValidatorFunction,
     schema: CoreSchema,
     *,
     ref: str | None = None,
@@ -1837,7 +1837,7 @@ class PlainFunctionSchema(TypedDict, total=False):
 
 
 def general_plain_validation_function(
-    function: GeneralValidatorCallback,
+    function: GeneralValidatorFunction,
     *,
     ref: str | None = None,
     metadata: Any = None,
@@ -1875,7 +1875,7 @@ def general_plain_validation_function(
 
 
 def field_plain_validation_function(
-    function: FieldValidatorCallback,
+    function: FieldValidatorFunction,
     *,
     ref: str | None = None,
     metadata: Any = None,
