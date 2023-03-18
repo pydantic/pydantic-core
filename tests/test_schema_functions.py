@@ -154,11 +154,15 @@ all_schema_functions = [
         args({'type': 'int'}, {'type': 'str'}),
         {'type': 'chain', 'steps': [{'type': 'int'}, {'type': 'str'}]},
     ),
-    (core_schema.typed_dict_field, args({'type': 'int'}, required=True), {'schema': {'type': 'int'}, 'required': True}),
+    (
+        core_schema.typed_dict_field,
+        args({'type': 'int'}, required=True),
+        {'type': 'typed-dict-field', 'schema': {'type': 'int'}, 'required': True},
+    ),
     (
         core_schema.typed_dict_schema,
         args({'foo': core_schema.typed_dict_field({'type': 'int'})}),
-        {'type': 'typed-dict', 'fields': {'foo': {'schema': {'type': 'int'}}}},
+        {'type': 'typed-dict', 'fields': {'foo': {'type': 'typed-dict-field', 'schema': {'type': 'int'}}}},
     ),
     (
         core_schema.model_schema,
@@ -235,7 +239,7 @@ def test_schema_functions(function, args_kwargs, expected_schema):
     args, kwargs = args_kwargs
     schema = function(*args, **kwargs)
     assert schema == expected_schema
-    if schema.get('type') in {None, 'definition-ref'}:
+    if schema.get('type') in {None, 'definition-ref', 'typed-dict-field'}:
         return
 
     v = SchemaValidator(schema)

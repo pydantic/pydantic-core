@@ -2365,6 +2365,7 @@ def lax_or_strict_schema(
 
 
 class TypedDictField(TypedDict, total=False):
+    type: Required[Literal['typed-dict-field']]
     schema: Required[CoreSchema]
     required: bool
     validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
@@ -2401,6 +2402,7 @@ def typed_dict_field(
         frozen: Whether the field is frozen
     """
     return dict_not_none(
+        type='typed-dict-field',
         schema=schema,
         required=required,
         validation_alias=validation_alias,
@@ -3183,6 +3185,7 @@ CoreSchema = Union[
     MultiHostUrlSchema,
     DefinitionsSchema,
     DefinitionReferenceSchema,
+    TypedDictField,
 ]
 
 # to update this, call `pytest -k test_core_schema_type_literal` and copy the output
@@ -3231,6 +3234,7 @@ CoreSchemaType = Literal[
     'multi-host-url',
     'definitions',
     'definition-ref',
+    'typed-dict-field',
 ]
 
 
