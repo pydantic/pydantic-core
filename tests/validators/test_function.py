@@ -722,3 +722,51 @@ def test_typed_dict_data() -> None:
         v.validate_python({'a': 1, 'b': 'wrong', 'c': b'foo'})
 
     assert info_stuff == {'field_name': 'c', 'data': {'a': 1}}
+
+
+@pytest.mark.parametrize('mode', ['before', 'after', 'wrap'])
+def test_model_root_function_assignment(mode):
+    """
+    Root functional validators should not be called in validate assignment, since the input value makes no sense.
+    """
+    call_count = 0
+
+    class Model:
+        x: str
+        y: int
+
+        def __init__(self, **kwargs: Any) -> None:
+            self.__dict__.update(kwargs)
+
+    def f(input_value: Any, *args) -> Any:
+        nonlocal call_count
+        call_count += 1
+        if mode == 'wrap':
+            return args[0](input_value)
+        else:
+            return input_value
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            {
+                'type': f'function-{mode}',
+                'function': {'type': 'general', 'function': f},
+                'schema': core_schema.typed_dict_schema(
+                    {
+                        'x': core_schema.typed_dict_field(core_schema.str_schema()),
+                        'y': core_schema.typed_dict_field(core_schema.int_schema()),
+                    }
+                ),
+            },
+        )
+    )
+
+    m = Model()
+    v.validate_python({'x': b'input', 'y': '123'}, init_self=m)
+    assert m.x == 'input'
+    assert m.y == 123
+    assert call_count == 1
+
+    v.validate_assignment('x', b'different', init_self=m)
+    assert call_count == 1
