@@ -710,5 +710,34 @@ def test_validate_assignment():
 
     v.validate_assignment('field_b', '321', m)
 
+    m.field_a = 'hello'
     assert m.field_b == 321
     assert m.__fields_set__ == {'field_a', 'field_b'}
+
+
+def test_validate_assignment_no_fields_set():
+    class MyModel:
+        __slots__ = ('__dict__',)
+
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'cls': MyModel,
+            'schema': {
+                'type': 'typed-dict',
+                'return_fields_set': True,
+                'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
+            },
+        }
+    )
+
+    m = MyModel()
+    m.field_a = 'hello'
+    m.field_b = 123
+    assert not hasattr(m, '__fields_set__')
+
+    v.validate_assignment('field_a', b'different', m)
+
+    m.field_a = 'different'
+    assert m.field_b == 123
+    assert not hasattr(m, '__fields_set__')
