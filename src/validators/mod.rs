@@ -165,22 +165,23 @@ impl SchemaValidator {
         }
     }
 
+    #[pyo3(signature = (field, input, init_self, *, strict=None, context=None))]
     pub fn validate_assignment(
         &self,
         py: Python,
         field: String,
         input: &PyAny,
-        data: &PyDict,
+        init_self: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         let extra = Extra {
-            data: Some(data),
+            data: None,
             assignee_field: Some(field.as_str()),
             strict,
             context,
             field_name: None,
-            init_self: None,
+            init_self: Some(init_self),
         };
         let r = self
             .validator
@@ -453,8 +454,7 @@ pub fn build_validator<'a>(
 /// but that would confuse it with context as per pydantic/pydantic#1549
 #[derive(Debug, Default)]
 pub struct Extra<'a> {
-    /// This is used as the `data` kwargs to validator functions, it also represents the current model
-    /// data when validating assignment
+    /// This is used as the `data` kwargs to validator functions
     pub data: Option<&'a PyDict>,
     /// Represents the fields of the model we are currently validating
     /// If there is no model this will be None

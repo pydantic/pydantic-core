@@ -253,7 +253,9 @@ def test_validate_assignment():
 
     assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
 
-    assert v.validate_assignment('field_a', b'abc', {'field_a': 'test'}) == ({'field_a': 'abc'}, {'field_a'})
+    data = {'field_a': 'test'}
+    assert v.validate_assignment('field_a', b'abc', data) == {'field_a': 'abc'}
+    assert data == {'field_a': 'abc'}
 
 
 def test_validate_assignment_strict_field():
@@ -317,8 +319,7 @@ def test_validate_assignment_functions():
     calls.clear()
 
     assert v.validate_assignment('field_a', 'new-val', {'field_a': 'testtest', 'field_b': 6}) == (
-        {'field_a': 'new-valnew-val', 'field_b': 6},
-        {'field_a'},
+        {'field_a': 'new-valnew-val', 'field_b': 6}
     )
     assert calls == ['func_a']
 
@@ -380,10 +381,11 @@ def test_validate_assignment_with_strict():
     r = v.validate_python({'x': 'a', 'y': '123'})
     assert r == {'x': 'a', 'y': 123}
 
-    assert v.validate_assignment('y', '124', r) == {'x': 'a', 'y': 124}
+    v.validate_assignment('y', '124', r)
+    assert r == {'x': 'a', 'y': 124}
 
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_assignment('y', '124', r, True)
+        v.validate_assignment('y', '124', r, strict=True)
 
     assert exc_info.value.errors() == [
         {'type': 'int_type', 'loc': ('y',), 'msg': 'Input should be a valid integer', 'input': '124'}
@@ -1426,10 +1428,10 @@ def test_frozen_field():
     )
     r1 = v.validate_python({'name': 'Samuel', 'age': '36'})
     assert r1 == {'name': 'Samuel', 'age': 36, 'is_developer': True}
-    r2 = v.validate_assignment('age', '35', r1)
-    assert r2 == {'name': 'Samuel', 'age': 35, 'is_developer': True}
+    v.validate_assignment('age', '35', r1)
+    assert r1 == {'name': 'Samuel', 'age': 35, 'is_developer': True}
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_assignment('is_developer', False, r2)
+        v.validate_assignment('is_developer', False, r1)
     assert exc_info.value.errors() == [
         {'type': 'frozen', 'loc': ('is_developer',), 'msg': 'Field is frozen', 'input': False}
     ]

@@ -4,7 +4,7 @@ use std::ptr::null_mut;
 use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString, PyTuple, PyType};
+use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
 use pyo3::{ffi, intern};
 
 use crate::build_tools::{py_err, SchemaDict};
@@ -79,9 +79,14 @@ impl Validator for ModelValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        // in the case hat init_self is Some, we're calling validation from within `BaseModel.__init__`
         if let Some(init_self) = extra.init_self {
-            return self.validate_init(py, init_self, input, extra, slots, recursion_guard);
+            // in the case that init_self is Some, we're calling validation from within `BaseModel.__init__`
+            // or from `validate_assignment`
+            return if let Some(assignee_field) = extra.assignee_field {
+                self.validate_assignment(py, init_self, assignee_field, input, extra, slots, recursion_guard)
+            } else {
+                self.validate_init(py, init_self, input, extra, slots, recursion_guard)
+            };
         }
 
         let class = self.class.as_ref(py);
@@ -157,6 +162,33 @@ impl ModelValidator {
                 .map_err(|e| convert_err(py, e, input))?;
         }
         Ok(init_self.into_py(py))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn validate_assignment<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        init_self: &PyAny,
+        assignee_field: &str,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        // inner validator takes care of updating dict, here we just need to update fields_set
+        let next_extra = Extra {
+            init_self: init_self.get_attr(intern!(py, "__dict__")),
+            ..*extra
+        };
+        let output = self
+            .validator
+            .validate(py, input, &next_extra, slots, recursion_guard)?;
+        if self.expect_fields_set {
+            if let Some(fields_set) = init_self.get_attr(intern!(py, "__fields_set__")) {
+                fields_set.downcast::<PySet>()?.add(assignee_field)?;
+            }
+        }
+        Ok(output)
     }
 
     fn create_class(&self, model_dict: &PyAny, fields_set: Option<&PyAny>) -> PyResult<PyObject> {

@@ -346,19 +346,15 @@ impl TypedDictValidator {
     where
         'data: 's,
     {
-        let prepare_tuple = |output: PyObject| {
-            let data = extra.data.unwrap();
+        let data: &PyDict = extra.init_self.expect("init_self should not be None").downcast()?;
+
+        let ok = |output: PyObject| {
             data.set_item(field, output)?;
-            if self.return_fields_set {
-                let fields_set = PySet::new(py, &[field])?;
-                Ok((data, fields_set).to_object(py))
-            } else {
-                Ok(data.to_object(py))
-            }
+            Ok(data.to_object(py))
         };
 
         let prepare_result = |result: ValResult<'data, PyObject>| match result {
-            Ok(output) => prepare_tuple(output),
+            Ok(output) => ok(output),
             Err(ValError::LineErrors(line_errors)) => {
                 let errors = line_errors
                     .into_iter()
@@ -385,7 +381,7 @@ impl TypedDictValidator {
             // this is the "allow" case of extra_behavior
             match self.extra_validator {
                 Some(ref validator) => prepare_result(validator.validate(py, input, &extra, slots, recursion_guard)),
-                None => prepare_tuple(input.to_object(py)),
+                None => ok(input.to_object(py)),
             }
         } else {
             // otherwise we raise an error:

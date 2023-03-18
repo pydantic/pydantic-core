@@ -60,7 +60,7 @@ class SchemaValidator:
         init_self: 'Any | None' = None,
     ) -> bool: ...
     def validate_assignment(
-        self, field: str, input: Any, data: 'dict[str, Any]', strict: 'bool | None' = None, context: Any = None
+        self, field: str, input: Any, init_self: Any, *, strict: 'bool | None' = None, context: Any = None
     ) -> 'dict[str, Any]': ...
 
 IncEx: TypeAlias = 'set[int] | set[str] | dict[int, IncEx] | dict[str, IncEx] | None'

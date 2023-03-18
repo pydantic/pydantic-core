@@ -682,3 +682,33 @@ def test_post_init_mutate():
     assert m.field_b == 12
     assert m.__fields_set__ == {'field_a'}
     assert m.__dict__ == {'field_a': 'testtest', 'field_b': 12}
+
+
+def test_validate_assignment():
+    class MyModel:
+        # this is not required, but it avoids `__fields_set__` being included in `__dict__`
+        __slots__ = '__dict__', '__fields_set__'
+        field_a: str
+        field_b: int
+
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'cls': MyModel,
+            'schema': {
+                'type': 'typed-dict',
+                'return_fields_set': True,
+                'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
+            },
+        }
+    )
+
+    m = MyModel()
+    m.field_a = 'hello'
+    m.field_b = 123
+    m.__fields_set__ = {'field_a'}
+
+    v.validate_assignment('field_b', '321', m)
+
+    assert m.field_b == 321
+    assert m.__fields_set__ == {'field_a', 'field_b'}
