@@ -1,8 +1,9 @@
 import json
-from typing import Any, TypedDict
+from typing import Any
 
 import pytest
 from dirty_equals import IsStrictDict
+from typing_extensions import TypedDict
 
 from pydantic_core import SchemaSerializer, core_schema
 
