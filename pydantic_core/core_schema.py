@@ -3185,7 +3185,6 @@ CoreSchema = Union[
     MultiHostUrlSchema,
     DefinitionsSchema,
     DefinitionReferenceSchema,
-    TypedDictField,
 ]
 
 # to update this, call `pytest -k test_core_schema_type_literal` and copy the output
@@ -3234,7 +3233,6 @@ CoreSchemaType = Literal[
     'multi-host-url',
     'definitions',
     'definition-ref',
-    'typed-dict-field',
 ]
 
 
