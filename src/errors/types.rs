@@ -54,7 +54,9 @@ pub enum ErrorType {
     #[strum(message = "Field required")]
     Missing,
     #[strum(message = "Field is frozen")]
-    Frozen,
+    FrozenField,
+    #[strum(message = "Model is frozen")]
+    FrozenModel,
     #[strum(message = "Extra inputs are not permitted")]
     ExtraForbidden,
     #[strum(message = "Keys should be strings")]
