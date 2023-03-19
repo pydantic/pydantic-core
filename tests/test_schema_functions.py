@@ -239,7 +239,7 @@ def test_schema_functions(function, args_kwargs, expected_schema):
     args, kwargs = args_kwargs
     schema = function(*args, **kwargs)
     assert schema == expected_schema
-    if schema.get('type') in {None, 'definition-ref'}:
+    if schema.get('type') in {None, 'definition-ref', 'typed-dict-field'}:
         return
 
     v = SchemaValidator(schema)
@@ -258,6 +258,9 @@ def test_all_schema_functions_used():
         for s in core_schema.CoreSchema.__args__
     }
     types_used = {args['type'] for _, _, args in all_schema_functions if 'type' in args}
+
+    # isn't a CoreSchema type
+    types_used.remove('typed-dict-field')
 
     assert all_types == types_used
 
