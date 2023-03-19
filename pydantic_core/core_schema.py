@@ -31,6 +31,7 @@ class CoreConfig(TypedDict, total=False):
     typed_dict_total: bool  # default: True
     # used on typed-dicts and tagged union keys
     from_attributes: bool
+    frozen: bool
     revalidate_models: bool
     # used on typed-dicts and arguments
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1

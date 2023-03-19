@@ -1431,5 +1431,5 @@ def test_frozen_field():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_assignment('is_developer', False, r2)
     assert exc_info.value.errors() == [
-        {'type': 'frozen', 'loc': ('is_developer',), 'msg': 'Field is frozen', 'input': False}
+        {'type': 'frozen_field', 'loc': ('is_developer',), 'msg': 'Field is frozen', 'input': False}
     ]

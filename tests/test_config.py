@@ -241,3 +241,41 @@ def test_allow_inf_nan(config: CoreConfig, float_field_schema, input_value, expe
     else:
         output_dict = v.validate_python(input_value)
         assert output_dict == expected
+
+
+@pytest.mark.parametrize(
+    'config,field_schema,expected',
+    [
+        ({}, {'schema': {'type': 'str'}}, None),
+        ({'frozen': False}, {'schema': {'type': 'str'}}, None),
+        ({'frozen': True}, {'schema': {'type': 'str'}}, Err("Model is frozen [type=frozen_model, input_value='y',")),
+        (
+            {'frozen': True},
+            {'schema': {'type': 'str'}, 'frozen': False},
+            Err("Model is frozen [type=frozen_model, input_value='y',"),
+        ),
+        (
+            {'frozen': False},
+            {'schema': {'type': 'str'}, 'frozen': True},
+            Err("Field is frozen [type=frozen_field, input_value='y',"),
+        ),
+    ],
+)
+def test_frozen(config: CoreConfig, field_schema, expected):
+    class MyModel:
+        __slots__ = {'__dict__'}
+
+    v = SchemaValidator(
+        {'type': 'model', 'cls': MyModel, 'schema': {'type': 'typed-dict', 'fields': {'f': field_schema}}},
+        config=config,
+    )
+
+    m = v.validate_python({'f': 'x'})
+    assert m.f == 'x'
+
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_assignment('f', 'y', m.__dict__)
+    else:
+        m2 = v.validate_assignment('f', 'y', m.__dict__)
+        assert m2.__dict__ == {'f': 'y'}

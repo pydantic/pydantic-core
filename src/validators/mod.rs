@@ -8,8 +8,8 @@ use pyo3::types::{PyAny, PyDict};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_context::BuildContext;
-use crate::build_tools::{py_err, py_error_type, SchemaDict, SchemaError};
-use crate::errors::{ValError, ValResult, ValidationError};
+use crate::build_tools::{py_err, py_error_type, schema_or_config_same, SchemaDict, SchemaError};
+use crate::errors::{ErrorType, ValError, ValResult, ValidationError};
 use crate::input::Input;
 use crate::questions::{Answers, Question};
 use crate::recursion_guard::RecursionGuard;
@@ -61,6 +61,7 @@ pub struct SchemaValidator {
     schema: PyObject,
     #[pyo3(get)]
     title: PyObject,
+    frozen: bool,
 }
 
 #[pymethods]
@@ -83,11 +84,13 @@ impl SchemaValidator {
             Some(t) => t.into_py(py),
             None => validator.get_name().into_py(py),
         };
+        let frozen: bool = schema_or_config_same(schema.downcast()?, config, intern!(py, "frozen"))?.unwrap_or(false);
         Ok(Self {
             validator,
             slots,
             schema: schema.into_py(py),
             title,
+            frozen,
         })
     }
 
@@ -199,18 +202,25 @@ impl SchemaValidator {
             context,
             field_name: None,
         };
-        let r = self
-            .validator
-            .validate(py, input, &extra, &self.slots, &mut RecursionGuard::default());
-        r.map_err(|e| self.prepare_validation_err(py, e))
+
+        if self.frozen {
+            let err = Err(ValError::new_with_loc(ErrorType::FrozenModel, input, field));
+            err.map_err(|e| self.prepare_validation_err(py, e))
+        } else {
+            let r = self
+                .validator
+                .validate(py, input, &extra, &self.slots, &mut RecursionGuard::default());
+            r.map_err(|e| self.prepare_validation_err(py, e))
+        }
     }
 
     pub fn __repr__(&self, py: Python) -> String {
         format!(
-            "SchemaValidator(title={:?}, validator={:#?}, slots={:#?})",
+            "SchemaValidator(title={:?}, validator={:#?}, slots={:#?}, frozen={:#?})",
             self.title.extract::<&str>(py).unwrap(),
             self.validator,
             self.slots,
+            self.frozen,
         )
     }
 
@@ -282,6 +292,7 @@ impl<'py> SelfValidator<'py> {
             slots: build_context.into_slots_val()?,
             schema: py.None(),
             title: "Self Schema".into_py(py),
+            frozen: false,
         })
     }
 }
