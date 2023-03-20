@@ -334,7 +334,7 @@ impl DataclassArgsValidator {
             }
         } else {
             Err(ValError::new_with_loc(
-                ErrorType::UnexpectedKeywordArgument,
+                ErrorType::ExtraForbidden,
                 input,
                 field_name.to_string(),
             ))

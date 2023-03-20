@@ -694,3 +694,17 @@ def test_dataclass_validate_assignment():
     assert dataclasses.asdict(foo) == {'a': 'hello', 'b': True}
     v.validate_assignment('a', b'world', foo)
     assert dataclasses.asdict(foo) == {'a': 'world', 'b': True}
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_assignment('a', 123, foo)
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {'type': 'string_type', 'loc': ('a',), 'msg': 'Input should be a valid string', 'input': 123}
+    ]
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_assignment('c', 123, foo)
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {'type': 'extra_forbidden', 'loc': ('c',), 'msg': 'Extra inputs are not permitted', 'input': 123}
+    ]
