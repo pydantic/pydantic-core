@@ -122,6 +122,10 @@ impl Validator for DataclassArgsValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
+        if let Some(field) = extra.assignee_field {
+            // we're validating assignment, completely different logic
+            return self.validate_assignment(py, field, input, extra, slots, recursion_guard);
+        }
         let args = input.validate_dataclass_args(&self.dataclass_name)?;
 
         let output_dict = PyDict::new(py);
@@ -290,6 +294,54 @@ impl Validator for DataclassArgsValidator {
     }
 }
 
+impl DataclassArgsValidator {
+    fn validate_assignment<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        field_name: &str,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject>
+    where
+        'data: 's,
+    {
+        let data: &PyDict = extra
+            .init_self
+            .expect("init_self should not be None on validate_assignment")
+            .downcast()?;
+
+        if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
+            let next_extra = Extra {
+                field_name: Some(field_name),
+                assignee_field: None,
+                ..*extra
+            };
+            match field.validator.validate(py, input, &next_extra, slots, recursion_guard) {
+                Ok(output) => {
+                    data.set_item(field_name, output)?;
+                    Ok(data.to_object(py))
+                }
+                Err(ValError::LineErrors(line_errors)) => {
+                    let errors = line_errors
+                        .into_iter()
+                        .map(|e| e.with_outer_location(field_name.into()))
+                        .collect();
+                    Err(ValError::LineErrors(errors))
+                }
+                Err(err) => Err(err),
+            }
+        } else {
+            Err(ValError::new_with_loc(
+                ErrorType::UnexpectedKeywordArgument,
+                input,
+                field_name.to_string(),
+            ))
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DataclassValidator {
     strict: bool,
@@ -366,21 +418,9 @@ impl Validator for DataclassValidator {
             ))
         } else {
             let input = input.maybe_subclass_dict(class)?;
-            let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-            let (dc_dict, post_init_kwargs): (&PyAny, &PyAny) = output.extract(py)?;
+            let val_output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
             let dc = create_class(self.class.as_ref(py))?;
-            force_setattr(py, dc.as_ref(py), intern!(py, "__dict__"), dc_dict)?;
-
-            if let Some(ref post_init) = self.post_init {
-                let post_init = post_init.as_ref(py);
-                let r = if post_init_kwargs.is_none() {
-                    dc.call_method0(py, post_init)
-                } else {
-                    let args = post_init_kwargs.downcast::<PyTuple>()?;
-                    dc.call_method1(py, post_init, args)
-                };
-                r.map_err(|e| convert_err(py, e, input))?;
-            }
+            self.set_dict_call(py, dc.as_ref(py), val_output, input)?;
             Ok(dc)
         }
     }
@@ -395,7 +435,7 @@ impl DataclassValidator {
     fn validate_init<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        init_self: &'data PyAny,
+        init_self: &'s PyAny,
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
@@ -407,32 +447,18 @@ impl DataclassValidator {
             init_self: None,
             ..*extra
         };
-        let output = self.validator.validate(py, input, &new_extra, slots, recursion_guard)?;
-        let (dc_dict, post_init_kwargs): (&PyAny, &PyAny) = output.extract(py)?;
-        // self.set_dict_call(py, init_self, dc_dict, post_init_kwargs, input)?;
+        let val_output = self.validator.validate(py, input, &new_extra, slots, recursion_guard)?;
 
-        force_setattr(py, init_self, intern!(py, "__dict__"), dc_dict)?;
+        self.set_dict_call(py, init_self, val_output, input)?;
 
-        if let Some(ref post_init) = self.post_init {
-            let post_init = post_init.as_ref(py);
-            let r = if post_init_kwargs.is_none() {
-                init_self.call_method0(post_init)
-            } else {
-                let args = post_init_kwargs.downcast::<PyTuple>()?;
-                init_self.call_method1(post_init, args)
-            };
-            r.map_err(|e| convert_err(py, e, input))?;
-        }
-        Ok(py.None())
-
-        // Ok(init_self.into_py(py))
+        Ok(init_self.into_py(py))
     }
 
     #[allow(clippy::too_many_arguments)]
     fn validate_assignment<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        init_self: &PyAny,
+        init_self: &'s PyAny,
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
@@ -443,19 +469,17 @@ impl DataclassValidator {
             init_self: init_self.get_attr(intern!(py, "__dict__")),
             ..*extra
         };
-        self
-            .validator
-            .validate(py, input, &next_extra, slots, recursion_guard)
+        self.validator.validate(py, input, &next_extra, slots, recursion_guard)
     }
 
     fn set_dict_call<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        dc: &'data PyAny,
-        dc_dict: &'data PyAny,
-        post_init_kwargs: &'data PyAny,
+        dc: &PyAny,
+        val_output: PyObject,
         input: &'data impl Input<'data>,
     ) -> ValResult<'data, ()> {
+        let (dc_dict, post_init_kwargs): (&PyAny, &PyAny) = val_output.extract(py)?;
         force_setattr(py, dc, intern!(py, "__dict__"), dc_dict)?;
 
         if let Some(ref post_init) = self.post_init {

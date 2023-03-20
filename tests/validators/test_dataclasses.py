@@ -584,3 +584,113 @@ def test_dataclass_field_wrap_validator2():
     v = SchemaValidator(schema)
     foo = v.validate_python({'a': 1, 'b': b'hello'})
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
+
+
+def test_dataclass_self_init():
+    @dataclasses.dataclass(init=False)
+    class Foo:
+        a: str
+        b: bool
+
+        def __init__(self, *args, **kwargs):
+            v.validate_python(ArgsKwargs(args, kwargs), init_self=self)
+
+    schema = core_schema.dataclass_schema(
+        Foo,
+        core_schema.dataclass_args_schema(
+            'Foo',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False),
+                core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False),
+            ],
+        ),
+    )
+    v = SchemaValidator(schema)
+
+    foo = Foo(b'hello', 'True')
+    assert dataclasses.is_dataclass(foo)
+    assert dataclasses.asdict(foo) == {'a': 'hello', 'b': True}
+
+
+def test_dataclass_self_init_alias():
+    @dataclasses.dataclass(init=False)
+    class Foo:
+        a: str
+        b: bool
+
+    schema = core_schema.dataclass_schema(
+        Foo,
+        core_schema.dataclass_args_schema(
+            'Foo',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), validation_alias='aAlias'),
+                core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), validation_alias='bAlias'),
+            ],
+        ),
+    )
+    v = SchemaValidator(schema)
+
+    def __init__(self, *args, **kwargs):
+        v.validate_python(ArgsKwargs(args, kwargs), init_self=self)
+
+    Foo.__init__ = __init__
+
+    foo = Foo(aAlias=b'hello', bAlias='True')
+    assert dataclasses.is_dataclass(foo)
+    assert dataclasses.asdict(foo) == {'a': 'hello', 'b': True}
+
+
+def test_dataclass_self_init_post_init():
+    calls = []
+
+    @dataclasses.dataclass(init=False)
+    class Foo:
+        a: str
+        b: bool
+        _: dataclasses.KW_ONLY
+        c: dataclasses.InitVar[int]
+
+        def __init__(self, *args, **kwargs):
+            v.validate_python(ArgsKwargs(args, kwargs), init_self=self)
+
+        def __post_init__(self, c):
+            calls.append(c)
+
+    schema = core_schema.dataclass_schema(
+        Foo,
+        core_schema.dataclass_args_schema(
+            'Foo',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False),
+                core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False),
+                core_schema.dataclass_field(name='c', schema=core_schema.int_schema(), init_only=True),
+            ],
+            collect_init_only=True,
+        ),
+        post_init=True,
+    )
+    v = SchemaValidator(schema)
+
+    foo = Foo(b'hello', 'True', c='123')
+    assert dataclasses.is_dataclass(foo)
+    assert dataclasses.asdict(foo) == {'a': 'hello', 'b': True}
+    assert calls == [123]
+
+
+def test_dataclass_validate_assignment():
+    schema = core_schema.dataclass_schema(
+        FooDataclass,
+        core_schema.dataclass_args_schema(
+            'FooDataclass',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False),
+                core_schema.dataclass_field(name='b', schema=core_schema.bool_schema(), kw_only=False),
+            ],
+        ),
+    )
+    v = SchemaValidator(schema)
+
+    foo = v.validate_python({'a': 'hello', 'b': 'True'})
+    assert dataclasses.asdict(foo) == {'a': 'hello', 'b': True}
+    v.validate_assignment('a', b'world', foo)
+    assert dataclasses.asdict(foo) == {'a': 'world', 'b': True}
