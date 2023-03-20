@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 import pytest
+from dirty_equals import IsInstance
 
 from pydantic_core import (
     PydanticCustomError,
@@ -388,3 +389,24 @@ def test_all_errors():
         literal = ''.join(f'\n    {e!r},' for e in error_types)
         print(f'python code (end of pydantic_core/core_schema.py):\n\nErrorType = Literal[{literal}\n]')
         pytest.fail('core_schema.ErrorType needs to be updated')
+
+
+class BadRepr:
+    def __repr__(self):
+        raise RuntimeError('bad repr')
+
+
+def test_error_on_repr():
+
+    s = SchemaValidator({'type': 'int'})
+    with pytest.raises(ValidationError) as exc_info:
+        s.validate_python(BadRepr())
+
+    assert str(exc_info.value) == (
+        '1 validation error for int\n'
+        '  Input should be a valid integer '
+        '[type=int_type, input_value=<unprintable BadRepr object>, input_type=BadRepr]'
+    )
+    assert exc_info.value.errors() == [
+        {'type': 'int_type', 'loc': (), 'msg': 'Input should be a valid integer', 'input': IsInstance(BadRepr)}
+    ]
