@@ -341,6 +341,15 @@ impl Validator for DataclassValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
+        if let Some(init_self) = extra.init_self {
+            // in the case that init_self is Some, we're calling validation from within `BaseModel.__init__`
+            // or from `validate_assignment`
+            return if extra.assignee_field.is_some() {
+                self.validate_assignment(py, init_self, input, extra, slots, recursion_guard)
+            } else {
+                self.validate_init(py, init_self, input, extra, slots, recursion_guard)
+            };
+        }
         let class = self.class.as_ref(py);
 
         // we only do the is_exact_instance in strict mode
@@ -378,5 +387,87 @@ impl Validator for DataclassValidator {
 
     fn get_name(&self) -> &str {
         &self.name
+    }
+}
+
+impl DataclassValidator {
+    /// here we just call the inner validator, then set attributes on `init_self`
+    fn validate_init<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        init_self: &'data PyAny,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        // we need to set `init_self` to None for nested validators as we don't want to operate on the init_self
+        // instance anymore
+        let new_extra = Extra {
+            init_self: None,
+            ..*extra
+        };
+        let output = self.validator.validate(py, input, &new_extra, slots, recursion_guard)?;
+        let (dc_dict, post_init_kwargs): (&PyAny, &PyAny) = output.extract(py)?;
+        // self.set_dict_call(py, init_self, dc_dict, post_init_kwargs, input)?;
+
+        force_setattr(py, init_self, intern!(py, "__dict__"), dc_dict)?;
+
+        if let Some(ref post_init) = self.post_init {
+            let post_init = post_init.as_ref(py);
+            let r = if post_init_kwargs.is_none() {
+                init_self.call_method0(post_init)
+            } else {
+                let args = post_init_kwargs.downcast::<PyTuple>()?;
+                init_self.call_method1(post_init, args)
+            };
+            r.map_err(|e| convert_err(py, e, input))?;
+        }
+        Ok(py.None())
+
+        // Ok(init_self.into_py(py))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn validate_assignment<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        init_self: &PyAny,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        // inner validator takes care of updating dict, here we just need to update fields_set
+        let next_extra = Extra {
+            init_self: init_self.get_attr(intern!(py, "__dict__")),
+            ..*extra
+        };
+        self
+            .validator
+            .validate(py, input, &next_extra, slots, recursion_guard)
+    }
+
+    fn set_dict_call<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        dc: &'data PyAny,
+        dc_dict: &'data PyAny,
+        post_init_kwargs: &'data PyAny,
+        input: &'data impl Input<'data>,
+    ) -> ValResult<'data, ()> {
+        force_setattr(py, dc, intern!(py, "__dict__"), dc_dict)?;
+
+        if let Some(ref post_init) = self.post_init {
+            let post_init = post_init.as_ref(py);
+            let r = if post_init_kwargs.is_none() {
+                dc.call_method0(post_init)
+            } else {
+                let args = post_init_kwargs.downcast::<PyTuple>()?;
+                dc.call_method1(post_init, args)
+            };
+            r.map_err(|e| convert_err(py, e, input))?;
+        }
+        Ok(())
     }
 }
