@@ -704,7 +704,12 @@ def test_dataclass_validate_assignment():
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_assignment('c', 123, foo)
-    # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
-        {'type': 'extra_forbidden', 'loc': ('c',), 'msg': 'Extra inputs are not permitted', 'input': 123}
+        {
+            'type': 'no_such_attribute',
+            'loc': ('c',),
+            'msg': "Object has no attribute 'c'",
+            'input': 123,
+            'ctx': {'attribute': 'c'},
+        }
     ]

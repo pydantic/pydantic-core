@@ -3237,6 +3237,7 @@ CoreSchemaType = Literal[
 # used in _pydantic_core.pyi::PydanticKnownError
 # to update this, call `pytest -k test_all_errors` and copy the output
 ErrorType = Literal[
+    'no_such_attribute',
     'json_invalid',
     'json_type',
     'recursion_loop',

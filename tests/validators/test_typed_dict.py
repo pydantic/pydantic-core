@@ -334,8 +334,15 @@ def test_validate_assignment_ignore_extra():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_assignment('other_field', 456, {'field_a': 'test'})
 
+    # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
-        {'type': 'extra_forbidden', 'loc': ('other_field',), 'msg': 'Extra inputs are not permitted', 'input': 456}
+        {
+            'type': 'no_such_attribute',
+            'loc': ('other_field',),
+            'msg': "Object has no attribute 'other_field'",
+            'input': 456,
+            'ctx': {'attribute': 'other_field'},
+        }
     ]
 
 

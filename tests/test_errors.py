@@ -2,7 +2,14 @@ from decimal import Decimal
 
 import pytest
 
-from pydantic_core import PydanticCustomError, PydanticKnownError, PydanticOmit, SchemaValidator, ValidationError
+from pydantic_core import (
+    PydanticCustomError,
+    PydanticKnownError,
+    PydanticOmit,
+    SchemaValidator,
+    ValidationError,
+    core_schema,
+)
 from pydantic_core._pydantic_core import list_all_errors
 
 from .conftest import PyAndJson
@@ -166,6 +173,7 @@ def test_pydantic_error_type_raise_ctx():
 
 
 all_errors = [
+    ('no_such_attribute', "Object has no attribute 'wrong_name'", {'attribute': 'wrong_name'}),
     ('json_invalid', 'Invalid JSON: foobar', {'error': 'foobar'}),
     ('json_type', 'JSON input should be string, bytes or bytearray', None),
     ('recursion_loop', 'Recursion error - cyclic reference detected', None),
@@ -342,3 +350,41 @@ def test_type_error_error():
 def test_does_not_require_context():
     with pytest.raises(TypeError, match="^'json_type' errors do not require context$"):
         PydanticKnownError('json_type', {'gt': 123})
+
+
+def test_all_errors():
+    errors = list_all_errors()
+    # print(f'{len(errors)=}')
+    assert len(errors) == len(set(e['type'] for e in errors)), 'error types are not unique'
+    # insert_assert(errors[:4])
+    assert errors[:4] == [
+        {
+            'type': 'no_such_attribute',
+            'message_template': "Object has no attribute '{attribute}'",
+            'example_message': "Object has no attribute ''",
+            'example_context': {'attribute': ''},
+        },
+        {
+            'type': 'json_invalid',
+            'message_template': 'Invalid JSON: {error}',
+            'example_message': 'Invalid JSON: ',
+            'example_context': {'error': ''},
+        },
+        {
+            'type': 'json_type',
+            'message_template': 'JSON input should be string, bytes or bytearray',
+            'example_message': 'JSON input should be string, bytes or bytearray',
+            'example_context': None,
+        },
+        {
+            'type': 'recursion_loop',
+            'message_template': 'Recursion error - cyclic reference detected',
+            'example_message': 'Recursion error - cyclic reference detected',
+            'example_context': None,
+        },
+    ]
+    error_types = [e['type'] for e in errors]
+    if error_types != list(core_schema.ErrorType.__args__):
+        literal = ''.join(f'\n    {e!r},' for e in error_types)
+        print(f'python code (end of pydantic_core/core_schema.py):\n\nErrorType = Literal[{literal}\n]')
+        pytest.fail('core_schema.ErrorType needs to be updated')

@@ -391,7 +391,9 @@ impl TypedDictValidator {
             // - with forbid this is obvious
             // - with ignore the model should never be overloaded, so an error is the clearest option
             Err(ValError::new_with_loc(
-                ErrorType::ExtraForbidden,
+                ErrorType::NoSuchAttribute {
+                    attribute: field.to_string(),
+                },
                 input,
                 field.to_string(),
             ))

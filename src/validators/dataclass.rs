@@ -334,7 +334,9 @@ impl DataclassArgsValidator {
             }
         } else {
             Err(ValError::new_with_loc(
-                ErrorType::ExtraForbidden,
+                ErrorType::NoSuchAttribute {
+                    attribute: field_name.to_string(),
+                },
                 input,
                 field_name.to_string(),
             ))
