@@ -647,7 +647,7 @@ def test_dataclass_self_init_post_init():
     class Foo:
         a: str
         b: bool
-        _: dataclasses.KW_ONLY
+        # _: dataclasses.KW_ONLY
         c: dataclasses.InitVar[int]
 
         def __init__(self, *args, **kwargs):
