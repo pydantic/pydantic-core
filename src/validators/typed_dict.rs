@@ -2,8 +2,8 @@ use pyo3::intern;
 use pyo3::prelude::*;
 
 use ahash::AHashSet;
-use pyo3::exceptions::PyTypeError;
-use pyo3::types::{PyDict, PySet, PyString};
+use pyo3::exceptions::{PyKeyError, PyTypeError};
+use pyo3::types::{PyDict, PySet, PyString, PyType};
 
 use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same, SchemaDict};
 use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
@@ -375,7 +375,12 @@ impl TypedDictValidator {
 
         // by using dict but removing the field in question, we match V1 behaviour
         let data_dict = dict.copy()?;
-        data_dict.del_item(field)?;
+        if let Err(err) = data_dict.del_item(field) {
+            // KeyError is fine here as the field might not be in the dict
+            if !err.get_type(py).is(PyType::new::<PyKeyError>(py)) {
+                return Err(err.into());
+            }
+        }
 
         let extra = Extra {
             field_name: Some(field),
