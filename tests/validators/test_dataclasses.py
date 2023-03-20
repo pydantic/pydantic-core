@@ -717,3 +717,47 @@ def test_dataclass_validate_assignment():
     # wrong arguments
     with pytest.raises(TypeError, match='self_instance should not be None on dataclass validate_assignment'):
         v.validate_assignment('field_a', 'c', 123)
+
+
+def test_validate_assignment_function():
+    @dataclasses.dataclass
+    class MyDataclass:
+        field_a: str
+        field_b: int
+        field_c: int
+
+    calls = []
+
+    def func(x, info):
+        calls.append(str(info))
+        return x * 2
+
+    v = SchemaValidator(
+        core_schema.dataclass_schema(
+            MyDataclass,
+            core_schema.dataclass_args_schema(
+                'MyDataclass',
+                [
+                    core_schema.dataclass_field('field_a', core_schema.str_schema()),
+                    core_schema.dataclass_field(
+                        'field_b', core_schema.field_after_validation_function(func, core_schema.int_schema())
+                    ),
+                    core_schema.dataclass_field('field_c', core_schema.int_schema()),
+                ],
+            ),
+        )
+    )
+
+    m = v.validate_python({'field_a': 'x', 'field_b': 123, 'field_c': 456})
+    assert m.field_a == 'x'
+    assert m.field_b == 246
+    assert m.field_c == 456
+    assert calls == ["ValidationInfo(config=None, context=None, data={'field_a': 'x'}, field_name='field_b')"]
+
+    v.validate_assignment(m, 'field_b', '111')
+
+    assert m.field_b == 222
+    assert calls == [
+        "ValidationInfo(config=None, context=None, data={'field_a': 'x'}, field_name='field_b')",
+        "ValidationInfo(config=None, context=None, data={'field_a': 'x', 'field_c': 456}, field_name='field_b')",
+    ]

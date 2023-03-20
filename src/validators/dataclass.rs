@@ -1,4 +1,4 @@
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
@@ -308,7 +308,7 @@ impl DataclassArgsValidator {
     where
         'data: 's,
     {
-        let data: &PyDict = match extra.self_instance {
+        let dict: &PyDict = match extra.self_instance {
             Some(d) => d.downcast()?,
             None => {
                 return Err(
@@ -318,15 +318,24 @@ impl DataclassArgsValidator {
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
+            // by using dict but removing the field in question, we match V1 behaviour
+            let data_dict = dict.copy()?;
+            if let Err(err) = data_dict.del_item(field_name) {
+                // KeyError is fine here as the field might not be in the dict
+                if !err.get_type(py).is(PyType::new::<PyKeyError>(py)) {
+                    return Err(err.into());
+                }
+            }
             let next_extra = Extra {
                 field_name: Some(field_name),
                 assignee_field: None,
+                data: Some(data_dict),
                 ..*extra
             };
             match field.validator.validate(py, input, &next_extra, slots, recursion_guard) {
                 Ok(output) => {
-                    data.set_item(field_name, output)?;
-                    Ok(data.to_object(py))
+                    dict.set_item(field_name, output)?;
+                    Ok(dict.to_object(py))
                 }
                 Err(ValError::LineErrors(line_errors)) => {
                     let errors = line_errors
