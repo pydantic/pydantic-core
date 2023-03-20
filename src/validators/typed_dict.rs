@@ -347,7 +347,7 @@ impl TypedDictValidator {
     where
         'data: 's,
     {
-        let data: &PyDict = match extra.self_instance {
+        let dict: &PyDict = match extra.self_instance {
             Some(d) => d.downcast()?,
             None => {
                 return Err(
@@ -357,8 +357,8 @@ impl TypedDictValidator {
         };
 
         let ok = |output: PyObject| {
-            data.set_item(field, output)?;
-            Ok(data.to_object(py))
+            dict.set_item(field, output)?;
+            Ok(dict.to_object(py))
         };
 
         let prepare_result = |result: ValResult<'data, PyObject>| match result {
@@ -373,9 +373,14 @@ impl TypedDictValidator {
             Err(err) => Err(err),
         };
 
+        // by using dict but removing the field in question, we match V1 behaviour
+        let data_dict = dict.copy()?;
+        data_dict.del_item(field)?;
+
         let extra = Extra {
             field_name: Some(field),
             assignee_field: None,
+            data: Some(data_dict),
             ..*extra
         };
 

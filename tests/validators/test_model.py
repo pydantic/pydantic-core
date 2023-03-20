@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import plain_repr
 
@@ -713,6 +713,52 @@ def test_validate_assignment():
     m.field_a = 'hello'
     assert m.field_b == 321
     assert m.__fields_set__ == {'field_a', 'field_b'}
+
+
+def test_validate_assignment_function():
+    class MyModel:
+        # this is not required, but it avoids `__fields_set__` being included in `__dict__`
+        __slots__ = '__dict__', '__fields_set__'
+        field_a: str
+        field_b: int
+        field_c: int
+
+    calls = []
+
+    def func(x, info):
+        calls.append(str(info))
+        return x * 2
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            MyModel,
+            core_schema.typed_dict_schema(
+                {
+                    'field_a': core_schema.typed_dict_field(core_schema.str_schema()),
+                    'field_b': core_schema.typed_dict_field(
+                        core_schema.field_after_validation_function(func, core_schema.int_schema())
+                    ),
+                    'field_c': core_schema.typed_dict_field(core_schema.int_schema()),
+                },
+                return_fields_set=True,
+            ),
+        )
+    )
+
+    m = v.validate_python({'field_a': 'x', 'field_b': 123, 'field_c': 456})
+    assert m.field_a == 'x'
+    assert m.field_b == 246
+    assert m.field_c == 456
+    assert m.__fields_set__ == {'field_a', 'field_b', 'field_c'}
+    assert calls == ["ValidationInfo(config=None, context=None, data={'field_a': 'x'}, field_name='field_b')"]
+
+    v.validate_assignment(m, 'field_b', '111')
+
+    assert m.field_b == 222
+    assert calls == [
+        "ValidationInfo(config=None, context=None, data={'field_a': 'x'}, field_name='field_b')",
+        "ValidationInfo(config=None, context=None, data={'field_a': 'x', 'field_c': 456}, field_name='field_b')",
+    ]
 
 
 def test_validate_assignment_no_fields_set():
