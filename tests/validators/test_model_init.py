@@ -28,7 +28,7 @@ def test_model_init():
     assert m.__fields_set__ == {'field_a', 'field_b'}
 
     m2 = MyModel()
-    ans = v.validate_python({'field_a': 'test', 'field_b': 12}, init_self=m2)
+    ans = v.validate_python({'field_a': 'test', 'field_b': 12}, self_instance=m2)
     assert ans == m2
     assert m.field_a == 'test'
     assert m.field_b == 12
@@ -72,7 +72,7 @@ def test_model_init_nested():
     assert m.field_b.x_b == 12
 
     m2 = MyModel()
-    v.validate_python({'field_a': 'test', 'field_b': {'x_a': 'foo', 'x_b': 12}}, init_self=m2)
+    v.validate_python({'field_a': 'test', 'field_b': {'x_a': 'foo', 'x_b': 12}}, self_instance=m2)
     assert m2.field_a == 'test'
     assert isinstance(m2.field_b, MyModel)
     assert m2.field_b.x_a == 'foo'
@@ -109,14 +109,14 @@ def test_function_before():
     assert m.field_b == 12
 
     m2 = MyModel()
-    v.validate_python({'field_a': b'321', 'field_b': '12'}, init_self=m2)
+    v.validate_python({'field_a': b'321', 'field_b': '12'}, self_instance=m2)
     assert m2.__dict__ == {'field_a': '321 XX', 'field_b': 12}
     assert m2.__fields_set__ == {'field_a', 'field_b'}
 
 
 def test_function_after():
     def f(input_value, _info):
-        # always a model here, because even with `init_self` the validator returns a model, e.g. m2 here
+        # always a model here, because even with `self_instance` the validator returns a model, e.g. m2 here
         assert isinstance(input_value, MyModel)
         input_value.field_a += ' Changed'
         return input_value
@@ -143,7 +143,7 @@ def test_function_after():
     assert m.field_b == 12
 
     m2 = MyModel()
-    v.validate_python({'field_a': b'321', 'field_b': '12'}, init_self=m2)
+    v.validate_python({'field_a': b'321', 'field_b': '12'}, self_instance=m2)
     assert m2.__dict__ == {'field_a': '321 Changed', 'field_b': 12}
     assert m2.__fields_set__ == {'field_a', 'field_b'}
 
@@ -152,7 +152,7 @@ def test_function_wrap():
     def f(input_value, handler, _info):
         assert isinstance(input_value, dict)
         v = handler(input_value)
-        # always a model here, because even with `init_self` the validator returns a model, e.g. m2 here
+        # always a model here, because even with `self_instance` the validator returns a model, e.g. m2 here
         assert isinstance(v, MyModel)
         v.field_a += ' Changed'
         return v
@@ -179,7 +179,7 @@ def test_function_wrap():
     assert m.field_b == 12
 
     m2 = MyModel()
-    v.validate_python({'field_a': b'321', 'field_b': '12'}, init_self=m2)
+    v.validate_python({'field_a': b'321', 'field_b': '12'}, self_instance=m2)
     assert m2.__dict__ == {'field_a': '321 Changed', 'field_b': 12}
     assert m2.__fields_set__ == {'field_a', 'field_b'}
 
@@ -189,11 +189,11 @@ def test_simple():
     assert v.validate_python(b'abc') == 'abc'
     assert v.isinstance_python(b'abc') is True
 
-    assert v.validate_python(b'abc', init_self='foobar') == 'abc'
-    assert v.isinstance_python(b'abc', init_self='foobar') is True
+    assert v.validate_python(b'abc', self_instance='foobar') == 'abc'
+    assert v.isinstance_python(b'abc', self_instance='foobar') is True
 
     assert v.validate_json('"abc"') == 'abc'
     assert v.isinstance_json('"abc"') is True
 
-    assert v.validate_json('"abc"', init_self='foobar') == 'abc'
-    assert v.isinstance_json('"abc"', init_self='foobar') is True
+    assert v.validate_json('"abc"', self_instance='foobar') == 'abc'
+    assert v.isinstance_json('"abc"', self_instance='foobar') is True

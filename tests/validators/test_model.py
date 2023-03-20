@@ -708,7 +708,7 @@ def test_validate_assignment():
     m.field_b = 123
     m.__fields_set__ = {'field_a'}
 
-    v.validate_assignment('field_b', '321', m)
+    v.validate_assignment(m, 'field_b', '321')
 
     m.field_a = 'hello'
     assert m.field_b == 321
@@ -736,7 +736,7 @@ def test_validate_assignment_no_fields_set():
     m.field_b = 123
     assert not hasattr(m, '__fields_set__')
 
-    v.validate_assignment('field_a', b'different', m)
+    v.validate_assignment(m, 'field_a', b'different')
 
     m.field_a = 'different'
     assert m.field_b == 123

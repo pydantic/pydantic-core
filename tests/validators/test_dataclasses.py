@@ -593,7 +593,7 @@ def test_dataclass_self_init():
         b: bool
 
         def __init__(self, *args, **kwargs):
-            v.validate_python(ArgsKwargs(args, kwargs), init_self=self)
+            v.validate_python(ArgsKwargs(args, kwargs), self_instance=self)
 
     schema = core_schema.dataclass_schema(
         Foo,
@@ -631,7 +631,7 @@ def test_dataclass_self_init_alias():
     v = SchemaValidator(schema)
 
     def __init__(self, *args, **kwargs):
-        v.validate_python(ArgsKwargs(args, kwargs), init_self=self)
+        v.validate_python(ArgsKwargs(args, kwargs), self_instance=self)
 
     Foo.__init__ = __init__
 
@@ -651,7 +651,7 @@ def test_dataclass_self_init_post_init():
         c: dataclasses.InitVar[int]
 
         def __init__(self, *args, **kwargs):
-            v.validate_python(ArgsKwargs(args, kwargs), init_self=self)
+            v.validate_python(ArgsKwargs(args, kwargs), self_instance=self)
 
         def __post_init__(self, c):
             calls.append(c)
@@ -692,18 +692,18 @@ def test_dataclass_validate_assignment():
 
     foo = v.validate_python({'a': 'hello', 'b': 'True'})
     assert dataclasses.asdict(foo) == {'a': 'hello', 'b': True}
-    v.validate_assignment('a', b'world', foo)
+    v.validate_assignment(foo, 'a', b'world')
     assert dataclasses.asdict(foo) == {'a': 'world', 'b': True}
 
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_assignment('a', 123, foo)
+        v.validate_assignment(foo, 'a', 123)
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {'type': 'string_type', 'loc': ('a',), 'msg': 'Input should be a valid string', 'input': 123}
     ]
 
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_assignment('c', 123, foo)
+        v.validate_assignment(foo, 'c', 123)
     assert exc_info.value.errors() == [
         {
             'type': 'no_such_attribute',

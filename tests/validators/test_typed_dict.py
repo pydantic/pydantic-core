@@ -254,7 +254,7 @@ def test_validate_assignment():
     assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
 
     data = {'field_a': 'test'}
-    assert v.validate_assignment('field_a', b'abc', data) == {'field_a': 'abc'}
+    assert v.validate_assignment(data, 'field_a', b'abc') == {'field_a': 'abc'}
     assert data == {'field_a': 'abc'}
 
 
@@ -270,7 +270,7 @@ def test_validate_assignment_strict_field():
     assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
 
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_assignment('field_a', b'abc', {'field_a': 'test'})
+        v.validate_assignment({'field_a': 'test'}, 'field_a', b'abc')
     assert exc_info.value.errors() == [
         {'input': b'abc', 'type': 'string_type', 'loc': ('field_a',), 'msg': 'Input should be a valid string'}
     ]
@@ -318,7 +318,7 @@ def test_validate_assignment_functions():
     assert calls == ['func_a', 'func_b']
     calls.clear()
 
-    assert v.validate_assignment('field_a', 'new-val', {'field_a': 'testtest', 'field_b': 6}) == (
+    assert v.validate_assignment({'field_a': 'testtest', 'field_b': 6}, 'field_a', 'new-val') == (
         {'field_a': 'new-valnew-val', 'field_b': 6}
     )
     assert calls == ['func_a']
@@ -332,7 +332,7 @@ def test_validate_assignment_ignore_extra():
     assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
 
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_assignment('other_field', 456, {'field_a': 'test'})
+        v.validate_assignment({'field_a': 'test'}, 'other_field', 456)
 
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
@@ -353,7 +353,7 @@ def test_validate_assignment_allow_extra():
 
     assert v.validate_python({'field_a': 'test'}) == {'field_a': 'test'}
 
-    assert v.validate_assignment('other_field', 456, {'field_a': 'test'}) == {'field_a': 'test', 'other_field': 456}
+    assert v.validate_assignment({'field_a': 'test'}, 'other_field', 456) == {'field_a': 'test', 'other_field': 456}
 
 
 def test_validate_assignment_allow_extra_validate():
@@ -366,10 +366,10 @@ def test_validate_assignment_allow_extra_validate():
         }
     )
 
-    assert v.validate_assignment('other_field', '456', {'field_a': 'test'}) == {'field_a': 'test', 'other_field': 456}
+    assert v.validate_assignment({'field_a': 'test'}, 'other_field', '456') == {'field_a': 'test', 'other_field': 456}
 
     with pytest.raises(ValidationError) as exc_info:
-        assert v.validate_assignment('other_field', 'xyz', {'field_a': 'test'})
+        assert v.validate_assignment({'field_a': 'test'}, 'other_field', 'xyz')
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
@@ -388,11 +388,11 @@ def test_validate_assignment_with_strict():
     r = v.validate_python({'x': 'a', 'y': '123'})
     assert r == {'x': 'a', 'y': 123}
 
-    v.validate_assignment('y', '124', r)
+    v.validate_assignment(r, 'y', '124')
     assert r == {'x': 'a', 'y': 124}
 
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_assignment('y', '124', r, strict=True)
+        v.validate_assignment(r, 'y', '124', strict=True)
 
     assert exc_info.value.errors() == [
         {'type': 'int_type', 'loc': ('y',), 'msg': 'Input should be a valid integer', 'input': '124'}
@@ -1435,10 +1435,10 @@ def test_frozen_field():
     )
     r1 = v.validate_python({'name': 'Samuel', 'age': '36'})
     assert r1 == {'name': 'Samuel', 'age': 36, 'is_developer': True}
-    v.validate_assignment('age', '35', r1)
+    v.validate_assignment(r1, 'age', '35')
     assert r1 == {'name': 'Samuel', 'age': 35, 'is_developer': True}
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_assignment('is_developer', False, r1)
+        v.validate_assignment(r1, 'is_developer', False)
     assert exc_info.value.errors() == [
         {'type': 'frozen', 'loc': ('is_developer',), 'msg': 'Field is frozen', 'input': False}
     ]

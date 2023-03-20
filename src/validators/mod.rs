@@ -97,29 +97,29 @@ impl SchemaValidator {
         Ok((cls, args).into_py(py))
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, init_self=None))]
+    #[pyo3(signature = (input, *, strict=None, context=None, self_instance=None))]
     pub fn validate_python(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        init_self: Option<&PyAny>,
+        self_instance: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        let r = self._validate(py, input, strict, context, init_self);
+        let r = self._validate(py, input, strict, context, self_instance);
         r.map_err(|e| self.prepare_validation_err(py, e))
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, init_self=None))]
+    #[pyo3(signature = (input, *, strict=None, context=None, self_instance=None))]
     pub fn isinstance_python(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        init_self: Option<&PyAny>,
+        self_instance: Option<&PyAny>,
     ) -> PyResult<bool> {
-        match self._validate(py, input, strict, context, init_self) {
+        match self._validate(py, input, strict, context, self_instance) {
             Ok(_) => Ok(true),
             Err(ValError::InternalErr(err)) => Err(err),
             Err(ValError::Omit) => Err(ValidationError::omit_error()),
@@ -127,35 +127,35 @@ impl SchemaValidator {
         }
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, init_self=None))]
+    #[pyo3(signature = (input, *, strict=None, context=None, self_instance=None))]
     pub fn validate_json(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        init_self: Option<&PyAny>,
+        self_instance: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         match input.parse_json() {
             Ok(input) => {
-                let r = self._validate(py, &input, strict, context, init_self);
+                let r = self._validate(py, &input, strict, context, self_instance);
                 r.map_err(|e| self.prepare_validation_err(py, e))
             }
             Err(err) => Err(self.prepare_validation_err(py, err)),
         }
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, init_self=None))]
+    #[pyo3(signature = (input, *, strict=None, context=None, self_instance=None))]
     pub fn isinstance_json(
         &self,
         py: Python,
         input: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
-        init_self: Option<&PyAny>,
+        self_instance: Option<&PyAny>,
     ) -> PyResult<bool> {
         match input.parse_json() {
-            Ok(input) => match self._validate(py, &input, strict, context, init_self) {
+            Ok(input) => match self._validate(py, &input, strict, context, self_instance) {
                 Ok(_) => Ok(true),
                 Err(ValError::InternalErr(err)) => Err(err),
                 Err(ValError::Omit) => Err(ValidationError::omit_error()),
@@ -165,13 +165,13 @@ impl SchemaValidator {
         }
     }
 
-    #[pyo3(signature = (field, input, init_self, *, strict=None, context=None))]
+    #[pyo3(signature = (obj, field, input, *, strict=None, context=None))]
     pub fn validate_assignment(
         &self,
         py: Python,
+        obj: &PyAny,
         field: String,
         input: &PyAny,
-        init_self: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
     ) -> PyResult<PyObject> {
@@ -181,7 +181,7 @@ impl SchemaValidator {
             strict,
             context,
             field_name: None,
-            init_self: Some(init_self),
+            self_instance: Some(obj),
         };
         let r = self
             .validator
@@ -222,7 +222,7 @@ impl SchemaValidator {
         input: &'data impl Input<'data>,
         strict: Option<bool>,
         context: Option<&'data PyAny>,
-        init_self: Option<&PyAny>,
+        self_instance: Option<&PyAny>,
     ) -> ValResult<'data, PyObject>
     where
         's: 'data,
@@ -230,7 +230,7 @@ impl SchemaValidator {
         self.validator.validate(
             py,
             input,
-            &Extra::new(strict, context, init_self),
+            &Extra::new(strict, context, self_instance),
             &self.slots,
             &mut RecursionGuard::default(),
         )
@@ -466,15 +466,15 @@ pub struct Extra<'a> {
     /// context used in validator functions
     pub context: Option<&'a PyAny>,
     /// This is an instance of the model or dataclass being validated, when validation is performed from `__init__`
-    init_self: Option<&'a PyAny>,
+    self_instance: Option<&'a PyAny>,
 }
 
 impl<'a> Extra<'a> {
-    pub fn new(strict: Option<bool>, context: Option<&'a PyAny>, init_self: Option<&'a PyAny>) -> Self {
+    pub fn new(strict: Option<bool>, context: Option<&'a PyAny>, self_instance: Option<&'a PyAny>) -> Self {
         Extra {
             strict,
             context,
-            init_self,
+            self_instance,
             ..Default::default()
         }
     }
@@ -488,7 +488,7 @@ impl<'a> Extra<'a> {
             strict: Some(true),
             context: self.context,
             field_name: self.field_name,
-            init_self: self.init_self,
+            self_instance: self.self_instance,
         }
     }
 }

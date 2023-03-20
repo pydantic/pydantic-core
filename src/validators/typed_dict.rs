@@ -347,8 +347,8 @@ impl TypedDictValidator {
         'data: 's,
     {
         let data: &PyDict = extra
-            .init_self
-            .expect("init_self should not be None on validate_assignment")
+            .self_instance
+            .expect("self_instance should not be None on validate_assignment")
             .downcast()?;
 
         let ok = |output: PyObject| {

@@ -320,7 +320,7 @@ def test_validate_assignment():
 
     m = {'field_a': 'test', 'more': 'foobar'}
     assert v.validate_python({'field_a': 'test'}) == m
-    assert v.validate_assignment('field_a', b'abc', m) == {'field_a': 'abc', 'more': 'foobar'}
+    assert v.validate_assignment(m, 'field_a', b'abc') == {'field_a': 'abc', 'more': 'foobar'}
 
 
 def test_function_wrong_sig():
@@ -763,10 +763,10 @@ def test_model_root_function_assignment(mode):
     )
 
     m = Model()
-    v.validate_python({'x': b'input', 'y': '123'}, init_self=m)
+    v.validate_python({'x': b'input', 'y': '123'}, self_instance=m)
     assert m.x == 'input'
     assert m.y == 123
     assert call_count == 1
 
-    v.validate_assignment('x', b'different', init_self=m)
+    v.validate_assignment(m, 'x', b'different')
     assert call_count == 1

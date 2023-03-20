@@ -79,13 +79,13 @@ impl Validator for ModelValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        if let Some(init_self) = extra.init_self {
-            // in the case that init_self is Some, we're calling validation from within `BaseModel.__init__`
+        if let Some(self_instance) = extra.self_instance {
+            // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
             // or from `validate_assignment`
             return if let Some(assignee_field) = extra.assignee_field {
-                self.validate_assignment(py, init_self, assignee_field, input, extra, slots, recursion_guard)
+                self.validate_assignment(py, self_instance, assignee_field, input, extra, slots, recursion_guard)
             } else {
-                self.validate_init(py, init_self, input, extra, slots, recursion_guard)
+                self.validate_init(py, self_instance, input, extra, slots, recursion_guard)
             };
         }
 
@@ -133,42 +133,42 @@ impl Validator for ModelValidator {
 }
 
 impl ModelValidator {
-    /// here we just call the inner validator, then set attributes on `init_self`
+    /// here we just call the inner validator, then set attributes on `self_instance`
     fn validate_init<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        init_self: &'s PyAny,
+        self_instance: &'s PyAny,
         input: &'data impl Input<'data>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        // we need to set `init_self` to None for nested validators as we don't want to operate on the init_self
+        // we need to set `self_instance` to None for nested validators as we don't want to operate on the self_instance
         // instance anymore
         let new_extra = Extra {
-            init_self: None,
+            self_instance: None,
             ..*extra
         };
         let output = self.validator.validate(py, input, &new_extra, slots, recursion_guard)?;
         if self.expect_fields_set {
             let (model_dict, fields_set): (&PyAny, &PyAny) = output.extract(py)?;
-            set_model_attrs(init_self, model_dict, Some(fields_set))?;
+            set_model_attrs(self_instance, model_dict, Some(fields_set))?;
         } else {
-            set_model_attrs(init_self, output.as_ref(py), None)?;
+            set_model_attrs(self_instance, output.as_ref(py), None)?;
         };
         if let Some(ref post_init) = self.post_init {
-            init_self
+            self_instance
                 .call_method1(post_init.as_ref(py), (extra.context,))
                 .map_err(|e| convert_err(py, e, input))?;
         }
-        Ok(init_self.into_py(py))
+        Ok(self_instance.into_py(py))
     }
 
     #[allow(clippy::too_many_arguments)]
     fn validate_assignment<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        init_self: &PyAny,
+        self_instance: &PyAny,
         assignee_field: &str,
         input: &'data impl Input<'data>,
         extra: &Extra,
@@ -177,14 +177,14 @@ impl ModelValidator {
     ) -> ValResult<'data, PyObject> {
         // inner validator takes care of updating dict, here we just need to update fields_set
         let next_extra = Extra {
-            init_self: init_self.get_attr(intern!(py, "__dict__")),
+            self_instance: self_instance.get_attr(intern!(py, "__dict__")),
             ..*extra
         };
         let output = self
             .validator
             .validate(py, input, &next_extra, slots, recursion_guard)?;
         if self.expect_fields_set {
-            if let Some(fields_set) = init_self.get_attr(intern!(py, "__fields_set__")) {
+            if let Some(fields_set) = self_instance.get_attr(intern!(py, "__fields_set__")) {
                 fields_set.downcast::<PySet>()?.add(assignee_field)?;
             }
         }
