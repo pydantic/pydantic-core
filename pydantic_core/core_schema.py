@@ -2556,6 +2556,7 @@ def model_schema(
 
 
 class DataclassField(TypedDict, total=False):
+    type: Required[Literal['dataclass-field']]
     name: Required[str]
     schema: Required[CoreSchema]
     kw_only: bool  # default: True
@@ -2596,6 +2597,7 @@ def dataclass_field(
         serialization_exclude: Whether to exclude the field when serializing
     """
     return dict_not_none(
+        type='dataclass-field',
         name=name,
         schema=schema,
         kw_only=kw_only,

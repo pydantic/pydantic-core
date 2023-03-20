@@ -222,8 +222,12 @@ all_schema_functions = [
     (core_schema.definition_reference_schema, args('foo'), {'type': 'definition-ref', 'schema_ref': 'foo'}),
     (
         core_schema.dataclass_args_schema,
-        args('Foo', [{'name': 'foo', 'schema': {'type': 'int'}}]),
-        {'type': 'dataclass-args', 'dataclass_name': 'Foo', 'fields': [{'name': 'foo', 'schema': {'type': 'int'}}]},
+        args('Foo', [{'name': 'foo', 'type': 'dataclass-field', 'schema': {'type': 'int'}}]),
+        {
+            'type': 'dataclass-args',
+            'dataclass_name': 'Foo',
+            'fields': [{'name': 'foo', 'type': 'dataclass-field', 'schema': {'type': 'int'}}],
+        },
     ),
     (
         core_schema.dataclass_schema,
