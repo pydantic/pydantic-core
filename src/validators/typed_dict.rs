@@ -2,6 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 
 use ahash::AHashSet;
+use pyo3::exceptions::PyTypeError;
 use pyo3::types::{PyDict, PySet, PyString};
 
 use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same, SchemaDict};
@@ -346,10 +347,14 @@ impl TypedDictValidator {
     where
         'data: 's,
     {
-        let data: &PyDict = extra
-            .self_instance
-            .expect("self_instance should not be None on validate_assignment")
-            .downcast()?;
+        let data: &PyDict = match extra.self_instance {
+            Some(d) => d.downcast()?,
+            None => {
+                return Err(
+                    PyTypeError::new_err("self_instance should not be None on typed-dict validate_assignment").into(),
+                )
+            }
+        };
 
         let ok = |output: PyObject| {
             data.set_item(field, output)?;

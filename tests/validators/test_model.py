@@ -741,3 +741,7 @@ def test_validate_assignment_no_fields_set():
     m.field_a = 'different'
     assert m.field_b == 123
     assert not hasattr(m, '__fields_set__')
+
+    # wrong arguments
+    with pytest.raises(TypeError, match='self_instance should not be None on typed-dict validate_assignment'):
+        v.validate_assignment('field_a', 'field_a', b'different')

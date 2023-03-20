@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
@@ -307,10 +308,14 @@ impl DataclassArgsValidator {
     where
         'data: 's,
     {
-        let data: &PyDict = extra
-            .self_instance
-            .expect("self_instance should not be None on validate_assignment")
-            .downcast()?;
+        let data: &PyDict = match extra.self_instance {
+            Some(d) => d.downcast()?,
+            None => {
+                return Err(
+                    PyTypeError::new_err("self_instance should not be None on dataclass validate_assignment").into(),
+                )
+            }
+        };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
             let next_extra = Extra {

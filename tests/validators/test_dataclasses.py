@@ -713,3 +713,7 @@ def test_dataclass_validate_assignment():
             'ctx': {'attribute': 'c'},
         }
     ]
+
+    # wrong arguments
+    with pytest.raises(TypeError, match='self_instance should not be None on dataclass validate_assignment'):
+        v.validate_assignment('field_a', 'c', 123)
