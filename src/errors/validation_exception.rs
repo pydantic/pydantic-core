@@ -24,6 +24,10 @@ pub struct ValidationError {
 }
 
 impl ValidationError {
+    pub fn new(line_errors: Vec<PyLineError>, title: PyObject) -> Self {
+        Self { line_errors, title }
+    }
+
     pub fn from_val_error(py: Python, title: PyObject, error: ValError, outer_location: Option<LocItem>) -> PyErr {
         match error {
             ValError::LineErrors(raw_errors) => {

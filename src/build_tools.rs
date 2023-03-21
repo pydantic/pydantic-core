@@ -99,17 +99,15 @@ pub fn is_strict(schema: &PyDict, config: Option<&PyDict>) -> PyResult<bool> {
     Ok(schema_or_config_same(schema, config, intern!(py, "strict"))?.unwrap_or(false))
 }
 
-enum SchemaErrorInner {
+enum SchemaErrorEnum {
     Message(String),
-    Error(ValidationError),
+    ValidationError(ValidationError),
 }
 
 // we could perhaps do clever things here to store each schema error, or have different types for the top
 // level error group, and other errors, we could perhaps also support error groups!?
 #[pyclass(extends=PyException, module="pydantic_core._pydantic_core")]
-pub struct SchemaError {
-    value: SchemaErrorInner,
-}
+pub struct SchemaError(SchemaErrorEnum);
 
 impl fmt::Debug for SchemaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -119,7 +117,7 @@ impl fmt::Debug for SchemaError {
 
 impl fmt::Display for SchemaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message())
+        f.write_str(self.message())
     }
 }
 
@@ -139,25 +137,25 @@ impl SchemaError {
     }
 
     pub fn from_val_error(py: Python, error: ValError) -> PyErr {
-        let validation_error = ValidationError::from_val_error(py, "Schema".to_object(py), error, None);
-        match validation_error.into_value(py).extract::<ValidationError>(py) {
-            Ok(err) => {
-                let schema_error = SchemaError {
-                    value: SchemaErrorInner::Error(err),
-                };
+        match error {
+            ValError::LineErrors(raw_errors) => {
+                let line_errors = raw_errors.into_iter().map(|e| e.into_py(py)).collect();
+                let validation_error = ValidationError::new(line_errors, "Schema".to_object(py));
+                let schema_error = SchemaError(SchemaErrorEnum::ValidationError(validation_error));
                 match Py::new(py, schema_error) {
                     Ok(err) => PyErr::from_value(err.into_ref(py)),
                     Err(err) => err,
                 }
             }
-            Err(err) => err,
+            ValError::InternalErr(err) => err,
+            ValError::Omit => Self::new_err("Unexpected Omit error."),
         }
     }
 
-    fn message(&self) -> String {
-        match &self.value {
-            SchemaErrorInner::Message(message) => message.to_owned(),
-            SchemaErrorInner::Error(_) => "<ValidationError>".to_owned(),
+    fn message(&self) -> &str {
+        match &self.0 {
+            SchemaErrorEnum::Message(message) => message.as_str(),
+            SchemaErrorEnum::ValidationError(_) => "<ValidationError>",
         }
     }
 }
@@ -166,36 +164,34 @@ impl SchemaError {
 impl SchemaError {
     #[new]
     fn py_new(message: String) -> Self {
-        Self {
-            value: SchemaErrorInner::Message(message),
-        }
-    }
-
-    fn __repr__(&self, py: Python) -> String {
-        match &self.value {
-            SchemaErrorInner::Message(message) => format!("SchemaError({message:?})"),
-            SchemaErrorInner::Error(error) => error.display(py),
-        }
-    }
-
-    fn __str__(&self, py: Python) -> String {
-        match &self.value {
-            SchemaErrorInner::Message(message) => message.to_owned(),
-            SchemaErrorInner::Error(error) => error.display(py),
-        }
+        Self(SchemaErrorEnum::Message(message))
     }
 
     fn error_count(&self) -> usize {
-        match &self.value {
-            SchemaErrorInner::Message(_) => 0,
-            SchemaErrorInner::Error(error) => error.error_count(),
+        match &self.0 {
+            SchemaErrorEnum::Message(_) => 0,
+            SchemaErrorEnum::ValidationError(error) => error.error_count(),
         }
     }
 
     fn errors(&self, py: Python) -> PyResult<Py<PyList>> {
-        match &self.value {
-            SchemaErrorInner::Message(_) => Ok(PyList::new(py, Vec::<PyAny>::new()).into_py(py)),
-            SchemaErrorInner::Error(error) => error.errors(py, None),
+        match &self.0 {
+            SchemaErrorEnum::Message(_) => Ok(PyList::empty(py).into_py(py)),
+            SchemaErrorEnum::ValidationError(error) => error.errors(py, None),
+        }
+    }
+
+    fn __str__(&self, py: Python) -> String {
+        match &self.0 {
+            SchemaErrorEnum::Message(message) => message.to_owned(),
+            SchemaErrorEnum::ValidationError(error) => error.display(py),
+        }
+    }
+
+    fn __repr__(&self, py: Python) -> String {
+        match &self.0 {
+            SchemaErrorEnum::Message(message) => format!("SchemaError({message:?})"),
+            SchemaErrorEnum::ValidationError(error) => error.display(py),
         }
     }
 }
