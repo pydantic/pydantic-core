@@ -602,7 +602,10 @@ def test_revalidate_post_init():
                 'type': 'typed-dict',
                 'return_fields_set': True,
                 'from_attributes': True,
-                'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
+                'fields': {
+                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                },
             },
             'config': {'revalidate_models': True},
         }
@@ -737,7 +740,10 @@ def test_validate_assignment():
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
-                'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
+                'fields': {
+                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                },
             },
         }
     )
@@ -811,7 +817,10 @@ def test_validate_assignment_no_fields_set():
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
-                'fields': {'field_a': {'schema': {'type': 'str'}}, 'field_b': {'schema': {'type': 'int'}}},
+                'fields': {
+                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                },
             },
         }
     )
