@@ -172,24 +172,24 @@ def simple_ser_schema(type: ExpectedSerializationTypes) -> SimpleSerSchema:
     return SimpleSerSchema(type=type)
 
 
-class GeneralSerializePlainFunction(Protocol):  # pragma: no cover
+class GeneralPlainSerializerFunction(Protocol):  # pragma: no cover
     def __call__(self, __input_value: Any, __info: SerializationInfo) -> Any:
         ...
 
 
-class FieldSerializePlainFunction(Protocol):  # pragma: no cover
+class FieldPlainSerializerFunction(Protocol):  # pragma: no cover
     def __call__(self, __model: Any, __input_value: Any, __info: FieldSerializationInfo) -> Any:
         ...
 
 
-class GeneralSerializePlainFunctionSchema(TypedDict):
+class GeneralPlainSerializerFunctionSchema(TypedDict):
     type: Literal['general']
-    function: GeneralSerializePlainFunction
+    function: GeneralPlainSerializerFunction
 
 
-class FieldSerializePlainFunctionSchema(TypedDict):
+class FieldPlainSerializerFunctionSchema(TypedDict):
     type: Literal['field']
-    function: FieldSerializePlainFunction
+    function: FieldPlainSerializerFunction
 
 
 # must match `src/serializers/ob_type.rs::ObType`
@@ -231,19 +231,19 @@ Values have the following meanings:
 """
 
 
-class FunctionPlainSerSchema(TypedDict, total=False):
+class PlainSerFunctionSchema(TypedDict, total=False):
     type: Required[Literal['function-plain']]
-    function: Required[Union[GeneralSerializePlainFunctionSchema, FieldSerializePlainFunctionSchema]]
+    function: Required[Union[GeneralPlainSerializerFunctionSchema, FieldPlainSerializerFunctionSchema]]
     json_return_type: JsonReturnTypes
     when_used: WhenUsed  # default: 'always'
 
 
-def general_function_plain_ser_schema(
-    function: GeneralSerializePlainFunction,
+def general_plain_function_ser_schema(
+    function: GeneralPlainSerializerFunction,
     *,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
-) -> FunctionPlainSerSchema:
+) -> PlainSerFunctionSchema:
     """
     Returns a schema for serialization with a function.
 
@@ -263,12 +263,12 @@ def general_function_plain_ser_schema(
     )
 
 
-def field_function_plain_ser_schema(
-    function: FieldSerializePlainFunction,
+def field_plain_function_ser_schema(
+    function: FieldPlainSerializerFunction,
     *,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
-) -> FunctionPlainSerSchema:
+) -> PlainSerFunctionSchema:
     """
     Returns a schema to serialize a field from a model, TypedDict or dataclass.
 
@@ -293,43 +293,43 @@ class SerializeWrapHandler(Protocol):  # pragma: no cover
         ...
 
 
-class GeneralSerializeWrapFunction(Protocol):  # pragma: no cover
+class GeneralWrapSerializerFunction(Protocol):  # pragma: no cover
     def __call__(self, __input_value: Any, __serializer: SerializeWrapHandler, __info: SerializationInfo) -> Any:
         ...
 
 
-class FieldSerializeWrapFunction(Protocol):  # pragma: no cover
+class FieldWrapSerializerFunction(Protocol):  # pragma: no cover
     def __call__(
         self, __model: Any, __input_value: Any, __serializer: SerializeWrapHandler, __info: FieldSerializationInfo
     ) -> Any:
         ...
 
 
-class GeneralSerializeWrapFunctionSchema(TypedDict):
+class GeneralWrapSerializerFunctionSchema(TypedDict):
     type: Literal['general']
-    function: GeneralSerializeWrapFunction
+    function: GeneralWrapSerializerFunction
 
 
-class FieldSerializeWrapFunctionSchema(TypedDict):
+class FieldWrapSerializerFunctionSchema(TypedDict):
     type: Literal['field']
-    function: FieldSerializeWrapFunction
+    function: FieldWrapSerializerFunction
 
 
-class FunctionWrapSerSchema(TypedDict, total=False):
+class WrapSerFunctionSchema(TypedDict, total=False):
     type: Required[Literal['function-wrap']]
-    function: Required[Union[GeneralSerializeWrapFunctionSchema, FieldSerializeWrapFunctionSchema]]
+    function: Required[Union[GeneralWrapSerializerFunctionSchema, FieldWrapSerializerFunctionSchema]]
     schema: Required[CoreSchema]
     json_return_type: JsonReturnTypes
     when_used: WhenUsed  # default: 'always'
 
 
-def general_function_wrap_ser_schema(
-    function: GeneralSerializeWrapFunction,
+def general_wrap_function_ser_schema(
+    function: GeneralWrapSerializerFunction,
     schema: CoreSchema,
     *,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
-) -> FunctionWrapSerSchema:
+) -> WrapSerFunctionSchema:
     """
     Returns a schema for serialization with a function.
 
@@ -351,13 +351,13 @@ def general_function_wrap_ser_schema(
     )
 
 
-def field_function_wrap_ser_schema(
-    function: FieldSerializeWrapFunction,
+def field_wrap_function_ser_schema(
+    function: FieldWrapSerializerFunction,
     schema: CoreSchema,
     *,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
-) -> FunctionWrapSerSchema:
+) -> WrapSerFunctionSchema:
     """
     Returns a schema to serialize a field from a model, TypedDict or dataclass.
 
@@ -436,7 +436,7 @@ def model_ser_schema(cls: Type[Any], schema: CoreSchema) -> ModelSerSchema:
 
 
 SerSchema = Union[
-    SimpleSerSchema, FunctionPlainSerSchema, FunctionWrapSerSchema, FormatSerSchema, ToStringSerSchema, ModelSerSchema
+    SimpleSerSchema, PlainSerFunctionSchema, WrapSerFunctionSchema, FormatSerSchema, ToStringSerSchema, ModelSerSchema
 ]
 
 
@@ -1796,21 +1796,21 @@ def general_after_validation_function(
     )
 
 
-class CallableValidator(Protocol):
+class ValidateWrapHandler(Protocol):
     def __call__(self, input_value: Any, outer_location: str | int | None = None) -> Any:  # pragma: no cover
         ...
 
 
 class GeneralWrapValidatorFunction(Protocol):
     def __call__(
-        self, __input_value: Any, __validator: CallableValidator, __info: ValidationInfo
+        self, __input_value: Any, __validator: ValidateWrapHandler, __info: ValidationInfo
     ) -> Any:  # pragma: no cover
         ...
 
 
 class FieldWrapValidatorFunction(Protocol):
     def __call__(
-        self, __input_value: Any, __validator: CallableValidator, __info: FieldValidationInfo
+        self, __input_value: Any, __validator: ValidateWrapHandler, __info: FieldValidationInfo
     ) -> Any:  # pragma: no cover
         ...
 
@@ -1850,7 +1850,7 @@ def general_wrap_validation_function(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: str, validator: core_schema.CallableValidator, info: core_schema.ValidationInfo) -> str:
+    def fn(v: str, validator: core_schema.ValidateWrapHandler, info: core_schema.ValidationInfo) -> str:
         return validator(input_value=v) + 'world'
 
     schema = core_schema.general_wrap_validation_function(function=fn, schema=core_schema.str_schema())
@@ -1892,7 +1892,7 @@ def field_wrap_validation_function(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    def fn(v: bytes, validator: core_schema.CallableValidator, info: core_schema.FieldValidationInfo) -> str:
+    def fn(v: bytes, validator: core_schema.ValidateWrapHandler, info: core_schema.FieldValidationInfo) -> str:
         assert info.data is not None
         assert info.field_name is not None
         return validator(v) + 'world'

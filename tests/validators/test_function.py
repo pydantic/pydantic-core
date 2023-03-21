@@ -541,7 +541,7 @@ def test_model_field_wrap_validator() -> None:
         def __init__(self, **kwargs: Any) -> None:
             self.__dict__.update(kwargs)
 
-    def f(input_value: Any, val: core_schema.CallableValidator, info: core_schema.FieldValidationInfo) -> Any:
+    def f(input_value: Any, val: core_schema.ValidateWrapHandler, info: core_schema.FieldValidationInfo) -> Any:
         assert info.field_name == 'x'
         assert info.data == {}
         assert isinstance(input_value, bytes)
@@ -658,7 +658,7 @@ def test_non_model_field_wrap_validator_tries_to_access_field_info() -> None:
         def __init__(self, **kwargs: Any) -> None:
             self.__dict__.update(kwargs)
 
-    def f(input_value: Any, val: core_schema.CallableValidator, info: core_schema.ValidationInfo) -> Any:
+    def f(input_value: Any, val: core_schema.ValidateWrapHandler, info: core_schema.ValidationInfo) -> Any:
         check_that_info_has_no_model_data(info)
         return f'input: {val(input_value)}'
 

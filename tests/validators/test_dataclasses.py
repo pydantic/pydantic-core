@@ -525,7 +525,9 @@ def test_dataclass_field_wrap_validator1():
         b: str
 
         @classmethod
-        def validate_b(cls, v: bytes, nxt: core_schema.CallableValidator, info: core_schema.FieldValidationInfo) -> str:
+        def validate_b(
+            cls, v: bytes, nxt: core_schema.ValidateWrapHandler, info: core_schema.FieldValidationInfo
+        ) -> str:
             assert v == b'hello'
             v = nxt(v)
             assert v == 'hello'
@@ -560,7 +562,7 @@ def test_dataclass_field_wrap_validator2():
 
         @classmethod
         def validate_b(
-            cls, v: bytes, nxt: core_schema.CallableValidator, info: core_schema.FieldValidationInfo
+            cls, v: bytes, nxt: core_schema.ValidateWrapHandler, info: core_schema.FieldValidationInfo
         ) -> bytes:
             assert v == b'hello'
             assert info.field_name == 'b'
