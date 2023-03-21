@@ -187,7 +187,7 @@ def test_function_wrap_field_serializer_to_python():
     class Model(TypedDict):
         x: int
 
-    def ser_x(data: Model, v: Any, serializer: core_schema.SerializeWrapHandler, _) -> str:
+    def ser_x(data: Model, v: Any, serializer: core_schema.SerializerFunctionWrapHandler, _) -> str:
         x = serializer(v)
         assert data['x'] == 1_000
         return f'{x:_}'
@@ -232,7 +232,7 @@ def test_function_wrap_field_serializer_to_json():
     class Model(TypedDict):
         x: int
 
-    def ser_x(data: Model, v: Any, serializer: core_schema.SerializeWrapHandler, _) -> str:
+    def ser_x(data: Model, v: Any, serializer: core_schema.SerializerFunctionWrapHandler, _) -> str:
         assert data['x'] == 1_000
         x = serializer(v)
         return f'{x:_}'

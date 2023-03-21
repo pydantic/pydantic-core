@@ -164,7 +164,7 @@ def test_correct_function_signature() -> None:
     def my_validator(value: Any, info: Any) -> str:
         return str(value)
 
-    v = SchemaValidator(core_schema.general_plain_validation_function(my_validator))
+    v = SchemaValidator(core_schema.general_plain_validator_function(my_validator))
     assert v.validate_python(1) == '1'
 
 
@@ -172,7 +172,7 @@ def test_wrong_function_signature() -> None:
     def wrong_validator(value: Any) -> Any:
         return value
 
-    v = SchemaValidator(core_schema.general_plain_validation_function(wrong_validator))  # type: ignore
+    v = SchemaValidator(core_schema.general_plain_validator_function(wrong_validator))  # type: ignore
 
     # use this instead of pytest.raises since pyright complains about input when pytest isn't installed
     try:
@@ -211,7 +211,9 @@ def test_ser_function_plain():
 
 
 def test_ser_function_wrap():
-    def f(__input: Any, __serialize: core_schema.SerializeWrapHandler, __info: core_schema.SerializationInfo) -> str:
+    def f(
+        __input: Any, __serialize: core_schema.SerializerFunctionWrapHandler, __info: core_schema.SerializationInfo
+    ) -> str:
         return f'{__serialize} {__info}'
 
     s = SchemaSerializer(
