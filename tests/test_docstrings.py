@@ -1,7 +1,13 @@
 import sys
 
 import pytest
-from pytest_examples import CodeExample, ExampleRunner, find_examples
+
+try:
+    from pytest_examples import CodeExample, ExampleRunner, find_examples
+except ImportError:
+    # pytest_examples is not installed on emscripten
+    def find_examples(*_directories):
+        return []
 
 
 @pytest.mark.skipif(sys.platform != 'linux', reason='README.md is not mounted in wasm file system')
