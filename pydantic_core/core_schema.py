@@ -231,19 +231,19 @@ Values have the following meanings:
 """
 
 
-class PlainSerFunctionSchema(TypedDict, total=False):
+class PlainSerializerFunctionSerSchema(TypedDict, total=False):
     type: Required[Literal['function-plain']]
     function: Required[Union[GeneralPlainSerializerFunctionSchema, FieldPlainSerializerFunctionSchema]]
     json_return_type: JsonReturnTypes
     when_used: WhenUsed  # default: 'always'
 
 
-def general_plain_function_ser_schema(
+def general_plain_serializer_function_ser_schema(
     function: GeneralPlainSerializerFunction,
     *,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
-) -> PlainSerFunctionSchema:
+) -> PlainSerializerFunctionSerSchema:
     """
     Returns a schema for serialization with a function.
 
@@ -263,12 +263,12 @@ def general_plain_function_ser_schema(
     )
 
 
-def field_plain_function_ser_schema(
+def field_plain_serializer_function_ser_schema(
     function: FieldPlainSerializerFunction,
     *,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
-) -> PlainSerFunctionSchema:
+) -> PlainSerializerFunctionSerSchema:
     """
     Returns a schema to serialize a field from a model, TypedDict or dataclass.
 
@@ -315,7 +315,7 @@ class FieldWrapSerializerFunctionSchema(TypedDict):
     function: FieldWrapSerializerFunction
 
 
-class WrapSerFunctionSchema(TypedDict, total=False):
+class WrapSerializerFunctionSerSchema(TypedDict, total=False):
     type: Required[Literal['function-wrap']]
     function: Required[Union[GeneralWrapSerializerFunctionSchema, FieldWrapSerializerFunctionSchema]]
     schema: Required[CoreSchema]
@@ -323,13 +323,13 @@ class WrapSerFunctionSchema(TypedDict, total=False):
     when_used: WhenUsed  # default: 'always'
 
 
-def general_wrap_function_ser_schema(
+def general_wrap_serializer_function_ser_schema(
     function: GeneralWrapSerializerFunction,
     schema: CoreSchema,
     *,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
-) -> WrapSerFunctionSchema:
+) -> WrapSerializerFunctionSerSchema:
     """
     Returns a schema for serialization with a function.
 
@@ -351,13 +351,13 @@ def general_wrap_function_ser_schema(
     )
 
 
-def field_wrap_function_ser_schema(
+def field_wrap_serializer_function_ser_schema(
     function: FieldWrapSerializerFunction,
     schema: CoreSchema,
     *,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
-) -> WrapSerFunctionSchema:
+) -> WrapSerializerFunctionSerSchema:
     """
     Returns a schema to serialize a field from a model, TypedDict or dataclass.
 
@@ -436,7 +436,12 @@ def model_ser_schema(cls: Type[Any], schema: CoreSchema) -> ModelSerSchema:
 
 
 SerSchema = Union[
-    SimpleSerSchema, PlainSerFunctionSchema, WrapSerFunctionSchema, FormatSerSchema, ToStringSerSchema, ModelSerSchema
+    SimpleSerSchema,
+    PlainSerializerFunctionSerSchema,
+    WrapSerializerFunctionSerSchema,
+    FormatSerSchema,
+    ToStringSerSchema,
+    ModelSerSchema,
 ]
 
 
