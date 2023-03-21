@@ -4,10 +4,11 @@ use std::fmt;
 
 use pyo3::exceptions::{PyException, PyKeyError};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::{PyDict, PyList, PyString};
 use pyo3::{intern, FromPyObject, PyErrArguments};
 
-use crate::errors::{pretty_line_errors, ValError};
+use crate::errors::ValError;
+use crate::ValidationError;
 
 pub trait SchemaDict<'py> {
     fn get_as<T>(&'py self, key: &PyString) -> PyResult<Option<T>>
@@ -98,22 +99,27 @@ pub fn is_strict(schema: &PyDict, config: Option<&PyDict>) -> PyResult<bool> {
     Ok(schema_or_config_same(schema, config, intern!(py, "strict"))?.unwrap_or(false))
 }
 
+enum SchemaErrorInner {
+    Message(String),
+    Error(ValidationError),
+}
+
 // we could perhaps do clever things here to store each schema error, or have different types for the top
 // level error group, and other errors, we could perhaps also support error groups!?
 #[pyclass(extends=PyException, module="pydantic_core._pydantic_core")]
 pub struct SchemaError {
-    message: String,
+    value: SchemaErrorInner,
 }
 
 impl fmt::Debug for SchemaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "SchemaError({:?})", self.message)
+        write!(f, "SchemaError({:?})", self.message())
     }
 }
 
 impl fmt::Display for SchemaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
+        f.write_str(&self.message())
     }
 }
 
@@ -133,13 +139,25 @@ impl SchemaError {
     }
 
     pub fn from_val_error(py: Python, error: ValError) -> PyErr {
-        match error {
-            ValError::LineErrors(line_errors) => {
-                let details = pretty_line_errors(py, line_errors);
-                SchemaError::new_err(format!("Invalid Schema:\n{details}"))
+        let validation_error = ValidationError::from_val_error(py, "Schema".to_object(py), error, None);
+        match validation_error.into_value(py).extract::<ValidationError>(py) {
+            Ok(err) => {
+                let schema_error = SchemaError {
+                    value: SchemaErrorInner::Error(err),
+                };
+                match Py::new(py, schema_error) {
+                    Ok(err) => PyErr::from_value(err.into_ref(py)),
+                    Err(err) => err,
+                }
             }
-            ValError::InternalErr(py_err) => py_err,
-            ValError::Omit => unreachable!(),
+            Err(err) => err,
+        }
+    }
+
+    fn message(&self) -> String {
+        match &self.value {
+            SchemaErrorInner::Message(message) => message.to_owned(),
+            SchemaErrorInner::Error(_) => "<ValidationError>".to_owned(),
         }
     }
 }
@@ -148,15 +166,37 @@ impl SchemaError {
 impl SchemaError {
     #[new]
     fn py_new(message: String) -> Self {
-        Self { message }
+        Self {
+            value: SchemaErrorInner::Message(message),
+        }
     }
 
-    fn __repr__(&self) -> String {
-        format!("{self:?}")
+    fn __repr__(&self, py: Python) -> String {
+        match &self.value {
+            SchemaErrorInner::Message(message) => format!("SchemaError({message:?})"),
+            SchemaErrorInner::Error(error) => error.display(py),
+        }
     }
 
-    fn __str__(&self) -> String {
-        self.to_string()
+    fn __str__(&self, py: Python) -> String {
+        match &self.value {
+            SchemaErrorInner::Message(message) => message.to_owned(),
+            SchemaErrorInner::Error(error) => error.display(py),
+        }
+    }
+
+    fn error_count(&self) -> usize {
+        match &self.value {
+            SchemaErrorInner::Message(_) => 0,
+            SchemaErrorInner::Error(error) => error.error_count(),
+        }
+    }
+
+    fn errors(&self, py: Python) -> PyResult<Py<PyList>> {
+        match &self.value {
+            SchemaErrorInner::Message(_) => Ok(PyList::new(py, Vec::<PyAny>::new()).into_py(py)),
+            SchemaErrorInner::Error(error) => error.errors(py, None),
+        }
     }
 }
 

@@ -41,7 +41,7 @@ impl ValidationError {
         }
     }
 
-    fn display(&self, py: Python) -> String {
+    pub fn display(&self, py: Python) -> String {
         let count = self.line_errors.len();
         let plural = if count == 1 { "" } else { "s" };
         let title: &str = self.title.extract(py).unwrap();
@@ -77,11 +77,11 @@ impl ValidationError {
         self.title.clone_ref(py)
     }
 
-    fn error_count(&self) -> usize {
+    pub fn error_count(&self) -> usize {
         self.line_errors.len()
     }
 
-    fn errors(&self, py: Python, include_context: Option<bool>) -> PyResult<Py<PyList>> {
+    pub fn errors(&self, py: Python, include_context: Option<bool>) -> PyResult<Py<PyList>> {
         // taken approximately from the pyo3, but modified to return the error during iteration
         // https://github.com/PyO3/pyo3/blob/a3edbf4fcd595f0e234c87d4705eb600a9779130/src/types/list.rs#L27-L55
         unsafe {
