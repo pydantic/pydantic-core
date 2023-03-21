@@ -234,7 +234,7 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
     fn py_gc_traverse(&self, _visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
         Ok(())
     }
-    fn py_gc_clear(&mut self) {}
+
     fn to_python(
         &self,
         value: &PyAny,

@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::fmt::Debug;
 
 use pyo3::prelude::*;
@@ -22,12 +23,12 @@ mod ob_type;
 mod shared;
 mod type_serializers;
 
-#[pyclass(module = "pydantic_core._pydantic_core")]
+#[pyclass(module = "pydantic_core._pydantic_core", frozen)]
 #[derive(Debug, Clone)]
 pub struct SchemaSerializer {
     serializer: CombinedSerializer,
     slots: Vec<CombinedSerializer>,
-    json_size: usize,
+    json_size: RefCell<usize>,
     config: SerializationConfig,
 }
 
@@ -43,7 +44,7 @@ impl SchemaSerializer {
         Ok(Self {
             serializer,
             slots: build_context.into_slots_ser()?,
-            json_size: 1024,
+            json_size: RefCell::new(1024),
             config: SerializationConfig::from_config(config)?,
         })
     }
@@ -86,7 +87,7 @@ impl SchemaSerializer {
 
     #[allow(clippy::too_many_arguments)]
     pub fn to_json(
-        &mut self,
+        &self,
         py: Python,
         value: &PyAny,
         indent: Option<usize>,
@@ -114,19 +115,12 @@ impl SchemaSerializer {
             &self.config,
             &rec_guard,
         );
-        let bytes = to_json_bytes(
-            value,
-            &self.serializer,
-            include,
-            exclude,
-            &extra,
-            indent,
-            self.json_size,
-        )?;
+        let mut json_size = self.json_size.borrow_mut();
+        let bytes = to_json_bytes(value, &self.serializer, include, exclude, &extra, indent, *json_size)?;
 
         warnings.final_check(py)?;
 
-        self.json_size = bytes.len();
+        *json_size = bytes.len();
         let py_bytes = PyBytes::new(py, &bytes);
         Ok(py_bytes.into())
     }
@@ -144,13 +138,6 @@ impl SchemaSerializer {
             slot.py_gc_traverse(&visit)?;
         }
         Ok(())
-    }
-
-    fn __clear__(&mut self) {
-        self.serializer.py_gc_clear();
-        for slot in self.slots.iter_mut() {
-            slot.py_gc_clear();
-        }
     }
 }
 

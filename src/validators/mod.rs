@@ -53,7 +53,7 @@ mod with_default;
 
 pub use with_default::DefaultType;
 
-#[pyclass(module = "pydantic_core._pydantic_core")]
+#[pyclass(module = "pydantic_core._pydantic_core", frozen)]
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {
     validator: CombinedValidator,
@@ -205,13 +205,6 @@ impl SchemaValidator {
             slot.py_gc_traverse(&visit)?;
         }
         Ok(())
-    }
-
-    fn __clear__(&mut self) {
-        self.validator.py_gc_clear();
-        for slot in self.slots.iter_mut() {
-            slot.py_gc_clear();
-        }
     }
 }
 
@@ -590,7 +583,6 @@ pub trait Validator: Send + Sync + Clone + Debug {
     fn py_gc_traverse(&self, _visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
         Ok(())
     }
-    fn py_gc_clear(&mut self) {}
 
     /// Do the actual validation for this schema/type
     fn validate<'s, 'data>(
