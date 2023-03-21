@@ -80,14 +80,18 @@ impl Validator for FunctionBeforeValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
-        let value = self
-            .func
-            .call1(py, (input.to_object(py), info))
-            .map_err(|e| convert_err(py, e, input))?;
-
-        self.validator
-            .validate(py, value.into_ref(py), extra, slots, recursion_guard)
+        // skip function calls if `assignee_field` is set
+        if extra.assignee_field.is_none() {
+            let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
+            let value = self
+                .func
+                .call1(py, (input.to_object(py), info))
+                .map_err(|e| convert_err(py, e, input))?;
+            self.validator
+                .validate(py, value.into_ref(py), extra, slots, recursion_guard)
+        } else {
+            self.validator.validate(py, input, extra, slots, recursion_guard)
+        }
     }
 
     fn get_name(&self) -> &str {
@@ -124,8 +128,13 @@ impl Validator for FunctionAfterValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let v = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
-        self.func.call1(py, (v, info)).map_err(|e| convert_err(py, e, input))
+        // skip function calls if `assignee_field` is set
+        if extra.assignee_field.is_none() {
+            let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
+            self.func.call1(py, (v, info)).map_err(|e| convert_err(py, e, input))
+        } else {
+            Ok(v)
+        }
     }
 
     fn get_name(&self) -> &str {
@@ -212,13 +221,25 @@ impl Validator for FunctionWrapValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let call_next_validator = ValidatorCallable {
-            validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
-        };
-        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
-        self.func
-            .call1(py, (input.to_object(py), call_next_validator, info))
-            .map_err(|e| convert_err(py, e, input))
+        // skip function calls if `assignee_field` is set
+        if extra.assignee_field.is_none() {
+            let call_next_validator = ValidatorCallable {
+                validator: InternalValidator::new(
+                    py,
+                    "ValidatorCallable",
+                    &self.validator,
+                    slots,
+                    extra,
+                    recursion_guard,
+                ),
+            };
+            let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
+            self.func
+                .call1(py, (input.to_object(py), call_next_validator, info))
+                .map_err(|e| convert_err(py, e, input))
+        } else {
+            self.validator.validate(py, input, extra, slots, recursion_guard)
+        }
     }
 
     fn get_name(&self) -> &str {
@@ -353,5 +374,22 @@ impl ValidationInfo {
             Some(ref field_name) => Ok(PyString::new(py, field_name)),
             None => Err(PyAttributeError::new_err("No attribute named 'field_name'")),
         }
+    }
+
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        let context = match self.context {
+            Some(ref context) => context.as_ref(py).repr()?.extract()?,
+            None => "None",
+        };
+        let config = self.config.as_ref(py).repr()?;
+        let mut s = format!("ValidationInfo(config={config}, context={context}");
+        if let Some(ref data) = self.data {
+            s += &format!(", data={}", data.as_ref(py).repr()?);
+        }
+        if let Some(ref field_name) = self.field_name {
+            s += &format!(", field_name='{field_name}'");
+        }
+        s += ")";
+        Ok(s)
     }
 }
