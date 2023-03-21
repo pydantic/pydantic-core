@@ -14,3 +14,5 @@ except ImportError:
 @pytest.mark.parametrize('example', find_examples('pydantic_core/core_schema.py', 'README.md'))
 def test_docstrings(example: CodeExample, run_example: ExampleRunner):
     run_example.run(example)
+    # run_example.ruff(example)
+    # run_example.black(example, line_length=100)
