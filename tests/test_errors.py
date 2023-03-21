@@ -172,7 +172,7 @@ all_errors = [
     ('dict_attributes_type', 'Input should be a valid dictionary or instance to extract fields from', None),
     ('missing', 'Field required', None),
     ('frozen_field', 'Field is frozen', None),
-    ('frozen_model', 'Model is frozen', None),
+    ('frozen_instance', 'Instance is frozen', None),
     ('extra_forbidden', 'Extra inputs are not permitted', None),
     ('invalid_key', 'Keys should be strings', None),
     ('get_attribute_error', 'Error extracting attribute: foo', {'error': 'foo'}),

@@ -204,7 +204,7 @@ impl SchemaValidator {
         };
 
         if self.frozen {
-            Err(self.prepare_validation_err(py, ValError::new_with_loc(ErrorType::FrozenModel, input, field)))
+            Err(self.prepare_validation_err(py, ValError::new_with_loc(ErrorType::FrozenInstance, input, field)))
         } else {
             let r = self
                 .validator

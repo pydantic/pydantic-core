@@ -3244,7 +3244,7 @@ ErrorType = Literal[
     'dict_attributes_type',
     'missing',
     'frozen_field',
-    'frozen_model',
+    'frozen_instance',
     'extra_forbidden',
     'invalid_key',
     'get_attribute_error',

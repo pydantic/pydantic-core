@@ -248,11 +248,15 @@ def test_allow_inf_nan(config: CoreConfig, float_field_schema, input_value, expe
     [
         ({}, {'schema': {'type': 'str'}}, None),
         ({'frozen': False}, {'schema': {'type': 'str'}}, None),
-        ({'frozen': True}, {'schema': {'type': 'str'}}, Err("Model is frozen [type=frozen_model, input_value='y',")),
+        (
+            {'frozen': True},
+            {'schema': {'type': 'str'}},
+            Err("Instance is frozen [type=frozen_instance, input_value='y',"),
+        ),
         (
             {'frozen': True},
             {'schema': {'type': 'str'}, 'frozen': False},
-            Err("Model is frozen [type=frozen_model, input_value='y',"),
+            Err("Instance is frozen [type=frozen_instance, input_value='y',"),
         ),
         (
             {'frozen': False},
