@@ -1078,8 +1078,10 @@ def is_instance_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
+
     class A:
         pass
+
 
     schema = core_schema.is_instance_schema(cls=A)
     v = SchemaValidator(schema)
@@ -1131,11 +1133,14 @@ def is_subclass_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
+
     class A:
         pass
 
+
     class B(A):
         pass
+
 
     schema = core_schema.is_subclass_schema(cls=A)
     v = SchemaValidator(schema)
@@ -1331,7 +1336,9 @@ def tuple_variable_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    schema = core_schema.tuple_variable_schema(items_schema=core_schema.int_schema(), min_length=0, max_length=10)
+    schema = core_schema.tuple_variable_schema(
+        items_schema=core_schema.int_schema(), min_length=0, max_length=10
+    )
     v = SchemaValidator(schema)
     assert v.validate_python(('1', 2, 3)) == (1, 2, 3)
     ```
@@ -1445,7 +1452,9 @@ def frozenset_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    schema = core_schema.frozenset_schema(items_schema=core_schema.int_schema(), min_length=0, max_length=10)
+    schema = core_schema.frozenset_schema(
+        items_schema=core_schema.int_schema(), min_length=0, max_length=10
+    )
     v = SchemaValidator(schema)
     assert v.validate_python(frozenset(range(3))) == frozenset({0, 1, 2})
     ```
@@ -1499,8 +1508,10 @@ def generator_schema(
     from typing import Iterator
     from pydantic_core import SchemaValidator, core_schema
 
+
     def gen() -> Iterator[int]:
         yield 1
+
 
     schema = core_schema.generator_schema(items_schema=core_schema.int_schema())
     v = SchemaValidator(schema)
@@ -1574,6 +1585,7 @@ def dict_schema(
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
+
     schema = core_schema.dict_schema(
         keys_schema=core_schema.str_schema(), values_schema=core_schema.int_schema()
     )
