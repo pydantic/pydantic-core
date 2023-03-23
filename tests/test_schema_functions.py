@@ -86,7 +86,7 @@ all_schema_functions = [
         {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'int'}},
     ),
     (
-        core_schema.general_before_validation_function,
+        core_schema.general_before_validator_function,
         args(val_function, {'type': 'int'}),
         {
             'type': 'function-before',
@@ -95,7 +95,7 @@ all_schema_functions = [
         },
     ),
     (
-        core_schema.general_after_validation_function,
+        core_schema.general_after_validator_function,
         args(val_function, {'type': 'int'}),
         {
             'type': 'function-after',
@@ -104,12 +104,12 @@ all_schema_functions = [
         },
     ),
     (
-        core_schema.general_wrap_validation_function,
+        core_schema.general_wrap_validator_function,
         args(val_function, {'type': 'int'}),
         {'type': 'function-wrap', 'function': {'type': 'general', 'function': val_function}, 'schema': {'type': 'int'}},
     ),
     (
-        core_schema.general_plain_validation_function,
+        core_schema.general_plain_validator_function,
         args(val_function),
         {'type': 'function-plain', 'function': {'type': 'general', 'function': val_function}},
     ),
@@ -154,11 +154,15 @@ all_schema_functions = [
         args({'type': 'int'}, {'type': 'str'}),
         {'type': 'chain', 'steps': [{'type': 'int'}, {'type': 'str'}]},
     ),
-    (core_schema.typed_dict_field, args({'type': 'int'}, required=True), {'schema': {'type': 'int'}, 'required': True}),
+    (
+        core_schema.typed_dict_field,
+        args({'type': 'int'}, required=True),
+        {'type': 'typed-dict-field', 'schema': {'type': 'int'}, 'required': True},
+    ),
     (
         core_schema.typed_dict_schema,
         args({'foo': core_schema.typed_dict_field({'type': 'int'})}),
-        {'type': 'typed-dict', 'fields': {'foo': {'schema': {'type': 'int'}}}},
+        {'type': 'typed-dict', 'fields': {'foo': {'type': 'typed-dict-field', 'schema': {'type': 'int'}}}},
     ),
     (
         core_schema.model_schema,
@@ -218,8 +222,12 @@ all_schema_functions = [
     (core_schema.definition_reference_schema, args('foo'), {'type': 'definition-ref', 'schema_ref': 'foo'}),
     (
         core_schema.dataclass_args_schema,
-        args('Foo', [{'name': 'foo', 'schema': {'type': 'int'}}]),
-        {'type': 'dataclass-args', 'dataclass_name': 'Foo', 'fields': [{'name': 'foo', 'schema': {'type': 'int'}}]},
+        args('Foo', [{'name': 'foo', 'type': 'dataclass-field', 'schema': {'type': 'int'}}]),
+        {
+            'type': 'dataclass-args',
+            'dataclass_name': 'Foo',
+            'fields': [{'name': 'foo', 'type': 'dataclass-field', 'schema': {'type': 'int'}}],
+        },
     ),
     (
         core_schema.dataclass_schema,
@@ -235,7 +243,7 @@ def test_schema_functions(function, args_kwargs, expected_schema):
     args, kwargs = args_kwargs
     schema = function(*args, **kwargs)
     assert schema == expected_schema
-    if schema.get('type') in {None, 'definition-ref'}:
+    if schema.get('type') in {None, 'definition-ref', 'typed-dict-field'}:
         return
 
     v = SchemaValidator(schema)
@@ -254,6 +262,9 @@ def test_all_schema_functions_used():
         for s in core_schema.CoreSchema.__args__
     }
     types_used = {args['type'] for _, _, args in all_schema_functions if 'type' in args}
+
+    # isn't a CoreSchema type
+    types_used.remove('typed-dict-field')
 
     assert all_types == types_used
 
@@ -281,7 +292,7 @@ def repr_function(value, _info):
 def test_expected_serialization_types(json_return_type):
     SchemaSerializer(
         core_schema.any_schema(
-            serialization=core_schema.general_function_plain_ser_schema(
+            serialization=core_schema.general_plain_serializer_function_ser_schema(
                 repr_function, json_return_type=json_return_type
             )
         )

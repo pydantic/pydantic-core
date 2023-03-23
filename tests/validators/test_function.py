@@ -89,7 +89,10 @@ def test_function_before_error_model():
         {
             'type': 'function-before',
             'function': {'type': 'general', 'function': f},
-            'schema': {'type': 'typed-dict', 'fields': {'my_field': {'schema': {'type': 'str', 'max_length': 5}}}},
+            'schema': {
+                'type': 'typed-dict',
+                'fields': {'my_field': {'type': 'typed-dict-field', 'schema': {'type': 'str', 'max_length': 5}}},
+            },
         }
     )
 
@@ -248,11 +251,12 @@ def test_function_after_config():
             'type': 'typed-dict',
             'fields': {
                 'test_field': {
+                    'type': 'typed-dict-field',
                     'schema': {
                         'type': 'function-after',
                         'function': {'type': 'field', 'function': f},
                         'schema': {'type': 'str'},
-                    }
+                    },
                 }
             },
         },
@@ -314,7 +318,10 @@ def test_validate_assignment():
         {
             'type': 'function-after',
             'function': {'type': 'general', 'function': f},
-            'schema': {'type': 'typed-dict', 'fields': {'field_a': {'schema': {'type': 'str'}}}},
+            'schema': {
+                'type': 'typed-dict',
+                'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
+            },
         }
     )
 
@@ -470,7 +477,7 @@ def test_model_field_before_validator() -> None:
             core_schema.typed_dict_schema(
                 {
                     'x': core_schema.typed_dict_field(
-                        core_schema.field_before_validation_function(f, core_schema.str_schema())
+                        core_schema.field_before_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -499,7 +506,7 @@ def test_model_field_after_validator() -> None:
             core_schema.typed_dict_schema(
                 {
                     'x': core_schema.typed_dict_field(
-                        core_schema.field_after_validation_function(f, core_schema.str_schema())
+                        core_schema.field_after_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -526,7 +533,7 @@ def test_model_field_plain_validator() -> None:
         core_schema.model_schema(
             Model,
             core_schema.typed_dict_schema(
-                {'x': core_schema.typed_dict_field(core_schema.field_plain_validation_function(f))}
+                {'x': core_schema.typed_dict_field(core_schema.field_plain_validator_function(f))}
             ),
         )
     )
@@ -541,7 +548,9 @@ def test_model_field_wrap_validator() -> None:
         def __init__(self, **kwargs: Any) -> None:
             self.__dict__.update(kwargs)
 
-    def f(input_value: Any, val: core_schema.CallableValidator, info: core_schema.FieldValidationInfo) -> Any:
+    def f(
+        input_value: Any, val: core_schema.ValidatorFunctionWrapHandler, info: core_schema.FieldValidationInfo
+    ) -> Any:
         assert info.field_name == 'x'
         assert info.data == {}
         assert isinstance(input_value, bytes)
@@ -553,7 +562,7 @@ def test_model_field_wrap_validator() -> None:
             core_schema.typed_dict_schema(
                 {
                     'x': core_schema.typed_dict_field(
-                        core_schema.field_wrap_validation_function(f, core_schema.str_schema())
+                        core_schema.field_wrap_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -590,7 +599,7 @@ def test_non_model_field_before_validator_tries_to_access_field_info() -> None:
             core_schema.typed_dict_schema(
                 {
                     'x': core_schema.typed_dict_field(
-                        core_schema.general_before_validation_function(f, core_schema.str_schema())
+                        core_schema.general_before_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -617,7 +626,7 @@ def test_non_model_field_after_validator_tries_to_access_field_info() -> None:
             core_schema.typed_dict_schema(
                 {
                     'x': core_schema.typed_dict_field(
-                        core_schema.general_after_validation_function(f, core_schema.str_schema())
+                        core_schema.general_after_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -643,7 +652,7 @@ def test_non_model_field_plain_validator_tries_to_access_field_info() -> None:
         core_schema.model_schema(
             Model,
             core_schema.typed_dict_schema(
-                {'x': core_schema.typed_dict_field(core_schema.general_plain_validation_function(f))}
+                {'x': core_schema.typed_dict_field(core_schema.general_plain_validator_function(f))}
             ),
         )
     )
@@ -658,7 +667,7 @@ def test_non_model_field_wrap_validator_tries_to_access_field_info() -> None:
         def __init__(self, **kwargs: Any) -> None:
             self.__dict__.update(kwargs)
 
-    def f(input_value: Any, val: core_schema.CallableValidator, info: core_schema.ValidationInfo) -> Any:
+    def f(input_value: Any, val: core_schema.ValidatorFunctionWrapHandler, info: core_schema.ValidationInfo) -> Any:
         check_that_info_has_no_model_data(info)
         return f'input: {val(input_value)}'
 
@@ -668,7 +677,7 @@ def test_non_model_field_wrap_validator_tries_to_access_field_info() -> None:
             core_schema.typed_dict_schema(
                 {
                     'x': core_schema.typed_dict_field(
-                        core_schema.general_wrap_validation_function(f, core_schema.str_schema())
+                        core_schema.general_wrap_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -706,7 +715,7 @@ def test_typed_dict_data() -> None:
                 'a': core_schema.typed_dict_field(core_schema.int_schema()),
                 'b': core_schema.typed_dict_field(core_schema.int_schema()),
                 'c': core_schema.typed_dict_field(
-                    core_schema.field_after_validation_function(f, core_schema.str_schema())
+                    core_schema.field_after_validator_function(f, core_schema.str_schema())
                 ),
             }
         )

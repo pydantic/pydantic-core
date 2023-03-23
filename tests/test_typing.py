@@ -42,8 +42,14 @@ def test_schema_typing() -> None:
         'type': 'tagged-union',
         'discriminator': 'type',
         'choices': {
-            'apple': {'type': 'typed-dict', 'fields': {'pips': {'schema': {'type': 'int'}}}},
-            'banana': {'type': 'typed-dict', 'fields': {'curvature': {'schema': {'type': 'float'}}}},
+            'apple': {
+                'type': 'typed-dict',
+                'fields': {'pips': {'type': 'typed-dict-field', 'schema': {'type': 'int'}}},
+            },
+            'banana': {
+                'type': 'typed-dict',
+                'fields': {'curvature': {'type': 'typed-dict-field', 'schema': {'type': 'float'}}},
+            },
         },
     }
     SchemaValidator(schema)
@@ -78,16 +84,27 @@ def test_schema_typing() -> None:
     schema: CoreSchema = {
         'type': 'model',
         'cls': Foo,
-        'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'bar': {'schema': {'type': 'str'}}}},
+        'schema': {
+            'type': 'typed-dict',
+            'return_fields_set': True,
+            'fields': {'bar': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
+        },
     }
     SchemaValidator(schema)
     schema: CoreSchema = {
         'type': 'typed-dict',
         'fields': {
-            'a': {'schema': {'type': 'str'}},
-            'b': {'schema': {'type': 'str'}, 'validation_alias': 'foobar'},
-            'c': {'schema': {'type': 'str'}, 'validation_alias': [['foobar', 0, 'bar'], ['foo']]},
-            'd': {'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default': 'spam'}},
+            'a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
+            'b': {'type': 'typed-dict-field', 'schema': {'type': 'str'}, 'validation_alias': 'foobar'},
+            'c': {
+                'type': 'typed-dict-field',
+                'schema': {'type': 'str'},
+                'validation_alias': [['foobar', 0, 'bar'], ['foo']],
+            },
+            'd': {
+                'type': 'typed-dict-field',
+                'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default': 'spam'},
+            },
         },
     }
     SchemaValidator(schema)
@@ -103,8 +120,9 @@ def test_schema_typing() -> None:
         'ref': 'Branch',
         'type': 'typed-dict',
         'fields': {
-            'name': {'schema': {'type': 'str'}},
+            'name': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
             'sub_branch': {
+                'type': 'typed-dict-field',
                 'schema': {
                     'type': 'default',
                     'schema': {
@@ -112,7 +130,7 @@ def test_schema_typing() -> None:
                         'choices': [{'type': 'none'}, {'type': 'definition-ref', 'schema_ref': 'Branch'}],
                     },
                     'default': None,
-                }
+                },
             },
         },
     }
@@ -164,7 +182,7 @@ def test_correct_function_signature() -> None:
     def my_validator(value: Any, info: Any) -> str:
         return str(value)
 
-    v = SchemaValidator(core_schema.general_plain_validation_function(my_validator))
+    v = SchemaValidator(core_schema.general_plain_validator_function(my_validator))
     assert v.validate_python(1) == '1'
 
 
@@ -172,7 +190,7 @@ def test_wrong_function_signature() -> None:
     def wrong_validator(value: Any) -> Any:
         return value
 
-    v = SchemaValidator(core_schema.general_plain_validation_function(wrong_validator))  # type: ignore
+    v = SchemaValidator(core_schema.general_plain_validator_function(wrong_validator))  # type: ignore
 
     # use this instead of pytest.raises since pyright complains about input when pytest isn't installed
     try:
@@ -200,7 +218,9 @@ def test_ser_function_plain():
         return str(__info)
 
     s = SchemaSerializer(
-        core_schema.any_schema(serialization=core_schema.general_function_plain_ser_schema(f, json_return_type='str'))
+        core_schema.any_schema(
+            serialization=core_schema.general_plain_serializer_function_ser_schema(f, json_return_type='str')
+        )
     )
     assert s.to_python(123) == (
         "SerializationInfo(include=None, exclude=None, mode='python', by_alias=True, exclude_unset=False, "
@@ -209,12 +229,16 @@ def test_ser_function_plain():
 
 
 def test_ser_function_wrap():
-    def f(__input: Any, __serialize: core_schema.SerializeWrapHandler, __info: core_schema.SerializationInfo) -> str:
+    def f(
+        __input: Any, __serialize: core_schema.SerializerFunctionWrapHandler, __info: core_schema.SerializationInfo
+    ) -> str:
         return f'{__serialize} {__info}'
 
     s = SchemaSerializer(
         core_schema.any_schema(
-            serialization=core_schema.general_function_wrap_ser_schema(f, core_schema.str_schema(), when_used='json')
+            serialization=core_schema.general_wrap_serializer_function_ser_schema(
+                f, core_schema.str_schema(), when_used='json'
+            )
         )
     )
     # insert_assert(s.to_python(123, mode='json'))

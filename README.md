@@ -25,31 +25,33 @@ Example of usage:
 ```py
 from pydantic_core import SchemaValidator, ValidationError
 
-v = SchemaValidator(
-    {
-        'type': 'typed-dict',
-        'fields': {
-            'name': {
-                'schema': {
-                    'type': 'str',
-                },
-            },
-            'age': {
-                'schema': {
-                    'type': 'int',
-                    'ge': 18,
-                },
-            },
-            'is_developer': {
-                'schema': {
-                    'type': 'default',
-                    'schema': {'type': 'bool'},
-                    'default': True,
-                }
+
+v = SchemaValidator({
+    'type': 'typed-dict',
+    'fields': {
+        'name': {
+            'type': 'typed-dict-field',
+            'schema': {
+                'type': 'str',
             },
         },
-    }
-)
+        'age': {
+            'type': 'typed-dict-field',
+            'schema': {
+                'type': 'int',
+                'ge': 18,
+            },
+        },
+        'is_developer': {
+            'type': 'typed-dict-field',
+            'schema': {
+                'type': 'default',
+                'schema': {'type': 'bool'},
+                'default': True,
+            }
+        },
+    },
+})
 
 r1 = v.validate_python({'name': 'Samuel', 'age': 35})
 assert r1 == {'name': 'Samuel', 'age': 35, 'is_developer': True}

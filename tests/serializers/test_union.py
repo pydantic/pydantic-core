@@ -46,8 +46,9 @@ def model_serializer() -> SchemaSerializer:
                         'type': 'typed-dict',
                         'return_fields_set': True,
                         'fields': {
-                            'a': {'schema': {'type': 'bytes'}},
+                            'a': {'type': 'typed-dict-field', 'schema': {'type': 'bytes'}},
                             'b': {
+                                'type': 'typed-dict-field',
                                 'schema': {
                                     'type': 'float',
                                     'serialization': {
@@ -55,7 +56,7 @@ def model_serializer() -> SchemaSerializer:
                                         'formatting_string': '0.1f',
                                         'when_used': 'unless-none',
                                     },
-                                }
+                                },
                             },
                         },
                     },
@@ -67,8 +68,9 @@ def model_serializer() -> SchemaSerializer:
                         'type': 'typed-dict',
                         'return_fields_set': True,
                         'fields': {
-                            'c': {'schema': {'type': 'bytes'}},
+                            'c': {'type': 'typed-dict-field', 'schema': {'type': 'bytes'}},
                             'd': {
+                                'type': 'typed-dict-field',
                                 'schema': {
                                     'type': 'float',
                                     'serialization': {
@@ -76,7 +78,7 @@ def model_serializer() -> SchemaSerializer:
                                         'formatting_string': '0.2f',
                                         'when_used': 'unless-none',
                                     },
-                                }
+                                },
                             },
                         },
                     },
@@ -130,7 +132,9 @@ def test_union_of_functions():
 
     s = SchemaSerializer(
         core_schema.union_schema(
-            core_schema.any_schema(serialization=core_schema.general_function_plain_ser_schema(repr_function)),
+            core_schema.any_schema(
+                serialization=core_schema.general_plain_serializer_function_ser_schema(repr_function)
+            ),
             core_schema.float_schema(serialization=core_schema.format_ser_schema('_^14')),
         )
     )
