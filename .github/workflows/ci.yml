@@ -42,7 +42,7 @@ jobs:
       - run: pip install -e .
         env:
           RUST_BACKTRACE: 1
-          RUSTFLAGS: '-C instrument-coverage'
+          RUSTFLAGS: '-C instrument-coverage -g'
 
       - run: pip freeze
 
