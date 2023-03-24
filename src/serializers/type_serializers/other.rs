@@ -62,6 +62,7 @@ impl BuildSerializer for CallBuilder {
     }
 }
 
+/// LaxOrStrict always uses the strict branch to serialize
 pub struct LaxOrStrictBuilder;
 
 impl BuildSerializer for LaxOrStrictBuilder {
@@ -72,8 +73,8 @@ impl BuildSerializer for LaxOrStrictBuilder {
         config: Option<&PyDict>,
         build_context: &mut BuildContext<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        let lax_schema: &PyDict = schema.get_as_req(intern!(schema.py(), "strict_schema"))?;
-        CombinedSerializer::build(lax_schema, config, build_context)
+        let arbitrarily_chosen_strict_schema: &PyDict = schema.get_as_req(intern!(schema.py(), "strict_schema"))?;
+        CombinedSerializer::build(arbitrarily_chosen_strict_schema, config, build_context)
     }
 }
 
