@@ -48,6 +48,9 @@ jobs:
 
       - run: coverage run -m pytest
 
+      - uses: mxschmitt/action-tmate@v3
+        if: failure()
+
       - run: ls -lha
       - run: coverage xml
 
@@ -102,9 +105,6 @@ jobs:
         env:
           BENCHMARK_VS_PYDANTIC: 1
           HYPOTHESIS_PROFILE: slow
-
-      - uses: mxschmitt/action-tmate@v3
-        if: failure()
 
   test-os:
     name: test on ${{ matrix.os }}
