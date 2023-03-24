@@ -103,6 +103,9 @@ jobs:
           BENCHMARK_VS_PYDANTIC: 1
           HYPOTHESIS_PROFILE: slow
 
+      - uses: mxschmitt/action-tmate@v3
+        if: failure()
+
   test-os:
     name: test on ${{ matrix.os }}
 
