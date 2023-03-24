@@ -41,15 +41,11 @@ jobs:
 
       - run: pip install -e .
         env:
-          RUST_BACKTRACE: 1
           RUSTFLAGS: '-C instrument-coverage'
 
       - run: pip freeze
 
       - run: coverage run -m pytest
-        env:
-          BENCHMARK_VS_PYDANTIC: 1
-          HYPOTHESIS_PROFILE: slow
 
       - run: ls -lha
       - run: coverage xml
@@ -95,9 +91,7 @@ jobs:
 
       - run: pip install -r tests/requirements.txt
 
-      - run: pip install -e .
-        env:
-          RUST_BACKTRACE: 1
+      - run: pip install .
 
       - run: pip freeze
 
