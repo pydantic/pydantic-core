@@ -164,11 +164,18 @@ impl Validator for ModelValidator {
             slots,
             recursion_guard,
         )?;
-        if self.expect_fields_set {
+        let output = if self.expect_fields_set {
+            let (output, updated_fields_set): (&PyDict, &PySet) = output.extract(py)?;
             if let Some(fields_set) = model.get_attr(intern!(py, "__fields_set__")) {
-                fields_set.downcast::<PySet>()?.add(field_name)?;
+                let fields_set: &PySet = fields_set.downcast()?;
+                for field_name in updated_fields_set {
+                    fields_set.add(field_name)?;
+                }
             }
-        }
+            output.to_object(py)
+        } else {
+            output
+        };
         force_setattr(py, model, intern!(py, "__dict__"), output)?;
         Ok(model.into_py(py))
     }

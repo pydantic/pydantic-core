@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 
 use ahash::AHashSet;
 use pyo3::exceptions::PyKeyError;
+use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PySet, PyString, PyType};
 
 use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same, SchemaDict};
@@ -383,7 +384,7 @@ impl Validator for TypedDictValidator {
             ..*extra
         };
 
-        if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
+        let new_data = if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
             if field.frozen {
                 Err(ValError::new_with_loc(
                     ErrorType::FrozenField,
@@ -416,6 +417,12 @@ impl Validator for TypedDictValidator {
                 field_value,
                 field_name.to_string(),
             ))
+        }?;
+        if self.return_fields_set {
+            let fields_set: &PySet = PySet::new(py, &[field_name.to_string()])?;
+            Ok(PyTuple::new(py, [new_data, fields_set.to_object(py)]).to_object(py))
+        } else {
+            Ok(new_data)
         }
     }
 }

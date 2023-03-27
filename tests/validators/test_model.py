@@ -1,4 +1,6 @@
 import re
+from copy import deepcopy
+from typing import Any, List
 
 import pytest
 
@@ -768,7 +770,7 @@ def test_validate_assignment_function():
         field_b: int
         field_c: int
 
-    calls = []
+    calls: List[Any] = []
 
     def func(x, info):
         calls.append(str(info))
@@ -863,3 +865,71 @@ def test_frozen():
     assert exc_info.value.errors() == [
         {'type': 'frozen_instance', 'loc': (), 'msg': 'Instance is frozen', 'input': 'y'}
     ]
+
+
+@pytest.mark.parametrize(
+    'function_schema,call1, call2',
+    [
+        (
+            core_schema.general_after_validator_function,
+            (({'a': 1, 'b': 2}, {'b'}), 'ValidationInfo(config=None, context=None)'),
+            (({'a': 10, 'b': 2}, {'a'}), 'ValidationInfo(config=None, context=None)'),
+        ),
+        (
+            core_schema.general_before_validator_function,
+            ({'b': 2}, 'ValidationInfo(config=None, context=None)'),
+            ({'a': 10, 'b': 2}, 'ValidationInfo(config=None, context=None)'),
+        ),
+        (
+            core_schema.general_wrap_validator_function,
+            ({'b': 2}, 'ValidationInfo(config=None, context=None)'),
+            ({'a': 10, 'b': 2}, 'ValidationInfo(config=None, context=None)'),
+        ),
+    ],
+)
+def test_validate_assignment_model_validator_function(function_schema: Any, call1: Any, call2: Any):
+    class Model:
+        __slots__ = ('__dict__', '__fields_set__')
+
+    calls: List[Any] = []
+
+    def f(values_or_values_and_fields_set: Any, *args: Any) -> Any:
+        if len(args) == 2:
+            # wrap
+            handler, info = args
+            calls.append((deepcopy(values_or_values_and_fields_set), str(info)))
+            return handler(values_or_values_and_fields_set)
+        else:
+            info = args[0]
+            calls.append((deepcopy(values_or_values_and_fields_set), str(info)))
+            return values_or_values_and_fields_set
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            function_schema(
+                f,
+                core_schema.typed_dict_schema(
+                    {
+                        'a': core_schema.typed_dict_field(
+                            core_schema.with_default_schema(core_schema.int_schema(), default=1)
+                        ),
+                        'b': core_schema.typed_dict_field(core_schema.int_schema()),
+                    },
+                    return_fields_set=True,
+                ),
+            ),
+        )
+    )
+
+    m = v.validate_python({'b': 2})
+    assert m.a == 1
+    assert m.b == 2
+    assert m.__fields_set__ == {'b'}
+    assert calls == [call1]
+
+    v.validate_assignment(m, 'a', 10)
+    assert m.a == 10
+    assert m.b == 2
+    assert m.__fields_set__ == {'a', 'b'}
+    assert calls == [call1, call2]
