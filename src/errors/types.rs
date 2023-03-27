@@ -432,7 +432,6 @@ static ERROR_TYPE_LOOKUP: GILOnceCell<AHashMap<String, ErrorType>> = GILOnceCell
 
 impl ErrorType {
     /// create an new ErrorType from python, no_coverage since coverage doesn't work properly here due to the macro
-    #[cfg_attr(has_no_coverage, no_coverage)]
     pub fn new(py: Python, value: &str, ctx: Option<&PyDict>) -> PyResult<Self> {
         let lookup = ERROR_TYPE_LOOKUP.get_or_init(py, Self::build_lookup);
         let error_type = match lookup.get(value) {

@@ -53,7 +53,6 @@ impl<'py> SchemaDict<'py> for Option<&PyDict> {
         }
     }
 
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn get_as_req<T>(&'py self, key: &PyString) -> PyResult<T>
     where
         T: FromPyObject<'py>,
@@ -122,7 +121,6 @@ impl fmt::Display for SchemaError {
 }
 
 impl Error for SchemaError {
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }

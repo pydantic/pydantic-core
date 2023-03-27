@@ -39,7 +39,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn is_none(&self) -> bool;
 
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn get_attr(&self, _name: &PyString) -> Option<&PyAny> {
         None
     }
@@ -86,7 +85,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_str(&'a self) -> ValResult<EitherString<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
         self.strict_str()
     }
@@ -99,7 +97,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_bytes(&'a self) -> ValResult<EitherBytes<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_bytes(&'a self) -> ValResult<EitherBytes<'a>> {
         self.strict_bytes()
     }
@@ -112,7 +109,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_bool(&self) -> ValResult<bool>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_bool(&self) -> ValResult<bool> {
         self.strict_bool()
     }
@@ -125,7 +121,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_int(&self) -> ValResult<i64>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_int(&self) -> ValResult<i64> {
         self.strict_int()
     }
@@ -138,7 +133,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_float(&self) -> ValResult<f64>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_float(&self) -> ValResult<f64> {
         self.strict_float()
     }
@@ -151,7 +145,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_dict(&'a self) -> ValResult<GenericMapping<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_dict(&'a self) -> ValResult<GenericMapping<'a>> {
         self.strict_dict()
     }
@@ -168,7 +161,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_list(&'a self) -> ValResult<GenericCollection<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_list(&'a self, _allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
         self.strict_list()
     }
@@ -181,7 +173,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_tuple(&'a self) -> ValResult<GenericCollection<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
         self.strict_tuple()
     }
@@ -194,7 +185,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_set(&'a self) -> ValResult<GenericCollection<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_set(&'a self) -> ValResult<GenericCollection<'a>> {
         self.strict_set()
     }
@@ -207,7 +197,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_frozenset(&'a self) -> ValResult<GenericCollection<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
         self.strict_frozenset()
     }
@@ -222,7 +211,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_date(&self) -> ValResult<EitherDate>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_date(&self) -> ValResult<EitherDate> {
         self.strict_date()
     }
@@ -235,7 +223,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_time(&self) -> ValResult<EitherTime>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_time(&self) -> ValResult<EitherTime> {
         self.strict_time()
     }
@@ -248,7 +235,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_datetime(&self) -> ValResult<EitherDateTime>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_datetime(&self) -> ValResult<EitherDateTime> {
         self.strict_datetime()
     }
@@ -261,7 +247,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         }
     }
     fn strict_timedelta(&self) -> ValResult<EitherTimedelta>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_timedelta(&self) -> ValResult<EitherTimedelta> {
         self.strict_timedelta()
     }
