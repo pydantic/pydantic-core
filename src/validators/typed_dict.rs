@@ -229,7 +229,7 @@ impl Validator for TypedDictValidator {
                             Err(err) => return Err(err),
                         }
                         continue;
-                    } else if let Some(value) = field.validator.default_value(py, &extra, slots, recursion_guard)? {
+                    } else if let Some(value) = field.validator.default_value(py, Some(field.name.as_str()), &extra, slots, recursion_guard)? {
                         output_dict.set_item(&field.name_py, value)?;
                     } else if field.required {
                         errors.push(ValLineError::new_with_loc(

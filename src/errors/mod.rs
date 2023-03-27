@@ -9,7 +9,7 @@ mod value_exception;
 pub use self::line_error::{InputValue, ValError, ValLineError, ValResult};
 pub use self::location::LocItem;
 pub use self::types::{list_all_errors, ErrorType};
-pub use self::validation_exception::{pretty_py_line_errors, ValidationError};
+pub use self::validation_exception::ValidationError;
 pub use self::value_exception::{PydanticCustomError, PydanticKnownError, PydanticOmit};
 
 pub fn py_err_string(py: Python, err: PyErr) -> String {

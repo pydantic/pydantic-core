@@ -220,10 +220,13 @@ impl Validator for DataclassArgsValidator {
                         }
                         // found neither, check if there is a default value, otherwise error
                         (None, None) => {
-                            if let Some(value) = field
-                                .validator
-                                .default_value(py, &extra, slots, recursion_guard)?
-                            {
+                            if let Some(value) = field.validator.default_value(
+                                py,
+                                Some(field.name.as_str()),
+                                &extra,
+                                slots,
+                                recursion_guard,
+                            )? {
                                 set_item!(field, value);
                             } else {
                                 errors.push(ValLineError::new_with_loc(

@@ -220,7 +220,7 @@ impl Validator for ArgumentsValidator {
                             }
                         }
                         (None, None) => {
-                            if let Some(value) = parameter.validator.default_value(py, extra, slots, recursion_guard)? {
+                            if let Some(value) = parameter.validator.default_value(py, Some(parameter.name.as_str()), extra, slots, recursion_guard)? {
                                 if let Some(ref kwarg_key) = parameter.kwarg_key {
                                     output_kwargs.set_item(kwarg_key, value)?;
                                 } else {

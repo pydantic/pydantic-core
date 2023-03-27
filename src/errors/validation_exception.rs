@@ -46,7 +46,7 @@ impl ValidationError {
     }
 
     pub fn display(&self, py: Python, prefix_override: Option<&'static str>) -> String {
-        let line_errors = pretty_py_line_errors(py, &self.line_errors);
+        let line_errors = pretty_py_line_errors(py, self.line_errors.iter());
         if let Some(prefix) = prefix_override {
             format!("{prefix}\n{line_errors}")
         } else {
@@ -133,9 +133,8 @@ macro_rules! truncate_input_value {
     };
 }
 
-pub fn pretty_py_line_errors(py: Python, line_errors_iter: &[PyLineError]) -> String {
+pub fn pretty_py_line_errors<'a>(py: Python, line_errors_iter: impl Iterator<Item = &'a PyLineError>) -> String {
     line_errors_iter
-        .iter()
         .map(|i| i.pretty(py))
         .collect::<Result<Vec<_>, _>>()
         .unwrap_or_else(|err| vec![format!("[error formatting line errors: {err}]")])

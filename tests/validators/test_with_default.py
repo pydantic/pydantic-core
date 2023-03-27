@@ -2,7 +2,7 @@ from collections import deque
 
 import pytest
 
-from pydantic_core import SchemaError, SchemaValidator, core_schema
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import PyAndJson, plain_repr
 
@@ -336,16 +336,47 @@ def test_validate_default_factory():
     assert v.validate_python(()) == (42,)
 
 
-def test_validate_default_error():
+def test_validate_default_error_tuple():
     v = SchemaValidator(
         core_schema.tuple_positional_schema(
             core_schema.with_default_schema(core_schema.int_schema(), default='wrong', validate_default=True)
         )
     )
     assert v.validate_python(('2',)) == (2,)
-    msg = (
-        r"^Error validating default value:\n  Input should be a valid integer, unable to parse string as an integer "
-        r"\[type=int_parsing, input_value='wrong', input_type=str\]$"
-    )
-    with pytest.raises(ValueError, match=msg):
+    with pytest.raises(ValidationError, match='Input should be a valid integer,') as exc_info:
         v.validate_python(())
+
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'type': 'int_parsing',
+            'loc': (0,),
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'wrong',
+        }
+    ]
+
+
+def test_validate_default_error_typed_dict():
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            {
+                'x': core_schema.typed_dict_field(
+                    core_schema.with_default_schema(core_schema.int_schema(), default='xx', validate_default=True)
+                )
+            }
+        )
+    )
+    assert v.validate_python({'x': '2'}) == {'x': 2}
+    with pytest.raises(ValidationError, match='Input should be a valid integer,') as exc_info:
+        v.validate_python({})
+
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'type': 'int_parsing',
+            'loc': ('x',),
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'xx',
+        }
+    ]

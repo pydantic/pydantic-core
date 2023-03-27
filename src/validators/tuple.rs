@@ -154,7 +154,9 @@ impl Validator for TuplePositionalValidator {
                             Err(err) => return Err(err),
                         },
                         None => {
-                            if let Some(value) = validator.default_value(py, extra, slots, recursion_guard)? {
+                            if let Some(value) =
+                                validator.default_value(py, Some(index), extra, slots, recursion_guard)?
+                            {
                                 output.push(value);
                             } else {
                                 errors.push(ValLineError::new_with_loc(ErrorType::Missing, input, index));

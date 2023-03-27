@@ -1,10 +1,9 @@
-use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::{py_err, schema_or_config_same, SchemaDict};
-use crate::errors::{pretty_py_line_errors, ValError, ValResult};
+use crate::errors::{LocItem, ValError, ValResult};
 use crate::input::Input;
 use crate::questions::Question;
 use crate::recursion_guard::RecursionGuard;
@@ -109,7 +108,9 @@ impl Validator for WithDefaultValidator {
             Ok(v) => Ok(v),
             Err(e) => match self.on_error {
                 OnError::Raise => Err(e),
-                OnError::Default => Ok(self.default_value(py, extra, slots, recursion_guard)?.unwrap()),
+                OnError::Default => Ok(self
+                    .default_value(py, None::<usize>, extra, slots, recursion_guard)?
+                    .unwrap()),
                 OnError::Omit => Err(ValError::Omit),
             },
         }
@@ -118,26 +119,23 @@ impl Validator for WithDefaultValidator {
     fn default_value<'s, 'data>(
         &'s self,
         py: Python<'data>,
+        outer_loc: Option<impl Into<LocItem>>,
         extra: &Extra,
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
-    ) -> PyResult<Option<PyObject>> {
+    ) -> ValResult<'data, Option<PyObject>> {
         match self.default.default_value(py)? {
             Some(dft) => {
                 if self.validate_default {
                     match self.validate(py, dft.into_ref(py), extra, slots, recursion_guard) {
                         Ok(v) => Ok(Some(v)),
-                        Err(ValError::LineErrors(e)) => {
-                            let line_errors_iter = e.into_iter().map(|e| e.into_py(py)).collect::<Vec<_>>();
-                            let errors = pretty_py_line_errors(py, &line_errors_iter);
-                            Err(PyValueError::new_err(format!(
-                                "Error validating default value:\n{errors}"
-                            )))
+                        Err(e) => {
+                            if let Some(outer_loc) = outer_loc {
+                                Err(e.with_outer_location(outer_loc.into()))
+                            } else {
+                                Err(e)
+                            }
                         }
-                        Err(ValError::InternalErr(e)) => Err(e),
-                        Err(ValError::Omit) => Err(PyValueError::new_err(
-                            "Unexpected Omit error from default value validation",
-                        )),
                     }
                 } else {
                     Ok(Some(dft))
