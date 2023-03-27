@@ -652,37 +652,3 @@ pub trait Validator: Send + Sync + Clone + Debug {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use std::{fs, path::Path};
-
-    use crate::validators::SchemaValidator;
-    use pyo3::prelude::*;
-
-    #[test]
-    fn test_validate_assignment() {
-        Python::with_gil(|py| {
-            let sys_path = py.import("sys").unwrap().getattr("path").unwrap();
-            sys_path
-                .call_method1("append", ("/Users/adriangarciabadaracco/GitHub/pydantic-core/",))
-                .unwrap();
-
-            let test_mod_contents = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("test.py")).unwrap();
-            let schema: Py<PyAny> = PyModule::from_code(py, &test_mod_contents, "test.py", "test")
-                .unwrap()
-                .getattr("schema")
-                .unwrap()
-                .into();
-            let validator = SchemaValidator::py_new(py, schema.as_ref(py), None).unwrap();
-
-            let input = py.eval("{'width': '1', 'length': 1}", None, None).unwrap();
-            let obj = validator.validate_python(py, input, None, None, None).unwrap();
-
-            let input = py.eval("2", None, None).unwrap();
-            validator
-                .validate_assignment(py, obj.as_ref(py), "width", input, None, None)
-                .unwrap();
-        });
-    }
-}
