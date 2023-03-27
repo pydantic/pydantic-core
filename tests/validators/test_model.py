@@ -888,6 +888,18 @@ def test_frozen():
     ],
 )
 def test_validate_assignment_model_validator_function(function_schema: Any, call1: Any, call2: Any):
+    """
+    Test handling of values and fields_set for validator functions that wrap a model when using
+    validate_assignment.
+
+    Note that we are currently not exposing this functionality in conjunction with getting
+    access to `fields_set` in a model validator, so the behavior of fields set.
+    In particular, for function_after it is not clear if the fields set passed to
+    the validator should be the fields that were assigned on this call to `validate_assignment`
+    (currently always a single field) or the fields that have been assigned in the
+    model since it was created.
+    """
+
     class Model:
         __slots__ = ('__dict__', '__fields_set__')
 
