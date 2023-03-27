@@ -50,6 +50,9 @@ jobs:
 
       - run: coverage run -m pytest
 
+      - uses: mxschmitt/action-tmate@v3
+        if: failure()
+
       - run: ls -lha
       - run: coverage xml
 
