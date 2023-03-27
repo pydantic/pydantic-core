@@ -328,10 +328,24 @@ def test_validate_default():
 def test_validate_default_factory():
     v = SchemaValidator(
         core_schema.tuple_positional_schema(
-            core_schema.with_default_schema(
-                core_schema.int_schema(), default_factory=lambda: '42', validate_default=True
-            )
-        )
+            core_schema.with_default_schema(core_schema.int_schema(), default_factory=lambda: '42')
+        ),
+        config=dict(validate_default=True),
     )
     assert v.validate_python(('2',)) == (2,)
     assert v.validate_python(()) == (42,)
+
+
+def test_validate_default_error():
+    v = SchemaValidator(
+        core_schema.tuple_positional_schema(
+            core_schema.with_default_schema(core_schema.int_schema(), default='wrong', validate_default=True)
+        )
+    )
+    assert v.validate_python(('2',)) == (2,)
+    msg = (
+        r"^Error validating default value:\n  Input should be a valid integer, unable to parse string as an integer "
+        r"\[type=int_parsing, input_value='wrong', input_type=str\]$"
+    )
+    with pytest.raises(ValueError, match=msg):
+        v.validate_python(())

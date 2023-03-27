@@ -609,7 +609,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         _extra: &Extra,
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, Option<PyObject>> {
+    ) -> PyResult<Option<PyObject>> {
         Ok(None)
     }
 
