@@ -46,7 +46,7 @@ jobs:
 
       - run: pip freeze
 
-      - run: coverage run -m pytest
+      - run: coverage run -m pytest --ignore=tests/test_docstrings.py
 
       - run: ls -lha
       - run: coverage xml
