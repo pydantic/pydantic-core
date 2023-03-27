@@ -80,18 +80,13 @@ impl Validator for FunctionBeforeValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        // skip function calls if `assignee_field` is set
-        if extra.assignee_field.is_none() {
-            let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
-            let value = self
-                .func
-                .call1(py, (input.to_object(py), info))
-                .map_err(|e| convert_err(py, e, input))?;
-            self.validator
-                .validate(py, value.into_ref(py), extra, slots, recursion_guard)
-        } else {
-            self.validator.validate(py, input, extra, slots, recursion_guard)
-        }
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
+        let value = self
+            .func
+            .call1(py, (input.to_object(py), info))
+            .map_err(|e| convert_err(py, e, input))?;
+        self.validator
+            .validate(py, value.into_ref(py), extra, slots, recursion_guard)
     }
 
     fn get_name(&self) -> &str {
@@ -104,6 +99,29 @@ impl Validator for FunctionBeforeValidator {
 
     fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
         self.validator.complete(build_context)
+    }
+
+    fn validate_assignment<'s, 'data: 's>(
+        &'s self,
+        py: Python<'data>,
+        obj: &'data PyAny,
+        field_name: &'data str,
+        field_value: &'data PyAny,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
+        let value = self.func.call1(py, (obj, info)).map_err(|e| convert_err(py, e, obj))?;
+        self.validator.validate_assignment(
+            py,
+            value.into_ref(py),
+            field_name,
+            field_value,
+            extra,
+            slots,
+            recursion_guard,
+        )
     }
 }
 
@@ -128,13 +146,8 @@ impl Validator for FunctionAfterValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let v = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-        // skip function calls if `assignee_field` is set
-        if extra.assignee_field.is_none() {
-            let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
-            self.func.call1(py, (v, info)).map_err(|e| convert_err(py, e, input))
-        } else {
-            Ok(v)
-        }
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
+        self.func.call1(py, (v, info)).map_err(|e| convert_err(py, e, input))
     }
 
     fn get_name(&self) -> &str {
@@ -147,6 +160,23 @@ impl Validator for FunctionAfterValidator {
 
     fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
         self.validator.complete(build_context)
+    }
+
+    fn validate_assignment<'s, 'data: 's>(
+        &'s self,
+        py: Python<'data>,
+        obj: &'data PyAny,
+        field_name: &'data str,
+        field_value: &'data PyAny,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        let v = self
+            .validator
+            .validate_assignment(py, obj, field_name, field_value, extra, slots, recursion_guard)?;
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
+        self.func.call1(py, (v, info)).map_err(|e| convert_err(py, e, obj))
     }
 }
 
@@ -213,6 +243,26 @@ pub struct FunctionWrapValidator {
 impl_build!(FunctionWrapValidator, "function-wrap");
 
 impl Validator for FunctionWrapValidator {
+    fn validate_assignment<'s, 'data: 's>(
+        &'s self,
+        py: Python<'data>,
+        obj: &'data PyAny,
+        field_name: &'data str,
+        field_value: &'data PyAny,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        let call_next_validator = ValidatorCallable {
+            validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
+            updated_field: Some((field_name.to_string(), field_value.into_py(py))),
+        };
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
+        self.func
+            .call1(py, (obj.to_object(py), call_next_validator, info))
+            .map_err(|e| convert_err(py, e, obj))
+    }
+
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -221,25 +271,14 @@ impl Validator for FunctionWrapValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        // skip function calls if `assignee_field` is set
-        if extra.assignee_field.is_none() {
-            let call_next_validator = ValidatorCallable {
-                validator: InternalValidator::new(
-                    py,
-                    "ValidatorCallable",
-                    &self.validator,
-                    slots,
-                    extra,
-                    recursion_guard,
-                ),
-            };
-            let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
-            self.func
-                .call1(py, (input.to_object(py), call_next_validator, info))
-                .map_err(|e| convert_err(py, e, input))
-        } else {
-            self.validator.validate(py, input, extra, slots, recursion_guard)
-        }
+        let call_next_validator = ValidatorCallable {
+            validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
+            updated_field: None,
+        };
+        let info = ValidationInfo::new(py, extra, &self.config, self.is_field_validator)?;
+        self.func
+            .call1(py, (input.to_object(py), call_next_validator, info))
+            .map_err(|e| convert_err(py, e, input))
     }
 
     fn get_name(&self) -> &str {
@@ -258,6 +297,7 @@ impl Validator for FunctionWrapValidator {
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
 struct ValidatorCallable {
+    updated_field: Option<(String, Py<PyAny>)>,
     validator: InternalValidator,
 }
 
@@ -271,7 +311,16 @@ impl ValidatorCallable {
             },
             None => None,
         };
-        self.validator.validate(py, input_value, outer_location)
+        match &self.updated_field {
+            Some((field_name, field_value)) => self.validator.validate_assignment(
+                py,
+                input_value,
+                field_name.as_str(),
+                field_value.as_ref(py),
+                outer_location,
+            ),
+            None => self.validator.validate(py, input_value, outer_location),
+        }
     }
 
     fn __repr__(&self) -> String {

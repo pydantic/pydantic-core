@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
 
+use pyo3::exceptions::PyTypeError;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
@@ -165,28 +166,29 @@ impl SchemaValidator {
         }
     }
 
-    #[pyo3(signature = (obj, field, input, *, strict=None, context=None))]
+    #[pyo3(signature = (obj, field_name, field_value, *, strict=None, context=None))]
     pub fn validate_assignment(
         &self,
         py: Python,
         obj: &PyAny,
-        field: String,
-        input: &PyAny,
+        field_name: &str,
+        field_value: &PyAny,
         strict: Option<bool>,
         context: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         let extra = Extra {
             data: None,
-            assignee_field: Some(field.as_str()),
+            updated_field: None,
             strict,
             context,
             field_name: None,
-            self_instance: Some(obj),
+            self_instance: None,
         };
-        let r = self
-            .validator
-            .validate(py, input, &extra, &self.slots, &mut RecursionGuard::default());
-        r.map_err(|e| self.prepare_validation_err(py, e))
+
+        let guard = &mut RecursionGuard::default();
+        self.validator
+            .validate_assignment(py, obj, field_name, field_value, &extra, &self.slots, guard)
+            .map_err(|e| self.prepare_validation_err(py, e))
     }
 
     pub fn __repr__(&self, py: Python) -> String {
@@ -460,7 +462,7 @@ pub struct Extra<'a> {
     /// If there is no model this will be None
     pub field_name: Option<&'a str>,
     /// The field being assigned to when validating assignment
-    pub assignee_field: Option<&'a str>,
+    pub updated_field: Option<(&'a str, &'a PyAny)>,
     /// whether we're in strict or lax mode
     pub strict: Option<bool>,
     /// context used in validator functions
@@ -484,7 +486,7 @@ impl<'a> Extra<'a> {
     pub fn as_strict(&self) -> Self {
         Self {
             data: self.data,
-            assignee_field: self.assignee_field,
+            updated_field: self.updated_field,
             strict: Some(true),
             context: self.context,
             field_name: self.field_name,
@@ -614,6 +616,24 @@ pub trait Validator: Send + Sync + Clone + Debug {
         Ok(None)
     }
 
+    /// Validate assignment to a field of a model
+    #[allow(clippy::too_many_arguments)]
+    fn validate_assignment<'s, 'data: 's>(
+        &'s self,
+        _py: Python<'data>,
+        _obj: &'data PyAny,
+        _field_name: &'data str,
+        _field_value: &'data PyAny,
+        _extra: &Extra,
+        _slots: &'data [CombinedValidator],
+        _recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        Err(ValError::InternalErr(PyTypeError::new_err(format!(
+            "validate_assignment is not supported for {}",
+            self.get_name(),
+        ))))
+    }
+
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`
     fn get_name(&self) -> &str;
@@ -630,5 +650,39 @@ pub trait Validator: Send + Sync + Clone + Debug {
     /// it is used by `RecursiveRefValidator` to set its name
     fn complete(&mut self, _build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path::Path};
+
+    use crate::validators::SchemaValidator;
+    use pyo3::prelude::*;
+
+    #[test]
+    fn test_validate_assignment() {
+        Python::with_gil(|py| {
+            let sys_path = py.import("sys").unwrap().getattr("path").unwrap();
+            sys_path
+                .call_method1("append", ("/Users/adriangarciabadaracco/GitHub/pydantic-core/",))
+                .unwrap();
+
+            let test_mod_contents = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("test.py")).unwrap();
+            let schema: Py<PyAny> = PyModule::from_code(py, &test_mod_contents, "test.py", "test")
+                .unwrap()
+                .getattr("schema")
+                .unwrap()
+                .into();
+            let validator = SchemaValidator::py_new(py, schema.as_ref(py), None).unwrap();
+
+            let input = py.eval("{'width': '1', 'length': 1}", None, None).unwrap();
+            let obj = validator.validate_python(py, input, None, None, None).unwrap();
+
+            let input = py.eval("2", None, None).unwrap();
+            validator
+                .validate_assignment(py, obj.as_ref(py), "width", input, None, None)
+                .unwrap();
+        });
     }
 }

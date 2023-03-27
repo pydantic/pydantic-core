@@ -192,7 +192,7 @@ pub struct InternalValidator {
     slots: Vec<CombinedValidator>,
     // TODO, do we need data?
     data: Option<Py<PyDict>>,
-    field: Option<String>,
+    updated_field: Option<(String, PyObject)>,
     strict: Option<bool>,
     context: Option<PyObject>,
     self_instance: Option<PyObject>,
@@ -219,12 +219,43 @@ impl InternalValidator {
             validator: validator.clone(),
             slots: slots.to_vec(),
             data: extra.data.map(|d| d.into_py(py)),
-            field: extra.assignee_field.map(|f| f.to_string()),
+            updated_field: extra
+                .updated_field
+                .map(|(name, value)| (name.to_string(), value.to_object(py))),
             strict: extra.strict,
             context: extra.context.map(|d| d.into_py(py)),
             self_instance: extra.self_instance.map(|d| d.into_py(py)),
             recursion_guard: recursion_guard.clone(),
         }
+    }
+
+    pub fn validate_assignment<'s, 'data: 's>(
+        &'s mut self,
+        py: Python<'data>,
+        model: &'data PyAny,
+        field_name: &'data str,
+        field_value: &'data PyAny,
+        outer_location: Option<LocItem>,
+    ) -> PyResult<PyObject> {
+        let extra = Extra {
+            data: self.data.as_ref().map(|data| data.as_ref(py)),
+            updated_field: Some((field_name, field_value)),
+            strict: self.strict,
+            context: self.context.as_ref().map(|data| data.as_ref(py)),
+            field_name: None,
+            self_instance: self.self_instance.as_ref().map(|data| data.as_ref(py)),
+        };
+        self.validator
+            .validate_assignment(
+                py,
+                model,
+                field_name,
+                field_value,
+                &extra,
+                &self.slots,
+                &mut self.recursion_guard,
+            )
+            .map_err(|e| ValidationError::from_val_error(py, self.name.to_object(py), e, outer_location))
     }
 
     pub fn validate<'s, 'data>(
@@ -236,9 +267,13 @@ impl InternalValidator {
     where
         's: 'data,
     {
+        let updated_field = self
+            .updated_field
+            .as_ref()
+            .map(|(field_name, field_value)| (field_name.as_str(), field_value.as_ref(py)));
         let extra = Extra {
             data: self.data.as_ref().map(|data| data.as_ref(py)),
-            assignee_field: self.field.as_deref(),
+            updated_field,
             strict: self.strict,
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             field_name: None,

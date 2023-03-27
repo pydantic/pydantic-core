@@ -837,7 +837,7 @@ def test_validate_assignment_no_fields_set():
     assert not hasattr(m, '__fields_set__')
 
     # wrong arguments
-    with pytest.raises(TypeError, match='self_instance should not be None on typed-dict validate_assignment'):
+    with pytest.raises(TypeError, match="'field_a' is not a model instance"):
         v.validate_assignment('field_a', 'field_a', b'different')
 
 
