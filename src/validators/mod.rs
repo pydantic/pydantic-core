@@ -183,7 +183,6 @@ impl SchemaValidator {
             field_name: None,
             self_instance: Some(obj),
         };
-
         let r = self
             .validator
             .validate(py, input, &extra, &self.slots, &mut RecursionGuard::default());
