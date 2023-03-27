@@ -49,8 +49,11 @@ jobs:
       - run: pip freeze
 
       - run: coverage run -m pytest
+        env:
+          LLVM_PROFILE_FILE: 'coverage_reports/pydantic_core_%p.profraw'
 
       - run: ls -lha
+      - run: ls -lha coverage_reports
       - run: coverage xml
 
       - run: coverage-prepare lcov pydantic_core/*.so
