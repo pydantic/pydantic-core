@@ -44,8 +44,14 @@ def test_typed_dict(py_and_json: PyAndJson):
         {
             'type': 'typed-dict',
             'fields': {
-                'f1': {'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f1}}},
-                'f2': {'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f2}}},
+                'f1': {
+                    'type': 'typed-dict-field',
+                    'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f1}},
+                },
+                'f2': {
+                    'type': 'typed-dict-field',
+                    'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f2}},
+                },
             },
         }
     )
@@ -112,14 +118,20 @@ def test_validate_assignment_with_context():
         {
             'type': 'typed-dict',
             'fields': {
-                'f1': {'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f1}}},
-                'f2': {'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f2}}},
+                'f1': {
+                    'type': 'typed-dict-field',
+                    'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f1}},
+                },
+                'f2': {
+                    'type': 'typed-dict-field',
+                    'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f2}},
+                },
             },
         }
     )
 
-    m1 = v.validate_python({'f1': '1', 'f2': '2'}, None, {'x': 'y'})
+    m1 = v.validate_python({'f1': '1', 'f2': '2'}, strict=None, context={'x': 'y'})
     assert m1 == {'f1': "1| context: {'x': 'y', 'f1': '1'}", 'f2': "2| context: {'x': 'y', 'f1': '1', 'f2': '2'}"}
 
-    m2 = v.validate_assignment('f1', '3', m1, None, {'x': 'y'})
+    m2 = v.validate_assignment(m1, 'f1', '3', context={'x': 'y'})
     assert m2 == {'f1': "3| context: {'x': 'y', 'f1': '3'}", 'f2': "2| context: {'x': 'y', 'f1': '1', 'f2': '2'}"}

@@ -53,7 +53,11 @@ def test_internal_error():
         {
             'type': 'model',
             'cls': int,
-            'schema': {'type': 'typed-dict', 'return_fields_set': True, 'fields': {'f': {'schema': {'type': 'int'}}}},
+            'schema': {
+                'type': 'typed-dict',
+                'return_fields_set': True,
+                'fields': {'f': {'type': 'typed-dict-field', 'schema': {'type': 'int'}}},
+            },
         }
     )
     with pytest.raises(AttributeError, match="'int' object has no attribute '__dict__'"):
@@ -78,7 +82,7 @@ def test_omit(py_and_json: PyAndJson):
         else:
             return v
 
-    v = py_and_json(core_schema.general_plain_validation_function(omit))
+    v = py_and_json(core_schema.general_plain_validator_function(omit))
     assert v.validate_test('foo') == 'foo'
     assert v.isinstance_test('foo') is True
 

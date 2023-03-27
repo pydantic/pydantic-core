@@ -34,10 +34,19 @@ def test_schema_as_string():
 def test_schema_wrong_type():
     with pytest.raises(SchemaError) as exc_info:
         SchemaValidator(1)
-    assert exc_info.value.args[0] == (
+    assert str(exc_info.value) == (
         'Invalid Schema:\n  Input should be a valid dictionary or instance to'
         ' extract fields from [type=dict_attributes_type, input_value=1, input_type=int]'
     )
+    assert exc_info.value.errors() == [
+        {
+            'input': 1,
+            'loc': (),
+            'msg': 'Input should be a valid dictionary or instance to extract fields ' 'from',
+            'type': 'dict_attributes_type',
+        }
+    ]
+    assert exc_info.value.error_count() == 1
 
 
 @pytest.mark.parametrize('pickle_protocol', range(1, pickle.HIGHEST_PROTOCOL + 1))
@@ -60,7 +69,10 @@ def test_schema_definition_error():
 def test_not_schema_definition_error():
     schema = {
         'type': 'typed-dict',
-        'fields': {f'f_{i}': {'schema': {'type': 'nullable', 'schema': {'type': 'int'}}} for i in range(101)},
+        'fields': {
+            f'f_{i}': {'type': 'typed-dict-field', 'schema': {'type': 'nullable', 'schema': {'type': 'int'}}}
+            for i in range(101)
+        },
     }
     v = SchemaValidator(schema)
     assert repr(v).count('TypedDictField') == 101

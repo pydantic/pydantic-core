@@ -36,7 +36,7 @@ def test_def_error():
             )
         )
 
-    assert exc_info.value.args[0].startswith(
+    assert str(exc_info.value).startswith(
         "Invalid Schema:\ndefinitions -> definitions -> 1\n  Input tag 'wrong' found using 'type'"
     )
 

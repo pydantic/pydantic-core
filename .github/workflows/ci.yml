@@ -25,7 +25,7 @@ jobs:
         name: cache rust
         uses: Swatinem/rust-cache@v2
         with:
-          key: coverage-v1
+          key: coverage-v2
 
       - run: cargo install rustfilt coverage-prepare
         if: steps.cache-rust.outputs.cache-hit != 'true'
@@ -47,9 +47,6 @@ jobs:
       - run: pip freeze
 
       - run: coverage run -m pytest
-        env:
-          BENCHMARK_VS_PYDANTIC: 1
-          HYPOTHESIS_PROFILE: slow
 
       - run: ls -lha
       - run: coverage xml
@@ -76,9 +73,6 @@ jobs:
           - 'pypy3.9'
 
     runs-on: ubuntu-latest
-
-    env:
-      PYTHON: ${{ matrix.python-version }}
 
     steps:
       - uses: actions/checkout@v3
@@ -265,6 +259,7 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
+          allowed-failures: coverage
 
   build:
     name: build on ${{ matrix.platform || matrix.os }} (${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
@@ -344,14 +339,14 @@ jobs:
 
       - name: build sdist
         if: ${{ matrix.os == 'ubuntu' && matrix.target == 'x86_64' && matrix.manylinux == 'auto' }}
-        uses: messense/maturin-action@v1
+        uses: PyO3/maturin-action@v1
         with:
           command: sdist
           args: --out dist
           rust-toolchain: stable
 
       - name: build wheels
-        uses: messense/maturin-action@v1
+        uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}

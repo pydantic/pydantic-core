@@ -24,6 +24,10 @@ pub struct ValidationError {
 }
 
 impl ValidationError {
+    pub fn new(line_errors: Vec<PyLineError>, title: PyObject) -> Self {
+        Self { line_errors, title }
+    }
+
     pub fn from_val_error(py: Python, title: PyObject, error: ValError, outer_location: Option<LocItem>) -> PyErr {
         match error {
             ValError::LineErrors(raw_errors) => {
@@ -41,12 +45,16 @@ impl ValidationError {
         }
     }
 
-    fn display(&self, py: Python) -> String {
-        let count = self.line_errors.len();
-        let plural = if count == 1 { "" } else { "s" };
-        let title: &str = self.title.extract(py).unwrap();
+    pub fn display(&self, py: Python, prefix_override: Option<&'static str>) -> String {
         let line_errors = pretty_py_line_errors(py, self.line_errors.iter());
-        format!("{count} validation error{plural} for {title}\n{line_errors}")
+        if let Some(prefix) = prefix_override {
+            format!("{prefix}\n{line_errors}")
+        } else {
+            let count = self.line_errors.len();
+            let plural = if count == 1 { "" } else { "s" };
+            let title: &str = self.title.extract(py).unwrap();
+            format!("{count} validation error{plural} for {title}\n{line_errors}")
+        }
     }
 
     pub fn omit_error() -> PyErr {
@@ -77,11 +85,11 @@ impl ValidationError {
         self.title.clone_ref(py)
     }
 
-    fn error_count(&self) -> usize {
+    pub fn error_count(&self) -> usize {
         self.line_errors.len()
     }
 
-    fn errors(&self, py: Python, include_context: Option<bool>) -> PyResult<Py<PyList>> {
+    pub fn errors(&self, py: Python, include_context: Option<bool>) -> PyResult<Py<PyList>> {
         // taken approximately from the pyo3, but modified to return the error during iteration
         // https://github.com/PyO3/pyo3/blob/a3edbf4fcd595f0e234c87d4705eb600a9779130/src/types/list.rs#L27-L55
         unsafe {
@@ -102,7 +110,7 @@ impl ValidationError {
     }
 
     fn __repr__(&self, py: Python) -> String {
-        self.display(py)
+        self.display(py, None)
     }
 
     fn __str__(&self, py: Python) -> String {
