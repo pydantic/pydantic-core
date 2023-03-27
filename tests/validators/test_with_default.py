@@ -2,7 +2,7 @@ from collections import deque
 
 import pytest
 
-from pydantic_core import SchemaError, SchemaValidator
+from pydantic_core import SchemaError, SchemaValidator, core_schema
 
 from ..conftest import PyAndJson, plain_repr
 
@@ -309,3 +309,29 @@ def test_model_class():
     assert m.field_a == '[default-a]'
     assert m.field_b == '[default-b]'
     assert m.__fields_set__ == set()
+
+
+def test_validate_default():
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            {
+                'x': core_schema.typed_dict_field(
+                    core_schema.with_default_schema(core_schema.int_schema(), default='42', validate_default=True)
+                )
+            }
+        )
+    )
+    assert v.validate_python({'x': '2'}) == {'x': 2}
+    assert v.validate_python({}) == {'x': 42}
+
+
+def test_validate_default_factory():
+    v = SchemaValidator(
+        core_schema.tuple_positional_schema(
+            core_schema.with_default_schema(
+                core_schema.int_schema(), default_factory=lambda: '42', validate_default=True
+            )
+        )
+    )
+    assert v.validate_python(('2',)) == (2,)
+    assert v.validate_python(()) == (42,)

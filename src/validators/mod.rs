@@ -602,6 +602,17 @@ pub trait Validator: Send + Sync + Clone + Debug {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject>;
 
+    /// Get a default value, currently only used by `WithDefaultValidator`
+    fn default_value<'s, 'data>(
+        &'s self,
+        _py: Python<'data>,
+        _extra: &Extra,
+        _slots: &'data [CombinedValidator],
+        _recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, Option<PyObject>> {
+        Ok(None)
+    }
+
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`
     fn get_name(&self) -> &str;
