@@ -21,14 +21,7 @@ jobs:
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - id: cache-rust
-        name: cache rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: coverage-v2
-
       - run: cargo install rustfilt coverage-prepare
-        if: steps.cache-rust.outputs.cache-hit != 'true'
 
       - run: rustup component add llvm-tools-preview
 
@@ -55,7 +48,7 @@ jobs:
 
       - uses: codecov/codecov-action@v3
 
-  # See https://github.com/PyO3/pyo3/discussions/2781
+  # See https://github.com/pydantic/pydantic-core/issues/451
   # tests intermittently segfault with pypy and cpython 3.7 when using `coverage run ...`, hence separate job
   test-python:
     name: test ${{ matrix.python-version }}
