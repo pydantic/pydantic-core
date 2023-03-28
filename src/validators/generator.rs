@@ -235,7 +235,6 @@ impl InternalValidator {
     ) -> PyResult<PyObject> {
         let extra = Extra {
             data: self.data.as_ref().map(|data| data.as_ref(py)),
-            updated_field: None,
             strict: self.strict,
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             field_name: None,
@@ -265,7 +264,6 @@ impl InternalValidator {
     {
         let extra = Extra {
             data: self.data.as_ref().map(|data| data.as_ref(py)),
-            updated_field: None,
             strict: self.strict,
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             field_name: None,
