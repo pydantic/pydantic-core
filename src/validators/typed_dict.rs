@@ -163,10 +163,6 @@ impl Validator for TypedDictValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let fields: Vec<(bool, &TypedDictField)> = match extra.updated_field {
-            Some((assignee_field_name, _)) => self.fields.iter().map(|f| (f.name != assignee_field_name, f)).collect(),
-            None => self.fields.iter().map(|f| (false, f)).collect(),
-        };
         let strict = extra.strict.unwrap_or(self.strict);
         let dict = input.validate_typed_dict(strict, self.from_attributes)?;
 
@@ -186,7 +182,7 @@ impl Validator for TypedDictValidator {
 
         macro_rules! process {
             ($dict:ident, $get_method:ident, $iter:ty $(,$kwargs:ident)?) => {{
-                for (skip_validating_this_field, field) in &fields {
+                for field in &self.fields {
                     let extra = Extra {
                         data: Some(output_dict),
                         field_name: Some(&field.name),
@@ -210,13 +206,6 @@ impl Validator for TypedDictValidator {
                             // key is "used" whether or not validation passes, since we want to skip this key in
                             // extra logic either way
                             used_keys.insert(used_key);
-                        }
-                        if *skip_validating_this_field {
-                            output_dict.set_item(&field.name_py, value)?;
-                            if let Some(ref mut fs) = fields_set_vec {
-                                fs.push(field.name_py.clone_ref(py));
-                            }
-                            continue
                         }
                         match field
                             .validator
