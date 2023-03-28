@@ -154,16 +154,9 @@ impl Validator for ModelValidator {
         let new_dict = dict.copy()?;
         new_dict.set_item(field_name, field_value)?;
 
-        let new_input: &PyAny = new_dict;
-        let output = self.validator.validate_assignment(
-            py,
-            new_input,
-            field_name,
-            field_value,
-            extra,
-            slots,
-            recursion_guard,
-        )?;
+        let output =
+            self.validator
+                .validate_assignment(py, new_dict, field_name, field_value, extra, slots, recursion_guard)?;
         let output = if self.expect_fields_set {
             let (output, updated_fields_set): (&PyDict, &PySet) = output.extract(py)?;
             if let Some(fields_set) = model.get_attr(intern!(py, "__fields_set__")) {

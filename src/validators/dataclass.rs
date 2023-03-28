@@ -1,12 +1,11 @@
-use pyo3::exceptions::PyKeyError;
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
 
 use ahash::AHashSet;
 
-use crate::build_tools::{is_strict, py_err, schema_or_config_same, SchemaDict};
+use crate::build_tools::{is_strict, py_err, safe_repr, schema_or_config_same, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{GenericArguments, Input};
 use crate::lookup_key::LookupKey;
@@ -443,32 +442,20 @@ impl Validator for DataclassValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let dict: &PyDict = match obj.get_attr(intern!(py, "__dict__")) {
+        let dict_attr = intern!(py, "__dict__");
+        let dict: &PyDict = match obj.get_attr(dict_attr) {
             Some(v) => v.downcast()?,
-            None => {
-                return Err(ValError::InternalErr(PyTypeError::new_err(format!(
-                    "{} is not a model instance",
-                    obj.repr()?
-                ))))
-            }
+            None => return Err(PyTypeError::new_err(format!("{} is not a model instance", safe_repr(obj))).into()),
         };
 
         let new_dict = dict.copy()?;
         new_dict.set_item(field_name, field_value)?;
 
-        let new_input: &PyAny = new_dict;
+        let dc_dict =
+            self.validator
+                .validate_assignment(py, new_dict, field_name, field_value, extra, slots, recursion_guard)?;
 
-        let dc_dict = self.validator.validate_assignment(
-            py,
-            new_input,
-            field_name,
-            field_value,
-            extra,
-            slots,
-            recursion_guard,
-        )?;
-
-        force_setattr(py, obj, intern!(py, "__dict__"), dc_dict)?;
+        force_setattr(py, obj, dict_attr, dc_dict)?;
 
         Ok(obj.to_object(py))
     }
