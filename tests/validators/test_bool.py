@@ -98,4 +98,4 @@ def test_validate_assignment_not_supported() -> None:
     """
     v = SchemaValidator(core_schema.bool_schema())
     with pytest.raises(TypeError, match='validate_assignment is not supported for bool'):
-        v.validate_assignment(False, 'foo', 123)
+        v.validate_assignment(False, 'foo', True)
