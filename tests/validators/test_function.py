@@ -234,7 +234,7 @@ def test_function_wrap_invalid_location():
         {'type': 'function-wrap', 'function': {'type': 'general', 'function': f}, 'schema': {'type': 'int'}}
     )
 
-    with pytest.raises(TypeError, match='^ValidatorCallable outer_location must be a str or int$'):
+    with pytest.raises(TypeError, match='^outer_location must be a str or int$'):
         v.validate_python(4)
 
 

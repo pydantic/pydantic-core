@@ -192,7 +192,6 @@ pub struct InternalValidator {
     slots: Vec<CombinedValidator>,
     // TODO, do we need data?
     data: Option<Py<PyDict>>,
-    updated_field: Option<(String, PyObject)>,
     strict: Option<bool>,
     context: Option<PyObject>,
     self_instance: Option<PyObject>,
@@ -219,9 +218,6 @@ impl InternalValidator {
             validator: validator.clone(),
             slots: slots.to_vec(),
             data: extra.data.map(|d| d.into_py(py)),
-            updated_field: extra
-                .updated_field
-                .map(|(name, value)| (name.to_string(), value.to_object(py))),
             strict: extra.strict,
             context: extra.context.map(|d| d.into_py(py)),
             self_instance: extra.self_instance.map(|d| d.into_py(py)),
@@ -239,7 +235,7 @@ impl InternalValidator {
     ) -> PyResult<PyObject> {
         let extra = Extra {
             data: self.data.as_ref().map(|data| data.as_ref(py)),
-            updated_field: Some((field_name, field_value)),
+            updated_field: None,
             strict: self.strict,
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             field_name: None,
@@ -267,13 +263,9 @@ impl InternalValidator {
     where
         's: 'data,
     {
-        let updated_field = self
-            .updated_field
-            .as_ref()
-            .map(|(field_name, field_value)| (field_name.as_str(), field_value.as_ref(py)));
         let extra = Extra {
             data: self.data.as_ref().map(|data| data.as_ref(py)),
-            updated_field,
+            updated_field: None,
             strict: self.strict,
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             field_name: None,
