@@ -87,19 +87,30 @@ impl Validator for ModelValidator {
         }
 
         let class = self.class.as_ref(py);
-        let instance = if input.is_exact_instance(class)? {
-            if self.revalidate {
-                let fields_set = input.get_attr(intern!(py, "__fields_set__"));
-                let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-                if self.expect_fields_set {
-                    let (model_dict, validation_fields_set): (&PyAny, &PyAny) = output.extract(py)?;
-                    let fields_set = fields_set.unwrap_or(validation_fields_set);
-                    self.create_class(model_dict, Some(fields_set))?
+        let instance = if input.input_is_instance(class, 0)? {
+            // if the input is an exact instance OR we're not in strict mode, then processed
+            // which means raise ane error in the case of an instance of a subclass in strict mode
+            if input.is_exact_instance(class) || !extra.strict.unwrap_or(self.strict) {
+                if self.revalidate {
+                    let fields_set = input.get_attr(intern!(py, "__fields_set__"));
+                    let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
+                    if self.expect_fields_set {
+                        let (model_dict, validation_fields_set): (&PyAny, &PyAny) = output.extract(py)?;
+                        let fields_set = fields_set.unwrap_or(validation_fields_set);
+                        self.create_class(model_dict, Some(fields_set))?
+                    } else {
+                        self.create_class(output.as_ref(py), fields_set)?
+                    }
                 } else {
-                    self.create_class(output.as_ref(py), fields_set)?
+                    return Ok(input.to_object(py));
                 }
             } else {
-                return Ok(input.to_object(py));
+                return Err(ValError::new(
+                    ErrorType::ModelClassType {
+                        class_name: self.get_name().to_string(),
+                    },
+                    input,
+                ));
             }
         } else if extra.strict.unwrap_or(self.strict) {
             return Err(ValError::new(
@@ -124,6 +135,7 @@ impl Validator for ModelValidator {
         }
         Ok(instance)
     }
+
     fn get_name(&self) -> &str {
         &self.name
     }

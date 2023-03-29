@@ -110,8 +110,8 @@ impl<'a> Input<'a> for PyAny {
         Ok(result == 1)
     }
 
-    fn is_exact_instance(&self, class: &PyType) -> PyResult<bool> {
-        self.get_type().eq(class)
+    fn is_exact_instance(&self, class: &PyType) -> bool {
+        self.get_type().is(class)
     }
 
     fn input_is_subclass(&self, class: &PyType) -> PyResult<bool> {

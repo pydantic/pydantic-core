@@ -418,7 +418,7 @@ impl Validator for DataclassValidator {
         // created with invalid types
         // in theory we could have a flag to skip validation for an exact type in some scenarios, but I'm not sure
         // that's a good idea
-        if extra.strict.unwrap_or(self.strict) && !input.is_exact_instance(class)? {
+        if extra.strict.unwrap_or(self.strict) && !input.is_exact_instance(class) {
             Err(ValError::new(
                 ErrorType::ModelClassType {
                     class_name: self.get_name().to_string(),

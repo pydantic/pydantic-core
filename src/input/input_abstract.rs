@@ -47,8 +47,8 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
     // input_ prefix to differentiate from the function on PyAny
     fn input_is_instance(&self, class: &PyAny, json_mask: u8) -> PyResult<bool>;
 
-    fn is_exact_instance(&self, _class: &PyType) -> PyResult<bool> {
-        Ok(false)
+    fn is_exact_instance(&self, _class: &PyType) -> bool {
+        false
     }
 
     fn input_is_subclass(&self, _class: &PyType) -> PyResult<bool> {
