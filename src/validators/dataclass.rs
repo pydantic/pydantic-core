@@ -291,16 +291,6 @@ impl Validator for DataclassArgsValidator {
         }
     }
 
-    fn get_name(&self) -> &str {
-        &self.validator_name
-    }
-
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
-        self.fields
-            .iter_mut()
-            .try_for_each(|field| field.validator.complete(build_context))
-    }
-
     fn validate_assignment<'s, 'data: 's>(
         &'s self,
         py: Python<'data>,
@@ -354,6 +344,16 @@ impl Validator for DataclassArgsValidator {
             ))
         }
     }
+
+    fn get_name(&self) -> &str {
+        &self.validator_name
+    }
+
+    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
+        self.fields
+            .iter_mut()
+            .try_for_each(|field| field.validator.complete(build_context))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -362,6 +362,7 @@ pub struct DataclassValidator {
     validator: Box<CombinedValidator>,
     class: Py<PyType>,
     post_init: Option<Py<PyString>>,
+    revalidate: bool,
     name: String,
 }
 
@@ -390,6 +391,7 @@ impl BuildValidator for DataclassValidator {
             validator: Box::new(validator),
             class: class.into(),
             post_init,
+            revalidate: schema_or_config_same(schema, config, intern!(py, "revalidate_instances"))?.unwrap_or(false),
             // as with model, get the class's `__name__`, not using `class.name()` since it uses `__qualname__`
             // which is not what we want here
             name: class.getattr(intern!(py, "__name__"))?.extract()?,
@@ -411,20 +413,35 @@ impl Validator for DataclassValidator {
             // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
             return self.validate_init(py, self_instance, input, extra, slots, recursion_guard);
         }
-        let class = self.class.as_ref(py);
 
-        // we only do the is_exact_instance in strict mode
-        // we run validation even if input is an exact class to cover the case where a vanilla dataclass has been
-        // created with invalid types
-        // in theory we could have a flag to skip validation for an exact type in some scenarios, but I'm not sure
-        // that's a good idea
-        if extra.strict.unwrap_or(self.strict) && !input.is_exact_instance(class) {
-            Err(ValError::new(
+        // same logic as on models
+        let class = self.class.as_ref(py);
+        if input.input_is_instance(class, 0)? {
+            if input.is_exact_instance(class) || !extra.strict.unwrap_or(self.strict) {
+                if self.revalidate {
+                    let input = input.maybe_subclass_dict(class)?;
+                    let val_output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
+                    let dc = create_class(self.class.as_ref(py))?;
+                    self.set_dict_call(py, dc.as_ref(py), val_output, input)?;
+                    Ok(dc)
+                } else {
+                    Ok(input.to_object(py))
+                }
+            } else {
+                Err(ValError::new(
+                    ErrorType::ModelClassType {
+                        class_name: self.get_name().to_string(),
+                    },
+                    input,
+                ))
+            }
+        } else if extra.strict.unwrap_or(self.strict) && input.is_python() {
+            return Err(ValError::new(
                 ErrorType::ModelClassType {
                     class_name: self.get_name().to_string(),
                 },
                 input,
-            ))
+            ));
         } else {
             let input = input.maybe_subclass_dict(class)?;
             let val_output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
@@ -432,10 +449,6 @@ impl Validator for DataclassValidator {
             self.set_dict_call(py, dc.as_ref(py), val_output, input)?;
             Ok(dc)
         }
-    }
-
-    fn get_name(&self) -> &str {
-        &self.name
     }
 
     fn validate_assignment<'s, 'data: 's>(
@@ -464,6 +477,10 @@ impl Validator for DataclassValidator {
         force_setattr(py, obj, dict_attr, dc_dict)?;
 
         Ok(obj.to_object(py))
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
     }
 }
 

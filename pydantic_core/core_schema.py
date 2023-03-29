@@ -2563,9 +2563,9 @@ class ModelSchema(TypedDict, total=False):
     cls: Required[Type[Any]]
     schema: Required[CoreSchema]
     post_init: str
+    revalidate_instances: bool
     strict: bool
     frozen: bool
-    revalidate_instances: bool
     config: CoreConfig
     ref: str
     metadata: Any
@@ -2577,9 +2577,9 @@ def model_schema(
     schema: CoreSchema,
     *,
     post_init: str | None = None,
+    revalidate_instances: bool | None = None,
     strict: bool | None = None,
     frozen: bool | None = None,
-    revalidate_instances: bool | None = None,
     config: CoreConfig | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -2615,10 +2615,10 @@ def model_schema(
         cls: The class to use for the model
         schema: The schema to use for the model
         post_init: The call after init to use for the model
-        strict: Whether the model is strict
-        frozen: Whether the model is frozen
         revalidate_instances: whether instances of models and dataclasses (including subclass instances)
           should re-validate defaults to config.revalidate_instances, else False
+        strict: Whether the model is strict
+        frozen: Whether the model is frozen
         config: The config to use for the model
         ref: See [TODO] for details
         metadata: See [TODO] for details
@@ -2629,9 +2629,9 @@ def model_schema(
         cls=cls,
         schema=schema,
         post_init=post_init,
+        revalidate_instances=revalidate_instances,
         strict=strict,
         frozen=frozen,
-        revalidate_instances=revalidate_instances,
         config=config,
         ref=ref,
         metadata=metadata,
@@ -2762,6 +2762,7 @@ class DataclassSchema(TypedDict, total=False):
     cls: Required[Type[Any]]
     schema: Required[CoreSchema]
     post_init: bool  # default: False
+    revalidate_instances: bool  # default: False
     strict: bool  # default: False
     ref: str
     metadata: Any
@@ -2773,6 +2774,7 @@ def dataclass_schema(
     schema: CoreSchema,
     *,
     post_init: bool | None = None,
+    revalidate_instances: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -2786,6 +2788,8 @@ def dataclass_schema(
         cls: The dataclass type, used to to perform subclass checks
         schema: The schema to use for the dataclass fields
         post_init: Whether to call `__post_init__` after validation
+        revalidate_instances: whether instances of models and dataclasses (including subclass instances)
+          should re-validate defaults to config.revalidate_instances, else False
         strict: Whether to require an exact instance of `cls`
         ref: See [TODO] for details
         metadata: See [TODO] for details
@@ -2796,6 +2800,7 @@ def dataclass_schema(
         cls=cls,
         schema=schema,
         post_init=post_init,
+        revalidate_instances=revalidate_instances,
         strict=strict,
         ref=ref,
         metadata=metadata,

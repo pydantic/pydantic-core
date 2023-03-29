@@ -86,58 +86,55 @@ impl Validator for ModelValidator {
             return self.validate_init(py, self_instance, input, extra, slots, recursion_guard);
         }
 
-        // if we're in stict mode, we require an exact instance of the class (from python, with JSON an object is ok)
+        // if we're in strict mode, we require an exact instance of the class (from python, with JSON an object is ok)
         // if we're not in strict mode, instances subclasses are okay, as well as dicts, mappings, from attributes etc.
         // if the input is an instance of the class, we "revalidate" it - e.g. we extract and reuse `__fields_set__`
         // but use from attributes to create a new instance of the model field type
         let class = self.class.as_ref(py);
-        let instance = if input.input_is_instance(class, 0)? {
-            // if the input is an exact instance OR we're not in strict mode, then processed
+        // mask 0 so JSON is input is never true here
+        if input.input_is_instance(class, 0)? {
+            // if the input is an exact instance OR we're not in strict mode, then progress
             // which means raise ane error in the case of an instance of a subclass in strict mode
             if input.is_exact_instance(class) || !extra.strict.unwrap_or(self.strict) {
                 if self.revalidate {
                     let fields_set = input.get_attr(intern!(py, "__fields_set__"));
                     let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-                    if self.expect_fields_set {
+                    let instance = if self.expect_fields_set {
                         let (model_dict, validation_fields_set): (&PyAny, &PyAny) = output.extract(py)?;
                         let fields_set = fields_set.unwrap_or(validation_fields_set);
                         self.create_class(model_dict, Some(fields_set))?
                     } else {
                         self.create_class(output.as_ref(py), fields_set)?
-                    }
+                    };
+                    self.call_post_init(py, instance, input, extra)
                 } else {
-                    return Ok(input.to_object(py));
+                    Ok(input.to_object(py))
                 }
             } else {
-                return Err(ValError::new(
+                Err(ValError::new(
                     ErrorType::ModelClassType {
                         class_name: self.get_name().to_string(),
                     },
                     input,
-                ));
+                ))
             }
         } else if extra.strict.unwrap_or(self.strict) && input.is_python() {
-            return Err(ValError::new(
+            Err(ValError::new(
                 ErrorType::ModelClassType {
                     class_name: self.get_name().to_string(),
                 },
                 input,
-            ));
+            ))
         } else {
             let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-            if self.expect_fields_set {
+            let instance = if self.expect_fields_set {
                 let (model_dict, fields_set): (&PyAny, &PyAny) = output.extract(py)?;
                 self.create_class(model_dict, Some(fields_set))?
             } else {
                 self.create_class(output.as_ref(py), None)?
-            }
-        };
-        if let Some(ref post_init) = self.post_init {
-            instance
-                .call_method1(py, post_init.as_ref(py), (extra.context,))
-                .map_err(|e| convert_err(py, e, input))?;
+            };
+            self.call_post_init(py, instance, input, extra)
         }
-        Ok(instance)
     }
 
     fn get_name(&self) -> &str {
@@ -213,12 +210,22 @@ impl ModelValidator {
         } else {
             set_model_attrs(self_instance, output.as_ref(py), None)?;
         };
+        self.call_post_init(py, self_instance.into_py(py), input, extra)
+    }
+
+    fn call_post_init<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        instance: PyObject,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+    ) -> ValResult<'data, PyObject> {
         if let Some(ref post_init) = self.post_init {
-            self_instance
-                .call_method1(post_init.as_ref(py), (extra.context,))
+            instance
+                .call_method1(py, post_init.as_ref(py), (extra.context,))
                 .map_err(|e| convert_err(py, e, input))?;
         }
-        Ok(self_instance.into_py(py))
+        Ok(instance)
     }
 
     fn create_class(&self, model_dict: &PyAny, fields_set: Option<&PyAny>) -> PyResult<PyObject> {
