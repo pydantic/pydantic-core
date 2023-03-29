@@ -520,7 +520,7 @@ def test_model_class_instance_subclass_revalidate():
                 'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
             },
             'post_init': 'model_post_init',
-            'config': {'from_attributes': True, 'revalidate_models': True},
+            'config': {'from_attributes': True, 'revalidate_instances': True},
         }
     )
 
@@ -607,6 +607,40 @@ def test_model_class_strict():
     ]
 
 
+def test_model_class_strict_json():
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+        field_a: str
+        field_b: int
+        field_c: int
+
+    v = SchemaValidator(
+        {
+            'type': 'model',
+            'strict': True,
+            'cls': MyModel,
+            'schema': {
+                'type': 'typed-dict',
+                'return_fields_set': True,
+                'fields': {
+                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_c': {
+                        'type': 'typed-dict-field',
+                        'schema': {'type': 'default', 'default': 42, 'schema': {'type': 'int'}},
+                    },
+                },
+            },
+        }
+    )
+    m = v.validate_json('{"field_a": "foobar", "field_b": "123"}')
+    assert isinstance(m, MyModel)
+    assert m.field_a == 'foobar'
+    assert m.field_b == 123
+    assert m.field_c == 42
+    assert m.__fields_set__ == {'field_a', 'field_b'}
+
+
 def test_internal_error():
     v = SchemaValidator(
         {
@@ -637,6 +671,7 @@ def test_revalidate():
         {
             'type': 'model',
             'cls': MyModel,
+            'revalidate_instances': True,
             'schema': {
                 'type': 'typed-dict',
                 'return_fields_set': True,
@@ -646,7 +681,6 @@ def test_revalidate():
                     'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
                 },
             },
-            'config': {'revalidate_models': True},
         }
     )
     assert re.search(r'revalidate: \w+', repr(v)).group(0) == 'revalidate: true'
@@ -704,7 +738,7 @@ def test_revalidate_extra():
                     'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
                 },
             },
-            'config': {'revalidate_models': True},
+            'config': {'revalidate_instances': True},
         }
     )
 
@@ -784,7 +818,7 @@ def test_revalidate_post_init():
                     'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
                 },
             },
-            'config': {'revalidate_models': True},
+            'config': {'revalidate_instances': True},
         }
     )
     assert re.search(r'revalidate: \w+', repr(v)).group(0) == 'revalidate: true'

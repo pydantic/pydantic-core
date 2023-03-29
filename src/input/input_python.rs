@@ -114,6 +114,10 @@ impl<'a> Input<'a> for PyAny {
         self.get_type().is(class)
     }
 
+    fn is_python(&self) -> bool {
+        true
+    }
+
     fn input_is_subclass(&self, class: &PyType) -> PyResult<bool> {
         match self.downcast::<PyType>() {
             Ok(py_type) => py_type.is_subclass(class),

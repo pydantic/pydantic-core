@@ -31,7 +31,8 @@ class CoreConfig(TypedDict, total=False):
     typed_dict_total: bool  # default: True
     # used on typed-dicts and tagged union keys
     from_attributes: bool
-    revalidate_models: bool
+    # whether instances of models and dataclasses (including subclass instances) should re-validate, default False
+    revalidate_instances: bool
     # whether to validate default values during validation, default False
     validate_default: bool
     # used on typed-dicts and arguments
@@ -2564,6 +2565,7 @@ class ModelSchema(TypedDict, total=False):
     post_init: str
     strict: bool
     frozen: bool
+    revalidate_instances: bool
     config: CoreConfig
     ref: str
     metadata: Any
@@ -2577,6 +2579,7 @@ def model_schema(
     post_init: str | None = None,
     strict: bool | None = None,
     frozen: bool | None = None,
+    revalidate_instances: bool | None = None,
     config: CoreConfig | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -2614,6 +2617,8 @@ def model_schema(
         post_init: The call after init to use for the model
         strict: Whether the model is strict
         frozen: Whether the model is frozen
+        revalidate_instances: whether instances of models and dataclasses (including subclass instances)
+          should re-validate defaults to config.revalidate_instances, else False
         config: The config to use for the model
         ref: See [TODO] for details
         metadata: See [TODO] for details
@@ -2626,6 +2631,7 @@ def model_schema(
         post_init=post_init,
         strict=strict,
         frozen=frozen,
+        revalidate_instances=revalidate_instances,
         config=config,
         ref=ref,
         metadata=metadata,

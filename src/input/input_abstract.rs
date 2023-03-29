@@ -51,6 +51,10 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         false
     }
 
+    fn is_python(&self) -> bool {
+        false
+    }
+
     fn input_is_subclass(&self, _class: &PyType) -> PyResult<bool> {
         Ok(false)
     }

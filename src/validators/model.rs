@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
 use pyo3::{ffi, intern};
 
-use crate::build_tools::{py_err, safe_repr, SchemaDict};
+use crate::build_tools::{py_err, safe_repr, schema_or_config_same, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{py_error_on_minusone, Input};
 use crate::questions::Question;
@@ -50,7 +50,7 @@ impl BuildValidator for ModelValidator {
             // we don't use is_strict here since we don't want validation to be strict in this case if
             // `config.strict` is set, only if this specific field is strict
             strict: schema.get_as(intern!(py, "strict"))?.unwrap_or(false),
-            revalidate: config.get_as(intern!(py, "revalidate_models"))?.unwrap_or(false),
+            revalidate: schema_or_config_same(schema, config, intern!(py, "revalidate_instances"))?.unwrap_or(false),
             validator: Box::new(validator),
             class: class.into(),
             post_init: schema
@@ -86,6 +86,10 @@ impl Validator for ModelValidator {
             return self.validate_init(py, self_instance, input, extra, slots, recursion_guard);
         }
 
+        // if we're in stict mode, we require an exact instance of the class (from python, with JSON an object is ok)
+        // if we're not in strict mode, instances subclasses are okay, as well as dicts, mappings, from attributes etc.
+        // if the input is an instance of the class, we "revalidate" it - e.g. we extract and reuse `__fields_set__`
+        // but use from attributes to create a new instance of the model field type
         let class = self.class.as_ref(py);
         let instance = if input.input_is_instance(class, 0)? {
             // if the input is an exact instance OR we're not in strict mode, then processed
@@ -112,7 +116,7 @@ impl Validator for ModelValidator {
                     input,
                 ));
             }
-        } else if extra.strict.unwrap_or(self.strict) {
+        } else if extra.strict.unwrap_or(self.strict) && input.is_python() {
             return Err(ValError::new(
                 ErrorType::ModelClassType {
                     class_name: self.get_name().to_string(),
