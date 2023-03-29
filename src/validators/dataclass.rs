@@ -298,10 +298,16 @@ impl Validator for DataclassArgsValidator {
     fn get_name(&self) -> &str {
         &self.validator_name
     }
+
+    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
+        self.fields
+            .iter_mut()
+            .try_for_each(|field| field.validator.complete(build_context))
+    }
 }
 
 impl DataclassArgsValidator {
-    fn validate_assignment<'s, 'data>(
+    fn validate_assignment<'s, 'data: 's>(
         &'s self,
         py: Python<'data>,
         field_name: &str,
