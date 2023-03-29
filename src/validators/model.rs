@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
 use pyo3::{ffi, intern};
 
-use crate::build_tools::{py_err, SchemaDict};
+use crate::build_tools::{py_err, safe_repr, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{py_error_on_minusone, Input};
 use crate::questions::Question;
@@ -143,12 +143,7 @@ impl Validator for ModelValidator {
         }
         let dict: &PyDict = match model.get_attr(intern!(py, "__dict__")) {
             Some(v) => v.downcast()?,
-            None => {
-                return Err(ValError::InternalErr(PyTypeError::new_err(format!(
-                    "{} is not a model instance",
-                    model.repr()?
-                ))))
-            }
+            None => return Err(PyTypeError::new_err(format!("{} is not a model instance", safe_repr(model))).into()),
         };
 
         let new_dict = dict.copy()?;

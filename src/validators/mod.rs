@@ -624,10 +624,8 @@ pub trait Validator: Send + Sync + Clone + Debug {
         _slots: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Err(ValError::InternalErr(PyTypeError::new_err(format!(
-            "validate_assignment is not supported for {}",
-            self.get_name(),
-        ))))
+        let py_err = PyTypeError::new_err(format!("validate_assignment is not supported for {}", self.get_name()));
+        Err(py_err.into())
     }
 
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
