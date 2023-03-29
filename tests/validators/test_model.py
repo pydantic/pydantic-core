@@ -520,7 +520,7 @@ def test_model_class_instance_subclass_revalidate():
                 'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
             },
             'post_init': 'model_post_init',
-            'config': {'from_attributes': True, 'revalidate_instances': True},
+            'revalidate_instances': True,
         }
     )
 

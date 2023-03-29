@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::ptr::null_mut;
 
 use pyo3::conversion::AsPyPointer;
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyAttributeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
 use pyo3::{ffi, intern};
@@ -98,7 +98,16 @@ impl Validator for ModelValidator {
             if input.is_exact_instance(class) || !extra.strict.unwrap_or(self.strict) {
                 if self.revalidate {
                     let fields_set = input.get_attr(intern!(py, "__fields_set__"));
-                    let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
+                    // get dict here so from_attributes logic doesn't apply
+                    let dict = match input.get_attr(intern!(py, "__dict__")) {
+                        Some(d) => d,
+                        None => {
+                            return Err(
+                                PyAttributeError::new_err("Input unexpectedly had no `__dict__` attribute").into(),
+                            )
+                        }
+                    };
+                    let output = self.validator.validate(py, dict, extra, slots, recursion_guard)?;
                     let instance = if self.expect_fields_set {
                         let (model_dict, validation_fields_set): (&PyAny, &PyAny) = output.extract(py)?;
                         let fields_set = fields_set.unwrap_or(validation_fields_set);

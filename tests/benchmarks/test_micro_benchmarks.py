@@ -1217,3 +1217,35 @@ def test_definition_out_of_tree(benchmark):
     )
     values = [1, 2, 3.0, '4', '5', '6'] * 1000
     benchmark(validator.validate_python, values)
+
+
+@pytest.mark.benchmark(group='model_from_attributes')
+def test_model_from_attributes(benchmark):
+    class MyModel:
+        __slots__ = '__dict__', '__fields_set__'
+
+        def __init__(self, **d):
+            self.__dict__ = d
+            self.__fields_set__ = set(d)
+
+    validator = SchemaValidator(
+        core_schema.model_schema(
+            MyModel,
+            core_schema.typed_dict_schema(
+                {
+                    'foo': core_schema.typed_dict_field(core_schema.int_schema()),
+                    'bar': core_schema.typed_dict_field(core_schema.int_schema()),
+                },
+                from_attributes=True,
+            ),
+            revalidate_instances=True,
+        )
+    )
+    m1 = MyModel(foo=1, bar='2')
+    m2 = validator.validate_python(m1)
+    assert m1 is not m2
+    assert m2.foo == 1
+    assert m2.bar == 2
+
+    benchmark(validator.validate_python, m1, name='from_model')
+    benchmark(validator.validate_python, {'foo': 1, 'bar': '2'}, name='from_dict')
