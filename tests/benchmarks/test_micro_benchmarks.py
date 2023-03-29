@@ -1219,8 +1219,8 @@ def test_definition_out_of_tree(benchmark):
     benchmark(validator.validate_python, values)
 
 
-@pytest.mark.benchmark(group='model_from_attributes')
-def test_model_from_attributes(benchmark):
+@pytest.mark.benchmark(group='model_instance')
+def test_model_instance(benchmark):
     class MyModel:
         __slots__ = '__dict__', '__fields_set__'
 
@@ -1235,8 +1235,7 @@ def test_model_from_attributes(benchmark):
                 {
                     'foo': core_schema.typed_dict_field(core_schema.int_schema()),
                     'bar': core_schema.typed_dict_field(core_schema.int_schema()),
-                },
-                from_attributes=True,
+                }
             ),
             revalidate_instances=True,
         )
@@ -1247,5 +1246,46 @@ def test_model_from_attributes(benchmark):
     assert m2.foo == 1
     assert m2.bar == 2
 
-    benchmark(validator.validate_python, m1, name='from_model')
-    benchmark(validator.validate_python, {'foo': 1, 'bar': '2'}, name='from_dict')
+    benchmark(validator.validate_python, m1)
+
+
+@pytest.mark.benchmark(group='model_instance')
+def test_model_instance_abc(benchmark):
+    import abc
+
+    class MyMeta(abc.ABCMeta):
+        def __instancecheck__(self, instance) -> bool:
+            return hasattr(instance, '__pydantic_validator__') and super().__instancecheck__(instance)
+
+    class BaseModel(metaclass=MyMeta):
+        __slots__ = '__dict__', '__fields_set__'
+        __pydantic_validator__ = True
+
+        def __init__(self, **d):
+            self.__dict__ = d
+            self.__fields_set__ = set(d)
+
+    class MyModel(BaseModel):
+        pass
+
+    validator = SchemaValidator(
+        core_schema.model_schema(
+            MyModel,
+            core_schema.typed_dict_schema(
+                {
+                    'foo': core_schema.typed_dict_field(core_schema.int_schema()),
+                    'bar': core_schema.typed_dict_field(core_schema.int_schema()),
+                }
+            ),
+            revalidate_instances=True,
+        )
+    )
+    m1 = MyModel(foo=1, bar='2')
+    m2 = validator.validate_python(m1)
+    assert m1 is not m2
+    assert m2.foo == 1
+    assert m2.bar == 2
+
+    assert validator.isinstance_python(m1)
+
+    benchmark(validator.validate_python, m1)
