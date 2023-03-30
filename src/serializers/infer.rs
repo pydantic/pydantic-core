@@ -421,7 +421,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             if extra.serialize_unknown {
                 serializer.serialize_str(&serialize_unknown(value))
             } else {
-                Err(py_err_se_err(unknown_type_error(value)))
+                return Err(py_err_se_err(unknown_type_error(value)));
             }
         }
     };

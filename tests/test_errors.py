@@ -471,3 +471,27 @@ def test_error_json_unknown():
             'input': IsStr(regex='<tests.test_errors.Foobar object at 0x[a-f0-9]{6,16}>'),
         }
     ]
+
+
+def test_error_json_loc():
+    s = SchemaValidator(
+        core_schema.dict_schema(core_schema.str_schema(), core_schema.list_schema(core_schema.int_schema()))
+    )
+    with pytest.raises(ValidationError) as exc_info:
+        s.validate_python({'a': [0, 1, 'x'], 'b': [0, 'y']})
+
+    # insert_assert(json.loads(exc_info.value.json()))
+    assert json.loads(exc_info.value.json()) == [
+        {
+            'type': 'int_parsing',
+            'loc': ['a', 2],
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'x',
+        },
+        {
+            'type': 'int_parsing',
+            'loc': ['b', 1],
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'y',
+        },
+    ]
