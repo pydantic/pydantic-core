@@ -737,6 +737,7 @@ fn input_is_instance_fast(instance_type_ptr: *mut ffi::PyTypeObject, check_type_
         true
     } else {
         let base_type_ptr = unsafe { (*instance_type_ptr).tp_base };
+        // could use `base_type_ptr == &mut PyBaseObject_Type` here and save one loop, but seems to be slower
         if base_type_ptr.is_null() {
             false
         } else {
