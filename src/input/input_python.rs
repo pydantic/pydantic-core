@@ -110,6 +110,10 @@ impl<'a> Input<'a> for PyAny {
         Ok(result == 1)
     }
 
+    fn input_is_instance_fast(&self, class: &PyType, _json_mask: u8) -> PyResult<bool> {
+        Ok(input_is_instance_fast(self.get_type_ptr(), class.as_type_ptr()))
+    }
+
     fn is_exact_instance(&self, class: &PyType) -> bool {
         self.get_type().is(class)
     }
@@ -725,4 +729,18 @@ pub fn list_as_tuple(list: &PyList) -> &PyTuple {
         Py::from_owned_ptr(list.py(), tuple_ptr)
     };
     py_tuple.into_ref(list.py())
+}
+
+/// check if the instances type matches the type checked against, if not check the base type until base type is null
+fn input_is_instance_fast(instance_type_ptr: *mut ffi::PyTypeObject, check_type_ptr: *mut ffi::PyTypeObject) -> bool {
+    if instance_type_ptr == check_type_ptr {
+        true
+    } else {
+        let base_type_ptr = unsafe { (*instance_type_ptr).tp_base };
+        if base_type_ptr.is_null() {
+            false
+        } else {
+            input_is_instance_fast(base_type_ptr, check_type_ptr)
+        }
+    }
 }
