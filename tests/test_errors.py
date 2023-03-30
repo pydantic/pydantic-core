@@ -448,6 +448,11 @@ class Foobar:
     pass
 
 
+class CustomStr:
+    def __str__(self):
+        return 'custom str'
+
+
 def test_error_json_unknown():
     s = SchemaValidator({'type': 'str'})
     with pytest.raises(ValidationError) as exc_info:
@@ -470,6 +475,12 @@ def test_error_json_unknown():
             'msg': 'Input should be a valid string',
             'input': IsStr(regex='<tests.test_errors.Foobar object at 0x[a-f0-9]{6,16}>'),
         }
+    ]
+    with pytest.raises(ValidationError) as exc_info:
+        s.validate_python(CustomStr())
+    # insert_assert(json.loads(exc_info.value.json()))
+    assert json.loads(exc_info.value.json()) == [
+        {'type': 'string_type', 'loc': [], 'msg': 'Input should be a valid string', 'input': 'custom str'}
     ]
 
 
