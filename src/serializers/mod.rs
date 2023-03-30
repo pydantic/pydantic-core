@@ -79,6 +79,7 @@ impl SchemaSerializer {
             round_trip,
             &self.config,
             &rec_guard,
+            false,
         );
         let v = self.serializer.to_python(value, include, exclude, &extra)?;
         warnings.final_check(py)?;
@@ -114,6 +115,7 @@ impl SchemaSerializer {
             round_trip,
             &self.config,
             &rec_guard,
+            false,
         );
         let bytes = to_json_bytes(
             value,
@@ -183,6 +185,7 @@ pub fn to_json(
         round_trip,
         &config,
         &rec_guard,
+        false,
     );
     let serializer = type_serializers::any::AnySerializer::default().into();
     let bytes = to_json_bytes(value, &serializer, include, exclude, &extra, indent, 1024)?;
@@ -191,13 +194,15 @@ pub fn to_json(
     Ok(py_bytes.into())
 }
 
-pub(crate) struct GeneralPythonSerializer {
+/// this is ugly, but would be much better if extra could be stored in `GeneralSerializeContext`
+/// then `GeneralSerializeContext` got a `serialize_infer` method, but I couldn't get it to work
+pub(crate) struct GeneralSerializeContext {
     warnings: CollectWarnings,
     rec_guard: SerRecursionGuard,
     config: SerializationConfig,
 }
 
-impl GeneralPythonSerializer {
+impl GeneralSerializeContext {
     pub fn new() -> Self {
         let warnings = CollectWarnings::new(None);
         let rec_guard = SerRecursionGuard::default();
@@ -209,22 +214,20 @@ impl GeneralPythonSerializer {
         }
     }
 
-    pub fn extra<'py>(&'py self, py: Python<'py>) -> Extra<'py> {
-        Extra {
-            mode: &SerMode::Json,
-            slots: &[],
-            ob_type_lookup: ob_type::ObTypeLookup::cached(py),
-            warnings: &self.warnings,
-            by_alias: false,
-            exclude_unset: false,
-            exclude_defaults: false,
-            exclude_none: false,
-            round_trip: false,
-            config: &self.config,
-            rec_guard: &self.rec_guard,
-            check: extra::SerCheck::None,
-            model: None,
-            field_name: None,
-        }
+    pub fn extra<'py>(&'py self, py: Python<'py>, serialize_unknown: bool) -> Extra<'py> {
+        Extra::new(
+            py,
+            &SerMode::Json,
+            &[],
+            None,
+            &self.warnings,
+            None,
+            None,
+            None,
+            None,
+            &self.config,
+            &self.rec_guard,
+            serialize_unknown,
+        )
     }
 }

@@ -462,5 +462,12 @@ def test_error_json_unknown():
             'input': HasRepr(IsStr(regex='<.+Foobar object at.+>')),
         }
     ]
-    with pytest.raises(ValueError):
-        exc_info.value.json()
+    # insert_assert(json.loads(exc_info.value.json()))
+    assert json.loads(exc_info.value.json()) == [
+        {
+            'type': 'string_type',
+            'loc': [],
+            'msg': 'Input should be a valid string',
+            'input': IsStr(regex='<tests.test_errors.Foobar object at 0x[a-f0-9]{6,16}>'),
+        }
+    ]

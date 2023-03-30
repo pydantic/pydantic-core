@@ -13,7 +13,7 @@ use serde::{Serialize, Serializer};
 use serde_json::ser::PrettyFormatter;
 
 use crate::build_tools::{py_error_type, safe_repr};
-use crate::serializers::GeneralPythonSerializer;
+use crate::serializers::GeneralSerializeContext;
 
 use super::line_error::ValLineError;
 use super::location::Location;
@@ -120,8 +120,8 @@ impl ValidationError {
         indent: Option<usize>,
         include_context: Option<bool>,
     ) -> PyResult<&'py PyString> {
-        let general_python_serializer = GeneralPythonSerializer::new();
-        let extra = general_python_serializer.extra(py);
+        let general_ser_context = GeneralSerializeContext::new();
+        let extra = general_ser_context.extra(py, true);
         let serializer = ValidationErrorSerializer {
             py,
             line_errors: &self.line_errors,
@@ -314,12 +314,12 @@ impl<'py> Serialize for PyLineErrorSerializer<'py> {
 
         map.serialize_entry(
             "input",
-            &self.extra.serialize_any(self.line_error.input_value.as_ref(py)),
+            &self.extra.serialize_infer(self.line_error.input_value.as_ref(py)),
         )?;
 
         if self.include_context {
             if let Some(context) = self.line_error.error_type.py_dict(py).map_err(py_err_json::<S>)? {
-                map.serialize_entry("ctx", &self.extra.serialize_any(context.as_ref(py)))?;
+                map.serialize_entry("ctx", &self.extra.serialize_infer(context.as_ref(py)))?;
             }
         }
         map.end()
