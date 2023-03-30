@@ -5,7 +5,7 @@ use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
 
 use ahash::AHashSet;
 
-use crate::build_tools::{is_strict, py_err, schema_or_config_same, SchemaDict};
+use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{GenericArguments, Input};
 use crate::lookup_key::LookupKey;
@@ -24,6 +24,13 @@ struct Field {
     init_only: bool,
     lookup_key: LookupKey,
     validator: CombinedValidator,
+    frozen: bool,
+}
+
+#[derive(Debug, Clone)]
+enum ExtraAttributeAssignmentBehavior {
+    Allow,
+    Forbid,
 }
 
 #[derive(Debug, Clone)]
@@ -33,6 +40,7 @@ pub struct DataclassArgsValidator {
     init_only_count: Option<usize>,
     dataclass_name: String,
     validator_name: String,
+    extra_attribute_behavior: ExtraAttributeAssignmentBehavior,
 }
 
 impl BuildValidator for DataclassArgsValidator {
@@ -46,6 +54,21 @@ impl BuildValidator for DataclassArgsValidator {
         let py = schema.py();
 
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
+
+        let extra_behavior = schema_or_config::<&str>(
+            schema,
+            config,
+            intern!(py, "extra_behavior"),
+            intern!(py, "typed_dict_extra_behavior"),
+        )?;
+        let extra_attribute_behavior = match extra_behavior {
+            Some(s) => match s {
+                "allow" => ExtraAttributeAssignmentBehavior::Allow,
+                "forbid" => ExtraAttributeAssignmentBehavior::Forbid,
+                _ => return py_err!(r#"Invalid extra_behavior: "{}""#, s),
+            },
+            None => ExtraAttributeAssignmentBehavior::Allow,
+        };
 
         let fields_schema: &PyList = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: Vec<Field> = Vec::with_capacity(fields_schema.len());
@@ -91,6 +114,7 @@ impl BuildValidator for DataclassArgsValidator {
                 lookup_key,
                 validator,
                 init_only: field.get_as(intern!(py, "init_only"))?.unwrap_or(false),
+                frozen: field.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
             });
         }
 
@@ -108,6 +132,7 @@ impl BuildValidator for DataclassArgsValidator {
             init_only_count,
             dataclass_name,
             validator_name,
+            extra_attribute_behavior,
         }
         .into())
     }
@@ -303,7 +328,19 @@ impl Validator for DataclassArgsValidator {
     ) -> ValResult<'data, PyObject> {
         let dict: &PyDict = obj.downcast()?;
 
+        let ok = |output: PyObject| {
+            dict.set_item(field_name, output)?;
+            Ok(dict.to_object(py))
+        };
+
         if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
+            if field.frozen {
+                return Err(ValError::new_with_loc(
+                    ErrorType::FrozenField,
+                    field_value,
+                    field.name.to_string(),
+                ));
+            }
             // by using dict but removing the field in question, we match V1 behaviour
             let data_dict = dict.copy()?;
             if let Err(err) = data_dict.del_item(field_name) {
@@ -321,10 +358,7 @@ impl Validator for DataclassArgsValidator {
                 .validator
                 .validate(py, field_value, &next_extra, slots, recursion_guard)
             {
-                Ok(output) => {
-                    dict.set_item(field_name, output)?;
-                    Ok(dict.to_object(py))
-                }
+                Ok(output) => ok(output),
                 Err(ValError::LineErrors(line_errors)) => {
                     let errors = line_errors
                         .into_iter()
@@ -334,7 +368,11 @@ impl Validator for DataclassArgsValidator {
                 }
                 Err(err) => Err(err),
             }
+        } else if matches!(self.extra_attribute_behavior, ExtraAttributeAssignmentBehavior::Allow) {
+            // this is the "allow" case of extra_behavior
+            ok(field_value.to_object(py))
         } else {
+            // the "forbid" case of extra_behavior
             Err(ValError::new_with_loc(
                 ErrorType::NoSuchAttribute {
                     attribute: field_name.to_string(),
@@ -364,6 +402,7 @@ pub struct DataclassValidator {
     post_init: Option<Py<PyString>>,
     revalidate: Revalidate,
     name: String,
+    frozen: bool,
 }
 
 impl BuildValidator for DataclassValidator {
@@ -399,6 +438,7 @@ impl BuildValidator for DataclassValidator {
             // as with model, get the class's `__name__`, not using `class.name()` since it uses `__qualname__`
             // which is not what we want here
             name: class.getattr(intern!(py, "__name__"))?.extract()?,
+            frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
         }
         .into())
     }
@@ -455,6 +495,9 @@ impl Validator for DataclassValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
+        if self.frozen {
+            return Err(ValError::new(ErrorType::FrozenInstance, field_value));
+        }
         let dict_py_str = intern!(py, "__dict__");
         let dict: &PyDict = obj.getattr(dict_py_str)?.downcast()?;
 

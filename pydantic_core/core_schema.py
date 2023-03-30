@@ -2645,6 +2645,7 @@ class DataclassField(TypedDict, total=False):
     schema: Required[CoreSchema]
     kw_only: bool  # default: True
     init_only: bool  # default: False
+    frozen: bool  # default: False
     validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
     serialization_alias: str
     serialization_exclude: bool  # default: False
@@ -2661,6 +2662,7 @@ def dataclass_field(
     serialization_alias: str | None = None,
     serialization_exclude: bool | None = None,
     metadata: Any = None,
+    frozen: bool | None = None,
 ) -> DataclassField:
     """
     Returns a schema for a dataclass field, e.g.:
@@ -2696,6 +2698,7 @@ def dataclass_field(
         serialization_alias=serialization_alias,
         serialization_exclude=serialization_exclude,
         metadata=metadata,
+        frozen=frozen,
     )
 
 
@@ -2708,6 +2711,7 @@ class DataclassArgsSchema(TypedDict, total=False):
     ref: str
     metadata: Any
     serialization: SerSchema
+    extra_behavior: Literal['allow', 'forbid'] | None
 
 
 def dataclass_args_schema(
@@ -2718,6 +2722,7 @@ def dataclass_args_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
+    extra_behavior: Literal['allow', 'forbid'] | None = None,
 ) -> DataclassArgsSchema:
     """
     Returns a schema for validating dataclass arguments, e.g.:
@@ -2754,6 +2759,7 @@ def dataclass_args_schema(
         ref=ref,
         metadata=metadata,
         serialization=serialization,
+        extra_behavior=extra_behavior,
     )
 
 
@@ -2764,6 +2770,7 @@ class DataclassSchema(TypedDict, total=False):
     post_init: bool  # default: False
     revalidate_instances: Literal['always', 'never', 'subclass-instances']  # default: 'never'
     strict: bool  # default: False
+    frozen: bool  # default False
     ref: str
     metadata: Any
     serialization: SerSchema
@@ -2779,6 +2786,7 @@ def dataclass_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
+    frozen: bool | None = None,
 ) -> DataclassSchema:
     """
     Returns a schema for a dataclass. As with `ModelSchema`, this schema can only be used as a field within
@@ -2805,6 +2813,7 @@ def dataclass_schema(
         ref=ref,
         metadata=metadata,
         serialization=serialization,
+        frozen=frozen,
     )
 
 
