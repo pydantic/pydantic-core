@@ -1048,7 +1048,7 @@ def test_validate_assignment_no_fields_set():
     assert not hasattr(m, '__fields_set__')
 
     # wrong arguments
-    with pytest.raises(TypeError, match="'field_a' is not a model instance"):
+    with pytest.raises(AttributeError, match="'str' object has no attribute '__dict__'"):
         v.validate_assignment('field_a', 'field_a', b'different')
 
 

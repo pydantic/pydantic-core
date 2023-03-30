@@ -1,11 +1,11 @@
-use pyo3::exceptions::{PyKeyError, PyTypeError};
+use pyo3::exceptions::PyKeyError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
 
 use ahash::AHashSet;
 
-use crate::build_tools::{is_strict, py_err, safe_repr, schema_or_config_same, SchemaDict};
+use crate::build_tools::{is_strict, py_err, schema_or_config_same, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{GenericArguments, Input};
 use crate::lookup_key::LookupKey;
@@ -419,7 +419,7 @@ impl Validator for DataclassValidator {
         if input.input_is_instance(class, 0)? {
             if input.is_exact_instance(class) || !extra.strict.unwrap_or(self.strict) {
                 if self.revalidate {
-                    let input = input.maybe_subclass_dict(class)?;
+                    let input = input.input_get_attr(intern!(py, "__dict__")).unwrap()?;
                     let val_output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
                     let dc = create_class(self.class.as_ref(py))?;
                     self.set_dict_call(py, dc.as_ref(py), val_output, input)?;
@@ -443,7 +443,6 @@ impl Validator for DataclassValidator {
                 input,
             ));
         } else {
-            let input = input.maybe_subclass_dict(class)?;
             let val_output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
             let dc = create_class(self.class.as_ref(py))?;
             self.set_dict_call(py, dc.as_ref(py), val_output, input)?;
@@ -461,11 +460,8 @@ impl Validator for DataclassValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let dict_attr = intern!(py, "__dict__");
-        let dict: &PyDict = match obj.get_attr(dict_attr) {
-            Some(v) => v.downcast()?,
-            None => return Err(PyTypeError::new_err(format!("{} is not a model instance", safe_repr(obj))).into()),
-        };
+        let dict_py_str = intern!(py, "__dict__");
+        let dict: &PyDict = obj.getattr(dict_py_str)?.downcast()?;
 
         let new_dict = dict.copy()?;
         new_dict.set_item(field_name, field_value)?;
@@ -474,7 +470,7 @@ impl Validator for DataclassValidator {
             self.validator
                 .validate_assignment(py, new_dict, field_name, field_value, extra, slots, recursion_guard)?;
 
-        force_setattr(py, obj, dict_attr, dc_dict)?;
+        force_setattr(py, obj, dict_py_str, dc_dict)?;
 
         Ok(obj.to_object(py))
     }

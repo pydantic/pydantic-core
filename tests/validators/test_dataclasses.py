@@ -726,7 +726,7 @@ def test_dataclass_validate_assignment():
     ]
 
     # wrong arguments
-    with pytest.raises(TypeError, match="'field_a' is not a model instance"):
+    with pytest.raises(AttributeError, match="'str' object has no attribute '__dict__'"):
         v.validate_assignment('field_a', 'c', 123)
 
 
