@@ -436,12 +436,12 @@ impl Validator for DataclassValidator {
                 ))
             }
         } else if extra.strict.unwrap_or(self.strict) && input.is_python() {
-            return Err(ValError::new(
+            Err(ValError::new(
                 ErrorType::ModelClassType {
                     class_name: self.get_name().to_string(),
                 },
                 input,
-            ));
+            ))
         } else {
             let val_output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
             let dc = create_class(self.class.as_ref(py))?;
