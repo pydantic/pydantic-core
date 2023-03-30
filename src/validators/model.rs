@@ -92,7 +92,7 @@ impl Validator for ModelValidator {
         // but use from attributes to create a new instance of the model field type
         let class = self.class.as_ref(py);
         // mask 0 so JSON is input is never true here
-        if input.input_is_instance(class, 0)? {
+        if input.input_is_instance_fast(class, 0)? {
             // if the input is an exact instance OR we're not in strict mode, then progress
             // which means raise ane error in the case of an instance of a subclass in strict mode
             if input.is_exact_instance(class) || !extra.strict.unwrap_or(self.strict) {

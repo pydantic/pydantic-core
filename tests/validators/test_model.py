@@ -455,7 +455,10 @@ def test_model_class_instance_subclass():
         def model_post_init(self, context):
             post_init_calls.append(context)
 
-    class MySubModel(MyModel):
+    class Foo:
+        pass
+
+    class MySubModel(Foo, MyModel):
         field_b: str
 
         def __init__(self):
@@ -474,6 +477,10 @@ def test_model_class_instance_subclass():
             'post_init': 'model_post_init',
         }
     )
+
+    m0 = MyModel()
+    m1 = v.validate_python(m0, context='call1')
+    assert m0 is m1
 
     m2 = MySubModel()
     assert m2.field_a
