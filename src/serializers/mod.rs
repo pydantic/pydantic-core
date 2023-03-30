@@ -9,7 +9,8 @@ use crate::validators::SelfValidator;
 
 use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
-use extra::{CollectWarnings, Extra, SerMode, SerRecursionGuard};
+pub(crate) use extra::Extra;
+use extra::{CollectWarnings, SerMode, SerRecursionGuard};
 pub use shared::CombinedSerializer;
 use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
 
@@ -188,4 +189,42 @@ pub fn to_json(
     warnings.final_check(py)?;
     let py_bytes = PyBytes::new(py, &bytes);
     Ok(py_bytes.into())
+}
+
+pub(crate) struct GeneralPythonSerializer {
+    warnings: CollectWarnings,
+    rec_guard: SerRecursionGuard,
+    config: SerializationConfig,
+}
+
+impl GeneralPythonSerializer {
+    pub fn new() -> Self {
+        let warnings = CollectWarnings::new(None);
+        let rec_guard = SerRecursionGuard::default();
+        let config = SerializationConfig::from_args(None, None).unwrap();
+        Self {
+            warnings,
+            rec_guard,
+            config,
+        }
+    }
+
+    pub fn extra<'py>(&'py self, py: Python<'py>) -> Extra<'py> {
+        Extra {
+            mode: &SerMode::Json,
+            slots: &[],
+            ob_type_lookup: ob_type::ObTypeLookup::cached(py),
+            warnings: &self.warnings,
+            by_alias: false,
+            exclude_unset: false,
+            exclude_defaults: false,
+            exclude_none: false,
+            round_trip: false,
+            config: &self.config,
+            rec_guard: &self.rec_guard,
+            check: extra::SerCheck::None,
+            model: None,
+            field_name: None,
+        }
+    }
 }

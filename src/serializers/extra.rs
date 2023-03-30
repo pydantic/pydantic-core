@@ -71,6 +71,10 @@ impl<'a> Extra<'a> {
             field_name: None,
         }
     }
+
+    pub fn serialize_any<'py>(&'py self, value: &'py PyAny) -> super::infer::SerializeInfer<'py> {
+        super::infer::SerializeInfer::new(value, None, None, self)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

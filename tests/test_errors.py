@@ -1,7 +1,8 @@
+import json
 from decimal import Decimal
 
 import pytest
-from dirty_equals import IsInstance
+from dirty_equals import HasRepr, IsInstance, IsStr
 
 from pydantic_core import (
     PydanticCustomError,
@@ -410,3 +411,56 @@ def test_error_on_repr():
     assert exc_info.value.errors() == [
         {'type': 'int_type', 'loc': (), 'msg': 'Input should be a valid integer', 'input': IsInstance(BadRepr)}
     ]
+
+
+def test_error_json():
+    s = SchemaValidator({'type': 'str', 'min_length': 3})
+    with pytest.raises(ValidationError) as exc_info:
+        s.validate_python('12')
+
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'type': 'string_too_short',
+            'loc': (),
+            'msg': 'String should have at least 3 characters',
+            'input': '12',
+            'ctx': {'min_length': 3},
+        }
+    ]
+    assert json.loads(exc_info.value.json()) == [
+        {
+            'type': 'string_too_short',
+            'loc': [],
+            'msg': 'String should have at least 3 characters',
+            'input': '12',
+            'ctx': {'min_length': 3},
+        }
+    ]
+    assert json.loads(exc_info.value.json(include_context=False)) == [
+        {'type': 'string_too_short', 'loc': [], 'msg': 'String should have at least 3 characters', 'input': '12'}
+    ]
+    assert exc_info.value.json().startswith('[{"type":"string_too_short",')
+    assert exc_info.value.json(indent=2).startswith('[\n  {\n    "type": "string_too_short",')
+
+
+class Foobar:
+    pass
+
+
+def test_error_json_unknown():
+    s = SchemaValidator({'type': 'str'})
+    with pytest.raises(ValidationError) as exc_info:
+        s.validate_python(Foobar())
+
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'type': 'string_type',
+            'loc': (),
+            'msg': 'Input should be a valid string',
+            'input': HasRepr(IsStr(regex='<.+Foobar object at.+>')),
+        }
+    ]
+    with pytest.raises(ValueError):
+        exc_info.value.json()
