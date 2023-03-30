@@ -249,7 +249,7 @@ impl PyLineError {
 }
 
 pub(super) fn json_py_err(error: impl Display) -> PyErr {
-    PyValueError::new_err(format!("Error serializing ValidationError to JSON: {}", error))
+    PyValueError::new_err(format!("Error serializing ValidationError to JSON: {error}"))
 }
 
 pub(super) fn py_err_json<S>(error: PyErr) -> S::Error

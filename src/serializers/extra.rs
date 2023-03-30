@@ -54,7 +54,7 @@ impl<'a> Extra<'a> {
         round_trip: Option<bool>,
         config: &'a SerializationConfig,
         rec_guard: &'a SerRecursionGuard,
-        serialize_unknown: bool,
+        serialize_unknown: Option<bool>,
     ) -> Self {
         Self {
             mode,
@@ -71,7 +71,7 @@ impl<'a> Extra<'a> {
             check: SerCheck::None,
             model: None,
             field_name: None,
-            serialize_unknown,
+            serialize_unknown: serialize_unknown.unwrap_or(false),
         }
     }
 
