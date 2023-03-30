@@ -1,6 +1,6 @@
 import dataclasses
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 import pytest
 from dirty_equals import IsListOrTuple, IsStr
@@ -773,17 +773,9 @@ def test_dataclass_validate_assignment():
         {'type': 'string_type', 'loc': ('a',), 'msg': 'Input should be a valid string', 'input': 123}
     ]
 
-    with pytest.raises(ValidationError) as exc_info:
-        v.validate_assignment(foo, 'c', 123)
-    assert exc_info.value.errors() == [
-        {
-            'type': 'no_such_attribute',
-            'loc': ('c',),
-            'msg': "Object has no attribute 'c'",
-            'input': 123,
-            'ctx': {'attribute': 'c'},
-        }
-    ]
+    # unknown attributes are not validated
+    v.validate_assignment(foo, 'c', '123')
+    assert getattr(foo, 'c') == '123'
 
     # wrong arguments
     with pytest.raises(AttributeError, match="'str' object has no attribute '__dict__'"):
@@ -887,7 +879,7 @@ def test_frozen_field():
     'config', [core_schema.CoreConfig(typed_dict_extra_behavior='allow'), core_schema.CoreConfig(), None]
 )
 @pytest.mark.parametrize('schema_extra_behavior_kw', [{'extra_behavior': 'allow'}, {}])
-def test_extra_behavior_allow(config: core_schema.CoreConfig | None, schema_extra_behavior_kw: Dict[str, Any]):
+def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
     @dataclasses.dataclass
     class MyModel:
         f: str
@@ -895,8 +887,9 @@ def test_extra_behavior_allow(config: core_schema.CoreConfig | None, schema_extr
     v = SchemaValidator(
         core_schema.dataclass_schema(
             MyModel,
-            core_schema.dataclass_args_schema('MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())]),
-            **schema_extra_behavior_kw,
+            core_schema.dataclass_args_schema(
+                'MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())], **schema_extra_behavior_kw
+            ),
         ),
         config=config,
     )
@@ -920,7 +913,7 @@ def test_extra_behavior_allow(config: core_schema.CoreConfig | None, schema_extr
         (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {'extra_behavior': 'forbid'}),
     ],
 )
-def test_extra_behavior_forbid(config: core_schema.CoreConfig | None, schema_extra_behavior_kw: Dict[str, Any]):
+def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
     @dataclasses.dataclass
     class MyModel:
         f: str

@@ -2711,7 +2711,7 @@ class DataclassArgsSchema(TypedDict, total=False):
     ref: str
     metadata: Any
     serialization: SerSchema
-    extra_behavior: Literal['allow', 'forbid'] | None
+    extra_behavior: Union[Literal['allow', 'forbid'], None]
 
 
 def dataclass_args_schema(
@@ -2722,7 +2722,7 @@ def dataclass_args_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-    extra_behavior: Literal['allow', 'forbid'] | None = None,
+    extra_behavior: Union[Literal['allow', 'forbid'], None] = None,
 ) -> DataclassArgsSchema:
     """
     Returns a schema for validating dataclass arguments, e.g.:
