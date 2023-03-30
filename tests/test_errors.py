@@ -217,7 +217,7 @@ all_errors = [
     ('mapping_type', 'Input should be a valid mapping, error: foobar', {'error': 'foobar'}),
     ('iterable_type', 'Input should be iterable', None),
     ('iteration_error', 'Error iterating over object, error: foobar', {'error': 'foobar'}),
-    ('list_type', 'Input should be a valid list/array', None),
+    ('list_type', 'Input should be a valid list', None),
     ('tuple_type', 'Input should be a valid tuple', None),
     ('set_type', 'Input should be a valid set', None),
     ('bool_type', 'Input should be a valid boolean', None),

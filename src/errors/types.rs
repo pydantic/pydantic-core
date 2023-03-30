@@ -466,7 +466,7 @@ impl ErrorType {
             Self::StringPatternMismatch {..} => "String should match pattern '{pattern}'",
             Self::DictType => "Input should be a valid dictionary",
             Self::MappingType {..} => "Input should be a valid mapping, error: {error}",
-            Self::ListType => "Input should be a valid list/array",
+            Self::ListType => "Input should be a valid list",
             Self::TupleType => "Input should be a valid tuple",
             Self::SetType => "Input should be a valid set",
             Self::BoolType => "Input should be a valid boolean",
@@ -526,6 +526,8 @@ impl ErrorType {
     pub fn message_template_json(&self) -> &'static str {
         match self {
             Self::NoneRequired => "Input should be null",
+            Self::ListType => "Input should be a valid array",
+            Self::DataclassType { .. } => "Input should be an object",
             _ => self.message_template_python(),
         }
     }
