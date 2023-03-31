@@ -1037,7 +1037,7 @@ class LiteralSchema(TypedDict, total=False):
 
 
 def literal_schema(
-    *expected: Any, ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
+    expected: list[Any], ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
 ) -> LiteralSchema:
     """
     Returns a schema that matches a literal value, e.g.:
@@ -1045,7 +1045,7 @@ def literal_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    schema = core_schema.literal_schema('hello', 'world')
+    schema = core_schema.literal_schema(['hello', 'world'])
     v = SchemaValidator(schema)
     assert v.validate_python('hello') == 'hello'
     ```
@@ -1056,9 +1056,7 @@ def literal_schema(
         metadata: See [TODO] for details
         serialization: Custom serialization schema
     """
-    return dict_not_none(
-        type='literal', expected=list(expected), ref=ref, metadata=metadata, serialization=serialization
-    )
+    return dict_not_none(type='literal', expected=expected, ref=ref, metadata=metadata, serialization=serialization)
 
 
 # must match input/parse_json.rs::JsonType::try_from

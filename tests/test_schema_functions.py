@@ -52,7 +52,7 @@ all_schema_functions = [
     (core_schema.time_schema, args(), {'type': 'time'}),
     (core_schema.datetime_schema, args(), {'type': 'datetime'}),
     (core_schema.timedelta_schema, args(), {'type': 'timedelta'}),
-    (core_schema.literal_schema, args('a', 'b'), {'type': 'literal', 'expected': ['a', 'b']}),
+    (core_schema.literal_schema, args(['a', 'b']), {'type': 'literal', 'expected': ['a', 'b']}),
     (core_schema.is_instance_schema, args(int), {'type': 'is-instance', 'cls': int}),
     (core_schema.callable_schema, args(), {'type': 'callable'}),
     (core_schema.list_schema, args(), {'type': 'list'}),

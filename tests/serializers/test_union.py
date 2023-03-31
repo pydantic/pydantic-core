@@ -158,7 +158,7 @@ def test_typed_dict_literal():
             [
                 core_schema.typed_dict_schema(
                     dict(
-                        pet_type=core_schema.typed_dict_field(core_schema.literal_schema('cat')),
+                        pet_type=core_schema.typed_dict_field(core_schema.literal_schema(['cat'])),
                         sound=core_schema.typed_dict_field(
                             core_schema.int_schema(serialization=core_schema.format_ser_schema('04d'))
                         ),
@@ -166,7 +166,7 @@ def test_typed_dict_literal():
                 ),
                 core_schema.typed_dict_schema(
                     dict(
-                        pet_type=core_schema.typed_dict_field(core_schema.literal_schema('dog')),
+                        pet_type=core_schema.typed_dict_field(core_schema.literal_schema(['dog'])),
                         sound=core_schema.typed_dict_field(
                             core_schema.float_schema(serialization=core_schema.format_ser_schema('0.3f'))
                         ),
