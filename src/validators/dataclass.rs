@@ -35,6 +35,7 @@ pub struct DataclassArgsValidator {
     dataclass_name: String,
     validator_name: String,
     extra_behavior: ExtraBehavior,
+    use_field_names_in_loc: bool,
 }
 
 impl BuildValidator for DataclassArgsValidator {
@@ -114,6 +115,7 @@ impl BuildValidator for DataclassArgsValidator {
             dataclass_name,
             validator_name,
             extra_behavior,
+            use_field_names_in_loc: config.get_as(intern!(py, "use_field_names_in_loc"))?.unwrap_or(false),
         }
         .into())
     }
@@ -173,13 +175,13 @@ impl Validator for DataclassArgsValidator {
                     if let Some(kwargs) = $args.kwargs {
                         if let Some((lookup_path, value)) = field.lookup_key.$get_method(kwargs)? {
                             used_keys.insert(lookup_path.first_key());
-                            kw_value = Some(value);
+                            kw_value = Some((lookup_path, value));
                         }
                     }
 
                     match (pos_value, kw_value) {
                         // found both positional and keyword arguments, error
-                        (Some(_), Some(kw_value)) => {
+                        (Some(_), Some((_, kw_value))) => {
                             errors.push(ValLineError::new_with_loc(
                                 ErrorType::MultipleArgumentValues,
                                 kw_value,
@@ -204,18 +206,16 @@ impl Validator for DataclassArgsValidator {
                             }
                         }
                         // found a keyword argument, validate it
-                        (None, Some(kw_value)) => {
+                        (None, Some((lookup_path, kw_value))) => {
                             match field
                                 .validator
                                 .validate(py, kw_value, &extra, slots, recursion_guard)
                             {
                                 Ok(value) => set_item!(field, value),
                                 Err(ValError::LineErrors(line_errors)) => {
-                                    errors.extend(
-                                        line_errors
-                                            .into_iter()
-                                            .map(|err| err.with_outer_location(field.name.clone().into())),
-                                    );
+                                    errors.extend(line_errors.into_iter().map(|err| {
+                                        lookup_path.apply_error_loc(err, self.use_field_names_in_loc, &field.name)
+                                    }));
                                 }
                                 Err(err) => return Err(err),
                             }
@@ -231,10 +231,11 @@ impl Validator for DataclassArgsValidator {
                             )? {
                                 set_item!(field, value);
                             } else {
-                                errors.push(ValLineError::new_with_loc(
+                                errors.push(field.lookup_key.error(
                                     ErrorType::MissingKeywordArgument,
                                     input,
-                                    field.name.clone(),
+                                    self.use_field_names_in_loc,
+                                    &field.name,
                                 ));
                             }
                         }

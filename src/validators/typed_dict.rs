@@ -210,10 +210,11 @@ impl Validator for TypedDictValidator {
                     } else if let Some(value) = field.validator.default_value(py, Some(field.name.as_str()), &extra, slots, recursion_guard)? {
                         output_dict.set_item(&field.name_py, value)?;
                     } else if field.required {
-                        errors.push(ValLineError::new_with_loc(
+                        errors.push(field.lookup_key.error(
                             ErrorType::Missing,
                             input,
-                            field.name.clone(),
+                            self.use_field_names_in_loc,
+                            &field.name
                         ));
                     }
                 }

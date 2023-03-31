@@ -552,9 +552,9 @@ def test_alias(py_and_json: PyAndJson):
         }
     )
     assert v.validate_test({'FieldA': '123'}) == {'field_a': 123}
-    with pytest.raises(ValidationError, match=r'field_a\n +Field required \[type=missing,'):
+    with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
         assert v.validate_test({'foobar': '123'})
-    with pytest.raises(ValidationError, match=r'field_a\n +Field required \[type=missing,'):
+    with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
         assert v.validate_test({'field_a': '123'})
 
 
@@ -597,7 +597,7 @@ def test_alias_allow_pop(py_and_json: PyAndJson):
     assert v.validate_test({'FieldA': '123'}) == ({'field_a': 123}, {'field_a'})
     assert v.validate_test({'field_a': '123'}) == ({'field_a': 123}, {'field_a'})
     assert v.validate_test({'FieldA': '1', 'field_a': '2'}) == ({'field_a': 1}, {'field_a'})
-    with pytest.raises(ValidationError, match=r'field_a\n +Field required \[type=missing,'):
+    with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
         assert v.validate_test({'foobar': '123'})
 
 
@@ -605,10 +605,10 @@ def test_alias_allow_pop(py_and_json: PyAndJson):
     'input_value,expected',
     [
         ({'foo': {'bar': '123'}}, {'field_a': 123}),
-        ({'x': '123'}, Err(r'field_a\n +Field required \[type=missing,')),
-        ({'foo': '123'}, Err(r'field_a\n +Field required \[type=missing,')),
-        ({'foo': [1, 2, 3]}, Err(r'field_a\n +Field required \[type=missing,')),
-        ({'foo': {'bat': '123'}}, Err(r'field_a\n +Field required \[type=missing,')),
+        ({'x': '123'}, Err(r'foo -> bar\n +Field required \[type=missing,')),
+        ({'foo': '123'}, Err(r'foo -> bar\n +Field required \[type=missing,')),
+        ({'foo': [1, 2, 3]}, Err(r'foo -> bar\n +Field required \[type=missing,')),
+        ({'foo': {'bat': '123'}}, Err(r'foo -> bar\n +Field required \[type=missing,')),
     ],
     ids=repr,
 )
@@ -657,7 +657,8 @@ def test_aliases_path_multiple(py_and_json: PyAndJson, input_value, expected):
                     'schema': {'type': 'int'},
                 }
             },
-        }
+        },
+        {'use_field_names_in_loc': True},
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=expected.message):
@@ -691,7 +692,8 @@ def test_aliases_path_negative(input_value, expected):
             'fields': {
                 'field_a': {'validation_alias': ['foo', -2], 'type': 'typed-dict-field', 'schema': {'type': 'int'}}
             },
-        }
+        },
+        {'use_field_names_in_loc': True},
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=expected.message):
@@ -707,7 +709,7 @@ def test_aliases_path_negative(input_value, expected):
     [
         ({'foo': [1, 42, 'xx']}, {'field_a': 42}),
         ({'foo': [42, 'xxx', 42]}, Err(r'Input should be a valid integer,')),
-        ({'foo': [42]}, Err(r'field_a\n +Field required \[type=missing,')),
+        ({'foo': [42]}, Err(r'foo -> -2\n +Field required \[type=missing,')),
     ],
     ids=repr,
 )
@@ -828,22 +830,22 @@ def test_alias_error_loc_alias(py_and_json: PyAndJson):
                 'field_a': {
                     'type': 'typed-dict-field',
                     'schema': {'type': 'int'},
-                    'validation_alias': [['foo'], ['bar', 1, -1]],
+                    'validation_alias': [['foo', 'x'], ['bar', 1, -1]],
                 }
             },
         },
         {'use_field_names_in_loc': False},  # this is the default
     )
-    assert v.validate_test({'foo': 42}) == {'field_a': 42}
+    assert v.validate_test({'foo': {'x': 42}}) == {'field_a': 42}
     assert v.validate_python({'bar': ['x', {-1: 42}]}) == {'field_a': 42}
     assert v.validate_test({'bar': ['x', [1, 2, 42]]}) == {'field_a': 42}
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_test({'foo': 'not_int'})
+        v.validate_test({'foo': {'x': 'not_int'}})
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
             'type': 'int_parsing',
-            'loc': ('foo',),
+            'loc': ('foo', 'x'),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'not_int',
         }
@@ -859,6 +861,10 @@ def test_alias_error_loc_alias(py_and_json: PyAndJson):
             'input': 'not_int',
         }
     ]
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_test({})
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [{'type': 'missing', 'loc': ('foo', 'x'), 'msg': 'Field required', 'input': {}}]
 
 
 def test_alias_error_loc_field_names(py_and_json: PyAndJson):
@@ -899,6 +905,10 @@ def test_alias_error_loc_field_names(py_and_json: PyAndJson):
             'input': 'not_int',
         }
     ]
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_test({})
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [{'type': 'missing', 'loc': ('field_a',), 'msg': 'Field required', 'input': {}}]
 
 
 def test_empty_model():
@@ -1296,7 +1306,8 @@ def test_from_attributes_path(input_value, expected):
                 }
             },
             'from_attributes': True,
-        }
+        },
+        {'use_field_names_in_loc': True},
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=expected.message):

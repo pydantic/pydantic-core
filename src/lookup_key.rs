@@ -6,8 +6,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyMapping, PyString};
 
 use crate::build_tools::py_err;
-use crate::errors::ValLineError;
-use crate::input::{JsonInput, JsonObject};
+use crate::errors::{ErrorType, ValLineError};
+use crate::input::{Input, JsonInput, JsonObject};
 
 /// Used got getting items from python dicts, python objects, or JSON objects, in different ways
 #[derive(Debug, Clone)]
@@ -277,6 +277,25 @@ impl LookupKey {
             }
         }
     }
+
+    pub fn error<'d>(
+        &self,
+        error_type: ErrorType,
+        input: &'d impl Input<'d>,
+        use_field_names_in_loc: bool,
+        field_name: &str,
+    ) -> ValLineError<'d> {
+        if use_field_names_in_loc {
+            ValLineError::new_with_loc(error_type, input, field_name.to_string())
+        } else {
+            let lookup_path = match self {
+                Self::Simple { path, .. } => path,
+                Self::Choice { path1, .. } => path1,
+                Self::PathChoices(paths) => paths.first().unwrap(),
+            };
+            ValLineError::new_with_full_loc(error_type, input, lookup_path.into())
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -329,21 +348,13 @@ impl LookupPath {
         } else {
             let mut line_error = line_error;
             for path_item in self.iter().rev() {
-                let loc_item = match path_item.clone() {
-                    PathItem::S(s, _) => s.into(),
-                    PathItem::Pos(val) => val.into(),
-                    PathItem::Neg(val) => {
-                        let neg_value = -(val as i64);
-                        neg_value.into()
-                    }
-                };
-                line_error = line_error.with_outer_location(loc_item);
+                line_error = line_error.with_outer_location(path_item.clone().into());
             }
             line_error
         }
     }
 
-    fn iter(&self) -> Iter<PathItem> {
+    pub fn iter(&self) -> Iter<PathItem> {
         self.0.iter()
     }
 
@@ -353,32 +364,6 @@ impl LookupPath {
         self.0.first().unwrap().get_key()
     }
 }
-//
-// pub(crate) struct LookupPathIter<'a> {
-//     path: &'a [PathItem],
-//     index: usize,
-// }
-//
-// impl<'a> Iterator for LookupPathIter<'a> {
-//     type Item = &'a PathItem;
-//
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let item = self.path.get(self.index)?;
-//         self.index += 1;
-//         Some(item)
-//     }
-// }
-//
-// impl<'a> DoubleEndedIterator for LookupPathIter<'a> {
-//     fn next_back(&mut self) -> Option<Self::Item> {
-//         if self.index == 0 {
-//             self.index = self.path.len();
-//         }
-//         let item = self.path.get(self.index)?;
-//         self.index -= 1;
-//         Some(item)
-//     }
-// }
 
 #[derive(Debug, Clone)]
 pub(crate) enum PathItem {
