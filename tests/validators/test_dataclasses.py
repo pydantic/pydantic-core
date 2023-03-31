@@ -973,7 +973,7 @@ def test_extra_behavior_ignore_cfg_err(
     class MyModel:
         f: str
 
-    with pytest.raises(SchemaError, match="Input should be 'allow' or 'forbid'"):
+    with pytest.raises(SchemaError, match="Input should be 'allow', 'forbid' or None"):
         SchemaValidator(
             core_schema.dataclass_schema(
                 MyModel,
