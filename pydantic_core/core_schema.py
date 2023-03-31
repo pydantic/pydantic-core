@@ -1278,7 +1278,7 @@ class TuplePositionalSchema(TypedDict, total=False):
 
 
 def tuple_positional_schema(
-    *items_schema: CoreSchema,
+    items_schema: list[CoreSchema],
     extra_schema: CoreSchema | None = None,
     strict: bool | None = None,
     ref: str | None = None,
@@ -1292,7 +1292,7 @@ def tuple_positional_schema(
     from pydantic_core import SchemaValidator, core_schema
 
     schema = core_schema.tuple_positional_schema(
-        core_schema.int_schema(), core_schema.str_schema()
+        [core_schema.int_schema(), core_schema.str_schema()]
     )
     v = SchemaValidator(schema)
     assert v.validate_python((1, 'hello')) == (1, 'hello')
@@ -1311,7 +1311,7 @@ def tuple_positional_schema(
     """
     return dict_not_none(
         type='tuple-positional',
-        items_schema=list(items_schema),
+        items_schema=items_schema,
         extra_schema=extra_schema,
         strict=strict,
         ref=ref,
