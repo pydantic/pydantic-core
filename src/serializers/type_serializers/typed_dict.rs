@@ -84,7 +84,7 @@ impl BuildSerializer for TypedDictSerializer {
             schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
 
         let include_extra = matches!(
-            ExtraBehavior::from_schema_or_config(py, schema, config)?,
+            ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?,
             ExtraBehavior::Allow
         );
 

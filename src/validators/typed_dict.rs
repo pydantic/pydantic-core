@@ -56,7 +56,7 @@ impl BuildValidator for TypedDictValidator {
 
         let return_fields_set = schema.get_as(intern!(py, "return_fields_set"))?.unwrap_or(false);
 
-        let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config)?;
+        let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
         let extra_validator = match (schema.get_item(intern!(py, "extra_validator")), &extra_behavior) {
             (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(v, config, build_context)?)),
@@ -239,7 +239,7 @@ impl Validator for TypedDictValidator {
                         // Unknown / extra field
                         let py_key = either_str.as_py_string(py);
                         match self.extra_behavior {
-                            ExtraBehavior::Forbid | ExtraBehavior::Unset => {
+                            ExtraBehavior::Forbid => {
                                 errors.push(ValLineError::new_with_loc(
                                     ErrorType::ExtraForbidden,
                                     value,
@@ -383,7 +383,7 @@ impl Validator for TypedDictValidator {
                     }
                     None => ok(field_value.to_object(py)),
                 },
-                ExtraBehavior::Forbid | ExtraBehavior::Ignore | ExtraBehavior::Unset => {
+                ExtraBehavior::Forbid | ExtraBehavior::Ignore => {
                     return Err(ValError::new_with_loc(
                         ErrorType::NoSuchAttribute {
                             attribute: field_name.to_string(),

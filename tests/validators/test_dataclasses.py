@@ -301,6 +301,7 @@ def test_dataclass_subclass(revalidate_instances, input_value, expected):
                 core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
                 core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
             ],
+            extra_behavior='forbid',
         ),
         revalidate_instances=revalidate_instances,
     )
@@ -773,9 +774,18 @@ def test_dataclass_validate_assignment():
         {'type': 'string_type', 'loc': ('a',), 'msg': 'Input should be a valid string', 'input': 123}
     ]
 
-    # unknown attributes are not validated
-    v.validate_assignment(foo, 'c', '123')
-    assert getattr(foo, 'c') == '123'
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_assignment(foo, 'c', '123')
+    assert exc_info.value.errors() == [
+        {
+            'type': 'no_such_attribute',
+            'loc': ('c',),
+            'msg': "Object has no attribute 'c'",
+            'input': '123',
+            'ctx': {'attribute': 'c'},
+        }
+    ]
+    assert not hasattr(foo, 'c')
 
     # wrong arguments
     with pytest.raises(AttributeError, match="'str' object has no attribute '__dict__'"):

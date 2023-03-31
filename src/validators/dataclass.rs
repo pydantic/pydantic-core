@@ -49,7 +49,7 @@ impl BuildValidator for DataclassArgsValidator {
 
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
-        let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config)?;
+        let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
         let fields_schema: &PyList = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: Vec<Field> = Vec::with_capacity(fields_schema.len());
@@ -262,7 +262,7 @@ impl Validator for DataclassArgsValidator {
                                     if !used_keys.contains(either_str.as_cow()?.as_ref()) {
                                         // Unknown / extra field
                                         match self.extra_behavior {
-                                            ExtraBehavior::Forbid | ExtraBehavior::Unset => {
+                                            ExtraBehavior::Forbid => {
                                                 errors.push(ValLineError::new_with_loc(
                                                     ErrorType::UnexpectedKeywordArgument,
                                                     value,
@@ -365,7 +365,7 @@ impl Validator for DataclassArgsValidator {
             match self.extra_behavior {
                 // For dataclasses we allow assigning unknown fields
                 // to match stdlib dataclass behavior
-                ExtraBehavior::Unset | ExtraBehavior::Allow => ok(field_value.to_object(py)),
+                ExtraBehavior::Allow => ok(field_value.to_object(py)),
                 // Unless the user explicitly set extra_behavior='forbid' or `'ignore'`
                 ExtraBehavior::Forbid | ExtraBehavior::Ignore => Err(ValError::new_with_loc(
                     ErrorType::NoSuchAttribute {
