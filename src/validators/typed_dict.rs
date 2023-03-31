@@ -180,11 +180,11 @@ impl Validator for TypedDictValidator {
                             continue;
                         }
                     };
-                    if let Some((used_key, value)) = op_key_value {
+                    if let Some((lookup_path, value)) = op_key_value {
                         if let Some(ref mut used_keys) = used_keys {
                             // key is "used" whether or not validation passes, since we want to skip this key in
                             // extra logic either way
-                            used_keys.insert(used_key);
+                            used_keys.insert(lookup_path.first_key());
                         }
                         match field
                             .validator

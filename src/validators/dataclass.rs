@@ -171,8 +171,8 @@ impl Validator for DataclassArgsValidator {
 
                     let mut kw_value = None;
                     if let Some(kwargs) = $args.kwargs {
-                        if let Some((key, value)) = field.lookup_key.$get_method(kwargs)? {
-                            used_keys.insert(key);
+                        if let Some((lookup_path, value)) = field.lookup_key.$get_method(kwargs)? {
+                            used_keys.insert(lookup_path.first_key());
                             kw_value = Some(value);
                         }
                     }

@@ -176,8 +176,8 @@ impl Validator for ArgumentsValidator {
                     let mut kw_value = None;
                     if let Some(kwargs) = $args.kwargs {
                         if let Some(ref lookup_key) = parameter.kw_lookup_key {
-                            if let Some((key, value)) = lookup_key.$get_method(kwargs)? {
-                                used_kwargs.insert(key);
+                            if let Some((lookup_path, value)) = lookup_key.$get_method(kwargs)? {
+                                used_kwargs.insert(lookup_path.first_key());
                                 kw_value = Some(value);
                             }
                         }
