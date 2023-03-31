@@ -323,14 +323,16 @@ pub(crate) enum PathItem {
     /// as above we store both the string and pystring to save creating the pystring for python
     S(String, Py<PyString>),
     /// integer key, used to get items from a list, tuple OR a dict with int keys `Dict[int, ...]` (python only)
-    I(usize),
+    Pos(usize),
+    Neg(usize),
 }
 
 impl fmt::Display for PathItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::S(key, _) => write!(f, "'{key}'"),
-            Self::I(key) => write!(f, "{key}"),
+            Self::Pos(key) => write!(f, "{key}"),
+            Self::Neg(key) => write!(f, "-{key}"),
         }
     }
 }
@@ -339,7 +341,11 @@ impl ToPyObject for PathItem {
     fn to_object(&self, py: Python<'_>) -> PyObject {
         match self {
             Self::S(_, val) => val.to_object(py),
-            Self::I(val) => val.to_object(py),
+            Self::Pos(val) => val.to_object(py),
+            Self::Neg(val) => {
+                let neg_value = -(*val as i64);
+                neg_value.to_object(py)
+            }
         }
     }
 }
@@ -349,13 +355,20 @@ impl PathItem {
         if let Ok(py_str_key) = obj.downcast::<PyString>() {
             let str_key = py_str_key.to_str()?.to_string();
             Ok(Self::S(str_key, py_str_key.into()))
-        } else {
-            let int_key = obj.extract::<usize>()?;
+        } else if let Ok(usize_key) = obj.extract::<usize>() {
             if index == 0 {
                 py_err!(PyTypeError; "The first item in an alias path should be a string")
             } else {
-                Ok(Self::I(int_key))
+                Ok(Self::Pos(usize_key))
             }
+        } else if let Ok(int_key) = obj.extract::<i64>() {
+            if index == 0 {
+                py_err!(PyTypeError; "The first item in an alias path should be a string")
+            } else {
+                Ok(Self::Neg(int_key.unsigned_abs() as usize))
+            }
+        } else {
+            py_err!(PyTypeError; "Item in an alias path should be a string or int")
         }
     }
 
@@ -372,7 +385,7 @@ impl PathItem {
     pub fn get_key(&self) -> &str {
         match self {
             Self::S(key, _) => key.as_str(),
-            Self::I(_) => unreachable!(),
+            _ => unreachable!(),
         }
     }
 
@@ -387,7 +400,7 @@ impl PathItem {
                 }
             }
             // int, we fall back to py_get_item - e.g. we want to use get_item for a list, tuple, dict, etc.
-            Self::I(_) => Ok(self.py_get_item(obj)),
+            _ => Ok(self.py_get_item(obj)),
         }
     }
 
@@ -395,7 +408,14 @@ impl PathItem {
         match any_json {
             JsonInput::Object(v_obj) => self.json_obj_get(v_obj),
             JsonInput::Array(v_array) => match self {
-                Self::I(index) => v_array.get(*index),
+                Self::Pos(index) => v_array.get(*index),
+                Self::Neg(index) => {
+                    if let Some(index) = v_array.len().checked_sub(*index) {
+                        v_array.get(index)
+                    } else {
+                        None
+                    }
+                }
                 _ => None,
             },
             _ => None,

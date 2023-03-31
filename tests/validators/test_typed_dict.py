@@ -668,6 +668,67 @@ def test_aliases_path_multiple(py_and_json: PyAndJson, input_value, expected):
         assert output == expected
 
 
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ({'foo': {-2: '123'}}, {'field_a': 123}),
+        # negatives indexes work fine
+        ({'foo': [1, 42, 'xx']}, {'field_a': 42}),
+        ({'foo': [42, 'xxx', 42]}, Err(r'Input should be a valid integer,')),
+        ({'foo': [42]}, Err(r'field_a\n +Field required \[type=missing,')),
+        ({'foo': {'xx': '123'}}, Err(r'field_a\n +Field required \[type=missing,')),
+        ({'foo': {'-2': '123'}}, Err(r'field_a\n +Field required \[type=missing,')),
+        ({'foo': {2: '123'}}, Err(r'field_a\n +Field required \[type=missing,')),
+        ({'foo': 'foobar'}, Err(r'field_a\n +Field required \[type=missing,')),
+        ({'foo': {0, 1, 2}}, Err(r'field_a\n +Field required \[type=missing,')),
+    ],
+    ids=repr,
+)
+def test_aliases_path_negative(input_value, expected):
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'field_a': {'validation_alias': ['foo', -2], 'type': 'typed-dict-field', 'schema': {'type': 'int'}}
+            },
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=expected.message):
+            val = v.validate_python(input_value)
+            print(f'UNEXPECTED OUTPUT: {val!r}')
+    else:
+        output = v.validate_python(input_value)
+        assert output == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        ({'foo': [1, 42, 'xx']}, {'field_a': 42}),
+        ({'foo': [42, 'xxx', 42]}, Err(r'Input should be a valid integer,')),
+        ({'foo': [42]}, Err(r'field_a\n +Field required \[type=missing,')),
+    ],
+    ids=repr,
+)
+def test_aliases_path_negative_json(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'field_a': {'validation_alias': ['foo', -2], 'type': 'typed-dict-field', 'schema': {'type': 'int'}}
+            },
+        }
+    )
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=expected.message):
+            val = v.validate_test(input_value)
+            print(f'UNEXPECTED OUTPUT: {val!r}')
+    else:
+        output = v.validate_test(input_value)
+        assert output == expected
+
+
 def test_aliases_debug():
     v = SchemaValidator(
         {
