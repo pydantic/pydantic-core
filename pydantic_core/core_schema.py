@@ -2188,7 +2188,7 @@ class UnionSchema(TypedDict, total=False):
 
 
 def union_schema(
-    *choices: CoreSchema,
+    choices: list[CoreSchema],
     auto_collapse: bool | None = None,
     custom_error_type: str | None = None,
     custom_error_message: str | None = None,
@@ -2204,7 +2204,7 @@ def union_schema(
     ```py
     from pydantic_core import SchemaValidator, core_schema
 
-    schema = core_schema.union_schema(core_schema.str_schema(), core_schema.int_schema())
+    schema = core_schema.union_schema([core_schema.str_schema(), core_schema.int_schema()])
     v = SchemaValidator(schema)
     assert v.validate_python('hello') == 'hello'
     assert v.validate_python(1) == 1
@@ -2223,7 +2223,7 @@ def union_schema(
     """
     return dict_not_none(
         type='union',
-        choices=list(choices),
+        choices=choices,
         auto_collapse=auto_collapse,
         custom_error_type=custom_error_type,
         custom_error_message=custom_error_message,

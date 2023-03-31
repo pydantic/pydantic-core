@@ -172,7 +172,7 @@ def test_literal_none():
 
 
 def test_union():
-    v = SchemaValidator(core_schema.union_schema(core_schema.literal_schema('a', 'b'), core_schema.int_schema()))
+    v = SchemaValidator(core_schema.union_schema([core_schema.literal_schema('a', 'b'), core_schema.int_schema()]))
     assert v.validate_python('a') == 'a'
     assert v.validate_python(4) == 4
     with pytest.raises(ValidationError) as exc_info:
