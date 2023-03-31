@@ -237,7 +237,6 @@ impl Validator for TypedDictValidator {
                         }
 
                         // Unknown / extra field
-                        let py_key = either_str.as_py_string(py);
                         match self.extra_behavior {
                             ExtraBehavior::Forbid => {
                                 errors.push(ValLineError::new_with_loc(
@@ -248,6 +247,7 @@ impl Validator for TypedDictValidator {
                             }
                             ExtraBehavior::Ignore => {}
                             ExtraBehavior::Allow => {
+                            let py_key = either_str.as_py_string(py);
                                 if let Some(ref validator) = self.extra_validator {
                                     match validator.validate(py, value, &extra, slots, recursion_guard) {
                                         Ok(value) => {
