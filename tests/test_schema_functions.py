@@ -173,8 +173,10 @@ all_schema_functions = [
     (
         core_schema.arguments_schema,
         args(
-            core_schema.arguments_parameter('foo', {'type': 'int'}),
-            core_schema.arguments_parameter('bar', {'type': 'str'}),
+            [
+                core_schema.arguments_parameter('foo', {'type': 'int'}),
+                core_schema.arguments_parameter('bar', {'type': 'str'}),
+            ],
             serialization=core_schema.format_ser_schema('d'),
         ),
         {
@@ -188,7 +190,7 @@ all_schema_functions = [
     ),
     (
         core_schema.call_schema,
-        args(core_schema.arguments_schema(core_schema.arguments_parameter('foo', {'type': 'int'})), val_function),
+        args(core_schema.arguments_schema([core_schema.arguments_parameter('foo', {'type': 'int'})]), val_function),
         {
             'type': 'call',
             'function': val_function,

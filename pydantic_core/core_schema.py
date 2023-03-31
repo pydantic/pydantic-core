@@ -2831,7 +2831,7 @@ def arguments_parameter(
     param = core_schema.arguments_parameter(
         name='a', schema=core_schema.str_schema(), mode='positional_only'
     )
-    schema = core_schema.arguments_schema(param)
+    schema = core_schema.arguments_schema([param])
     v = SchemaValidator(schema)
     assert v.validate_python(('hello',)) == (('hello',), {})
     ```
@@ -2857,7 +2857,7 @@ class ArgumentsSchema(TypedDict, total=False):
 
 
 def arguments_schema(
-    *arguments: ArgumentsParameter,
+    arguments: list[ArgumentsParameter],
     populate_by_name: bool | None = None,
     var_args_schema: CoreSchema | None = None,
     var_kwargs_schema: CoreSchema | None = None,
@@ -2877,7 +2877,7 @@ def arguments_schema(
     param_b = core_schema.arguments_parameter(
         name='b', schema=core_schema.bool_schema(), mode='positional_only'
     )
-    schema = core_schema.arguments_schema(param_a, param_b)
+    schema = core_schema.arguments_schema([param_a, param_b])
     v = SchemaValidator(schema)
     assert v.validate_python(('hello', True)) == (('hello', True), {})
     ```
@@ -2893,7 +2893,7 @@ def arguments_schema(
     """
     return dict_not_none(
         type='arguments',
-        arguments_schema=list(arguments),
+        arguments_schema=arguments,
         populate_by_name=populate_by_name,
         var_args_schema=var_args_schema,
         var_kwargs_schema=var_kwargs_schema,
@@ -2934,7 +2934,7 @@ def call_schema(
     param_b = core_schema.arguments_parameter(
         name='b', schema=core_schema.bool_schema(), mode='positional_only'
     )
-    args_schema = core_schema.arguments_schema(param_a, param_b)
+    args_schema = core_schema.arguments_schema([param_a, param_b])
 
     schema = core_schema.call_schema(
         arguments=args_schema,
