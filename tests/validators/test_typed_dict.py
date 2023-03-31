@@ -3,12 +3,12 @@ import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Mapping
+from typing import Any, Dict, Mapping, Union
 
 import pytest
 from dirty_equals import FunctionCheck, HasRepr, IsStr
 
-from pydantic_core import CoreConfig, SchemaError, SchemaValidator, ValidationError
+from pydantic_core import CoreConfig, SchemaError, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -1631,3 +1631,108 @@ def test_frozen_field():
     assert exc_info.value.errors() == [
         {'type': 'frozen_field', 'loc': ('is_developer',), 'msg': 'Field is frozen', 'input': False}
     ]
+
+
+@pytest.mark.parametrize(
+    'config,schema_extra_behavior_kw',
+    [
+        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {}),
+        (core_schema.CoreConfig(), {'extra_behavior': 'allow'}),
+        (None, {'extra_behavior': 'allow'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='forbid'), {'extra_behavior': 'allow'}),
+    ],
+)
+def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            {'f': core_schema.typed_dict_field(core_schema.str_schema())}, **schema_extra_behavior_kw
+        ),
+        config=config,
+    )
+
+    m: Dict[str, Any] = v.validate_python({'f': 'x'})
+    assert m['f'] == 'x'
+
+    v.validate_assignment(m, 'f', 'y')
+    assert m['f'] == 'y'
+
+    v.validate_assignment(m, 'not_f', 'xyz')
+    assert m['not_f'] == 'xyz'
+
+
+@pytest.mark.parametrize(
+    'config,schema_extra_behavior_kw',
+    [
+        (core_schema.CoreConfig(typed_dict_extra_behavior='forbid'), {}),
+        (core_schema.CoreConfig(), {'extra_behavior': 'forbid'}),
+        (None, {'extra_behavior': 'forbid'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {'extra_behavior': 'forbid'}),
+    ],
+)
+def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            {'f': core_schema.typed_dict_field(core_schema.str_schema())}, **schema_extra_behavior_kw
+        ),
+        config=config,
+    )
+
+    m: Dict[str, Any] = v.validate_python({'f': 'x'})
+    assert m['f'] == 'x'
+
+    v.validate_assignment(m, 'f', 'y')
+    assert m['f'] == 'y'
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_assignment(m, 'not_f', 'xyz')
+    assert exc_info.value.errors() == [
+        {
+            'type': 'no_such_attribute',
+            'loc': ('not_f',),
+            'msg': "Object has no attribute 'not_f'",
+            'input': 'xyz',
+            'ctx': {'attribute': 'not_f'},
+        }
+    ]
+    assert 'not_f' not in m
+
+
+@pytest.mark.parametrize(
+    'config,schema_extra_behavior_kw',
+    [
+        (core_schema.CoreConfig(typed_dict_extra_behavior='ignore'), {}),
+        (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
+        (None, {'extra_behavior': 'ignore'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='forbid'), {'extra_behavior': 'ignore'}),
+    ],
+)
+def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            {'f': core_schema.typed_dict_field(core_schema.str_schema())}, **schema_extra_behavior_kw
+        ),
+        config=config,
+    )
+
+    m: Dict[str, Any] = v.validate_python({'f': 'x'})
+    assert m['f'] == 'x'
+
+    v.validate_assignment(m, 'f', 'y')
+    assert m['f'] == 'y'
+
+    # even if we ignore extra attributes during initialization / validation
+    # we never ignore them during assignment
+    # instead if extra='ignore' was set (or nothing was set since that's the default)
+    # we treat it as if it were extra='forbid'
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_assignment(m, 'not_f', 'xyz')
+    assert exc_info.value.errors() == [
+        {
+            'type': 'no_such_attribute',
+            'loc': ('not_f',),
+            'msg': "Object has no attribute 'not_f'",
+            'input': 'xyz',
+            'ctx': {'attribute': 'not_f'},
+        }
+    ]
+    assert 'not_f' not in m

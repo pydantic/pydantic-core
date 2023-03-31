@@ -1,11 +1,12 @@
 use pyo3::exceptions::PyKeyError;
+use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
 
 use ahash::AHashSet;
 
-use crate::build_tools::{is_strict, py_err, schema_or_config, schema_or_config_same, SchemaDict};
+use crate::build_tools::{is_strict, py_err, schema_or_config_same, ExtraBehavior, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{GenericArguments, Input};
 use crate::lookup_key::LookupKey;
@@ -28,19 +29,13 @@ struct Field {
 }
 
 #[derive(Debug, Clone)]
-enum ExtraAttributeAssignmentBehavior {
-    Allow,
-    Forbid,
-}
-
-#[derive(Debug, Clone)]
 pub struct DataclassArgsValidator {
     fields: Vec<Field>,
     positional_count: usize,
     init_only_count: Option<usize>,
     dataclass_name: String,
     validator_name: String,
-    extra_attribute_behavior: ExtraAttributeAssignmentBehavior,
+    extra_behavior: ExtraBehavior,
 }
 
 impl BuildValidator for DataclassArgsValidator {
@@ -55,20 +50,13 @@ impl BuildValidator for DataclassArgsValidator {
 
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
-        let extra_behavior = schema_or_config::<&str>(
-            schema,
-            config,
-            intern!(py, "extra_behavior"),
-            intern!(py, "typed_dict_extra_behavior"),
-        )?;
-        let extra_attribute_behavior = match extra_behavior {
-            Some(s) => match s {
-                "allow" => ExtraAttributeAssignmentBehavior::Allow,
-                "forbid" => ExtraAttributeAssignmentBehavior::Forbid,
-                _ => return py_err!(r#"Invalid extra_behavior: "{}""#, s),
-            },
-            None => ExtraAttributeAssignmentBehavior::Allow,
-        };
+        let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config)?;
+
+        if matches!(extra_behavior, ExtraBehavior::Ignore) {
+            return Err(PyValueError::new_err(
+                "extra_behavior='ignore' is not supported for dataclasses",
+            ));
+        }
 
         let fields_schema: &PyList = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: Vec<Field> = Vec::with_capacity(fields_schema.len());
@@ -132,7 +120,7 @@ impl BuildValidator for DataclassArgsValidator {
             init_only_count,
             dataclass_name,
             validator_name,
-            extra_attribute_behavior,
+            extra_behavior,
         }
         .into())
     }
@@ -279,11 +267,18 @@ impl Validator for DataclassArgsValidator {
                             match raw_key.strict_str() {
                                 Ok(either_str) => {
                                     if !used_keys.contains(either_str.as_cow()?.as_ref()) {
-                                        errors.push(ValLineError::new_with_loc(
-                                            ErrorType::UnexpectedKeywordArgument,
-                                            value,
-                                            raw_key.as_loc_item(),
-                                        ));
+                                        // Unknown / extra field
+                                        match self.extra_behavior {
+                                            ExtraBehavior::Forbid | ExtraBehavior::Unset => {
+                                                errors.push(ValLineError::new_with_loc(
+                                                    ErrorType::UnexpectedKeywordArgument,
+                                                    value,
+                                                    raw_key.as_loc_item(),
+                                                ));
+                                            }
+                                            ExtraBehavior::Ignore => {}
+                                            ExtraBehavior::Allow => unreachable!(),
+                                        }
                                     }
                                 }
                                 Err(ValError::LineErrors(line_errors)) => {
@@ -368,18 +363,24 @@ impl Validator for DataclassArgsValidator {
                 }
                 Err(err) => Err(err),
             }
-        } else if matches!(self.extra_attribute_behavior, ExtraAttributeAssignmentBehavior::Allow) {
-            // this is the "allow" case of extra_behavior
-            ok(field_value.to_object(py))
         } else {
-            // the "forbid" case of extra_behavior
-            Err(ValError::new_with_loc(
-                ErrorType::NoSuchAttribute {
-                    attribute: field_name.to_string(),
-                },
-                field_value,
-                field_name.to_string(),
-            ))
+            // Handle extra (unknown) field
+            // We partially use the extra_behavior for initialization / validation
+            // to determine how to handle assignment
+            match self.extra_behavior {
+                // For dataclasses we allow assigning unknown fields
+                // by default to match stdlib dataclass behavior
+                ExtraBehavior::Allow | ExtraBehavior::Unset => ok(field_value.to_object(py)),
+                // Unless the user explicitly set extra_behavior='forbid'
+                ExtraBehavior::Forbid => Err(ValError::new_with_loc(
+                    ErrorType::NoSuchAttribute {
+                        attribute: field_name.to_string(),
+                    },
+                    field_value,
+                    field_name.to_string(),
+                )),
+                _ => unreachable!(),
+            }
         }
     }
 
