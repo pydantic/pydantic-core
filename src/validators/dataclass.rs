@@ -366,8 +366,7 @@ impl Validator for DataclassArgsValidator {
                 // For dataclasses we allow assigning unknown fields
                 // to match stdlib dataclass behavior
                 ExtraBehavior::Allow => ok(field_value.to_object(py)),
-                // Unless the user explicitly set extra_behavior='forbid' or `'ignore'`
-                ExtraBehavior::Forbid | ExtraBehavior::Ignore => Err(ValError::new_with_loc(
+                _ => Err(ValError::new_with_loc(
                     ErrorType::NoSuchAttribute {
                         attribute: field_name.to_string(),
                     },
