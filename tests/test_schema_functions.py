@@ -151,7 +151,7 @@ all_schema_functions = [
     ),
     (
         core_schema.chain_schema,
-        args({'type': 'int'}, {'type': 'str'}),
+        args([{'type': 'int'}, {'type': 'str'}]),
         {'type': 'chain', 'steps': [{'type': 'int'}, {'type': 'str'}]},
     ),
     (

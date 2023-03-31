@@ -2343,7 +2343,7 @@ class ChainSchema(TypedDict, total=False):
 
 
 def chain_schema(
-    *steps: CoreSchema, ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
+    steps: list[CoreSchema], ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
 ) -> ChainSchema:
     """
     Returns a schema that chains the provided validation schemas, e.g.:
@@ -2357,7 +2357,7 @@ def chain_schema(
 
     fn_schema = core_schema.general_plain_validator_function(function=fn)
     schema = core_schema.chain_schema(
-        fn_schema, fn_schema, fn_schema, core_schema.str_schema()
+        [fn_schema, fn_schema, fn_schema, core_schema.str_schema()]
     )
     v = SchemaValidator(schema)
     assert v.validate_python('hello') == 'hello world world world'
@@ -2369,7 +2369,7 @@ def chain_schema(
         metadata: See [TODO] for details
         serialization: Custom serialization schema
     """
-    return dict_not_none(type='chain', steps=list(steps), ref=ref, metadata=metadata, serialization=serialization)
+    return dict_not_none(type='chain', steps=steps, ref=ref, metadata=metadata, serialization=serialization)
 
 
 class LaxOrStrictSchema(TypedDict, total=False):
