@@ -282,18 +282,18 @@ impl LookupKey {
         &self,
         error_type: ErrorType,
         input: &'d impl Input<'d>,
-        use_field_names_in_loc: bool,
+        loc_by_alias: bool,
         field_name: &str,
     ) -> ValLineError<'d> {
-        if use_field_names_in_loc {
-            ValLineError::new_with_loc(error_type, input, field_name.to_string())
-        } else {
+        if loc_by_alias {
             let lookup_path = match self {
                 Self::Simple { path, .. } => path,
                 Self::Choice { path1, .. } => path1,
                 Self::PathChoices(paths) => paths.first().unwrap(),
             };
             ValLineError::new_with_full_loc(error_type, input, lookup_path.into())
+        } else {
+            ValLineError::new_with_loc(error_type, input, field_name.to_string())
         }
     }
 }
@@ -339,18 +339,17 @@ impl LookupPath {
 
     pub fn apply_error_loc<'a>(
         &self,
-        line_error: ValLineError<'a>,
-        use_field_names_in_loc: bool,
+        mut line_error: ValLineError<'a>,
+        loc_by_alias: bool,
         field_name: &str,
     ) -> ValLineError<'a> {
-        if use_field_names_in_loc {
-            line_error.with_outer_location(field_name.to_string().into())
-        } else {
-            let mut line_error = line_error;
+        if loc_by_alias {
             for path_item in self.iter().rev() {
                 line_error = line_error.with_outer_location(path_item.clone().into());
             }
             line_error
+        } else {
+            line_error.with_outer_location(field_name.to_string().into())
         }
     }
 

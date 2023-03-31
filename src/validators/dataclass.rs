@@ -35,7 +35,7 @@ pub struct DataclassArgsValidator {
     dataclass_name: String,
     validator_name: String,
     extra_behavior: ExtraBehavior,
-    use_field_names_in_loc: bool,
+    loc_by_alias: bool,
 }
 
 impl BuildValidator for DataclassArgsValidator {
@@ -115,7 +115,7 @@ impl BuildValidator for DataclassArgsValidator {
             dataclass_name,
             validator_name,
             extra_behavior,
-            use_field_names_in_loc: config.get_as(intern!(py, "use_field_names_in_loc"))?.unwrap_or(false),
+            loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
         }
         .into())
     }
@@ -213,9 +213,11 @@ impl Validator for DataclassArgsValidator {
                             {
                                 Ok(value) => set_item!(field, value),
                                 Err(ValError::LineErrors(line_errors)) => {
-                                    errors.extend(line_errors.into_iter().map(|err| {
-                                        lookup_path.apply_error_loc(err, self.use_field_names_in_loc, &field.name)
-                                    }));
+                                    errors.extend(
+                                        line_errors.into_iter().map(|err| {
+                                            lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name)
+                                        }),
+                                    );
                                 }
                                 Err(err) => return Err(err),
                             }
@@ -234,7 +236,7 @@ impl Validator for DataclassArgsValidator {
                                 errors.push(field.lookup_key.error(
                                     ErrorType::MissingKeywordArgument,
                                     input,
-                                    self.use_field_names_in_loc,
+                                    self.loc_by_alias,
                                     &field.name,
                                 ));
                             }

@@ -36,7 +36,7 @@ pub struct TypedDictValidator {
     strict: bool,
     from_attributes: bool,
     return_fields_set: bool,
-    use_field_names_in_loc: bool,
+    loc_by_alias: bool,
 }
 
 impl BuildValidator for TypedDictValidator {
@@ -129,7 +129,7 @@ impl BuildValidator for TypedDictValidator {
             strict,
             from_attributes,
             return_fields_set,
-            use_field_names_in_loc: config.get_as(intern!(py, "use_field_names_in_loc"))?.unwrap_or(false),
+            loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
         }
         .into())
     }
@@ -201,7 +201,7 @@ impl Validator for TypedDictValidator {
                             Err(ValError::Omit) => continue,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
-                                    errors.push(lookup_path.apply_error_loc(err, self.use_field_names_in_loc, &field.name));
+                                    errors.push(lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name));
                                 }
                             }
                             Err(err) => return Err(err),
@@ -213,7 +213,7 @@ impl Validator for TypedDictValidator {
                         errors.push(field.lookup_key.error(
                             ErrorType::Missing,
                             input,
-                            self.use_field_names_in_loc,
+                            self.loc_by_alias,
                             &field.name
                         ));
                     }

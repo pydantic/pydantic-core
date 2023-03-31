@@ -741,7 +741,7 @@ def test_dataclass_self_init_alias_field_name():
             ],
         ),
     )
-    v = SchemaValidator(schema, {'use_field_names_in_loc': True})
+    v = SchemaValidator(schema, {'loc_by_alias': False})
 
     def __init__(self, *args, **kwargs):
         v.validate_python(ArgsKwargs(args, kwargs), self_instance=self)

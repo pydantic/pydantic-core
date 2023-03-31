@@ -658,7 +658,7 @@ def test_aliases_path_multiple(py_and_json: PyAndJson, input_value, expected):
                 }
             },
         },
-        {'use_field_names_in_loc': True},
+        {'loc_by_alias': False},
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=expected.message):
@@ -693,7 +693,7 @@ def test_aliases_path_negative(input_value, expected):
                 'field_a': {'validation_alias': ['foo', -2], 'type': 'typed-dict-field', 'schema': {'type': 'int'}}
             },
         },
-        {'use_field_names_in_loc': True},
+        {'loc_by_alias': False},
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=expected.message):
@@ -834,7 +834,7 @@ def test_alias_error_loc_alias(py_and_json: PyAndJson):
                 }
             },
         },
-        {'use_field_names_in_loc': False},  # this is the default
+        {'loc_by_alias': True},  # this is the default
     )
     assert v.validate_test({'foo': {'x': 42}}) == {'field_a': 42}
     assert v.validate_python({'bar': ['x', {-1: 42}]}) == {'field_a': 42}
@@ -879,7 +879,7 @@ def test_alias_error_loc_field_names(py_and_json: PyAndJson):
                 }
             },
         },
-        {'use_field_names_in_loc': True},
+        {'loc_by_alias': False},
     )
     assert v.validate_test({'foo': 42}) == {'field_a': 42}
     assert v.validate_test({'bar': ['x', [1, 2, 42]]}) == {'field_a': 42}
@@ -1307,7 +1307,7 @@ def test_from_attributes_path(input_value, expected):
             },
             'from_attributes': True,
         },
-        {'use_field_names_in_loc': True},
+        {'loc_by_alias': False},
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=expected.message):
@@ -1364,7 +1364,7 @@ def test_alias_extra(py_and_json: PyAndJson):
                 }
             },
         },
-        {'use_field_names_in_loc': True},
+        {'loc_by_alias': False},
     )
     assert v.validate_test({'FieldA': 1}) == {'field_a': 1}
     assert v.validate_test({'foo': [1, 2, 3]}) == {'field_a': 3}
