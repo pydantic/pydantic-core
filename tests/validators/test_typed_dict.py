@@ -202,7 +202,7 @@ def test_allow_extra_invalid():
 
 
 def test_allow_extra_wrong():
-    with pytest.raises(SchemaError, match='Invalid extra_behavior: "wrong"'):
+    with pytest.raises(SchemaError, match='Invalid extra_behavior: `wrong`'):
         SchemaValidator({'type': 'typed-dict', 'fields': {}}, {'extra_fields_behavior': 'wrong'})
 
 

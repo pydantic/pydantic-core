@@ -19,7 +19,7 @@ def dict_not_none(**kwargs: Any) -> Any:
     return {k: v for k, v in kwargs.items() if v is not None}
 
 
-ExtraBehavior = Literal['allow', 'forbid', 'ignore', None]
+ExtraBehavior = Literal['allow', 'forbid', 'ignore']
 
 
 class CoreConfig(TypedDict, total=False):
@@ -2512,7 +2512,7 @@ def typed_dict_schema(
     strict: bool | None = None,
     extra_validator: CoreSchema | None = None,
     return_fields_set: bool | None = None,
-    extra_behavior: ExtraBehavior = None,
+    extra_behavior: ExtraBehavior | None = None,
     total: bool | None = None,
     populate_by_name: bool | None = None,
     from_attributes: bool | None = None,
@@ -2725,7 +2725,7 @@ def dataclass_args_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-    extra_behavior: ExtraBehavior = None,
+    extra_behavior: ExtraBehavior | None = None,
 ) -> DataclassArgsSchema:
     """
     Returns a schema for validating dataclass arguments, e.g.:

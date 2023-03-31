@@ -267,12 +267,10 @@ impl ExtraBehavior {
         )?
         .flatten();
         let res = match extra_behavior {
-            Some(s) => match s {
-                "allow" => Self::Allow,
-                "ignore" => Self::Ignore,
-                "forbid" => Self::Forbid,
-                _ => return py_err!(r#"Invalid extra_behavior: "{}""#, s),
-            },
+            Some("allow") => Self::Allow,
+            Some("ignore") => Self::Ignore,
+            Some("forbid") => Self::Forbid,
+            Some(v) => return py_err!("Invalid extra_behavior: `{}`", v),
             None => ExtraBehavior::Unset,
         };
         Ok(res)
