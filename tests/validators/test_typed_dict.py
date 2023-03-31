@@ -1619,7 +1619,7 @@ def test_extra_behavior_allow(
         config=config,
     )
 
-    m: Dict[str, Any] = v.validate_python({'f': 'x', 'extra_field': expected_extra_value})
+    m: Dict[str, Any] = v.validate_python({'f': 'x', 'extra_field': '123'})
     assert m == {'f': 'x', 'extra_field': expected_extra_value}
 
     v.validate_assignment(m, 'f', 'y')

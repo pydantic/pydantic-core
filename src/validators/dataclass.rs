@@ -1,5 +1,4 @@
 use pyo3::exceptions::PyKeyError;
-use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
@@ -51,12 +50,6 @@ impl BuildValidator for DataclassArgsValidator {
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config)?;
-
-        if matches!(extra_behavior, ExtraBehavior::Ignore) {
-            return Err(PyValueError::new_err(
-                "extra_behavior='ignore' is not supported for dataclasses",
-            ));
-        }
 
         let fields_schema: &PyList = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: Vec<Field> = Vec::with_capacity(fields_schema.len());
@@ -277,7 +270,9 @@ impl Validator for DataclassArgsValidator {
                                                 ));
                                             }
                                             ExtraBehavior::Ignore => {}
-                                            ExtraBehavior::Allow => unreachable!(),
+                                            ExtraBehavior::Allow => {
+                                                output_dict.set_item(either_str.as_py_string(py), value)?
+                                            }
                                         }
                                     }
                                 }
@@ -369,8 +364,8 @@ impl Validator for DataclassArgsValidator {
             // to determine how to handle assignment
             match self.extra_behavior {
                 // For dataclasses we allow assigning unknown fields
-                // by default to match stdlib dataclass behavior
-                ExtraBehavior::Allow | ExtraBehavior::Unset => ok(field_value.to_object(py)),
+                // to match stdlib dataclass behavior
+                ExtraBehavior::Ignore | ExtraBehavior::Unset | ExtraBehavior::Allow => ok(field_value.to_object(py)),
                 // Unless the user explicitly set extra_behavior='forbid'
                 ExtraBehavior::Forbid => Err(ValError::new_with_loc(
                     ErrorType::NoSuchAttribute {
@@ -379,7 +374,6 @@ impl Validator for DataclassArgsValidator {
                     field_value,
                     field_name.to_string(),
                 )),
-                _ => unreachable!(),
             }
         }
     }

@@ -5,7 +5,7 @@ from typing import Any, Dict, Union
 import pytest
 from dirty_equals import IsListOrTuple, IsStr
 
-from pydantic_core import ArgsKwargs, SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -878,15 +878,15 @@ def test_frozen_field():
 @pytest.mark.parametrize(
     'config,schema_extra_behavior_kw',
     [
-        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {}),
-        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {'extra_behavior': None}),
-        (core_schema.CoreConfig(), {'extra_behavior': 'allow'}),
-        (core_schema.CoreConfig(typed_dict_extra_behavior=None), {'extra_behavior': 'allow'}),
-        (None, {'extra_behavior': 'allow'}),
-        (core_schema.CoreConfig(typed_dict_extra_behavior='ignore'), {'extra_behavior': 'allow'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='ignore'), {}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='ignore'), {'extra_behavior': None}),
+        (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior=None), {'extra_behavior': 'ignore'}),
+        (None, {'extra_behavior': 'ignore'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {'extra_behavior': 'ignore'}),
     ],
 )
-def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
+def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
     @dataclasses.dataclass
     class MyModel:
         f: str
@@ -901,12 +901,15 @@ def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schem
         config=config,
     )
 
-    m: MyModel = v.validate_python({'f': 'x'})
+    m: MyModel = v.validate_python({'f': 'x', 'extra_field': 123})
     assert m.f == 'x'
+    assert not hasattr(m, 'extra_field')
 
     v.validate_assignment(m, 'f', 'y')
     assert m.f == 'y'
 
+    # despite passing extra=ignore
+    # we still allow attribute assignment
     v.validate_assignment(m, 'not_f', 'xyz')
     assert getattr(m, 'not_f') == 'xyz'
 
@@ -960,52 +963,34 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
 @pytest.mark.parametrize(
     'config,schema_extra_behavior_kw',
     [
-        (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
-        (core_schema.CoreConfig(typed_dict_extra_behavior=None), {'extra_behavior': 'ignore'}),
-        (None, {'extra_behavior': 'ignore'}),
-        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {'extra_behavior': 'ignore'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {'extra_behavior': None}),
+        (core_schema.CoreConfig(), {'extra_behavior': 'allow'}),
+        (None, {'extra_behavior': 'allow'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='forbid'), {'extra_behavior': 'allow'}),
     ],
 )
-def test_extra_behavior_ignore_cfg_err(
-    config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]
-):
+def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
     @dataclasses.dataclass
     class MyModel:
         f: str
 
-    with pytest.raises(SchemaError, match="Input should be 'allow', 'forbid' or None"):
-        SchemaValidator(
-            core_schema.dataclass_schema(
-                MyModel,
-                core_schema.dataclass_args_schema(
-                    'MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())], **schema_extra_behavior_kw
-                ),
+    v = SchemaValidator(
+        core_schema.dataclass_schema(
+            MyModel,
+            core_schema.dataclass_args_schema(
+                'MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())], **schema_extra_behavior_kw
             ),
-            config=config,
-        )
+        ),
+        config=config,
+    )
 
+    m: MyModel = v.validate_python({'f': 'x', 'extra_field': '123'})
+    assert m.f == 'x'
+    assert getattr(m, 'extra_field') == '123'
 
-@pytest.mark.parametrize(
-    'config,schema_extra_behavior_kw',
-    [
-        (core_schema.CoreConfig(typed_dict_extra_behavior='ignore'), {}),
-        (core_schema.CoreConfig(typed_dict_extra_behavior='ignore'), {'extra_behavior': None}),
-    ],
-)
-def test_extra_behavior_ignore_schema_err(
-    config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]
-):
-    @dataclasses.dataclass
-    class MyModel:
-        f: str
+    v.validate_assignment(m, 'f', 'y')
+    assert m.f == 'y'
 
-    with pytest.raises(SchemaError, match="extra_behavior='ignore' is not supported for dataclasses"):
-        SchemaValidator(
-            core_schema.dataclass_schema(
-                MyModel,
-                core_schema.dataclass_args_schema(
-                    'MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())], **schema_extra_behavior_kw
-                ),
-            ),
-            config=config,
-        )
+    v.validate_assignment(m, 'not_f', '123')
+    assert getattr(m, 'not_f') == '123'
