@@ -5,7 +5,7 @@ from typing import Any, Dict, Union
 import pytest
 from dirty_equals import IsListOrTuple, IsStr
 
-from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError, core_schema
+from pydantic_core import ArgsKwargs, SchemaError, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -876,9 +876,16 @@ def test_frozen_field():
 
 
 @pytest.mark.parametrize(
-    'config', [core_schema.CoreConfig(typed_dict_extra_behavior='allow'), core_schema.CoreConfig(), None]
+    'config,schema_extra_behavior_kw',
+    [
+        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {'extra_behavior': None}),
+        (core_schema.CoreConfig(), {'extra_behavior': 'allow'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior=None), {'extra_behavior': 'allow'}),
+        (None, {'extra_behavior': 'allow'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='ignore'), {'extra_behavior': 'allow'}),
+    ],
 )
-@pytest.mark.parametrize('schema_extra_behavior_kw', [{'extra_behavior': 'allow'}, {}])
 def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
     @dataclasses.dataclass
     class MyModel:
@@ -908,9 +915,11 @@ def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schem
     'config,schema_extra_behavior_kw',
     [
         (core_schema.CoreConfig(typed_dict_extra_behavior='forbid'), {}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='forbid'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'forbid'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior=None), {'extra_behavior': 'forbid'}),
         (None, {'extra_behavior': 'forbid'}),
-        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {'extra_behavior': 'forbid'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='ignore'), {'extra_behavior': 'forbid'}),
     ],
 )
 def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
@@ -946,3 +955,57 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
         }
     ]
     assert not hasattr(m, 'not_f')
+
+
+@pytest.mark.parametrize(
+    'config,schema_extra_behavior_kw',
+    [
+        (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior=None), {'extra_behavior': 'ignore'}),
+        (None, {'extra_behavior': 'ignore'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {'extra_behavior': 'ignore'}),
+    ],
+)
+def test_extra_behavior_ignore_cfg_err(
+    config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]
+):
+    @dataclasses.dataclass
+    class MyModel:
+        f: str
+
+    with pytest.raises(SchemaError, match="Input should be 'allow' or 'forbid'"):
+        SchemaValidator(
+            core_schema.dataclass_schema(
+                MyModel,
+                core_schema.dataclass_args_schema(
+                    'MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())], **schema_extra_behavior_kw
+                ),
+            ),
+            config=config,
+        )
+
+
+@pytest.mark.parametrize(
+    'config,schema_extra_behavior_kw',
+    [
+        (core_schema.CoreConfig(typed_dict_extra_behavior='ignore'), {}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='ignore'), {'extra_behavior': None}),
+    ],
+)
+def test_extra_behavior_ignore_schema_err(
+    config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]
+):
+    @dataclasses.dataclass
+    class MyModel:
+        f: str
+
+    with pytest.raises(SchemaError, match="extra_behavior='ignore' is not supported for dataclasses"):
+        SchemaValidator(
+            core_schema.dataclass_schema(
+                MyModel,
+                core_schema.dataclass_args_schema(
+                    'MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())], **schema_extra_behavior_kw
+                ),
+            ),
+            config=config,
+        )

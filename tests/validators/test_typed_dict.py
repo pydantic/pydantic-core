@@ -198,50 +198,6 @@ def test_forbid_extra():
     ]
 
 
-def test_allow_extra():
-    v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'return_fields_set': True,
-            'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
-            'extra_behavior': 'allow',
-        }
-    )
-
-    assert v.validate_python({'field_a': b'abc', 'field_b': (1, 2)}) == (
-        {'field_a': 'abc', 'field_b': (1, 2)},
-        {'field_a', 'field_b'},
-    )
-
-
-def test_allow_extra_validate():
-    v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'return_fields_set': True,
-            'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
-            'extra_validator': {'type': 'int'},
-            'extra_behavior': 'allow',
-        }
-    )
-
-    assert v.validate_python({'field_a': 'test', 'other_value': '123'}) == (
-        {'field_a': 'test', 'other_value': 123},
-        {'field_a', 'other_value'},
-    )
-
-    with pytest.raises(ValidationError) as exc_info:
-        v.validate_python({'field_a': 'test', 'other_value': 12.5})
-    assert exc_info.value.errors() == [
-        {
-            'type': 'int_from_float',
-            'loc': ('other_value',),
-            'msg': 'Input should be a valid integer, got a number with a fractional part',
-            'input': 12.5,
-        }
-    ]
-
-
 def test_allow_extra_invalid():
     with pytest.raises(SchemaError, match='extra_validator can only be used if extra_behavior=allow'):
         SchemaValidator(
@@ -1637,33 +1593,47 @@ def test_frozen_field():
     'config,schema_extra_behavior_kw',
     [
         (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'allow'}),
         (None, {'extra_behavior': 'allow'}),
         (core_schema.CoreConfig(typed_dict_extra_behavior='forbid'), {'extra_behavior': 'allow'}),
     ],
 )
-def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
+@pytest.mark.parametrize(
+    'extra_validator_kw, expected_extra_value',
+    [({}, '123'), ({'extra_validator': None}, '123'), ({'extra_validator': core_schema.int_schema()}, 123)],
+    ids=['extra_validator=unset', 'extra_validator=None', 'extra_validator=int'],
+)
+def test_extra_behavior_allow(
+    config: Union[core_schema.CoreConfig, None],
+    schema_extra_behavior_kw: Dict[str, Any],
+    extra_validator_kw: Dict[str, Any],
+    expected_extra_value: Any,
+):
     v = SchemaValidator(
         core_schema.typed_dict_schema(
-            {'f': core_schema.typed_dict_field(core_schema.str_schema())}, **schema_extra_behavior_kw
+            {'f': core_schema.typed_dict_field(core_schema.str_schema())},
+            **schema_extra_behavior_kw,
+            **extra_validator_kw,
         ),
         config=config,
     )
 
-    m: Dict[str, Any] = v.validate_python({'f': 'x'})
-    assert m['f'] == 'x'
+    m: Dict[str, Any] = v.validate_python({'f': 'x', 'extra_field': expected_extra_value})
+    assert m == {'f': 'x', 'extra_field': expected_extra_value}
 
     v.validate_assignment(m, 'f', 'y')
     assert m['f'] == 'y'
 
-    v.validate_assignment(m, 'not_f', 'xyz')
-    assert m['not_f'] == 'xyz'
+    v.validate_assignment(m, 'not_f', '123')
+    assert m['not_f'] == expected_extra_value
 
 
 @pytest.mark.parametrize(
     'config,schema_extra_behavior_kw',
     [
         (core_schema.CoreConfig(typed_dict_extra_behavior='forbid'), {}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior='forbid'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'forbid'}),
         (None, {'extra_behavior': 'forbid'}),
         (core_schema.CoreConfig(typed_dict_extra_behavior='allow'), {'extra_behavior': 'forbid'}),
@@ -1678,7 +1648,13 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
     )
 
     m: Dict[str, Any] = v.validate_python({'f': 'x'})
-    assert m['f'] == 'x'
+    assert m == {'f': 'x'}
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python({'f': 'x', 'extra_field': 123})
+    assert exc_info.value.errors() == [
+        {'type': 'extra_forbidden', 'loc': ('extra_field',), 'msg': 'Extra inputs are not permitted', 'input': 123}
+    ]
 
     v.validate_assignment(m, 'f', 'y')
     assert m['f'] == 'y'
@@ -1704,6 +1680,9 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
         (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
         (None, {'extra_behavior': 'ignore'}),
         (core_schema.CoreConfig(typed_dict_extra_behavior='forbid'), {'extra_behavior': 'ignore'}),
+        (core_schema.CoreConfig(typed_dict_extra_behavior=None), {}),
+        (core_schema.CoreConfig(), {'extra_behavior': None}),
+        (None, {'extra_behavior': None}),
     ],
 )
 def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
@@ -1714,8 +1693,8 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
         config=config,
     )
 
-    m: Dict[str, Any] = v.validate_python({'f': 'x'})
-    assert m['f'] == 'x'
+    m: Dict[str, Any] = v.validate_python({'f': 'x', 'extra_field': 123})
+    assert m == {'f': 'x'}
 
     v.validate_assignment(m, 'f', 'y')
     assert m['f'] == 'y'
