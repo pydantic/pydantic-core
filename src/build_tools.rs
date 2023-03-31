@@ -263,7 +263,7 @@ impl ExtraBehavior {
             schema,
             config,
             intern!(py, "extra_behavior"),
-            intern!(py, "typed_dict_extra_behavior"),
+            intern!(py, "extra_fields_behavior"),
         )?
         .flatten();
         let res = match extra_behavior {
