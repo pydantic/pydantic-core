@@ -34,6 +34,8 @@ class CoreConfig(TypedDict, total=False):
     typed_dict_total: bool  # default: True
     # used on typed-dicts and tagged union keys
     from_attributes: bool
+    # whether to use field_names instead of the used alias to construct error `loc`s, default False
+    use_field_names_in_loc: bool
     # whether instances of models and dataclasses (including subclass instances) should re-validate, default 'never'
     revalidate_instances: Literal['always', 'never', 'subclass-instances']
     # whether to validate default values during validation, default False

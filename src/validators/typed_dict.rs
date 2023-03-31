@@ -36,6 +36,7 @@ pub struct TypedDictValidator {
     strict: bool,
     from_attributes: bool,
     return_fields_set: bool,
+    use_field_names_in_loc: bool,
 }
 
 impl BuildValidator for TypedDictValidator {
@@ -128,6 +129,7 @@ impl BuildValidator for TypedDictValidator {
             strict,
             from_attributes,
             return_fields_set,
+            use_field_names_in_loc: config.get_as(intern!(py, "use_field_names_in_loc"))?.unwrap_or(false),
         }
         .into())
     }
@@ -199,7 +201,7 @@ impl Validator for TypedDictValidator {
                             Err(ValError::Omit) => continue,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
-                                    errors.push(err.with_outer_location(field.name.clone().into()));
+                                    errors.push(lookup_path.apply_error_loc(err, self.use_field_names_in_loc, &field.name));
                                 }
                             }
                             Err(err) => return Err(err),
@@ -292,26 +294,6 @@ impl Validator for TypedDictValidator {
         }
     }
 
-    fn get_name(&self) -> &str {
-        Self::EXPECTED_TYPE
-    }
-
-    fn ask(&self, question: &Question) -> bool {
-        match question {
-            Question::ReturnFieldsSet => self.return_fields_set,
-        }
-    }
-
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
-        self.fields
-            .iter_mut()
-            .try_for_each(|f| f.validator.complete(build_context))?;
-        match &mut self.extra_validator {
-            Some(v) => v.complete(build_context),
-            None => Ok(()),
-        }
-    }
-
     fn validate_assignment<'s, 'data: 's>(
         &'s self,
         py: Python<'data>,
@@ -399,6 +381,26 @@ impl Validator for TypedDictValidator {
             Ok(PyTuple::new(py, [new_data, fields_set.to_object(py)]).to_object(py))
         } else {
             Ok(new_data)
+        }
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
+
+    fn ask(&self, question: &Question) -> bool {
+        match question {
+            Question::ReturnFieldsSet => self.return_fields_set,
+        }
+    }
+
+    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
+        self.fields
+            .iter_mut()
+            .try_for_each(|f| f.validator.complete(build_context))?;
+        match &mut self.extra_validator {
+            Some(v) => v.complete(build_context),
+            None => Ok(()),
         }
     }
 }

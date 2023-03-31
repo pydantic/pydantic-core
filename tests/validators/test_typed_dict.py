@@ -820,23 +820,65 @@ def test_alias_build_error(alias_schema, error):
         )
 
 
-def test_alias_error_loc():
-    v = SchemaValidator(
+def test_alias_error_loc_alias(py_and_json: PyAndJson):
+    v = py_and_json(
         {
             'type': 'typed-dict',
             'fields': {
                 'field_a': {
                     'type': 'typed-dict-field',
                     'schema': {'type': 'int'},
-                    'validation_alias': [['bar'], ['foo']],
+                    'validation_alias': [['foo'], ['bar', 1, -1]],
                 }
             },
-        }
+        },
+        {'use_field_names_in_loc': False},  # this is the default
     )
-    assert v.validate_python({'foo': 42}) == {'field_a': 42}
-    assert v.validate_python({'bar': 42}) == {'field_a': 42}
+    assert v.validate_test({'foo': 42}) == {'field_a': 42}
+    assert v.validate_python({'bar': ['x', {-1: 42}]}) == {'field_a': 42}
+    assert v.validate_test({'bar': ['x', [1, 2, 42]]}) == {'field_a': 42}
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_python({'foo': 'not_int'})
+        v.validate_test({'foo': 'not_int'})
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'type': 'int_parsing',
+            'loc': ('foo',),
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'not_int',
+        }
+    ]
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_test({'bar': ['x', [1, 2, 'not_int']]})
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'type': 'int_parsing',
+            'loc': ('bar', 1, -1),
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'not_int',
+        }
+    ]
+
+
+def test_alias_error_loc_field_names(py_and_json: PyAndJson):
+    v = py_and_json(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'field_a': {
+                    'type': 'typed-dict-field',
+                    'schema': {'type': 'int'},
+                    'validation_alias': [['foo'], ['bar', 1, -1]],
+                }
+            },
+        },
+        {'use_field_names_in_loc': True},
+    )
+    assert v.validate_test({'foo': 42}) == {'field_a': 42}
+    assert v.validate_test({'bar': ['x', [1, 2, 42]]}) == {'field_a': 42}
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_test({'foo': 'not_int'})
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
@@ -847,7 +889,7 @@ def test_alias_error_loc():
         }
     ]
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_python({'bar': 'not_int'})
+        v.validate_test({'bar': ['x', [1, 2, 'not_int']]})
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
@@ -1310,7 +1352,8 @@ def test_alias_extra(py_and_json: PyAndJson):
                     'schema': {'type': 'int'},
                 }
             },
-        }
+        },
+        {'use_field_names_in_loc': True},
     )
     assert v.validate_test({'FieldA': 1}) == {'field_a': 1}
     assert v.validate_test({'foo': [1, 2, 3]}) == {'field_a': 3}
