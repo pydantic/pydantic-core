@@ -1,11 +1,12 @@
 use pyo3::once_cell::GILOnceCell;
 use std::fmt;
 
-use crate::lookup_key::{LookupPath, PathItem};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
+
+use crate::lookup_key::{LookupPath, PathItem};
 
 /// Used to store individual items of the error location, e.g. a string for key/field names
 /// or a number for array indices.
