@@ -2209,7 +2209,7 @@ def union_schema(
     ```
 
     Args:
-        *choices: The schemas to match
+        choices: The schemas to match
         auto_collapse: whether to automatically collapse unions with one element to the inner validator, default true
         custom_error_type: The custom error type to use if the validation fails
         custom_error_message: The custom error message to use if the validation fails
