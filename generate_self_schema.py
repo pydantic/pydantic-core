@@ -167,19 +167,7 @@ def type_dict_schema(typed_dict) -> dict[str, Any]:  # noqa: C901
 
 
 def union_schema(union_type: UnionType) -> core_schema.UnionSchema | core_schema.DefinitionReferenceSchema:
-    args = [union_type.__args__]
-
-    def is_none(o) -> bool:
-        return o in (None, type(None))
-
-    null_args = [arg for arg in args if is_none(arg)]
-    # in some cases unions can get processed incorrectly at runtime
-    # and end up as args = [(choice1, choice2, choice3)]
-    args = [subarg for arg in args for subarg in (arg if isinstance(arg, tuple) else (arg,)) if not is_none(subarg)]
-    schema = {'type': 'union', 'choices': [get_schema(arg) for arg in args]}
-    if null_args:
-        schema = {'type': 'nullable', 'schema': schema}
-    return schema
+    return {'type': 'union', 'choices': [get_schema(arg) for arg in union_type.__args__]}
 
 
 def all_literal_values(type_: type[core_schema.Literal]) -> list[any]:

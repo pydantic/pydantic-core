@@ -27,7 +27,7 @@ class CoreConfig(TypedDict, total=False):
     # if configs are merged, which should take precedence, default 0, default means child takes precedence
     config_merge_priority: int
     # settings related to typed_dicts only
-    typed_dict_extra_behavior: Union[Literal['allow', 'forbid', 'ignore'], None]
+    typed_dict_extra_behavior: Literal['allow', 'forbid', 'ignore', None]
     typed_dict_total: bool  # default: True
     # used on typed-dicts and tagged union keys
     from_attributes: bool
@@ -2494,7 +2494,7 @@ class TypedDictSchema(TypedDict, total=False):
     extra_validator: CoreSchema
     return_fields_set: bool
     # all these values can be set via config, equivalent fields have `typed_dict_` prefix
-    extra_behavior: Literal['allow', 'forbid', 'ignore']
+    extra_behavior: Literal['allow', 'forbid', 'ignore', None]
     total: bool  # default: True
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
     from_attributes: bool
@@ -2509,7 +2509,7 @@ def typed_dict_schema(
     strict: bool | None = None,
     extra_validator: CoreSchema | None = None,
     return_fields_set: bool | None = None,
-    extra_behavior: Literal['allow', 'forbid', 'ignore'] | None = None,
+    extra_behavior: Literal['allow', 'forbid', 'ignore', None] = None,
     total: bool | None = None,
     populate_by_name: bool | None = None,
     from_attributes: bool | None = None,
@@ -2711,7 +2711,7 @@ class DataclassArgsSchema(TypedDict, total=False):
     ref: str
     metadata: Any
     serialization: SerSchema
-    extra_behavior: Union[Literal['allow', 'forbid'], None]
+    extra_behavior: Literal['allow', 'forbid', None]
 
 
 def dataclass_args_schema(
@@ -2722,7 +2722,7 @@ def dataclass_args_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-    extra_behavior: Union[Literal['allow', 'forbid'], None] = None,
+    extra_behavior: Literal['allow', 'forbid', None] = None,
 ) -> DataclassArgsSchema:
     """
     Returns a schema for validating dataclass arguments, e.g.:
