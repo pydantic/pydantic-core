@@ -881,7 +881,6 @@ def test_frozen_field():
         (core_schema.CoreConfig(extra_fields_behavior='ignore'), {}),
         (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
-        (core_schema.CoreConfig(extra_fields_behavior=None), {'extra_behavior': 'ignore'}),
         (None, {'extra_behavior': 'ignore'}),
         (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': 'ignore'}),
     ],
@@ -908,10 +907,19 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
     v.validate_assignment(m, 'f', 'y')
     assert m.f == 'y'
 
-    # despite passing extra=ignore
-    # we still allow attribute assignment
-    v.validate_assignment(m, 'not_f', 'xyz')
-    assert getattr(m, 'not_f') == 'xyz'
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_assignment(m, 'not_f', 'xyz')
+
+    assert exc_info.value.errors() == [
+        {
+            'type': 'no_such_attribute',
+            'loc': ('not_f',),
+            'msg': "Object has no attribute 'not_f'",
+            'input': 'xyz',
+            'ctx': {'attribute': 'not_f'},
+        }
+    ]
+    assert not hasattr(m, 'not_f')
 
 
 @pytest.mark.parametrize(
@@ -920,7 +928,6 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
         (core_schema.CoreConfig(extra_fields_behavior='forbid'), {}),
         (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'forbid'}),
-        (core_schema.CoreConfig(extra_fields_behavior=None), {'extra_behavior': 'forbid'}),
         (None, {'extra_behavior': 'forbid'}),
         (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': 'forbid'}),
     ],

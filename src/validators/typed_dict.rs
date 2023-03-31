@@ -383,8 +383,7 @@ impl Validator for TypedDictValidator {
                     }
                     None => ok(field_value.to_object(py)),
                 },
-                // forbid, unset or ignore
-                _ => {
+                ExtraBehavior::Forbid | ExtraBehavior::Ignore | ExtraBehavior::Unset => {
                     return Err(ValError::new_with_loc(
                         ErrorType::NoSuchAttribute {
                             attribute: field_name.to_string(),
