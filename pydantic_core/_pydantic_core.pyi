@@ -170,7 +170,16 @@ class SchemaError(Exception):
     def error_count(self) -> int: ...
     def errors(self) -> 'list[ErrorDetails]': ...
 
+class InitErrorDetails(TypedDict):
+    type: str
+    loc: 'tuple[int | str, ...]'
+    input: Any
+    ctx: NotRequired['dict[str, str | int | float]']
+
 class ValidationError(ValueError):
+    def __init__(
+        self, title: str, errors: 'list[InitErrorDetails]', error_mode: Literal['python', 'json'] = 'python'
+    ) -> None: ...
     @property
     def title(self) -> str: ...
     def error_count(self) -> int: ...

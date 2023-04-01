@@ -19,9 +19,11 @@ pub enum ErrorMode {
     Json,
 }
 
-impl ErrorMode {
-    pub fn from_raw(s: Option<&str>) -> PyResult<Self> {
-        match s {
+impl TryFrom<Option<&str>> for ErrorMode {
+    type Error = PyErr;
+
+    fn try_from(error_mode: Option<&str>) -> PyResult<Self> {
+        match error_mode {
             None => Ok(Self::Python),
             Some("python") => Ok(Self::Python),
             Some("json") => Ok(Self::Json),

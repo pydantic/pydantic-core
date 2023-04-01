@@ -3,16 +3,16 @@ use std::fmt::{Display, Write};
 use std::str::from_utf8;
 
 use crate::errors::LocItem;
-use pyo3::exceptions::PyValueError;
-use pyo3::ffi;
+use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::ffi::Py_ssize_t;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
+use pyo3::{ffi, intern};
 use serde::ser::{Error, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 use serde_json::ser::PrettyFormatter;
 
-use crate::build_tools::{py_error_type, safe_repr};
+use crate::build_tools::{py_error_type, safe_repr, SchemaDict};
 use crate::serializers::GeneralSerializeContext;
 
 use super::line_error::ValLineError;
@@ -96,11 +96,11 @@ impl<'a> IntoPy<ValError<'a>> for ValidationError {
 #[pymethods]
 impl ValidationError {
     #[new]
-    fn py_new(line_errors: Vec<PyLineError>, title: PyObject, error_mode: Option<&str>) -> PyResult<Self> {
+    fn py_new(title: PyObject, line_errors: &PyList, error_mode: Option<&str>) -> PyResult<Self> {
         Ok(Self {
-            line_errors,
+            line_errors: line_errors.iter().map(PyLineError::try_from).collect::<PyResult<_>>()?,
             title,
-            error_mode: ErrorMode::from_raw(error_mode)?,
+            error_mode: ErrorMode::try_from(error_mode)?,
         })
     }
 
@@ -232,6 +232,38 @@ impl<'a> IntoPy<ValLineError<'a>> for PyLineError {
             location: self.location,
             input_value: self.input_value.into(),
         }
+    }
+}
+
+impl TryFrom<&PyAny> for PyLineError {
+    type Error = PyErr;
+
+    fn try_from(value: &PyAny) -> PyResult<Self> {
+        let dict: &PyDict = value.downcast()?;
+        let py = value.py();
+
+        let type_: &str = match dict.get_item("type") {
+            Some(t) => t.extract()?,
+            None => return Err(PyKeyError::new_err("type")),
+        };
+        let context: Option<&PyDict> = dict.get_as(intern!(py, "ctx"))?;
+        let error_type = ErrorType::new(py, type_, context)?;
+
+        let location: Location = match dict.get_item("loc") {
+            Some(l) => Location::try_from(l)?,
+            None => return Err(PyKeyError::new_err("loc")),
+        };
+
+        let input_value = match dict.get_item("input") {
+            Some(i) => i.into_py(py),
+            None => py.None(),
+        };
+
+        Ok(Self {
+            error_type,
+            location,
+            input_value,
+        })
     }
 }
 
