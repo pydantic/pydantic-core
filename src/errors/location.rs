@@ -201,23 +201,27 @@ impl Serialize for Location {
     }
 }
 
-impl TryFrom<&PyAny> for Location {
+impl TryFrom<Option<&PyAny>> for Location {
     type Error = PyErr;
 
-    fn try_from(location: &PyAny) -> PyResult<Self> {
-        let loc_vec: Vec<LocItem> = if let Ok(tuple) = location.downcast::<PyTuple>() {
-            tuple.iter().map(LocItem::try_from).collect::<PyResult<_>>()?
-        } else if let Ok(list) = location.downcast::<PyList>() {
-            list.iter().map(LocItem::try_from).collect::<PyResult<_>>()?
+    fn try_from(location: Option<&PyAny>) -> PyResult<Self> {
+        if let Some(location) = location {
+            let loc_vec: Vec<LocItem> = if let Ok(tuple) = location.downcast::<PyTuple>() {
+                tuple.iter().map(LocItem::try_from).collect::<PyResult<_>>()?
+            } else if let Ok(list) = location.downcast::<PyList>() {
+                list.iter().map(LocItem::try_from).collect::<PyResult<_>>()?
+            } else {
+                return Err(PyTypeError::new_err(
+                    "Location must be a list or tuple of strings and ints",
+                ));
+            };
+            if loc_vec.is_empty() {
+                Ok(Self::Empty)
+            } else {
+                Ok(Self::List(loc_vec))
+            }
         } else {
-            return Err(PyTypeError::new_err(
-                "Location must be a list or tuple of strings and ints",
-            ));
-        };
-        if loc_vec.is_empty() {
             Ok(Self::Empty)
-        } else {
-            Ok(Self::List(loc_vec))
         }
     }
 }

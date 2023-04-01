@@ -172,7 +172,7 @@ class SchemaError(Exception):
 
 class InitErrorDetails(TypedDict):
     type: 'str | PydanticCustomError'
-    loc: 'tuple[int | str, ...]'
+    loc: NotRequired['tuple[int | str, ...]']
     input: Any
     ctx: NotRequired['dict[str, str | int | float]']
 

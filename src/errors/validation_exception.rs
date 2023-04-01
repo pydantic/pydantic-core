@@ -258,10 +258,7 @@ impl TryFrom<&PyAny> for PyLineError {
             ));
         };
 
-        let location: Location = match dict.get_item("loc") {
-            Some(l) => Location::try_from(l)?,
-            None => return Err(PyKeyError::new_err("loc")),
-        };
+        let location = Location::try_from(dict.get_item("loc"))?;
 
         let input_value = match dict.get_item("input") {
             Some(i) => i.into_py(py),

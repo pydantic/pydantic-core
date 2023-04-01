@@ -556,11 +556,11 @@ def test_raise_validation_error_json():
     ]
 
     with pytest.raises(ValidationError) as exc_info:
-        raise ValidationError('Foobar', [{'type': 'none_required', 'loc': (-42,), 'input': 'x'}], 'json')
+        raise ValidationError('Foobar', [{'type': 'none_required', 'loc': (), 'input': 'x'}], 'json')
 
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
-        {'type': 'none_required', 'loc': (-42,), 'msg': 'Input should be null', 'input': 'x'}
+        {'type': 'none_required', 'loc': (), 'msg': 'Input should be null', 'input': 'x'}
     ]
 
 
@@ -569,13 +569,13 @@ def test_raise_validation_error_custom():
         'my_error', 'this is a custom error {missed} {foo} {bar}', {'foo': 'X', 'bar': 42}
     )
     with pytest.raises(ValidationError) as exc_info:
-        raise ValidationError('Foobar', [{'type': custom_error, 'loc': (-42,), 'input': 'x'}])
+        raise ValidationError('Foobar', [{'type': custom_error, 'input': 'x'}])
 
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
             'type': 'my_error',
-            'loc': (-42,),
+            'loc': (),
             'msg': 'this is a custom error {missed} X 42',
             'input': 'x',
             'ctx': {'foo': 'X', 'bar': 42},
