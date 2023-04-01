@@ -3,7 +3,7 @@ use std::fmt::{Display, Write};
 use std::str::from_utf8;
 
 use crate::errors::LocItem;
-use pyo3::exceptions::{PyKeyError, PyValueError};
+use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::ffi::Py_ssize_t;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
@@ -14,6 +14,7 @@ use serde_json::ser::PrettyFormatter;
 
 use crate::build_tools::{py_error_type, safe_repr, SchemaDict};
 use crate::serializers::GeneralSerializeContext;
+use crate::PydanticCustomError;
 
 use super::line_error::ValLineError;
 use super::location::Location;
@@ -242,12 +243,20 @@ impl TryFrom<&PyAny> for PyLineError {
         let dict: &PyDict = value.downcast()?;
         let py = value.py();
 
-        let type_: &str = match dict.get_item("type") {
-            Some(t) => t.extract()?,
-            None => return Err(PyKeyError::new_err("type")),
+        let type_raw = dict
+            .get_item(intern!(py, "type"))
+            .ok_or_else(|| PyKeyError::new_err("type"))?;
+
+        let error_type = if let Ok(type_str) = type_raw.downcast::<PyString>() {
+            let context: Option<&PyDict> = dict.get_as(intern!(py, "ctx"))?;
+            ErrorType::new(py, type_str.to_str()?, context)?
+        } else if let Ok(custom_error) = type_raw.extract::<PydanticCustomError>() {
+            ErrorType::new_custom_error(custom_error)
+        } else {
+            return Err(PyTypeError::new_err(
+                "`type` should be a `str` or `PydanticCustomError`",
+            ));
         };
-        let context: Option<&PyDict> = dict.get_as(intern!(py, "ctx"))?;
-        let error_type = ErrorType::new(py, type_, context)?;
 
         let location: Location = match dict.get_item("loc") {
             Some(l) => Location::try_from(l)?,

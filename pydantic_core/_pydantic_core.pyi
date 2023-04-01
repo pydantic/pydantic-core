@@ -171,7 +171,7 @@ class SchemaError(Exception):
     def errors(self) -> 'list[ErrorDetails]': ...
 
 class InitErrorDetails(TypedDict):
-    type: str
+    type: 'str | PydanticCustomError'
     loc: 'tuple[int | str, ...]'
     input: Any
     ctx: NotRequired['dict[str, str | int | float]']
@@ -187,13 +187,12 @@ class ValidationError(ValueError):
     def json(self, indent: 'int | None' = None, include_context: bool = False) -> str: ...
 
 class PydanticCustomError(ValueError):
+    def __init__(self, error_type: str, message_template: str, context: 'dict[str, Any] | None' = None) -> None: ...
     @property
     def type(self) -> str: ...
     @property
     def message_template(self) -> str: ...
     context: 'dict[str, Any] | None'
-
-    def __init__(self, error_type: str, message_template: str, context: 'dict[str, Any] | None' = None) -> None: ...
     def message(self) -> str: ...
 
 class PydanticKnownError(ValueError):

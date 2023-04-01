@@ -198,7 +198,7 @@ pub enum ErrorType {
     },
     // Note: strum message and serialize are not used here
     CustomError {
-        value_error: PydanticCustomError,
+        custom_error: PydanticCustomError,
     },
     // ---------------------
     // literals
@@ -443,6 +443,10 @@ impl ErrorType {
         }
     }
 
+    pub fn new_custom_error(custom_error: PydanticCustomError) -> Self {
+        Self::CustomError { custom_error }
+    }
+
     pub fn message_template_python(&self) -> &'static str {
         match self {
             Self::NoSuchAttribute {..} => "Object has no attribute '{attribute}'",
@@ -560,7 +564,9 @@ impl ErrorType {
 
     pub fn type_string(&self) -> String {
         match self {
-            Self::CustomError { value_error } => value_error.error_type(),
+            Self::CustomError {
+                custom_error: value_error,
+            } => value_error.error_type(),
             _ => self.to_string(),
         }
     }
@@ -605,7 +611,9 @@ impl ErrorType {
             Self::BytesTooLong { max_length } => to_string_render!(tmpl, max_length),
             Self::ValueError { error } => render!(tmpl, error),
             Self::AssertionError { error } => render!(tmpl, error),
-            Self::CustomError { value_error } => value_error.message(py),
+            Self::CustomError {
+                custom_error: value_error,
+            } => value_error.message(py),
             Self::LiteralError { expected } => render!(tmpl, expected),
             Self::DateParsing { error } => render!(tmpl, error),
             Self::DateFromDatetimeParsing { error } => render!(tmpl, error),
@@ -660,7 +668,9 @@ impl ErrorType {
             Self::BytesTooLong { max_length } => py_dict!(py, max_length),
             Self::ValueError { error } => py_dict!(py, error),
             Self::AssertionError { error } => py_dict!(py, error),
-            Self::CustomError { value_error } => Ok(value_error.context(py)),
+            Self::CustomError {
+                custom_error: value_error,
+            } => Ok(value_error.context(py)),
             Self::LiteralError { expected } => py_dict!(py, expected),
             Self::DateParsing { error } => py_dict!(py, error),
             Self::DateFromDatetimeParsing { error } => py_dict!(py, error),
