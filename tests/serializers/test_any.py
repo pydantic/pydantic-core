@@ -278,7 +278,7 @@ def test_unknown_type(any_serializer: SchemaSerializer):
 
 def test_unknown_type_fallback(any_serializer: SchemaSerializer):
     def fallback_func(obj):
-        return f'fallback:{repr(obj)}'
+        return f'fallback:{obj!r}'
 
     f = Foobar()
     assert any_serializer.to_python(f) == f

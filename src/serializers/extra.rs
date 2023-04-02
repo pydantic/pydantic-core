@@ -163,9 +163,10 @@ pub(crate) struct ExtraOwned {
     config: SerializationConfig,
     rec_guard: SerRecursionGuard,
     check: SerCheck,
-    model: Option<Py<PyAny>>,
+    model: Option<PyObject>,
     field_name: Option<String>,
     serialize_unknown: bool,
+    fallback: Option<PyObject>,
 }
 
 impl ExtraOwned {
@@ -185,6 +186,7 @@ impl ExtraOwned {
             model: extra.model.map(|v| v.into()),
             field_name: extra.field_name.map(|v| v.to_string()),
             serialize_unknown: extra.serialize_unknown,
+            fallback: extra.fallback.map(|v| v.into()),
         }
     }
 
@@ -205,7 +207,7 @@ impl ExtraOwned {
             model: self.model.as_ref().map(|m| m.as_ref(py)),
             field_name: self.field_name.as_ref().map(|n| n.as_ref()),
             serialize_unknown: self.serialize_unknown,
-            fallback: None,
+            fallback: self.fallback.as_ref().map(|m| m.as_ref(py)),
         }
     }
 }
