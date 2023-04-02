@@ -15,6 +15,57 @@ use super::errors::{PydanticSerializationUnexpectedValue, UNEXPECTED_TYPE_SER};
 use super::ob_type::ObTypeLookup;
 use super::shared::CombinedSerializer;
 
+/// this is ugly, would be much better if extra could be stored in `SerializationState`
+/// then `SerializationState` got a `serialize_infer` method, but I couldn't get it to work
+pub(crate) struct SerializationState {
+    warnings: CollectWarnings,
+    rec_guard: SerRecursionGuard,
+    config: SerializationConfig,
+}
+
+impl SerializationState {
+    pub fn new(timedelta_mode: Option<&str>, bytes_mode: Option<&str>) -> Self {
+        let warnings = CollectWarnings::new(None);
+        let rec_guard = SerRecursionGuard::default();
+        let config = SerializationConfig::from_args(timedelta_mode, bytes_mode).unwrap();
+        Self {
+            warnings,
+            rec_guard,
+            config,
+        }
+    }
+
+    pub fn extra<'py>(
+        &'py self,
+        py: Python<'py>,
+        mode: &'py SerMode,
+        exclude_none: Option<bool>,
+        round_trip: Option<bool>,
+        serialize_unknown: Option<bool>,
+        fallback: Option<&'py PyAny>,
+    ) -> Extra<'py> {
+        Extra::new(
+            py,
+            mode,
+            &[],
+            None,
+            &self.warnings,
+            None,
+            None,
+            exclude_none,
+            round_trip,
+            &self.config,
+            &self.rec_guard,
+            serialize_unknown,
+            fallback,
+        )
+    }
+
+    pub fn final_check(&self, py: Python) -> PyResult<()> {
+        self.warnings.final_check(py)
+    }
+}
+
 /// Useful things which are passed around by type_serializers
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
@@ -38,6 +89,8 @@ pub(crate) struct Extra<'a> {
     pub model: Option<&'a PyAny>,
     pub field_name: Option<&'a str>,
     pub serialize_unknown: bool,
+    /// used only for `to_json` and `to_jsonable_python`
+    pub fallback: Option<&'a PyAny>,
 }
 
 impl<'a> Extra<'a> {
@@ -55,6 +108,7 @@ impl<'a> Extra<'a> {
         config: &'a SerializationConfig,
         rec_guard: &'a SerRecursionGuard,
         serialize_unknown: Option<bool>,
+        fallback: Option<&'a PyAny>,
     ) -> Self {
         Self {
             mode,
@@ -72,6 +126,7 @@ impl<'a> Extra<'a> {
             model: None,
             field_name: None,
             serialize_unknown: serialize_unknown.unwrap_or(false),
+            fallback,
         }
     }
 
@@ -153,6 +208,7 @@ impl ExtraOwned {
             model: self.model.as_ref().map(|m| m.as_ref(py)),
             field_name: self.field_name.as_ref().map(|n| n.as_ref()),
             serialize_unknown: self.serialize_unknown,
+            fallback: None,
         }
     }
 }

@@ -181,7 +181,10 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Path => value.str()?.into_py(py),
             ObType::Unknown => {
-                return if extra.serialize_unknown {
+                return if let Some(fallback) = extra.fallback {
+                    let next_value = fallback.call1((value,))?;
+                    infer_to_python(next_value, include, exclude, extra)
+                } else if extra.serialize_unknown {
                     Ok(serialize_unknown(value).into_py(py))
                 } else {
                     Err(unknown_type_error(value))
@@ -438,7 +441,10 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             serializer.serialize_str(s)
         }
         ObType::Unknown => {
-            if extra.serialize_unknown {
+            if let Some(fallback) = extra.fallback {
+                let next_value = fallback.call1((value,)).map_err(py_err_se_err)?;
+                infer_serialize(next_value, serializer, include, exclude, extra)
+            } else if extra.serialize_unknown {
                 serializer.serialize_str(&serialize_unknown(value))
             } else {
                 return Err(py_err_se_err(unknown_type_error(value)));
@@ -538,7 +544,12 @@ pub(crate) fn infer_json_key_known<'py>(ob_type: &ObType, key: &'py PyAny, extra
         }
         ObType::Path => Ok(key.str()?.to_string_lossy()),
         ObType::Unknown => {
-            if extra.serialize_unknown {
+            if let Some(fallback) = extra.fallback {
+                let next_key = fallback.call1((key,))?;
+                // totally unnecessary step to placate rust's lifetime rules
+                let next_key = next_key.to_object(key.py()).into_ref(key.py());
+                infer_json_key(next_key, extra)
+            } else if extra.serialize_unknown {
                 Ok(serialize_unknown(key))
             } else {
                 Err(unknown_type_error(key))
