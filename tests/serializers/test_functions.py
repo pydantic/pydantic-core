@@ -282,6 +282,32 @@ def test_wrong_return_type():
         s.to_json(123)
 
 
+def test_wrong_return_type_str():
+    def f(value, _):
+        if value == 666:
+            return value
+        else:
+            return str(value)
+
+    s = SchemaSerializer(
+        core_schema.any_schema(
+            serialization=core_schema.general_plain_serializer_function_ser_schema(f, json_return_type='str_subclass')
+        )
+    )
+    assert s.to_python(123) == '123'
+    assert s.to_python(123, mode='json') == '123'
+    assert s.to_json(123) == b'"123"'
+
+    assert s.to_python(666) == 666
+
+    with pytest.raises(TypeError, match="^'int' object cannot be converted to 'PyString'$"):
+        s.to_python(666, mode='json')
+
+    m = "^Error serializing to JSON: 'int' object cannot be converted to 'PyString'$"
+    with pytest.raises(PydanticSerializationError, match=m):
+        s.to_json(666)
+
+
 def test_function_wrap():
     def f(value, serializer, _info):
         return f'result={serializer(len(value))} repr={serializer!r}'
