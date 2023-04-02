@@ -285,8 +285,20 @@ def test_function_wrap():
         return f'result={serializer(len(value))} repr={serializer!r}'
 
     s = SchemaSerializer(
+        core_schema.int_schema(serialization=core_schema.general_wrap_serializer_function_ser_schema(f))
+    )
+    assert s.to_python('foo') == 'result=3 repr=SerializationCallable(serializer=int)'
+    assert s.to_python('foo', mode='json') == 'result=3 repr=SerializationCallable(serializer=int)'
+    assert s.to_json('foo') == b'"result=3 repr=SerializationCallable(serializer=int)"'
+
+
+def test_function_wrap_custom_schema():
+    def f(value, serializer, _info):
+        return f'result={serializer(len(value))} repr={serializer!r}'
+
+    s = SchemaSerializer(
         core_schema.any_schema(
-            serialization=core_schema.general_wrap_serializer_function_ser_schema(f, core_schema.int_schema())
+            serialization=core_schema.general_wrap_serializer_function_ser_schema(f, schema=core_schema.int_schema())
         )
     )
     assert s.to_python('foo') == 'result=3 repr=SerializationCallable(serializer=int)'
@@ -308,7 +320,7 @@ def test_function_wrap_fallback():
 
     s = SchemaSerializer(
         core_schema.any_schema(
-            serialization=core_schema.general_wrap_serializer_function_ser_schema(f, core_schema.any_schema())
+            serialization=core_schema.general_wrap_serializer_function_ser_schema(f, schema=core_schema.any_schema())
         )
     )
     assert s.to_python('foo') == 'result=foo'
@@ -344,7 +356,7 @@ def test_deque():
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.general_wrap_serializer_function_ser_schema(
-                serialize_deque, core_schema.any_schema()
+                serialize_deque, schema=core_schema.any_schema()
             )
         )
     )
@@ -372,7 +384,7 @@ def test_custom_mapping():
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.general_wrap_serializer_function_ser_schema(
-                serialize_custom_mapping, core_schema.int_schema()
+                serialize_custom_mapping, schema=core_schema.int_schema()
             )
         )
     )
