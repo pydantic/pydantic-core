@@ -423,7 +423,7 @@ def test_function_wrap_model():
             serialization=core_schema.general_wrap_serializer_function_ser_schema(wrap_function),
         )
     )
-    m = MyModel(a=1, b=b'foobar')
+    m = MyModel(a=1, b=b'foobar', c='excluded')
     assert calls == 0
     assert s.to_python(m) == {'a': 1, 'b': b'foobar'}
     assert calls == 1
@@ -437,6 +437,48 @@ def test_function_wrap_model():
     assert s.to_python(m, mode='json', exclude={'b'}) == {'a': 1}
     assert calls == 5
     assert s.to_json(m, exclude={'b'}) == b'{"a":1}'
+    assert calls == 6
+
+
+def test_function_plain_model():
+    calls = 0
+
+    def wrap_function(value, _info):
+        nonlocal calls
+        calls += 1
+        return value.__dict__
+
+    class MyModel:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            MyModel,
+            core_schema.typed_dict_schema(
+                {
+                    'a': core_schema.typed_dict_field(core_schema.any_schema()),
+                    'b': core_schema.typed_dict_field(core_schema.any_schema()),
+                    'c': core_schema.typed_dict_field(core_schema.any_schema(), serialization_exclude=True),
+                }
+            ),
+            serialization=core_schema.general_plain_serializer_function_ser_schema(wrap_function),
+        )
+    )
+    m = MyModel(a=1, b=b'foobar', c='not excluded')
+    assert calls == 0
+    assert s.to_python(m) == {'a': 1, 'b': b'foobar', 'c': 'not excluded'}
+    assert calls == 1
+    assert s.to_python(m, mode='json') == {'a': 1, 'b': 'foobar', 'c': 'not excluded'}
+    assert calls == 2
+    assert s.to_json(m) == b'{"a":1,"b":"foobar","c":"not excluded"}'
+    assert calls == 3
+
+    assert s.to_python(m, exclude={'b'}) == {'a': 1, 'b': b'foobar', 'c': 'not excluded'}
+    assert calls == 4
+    assert s.to_python(m, mode='json', exclude={'b'}) == {'a': 1, 'b': 'foobar', 'c': 'not excluded'}
+    assert calls == 5
+    assert s.to_json(m, exclude={'b'}) == b'{"a":1,"b":"foobar","c":"not excluded"}'
     assert calls == 6
 
 

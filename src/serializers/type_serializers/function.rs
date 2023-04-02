@@ -217,11 +217,12 @@ macro_rules! function_type_serializer {
                 match self.call(value, include, exclude, extra) {
                     Ok(v) => {
                         let next_value = v.as_ref(py);
+                            // None for include/exclude here, as filtering should be done
                         match self.json_return_ob_type {
                             Some(ref ob_type) => {
-                                infer_serialize_known(ob_type, next_value, serializer, include, exclude, extra)
+                                infer_serialize_known(ob_type, next_value, serializer, None, None, extra)
                             }
-                            None => infer_serialize(next_value, serializer, include, exclude, extra),
+                            None => infer_serialize(next_value, serializer, None, None, extra),
                         }
                     }
                     Err(err) => match err.value(py).extract::<PydanticSerializationUnexpectedValue>() {
