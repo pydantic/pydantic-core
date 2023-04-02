@@ -394,3 +394,45 @@ def test_custom_mapping():
     assert s.to_python({'a': 1, 'b': 2}, mode='json', include={'a'}) == 'a=1'
     assert s.to_json({'a': 1, 'b': 2}) == b'"a=1 b=2"'
     assert s.to_json({'a': 1, 'b': 2}, exclude={'b'}) == b'"a=1"'
+
+
+def test_function_wrap_model():
+    calls = 0
+
+    def wrap_function(value, handler, _info):
+        nonlocal calls
+        calls += 1
+        return handler(value)
+
+    class MyModel:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            MyModel,
+            core_schema.typed_dict_schema(
+                {
+                    'a': core_schema.typed_dict_field(core_schema.any_schema()),
+                    'b': core_schema.typed_dict_field(core_schema.any_schema()),
+                    'c': core_schema.typed_dict_field(core_schema.any_schema(), serialization_exclude=True),
+                }
+            ),
+            serialization=core_schema.general_wrap_serializer_function_ser_schema(wrap_function),
+        )
+    )
+    m = MyModel(a=1, b=b'foobar')
+    assert calls == 0
+    assert s.to_python(m) == {'a': 1, 'b': b'foobar'}
+    assert calls == 1
+    assert s.to_python(m, mode='json') == {'a': 1, 'b': 'foobar'}
+    assert calls == 2
+    assert s.to_json(m) == b'{"a":1,"b":"foobar"}'
+    assert calls == 3
+
+    assert s.to_python(m, exclude={'b'}) == {'a': 1}
+    assert calls == 4
+    assert s.to_python(m, mode='json', exclude={'b'}) == {'a': 1}
+    assert calls == 5
+    assert s.to_json(m, exclude={'b'}) == b'{"a":1}'
+    assert calls == 6

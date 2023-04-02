@@ -151,9 +151,10 @@ macro_rules! function_type_serializer {
                     Ok(v) => {
                         let next_value = v.as_ref(py);
                         match extra.mode {
+                            // None for include/exclude here, as filtering should be done
                             SerMode::Json => match self.json_return_ob_type {
-                                Some(ref ob_type) => infer_to_python_known(ob_type, next_value, include, exclude, extra),
-                                None => infer_to_python(next_value, include, exclude, extra),
+                                Some(ref ob_type) => infer_to_python_known(ob_type, next_value, None, None, extra),
+                                None => infer_to_python(next_value, None, None, extra),
                             },
                             _ => Ok(next_value.to_object(py)),
                         }
@@ -394,7 +395,7 @@ impl SerializationCallable {
                 Err(PydanticOmit::new_err())
             }
         } else {
-            let v = self.serializer.to_python(value, None, None, &extra)?;
+            let v = self.serializer.to_python(value, include, exclude, &extra)?;
             extra.warnings.final_check(py)?;
             Ok(Some(v))
         }
