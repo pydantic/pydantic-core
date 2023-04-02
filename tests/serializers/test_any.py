@@ -3,6 +3,7 @@ import json
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from enum import Enum
+from pathlib import Path
 from typing import ClassVar
 
 import pytest
@@ -90,6 +91,7 @@ def test_set_member_db(any_serializer):
         (MyDataclass(1, 'foo', 2), b'{"a":1,"b":"foo"}'),
         (MyModel(a=1, b='foo'), b'{"a":1,"b":"foo"}'),
         ([MyDataclass(1, 'a', 2), MyModel(a=2, b='b')], b'[{"a":1,"b":"a"},{"a":2,"b":"b"}]'),
+        (Path('/foo/bar/spam.svg'), b'"/foo/bar/spam.svg"'),
     ],
 )
 def test_any_json(any_serializer, value, expected_json):

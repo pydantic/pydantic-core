@@ -179,6 +179,7 @@ pub(crate) fn infer_to_python_known(
                 }
                 PyList::new(py, items).into_py(py)
             }
+            ObType::Path => value.str()?.into_py(py),
             ObType::Unknown => {
                 return if extra.serialize_unknown {
                     Ok(serialize_unknown(value).into_py(py))
@@ -432,6 +433,10 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             }
             seq.end()
         }
+        ObType::Path => {
+            let s = value.str().map_err(py_err_se_err)?.to_str().map_err(py_err_se_err)?;
+            serializer.serialize_str(s)
+        }
         ObType::Unknown => {
             if extra.serialize_unknown {
                 serializer.serialize_str(&serialize_unknown(value))
@@ -531,6 +536,7 @@ pub(crate) fn infer_json_key_known<'py>(ob_type: &ObType, key: &'py PyAny, extra
             let k = key.getattr(intern!(key.py(), "value"))?;
             infer_json_key(k, extra)
         }
+        ObType::Path => Ok(key.str()?.to_string_lossy()),
         ObType::Unknown => {
             if extra.serialize_unknown {
                 Ok(serialize_unknown(key))
