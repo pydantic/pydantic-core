@@ -203,6 +203,7 @@ class FieldPlainSerializerFunctionSchema(TypedDict):
 
 # must match `src/serializers/ob_type.rs::ObType`
 JsonReturnTypes = Literal[
+    'none',
     'int',
     'int_subclass',
     'bool',
@@ -228,6 +229,7 @@ JsonReturnTypes = Literal[
     'dataclass',
     'model',
     'enum',
+    'path',
 ]
 
 WhenUsed = Literal['always', 'unless-none', 'json', 'json-unless-none']

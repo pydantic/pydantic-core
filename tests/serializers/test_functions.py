@@ -1,5 +1,7 @@
 import json
+import sys
 from collections import deque
+from pathlib import Path
 
 import pytest
 
@@ -436,3 +438,18 @@ def test_function_wrap_model():
     assert calls == 5
     assert s.to_json(m, exclude={'b'}) == b'{"a":1}'
     assert calls == 6
+
+
+@pytest.mark.skipif(sys.platform == 'win32', reason='Path output different on windows')
+def test_wrap_return_type():
+    def to_path(value, handler, _info):
+        return Path(handler(value)).with_suffix('.new')
+
+    s = SchemaSerializer(
+        core_schema.str_schema(
+            serialization=core_schema.general_wrap_serializer_function_ser_schema(to_path, json_return_type='path')
+        )
+    )
+    assert s.to_python('foobar') == Path('foobar.new')
+    assert s.to_python('foobar', mode='json') == 'foobar.new'
+    assert s.to_json('foobar') == b'"foobar.new"'
