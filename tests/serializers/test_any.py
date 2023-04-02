@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import ClassVar
 
 import pytest
-from dirty_equals import IsList
+from dirty_equals import HasRepr, IsList
 
 from pydantic_core import PydanticSerializationError, SchemaSerializer, core_schema, to_json
 
@@ -260,11 +260,12 @@ def test_exclude_unset(any_serializer):
     assert any_serializer.to_python(m2, exclude_unset=True) == {'bar': 2, 'spam': 3}
 
 
-def test_unknown_type(any_serializer):
-    class Foobar:
-        def __repr__(self):
-            return '<Foobar repr>'
+class Foobar:
+    def __repr__(self):
+        return '<Foobar repr>'
 
+
+def test_unknown_type(any_serializer: SchemaSerializer):
     f = Foobar()
     assert any_serializer.to_python(f) == f
 
@@ -273,6 +274,66 @@ def test_unknown_type(any_serializer):
 
     with pytest.raises(PydanticSerializationError, match='Unable to serialize unknown type: <Foobar repr>'):
         any_serializer.to_json(f)
+
+
+def test_unknown_type_fallback(any_serializer: SchemaSerializer):
+    def fallback_func(obj):
+        return f'fallback:{repr(obj)}'
+
+    f = Foobar()
+    assert any_serializer.to_python(f) == f
+
+    assert any_serializer.to_python(f, mode='json', fallback=fallback_func) == 'fallback:<Foobar repr>'
+    assert any_serializer.to_python(f, fallback=fallback_func) == 'fallback:<Foobar repr>'
+    assert any_serializer.to_json(f, fallback=fallback_func) == b'"fallback:<Foobar repr>"'
+
+
+def test_fallback_cycle_same(any_serializer: SchemaSerializer):
+    def fallback_func(obj):
+        return obj
+
+    f = Foobar()
+    assert any_serializer.to_python(f) == f
+
+    with pytest.raises(ValueError, match=r'Circular reference detected \(id repeated\)'):
+        any_serializer.to_python(f, mode='json', fallback=fallback_func)
+
+    # because when recursion is detected and we're in mode python, we just return the value
+    assert any_serializer.to_python(f, fallback=fallback_func) == f
+
+    with pytest.raises(ValueError, match=r'Circular reference detected \(id repeated\)'):
+        any_serializer.to_json(f, fallback=fallback_func)
+
+
+class FoobarCount:
+    def __init__(self, v):
+        self.v = v
+
+    def __repr__(self):
+        return f'<FoobarCount {self.v} repr>'
+
+
+def test_fallback_cycle_change(any_serializer: SchemaSerializer):
+    v = 1
+
+    def fallback_func(obj):
+        nonlocal v
+        v += 1
+        return FoobarCount(v)
+
+    f = FoobarCount(0)
+    assert any_serializer.to_python(f) == f
+
+    with pytest.raises(ValueError, match=r'Circular reference detected \(depth exceeded\)'):
+        any_serializer.to_python(f, mode='json', fallback=fallback_func)
+
+    f = FoobarCount(0)
+    v = 0
+    # because when recursion is detected and we're in mode python, we just return the value
+    assert any_serializer.to_python(f, fallback=fallback_func) == HasRepr('<FoobarCount 201 repr>')
+
+    with pytest.raises(ValueError, match=r'Circular reference detected \(depth exceeded\)'):
+        any_serializer.to_json(f, fallback=fallback_func)
 
 
 class MyEnum(Enum):

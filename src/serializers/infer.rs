@@ -8,9 +8,10 @@ use pyo3::types::{
     PyTime, PyTuple,
 };
 
-use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
+use serde::ser::{Error, Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::build_tools::{py_err, safe_repr};
+use crate::serializers::errors::SERIALIZATION_ERR_MARKER;
 use crate::serializers::filter::SchemaFilter;
 use crate::url::{PyMultiHostUrl, PyUrl};
 
@@ -181,14 +182,16 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Path => value.str()?.into_py(py),
             ObType::Unknown => {
-                return if let Some(fallback) = extra.fallback {
+                if let Some(fallback) = extra.fallback {
                     let next_value = fallback.call1((value,))?;
-                    infer_to_python(next_value, include, exclude, extra)
+                    let next_result = infer_to_python(next_value, include, exclude, extra);
+                    extra.rec_guard.pop(value_id);
+                    return next_result;
                 } else if extra.serialize_unknown {
-                    Ok(serialize_unknown(value).into_py(py))
+                    serialize_unknown(value).into_py(py)
                 } else {
-                    Err(unknown_type_error(value))
-                };
+                    return Err(unknown_type_error(value));
+                }
             }
         },
         _ => match ob_type {
@@ -235,6 +238,16 @@ pub(crate) fn infer_to_python_known(
                     extra,
                 );
                 iter.into_py(py)
+            }
+            ObType::Unknown => {
+                if let Some(fallback) = extra.fallback {
+                    let next_value = fallback.call1((value,))?;
+                    let next_result = infer_to_python(next_value, include, exclude, extra);
+                    extra.rec_guard.pop(value_id);
+                    return next_result;
+                } else {
+                    value.into_py(py)
+                }
             }
             _ => value.into_py(py),
         },
@@ -443,11 +456,18 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         ObType::Unknown => {
             if let Some(fallback) = extra.fallback {
                 let next_value = fallback.call1((value,)).map_err(py_err_se_err)?;
-                infer_serialize(next_value, serializer, include, exclude, extra)
+                let next_result = infer_serialize(next_value, serializer, include, exclude, extra);
+                extra.rec_guard.pop(value_id);
+                return next_result;
             } else if extra.serialize_unknown {
                 serializer.serialize_str(&serialize_unknown(value))
             } else {
-                return Err(py_err_se_err(unknown_type_error(value)));
+                let msg = format!(
+                    "{}Unable to serialize unknown type: {}",
+                    SERIALIZATION_ERR_MARKER,
+                    safe_repr(value)
+                );
+                return Err(S::Error::custom(msg));
             }
         }
     };
@@ -463,9 +483,9 @@ fn serialize_unknown(value: &PyAny) -> Cow<str> {
     if let Ok(s) = value.str() {
         s.to_string_lossy()
     } else if let Ok(name) = value.get_type().name() {
-        format!("<{name} object cannot be serialized to JSON>").into()
+        format!("<Unserializable {name} object>").into()
     } else {
-        "<object cannot be serialized to JSON>".into()
+        "<Unserializable object>".into()
     }
 }
 

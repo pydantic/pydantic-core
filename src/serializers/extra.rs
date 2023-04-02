@@ -8,10 +8,8 @@ use pyo3::{intern, AsPyPointer};
 use ahash::AHashSet;
 use serde::ser::Error;
 
-use crate::build_tools::py_err;
-
 use super::config::SerializationConfig;
-use super::errors::{PydanticSerializationUnexpectedValue, UNEXPECTED_TYPE_SER};
+use super::errors::{PydanticSerializationUnexpectedValue, UNEXPECTED_TYPE_SER_MARKER};
 use super::ob_type::ObTypeLookup;
 use super::shared::CombinedSerializer;
 
@@ -89,7 +87,6 @@ pub(crate) struct Extra<'a> {
     pub model: Option<&'a PyAny>,
     pub field_name: Option<&'a str>,
     pub serialize_unknown: bool,
-    /// used only for `to_json` and `to_jsonable_python`
     pub fallback: Option<&'a PyAny>,
 }
 
@@ -304,7 +301,7 @@ impl CollectWarnings {
             // note: I think this should never actually happen since we use `to_python(..., mode='json')` during
             // JSON serialisation to "try" union branches, but it's here for completeness/correctness
             // in particular, in future we could allow errors instead of warnings on fallback
-            Err(S::Error::custom(UNEXPECTED_TYPE_SER))
+            Err(S::Error::custom(UNEXPECTED_TYPE_SER_MARKER))
         } else {
             self.fallback_warning(field_type, value);
             Ok(())
@@ -371,9 +368,9 @@ impl SerRecursionGuard {
         let id = value.as_ptr() as usize;
         let mut info = self.info.borrow_mut();
         if !info.ids.insert(id) {
-            py_err!(PyValueError; "Circular reference detected (id repeated)")
+            Err(PyValueError::new_err("Circular reference detected (id repeated)"))
         } else if info.depth > Self::MAX_DEPTH {
-            py_err!(PyValueError; "Circular reference detected (depth exceeded)")
+            Err(PyValueError::new_err("Circular reference detected (depth exceeded)"))
         } else {
             info.depth += 1;
             Ok(id)

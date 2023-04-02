@@ -219,3 +219,69 @@ def test_to_jsonable_python_fallback():
     assert to_jsonable_python(Foobar(), serialize_unknown=True) == 'Foobar.__str__'
     assert to_jsonable_python(Foobar(), serialize_unknown=True, fallback=fallback_func) == 'fallback:Foobar'
     assert to_jsonable_python(Foobar(), fallback=fallback_func) == 'fallback:Foobar'
+
+
+def test_cycle_same():
+    def fallback_func_passthrough(obj):
+        return obj
+
+    f = Foobar()
+
+    with pytest.raises(ValueError, match=r'Circular reference detected \(id repeated\)'):
+        to_jsonable_python(f, fallback=fallback_func_passthrough)
+
+    with pytest.raises(ValueError, match=r'Circular reference detected \(id repeated\)'):
+        to_json(f, fallback=fallback_func_passthrough)
+
+
+def test_cycle_change():
+    def fallback_func_change_id(obj):
+        return Foobar()
+
+    f = Foobar()
+
+    with pytest.raises(ValueError, match=r'Circular reference detected \(depth exceeded\)'):
+        to_jsonable_python(f, fallback=fallback_func_change_id)
+
+    with pytest.raises(ValueError, match=r'Circular reference detected \(depth exceeded\)'):
+        to_json(f, fallback=fallback_func_change_id)
+
+
+class FoobarHash:
+    def __str__(self):
+        return 'Foobar.__str__'
+
+    def __hash__(self):
+        return 1
+
+
+def test_json_key_fallback():
+    x = {FoobarHash(): 1}
+
+    assert to_jsonable_python(x, serialize_unknown=True) == {'Foobar.__str__': 1}
+    assert to_jsonable_python(x, fallback=fallback_func) == {'fallback:FoobarHash': 1}
+    assert to_json(x, serialize_unknown=True) == b'{"Foobar.__str__":1}'
+    assert to_json(x, fallback=fallback_func) == b'{"fallback:FoobarHash":1}'
+
+
+class BadRepr:
+    def __repr__(self):
+        raise ValueError('bad repr')
+
+    def __hash__(self):
+        return 1
+
+
+def test_bad_repr():
+    b = BadRepr()
+
+    error_msg = '^Unable to serialize unknown type: <unprintable BadRepr object>$'
+    with pytest.raises(PydanticSerializationError, match=error_msg):
+        to_jsonable_python(b)
+
+    assert to_jsonable_python(b, serialize_unknown=True) == '<Unserializable BadRepr object>'
+
+    with pytest.raises(PydanticSerializationError, match=error_msg):
+        to_json(b)
+
+    assert to_json(b, serialize_unknown=True) == b'"<Unserializable BadRepr object>"'
