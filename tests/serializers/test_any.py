@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import sys
 from collections import namedtuple
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
@@ -92,7 +93,16 @@ def test_set_member_db(any_serializer):
         (MyDataclass(1, 'foo', 2), b'{"a":1,"b":"foo"}'),
         (MyModel(a=1, b='foo'), b'{"a":1,"b":"foo"}'),
         ([MyDataclass(1, 'a', 2), MyModel(a=2, b='b')], b'[{"a":1,"b":"a"},{"a":2,"b":"b"}]'),
-        (Path('/foo/bar/spam.svg'), b'"/foo/bar/spam.svg"'),
+        pytest.param(
+            Path('/foo/bar/spam.svg'),
+            b'"/foo/bar/spam.svg"',
+            marks=pytest.mark.skipif(sys.platform == 'win32', reason='Path output different on windows'),
+        ),
+        pytest.param(
+            Path(r'C:\\foo\\bar\\spam.svg'),
+            b'"C:\\\\foo\\\\bar\\\\spam.svg"',
+            marks=pytest.mark.skipif(sys.platform != 'win32', reason='Path output different on windows'),
+        ),
         # I'm open to adding custom logic to make namedtuples behave like dataclasses or models
         (namedtuple('Point', ['x', 'y'])(1, 2), b'[1,2]'),
     ],
