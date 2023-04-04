@@ -13,16 +13,16 @@ from ..conftest import Err, PyAndJson, plain_repr
 
 def test_args_kwargs():
     ak = ArgsKwargs(('hello', True))
-    assert str(ak) == "args('hello', True)"
-    assert repr(ak) == "args('hello', True)"
+    assert str(ak) == "ArgsKwargs(('hello', True))"
+    assert repr(ak) == "ArgsKwargs(('hello', True))"
     assert ak.args == ('hello', True)
     assert ak.kwargs is None
     ak2 = ArgsKwargs((), {'a': 123})
-    assert repr(ak2) == 'args(a=123)'
+    assert repr(ak2) == "ArgsKwargs((), {'a': 123})"
     assert ak2.args == ()
     assert ak2.kwargs == {'a': 123}
     ak3 = ArgsKwargs(('hello', True), {'a': 123, 'b': b'bytes'})
-    assert repr(ak3) == "args('hello', True, a=123, b=b'bytes')"
+    assert repr(ak3) == "ArgsKwargs(('hello', True), {'a': 123, 'b': b'bytes'})"
 
     assert ak != ak2
 
@@ -31,7 +31,7 @@ def test_args_kwargs():
     assert ak3 != ArgsKwargs(('hello', True), {'a': 123, 'b': b'different'})
     assert ArgsKwargs((1,), {}) == ArgsKwargs((1,), None) == ArgsKwargs((1,))
 
-    assert repr(ArgsKwargs((1,))) == 'args(1)'
+    assert repr(ArgsKwargs((1,))) == 'ArgsKwargs((1,))'
 
 
 @pytest.mark.parametrize(
@@ -1009,13 +1009,13 @@ def test_error_display():
     ]
     # insert_assert(str(exc_info.value))
     assert str(exc_info.value) == (
-        '1 validation error for arguments\n'
-        'b\n'
-        '  Missing required argument [type=missing_argument, '
-        'input_value=args(a=1), input_type=ArgsKwargs]'
+        "1 validation error for arguments\n"
+        "b\n"
+        "  Missing required argument [type=missing_argument, "
+        "input_value=ArgsKwargs((), {'a': 1}), input_type=ArgsKwargs]"
     )
     # insert_assert(exc_info.value.json())
-    assert (
-        exc_info.value.json()
-        == '[{"type":"missing_argument","loc":["b"],"msg":"Missing required argument","input":"args(a=1)"}]'
+    assert exc_info.value.json() == (
+        '[{"type":"missing_argument","loc":["b"],"msg":"Missing required argument",'
+        '"input":"ArgsKwargs((), {\'a\': 1})"}]'
     )

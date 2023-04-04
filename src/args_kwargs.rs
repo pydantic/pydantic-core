@@ -1,7 +1,6 @@
 use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString, PyTuple};
-use std::borrow::Cow;
+use pyo3::types::{PyDict, PyTuple};
 
 use crate::build_tools::safe_repr;
 
@@ -53,18 +52,11 @@ impl ArgsKwargs {
         }
     }
 
-    pub fn __repr__(&self, py: Python) -> PyResult<String> {
-        let args = self.args.as_ref(py);
-        let mut vec = Vec::with_capacity(args.len() + self.kwargs.as_ref().map_or(0, |d| d.as_ref(py).len()));
-        for arg in args.iter() {
-            vec.push(safe_repr(arg));
+    pub fn __repr__(&self, py: Python) -> String {
+        let args = safe_repr(self.args.as_ref(py));
+        match self.kwargs {
+            Some(ref d) => format!("ArgsKwargs({args}, {})", safe_repr(d.as_ref(py))),
+            None => format!("ArgsKwargs({args})"),
         }
-        if let Some(ref kwargs) = self.kwargs {
-            for (k, v) in kwargs.as_ref(py).iter() {
-                let k_str: &PyString = k.downcast()?;
-                vec.push(Cow::Owned(format!("{}={}", k_str.to_string_lossy(), safe_repr(v))));
-            }
-        }
-        Ok(format!("args({})", vec.join(", ")))
     }
 }
