@@ -65,6 +65,6 @@ impl ArgsKwargs {
                 vec.push(Cow::Owned(format!("{}={}", k_str.to_string_lossy(), safe_repr(v))));
             }
         }
-        Ok(format!("ArgsKwargs({})", vec.join(", ")))
+        Ok(format!("args({})", vec.join(", ")))
     }
 }
