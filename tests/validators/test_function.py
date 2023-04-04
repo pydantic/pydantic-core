@@ -76,7 +76,9 @@ def test_function_before_error():
             'ctx': {'max_length': 5},
         }
     ]
-    assert repr(exc_info.value).startswith('1 validation error for function-before[my_function(), constrained-str]\n')
+    assert repr(exc_info.value).startswith(
+        '1 validation error for function-before[my_function(), str[max_length=5 min_length=0]]\n'
+    )
 
 
 def test_function_before_error_model():

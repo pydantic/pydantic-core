@@ -63,6 +63,7 @@ pub struct StrConstrainedValidator {
     strip_whitespace: bool,
     to_lower: bool,
     to_upper: bool,
+    name: String,
 }
 
 impl Validator for StrConstrainedValidator {
@@ -116,11 +117,13 @@ impl Validator for StrConstrainedValidator {
     }
 
     fn get_name(&self) -> &str {
-        "constrained-str"
+        &self.name
     }
 }
 
 impl StrConstrainedValidator {
+    const EXPECTED_TYPE: &'static str = "str";
+
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
         let py = schema.py();
         let pattern = match schema.get_as(intern!(py, "pattern"))? {
@@ -144,6 +147,16 @@ impl StrConstrainedValidator {
         let to_upper: bool =
             schema_or_config(schema, config, intern!(py, "to_upper"), intern!(py, "str_to_upper"))?.unwrap_or(false);
 
+        let name = match config {
+            Some(_config) => Self::EXPECTED_TYPE.into(),
+            _ => format!(
+                "{}[max_length={} min_length={}]",
+                Self::EXPECTED_TYPE,
+                max_length.unwrap_or_default(),
+                min_length.unwrap_or_default()
+            ),
+        };
+
         Ok(Self {
             strict: is_strict(schema, config)?,
             pattern,
@@ -152,6 +165,7 @@ impl StrConstrainedValidator {
             strip_whitespace,
             to_lower,
             to_upper,
+            name,
         })
     }
 
