@@ -144,6 +144,9 @@ def test_dict():
     v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
     assert v.validate_json('{"1": 2, "3": 4}') == {1: 2, 3: 4}
 
+    # duplicate keys are not allowed
+    assert v.validate_json('{"1": 1, "1": 2}') == {1: 2}
+
 
 def test_dict_any_value():
     v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'str'}})
