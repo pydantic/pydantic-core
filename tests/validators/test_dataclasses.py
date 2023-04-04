@@ -35,15 +35,8 @@ from ..conftest import Err, PyAndJson
         (
             {'a': 'hello'},
             Err(
-                'Missing required keyword only argument',
-                errors=[
-                    {
-                        'type': 'missing_keyword_only_argument',
-                        'loc': ('b',),
-                        'msg': 'Missing required keyword only argument',
-                        'input': {'a': 'hello'},
-                    }
-                ],
+                'Field required',
+                errors=[{'type': 'missing', 'loc': ('b',), 'msg': 'Field required', 'input': {'a': 'hello'}}],
             ),
         ),
     ],
@@ -92,15 +85,8 @@ def test_dataclass_args(py_and_json: PyAndJson, input_value, expected):
         (
             {'a': 'hello'},
             Err(
-                'Missing required keyword only argument',
-                errors=[
-                    {
-                        'type': 'missing_keyword_only_argument',
-                        'loc': ('b',),
-                        'msg': 'Missing required keyword only argument',
-                        'input': {'a': 'hello'},
-                    }
-                ],
+                'Field required',
+                errors=[{'type': 'missing', 'loc': ('b',), 'msg': 'Field required', 'input': {'a': 'hello'}}],
             ),
         ),
         (
