@@ -41,18 +41,18 @@ where
     {
         let mut map = self.map.borrow_mut();
         if let Some(map) = map.as_ref() {
-            if let Some(index) = map.get(key) {
-                return Some(&self.vec[*index].1);
-            }
-        }
-        if let Some((index, (k, v))) = self.vec.iter().enumerate().find(|(_, (k, _))| k == key) {
-            if map.is_none() {
-                *map = Some(AHashMap::with_capacity(self.vec.len()));
-            }
-            map.as_mut().unwrap().insert(k.clone(), index);
-            Some(v)
+            map.get(key).map(|&i| &self.vec[i].1)
         } else {
-            None
+            let mut new_map = AHashMap::with_capacity(self.vec.len());
+            let mut value = None;
+            for (index, (k, v)) in self.vec.iter().enumerate() {
+                if value.is_none() && k == key {
+                    value = Some(v);
+                }
+                new_map.insert(k.clone(), index);
+            }
+            *map = Some(new_map);
+            value
         }
     }
 
