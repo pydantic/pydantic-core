@@ -62,15 +62,15 @@ def test_args_kwargs():
                 '',
                 [
                     {
-                        'type': 'missing_positional_argument',
+                        'type': 'missing_positional_only_argument',
                         'loc': (1,),
-                        'msg': 'Missing required positional argument',
+                        'msg': 'Missing required positional only argument',
                         'input': [1],
                     },
                     {
-                        'type': 'missing_positional_argument',
+                        'type': 'missing_positional_only_argument',
                         'loc': (2,),
-                        'msg': 'Missing required positional argument',
+                        'msg': 'Missing required positional only argument',
                         'input': [1],
                     },
                 ],
@@ -136,21 +136,21 @@ def test_args_kwargs():
                 '3 validation errors for arguments',
                 [
                     {
-                        'type': 'missing_positional_argument',
+                        'type': 'missing_positional_only_argument',
                         'loc': (0,),
-                        'msg': 'Missing required positional argument',
+                        'msg': 'Missing required positional only argument',
                         'input': ArgsKwargs(()),
                     },
                     {
-                        'type': 'missing_positional_argument',
+                        'type': 'missing_positional_only_argument',
                         'loc': (1,),
-                        'msg': 'Missing required positional argument',
+                        'msg': 'Missing required positional only argument',
                         'input': ArgsKwargs(()),
                     },
                     {
-                        'type': 'missing_positional_argument',
+                        'type': 'missing_positional_only_argument',
                         'loc': (2,),
-                        'msg': 'Missing required positional argument',
+                        'msg': 'Missing required positional only argument',
                         'input': ArgsKwargs(()),
                     },
                 ],
@@ -205,12 +205,12 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
         [
             ArgsKwargs((), {'a': 1, 'b': 'a'}),
             Err(
-                'type=missing_keyword_argument,',
+                'type=missing_keyword_only_argument,',
                 [
                     {
-                        'type': 'missing_keyword_argument',
+                        'type': 'missing_keyword_only_argument',
                         'loc': ('c',),
-                        'msg': 'Missing required keyword argument',
+                        'msg': 'Missing required keyword only argument',
                         'input': ArgsKwargs((), {'a': 1, 'b': 'a'}),
                     }
                 ],
@@ -242,21 +242,21 @@ def test_positional_args(py_and_json: PyAndJson, input_value, expected):
                 '',
                 [
                     {
-                        'type': 'missing_keyword_argument',
+                        'type': 'missing_keyword_only_argument',
                         'loc': ('a',),
-                        'msg': 'Missing required keyword argument',
+                        'msg': 'Missing required keyword only argument',
                         'input': ArgsKwargs(()),
                     },
                     {
-                        'type': 'missing_keyword_argument',
+                        'type': 'missing_keyword_only_argument',
                         'loc': ('b',),
-                        'msg': 'Missing required keyword argument',
+                        'msg': 'Missing required keyword only argument',
                         'input': ArgsKwargs(()),
                     },
                     {
-                        'type': 'missing_keyword_argument',
+                        'type': 'missing_keyword_only_argument',
                         'loc': ('c',),
-                        'msg': 'Missing required keyword argument',
+                        'msg': 'Missing required keyword only argument',
                         'input': ArgsKwargs(()),
                     },
                 ],
@@ -457,7 +457,7 @@ def test_var_args_only(py_and_json: PyAndJson, input_value, expected):
         [[1, 2, 3], ((1, 2, 3), {})],
         [['1', '2', '3'], ((1, 2, 3), {})],
         [[1], ((1,), {})],
-        [[], Err('0\n  Missing required positional argument')],
+        [[], Err('0\n  Missing required positional only argument')],
         [
             ['x'],
             Err(
@@ -724,7 +724,7 @@ def test_kwargs(py_and_json: PyAndJson, input_value, expected):
     [
         [ArgsKwargs((1,)), ((1,), {})],
         [ArgsKwargs((), {'Foo': 1}), ((), {'a': 1})],
-        [ArgsKwargs((), {'a': 1}), Err('Foo\n  Missing required keyword argument [type=missing_keyword_argument,')],
+        [ArgsKwargs((), {'a': 1}), Err('Foo\n  Missing required argument [type=missing_argument,')],
     ],
     ids=repr,
 )
@@ -863,9 +863,9 @@ def test_function_types():
             'input': 'b',
         },
         {
-            'type': 'missing_keyword_argument',
+            'type': 'missing_keyword_only_argument',
             'loc': ('c',),
-            'msg': 'Missing required keyword argument',
+            'msg': 'Missing required keyword only argument',
             'input': ArgsKwargs((1, 'b')),
         },
     ]
@@ -908,9 +908,9 @@ def create_function(validate):
         foobar('1', b=2, c=3)
     assert exc_info.value.errors() == [
         {
-            'type': 'missing_positional_argument',
+            'type': 'missing_positional_only_argument',
             'loc': (1,),
-            'msg': 'Missing required positional argument',
+            'msg': 'Missing required positional only argument',
             'input': ArgsKwargs(('1',), {'b': 2, 'c': 3}),
         },
         {'type': 'unexpected_keyword_argument', 'loc': ('b',), 'msg': 'Unexpected keyword argument', 'input': 2},
@@ -1001,9 +1001,9 @@ def test_error_display():
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors() == [
         {
-            'type': 'missing_keyword_argument',
+            'type': 'missing_argument',
             'loc': ('b',),
-            'msg': 'Missing required keyword argument',
+            'msg': 'Missing required argument',
             'input': ArgsKwargs((), {'a': 1}),
         }
     ]
@@ -1011,6 +1011,6 @@ def test_error_display():
     assert str(exc_info.value) == (
         '1 validation error for arguments\n'
         'b\n'
-        '  Missing required keyword argument [type=missing_keyword_argument, '
+        '  Missing required argument [type=missing_argument, '
         'input_value=args(a=1), input_type=ArgsKwargs]'
     )
