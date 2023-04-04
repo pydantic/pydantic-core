@@ -1014,3 +1014,8 @@ def test_error_display():
         '  Missing required argument [type=missing_argument, '
         'input_value=args(a=1), input_type=ArgsKwargs]'
     )
+    # insert_assert(exc_info.value.json())
+    assert (
+        exc_info.value.json()
+        == '[{"type":"missing_argument","loc":["b"],"msg":"Missing required argument","input":"args(a=1)"}]'
+    )
