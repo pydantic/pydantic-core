@@ -10,17 +10,6 @@ from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError, core_sch
 from ..conftest import Err, PyAndJson
 
 
-def test_args_kwargs():
-    ak = ArgsKwargs(('hello', True))
-    assert repr(ak) == "ArgsKwargs(args=('hello', True), kwargs={})"
-    assert ak.args == ('hello', True)
-    assert ak.kwargs is None
-    ak2 = ArgsKwargs((), {'a': 123})
-    assert repr(ak2) == "ArgsKwargs(args=(), kwargs={'a': 123})"
-    assert ak2.args == ()
-    assert ak2.kwargs == {'a': 123}
-
-
 @pytest.mark.parametrize(
     'input_value,expected',
     [
