@@ -514,8 +514,8 @@ impl Validator for DataclassValidator {
         &self.name
     }
 
-    fn complete(&mut self, _build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
-        self.validator.complete(_build_context)
+    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
+        self.validator.complete(build_context)
     }
 }
 
