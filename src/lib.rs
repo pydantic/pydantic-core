@@ -69,7 +69,7 @@ mod tests {
     // `cargo test --no-default-features --features auto-initialize`
     use crate::SchemaSerializer;
     use pyo3::prelude::*;
-    use pyo3::types::{PyDict, PyString};
+    use pyo3::types::PyDict;
 
     #[test]
     fn test_build_schema_serializer() {
