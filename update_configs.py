@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-VSCODE_CONFIG_DIR = Path('.vscode')
+VSCODE_CONFIG_DIR = Path(__file__).parent / '.vscode'
 VSCODE_CONFIG_DIR.mkdir(exist_ok=True)
 
 settings: Dict[str, Any]
