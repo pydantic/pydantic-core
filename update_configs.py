@@ -1,3 +1,8 @@
+"""
+Update configurations for VSCode and other editors.
+VSCode at least does not support composing configurations (https://github.com/microsoft/vscode/issues/15909)
+and we don't want to clobber any existing configurations.
+"""
 import json
 from pathlib import Path
 from typing import Any, Dict
