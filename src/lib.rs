@@ -65,6 +65,8 @@ fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
 
 #[cfg(test)]
 mod tests {
+    // Note: these tests require the following arguments to `cargo test`:
+    // `cargo test --no-default-features --features auto-initialize`
     use crate::SchemaSerializer;
     use pyo3::prelude::*;
     use pyo3::types::{PyDict, PyString};
