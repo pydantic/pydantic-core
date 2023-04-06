@@ -9,6 +9,7 @@ install:
 	pip install -r tests/requirements-linting.txt
 	pip install -e .
 	pre-commit install
+	python update_configs.py
 
 .PHONY: install-rust-coverage
 install-rust-coverage:
