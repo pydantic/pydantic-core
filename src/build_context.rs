@@ -180,8 +180,10 @@ fn extract_used_refs(schema: &PyAny, refs: &mut AHashSet<String>) -> PyResult<()
         if is_definition_ref(dict)? {
             refs.insert(dict.get_as_req(intern!(schema.py(), "schema_ref"))?);
         } else {
-            for (_, value) in dict.iter() {
-                extract_used_refs(value, refs)?;
+            for (key, value) in dict.iter() {
+                if !key.eq(intern!(schema.py(), "metadata"))? {
+                    extract_used_refs(value, refs)?;
+                }
             }
         }
     } else if let Ok(list) = schema.downcast::<PyList>() {
@@ -198,8 +200,8 @@ fn check_ref_used(schema: &PyAny, ref_: &str) -> PyResult<bool> {
             let key: &str = dict.get_as_req(intern!(schema.py(), "schema_ref"))?;
             return Ok(key == ref_);
         } else {
-            for (_, value) in dict.iter() {
-                if check_ref_used(value, ref_)? {
+            for (key, value) in dict.iter() {
+                if !key.eq(intern!(schema.py(), "metadata"))? && check_ref_used(value, ref_)? {
                     return Ok(true);
                 }
             }

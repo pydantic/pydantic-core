@@ -299,6 +299,7 @@ impl BuildSerializer for FunctionWrapSerializer {
             let schema_copy = schema.copy()?;
             // remove the serialization key from the schema so we don't recurse
             schema_copy.del_item(intern!(py, "serialization"))?;
+            schema_copy.del_item(intern!(py, "ref")).ok(); // remove ref if it exists
             schema_copy
         };
 
