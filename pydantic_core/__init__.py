@@ -51,6 +51,7 @@ __all__ = (
     'PydanticSerializationUnexpectedValue',
     'to_json',
     'to_jsonable_python',
+    'write_py_typed',
 )
 
 
@@ -67,3 +68,13 @@ class InitErrorDetails(_TypedDict):
     loc: _NotRequired['tuple[int | str, ...]']
     input: _Any
     ctx: _NotRequired['dict[str, str | int | float]']
+
+
+def write_py_typed() -> None:
+    """
+    Write a py.typed file to the current directory to indicate that this package has type hints.
+    """
+    from pathlib import Path
+
+    this_dir = Path(__file__).parent
+    (this_dir / 'py.typed').touch()

@@ -31,3 +31,4 @@ package-lock.json
 /pytest-speed/
 /src/self_schema.py
 /worktree/
+/pydantic_core/py.typed
