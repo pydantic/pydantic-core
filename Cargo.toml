@@ -59,6 +59,11 @@ codegen-units = 1
 strip = true
 
 [dev-dependencies]
+# From https://doc.rust-lang.org/cargo/reference/specifying-dependencies.htm:
+# > Dev-dependencies are not used when compiling a package for building,
+# > but are used for compiling tests, examples, and benchmarks.
+# The following makes it so you don't need to add the --no-default-features --features auto-initialize
+# flags to `cargo test` or `cargo bench`.
 pydantic-core = { path = ".", default-features = false, features = ["auto-initialize"] }
 
 [build-dependencies]
