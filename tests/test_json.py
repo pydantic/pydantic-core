@@ -230,25 +230,27 @@ def test_to_jsonable_python_fallback():
 
 
 def test_to_jsonable_python_schema_serializer():
-    c = core_schema.typed_dict_schema(
-        {
-            'my_foo': core_schema.typed_dict_field(core_schema.int_schema(), serialization_alias='myFoo'),
-            'my_bar': core_schema.typed_dict_field(core_schema.str_schema(), serialization_alias='myBar'),
-        }
-    )
-    v = SchemaValidator(c)
-    s = SchemaSerializer(c)
-
     class Foobar:
-        __pydantic_validator__ = v
-        __pydantic_serializer__ = s
-
         def __init__(self, my_foo: int, my_bar: str):
             self.my_foo = my_foo
             self.my_bar = my_bar
 
-    instance = Foobar(my_foo=1, my_bar='a')
+    c = core_schema.model_schema(
+        Foobar,
+        core_schema.typed_dict_schema(
+            {
+                'my_foo': core_schema.typed_dict_field(core_schema.int_schema(), serialization_alias='myFoo'),
+                'my_bar': core_schema.typed_dict_field(core_schema.str_schema(), serialization_alias='myBar'),
+            }
+        ),
+    )
+    v = SchemaValidator(c)
+    s = SchemaSerializer(c)
 
+    Foobar.__pydantic_validator__ = v
+    Foobar.__pydantic_serializer__ = s
+
+    instance = Foobar(my_foo=1, my_bar='a')
     assert to_jsonable_python(instance) == {'myFoo': 1, 'myBar': 'a'}
     assert to_jsonable_python(instance, by_alias=False) == {'my_foo': 1, 'my_bar': 'a'}
 

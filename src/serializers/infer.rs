@@ -93,12 +93,15 @@ pub(crate) fn infer_to_python_known(
     };
 
     let serialize_with_serializer = |value: &PyAny, is_model: bool| {
-        let dict = object_to_dict(value, is_model, extra)?;
         if let Ok(py_serializer) = value.getattr(intern!(py, "__pydantic_serializer__")) {
             if let Ok(serializer) = py_serializer.extract::<SchemaSerializer>() {
-                return serializer.serializer.to_python(dict, include, exclude, extra);
+                extra.rec_guard.pop(value_id);
+                return serializer.serializer.to_python(value, include, exclude, extra);
             }
         }
+        // Fallback to dict serialization if `__pydantic_serializer__` is not set.else
+        // This is currently only relevant to non-pydantic dataclasses.
+        let dict = object_to_dict(value, is_model, extra)?;
         serialize_dict(dict)
     };
 
