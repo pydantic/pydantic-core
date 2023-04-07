@@ -76,13 +76,6 @@ pub(crate) fn infer_to_python_known(
         }};
     }
 
-    let serialize_with_serializer = |value: &PyAny, is_model: bool| {
-        let py_serializer = value.getattr(intern!(py, "__pydantic_serializer__"))?;
-        let serializer = py_serializer.extract::<SchemaSerializer>()?;
-        let dict = object_to_dict(value, is_model, extra)?;
-        serializer.serializer.to_python(dict, include, exclude, extra)
-    };
-
     let serialize_dict = |dict: &PyDict| {
         let new_dict = PyDict::new(py);
         let filter = AnyFilter::new();
@@ -97,6 +90,16 @@ pub(crate) fn infer_to_python_known(
             }
         }
         Ok::<PyObject, PyErr>(new_dict.into_py(py))
+    };
+
+    let serialize_with_serializer = |value: &PyAny, is_model: bool| {
+        let dict = object_to_dict(value, is_model, extra)?;
+        if let Ok(py_serializer) = value.getattr(intern!(py, "__pydantic_serializer__")) {
+            if let Ok(serializer) = py_serializer.extract::<SchemaSerializer>() {
+                return serializer.serializer.to_python(dict, include, exclude, extra);
+            }
+        }
+        serialize_dict(dict)
     };
 
     let value = match extra.mode {
