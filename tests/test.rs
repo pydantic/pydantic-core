@@ -1,6 +1,3 @@
-// Note: these tests require the following arguments to `cargo test`:
-// `cargo test --no-default-features --features auto-initialize`
-
 #[cfg(test)]
 mod tests {
     use _pydantic_core::SchemaSerializer;
