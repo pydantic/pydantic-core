@@ -33,6 +33,16 @@ def test_ignored_def():
     assert r.endswith('slots=[])')
 
 
+def test_ignored_metadata():
+    v = SchemaValidator(
+        core_schema.list_schema(
+            core_schema.int_schema(metadata={'type': 'definition-ref', 'schema_ref': 'foobar'}), ref='foobar'
+        )
+    )
+    assert v.validate_python([1, 2, 3]) == [1, 2, 3]
+    assert plain_repr(v).endswith('slots=[])')
+
+
 def test_def_error():
     with pytest.raises(SchemaError) as exc_info:
         SchemaValidator(
