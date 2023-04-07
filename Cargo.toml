@@ -51,12 +51,15 @@ crate-type = ["cdylib", "rlib"]
 extension-module = ["pyo3/extension-module"]
 # required for cargo bench
 auto-initialize = ["pyo3/auto-initialize"]
-default = ["mimalloc", "extension-module", "mimalloc/local_dynamic_tls", "pyo3/generate-import-lib"]
+default = ["mimalloc", "mimalloc/local_dynamic_tls", "pyo3/generate-import-lib"]
 
 [profile.release]
 lto = "fat"
 codegen-units = 1
 strip = true
+
+[dev-dependencies]
+pydantic-core = { path = ".", default-features = false, features = ["auto-initialize"] }
 
 [build-dependencies]
 version_check = "0.9.4"
