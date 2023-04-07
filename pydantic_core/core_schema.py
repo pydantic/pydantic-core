@@ -3283,9 +3283,9 @@ def definition_reference_schema(
     return dict_not_none(type='definition-ref', schema_ref=schema_ref, metadata=metadata, serialization=serialization)
 
 
-MYPY: Literal[False] = False
-
-
+MYPY = False
+# See https://github.com/python/mypy/issues/14034 for details, in summary mypy is extremely slow to process this
+# union which kills performance not just for pydantic, but even for code using pydantic
 if not MYPY:
     CoreSchema = Union[
         AnySchema,
