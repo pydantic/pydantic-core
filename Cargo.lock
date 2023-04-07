@@ -233,7 +233,6 @@ dependencies = [
  "idna",
  "indexmap",
  "mimalloc",
- "pydantic-core",
  "pyo3",
  "pyo3-build-config",
  "regex",
