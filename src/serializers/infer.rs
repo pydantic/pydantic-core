@@ -13,6 +13,7 @@ use serde::ser::{Error, Serialize, SerializeMap, SerializeSeq, Serializer};
 use crate::build_tools::{py_err, safe_repr};
 use crate::serializers::errors::SERIALIZATION_ERR_MARKER;
 use crate::serializers::filter::SchemaFilter;
+use crate::serializers::{shared::TypeSerializer, SchemaSerializer};
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::errors::{py_err_se_err, PydanticSerializationError};
@@ -74,6 +75,13 @@ pub(crate) fn infer_to_python_known(
             items
         }};
     }
+
+    let serialize_with_serializer = |value: &PyAny, is_model: bool| {
+        let py_serializer = value.getattr(intern!(py, "__pydantic_serializer__"))?;
+        let serializer = py_serializer.extract::<SchemaSerializer>()?;
+        let dict = object_to_dict(value, is_model, extra)?;
+        serializer.serializer.to_python(dict, include, exclude, extra)
+    };
 
     let serialize_dict = |dict: &PyDict| {
         let new_dict = PyDict::new(py);
@@ -160,8 +168,8 @@ pub(crate) fn infer_to_python_known(
                 let py_url: PyMultiHostUrl = value.extract()?;
                 py_url.__str__().into_py(py)
             }
-            ObType::Dataclass => serialize_dict(object_to_dict(value, false, extra)?)?,
-            ObType::Model => serialize_dict(object_to_dict(value, true, extra)?)?,
+            ObType::Dataclass => serialize_with_serializer(value, false)?,
+            ObType::Model => serialize_with_serializer(value, true)?,
             ObType::Enum => {
                 let v = value.getattr(intern!(py, "value"))?;
                 infer_to_python(v, include, exclude, extra)?.into_py(py)
