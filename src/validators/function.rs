@@ -25,7 +25,7 @@ macro_rules! impl_build {
             ) -> PyResult<CombinedValidator> {
                 let py = schema.py();
                 let validator = build_validator(schema.get_as_req(intern!(py, "schema"))?, config, build_context)?;
-                let (is_field_validator, function) = destructure_function_schema(schema)?;
+                let (is_field_validator, _info_arg, function) = destructure_function_schema(schema)?;
                 let name = format!(
                     "{}[{}(), {}]",
                     $name,
@@ -171,7 +171,7 @@ impl BuildValidator for FunctionPlainValidator {
         _build_context: &mut BuildContext<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let (is_field_validator, function) = destructure_function_schema(schema)?;
+        let (is_field_validator, _info_arg, function) = destructure_function_schema(schema)?;
         Ok(Self {
             func: function.into_py(py),
             config: match config {

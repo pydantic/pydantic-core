@@ -182,7 +182,9 @@ def test_function_plain_field_serializer_to_python():
         core_schema.typed_dict_schema(
             {
                 'x': core_schema.typed_dict_field(
-                    core_schema.int_schema(serialization=core_schema.field_plain_serializer_function_ser_schema(ser_x))
+                    core_schema.int_schema(
+                        serialization=core_schema.plain_serializer_function_ser_schema(ser_x, 'field', True)
+                    )
                 )
             }
         )
@@ -204,8 +206,8 @@ def test_function_wrap_field_serializer_to_python():
             {
                 'x': core_schema.typed_dict_field(
                     core_schema.int_schema(
-                        serialization=core_schema.field_wrap_serializer_function_ser_schema(
-                            ser_x, schema=core_schema.any_schema()
+                        serialization=core_schema.wrap_serializer_function_ser_schema(
+                            ser_x, 'field', True, schema=core_schema.any_schema()
                         )
                     )
                 )
@@ -227,7 +229,9 @@ def test_function_plain_field_serializer_to_json():
         core_schema.typed_dict_schema(
             {
                 'x': core_schema.typed_dict_field(
-                    core_schema.int_schema(serialization=core_schema.field_plain_serializer_function_ser_schema(ser_x))
+                    core_schema.int_schema(
+                        serialization=core_schema.plain_serializer_function_ser_schema(ser_x, 'field', True)
+                    )
                 )
             }
         )
@@ -249,8 +253,8 @@ def test_function_wrap_field_serializer_to_json():
             {
                 'x': core_schema.typed_dict_field(
                     core_schema.int_schema(
-                        serialization=core_schema.field_wrap_serializer_function_ser_schema(
-                            ser_x, schema=core_schema.any_schema()
+                        serialization=core_schema.wrap_serializer_function_ser_schema(
+                            ser_x, 'field', True, schema=core_schema.any_schema()
                         )
                     )
                 )

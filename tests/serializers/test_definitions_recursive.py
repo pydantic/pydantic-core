@@ -88,7 +88,7 @@ def test_recursive_function():
             'ref': 'my_ref',
             'serialization': {
                 'type': 'function-wrap',
-                'function': {'type': 'general', 'function': lambda x, _1, _2: x},
+                'function': {'type': 'general', 'info_arg': True, 'function': lambda x, _1, _2: x},
             },
         }
     )
@@ -116,7 +116,7 @@ def test_recursive_function_deeper_ref():
             },
             'serialization': {
                 'type': 'function-wrap',
-                'function': {'type': 'general', 'function': lambda x, _1, _2: x},
+                'function': {'type': 'general', 'info_arg': True, 'function': lambda x, _1, _2: x},
             },
         }
     )

@@ -79,6 +79,7 @@ pub struct FunctionPlainSerializer {
     json_return_ob_type: Option<ObType>,
     when_used: WhenUsed,
     is_field_serializer: bool,
+    info_arg: bool,
 }
 
 impl BuildSerializer for FunctionPlainSerializer {
@@ -95,7 +96,7 @@ impl BuildSerializer for FunctionPlainSerializer {
 
         let ser_schema: &PyDict = schema.get_as_req(intern!(py, "serialization"))?;
 
-        let (is_field_serializer, function) = destructure_function_schema(ser_schema)?;
+        let (is_field_serializer, info_arg, function) = destructure_function_schema(ser_schema)?;
         let function_name = function_name(function)?;
 
         let name = format!("plain_function[{function_name}]");
@@ -106,6 +107,7 @@ impl BuildSerializer for FunctionPlainSerializer {
             json_return_ob_type: get_json_return_type(ser_schema)?,
             when_used: WhenUsed::new(ser_schema, WhenUsed::Always)?,
             is_field_serializer,
+            info_arg,
         }
         .into())
     }
@@ -121,14 +123,22 @@ impl FunctionPlainSerializer {
     ) -> PyResult<PyObject> {
         let py = value.py();
         if self.when_used.should_use(value, extra) {
-            let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
             if self.is_field_serializer {
-                match extra.model {
-                    Some(model) => self.func.call1(py, (model, value, info)),
-                    _ => Err(PyRuntimeError::new_err("This serializer expected to be run inside the context of a model field but no model field was found")),
+                if let Some(model) = extra.model {
+                    if self.info_arg {
+                        let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
+                        self.func.call1(py, (model, value, info))
+                    } else {
+                        self.func.call1(py, (model, value))
+                    }
+                } else {
+                    Err(PyRuntimeError::new_err("This serializer expected to be run inside the context of a model field but no model field was found"))
                 }
-            } else {
+            } else if self.info_arg {
+                let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
                 self.func.call1(py, (value, info))
+            } else {
+                self.func.call1(py, (value,))
             }
         } else {
             Ok(value.into_py(py))
@@ -273,6 +283,7 @@ pub struct FunctionWrapSerializer {
     json_return_ob_type: Option<ObType>,
     when_used: WhenUsed,
     is_field_serializer: bool,
+    info_arg: bool,
 }
 
 impl BuildSerializer for FunctionWrapSerializer {
@@ -288,7 +299,7 @@ impl BuildSerializer for FunctionWrapSerializer {
         let py = schema.py();
         let ser_schema: &PyDict = schema.get_as_req(intern!(py, "serialization"))?;
 
-        let (is_field_serializer, function) = destructure_function_schema(ser_schema)?;
+        let (is_field_serializer, info_arg, function) = destructure_function_schema(ser_schema)?;
         let function_name = function_name(function)?;
 
         // try to get `schema.serialization.schema`, otherwise use `schema` with `serialization` key removed
@@ -317,6 +328,7 @@ impl BuildSerializer for FunctionWrapSerializer {
             json_return_ob_type: get_json_return_type(ser_schema)?,
             when_used: WhenUsed::new(ser_schema, WhenUsed::Always)?,
             is_field_serializer,
+            info_arg,
         }
         .into())
     }
@@ -333,14 +345,22 @@ impl FunctionWrapSerializer {
         let py = value.py();
         if self.when_used.should_use(value, extra) {
             let serialize = SerializationCallable::new(py, &self.serializer, include, exclude, extra);
-            let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
             if self.is_field_serializer {
-                match extra.model {
-                    Some(model) => self.func.call1(py, (model, value, serialize, info)),
-                    _ => Err(PyRuntimeError::new_err("This serializer expected to be run inside the context of a model field but no model field was found")),
+                if let Some(model) = extra.model {
+                    if self.info_arg {
+                        let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
+                        self.func.call1(py, (model, value, serialize, info))
+                    } else {
+                        self.func.call1(py, (model, value, serialize))
+                    }
+                } else {
+                    Err(PyRuntimeError::new_err("This serializer expected to be run inside the context of a model field but no model field was found"))
                 }
-            } else {
+            } else if self.info_arg {
+                let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
                 self.func.call1(py, (value, serialize, info))
+            } else {
+                self.func.call1(py, (value, serialize))
             }
         } else {
             Ok(value.into_py(py))
