@@ -203,6 +203,24 @@ def test_date_format_function(benchmark):
     benchmark(serializer.to_python, d)
 
 
+@pytest.mark.benchmark(group='date-format')
+def test_date_format_function_no_info(benchmark):
+    def fmt(value):
+        return value.strftime('%Y-%m-%d')
+
+    serializer = SchemaSerializer(
+        core_schema.any_schema(
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                fmt, 'general', False, json_return_type='str'
+            )
+        )
+    )
+    d = date(2022, 11, 20)
+    assert serializer.to_python(d) == '2022-11-20'
+
+    benchmark(serializer.to_python, d)
+
+
 @pytest.fixture(scope='module', name='v1_model')
 def v1_model_fixture():
     class PydanticModel(BaseModel):
