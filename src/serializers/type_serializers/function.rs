@@ -10,7 +10,7 @@ use pyo3::types::PyString;
 use serde::ser::Error;
 
 use crate::build_context::BuildContext;
-use crate::build_tools::{destructure_function_schema, function_name, py_error_type, SchemaDict};
+use crate::build_tools::{function_name, py_error_type, SchemaDict};
 use crate::serializers::extra::{ExtraOwned, SerMode};
 use crate::serializers::filter::AnyFilter;
 use crate::{PydanticOmit, PydanticSerializationUnexpectedValue};
@@ -80,6 +80,19 @@ pub struct FunctionPlainSerializer {
     when_used: WhenUsed,
     is_field_serializer: bool,
     info_arg: bool,
+}
+
+fn destructure_function_schema(schema: &PyDict) -> PyResult<(bool, bool, &PyAny)> {
+    let func_dict: &PyDict = schema.get_as_req(intern!(schema.py(), "function"))?;
+    let function: &PyAny = func_dict.get_as_req(intern!(schema.py(), "function"))?;
+    let func_type: &str = func_dict.get_as_req(intern!(schema.py(), "type"))?;
+    let is_field_serializer = match func_type {
+        "field" => true,
+        "general" => false,
+        _ => unreachable!(),
+    };
+    let info_arg: bool = func_dict.get_as(intern!(schema.py(), "info_arg"))?.unwrap_or(true);
+    Ok((is_field_serializer, info_arg, function))
 }
 
 impl BuildSerializer for FunctionPlainSerializer {
