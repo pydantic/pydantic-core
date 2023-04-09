@@ -16,10 +16,29 @@ def repr_function(value, _info):
     'value,expected_python,expected_json',
     [(None, 'None', b'"None"'), (1, '1', b'"1"'), ([1, 2, 3], '[1, 2, 3]', b'"[1, 2, 3]"')],
 )
-def test_function(value, expected_python, expected_json):
+def test_function_general(value, expected_python, expected_json):
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.plain_serializer_function_ser_schema(repr_function, 'general', True)
+        )
+    )
+    assert s.to_python(value) == expected_python
+    assert s.to_json(value) == expected_json
+    assert s.to_python(value, mode='json') == json.loads(expected_json)
+
+
+def repr_function_no_info(value):
+    return repr(value)
+
+
+@pytest.mark.parametrize(
+    'value,expected_python,expected_json',
+    [(None, 'None', b'"None"'), (1, '1', b'"1"'), ([1, 2, 3], '[1, 2, 3]', b'"[1, 2, 3]"')],
+)
+def test_function_no_info(value, expected_python, expected_json):
+    s = SchemaSerializer(
+        core_schema.any_schema(
+            serialization=core_schema.plain_serializer_function_ser_schema(repr_function_no_info, 'general', False)
         )
     )
     assert s.to_python(value) == expected_python
@@ -326,6 +345,18 @@ def test_function_wrap():
 
     s = SchemaSerializer(
         core_schema.int_schema(serialization=core_schema.wrap_serializer_function_ser_schema(f, 'general', True))
+    )
+    assert s.to_python('foo') == 'result=3 repr=SerializationCallable(serializer=int)'
+    assert s.to_python('foo', mode='json') == 'result=3 repr=SerializationCallable(serializer=int)'
+    assert s.to_json('foo') == b'"result=3 repr=SerializationCallable(serializer=int)"'
+
+
+def test_function_wrap_no_info():
+    def f(value, serializer):
+        return f'result={serializer(len(value))} repr={serializer!r}'
+
+    s = SchemaSerializer(
+        core_schema.int_schema(serialization=core_schema.wrap_serializer_function_ser_schema(f, 'general', False))
     )
     assert s.to_python('foo') == 'result=3 repr=SerializationCallable(serializer=int)'
     assert s.to_python('foo', mode='json') == 'result=3 repr=SerializationCallable(serializer=int)'
