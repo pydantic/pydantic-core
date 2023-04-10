@@ -156,11 +156,11 @@ impl Validator for TypedDictValidator {
 
         // we only care about which keys have been used if we're iterating over the object for extra after
         // the first pass
-        let mut used_keys: Option<AHashSet<&str>> = match self.extra_behavior {
-            ExtraBehavior::Allow | ExtraBehavior::Forbid => Some(AHashSet::with_capacity(self.fields.len())),
+        let mut used_keys: Option<AHashSet<&str>> = match (&self.extra_behavior, &dict) {
+            (_, GenericMapping::PyGetAttr(_, _)) => None,
+            (ExtraBehavior::Allow | ExtraBehavior::Forbid, _) => Some(AHashSet::with_capacity(self.fields.len())),
             _ => None,
         };
-
         macro_rules! process {
             ($dict:ident, $get_method:ident, $iter:ty $(,$kwargs:ident)?) => {{
                 for field in &self.fields {
@@ -242,14 +242,11 @@ impl Validator for TypedDictValidator {
                         // Unknown / extra field
                         match self.extra_behavior {
                             ExtraBehavior::Forbid => {
-                                // Don't error for extra attributes
-                                if !matches!(dict, GenericMapping::PyGetAttr(_, _)) {
-                                    errors.push(ValLineError::new_with_loc(
-                                        ErrorType::ExtraForbidden,
-                                        value,
-                                        raw_key.as_loc_item(),
-                                    ));
-                                }
+                                errors.push(ValLineError::new_with_loc(
+                                    ErrorType::ExtraForbidden,
+                                    value,
+                                    raw_key.as_loc_item(),
+                                ));
                             }
                             ExtraBehavior::Ignore => {}
                             ExtraBehavior::Allow => {
