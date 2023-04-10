@@ -161,6 +161,7 @@ impl Validator for TypedDictValidator {
             (ExtraBehavior::Allow | ExtraBehavior::Forbid, _) => Some(AHashSet::with_capacity(self.fields.len())),
             _ => None,
         };
+
         macro_rules! process {
             ($dict:ident, $get_method:ident, $iter:ty $(,$kwargs:ident)?) => {{
                 for field in &self.fields {
