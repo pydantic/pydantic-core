@@ -42,11 +42,14 @@ def test_float(py_and_json: PyAndJson, input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        (0, 0),
-        (1, 1),
-        (42, 42),
+        (0.0, 0.0),
+        (1.0, 1.0),
         (42.0, 42.0),
         (42.5, 42.5),
+        (True, Err('Input should be a valid number [type=float_type, input_value=True, input_type=bool]')),
+        (0, Err('Input should be a valid number [type=float_type, input_value=0, input_type=int]')),
+        (1, Err('Input should be a valid number [type=float_type, input_value=1, input_type=int]')),
+        (42, Err('Input should be a valid number [type=float_type, input_value=42, input_type=int]')),
         ('42', Err("Input should be a valid number [type=float_type, input_value='42', input_type=str]")),
         (True, Err('Input should be a valid number [type=float_type, input_value=True, input_type=bool]')),
     ],
@@ -135,8 +138,9 @@ def test_union_float(py_and_json: PyAndJson):
     v = py_and_json(
         {'type': 'union', 'choices': [{'type': 'float', 'strict': True}, {'type': 'float', 'multiple_of': 7}]}
     )
+    assert v.validate_test(14) == 14
     assert v.validate_test('14') == 14
-    assert v.validate_test(5) == 5
+    assert v.validate_test(5.0) == 5.0
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test('5')
     assert exc_info.value.errors() == [

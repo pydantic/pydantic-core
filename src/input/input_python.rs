@@ -4,8 +4,8 @@ use std::str::from_utf8;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{
-    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyIterator, PyList, PyMapping,
-    PySet, PyString, PyTime, PyTuple, PyType,
+    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyInt, PyIterator, PyList,
+    PyMapping, PySet, PyString, PyTime, PyTuple, PyType,
 };
 #[cfg(not(PyPy))]
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
@@ -290,7 +290,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_float(&self) -> ValResult<f64> {
-        if self.extract::<bool>().is_ok() {
+        if matches!(self.is_instance_of::<PyInt>(), Ok(true)) {
             Err(ValError::new(ErrorType::FloatType, self))
         } else if let Ok(float) = self.extract::<f64>() {
             Ok(float)

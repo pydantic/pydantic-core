@@ -144,7 +144,6 @@ impl<'a> Input<'a> for JsonInput {
     fn strict_float(&self) -> ValResult<f64> {
         match self {
             JsonInput::Float(f) => Ok(*f),
-            JsonInput::Int(i) => Ok(*i as f64),
             _ => Err(ValError::new(ErrorType::FloatType, self)),
         }
     }

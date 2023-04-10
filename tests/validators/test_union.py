@@ -1,6 +1,6 @@
 import pytest
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import plain_repr
 
@@ -326,3 +326,17 @@ def test_custom_error_type_context():
     assert exc_info.value.errors() == [
         {'type': 'less_than', 'loc': (), 'msg': 'Input should be less than 42', 'input': 123, 'ctx': {'lt': 42.0}}
     ]
+
+
+def test_int_float():
+    v = SchemaValidator(core_schema.union_schema([core_schema.int_schema(), core_schema.float_schema()]))
+    assert repr(v.validate_python(1)) == '1'
+    assert repr(v.validate_json('1')) == '1'
+    assert repr(v.validate_python(1.0)) == '1.0'
+    assert repr(v.validate_json('1.0')) == '1.0'
+
+    v = SchemaValidator(core_schema.union_schema([core_schema.float_schema(), core_schema.int_schema()]))
+    assert repr(v.validate_python(1)) == '1'
+    assert repr(v.validate_json('1')) == '1'
+    assert repr(v.validate_python(1.0)) == '1.0'
+    assert repr(v.validate_json('1.0')) == '1.0'
