@@ -242,11 +242,14 @@ impl Validator for TypedDictValidator {
                         // Unknown / extra field
                         match self.extra_behavior {
                             ExtraBehavior::Forbid => {
-                                errors.push(ValLineError::new_with_loc(
-                                    ErrorType::ExtraForbidden,
-                                    value,
-                                    raw_key.as_loc_item(),
-                                ));
+                                // Don't error for extra attributes
+                                if !matches!(dict, GenericMapping::PyGetAttr(_, _)) {
+                                    errors.push(ValLineError::new_with_loc(
+                                        ErrorType::ExtraForbidden,
+                                        value,
+                                        raw_key.as_loc_item(),
+                                    ));
+                                }
                             }
                             ExtraBehavior::Ignore => {}
                             ExtraBehavior::Allow => {

@@ -1199,6 +1199,24 @@ def test_from_attributes_extra():
     assert v.validate_python(Cls(a=1, b=datetime.now, c=lambda: 42)) == ({'a': 1}, {'a'})
 
 
+def test_from_attributes_extra_forbid() -> None:
+    class Source:
+        a = 1
+        b = 2
+
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'return_fields_set': True,
+            'fields': {'a': {'type': 'typed-dict-field', 'schema': {'type': 'int'}}},
+            'from_attributes': True,
+            'extra_behavior': 'forbid',
+        }
+    )
+
+    assert v.validate_python(Source()) == ({'a': 1}, {'a'})
+
+
 def foobar():
     pass
 
