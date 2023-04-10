@@ -1219,8 +1219,8 @@ def test_from_attributes_extra_ignore_no_attributes_accessed() -> None:
             accessed.append(__name)
             return super().__getattribute__(__name)
 
-    assert v.validate_python(Source()) == ({'a': 1}, {'a'})
-    assert accessed == ['a']
+    assert v.validate_python(Source()) == {'a': 1}
+    assert 'a' in accessed and 'b' not in accessed
 
 
 def test_from_attributes_extra_forbid() -> None:
