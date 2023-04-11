@@ -97,9 +97,11 @@ jobs:
       - run: 'pip install "maturin>=0.14.16,<0.15" typing_extensions'
 
       # purposefully building here using maturin, not `pip install` so we do a debug build
-      - run: maturin develop
+      - run: maturin build
         env:
           RUST_BACKTRACE: 1
+
+      - run: pip install `find target/wheels/*.whl`
 
       - run: pip freeze
 
