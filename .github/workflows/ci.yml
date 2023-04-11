@@ -139,6 +139,31 @@ jobs:
 
       - run: cargo test
 
+  # test with a debug build
+  test-debug:
+    name: test ${{ matrix.python-version }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: set up python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - run: pip install -r tests/requirements.txt
+
+      - run: 'pip install "maturin>=0.14.16,<0.15" typing_extensions'
+
+      # purposefully building here using `make build-dev`, not `pip install` so we do a debug build
+      - run: make build-dev
+
+      - run: pip freeze
+
+      - run: pytest
+
   lint:
     runs-on: ubuntu-latest
 
@@ -261,7 +286,7 @@ jobs:
   # https://github.com/marketplace/actions/alls-green#why used for branch protection checks
   check:
     if: always()
-    needs: [coverage, test-python, test-os, lint, bench, build-wasm-emscripten]
+    needs: [coverage, test-python, test-os, test-debug, lint, bench, build-wasm-emscripten]
     runs-on: ubuntu-latest
     steps:
       - name: Decide whether the needed jobs succeeded or failed
