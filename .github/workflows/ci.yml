@@ -102,6 +102,7 @@ jobs:
           RUST_BACKTRACE: 1
 
       - run: pip install `find target/wheels/*.whl`
+      - run: rm tests/__init__.py
 
       - run: pip freeze
 
