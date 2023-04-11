@@ -1600,26 +1600,13 @@ class FieldValidatorFunction(Protocol):
         ...
 
 
-class NoInfoValidatorFunctionSchema(TypedDict):
-    type: Literal['no-info']
-    function: NoInfoValidatorFunction
-
-
-class GeneralValidatorFunctionSchema(TypedDict):
-    type: Literal['general']
-    function: GeneralValidatorFunction
-
-
-class FieldValidatorFunctionSchema(TypedDict):
-    type: Literal['field']
-    function: FieldValidatorFunction
-
-
-ValidationFunction = Union[NoInfoValidatorFunctionSchema, FieldValidatorFunctionSchema, GeneralValidatorFunctionSchema]
+AnyValidatorFunction = Union[NoInfoValidatorFunction, GeneralValidatorFunction, FieldValidatorFunction]
+ValidatorFunctionSignature = Literal['no-info', 'general', 'field']
 
 
 class _ValidatorFunctionSchema(TypedDict, total=False):
-    function: Required[ValidationFunction]
+    signature: Required[ValidatorFunctionSignature]
+    function: Required[AnyValidatorFunction]
     schema: Required[CoreSchema]
     ref: str
     metadata: Any
@@ -1630,16 +1617,17 @@ class BeforeValidatorFunctionSchema(_ValidatorFunctionSchema, total=False):
     type: Required[Literal['function-before']]
 
 
-def no_info_before_validator_function(
-    function: NoInfoValidatorFunction,
+def before_validator_function(
+    function: AnyValidatorFunction,
     schema: CoreSchema,
+    signature: ValidatorFunctionSignature,
     *,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
 ) -> BeforeValidatorFunctionSchema:
     """
-    Returns a schema that calls a validator function before validating, no info is provided, e.g.:
+    Returns a schema that calls a validator function before validating.
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
@@ -1647,8 +1635,8 @@ def no_info_before_validator_function(
     def fn(v: bytes) -> str:
         return v.decode() + 'world'
 
-    func_schema = core_schema.no_info_before_validator_function(
-        function=fn, schema=core_schema.str_schema()
+    func_schema = core_schema.before_validator_function(
+        function=fn, signature='no-info', schema=core_schema.str_schema()
     )
     schema = core_schema.typed_dict_schema({'a': core_schema.typed_dict_field(func_schema)})
 
@@ -1665,97 +1653,8 @@ def no_info_before_validator_function(
     """
     return dict_not_none(
         type='function-before',
-        function={'type': 'no-info', 'function': function},
-        schema=schema,
-        ref=ref,
-        metadata=metadata,
-        serialization=serialization,
-    )
-
-
-def field_before_validator_function(
-    function: FieldValidatorFunction,
-    schema: CoreSchema,
-    *,
-    ref: str | None = None,
-    metadata: Any = None,
-    serialization: SerSchema | None = None,
-) -> BeforeValidatorFunctionSchema:
-    """
-    Returns a schema that calls a validator function before validating the function is called with information
-    about the field being validated, e.g.:
-
-    ```py
-    from pydantic_core import SchemaValidator, core_schema
-
-    def fn(v: bytes, info: core_schema.FieldValidationInfo) -> str:
-        assert info.data is not None
-        assert info.field_name is not None
-        return v.decode() + 'world'
-
-    func_schema = core_schema.field_before_validator_function(
-        function=fn, schema=core_schema.str_schema()
-    )
-    schema = core_schema.typed_dict_schema({'a': core_schema.typed_dict_field(func_schema)})
-
-    v = SchemaValidator(schema)
-    assert v.validate_python({'a': b'hello '}) == {'a': 'hello world'}
-    ```
-
-    Args:
-        function: The validator function to call
-        schema: The schema to validate the output of the validator function
-        ref: optional unique identifier of the schema, used to reference the schema in other places
-        metadata: Any other information you want to include with the schema, not used by pydantic-core
-        serialization: Custom serialization schema
-    """
-    return dict_not_none(
-        type='function-before',
-        function={'type': 'field', 'function': function},
-        schema=schema,
-        ref=ref,
-        metadata=metadata,
-        serialization=serialization,
-    )
-
-
-def general_before_validator_function(
-    function: GeneralValidatorFunction,
-    schema: CoreSchema,
-    *,
-    ref: str | None = None,
-    metadata: Any = None,
-    serialization: SerSchema | None = None,
-) -> BeforeValidatorFunctionSchema:
-    """
-    Returns a schema that calls a validator function before validating the provided schema, e.g.:
-
-    ```py
-    from typing import Any
-    from pydantic_core import SchemaValidator, core_schema
-
-    def fn(v: Any, info: core_schema.ValidationInfo) -> str:
-        v_str = str(v)
-        assert 'hello' in v_str
-        return v_str + 'world'
-
-    schema = core_schema.general_before_validator_function(
-        function=fn, schema=core_schema.str_schema()
-    )
-    v = SchemaValidator(schema)
-    assert v.validate_python(b'hello ') == "b'hello 'world"
-    ```
-
-    Args:
-        function: The validator function to call
-        schema: The schema to validate the output of the validator function
-        ref: optional unique identifier of the schema, used to reference the schema in other places
-        metadata: Any other information you want to include with the schema, not used by pydantic-core
-        serialization: Custom serialization schema
-    """
-    return dict_not_none(
-        type='function-before',
-        function={'type': 'general', 'function': function},
+        function=function,
+        signature=signature,
         schema=schema,
         ref=ref,
         metadata=metadata,
@@ -1767,16 +1666,17 @@ class AfterValidatorFunctionSchema(_ValidatorFunctionSchema, total=False):
     type: Required[Literal['function-after']]
 
 
-def no_info_after_validator_function(
-    function: NoInfoValidatorFunction,
+def after_validator_function(
+    function: AnyValidatorFunction,
     schema: CoreSchema,
+    signature: ValidatorFunctionSignature,
     *,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
 ) -> AfterValidatorFunctionSchema:
     """
-    Returns a schema that calls a validator function after validating, no info is provided, e.g.:
+    Returns a schema that calls a validator function after validating.
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
@@ -1784,8 +1684,8 @@ def no_info_after_validator_function(
     def fn(v: str) -> str:
         return v + 'world'
 
-    func_schema = core_schema.no_info_after_validator_function(
-        function=fn, schema=core_schema.str_schema()
+    func_schema = core_schema.after_validator_function(
+        function=fn, signature='no-info', schema=core_schema.str_schema()
     )
     schema = core_schema.typed_dict_schema({'a': core_schema.typed_dict_field(func_schema)})
 
@@ -1795,6 +1695,7 @@ def no_info_after_validator_function(
 
     Args:
         function: The validator function to call after the schema is validated
+        signature: Controls if the info argument is provided and if it contains model field information.
         schema: The schema to validate before the validator function
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1802,95 +1703,8 @@ def no_info_after_validator_function(
     """
     return dict_not_none(
         type='function-after',
-        function={'type': 'field', 'function': function},
-        schema=schema,
-        ref=ref,
-        metadata=metadata,
-        serialization=serialization,
-    )
-
-
-def field_after_validator_function(
-    function: FieldValidatorFunction,
-    schema: CoreSchema,
-    *,
-    ref: str | None = None,
-    metadata: Any = None,
-    serialization: SerSchema | None = None,
-) -> AfterValidatorFunctionSchema:
-    """
-    Returns a schema that calls a validator function after validating the function is called with information
-    about the field being validated, e.g.:
-
-    ```py
-    from pydantic_core import SchemaValidator, core_schema
-
-    def fn(v: str, info: core_schema.FieldValidationInfo) -> str:
-        assert info.data is not None
-        assert info.field_name is not None
-        return v + 'world'
-
-    func_schema = core_schema.field_after_validator_function(
-        function=fn, schema=core_schema.str_schema()
-    )
-    schema = core_schema.typed_dict_schema({'a': core_schema.typed_dict_field(func_schema)})
-
-    v = SchemaValidator(schema)
-    assert v.validate_python({'a': b'hello '}) == {'a': 'hello world'}
-    ```
-
-    Args:
-        function: The validator function to call after the schema is validated
-        schema: The schema to validate before the validator function
-        ref: optional unique identifier of the schema, used to reference the schema in other places
-        metadata: Any other information you want to include with the schema, not used by pydantic-core
-        serialization: Custom serialization schema
-    """
-    return dict_not_none(
-        type='function-after',
-        function={'type': 'field', 'function': function},
-        schema=schema,
-        ref=ref,
-        metadata=metadata,
-        serialization=serialization,
-    )
-
-
-def general_after_validator_function(
-    function: GeneralValidatorFunction,
-    schema: CoreSchema,
-    *,
-    ref: str | None = None,
-    metadata: Any = None,
-    serialization: SerSchema | None = None,
-) -> AfterValidatorFunctionSchema:
-    """
-    Returns a schema that calls a validator function after validating the provided schema, e.g.:
-
-    ```py
-    from pydantic_core import SchemaValidator, core_schema
-
-    def fn(v: str, info: core_schema.ValidationInfo) -> str:
-        assert 'hello' in v
-        return v + 'world'
-
-    schema = core_schema.general_after_validator_function(
-        schema=core_schema.str_schema(), function=fn
-    )
-    v = SchemaValidator(schema)
-    assert v.validate_python('hello ') == 'hello world'
-    ```
-
-    Args:
-        schema: The schema to validate before the validator function
-        function: The validator function to call after the schema is validated
-        ref: optional unique identifier of the schema, used to reference the schema in other places
-        metadata: Any other information you want to include with the schema, not used by pydantic-core
-        serialization: Custom serialization schema
-    """
-    return dict_not_none(
-        type='function-after',
-        function={'type': 'general', 'function': function},
+        function=function,
+        signature=signature,
         schema=schema,
         ref=ref,
         metadata=metadata,
@@ -1922,38 +1736,23 @@ class FieldWrapValidatorFunction(Protocol):
         ...
 
 
-class NoInfoWrapValidatorFunctionSchema(TypedDict):
-    type: Literal['no-info']
-    function: NoInfoWrapValidatorFunction
-
-
-class GeneralWrapValidatorFunctionSchema(TypedDict):
-    type: Literal['general']
-    function: GeneralWrapValidatorFunction
-
-
-class FieldWrapValidatorFunctionSchema(TypedDict):
-    type: Literal['field']
-    function: FieldWrapValidatorFunction
-
-
-WrapValidatorFunction = Union[
-    NoInfoWrapValidatorFunctionSchema, GeneralWrapValidatorFunctionSchema, FieldWrapValidatorFunctionSchema
-]
+AnyWrapValidatorFunction = Union[NoInfoWrapValidatorFunction, GeneralWrapValidatorFunction, FieldWrapValidatorFunction]
 
 
 class WrapValidatorFunctionSchema(TypedDict, total=False):
     type: Required[Literal['function-wrap']]
-    function: Required[WrapValidatorFunction]
+    function: Required[AnyWrapValidatorFunction]
+    signature: Required[ValidatorFunctionSignature]
     schema: Required[CoreSchema]
     ref: str
     metadata: Any
     serialization: SerSchema
 
 
-def no_info_wrap_validator_function(
+def wrap_validator_function(
     function: NoInfoWrapValidatorFunction,
     schema: CoreSchema,
+    signature: ValidatorFunctionSignature,
     *,
     ref: str | None = None,
     metadata: Any = None,
@@ -1962,7 +1761,7 @@ def no_info_wrap_validator_function(
     """
     Returns a schema which calls a function with a `validator` callable argument which can
     optionally be used to call inner validation with the function logic, this is much like the
-    "onion" implementation of middleware in many popular web frameworks, no info argument is passed, e.g.:
+    "onion" implementation of middleware in many popular web frameworks.
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
@@ -1973,8 +1772,8 @@ def no_info_wrap_validator_function(
     ) -> str:
         return validator(input_value=v) + 'world'
 
-    schema = core_schema.no_info_wrap_validator_function(
-        function=fn, schema=core_schema.str_schema()
+    schema = core_schema.wrap_validator_function(
+        function=fn, signature='no-info', schema=core_schema.str_schema()
     )
     v = SchemaValidator(schema)
     assert v.validate_python('hello ') == 'hello world'
@@ -1989,106 +1788,8 @@ def no_info_wrap_validator_function(
     """
     return dict_not_none(
         type='function-wrap',
-        function={'type': 'no-info', 'function': function},
-        schema=schema,
-        ref=ref,
-        metadata=metadata,
-        serialization=serialization,
-    )
-
-
-def general_wrap_validator_function(
-    function: GeneralWrapValidatorFunction,
-    schema: CoreSchema,
-    *,
-    ref: str | None = None,
-    metadata: Any = None,
-    serialization: SerSchema | None = None,
-) -> WrapValidatorFunctionSchema:
-    """
-    Returns a schema which calls a function with a `validator` callable argument which can
-    optionally be used to call inner validation with the function logic, this is much like the
-    "onion" implementation of middleware in many popular web frameworks, general info is also passed, e.g.:
-
-    ```py
-    from pydantic_core import SchemaValidator, core_schema
-
-    def fn(
-        v: str,
-        validator: core_schema.ValidatorFunctionWrapHandler,
-        info: core_schema.ValidationInfo,
-    ) -> str:
-        return validator(input_value=v) + 'world'
-
-    schema = core_schema.general_wrap_validator_function(
-        function=fn, schema=core_schema.str_schema()
-    )
-    v = SchemaValidator(schema)
-    assert v.validate_python('hello ') == 'hello world'
-    ```
-
-    Args:
-        function: The validator function to call
-        schema: The schema to validate the output of the validator function
-        ref: optional unique identifier of the schema, used to reference the schema in other places
-        metadata: Any other information you want to include with the schema, not used by pydantic-core
-        serialization: Custom serialization schema
-    """
-    return dict_not_none(
-        type='function-wrap',
-        function={'type': 'general', 'function': function},
-        schema=schema,
-        ref=ref,
-        metadata=metadata,
-        serialization=serialization,
-    )
-
-
-def field_wrap_validator_function(
-    function: FieldWrapValidatorFunction,
-    schema: CoreSchema,
-    *,
-    ref: str | None = None,
-    metadata: Any = None,
-    serialization: SerSchema | None = None,
-) -> WrapValidatorFunctionSchema:
-    """
-    Returns a schema applicable to **fields**
-    which calls a function with a `validator` callable argument which can
-    optionally be used to call inner validation with the function logic, this is much like the
-    "onion" implementation of middleware in many popular web frameworks, field info is passed, e.g.:
-
-    ```py
-    from pydantic_core import SchemaValidator, core_schema
-
-    def fn(
-        v: bytes,
-        validator: core_schema.ValidatorFunctionWrapHandler,
-        info: core_schema.FieldValidationInfo,
-    ) -> str:
-        assert info.data is not None
-        assert info.field_name is not None
-        return validator(v) + 'world'
-
-    func_schema = core_schema.field_wrap_validator_function(
-        function=fn, schema=core_schema.str_schema()
-    )
-    schema = core_schema.typed_dict_schema({'a': core_schema.typed_dict_field(func_schema)})
-
-    v = SchemaValidator(schema)
-    assert v.validate_python({'a': b'hello '}) == {'a': 'hello world'}
-    ```
-
-    Args:
-        function: The validator function to call
-        schema: The schema to validate the output of the validator function
-        ref: optional unique identifier of the schema, used to reference the schema in other places
-        metadata: Any other information you want to include with the schema, not used by pydantic-core
-        serialization: Custom serialization schema
-    """
-    return dict_not_none(
-        type='function-wrap',
-        function={'type': 'field', 'function': function},
+        function=function,
+        signature=signature,
         schema=schema,
         ref=ref,
         metadata=metadata,
@@ -2098,21 +1799,23 @@ def field_wrap_validator_function(
 
 class PlainValidatorFunctionSchema(TypedDict, total=False):
     type: Required[Literal['function-plain']]
-    function: Required[ValidationFunction]
+    function: Required[AnyValidatorFunction]
+    signature: ValidatorFunctionSignature
     ref: str
     metadata: Any
     serialization: SerSchema
 
 
-def no_info_plain_validator_function(
-    function: NoInfoValidatorFunction,
+def plain_validator_function(
+    function: AnyValidatorFunction,
+    signature: ValidatorFunctionSignature,
     *,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
 ) -> PlainValidatorFunctionSchema:
     """
-    Returns a schema that uses the provided function for validation, no info is passed, e.g.:
+    Returns a schema that uses the provided function for validation without calling an inner schema.
 
     ```py
     from pydantic_core import SchemaValidator, core_schema
@@ -2121,7 +1824,7 @@ def no_info_plain_validator_function(
         assert 'hello' in v
         return v + 'world'
 
-    schema = core_schema.no_info_plain_validator_function(function=fn)
+    schema = core_schema.plain_validator_function(function=fn, signature='no-info')
     v = SchemaValidator(schema)
     assert v.validate_python('hello ') == 'hello world'
     ```
@@ -2134,85 +1837,8 @@ def no_info_plain_validator_function(
     """
     return dict_not_none(
         type='function-plain',
-        function={'type': 'no-info', 'function': function},
-        ref=ref,
-        metadata=metadata,
-        serialization=serialization,
-    )
-
-
-def general_plain_validator_function(
-    function: GeneralValidatorFunction,
-    *,
-    ref: str | None = None,
-    metadata: Any = None,
-    serialization: SerSchema | None = None,
-) -> PlainValidatorFunctionSchema:
-    """
-    Returns a schema that uses the provided function for validation, e.g.:
-
-    ```py
-    from pydantic_core import SchemaValidator, core_schema
-
-    def fn(v: str, info: core_schema.ValidationInfo) -> str:
-        assert 'hello' in v
-        return v + 'world'
-
-    schema = core_schema.general_plain_validator_function(function=fn)
-    v = SchemaValidator(schema)
-    assert v.validate_python('hello ') == 'hello world'
-    ```
-
-    Args:
-        function: The validator function to call
-        ref: optional unique identifier of the schema, used to reference the schema in other places
-        metadata: Any other information you want to include with the schema, not used by pydantic-core
-        serialization: Custom serialization schema
-    """
-    return dict_not_none(
-        type='function-plain',
-        function={'type': 'general', 'function': function},
-        ref=ref,
-        metadata=metadata,
-        serialization=serialization,
-    )
-
-
-def field_plain_validator_function(
-    function: FieldValidatorFunction,
-    *,
-    ref: str | None = None,
-    metadata: Any = None,
-    serialization: SerSchema | None = None,
-) -> PlainValidatorFunctionSchema:
-    """
-    Returns a schema that uses the provided function for validation, e.g.:
-
-    ```py
-    from typing import Any
-    from pydantic_core import SchemaValidator, core_schema
-
-    def fn(v: Any, info: core_schema.FieldValidationInfo) -> str:
-        assert info.data is not None
-        assert info.field_name is not None
-        return str(v) + 'world'
-
-    func_schema = core_schema.field_plain_validator_function(function=fn)
-    schema = core_schema.typed_dict_schema({'a': core_schema.typed_dict_field(func_schema)})
-
-    v = SchemaValidator(schema)
-    assert v.validate_python({'a': 'hello '}) == {'a': 'hello world'}
-    ```
-
-    Args:
-        function: The validator function to call
-        ref: optional unique identifier of the schema, used to reference the schema in other places
-        metadata: Any other information you want to include with the schema, not used by pydantic-core
-        serialization: Custom serialization schema
-    """
-    return dict_not_none(
-        type='function-plain',
-        function={'type': 'field', 'function': function},
+        function=function,
+        signature=signature,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
@@ -2511,7 +2137,7 @@ def chain_schema(
         assert 'hello' in v
         return v + ' world'
 
-    fn_schema = core_schema.general_plain_validator_function(function=fn)
+    fn_schema = core_schema.plain_validator_function(function=fn, signature='general')
     schema = core_schema.chain_schema(
         [fn_schema, fn_schema, fn_schema, core_schema.str_schema()]
     )
@@ -3277,6 +2903,7 @@ def url_schema(
     schema = core_schema.url_schema()
     v = SchemaValidator(schema)
     print(v.validate_python('https://example.com'))
+    #> https://example.com/
     ```
 
     Args:
@@ -3342,6 +2969,7 @@ def multi_host_url_schema(
     schema = core_schema.multi_host_url_schema()
     v = SchemaValidator(schema)
     print(v.validate_python('redis://localhost,0.0.0.0,127.0.0.1'))
+    #> redis://localhost,0.0.0.0,127.0.0.1
     ```
 
     Args:

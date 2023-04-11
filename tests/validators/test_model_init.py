@@ -96,7 +96,8 @@ def test_function_before():
     v = SchemaValidator(
         {
             'type': 'function-before',
-            'function': {'type': 'general', 'function': f},
+            'function': f,
+            'signature': 'general',
             'schema': {
                 'type': 'model',
                 'cls': MyModel,
@@ -133,7 +134,8 @@ def test_function_after():
     v = SchemaValidator(
         {
             'type': 'function-after',
-            'function': {'type': 'general', 'function': f},
+            'function': f,
+            'signature': 'general',
             'schema': {
                 'type': 'model',
                 'cls': MyModel,
@@ -172,7 +174,8 @@ def test_function_wrap():
     v = SchemaValidator(
         {
             'type': 'function-wrap',
-            'function': {'type': 'general', 'function': f},
+            'function': f,
+            'signature': 'general',
             'schema': {
                 'type': 'model',
                 'cls': MyModel,

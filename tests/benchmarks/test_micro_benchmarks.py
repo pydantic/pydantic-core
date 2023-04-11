@@ -932,7 +932,7 @@ def test_dont_raise_error(benchmark):
     def f(input_value, info):
         return input_value
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'general', 'function': f}})
+    v = SchemaValidator({'type': 'function-plain', 'function': f, 'signature': 'general'})
 
     @benchmark
     def t():
@@ -944,7 +944,7 @@ def test_dont_raise_error_no_info(benchmark):
     def f(input_value):
         return input_value
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'no-info', 'function': f}})
+    v = SchemaValidator({'type': 'function-plain', 'function': f, 'signature': 'no-info'})
 
     @benchmark
     def t():
@@ -956,7 +956,7 @@ def test_raise_error_value_error(benchmark):
     def f(input_value, info):
         raise ValueError('this is a custom error')
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'general', 'function': f}})
+    v = SchemaValidator({'type': 'function-plain', 'function': f, 'signature': 'general'})
 
     @benchmark
     def t():
@@ -973,7 +973,7 @@ def test_raise_error_custom(benchmark):
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'this is a custom error {foo}', {'foo': 'FOOBAR'})
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'general', 'function': f}})
+    v = SchemaValidator({'type': 'function-plain', 'function': f, 'signature': 'general'})
 
     @benchmark
     def t():
@@ -1070,7 +1070,7 @@ def test_chain_list(benchmark):
             'type': 'chain',
             'steps': [
                 {'type': 'str'},
-                {'type': 'function-plain', 'function': {'type': 'general', 'function': lambda v, info: Decimal(v)}},
+                {'type': 'function-plain', 'signature': 'general', 'function': lambda v, info: Decimal(v)},
             ],
         }
     )
@@ -1085,7 +1085,8 @@ def test_chain_function(benchmark):
         {
             'type': 'function-after',
             'schema': {'type': 'str'},
-            'function': {'type': 'general', 'function': lambda v, info: Decimal(v)},
+            'signature': 'general',
+            'function': lambda v, info: Decimal(v),
         }
     )
     assert validator.validate_python('42.42') == Decimal('42.42')
@@ -1100,8 +1101,8 @@ def test_chain_two_functions(benchmark):
             'type': 'chain',
             'steps': [
                 {'type': 'str'},
-                {'type': 'function-plain', 'function': {'type': 'general', 'function': lambda v, info: Decimal(v)}},
-                {'type': 'function-plain', 'function': {'type': 'general', 'function': lambda v, info: v * 2}},
+                {'type': 'function-plain', 'signature': 'general', 'function': lambda v, info: Decimal(v)},
+                {'type': 'function-plain', 'signature': 'general', 'function': lambda v, info: v * 2},
             ],
         }
     )
@@ -1118,9 +1119,11 @@ def test_chain_nested_functions(benchmark):
             'schema': {
                 'type': 'function-after',
                 'schema': {'type': 'str'},
-                'function': {'type': 'general', 'function': lambda v, info: Decimal(v)},
+                'signature': 'general',
+                'function': lambda v, info: Decimal(v),
             },
-            'function': {'type': 'general', 'function': lambda v, info: v * 2},
+            'signature': 'general',
+            'function': lambda v, info: v * 2,
         }
     )
     assert validator.validate_python('42.42') == Decimal('84.84')
@@ -1143,7 +1146,7 @@ def generator_gen_python(v, validator, info):
 
 @pytest.mark.benchmark(group='generator')
 def test_generator_python(benchmark):
-    schema = core_schema.general_wrap_validator_function(generator_gen_python, {'type': 'int'})
+    schema = core_schema.wrap_validator_function(generator_gen_python, {'type': 'int'}, signature='general')
     v = SchemaValidator(schema)
     input_value = tuple(range(100))
 

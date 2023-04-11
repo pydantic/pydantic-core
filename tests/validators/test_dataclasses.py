@@ -491,7 +491,9 @@ def test_dataclass_field_after_validator():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.field_after_validator_function(Foo.validate_b, core_schema.str_schema()),
+                    schema=core_schema.after_validator_function(
+                        Foo.validate_b, core_schema.str_schema(), signature='field'
+                    ),
                 ),
             ],
         ),
@@ -522,7 +524,7 @@ def test_dataclass_field_plain_validator():
             [
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
-                    name='b', schema=core_schema.field_plain_validator_function(Foo.validate_b)
+                    name='b', schema=core_schema.plain_validator_function(Foo.validate_b, signature='field')
                 ),
             ],
         ),
@@ -554,7 +556,9 @@ def test_dataclass_field_before_validator():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.field_before_validator_function(Foo.validate_b, core_schema.str_schema()),
+                    schema=core_schema.before_validator_function(
+                        Foo.validate_b, core_schema.str_schema(), signature='field'
+                    ),
                 ),
             ],
         ),
@@ -589,7 +593,10 @@ def test_dataclass_field_wrap_validator1():
             [
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
-                    name='b', schema=core_schema.field_wrap_validator_function(Foo.validate_b, core_schema.str_schema())
+                    name='b',
+                    schema=core_schema.wrap_validator_function(
+                        Foo.validate_b, core_schema.str_schema(), signature='field'
+                    ),
                 ),
             ],
         ),
@@ -622,7 +629,10 @@ def test_dataclass_field_wrap_validator2():
             [
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
-                    name='b', schema=core_schema.field_wrap_validator_function(Foo.validate_b, core_schema.str_schema())
+                    name='b',
+                    schema=core_schema.wrap_validator_function(
+                        Foo.validate_b, core_schema.str_schema(), signature='field'
+                    ),
                 ),
             ],
         ),
@@ -841,7 +851,8 @@ def test_validate_assignment_function():
                 [
                     core_schema.dataclass_field('field_a', core_schema.str_schema()),
                     core_schema.dataclass_field(
-                        'field_b', core_schema.field_after_validator_function(func, core_schema.int_schema())
+                        'field_b',
+                        core_schema.after_validator_function(func, core_schema.int_schema(), signature='field'),
                     ),
                     core_schema.dataclass_field('field_c', core_schema.int_schema()),
                 ],

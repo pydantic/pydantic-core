@@ -530,7 +530,8 @@ def test_definition_wrap():
         {
             'type': 'function-wrap',
             'ref': 'wrapper',
-            'function': {'type': 'general', 'function': wrap_func},
+            'function': wrap_func,
+            'signature': 'general',
             'schema': {
                 'type': 'tuple-positional',
                 'items_schema': [
@@ -658,7 +659,8 @@ def test_function_name():
             'choices': [
                 {
                     'type': 'function-after',
-                    'function': {'type': 'general', 'function': f},
+                    'function': f,
+                    'signature': 'general',
                     'schema': {'schema_ref': 'root-schema', 'type': 'definition-ref'},
                 },
                 {'type': 'int'},
@@ -700,7 +702,8 @@ def test_function_change_id(strict: bool):
             'choices': [
                 {
                     'type': 'function-before',
-                    'function': {'type': 'general', 'function': f},
+                    'function': f,
+                    'signature': 'general',
                     'schema': {'schema_ref': 'root-schema', 'type': 'definition-ref'},
                 }
             ],

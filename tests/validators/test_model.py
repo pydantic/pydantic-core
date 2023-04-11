@@ -1,5 +1,6 @@
 import re
 from copy import deepcopy
+from functools import partial
 from typing import Any, Callable, Dict, List, Set, Tuple
 
 import pytest
@@ -104,11 +105,12 @@ def test_model_class_root_validator_wrap():
 
     schema = core_schema.model_schema(
         MyModel,
-        core_schema.general_wrap_validator_function(
+        core_schema.wrap_validator_function(
             f,
             core_schema.typed_dict_schema(
                 {'field_a': core_schema.typed_dict_field(core_schema.int_schema())}, return_fields_set=True
             ),
+            signature='general',
         ),
     )
 
@@ -141,11 +143,12 @@ def test_model_class_root_validator_before():
 
     schema = core_schema.model_schema(
         MyModel,
-        core_schema.general_before_validator_function(
+        core_schema.before_validator_function(
             f,
             core_schema.typed_dict_schema(
                 {'field_a': core_schema.typed_dict_field(core_schema.int_schema())}, return_fields_set=True
             ),
+            signature='general',
         ),
     )
 
@@ -179,11 +182,12 @@ def test_model_class_root_validator_after():
 
     schema = core_schema.model_schema(
         MyModel,
-        core_schema.general_after_validator_function(
+        core_schema.after_validator_function(
             f,
             core_schema.typed_dict_schema(
                 {'field_a': core_schema.typed_dict_field(core_schema.int_schema())}, return_fields_set=True
             ),
+            signature='general',
         ),
     )
 
@@ -220,7 +224,8 @@ def test_function_ask(mode, return_fields_set):
             'cls': MyModel,
             'schema': {
                 'type': f'function-{mode}',
-                'function': {'type': 'general', 'function': f},
+                'function': f,
+                'signature': 'general',
                 'schema': {
                     'type': 'typed-dict',
                     'return_fields_set': return_fields_set,
@@ -241,11 +246,7 @@ def test_function_plain_ask():
         return input_value
 
     v = SchemaValidator(
-        {
-            'type': 'model',
-            'cls': MyModel,
-            'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f}},
-        }
+        {'type': 'model', 'cls': MyModel, 'schema': {'type': 'function-plain', 'function': f, 'signature': 'general'}}
     )
     assert 'expect_fields_set:false' in plain_repr(v)
     m = v.validate_python({'field_a': 'test'})
@@ -359,7 +360,8 @@ def test_model_class_function_after():
             'cls': MyModel,
             'schema': {
                 'type': 'function-after',
-                'function': {'type': 'general', 'function': f},
+                'function': f,
+                'signature': 'general',
                 'schema': {
                     'type': 'typed-dict',
                     'return_fields_set': True,
@@ -1028,7 +1030,7 @@ def test_validate_assignment_function():
                 {
                     'field_a': core_schema.typed_dict_field(core_schema.str_schema()),
                     'field_b': core_schema.typed_dict_field(
-                        core_schema.field_after_validator_function(func, core_schema.int_schema())
+                        core_schema.after_validator_function(func, core_schema.int_schema(), signature='field')
                     ),
                     'field_c': core_schema.typed_dict_field(core_schema.int_schema()),
                 },
@@ -1116,17 +1118,17 @@ def test_frozen():
     'function_schema,call1, call2',
     [
         (
-            core_schema.general_after_validator_function,
+            partial(core_schema.after_validator_function, signature='general'),
             (({'a': 1, 'b': 2}, {'b'}), 'ValidationInfo(config=None, context=None)'),
             (({'a': 10, 'b': 2}, {'a'}), 'ValidationInfo(config=None, context=None)'),
         ),
         (
-            core_schema.general_before_validator_function,
+            partial(core_schema.before_validator_function, signature='general'),
             ({'b': 2}, 'ValidationInfo(config=None, context=None)'),
             ({'a': 10, 'b': 2}, 'ValidationInfo(config=None, context=None)'),
         ),
         (
-            core_schema.general_wrap_validator_function,
+            partial(core_schema.wrap_validator_function, signature='general'),
             ({'b': 2}, 'ValidationInfo(config=None, context=None)'),
             ({'a': 10, 'b': 2}, 'ValidationInfo(config=None, context=None)'),
         ),

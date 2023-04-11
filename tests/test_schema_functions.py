@@ -1,5 +1,6 @@
 import re
 from datetime import date
+from functools import partial
 from typing import Any
 
 import pytest
@@ -20,7 +21,9 @@ class MyModel:
 
 
 def ids_function(val):
-    if callable(val):
+    if isinstance(val, partial):
+        return ids_function(val.func)
+    elif callable(val):
         return val.__name__
     elif isinstance(val, tuple) and len(val) == 2:
         return '({})'.format(', '.join([repr(a) for a in val[0]] + [f'{k}={v!r}' for k, v in val[1].items()]))
@@ -86,32 +89,24 @@ all_schema_functions = [
         {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'int'}},
     ),
     (
-        core_schema.general_before_validator_function,
+        partial(core_schema.before_validator_function, signature='general'),
         args(val_function, {'type': 'int'}),
-        {
-            'type': 'function-before',
-            'function': {'type': 'general', 'function': val_function},
-            'schema': {'type': 'int'},
-        },
+        {'type': 'function-before', 'function': val_function, 'signature': 'general', 'schema': {'type': 'int'}},
     ),
     (
-        core_schema.general_after_validator_function,
+        partial(core_schema.after_validator_function, signature='general'),
         args(val_function, {'type': 'int'}),
-        {
-            'type': 'function-after',
-            'function': {'type': 'general', 'function': val_function},
-            'schema': {'type': 'int'},
-        },
+        {'type': 'function-after', 'function': val_function, 'signature': 'general', 'schema': {'type': 'int'}},
     ),
     (
-        core_schema.general_wrap_validator_function,
+        partial(core_schema.wrap_validator_function, signature='general'),
         args(val_function, {'type': 'int'}),
-        {'type': 'function-wrap', 'function': {'type': 'general', 'function': val_function}, 'schema': {'type': 'int'}},
+        {'type': 'function-wrap', 'function': val_function, 'signature': 'general', 'schema': {'type': 'int'}},
     ),
     (
-        core_schema.general_plain_validator_function,
+        partial(core_schema.plain_validator_function, signature='general'),
         args(val_function),
-        {'type': 'function-plain', 'function': {'type': 'general', 'function': val_function}},
+        {'type': 'function-plain', 'function': val_function, 'signature': 'general'},
     ),
     (
         core_schema.with_default_schema,

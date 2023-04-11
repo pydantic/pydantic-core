@@ -166,7 +166,8 @@ def schema(*, strict: bool = False) -> dict:
                                 'type': 'typed-dict-field',
                                 'schema': {
                                     'type': 'function-before',
-                                    'function': {'type': 'general', 'function': append_func},
+                                    'function': append_func,
+                                    'signature': 'general',
                                     'schema': {'type': 'str'},
                                 },
                             },
@@ -174,7 +175,8 @@ def schema(*, strict: bool = False) -> dict:
                                 'type': 'typed-dict-field',
                                 'schema': {
                                     'type': 'function-after',
-                                    'function': {'type': 'general', 'function': append_func},
+                                    'function': append_func,
+                                    'signature': 'general',
                                     'schema': {'type': 'str'},
                                 },
                             },
@@ -182,16 +184,14 @@ def schema(*, strict: bool = False) -> dict:
                                 'type': 'typed-dict-field',
                                 'schema': {
                                     'type': 'function-wrap',
-                                    'function': {'type': 'general', 'function': wrap_function},
+                                    'function': wrap_function,
+                                    'signature': 'general',
                                     'schema': {'type': 'str'},
                                 },
                             },
                             'field_plain': {
                                 'type': 'typed-dict-field',
-                                'schema': {
-                                    'type': 'function-plain',
-                                    'function': {'type': 'general', 'function': append_func},
-                                },
+                                'schema': {'type': 'function-plain', 'function': append_func, 'signature': 'general'},
                             },
                         },
                     },

@@ -271,7 +271,8 @@ def test_validate_assignment_functions():
                     'type': 'typed-dict-field',
                     'schema': {
                         'type': 'function-after',
-                        'function': {'type': 'general', 'function': func_a},
+                        'function': func_a,
+                        'signature': 'general',
                         'schema': {'type': 'str'},
                     },
                 },
@@ -279,7 +280,8 @@ def test_validate_assignment_functions():
                     'type': 'typed-dict-field',
                     'schema': {
                         'type': 'function-after',
-                        'function': {'type': 'general', 'function': func_b},
+                        'function': func_b,
+                        'signature': 'general',
                         'schema': {'type': 'int'},
                     },
                 },
@@ -1660,7 +1662,8 @@ class TestOnError:
                             'on_error': 'raise',
                             'schema': {
                                 'type': 'function-wrap',
-                                'function': {'type': 'general', 'function': wrap_function},
+                                'signature': 'general',
+                                'function': wrap_function,
                                 'schema': {'type': 'str'},
                             },
                         },
