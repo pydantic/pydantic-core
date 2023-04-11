@@ -168,7 +168,8 @@ def test_literal_none():
     assert v.isinstance_python(0) is False
     assert v.isinstance_json('null') is True
     assert v.isinstance_json('""') is False
-    assert plain_repr(v) == 'SchemaValidator(title="none",validator=None(NoneValidator),slots=[])'
+    expected_repr_start = 'SchemaValidator(title="literal[None]"'
+    assert plain_repr(v)[: len(expected_repr_start)] == expected_repr_start
 
 
 def test_union():
@@ -195,9 +196,10 @@ def test_union():
     ]
 
 
-def test_enum():
+def test_enum_value():
     class FooEnum(Enum):
         foo = 'foo_value'
+        bar = 'bar_value'
 
     v = SchemaValidator(core_schema.literal_schema([FooEnum.foo]))
     assert v.validate_python(FooEnum.foo) == FooEnum.foo
@@ -211,5 +213,77 @@ def test_enum():
             'msg': "Input should be <FooEnum.foo: 'foo_value'>",
             'input': 'foo_value',
             'ctx': {'expected': "<FooEnum.foo: 'foo_value'>"},
+        }
+    ]
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python('unknown')
+    # insert_assert(exc_info.value.errors())
+    assert exc_info.value.errors() == [
+        {
+            'type': 'literal_error',
+            'loc': (),
+            'msg': "Input should be <FooEnum.foo: 'foo_value'>",
+            'input': 'unknown',
+            'ctx': {'expected': "<FooEnum.foo: 'foo_value'>"},
+        }
+    ]
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_json('"foo_value"')
+    assert exc_info.value.errors() == [
+        {
+            'type': 'literal_error',
+            'loc': (),
+            'msg': "Input should be <FooEnum.foo: 'foo_value'>",
+            'input': 'foo_value',
+            'ctx': {'expected': "<FooEnum.foo: 'foo_value'>"},
+        }
+    ]
+
+
+def test_str_enum_values():
+    class Foo(str, Enum):
+        foo = 'foo_value'
+        bar = 'bar_value'
+
+    v = SchemaValidator(core_schema.literal_schema([Foo.foo]))
+
+    assert v.validate_python(Foo.foo) == Foo.foo
+    assert v.validate_python('foo_value') == Foo.foo
+    assert v.validate_json('"foo_value"') == Foo.foo
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python('unknown')
+    assert exc_info.value.errors() == [
+        {
+            'type': 'literal_error',
+            'loc': (),
+            'msg': "Input should be <Foo.foo: 'foo_value'>",
+            'input': 'unknown',
+            'ctx': {'expected': "<Foo.foo: 'foo_value'>"},
+        }
+    ]
+
+
+def test_int_enum_values():
+    class Foo(int, Enum):
+        foo = 2
+        bar = 3
+
+    v = SchemaValidator(core_schema.literal_schema([Foo.foo]))
+
+    assert v.validate_python(Foo.foo) == Foo.foo
+    assert v.validate_python(2) == Foo.foo
+    assert v.validate_json('2') == Foo.foo
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(4)
+    assert exc_info.value.errors() == [
+        {
+            'type': 'literal_error',
+            'loc': (),
+            'msg': 'Input should be <Foo.foo: 2>',
+            'input': 4,
+            'ctx': {'expected': '<Foo.foo: 2>'},
         }
     ]
