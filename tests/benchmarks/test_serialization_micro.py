@@ -194,9 +194,7 @@ def test_date_format_function(benchmark):
 
     serializer = SchemaSerializer(
         core_schema.any_schema(
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                fmt, on_field=False, info_arg=True, json_return_type='str'
-            )
+            serialization=core_schema.plain_serializer_function_ser_schema(fmt, info_arg=True, json_return_type='str')
         )
     )
     d = date(2022, 11, 20)
@@ -212,9 +210,7 @@ def test_date_format_function_no_info(benchmark):
 
     serializer = SchemaSerializer(
         core_schema.any_schema(
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                fmt, on_field=False, info_arg=False, json_return_type='str'
-            )
+            serialization=core_schema.plain_serializer_function_ser_schema(fmt, json_return_type='str')
         )
     )
     d = date(2022, 11, 20)

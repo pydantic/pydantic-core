@@ -256,9 +256,7 @@ def test_function_plain_field_serializer_to_json_no_info():
             {
                 'x': core_schema.typed_dict_field(
                     core_schema.int_schema(
-                        serialization=core_schema.plain_serializer_function_ser_schema(
-                            ser_x, on_field=True, info_arg=False
-                        )
+                        serialization=core_schema.plain_serializer_function_ser_schema(ser_x, on_field=True)
                     )
                 )
             }
@@ -312,7 +310,7 @@ def test_function_wrap_field_serializer_to_json_no_info():
                 'x': core_schema.typed_dict_field(
                     core_schema.int_schema(
                         serialization=core_schema.wrap_serializer_function_ser_schema(
-                            ser_x, on_field=True, info_arg=False, schema=core_schema.any_schema()
+                            ser_x, on_field=True, schema=core_schema.any_schema()
                         )
                     )
                 )

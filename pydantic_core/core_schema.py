@@ -250,8 +250,8 @@ class PlainSerializerFunctionSerSchema(TypedDict, total=False):
 def plain_serializer_function_ser_schema(
     function: SerializerFunction,
     *,
-    on_field: bool,
-    info_arg: bool,
+    on_field: bool | None = None,
+    info_arg: bool | None = None,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
 ) -> PlainSerializerFunctionSerSchema:
@@ -312,8 +312,8 @@ class WrapSerializerFunctionSerSchema(TypedDict, total=False):
 def wrap_serializer_function_ser_schema(
     function: WrapSerializerFunction,
     *,
-    on_field: bool,
-    info_arg: bool,
+    on_field: bool | None = None,
+    info_arg: bool | None = None,
     schema: CoreSchema | None = None,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
@@ -1581,19 +1581,8 @@ def dict_schema(
     )
 
 
-class NoInfoValidatorFunction(Protocol):
-    def __call__(self, __input_value: Any) -> Any:  # pragma: no cover
-        ...
-
-
-class GeneralValidatorFunction(Protocol):
-    def __call__(self, __input_value: Any, __info: ValidationInfo) -> Any:  # pragma: no cover
-        ...
-
-
-class FieldValidatorFunction(Protocol):
-    def __call__(self, __input_value: Any, __info: FieldValidationInfo) -> Any:  # pragma: no cover
-        ...
+# (__input_value: Any) -> Any
+NoInfoValidatorFunction = Callable[[Any], Any]
 
 
 class NoInfoValidatorFunctionSchema(TypedDict):
@@ -1601,9 +1590,17 @@ class NoInfoValidatorFunctionSchema(TypedDict):
     function: NoInfoValidatorFunction
 
 
+# (__input_value: Any, __info: ValidationInfo) -> Any
+GeneralValidatorFunction = Callable[[Any, ValidationInfo], Any]
+
+
 class GeneralValidatorFunctionSchema(TypedDict):
     type: Literal['general']
     function: GeneralValidatorFunction
+
+
+# (__input_value: Any, __info: FieldValidationInfo) -> Any
+FieldValidatorFunction = Callable[[Any, FieldValidationInfo], Any]
 
 
 class FieldValidatorFunctionSchema(TypedDict):
@@ -1897,23 +1894,8 @@ class ValidatorFunctionWrapHandler(Protocol):
         ...
 
 
-class NoInfoWrapValidatorFunction(Protocol):
-    def __call__(self, __input_value: Any, __validator: ValidatorFunctionWrapHandler) -> Any:  # pragma: no cover
-        ...
-
-
-class GeneralWrapValidatorFunction(Protocol):
-    def __call__(
-        self, __input_value: Any, __validator: ValidatorFunctionWrapHandler, __info: ValidationInfo
-    ) -> Any:  # pragma: no cover
-        ...
-
-
-class FieldWrapValidatorFunction(Protocol):
-    def __call__(
-        self, __input_value: Any, __validator: ValidatorFunctionWrapHandler, __info: FieldValidationInfo
-    ) -> Any:  # pragma: no cover
-        ...
+# (__input_value: Any, __validator: ValidatorFunctionWrapHandler) -> Any
+NoInfoWrapValidatorFunction = Callable[[Any, ValidatorFunctionWrapHandler], Any]
 
 
 class NoInfoWrapValidatorFunctionSchema(TypedDict):
@@ -1921,9 +1903,17 @@ class NoInfoWrapValidatorFunctionSchema(TypedDict):
     function: NoInfoWrapValidatorFunction
 
 
+# (__input_value: Any, __validator: ValidatorFunctionWrapHandler, __info: ValidationInfo) -> Any
+GeneralWrapValidatorFunction = Callable[[Any, ValidatorFunctionWrapHandler, ValidationInfo], Any]
+
+
 class GeneralWrapValidatorFunctionSchema(TypedDict):
     type: Literal['general']
     function: GeneralWrapValidatorFunction
+
+
+# (__input_value: Any, __validator: ValidatorFunctionWrapHandler, __info: FieldValidationInfo) -> Any
+FieldWrapValidatorFunction = Callable[[Any, ValidatorFunctionWrapHandler, FieldValidationInfo], Any]
 
 
 class FieldWrapValidatorFunctionSchema(TypedDict):

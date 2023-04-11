@@ -333,20 +333,14 @@ def test_function_positional_tuple():
             'type': 'tuple-positional',
             'items_schema': [
                 core_schema.any_schema(
-                    serialization=core_schema.plain_serializer_function_ser_schema(
-                        partial(f, 'a'), on_field=False, info_arg=True
-                    )
+                    serialization=core_schema.plain_serializer_function_ser_schema(partial(f, 'a'), info_arg=True)
                 ),
                 core_schema.any_schema(
-                    serialization=core_schema.plain_serializer_function_ser_schema(
-                        partial(f, 'b'), on_field=False, info_arg=True
-                    )
+                    serialization=core_schema.plain_serializer_function_ser_schema(partial(f, 'b'), info_arg=True)
                 ),
             ],
             'extra_schema': core_schema.any_schema(
-                serialization=core_schema.plain_serializer_function_ser_schema(
-                    partial(f, 'extra'), on_field=False, info_arg=True
-                )
+                serialization=core_schema.plain_serializer_function_ser_schema(partial(f, 'extra'), info_arg=True)
             ),
         }
     )
