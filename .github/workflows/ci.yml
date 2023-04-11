@@ -94,6 +94,8 @@ jobs:
 
       - run: pip install -r tests/requirements.txt
 
+      - run: 'pip install maturin>=0.14.16,<0.15 typing_extensions'
+
       # purposefully building here using maturin, not `pip install` so we do a debug build
       - run: maturin develop
         env:
