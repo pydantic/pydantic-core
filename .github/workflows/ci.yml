@@ -94,7 +94,8 @@ jobs:
 
       - run: pip install -r tests/requirements.txt
 
-      - run: pip install -e .
+      # purposefully building here using maturin, not `pip install` so we do a debug build
+      - run: maturin develop
         env:
           RUST_BACKTRACE: 1
 
