@@ -45,7 +45,8 @@ where
         } else {
             let mut new_map = AHashMap::with_capacity(self.vec.len());
             let mut value = None;
-            for (index, (k, v)) in self.vec.iter().enumerate() {
+            // reverse here so the last value is the one that's returned
+            for (index, (k, v)) in self.vec.iter().enumerate().rev() {
                 if value.is_none() && k == key {
                     value = Some(v);
                 }

@@ -1,3 +1,4 @@
+import json
 import re
 
 import pytest
@@ -92,7 +93,7 @@ def test_float(input_value, expected):
         assert v.validate_json(input_value) == expected
 
 
-def test_model():
+def test_typed_dict():
     v = SchemaValidator(
         {
             'type': 'typed-dict',
@@ -106,6 +107,10 @@ def test_model():
     # language=json
     input_str = '{"field_a": "abc", "field_b": 1}'
     assert v.validate_json(input_str) == {'field_a': 'abc', 'field_b': 1}
+    # language=json
+    input_str = '{"field_a": "a", "field_a": "b", "field_b": 1}'
+    assert v.validate_json(input_str) == {'field_a': 'b', 'field_b': 1}
+    assert v.validate_json(input_str) == {'field_a': 'b', 'field_b': 1}
 
 
 def test_float_no_remainder():
@@ -144,7 +149,8 @@ def test_dict():
     v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
     assert v.validate_json('{"1": 2, "3": 4}') == {1: 2, 3: 4}
 
-    # duplicate keys are not allowed
+    # duplicate keys, the last value wins, like with python
+    assert json.loads('{"1": 1, "1": 2}') == {'1': 2}
     assert v.validate_json('{"1": 1, "1": 2}') == {1: 2}
 
 
