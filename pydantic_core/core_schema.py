@@ -241,7 +241,7 @@ Values have the following meanings:
 class PlainSerializerFunctionSerSchema(TypedDict, total=False):
     type: Required[Literal['function-plain']]
     function: Required[SerializerFunction]
-    on_field: bool  # default False
+    is_field_serializer: bool  # default False
     info_arg: bool  # default False
     json_return_type: JsonReturnTypes
     when_used: WhenUsed  # default: 'always'
@@ -250,7 +250,7 @@ class PlainSerializerFunctionSerSchema(TypedDict, total=False):
 def plain_serializer_function_ser_schema(
     function: SerializerFunction,
     *,
-    on_field: bool | None = None,
+    is_field_serializer: bool | None = None,
     info_arg: bool | None = None,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
@@ -260,7 +260,8 @@ def plain_serializer_function_ser_schema(
 
     Args:
         function: The function to use for serialization
-        on_field: Whether the serializer is for a field, e.g. takes `model` as the first argument
+        is_field_serializer: Whether the serializer is for a field, e.g. takes `model` as the first argument,
+          and `info` includes `field_name`
         info_arg: Whether the function takes an `__info` argument
         json_return_type: The type that the function returns if `mode='json'`
         when_used: When the function should be called
@@ -271,7 +272,7 @@ def plain_serializer_function_ser_schema(
     return dict_not_none(
         type='function-plain',
         function=function,
-        on_field=on_field,
+        is_field_serializer=is_field_serializer,
         info_arg=info_arg,
         json_return_type=json_return_type,
         when_used=when_used,
@@ -302,7 +303,7 @@ WrapSerializerFunction = Union[
 class WrapSerializerFunctionSerSchema(TypedDict, total=False):
     type: Required[Literal['function-wrap']]
     function: Required[WrapSerializerFunction]
-    on_field: bool  # default False
+    is_field_serializer: bool  # default False
     info_arg: bool  # default False
     schema: CoreSchema  # if omitted, the schema on which this serializer is defined is used
     json_return_type: JsonReturnTypes
@@ -312,7 +313,7 @@ class WrapSerializerFunctionSerSchema(TypedDict, total=False):
 def wrap_serializer_function_ser_schema(
     function: WrapSerializerFunction,
     *,
-    on_field: bool | None = None,
+    is_field_serializer: bool | None = None,
     info_arg: bool | None = None,
     schema: CoreSchema | None = None,
     json_return_type: JsonReturnTypes | None = None,
@@ -323,7 +324,8 @@ def wrap_serializer_function_ser_schema(
 
     Args:
         function: The function to use for serialization
-        on_field: Whether the serializer is for a field, e.g. takes `model` as the first argument
+        is_field_serializer: Whether the serializer is for a field, e.g. takes `model` as the first argument,
+          and `info` includes `field_name`
         info_arg: Whether the function takes an `__info` argument
         schema: The schema to use for the inner serialization
         json_return_type: The type that the function returns if `mode='json'`
@@ -335,7 +337,7 @@ def wrap_serializer_function_ser_schema(
     return dict_not_none(
         type='function-wrap',
         function=function,
-        on_field=on_field,
+        is_field_serializer=is_field_serializer,
         info_arg=info_arg,
         schema=schema,
         json_return_type=json_return_type,

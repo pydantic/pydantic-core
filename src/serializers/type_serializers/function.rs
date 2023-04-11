@@ -84,9 +84,11 @@ pub struct FunctionPlainSerializer {
 
 fn destructure_function_schema(schema: &PyDict) -> PyResult<(bool, bool, &PyAny)> {
     let function: &PyAny = schema.get_as_req(intern!(schema.py(), "function"))?;
-    let on_field: bool = schema.get_as(intern!(schema.py(), "on_field"))?.unwrap_or(false);
+    let is_field_serializer: bool = schema
+        .get_as(intern!(schema.py(), "is_field_serializer"))?
+        .unwrap_or(false);
     let info_arg: bool = schema.get_as(intern!(schema.py(), "info_arg"))?.unwrap_or(false);
-    Ok((on_field, info_arg, function))
+    Ok((is_field_serializer, info_arg, function))
 }
 
 impl BuildSerializer for FunctionPlainSerializer {

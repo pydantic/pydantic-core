@@ -113,7 +113,7 @@ def test_recursive_function_deeper_ref():
             },
             'serialization': {
                 'type': 'function-wrap',
-                'on_field': False,
+                'is_field_serializer': False,
                 'info_arg': True,
                 'function': lambda x, _1, _2: x,
             },
