@@ -19,7 +19,7 @@ def repr_function(value, _info):
 def test_function_general(value, expected_python, expected_json):
     s = SchemaSerializer(
         core_schema.any_schema(
-            serialization=core_schema.plain_serializer_function_ser_schema(repr_function, 'general', True)
+            serialization=core_schema.plain_serializer_function_ser_schema(repr_function, on_field=False, info_arg=True)
         )
     )
     assert s.to_python(value) == expected_python
@@ -38,7 +38,9 @@ def repr_function_no_info(value):
 def test_function_no_info(value, expected_python, expected_json):
     s = SchemaSerializer(
         core_schema.any_schema(
-            serialization=core_schema.plain_serializer_function_ser_schema(repr_function_no_info, 'general', False)
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                repr_function_no_info, on_field=False, info_arg=False
+            )
         )
     )
     assert s.to_python(value) == expected_python
@@ -55,7 +57,9 @@ def test_function_args():
         return value * 2
 
     s = SchemaSerializer(
-        core_schema.any_schema(serialization=core_schema.plain_serializer_function_ser_schema(double, 'general', True))
+        core_schema.any_schema(
+            serialization=core_schema.plain_serializer_function_ser_schema(double, on_field=False, info_arg=True)
+        )
     )
     assert s.to_python(4) == 8
     # insert_assert(f_info)
@@ -122,7 +126,7 @@ def test_function_error():
 
     s = SchemaSerializer(
         core_schema.any_schema(
-            serialization=core_schema.plain_serializer_function_ser_schema(raise_error, 'general', True)
+            serialization=core_schema.plain_serializer_function_ser_schema(raise_error, on_field=False, info_arg=True)
         )
     )
 
@@ -146,7 +150,9 @@ def test_function_error_keys():
     s = SchemaSerializer(
         core_schema.dict_schema(
             core_schema.any_schema(
-                serialization=core_schema.plain_serializer_function_ser_schema(raise_error, 'general', True)
+                serialization=core_schema.plain_serializer_function_ser_schema(
+                    raise_error, on_field=False, info_arg=True
+                )
             ),
             core_schema.int_schema(),
         )
@@ -174,7 +180,7 @@ def test_function_known_type():
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.plain_serializer_function_ser_schema(
-                append_42, 'general', True, json_return_type='list'
+                append_42, on_field=False, info_arg=True, json_return_type='list'
             )
         )
     )
@@ -199,7 +205,7 @@ def test_function_args_str():
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.plain_serializer_function_ser_schema(
-                append_args, 'general', True, json_return_type='str'
+                append_args, on_field=False, info_arg=True, json_return_type='str'
             )
         )
     )
@@ -230,7 +236,7 @@ def test_invalid_return_type():
         SchemaSerializer(
             core_schema.any_schema(
                 serialization=core_schema.plain_serializer_function_ser_schema(
-                    lambda _: 1, 'general', True, json_return_type='different'
+                    lambda _: 1, on_field=False, info_arg=True, json_return_type='different'
                 )
             )
         )
@@ -242,7 +248,9 @@ def test_dict_keys():
 
     s = SchemaSerializer(
         core_schema.dict_schema(
-            core_schema.int_schema(serialization=core_schema.plain_serializer_function_ser_schema(fmt, 'general', True))
+            core_schema.int_schema(
+                serialization=core_schema.plain_serializer_function_ser_schema(fmt, on_field=False, info_arg=True)
+            )
         )
     )
     assert s.to_python({1: True}) == {'<1>': True}
@@ -252,7 +260,9 @@ def test_function_as_key():
     s = SchemaSerializer(
         core_schema.dict_schema(
             core_schema.any_schema(
-                serialization=core_schema.plain_serializer_function_ser_schema(repr_function, 'general', True)
+                serialization=core_schema.plain_serializer_function_ser_schema(
+                    repr_function, on_field=False, info_arg=True
+                )
             ),
             core_schema.any_schema(),
         )
@@ -268,7 +278,9 @@ def test_function_only_json():
 
     s = SchemaSerializer(
         core_schema.any_schema(
-            serialization=core_schema.plain_serializer_function_ser_schema(double, 'general', True, when_used='json')
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                double, on_field=False, info_arg=True, when_used='json'
+            )
         )
     )
     assert s.to_python(4) == 4
@@ -282,7 +294,7 @@ def test_function_unless_none():
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.plain_serializer_function_ser_schema(
-                repr_function, 'general', True, when_used='unless-none'
+                repr_function, on_field=False, info_arg=True, when_used='unless-none'
             )
         )
     )
@@ -299,7 +311,7 @@ def test_wrong_return_type():
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.plain_serializer_function_ser_schema(
-                repr_function, 'general', True, json_return_type='int'
+                repr_function, on_field=False, info_arg=True, json_return_type='int'
             )
         )
     )
@@ -321,7 +333,7 @@ def test_wrong_return_type_str():
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.plain_serializer_function_ser_schema(
-                f, 'general', True, json_return_type='str_subclass'
+                f, on_field=False, info_arg=True, json_return_type='str_subclass'
             )
         )
     )
@@ -344,7 +356,9 @@ def test_function_wrap():
         return f'result={serializer(len(value))} repr={serializer!r}'
 
     s = SchemaSerializer(
-        core_schema.int_schema(serialization=core_schema.wrap_serializer_function_ser_schema(f, 'general', True))
+        core_schema.int_schema(
+            serialization=core_schema.wrap_serializer_function_ser_schema(f, on_field=False, info_arg=True)
+        )
     )
     assert s.to_python('foo') == 'result=3 repr=SerializationCallable(serializer=int)'
     assert s.to_python('foo', mode='json') == 'result=3 repr=SerializationCallable(serializer=int)'
@@ -356,7 +370,9 @@ def test_function_wrap_no_info():
         return f'result={serializer(len(value))} repr={serializer!r}'
 
     s = SchemaSerializer(
-        core_schema.int_schema(serialization=core_schema.wrap_serializer_function_ser_schema(f, 'general', False))
+        core_schema.int_schema(
+            serialization=core_schema.wrap_serializer_function_ser_schema(f, on_field=False, info_arg=False)
+        )
     )
     assert s.to_python('foo') == 'result=3 repr=SerializationCallable(serializer=int)'
     assert s.to_python('foo', mode='json') == 'result=3 repr=SerializationCallable(serializer=int)'
@@ -370,7 +386,7 @@ def test_function_wrap_custom_schema():
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.wrap_serializer_function_ser_schema(
-                f, 'general', True, schema=core_schema.int_schema()
+                f, on_field=False, info_arg=True, schema=core_schema.int_schema()
             )
         )
     )
@@ -394,7 +410,7 @@ def test_function_wrap_fallback():
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.wrap_serializer_function_ser_schema(
-                f, 'general', True, schema=core_schema.any_schema()
+                f, on_field=False, info_arg=True, schema=core_schema.any_schema()
             )
         )
     )
@@ -431,7 +447,7 @@ def test_deque():
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.wrap_serializer_function_ser_schema(
-                serialize_deque, 'general', True, schema=core_schema.any_schema()
+                serialize_deque, on_field=False, info_arg=True, schema=core_schema.any_schema()
             )
         )
     )
@@ -459,7 +475,7 @@ def test_custom_mapping():
     s = SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.wrap_serializer_function_ser_schema(
-                serialize_custom_mapping, 'general', True, schema=core_schema.int_schema()
+                serialize_custom_mapping, on_field=False, info_arg=True, schema=core_schema.int_schema()
             )
         )
     )
@@ -493,7 +509,7 @@ def test_function_wrap_model():
                     'c': core_schema.typed_dict_field(core_schema.any_schema(), serialization_exclude=True),
                 }
             ),
-            serialization=core_schema.wrap_serializer_function_ser_schema(wrap_function, 'general', True),
+            serialization=core_schema.wrap_serializer_function_ser_schema(wrap_function, on_field=False, info_arg=True),
         )
     )
     m = MyModel(a=1, b=b'foobar', c='excluded')
@@ -535,7 +551,9 @@ def test_function_plain_model():
                     'c': core_schema.typed_dict_field(core_schema.any_schema(), serialization_exclude=True),
                 }
             ),
-            serialization=core_schema.plain_serializer_function_ser_schema(wrap_function, 'general', True),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                wrap_function, on_field=False, info_arg=True
+            ),
         )
     )
     m = MyModel(a=1, b=b'foobar', c='not excluded')
@@ -563,7 +581,7 @@ def test_wrap_return_type():
     s = SchemaSerializer(
         core_schema.str_schema(
             serialization=core_schema.wrap_serializer_function_ser_schema(
-                to_path, 'general', True, json_return_type='path'
+                to_path, on_field=False, info_arg=True, json_return_type='path'
             )
         )
     )

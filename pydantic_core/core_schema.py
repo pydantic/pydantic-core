@@ -197,12 +197,6 @@ SerializerFunction = Union[
 ]
 
 
-class SerializerFunctionSchema(TypedDict):
-    type: Literal['general', 'field']
-    info_arg: bool
-    function: SerializerFunction
-
-
 # must match `src/serializers/ob_type.rs::ObType`
 JsonReturnTypes = Literal[
     'none',
@@ -246,16 +240,18 @@ Values have the following meanings:
 
 class PlainSerializerFunctionSerSchema(TypedDict, total=False):
     type: Required[Literal['function-plain']]
-    function: Required[SerializerFunctionSchema]
+    function: Required[SerializerFunction]
+    on_field: bool  # default False
+    info_arg: bool  # default False
     json_return_type: JsonReturnTypes
     when_used: WhenUsed  # default: 'always'
 
 
 def plain_serializer_function_ser_schema(
     function: SerializerFunction,
-    function_type: Literal['general', 'field'],
-    info_arg: bool,
     *,
+    on_field: bool,
+    info_arg: bool,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
 ) -> PlainSerializerFunctionSerSchema:
@@ -264,7 +260,7 @@ def plain_serializer_function_ser_schema(
 
     Args:
         function: The function to use for serialization
-        function_type: The type of function, either 'general' or 'field'
+        on_field: Whether the serializer is for a field, e.g. takes `model` as the first argument
         info_arg: Whether the function takes an `__info` argument
         json_return_type: The type that the function returns if `mode='json'`
         when_used: When the function should be called
@@ -274,7 +270,9 @@ def plain_serializer_function_ser_schema(
         when_used = None  # type: ignore
     return dict_not_none(
         type='function-plain',
-        function={'type': function_type, 'info_arg': info_arg, 'function': function},
+        function=function,
+        on_field=on_field,
+        info_arg=info_arg,
         json_return_type=json_return_type,
         when_used=when_used,
     )
@@ -301,15 +299,11 @@ WrapSerializerFunction = Union[
 ]
 
 
-class WrapSerializerFunctionSchema(TypedDict):
-    type: Literal['general', 'field']
-    info_arg: bool
-    function: WrapSerializerFunction
-
-
 class WrapSerializerFunctionSerSchema(TypedDict, total=False):
     type: Required[Literal['function-wrap']]
-    function: Required[WrapSerializerFunctionSchema]
+    function: Required[WrapSerializerFunction]
+    on_field: bool  # default False
+    info_arg: bool  # default False
     schema: CoreSchema  # if omitted, the schema on which this serializer is defined is used
     json_return_type: JsonReturnTypes
     when_used: WhenUsed  # default: 'always'
@@ -317,9 +311,9 @@ class WrapSerializerFunctionSerSchema(TypedDict, total=False):
 
 def wrap_serializer_function_ser_schema(
     function: WrapSerializerFunction,
-    function_type: Literal['general', 'field'],
-    info_arg: bool,
     *,
+    on_field: bool,
+    info_arg: bool,
     schema: CoreSchema | None = None,
     json_return_type: JsonReturnTypes | None = None,
     when_used: WhenUsed = 'always',
@@ -329,7 +323,7 @@ def wrap_serializer_function_ser_schema(
 
     Args:
         function: The function to use for serialization
-        function_type: The type of function, either 'general' or 'field'
+        on_field: Whether the serializer is for a field, e.g. takes `model` as the first argument
         info_arg: Whether the function takes an `__info` argument
         schema: The schema to use for the inner serialization
         json_return_type: The type that the function returns if `mode='json'`
@@ -340,8 +334,10 @@ def wrap_serializer_function_ser_schema(
         when_used = None  # type: ignore
     return dict_not_none(
         type='function-wrap',
+        function=function,
+        on_field=on_field,
+        info_arg=info_arg,
         schema=schema,
-        function={'type': function_type, 'info_arg': info_arg, 'function': function},
         json_return_type=json_return_type,
         when_used=when_used,
     )
@@ -1784,9 +1780,7 @@ def no_info_after_validator_function(
     def fn(v: str) -> str:
         return v + 'world'
 
-    func_schema = core_schema.no_info_after_validator_function(
-        function=fn, schema=core_schema.str_schema()
-    )
+    func_schema = core_schema.no_info_after_validator_function(fn, core_schema.str_schema())
     schema = core_schema.typed_dict_schema({'a': core_schema.typed_dict_field(func_schema)})
 
     v = SchemaValidator(schema)
@@ -1802,7 +1796,7 @@ def no_info_after_validator_function(
     """
     return dict_not_none(
         type='function-after',
-        function={'type': 'field', 'function': function},
+        function={'type': 'no-info', 'function': function},
         schema=schema,
         ref=ref,
         metadata=metadata,
@@ -3277,6 +3271,7 @@ def url_schema(
     schema = core_schema.url_schema()
     v = SchemaValidator(schema)
     print(v.validate_python('https://example.com'))
+    #> https://example.com/
     ```
 
     Args:
@@ -3342,6 +3337,7 @@ def multi_host_url_schema(
     schema = core_schema.multi_host_url_schema()
     v = SchemaValidator(schema)
     print(v.validate_python('redis://localhost,0.0.0.0,127.0.0.1'))
+    #> redis://localhost,0.0.0.0,127.0.0.1
     ```
 
     Args:

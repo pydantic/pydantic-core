@@ -295,7 +295,7 @@ def test_expected_serialization_types(json_return_type):
     SchemaSerializer(
         core_schema.any_schema(
             serialization=core_schema.plain_serializer_function_ser_schema(
-                repr_function, 'general', True, json_return_type=json_return_type
+                repr_function, on_field=False, info_arg=True, json_return_type=json_return_type
             )
         )
     )
