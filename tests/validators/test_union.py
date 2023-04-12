@@ -330,6 +330,9 @@ def test_custom_error_type_context():
 
 def test_int_float():
     v = SchemaValidator(core_schema.union_schema([core_schema.int_schema(), core_schema.float_schema()]))
+    assert 'strict_required:true' in plain_repr(v)
+    assert 'ultra_strict_required:true' in plain_repr(v)  # since "float" schema has ultra-strict behaviour
+
     assert repr(v.validate_python(1)) == '1'
     assert repr(v.validate_json('1')) == '1'
     assert repr(v.validate_python(1.0)) == '1.0'
@@ -340,3 +343,18 @@ def test_int_float():
     assert repr(v.validate_json('1')) == '1'
     assert repr(v.validate_python(1.0)) == '1.0'
     assert repr(v.validate_json('1.0')) == '1.0'
+
+
+def test_strict_check():
+    v = SchemaValidator(core_schema.union_schema([core_schema.int_schema(), core_schema.json_schema()]))
+    assert 'strict_required:true' in plain_repr(v)
+    assert 'ultra_strict_required:false' in plain_repr(v)
+
+
+def test_no_strict_check():
+    v = SchemaValidator(core_schema.union_schema([core_schema.is_instance_schema(int), core_schema.json_schema()]))
+    assert 'strict_required:false' in plain_repr(v)
+    assert 'ultra_strict_required:false' in plain_repr(v)
+
+    assert v.validate_python(123) == 123
+    assert v.validate_python('[1, 2, 3]') == [1, 2, 3]
