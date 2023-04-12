@@ -64,9 +64,13 @@ impl Validator for LaxOrStrictValidator {
         }
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
         if ultra_strict {
-            self.strict_validator.different_strict_behavior(true)
+            self.strict_validator.different_strict_behavior(build_context, true)
         } else {
             true
         }

@@ -395,3 +395,22 @@ def test_no_strict_check():
 
     assert v.validate_python(123) == 123
     assert v.validate_python('[1, 2, 3]') == [1, 2, 3]
+
+
+def test_strict_reference():
+    v = SchemaValidator(
+        core_schema.tuple_positional_schema(
+            [
+                core_schema.float_schema(),
+                core_schema.union_schema(
+                    [core_schema.int_schema(), core_schema.definition_reference_schema('tuple-ref')]
+                ),
+            ],
+            ref='tuple-ref',
+        )
+    )
+    assert 'strict_required:true' in plain_repr(v)
+    assert 'ultra_strict_required:true' in plain_repr(v)  # since "float" schema has ultra-strict behaviour
+
+    assert repr(v.validate_python((1, 2))) == '(1.0, 2)'
+    assert repr(v.validate_python((1.0, (2.0, 3)))) == '(1.0, (2.0, 3))'

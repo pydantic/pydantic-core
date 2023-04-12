@@ -164,8 +164,14 @@ impl Validator for UnionValidator {
         }
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        self.choices.iter().any(|v| v.different_strict_behavior(ultra_strict))
+    fn different_strict_behavior(
+        &self,
+        build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
+        self.choices
+            .iter()
+            .any(|v| v.different_strict_behavior(build_context, ultra_strict))
     }
 
     fn get_name(&self) -> &str {
@@ -178,8 +184,8 @@ impl Validator for UnionValidator {
 
     fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
         self.choices.iter_mut().try_for_each(|v| v.complete(build_context))?;
-        self.strict_required = self.different_strict_behavior(false);
-        self.ultra_strict_required = self.different_strict_behavior(true);
+        self.strict_required = self.different_strict_behavior(Some(build_context), false);
+        self.ultra_strict_required = self.different_strict_behavior(Some(build_context), true);
         Ok(())
     }
 }
@@ -417,8 +423,14 @@ impl Validator for TaggedUnionValidator {
         }
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        self.choices.values().any(|v| v.different_strict_behavior(ultra_strict))
+    fn different_strict_behavior(
+        &self,
+        build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
+        self.choices
+            .values()
+            .any(|v| v.different_strict_behavior(build_context, ultra_strict))
     }
 
     fn get_name(&self) -> &str {

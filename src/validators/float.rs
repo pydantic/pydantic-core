@@ -79,7 +79,11 @@ impl Validator for FloatValidator {
         Ok(float.into_py(py))
     }
 
-    fn different_strict_behavior(&self, _ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        _build_context: Option<&BuildContext<CombinedValidator>>,
+        _ultra_strict: bool,
+    ) -> bool {
         true
     }
 
@@ -155,7 +159,11 @@ impl Validator for ConstrainedFloatValidator {
         Ok(float.into_py(py))
     }
 
-    fn different_strict_behavior(&self, _ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        _build_context: Option<&BuildContext<CombinedValidator>>,
+        _ultra_strict: bool,
+    ) -> bool {
         true
     }
 

@@ -88,7 +88,11 @@ impl Validator for LiteralSingleStringValidator {
         }
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        _build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
         !ultra_strict
     }
 
@@ -138,7 +142,11 @@ impl Validator for LiteralSingleIntValidator {
         }
     }
 
-    fn different_strict_behavior(&self, _ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        _build_context: Option<&BuildContext<CombinedValidator>>,
+        _ultra_strict: bool,
+    ) -> bool {
         true
     }
 
@@ -201,7 +209,11 @@ impl Validator for LiteralMultipleStringsValidator {
         }
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        _build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
         !ultra_strict
     }
 
@@ -264,7 +276,11 @@ impl Validator for LiteralMultipleIntsValidator {
         }
     }
 
-    fn different_strict_behavior(&self, _ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        _build_context: Option<&BuildContext<CombinedValidator>>,
+        _ultra_strict: bool,
+    ) -> bool {
         true
     }
 
@@ -354,7 +370,11 @@ impl Validator for LiteralGeneralValidator {
         ))
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        _build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
         !ultra_strict
     }
 

@@ -62,9 +62,13 @@ impl Validator for JsonValidator {
         }
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
         if let Some(ref v) = self.validator {
-            v.different_strict_behavior(ultra_strict)
+            v.different_strict_behavior(build_context, ultra_strict)
         } else {
             false
         }

@@ -89,7 +89,11 @@ impl Validator for TimeDeltaValidator {
         Ok(timedelta.try_into_py(py)?)
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        _build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
         !ultra_strict
     }
 

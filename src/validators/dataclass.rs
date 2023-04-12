@@ -380,10 +380,14 @@ impl Validator for DataclassArgsValidator {
         }
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
         self.fields
             .iter()
-            .any(|f| f.validator.different_strict_behavior(ultra_strict))
+            .any(|f| f.validator.different_strict_behavior(build_context, ultra_strict))
     }
 
     fn get_name(&self) -> &str {
@@ -516,9 +520,13 @@ impl Validator for DataclassValidator {
         Ok(obj.to_object(py))
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
         if ultra_strict {
-            self.validator.different_strict_behavior(ultra_strict)
+            self.validator.different_strict_behavior(build_context, ultra_strict)
         } else {
             true
         }

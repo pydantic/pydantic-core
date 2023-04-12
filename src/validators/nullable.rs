@@ -46,8 +46,12 @@ impl Validator for NullableValidator {
         }
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        self.validator.different_strict_behavior(ultra_strict)
+    fn different_strict_behavior(
+        &self,
+        build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
+        self.validator.different_strict_behavior(build_context, ultra_strict)
     }
 
     fn get_name(&self) -> &str {

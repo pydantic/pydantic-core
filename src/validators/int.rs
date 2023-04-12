@@ -51,7 +51,11 @@ impl Validator for IntValidator {
         Ok(input.validate_int(extra.strict.unwrap_or(self.strict))?.into_py(py))
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        _build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
         !ultra_strict
     }
 
@@ -117,7 +121,11 @@ impl Validator for ConstrainedIntValidator {
         Ok(int.into_py(py))
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        _build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
         !ultra_strict
     }
 

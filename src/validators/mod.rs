@@ -634,7 +634,11 @@ pub trait Validator: Send + Sync + Clone + Debug {
 
     /// whether the validator behaves differently in strict mode, and in ultra strict mode
     /// implementations should return true if any of their sub-validators return true
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool;
+    fn different_strict_behavior(
+        &self,
+        build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool;
 
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`

@@ -90,10 +90,14 @@ impl Validator for SetValidator {
         Ok(set.into_py(py))
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+    fn different_strict_behavior(
+        &self,
+        build_context: Option<&BuildContext<CombinedValidator>>,
+        ultra_strict: bool,
+    ) -> bool {
         if ultra_strict {
             match self.item_validator {
-                Some(ref v) => v.different_strict_behavior(true),
+                Some(ref v) => v.different_strict_behavior(build_context, true),
                 None => false,
             }
         } else {
