@@ -129,8 +129,10 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         self.strict_int()
     }
 
-    fn validate_float(&self, strict: bool) -> ValResult<f64> {
-        if strict {
+    fn validate_float(&self, strict: bool, ultra_strict: bool) -> ValResult<f64> {
+        if ultra_strict {
+            self.ultra_strict_float()
+        } else if strict {
             self.strict_float()
         } else {
             self.lax_float()
