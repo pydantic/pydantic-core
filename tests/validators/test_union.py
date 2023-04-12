@@ -1,4 +1,5 @@
 import pytest
+from dirty_equals import IsFloat, IsInt
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
@@ -328,21 +329,57 @@ def test_custom_error_type_context():
     ]
 
 
+def test_dirty_behaviour():
+    """
+    Check dirty-equals does what we expect.
+    """
+
+    assert 1 == IsInt(approx=1, delta=0)
+    assert 1.0 != IsInt(approx=1, delta=0)
+    assert 1 != IsFloat(approx=1, delta=0)
+    assert 1.0 == IsFloat(approx=1, delta=0)
+
+
 def test_int_float():
     v = SchemaValidator(core_schema.union_schema([core_schema.int_schema(), core_schema.float_schema()]))
     assert 'strict_required:true' in plain_repr(v)
     assert 'ultra_strict_required:true' in plain_repr(v)  # since "float" schema has ultra-strict behaviour
 
-    assert repr(v.validate_python(1)) == '1'
-    assert repr(v.validate_json('1')) == '1'
-    assert repr(v.validate_python(1.0)) == '1.0'
-    assert repr(v.validate_json('1.0')) == '1.0'
+    assert v.validate_python(1) == IsInt(approx=1, delta=0)
+    assert v.validate_json('1') == IsInt(approx=1, delta=0)
+    assert v.validate_python(1.0) == IsFloat(approx=1, delta=0)
+    assert v.validate_json('1.0') == IsFloat(approx=1, delta=0)
 
     v = SchemaValidator(core_schema.union_schema([core_schema.float_schema(), core_schema.int_schema()]))
-    assert repr(v.validate_python(1)) == '1'
-    assert repr(v.validate_json('1')) == '1'
-    assert repr(v.validate_python(1.0)) == '1.0'
-    assert repr(v.validate_json('1.0')) == '1.0'
+    assert v.validate_python(1) == IsInt(approx=1, delta=0)
+    assert v.validate_json('1') == IsInt(approx=1, delta=0)
+    assert v.validate_python(1.0) == IsFloat(approx=1, delta=0)
+    assert v.validate_json('1.0') == IsFloat(approx=1, delta=0)
+
+
+def test_str_float():
+    v = SchemaValidator(core_schema.union_schema([core_schema.str_schema(), core_schema.float_schema()]))
+
+    assert v.validate_python(1) == IsFloat(approx=1, delta=0)
+    assert v.validate_json('1') == IsFloat(approx=1, delta=0)
+    assert v.validate_python(1.0) == IsFloat(approx=1, delta=0)
+    assert v.validate_json('1.0') == IsFloat(approx=1, delta=0)
+
+    assert v.validate_python('1.0') == '1.0'
+    assert v.validate_python('1') == '1'
+    assert v.validate_json('"1.0"') == '1.0'
+    assert v.validate_json('"1"') == '1'
+
+    v = SchemaValidator(core_schema.union_schema([core_schema.float_schema(), core_schema.str_schema()]))
+    assert v.validate_python(1) == IsFloat(approx=1, delta=0)
+    assert v.validate_json('1') == IsFloat(approx=1, delta=0)
+    assert v.validate_python(1.0) == IsFloat(approx=1, delta=0)
+    assert v.validate_json('1.0') == IsFloat(approx=1, delta=0)
+
+    assert v.validate_python('1.0') == '1.0'
+    assert v.validate_python('1') == '1'
+    assert v.validate_json('"1.0"') == '1.0'
+    assert v.validate_json('"1"') == '1'
 
 
 def test_strict_check():
