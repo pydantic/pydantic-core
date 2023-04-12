@@ -289,7 +289,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_float(&self) -> ValResult<f64> {
+    fn ultra_strict_float(&self) -> ValResult<f64> {
         if matches!(self.is_instance_of::<PyInt>(), Ok(true)) {
             Err(ValError::new(ErrorType::FloatType, self))
         } else if let Ok(float) = self.extract::<f64>() {
@@ -298,7 +298,15 @@ impl<'a> Input<'a> for PyAny {
             Err(ValError::new(ErrorType::FloatType, self))
         }
     }
-
+    fn strict_float(&self) -> ValResult<f64> {
+        if self.extract::<bool>().is_ok() {
+            Err(ValError::new(ErrorType::FloatType, self))
+        } else if let Ok(float) = self.extract::<f64>() {
+            Ok(float)
+        } else {
+            Err(ValError::new(ErrorType::FloatType, self))
+        }
+    }
     fn lax_float(&self) -> ValResult<f64> {
         if let Ok(float) = self.extract::<f64>() {
             Ok(float)

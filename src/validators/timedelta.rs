@@ -89,6 +89,10 @@ impl Validator for TimeDeltaValidator {
         Ok(timedelta.try_into_py(py)?)
     }
 
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        !ultra_strict
+    }
+
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }

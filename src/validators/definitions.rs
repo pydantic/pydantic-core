@@ -107,6 +107,11 @@ impl Validator for DefinitionRefValidator {
         }
     }
 
+    /// TODO!
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        !ultra_strict
+    }
+
     fn get_name(&self) -> &str {
         &self.inner_name
     }

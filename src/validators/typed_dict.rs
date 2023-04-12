@@ -386,6 +386,12 @@ impl Validator for TypedDictValidator {
         }
     }
 
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        self.fields
+            .iter()
+            .any(|f| f.validator.different_strict_behavior(ultra_strict))
+    }
+
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }

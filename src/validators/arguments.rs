@@ -326,6 +326,12 @@ impl Validator for ArgumentsValidator {
         }
     }
 
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        self.parameters
+            .iter()
+            .any(|p| p.validator.different_strict_behavior(ultra_strict))
+    }
+
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }

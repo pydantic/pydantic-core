@@ -141,9 +141,16 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
+    fn ultra_strict_float(&self) -> ValResult<f64> {
+        match self {
+            JsonInput::Float(f) => Ok(*f),
+            _ => Err(ValError::new(ErrorType::FloatType, self)),
+        }
+    }
     fn strict_float(&self) -> ValResult<f64> {
         match self {
             JsonInput::Float(f) => Ok(*f),
+            JsonInput::Int(i) => Ok(*i as f64),
             _ => Err(ValError::new(ErrorType::FloatType, self)),
         }
     }
@@ -367,6 +374,10 @@ impl<'a> Input<'a> for String {
         }
     }
 
+    #[cfg_attr(has_no_coverage, no_coverage)]
+    fn ultra_strict_float(&self) -> ValResult<f64> {
+        self.strict_float()
+    }
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_float(&self) -> ValResult<f64> {
         Err(ValError::new(ErrorType::FloatType, self))

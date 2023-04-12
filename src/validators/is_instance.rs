@@ -90,6 +90,10 @@ impl Validator for IsInstanceValidator {
         }
     }
 
+    fn different_strict_behavior(&self, _ultra_strict: bool) -> bool {
+        false
+    }
+
     fn get_name(&self) -> &str {
         &self.name
     }

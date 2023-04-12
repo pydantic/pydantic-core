@@ -62,6 +62,14 @@ impl Validator for JsonValidator {
         }
     }
 
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        if let Some(ref v) = self.validator {
+            v.different_strict_behavior(ultra_strict)
+        } else {
+            false
+        }
+    }
+
     fn get_name(&self) -> &str {
         &self.name
     }

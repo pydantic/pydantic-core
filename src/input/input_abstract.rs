@@ -136,6 +136,7 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
             self.lax_float()
         }
     }
+    fn ultra_strict_float(&self) -> ValResult<f64>;
     fn strict_float(&self) -> ValResult<f64>;
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn lax_float(&self) -> ValResult<f64> {

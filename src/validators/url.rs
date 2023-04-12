@@ -86,6 +86,10 @@ impl Validator for UrlValidator {
         }
     }
 
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        !ultra_strict
+    }
+
     fn get_name(&self) -> &str {
         &self.name
     }
@@ -204,6 +208,10 @@ impl Validator for MultiHostUrlValidator {
             Ok(()) => Ok(multi_url.into_py(py)),
             Err(error_type) => return Err(ValError::new(error_type, input)),
         }
+    }
+
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        !ultra_strict
     }
 
     fn get_name(&self) -> &str {

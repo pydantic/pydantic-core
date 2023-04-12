@@ -80,6 +80,14 @@ impl Validator for DictValidator {
         }
     }
 
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        if ultra_strict {
+            self.key_validator.different_strict_behavior(true) || self.value_validator.different_strict_behavior(true)
+        } else {
+            true
+        }
+    }
+
     fn get_name(&self) -> &str {
         &self.name
     }
