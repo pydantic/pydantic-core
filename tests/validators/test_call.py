@@ -181,11 +181,11 @@ def test_named_tuple():
     assert d.y == 2.2
 
 
-def test_function_call_partial(py_and_json: PyAndJson):
+def test_function_call_partial():
     def my_function(a, b, c):
         return a + b + c
 
-    v = py_and_json(
+    v = SchemaValidator(
         {
             'type': 'call',
             'function': partial(my_function, c=3),
@@ -198,6 +198,26 @@ def test_function_call_partial(py_and_json: PyAndJson):
             },
         }
     )
-    assert 'name:"call[my_function]"' in plain_repr(v.validator)
+    assert 'name:"call[my_function]"' in plain_repr(v)
     assert v.validate_python((1, 2)) == 6
     assert v.validate_python((1, '2')) == 6
+
+
+def test_custom_name():
+    def my_function(a):
+        return a
+
+    v = SchemaValidator(
+        {
+            'type': 'call',
+            'function': my_function,
+            'function_name': 'foobar',
+            'arguments_schema': {
+                'type': 'arguments',
+                'arguments_schema': [{'name': 'a', 'mode': 'positional_or_keyword', 'schema': {'type': 'int'}}],
+            },
+        }
+    )
+    assert 'name:"call[foobar]"' in plain_repr(v)
+    assert v.validate_python((1,)) == 1
+    assert v.validate_python(('2',)) == 2
