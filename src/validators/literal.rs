@@ -1,5 +1,6 @@
 use ahash::{HashMap, HashMapExt};
 use pyo3::intern;
+use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -19,15 +20,25 @@ pub struct LiteralValidator {
     name: String,
 }
 
+static PY_INT_TYPE: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+
 fn extract_int_strict(py: Python, item: &PyAny) -> Option<i64> {
-    if item.get_type().is(1.to_object(py).as_ref(py).get_type()) {
+    if item
+        .get_type()
+        .is(PY_INT_TYPE.get_or_init(py, || 1.to_object(py).as_ref(py).get_type().into()))
+    {
         return Some(item.extract().unwrap());
     }
     None
 }
 
+static PY_STR_TYPE: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+
 fn extract_str_strict(py: Python, item: &PyAny) -> Option<String> {
-    if item.get_type().is(intern!(py, "a").get_type()) {
+    if item
+        .get_type()
+        .is(PY_STR_TYPE.get_or_init(py, || "a".to_object(py).as_ref(py).get_type().into()))
+    {
         return Some(item.extract().unwrap());
     }
     None
