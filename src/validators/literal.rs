@@ -1,3 +1,6 @@
+// Validator for things inside of a typing.Literal[]
+// which can be an int, a string, bytes or an Enum value (including `class Foo(str, Enum)` type enums)
+
 use ahash::AHashSet;
 use pyo3::intern;
 use pyo3::once_cell::GILOnceCell;
@@ -13,8 +16,13 @@ use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct LiteralValidator {
+    // Specialized lookups for ints and strings because they
+    // (1) are easy to convert between Rust and Python
+    // (2) hashing them in Rust is very fast
+    // (3) are the most commonly used things in Literal[...]
     expected_int: Option<AHashSet<i64>>,
     expected_str: Option<AHashSet<String>>,
+    // Catch all for Enum and bytes (the latter only because it is seldom used)
     expected_py: Option<Py<PyDict>>,
     expected_repr: String,
     name: String,
@@ -115,6 +123,7 @@ impl Validator for LiteralValidator {
                 }
             }
         }
+        // must be an enum of bytes
         if let Some(expected_py) = &self.expected_py {
             if let Some(v) = expected_py.as_ref(py).get_item(input) {
                 return Ok(v.into());
