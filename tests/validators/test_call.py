@@ -1,6 +1,7 @@
 import dataclasses
 import re
 from collections import namedtuple
+from functools import partial
 
 import pytest
 
@@ -178,3 +179,25 @@ def test_named_tuple():
     assert isinstance(d, Point)
     assert d.x == 1.1
     assert d.y == 2.2
+
+
+def test_function_call_partial(py_and_json: PyAndJson):
+    def my_function(a, b, c):
+        return a + b + c
+
+    v = py_and_json(
+        {
+            'type': 'call',
+            'function': partial(my_function, c=3),
+            'arguments_schema': {
+                'type': 'arguments',
+                'arguments_schema': [
+                    {'name': 'a', 'mode': 'positional_or_keyword', 'schema': {'type': 'int'}},
+                    {'name': 'b', 'mode': 'positional_or_keyword', 'schema': {'type': 'int'}},
+                ],
+            },
+        }
+    )
+    assert 'name:"call[my_function]"' in plain_repr(v.validator)
+    assert v.validate_python((1, 2)) == 6
+    assert v.validate_python((1, '2')) == 6
