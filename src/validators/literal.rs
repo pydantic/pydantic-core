@@ -1,4 +1,4 @@
-use ahash::{HashMap, HashMapExt};
+use ahash::AHashSet;
 use pyo3::intern;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
@@ -13,8 +13,8 @@ use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct LiteralValidator {
-    expected_int: Option<HashMap<i64, Py<PyAny>>>,
-    expected_str: Option<HashMap<String, Py<PyAny>>>,
+    expected_int: Option<AHashSet<i64>>,
+    expected_str: Option<AHashSet<String>>,
     expected_py: Option<Py<PyDict>>,
     expected_repr: String,
     name: String,
@@ -22,11 +22,14 @@ pub struct LiteralValidator {
 
 static PY_INT_TYPE: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
+#[inline(always)]
+fn get_py_int_type(py: Python) -> &Py<PyAny> {
+    PY_INT_TYPE.get_or_init(py, || 1.to_object(py).as_ref(py).get_type().into())
+}
+
+#[inline(always)]
 fn extract_int_strict(py: Python, item: &PyAny) -> Option<i64> {
-    if item
-        .get_type()
-        .is(PY_INT_TYPE.get_or_init(py, || 1.to_object(py).as_ref(py).get_type().into()))
-    {
+    if item.get_type().is(get_py_int_type(py)) {
         return Some(item.extract().unwrap());
     }
     None
@@ -34,11 +37,14 @@ fn extract_int_strict(py: Python, item: &PyAny) -> Option<i64> {
 
 static PY_STR_TYPE: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
+#[inline(always)]
+fn get_py_str_type(py: Python) -> &Py<PyAny> {
+    PY_STR_TYPE.get_or_init(py, || "a".to_object(py).as_ref(py).get_type().into())
+}
+
+#[inline(always)]
 fn extract_str_strict(py: Python, item: &PyAny) -> Option<String> {
-    if item
-        .get_type()
-        .is(PY_STR_TYPE.get_or_init(py, || "a".to_object(py).as_ref(py).get_type().into()))
-    {
+    if item.get_type().is(get_py_str_type(py)) {
         return Some(item.extract().unwrap());
     }
     None
@@ -58,21 +64,24 @@ impl BuildValidator for LiteralValidator {
         }
         let py = expected.py();
         // Literal[...] only supports int, str, bytes or enums, all of which can be hashed
-        let mut expected_int = HashMap::new();
-        let mut expected_str = HashMap::new();
+        let mut expected_int = AHashSet::new();
+        let mut expected_str = AHashSet::new();
         let expected_py = PyDict::new(py);
         let mut repr_args: Vec<String> = Vec::new();
         for item in expected.iter() {
             repr_args.push(item.repr()?.extract()?);
             if let Some(int) = extract_int_strict(py, item) {
-                expected_int.insert(int, item.into());
+                expected_int.insert(int);
             } else if let Some(string) = extract_str_strict(py, item) {
-                expected_str.insert(string.to_string(), item.into());
+                expected_str.insert(string.to_string());
             } else {
                 expected_py.set_item(item, item)?;
             }
         }
         let (expected_repr, name) = expected_repr_name(repr_args, "literal");
+        // make sure we've initialized the GILOnceCell objects
+        get_py_int_type(py);
+        get_py_str_type(py);
         Ok(CombinedValidator::Literal(Self {
             expected_int: (!expected_int.is_empty()).then_some(expected_int),
             expected_str: (!expected_str.is_empty()).then_some(expected_str),
@@ -94,15 +103,15 @@ impl Validator for LiteralValidator {
     ) -> ValResult<'data, PyObject> {
         if let Some(expected_ints) = &self.expected_int {
             if let Some(int) = extract_int_strict(py, input.to_object(py).as_ref(py)) {
-                if let Some(value) = expected_ints.get(&int) {
-                    return Ok(value.clone());
+                if expected_ints.contains(&int) {
+                    return Ok(input.to_object(py));
                 }
             }
         }
         if let Some(expected_strings) = &self.expected_str {
             if let Some(string) = extract_str_strict(py, input.to_object(py).as_ref(py)) {
-                if let Some(value) = expected_strings.get(&string) {
-                    return Ok(value.clone());
+                if expected_strings.contains(&string) {
+                    return Ok(input.to_object(py));
                 }
             }
         }
