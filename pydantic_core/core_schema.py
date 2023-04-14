@@ -2878,6 +2878,7 @@ class DataclassArgsSchema(TypedDict, total=False):
     type: Required[Literal['dataclass-args']]
     dataclass_name: Required[str]
     fields: Required[List[DataclassField]]
+    computed_fields: List[ComputedField]
     populate_by_name: bool  # default: False
     collect_init_only: bool  # default: False
     ref: str
@@ -2890,6 +2891,7 @@ def dataclass_args_schema(
     dataclass_name: str,
     fields: list[DataclassField],
     *,
+    computed_fields: List[ComputedField] | None = None,
     populate_by_name: bool | None = None,
     collect_init_only: bool | None = None,
     ref: str | None = None,
@@ -2917,6 +2919,7 @@ def dataclass_args_schema(
     Args:
         dataclass_name: The name of the dataclass being validated
         fields: The fields to use for the dataclass
+        computed_fields: Computed fields to use when serializing the dataclass
         populate_by_name: Whether to populate by name
         collect_init_only: Whether to collect init only fields into a dict to pass to `__post_init__`
         ref: optional unique identifier of the schema, used to reference the schema in other places
@@ -2928,6 +2931,7 @@ def dataclass_args_schema(
         type='dataclass-args',
         dataclass_name=dataclass_name,
         fields=fields,
+        computed_fields=computed_fields,
         populate_by_name=populate_by_name,
         collect_init_only=collect_init_only,
         ref=ref,
