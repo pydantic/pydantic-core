@@ -3,6 +3,11 @@ import json
 import platform
 from typing import Any, ClassVar
 
+try:
+    from functools import cached_property
+except ImportError:
+    cached_property = None
+
 import pytest
 
 from pydantic_core import SchemaSerializer, SchemaValidator, core_schema
@@ -511,3 +516,93 @@ def test_function_wrap_field_serializer_to_json():
         )
     )
     assert json.loads(s.to_json(Model(x=1000))) == {'x': '1_000'}
+
+
+def test_property():
+    @dataclasses.dataclass
+    class Model:
+        width: int
+        height: int
+
+        @property
+        def area(self) -> bytes:
+            a = self.width * self.height
+            return b'%d' % a
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {
+                    'width': core_schema.typed_dict_field(core_schema.int_schema()),
+                    'height': core_schema.typed_dict_field(core_schema.int_schema()),
+                },
+                computed_fields=[core_schema.computed_field('area', json_return_type='bytes')],
+            ),
+        )
+    )
+    assert s.to_python(Model(3, 4)) == {'width': 3, 'height': 4, 'area': b'12'}
+    assert s.to_python(Model(3, 4), mode='json') == {'width': 3, 'height': 4, 'area': '12'}
+    assert s.to_json(Model(3, 4)) == b'{"width":3,"height":4,"area":"12"}'
+
+
+def test_property_alias():
+    @dataclasses.dataclass
+    class Model:
+        width: int
+        height: int
+
+        @property
+        def area(self) -> int:
+            return self.width * self.height
+
+        @property
+        def volume(self) -> int:
+            return self.area * self.height
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {
+                    'width': core_schema.typed_dict_field(core_schema.int_schema()),
+                    'height': core_schema.typed_dict_field(core_schema.int_schema()),
+                },
+                computed_fields=[
+                    core_schema.computed_field('area', alias='Area'),
+                    core_schema.computed_field('volume'),
+                ],
+            ),
+        )
+    )
+    assert s.to_python(Model(3, 4)) == {'width': 3, 'height': 4, 'Area': 12, 'volume': 48}
+    assert s.to_python(Model(3, 4), mode='json') == {'width': 3, 'height': 4, 'Area': 12, 'volume': 48}
+    assert s.to_json(Model(3, 4)) == b'{"width":3,"height":4,"Area":12,"volume":48}'
+
+
+@pytest.mark.skipif(cached_property is None, reason='cached_property is not available')
+def test_cached_property_alias():
+    @dataclasses.dataclass
+    class Model:
+        width: int
+        height: int
+
+        @cached_property
+        def area(self) -> int:
+            return self.width * self.height
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {
+                    'width': core_schema.typed_dict_field(core_schema.int_schema()),
+                    'height': core_schema.typed_dict_field(core_schema.int_schema()),
+                },
+                computed_fields=[core_schema.computed_field('area')],
+            ),
+        )
+    )
+    assert s.to_python(Model(3, 4)) == {'width': 3, 'height': 4, 'area': 12}
+    assert s.to_python(Model(3, 4), mode='json') == {'width': 3, 'height': 4, 'area': 12}
+    assert s.to_json(Model(3, 4)) == b'{"width":3,"height":4,"area":12}'
