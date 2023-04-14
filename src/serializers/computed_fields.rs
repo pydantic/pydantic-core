@@ -6,11 +6,12 @@ use serde::ser::SerializeMap;
 use serde::Serialize;
 
 use crate::build_tools::SchemaDict;
+use crate::serializers::filter::SchemaFilter;
 
 use super::errors::py_err_se_err;
 use super::infer::{infer_serialize, infer_serialize_known, infer_to_python, infer_to_python_known};
 use super::ob_type::ObType;
-use super::{Extra, SerMode};
+use super::Extra;
 
 use super::type_serializers::function::get_json_return_type;
 
@@ -35,12 +36,13 @@ impl ComputedFields {
         &self,
         model: &PyAny,
         output_dict: &PyDict,
+        filter: &SchemaFilter<isize>,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<()> {
         for computed_fields in self.0.iter() {
-            computed_fields.to_python(model, output_dict, include, exclude, extra)?;
+            computed_fields.to_python(model, output_dict, filter, include, exclude, extra)?;
         }
         Ok(())
     }
@@ -49,19 +51,26 @@ impl ComputedFields {
         &self,
         model: &PyAny,
         map: &mut S::SerializeMap,
+        filter: &SchemaFilter<isize>,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<(), S::Error> {
         for computed_field in self.0.iter() {
-            let cfs = ComputedFieldSerializer {
-                model,
-                computed_field,
-                include,
-                exclude,
-                extra,
-            };
-            map.serialize_entry(&computed_field.alias, &cfs)?;
+            let property_name = computed_field.property_name.as_ref(model.py());
+            if let Some((next_include, next_exclude)) = filter
+                .key_filter(property_name, include, exclude)
+                .map_err(py_err_se_err)?
+            {
+                let cfs = ComputedFieldSerializer {
+                    model,
+                    computed_field,
+                    include: next_include,
+                    exclude: next_exclude,
+                    extra,
+                };
+                map.serialize_entry(&computed_field.alias, &cfs)?;
+            }
         }
         Ok(())
     }
@@ -94,23 +103,24 @@ impl ComputedField {
         &self,
         model: &PyAny,
         output_dict: &PyDict,
+        filter: &SchemaFilter<isize>,
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<()> {
         let py = model.py();
         let property_name = self.property_name.as_ref(py);
-        let next_value = model.getattr(property_name)?;
 
-        // TODO fix include & exclude
-        let value = match extra.mode {
-            SerMode::Json => match self.return_ob_type {
-                Some(ref ob_type) => infer_to_python_known(ob_type, next_value, include, exclude, extra),
-                None => infer_to_python(next_value, include, exclude, extra),
-            },
-            _ => Ok(next_value.to_object(py)),
-        }?;
-        output_dict.set_item(self.alias_py.as_ref(py), value)?;
+        if let Some((next_include, next_exclude)) = filter.key_filter(property_name, include, exclude)? {
+            let next_value = model.getattr(property_name)?;
+
+            // TODO fix include & exclude
+            let value = match self.return_ob_type {
+                Some(ref ob_type) => infer_to_python_known(ob_type, next_value, next_include, next_exclude, extra),
+                None => infer_to_python(next_value, next_include, next_exclude, extra),
+            }?;
+            output_dict.set_item(self.alias_py.as_ref(py), value)?;
+        }
         Ok(())
     }
 }

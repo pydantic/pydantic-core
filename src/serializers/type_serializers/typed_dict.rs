@@ -207,7 +207,8 @@ impl TypeSerializer for TypedDictSerializer {
                             }
                         }
                         if self.include_extra {
-                            let value = infer_to_python(value, include, exclude, &extra)?;
+                            // TODO test this
+                            let value = infer_to_python(value, next_include, next_exclude, &extra)?;
                             output_dict.set_item(key, value)?;
                         } else if extra.check.enabled() {
                             return Err(PydanticSerializationUnexpectedValue::new_err(None));
@@ -225,7 +226,7 @@ impl TypeSerializer for TypedDictSerializer {
                 }
                 if let Some(ref computed_fields) = self.computed_fields {
                     if let Some(model) = td_extra.model {
-                        computed_fields.to_python(model, output_dict, include, exclude, extra)?;
+                        computed_fields.to_python(model, output_dict, &self.filter, include, exclude, extra)?;
                     }
                 }
                 Ok(output_dict.into_py(py))
@@ -304,7 +305,7 @@ impl TypeSerializer for TypedDictSerializer {
                 }
                 if let Some(ref computed_fields) = self.computed_fields {
                     if let Some(model) = td_extra.model {
-                        computed_fields.serde_serialize::<S>(model, &mut map, include, exclude, extra)?;
+                        computed_fields.serde_serialize::<S>(model, &mut map, &self.filter, include, exclude, extra)?;
                     }
                 }
                 map.end()

@@ -638,7 +638,7 @@ def test_property_other_error():
     class Model:
         width: int
 
-        @cached_property
+        @property
         def area(self) -> int:
             raise ValueError('xxx')
 
@@ -660,3 +660,37 @@ def test_property_other_error():
     e = '^Error serializing to JSON: ValueError: xxx$'
     with pytest.raises(PydanticSerializationError, match=e):
         s.to_json(Model(3))
+
+
+def test_property_include_exclude():
+    @dataclasses.dataclass
+    class Model:
+        a: int
+
+        @property
+        def b(self):
+            return [1, 2, b'3']
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {'a': core_schema.typed_dict_field(core_schema.int_schema())},
+                computed_fields=[core_schema.computed_field('b')],
+            ),
+        )
+    )
+    assert s.to_python(Model(1)) == {'a': 1, 'b': [1, 2, b'3']}
+    assert s.to_python(Model(1), exclude={'b'}) == {'a': 1}
+    assert s.to_python(Model(1), include={'a'}) == {'a': 1}
+    assert s.to_python(Model(1), exclude={'b': [0]}) == {'a': 1, 'b': [2, b'3']}
+
+    assert s.to_python(Model(1), mode='json') == {'a': 1, 'b': [1, 2, '3']}
+    assert s.to_python(Model(1), mode='json', exclude={'b'}) == {'a': 1}
+    assert s.to_python(Model(1), mode='json', include={'a'}) == {'a': 1}
+    assert s.to_python(Model(1), mode='json', exclude={'b': [0]}) == {'a': 1, 'b': [2, '3']}
+
+    assert s.to_json(Model(1)) == b'{"a":1,"b":[1,2,"3"]}'
+    assert s.to_json(Model(1), exclude={'b'}) == b'{"a":1}'
+    assert s.to_json(Model(1), include={'a'}) == b'{"a":1}'
+    assert s.to_json(Model(1), exclude={'b': [0]}) == b'{"a":1,"b":[2,"3"]}'

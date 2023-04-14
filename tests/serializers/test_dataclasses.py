@@ -119,4 +119,4 @@ def test_properties():
         assert j == b'{"a":"hello","b":"more","c":"hello more"}'
 
     assert s.to_python(FooProp(a='hello', b=b'more'), exclude={'b'}) == IsStrictDict(a='hello', c='hello more')
-    assert s.to_json(FooProp(a='hello', b=b'more'), include={'a'}) == b'{"a":"hello","c":"hello more"}'
+    assert s.to_json(FooProp(a='hello', b=b'more'), include={'a'}) == b'{"a":"hello"}'
