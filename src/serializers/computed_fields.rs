@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use crate::build_tools::SchemaDict;
 
+use super::errors::py_err_se_err;
 use super::infer::{infer_serialize, infer_serialize_known, infer_to_python, infer_to_python_known};
 use super::ob_type::ObType;
 use super::{Extra, SerMode};
@@ -126,7 +127,7 @@ impl<'py> Serialize for ComputedFieldSerializer<'py> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let py = self.model.py();
         let property_name = self.computed_field.property_name.as_ref(py);
-        let next_value = self.model.getattr(property_name).unwrap();
+        let next_value = self.model.getattr(property_name).map_err(py_err_se_err)?;
 
         match self.computed_field.return_ob_type {
             Some(ref ob_type) => {

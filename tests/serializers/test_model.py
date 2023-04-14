@@ -10,7 +10,7 @@ except ImportError:
 
 import pytest
 
-from pydantic_core import SchemaSerializer, SchemaValidator, core_schema
+from pydantic_core import PydanticSerializationError, SchemaSerializer, SchemaValidator, core_schema
 
 on_pypy = platform.python_implementation() == 'PyPy'
 # pypy doesn't seem to maintain order of `__dict__`
@@ -521,8 +521,9 @@ def test_function_wrap_field_serializer_to_json():
 def test_property():
     @dataclasses.dataclass
     class Model:
-        width: int
-        height: int
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
 
         @property
         def area(self) -> bytes:
@@ -541,9 +542,9 @@ def test_property():
             ),
         )
     )
-    assert s.to_python(Model(3, 4)) == {'width': 3, 'height': 4, 'area': b'12'}
-    assert s.to_python(Model(3, 4), mode='json') == {'width': 3, 'height': 4, 'area': '12'}
-    assert s.to_json(Model(3, 4)) == b'{"width":3,"height":4,"area":"12"}'
+    assert s.to_python(Model(width=3, height=4)) == {'width': 3, 'height': 4, 'area': b'12'}
+    assert s.to_python(Model(width=3, height=4), mode='json') == {'width': 3, 'height': 4, 'area': '12'}
+    assert s.to_json(Model(width=3, height=4)) == b'{"width":3,"height":4,"area":"12"}'
 
 
 def test_property_alias():
@@ -606,3 +607,56 @@ def test_cached_property_alias():
     assert s.to_python(Model(3, 4)) == {'width': 3, 'height': 4, 'area': 12}
     assert s.to_python(Model(3, 4), mode='json') == {'width': 3, 'height': 4, 'area': 12}
     assert s.to_json(Model(3, 4)) == b'{"width":3,"height":4,"area":12}'
+
+
+def test_property_attribute_error():
+    @dataclasses.dataclass
+    class Model:
+        width: int
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {'width': core_schema.typed_dict_field(core_schema.int_schema())},
+                computed_fields=[core_schema.computed_field('area', json_return_type='bytes')],
+            ),
+        )
+    )
+    with pytest.raises(AttributeError, match="^'Model' object has no attribute 'area'$"):
+        s.to_python(Model(3))
+    with pytest.raises(AttributeError, match="^'Model' object has no attribute 'area'$"):
+        s.to_python(Model(3), mode='json')
+
+    e = "^Error serializing to JSON: AttributeError: 'Model' object has no attribute 'area'$"
+    with pytest.raises(PydanticSerializationError, match=e):
+        s.to_json(Model(3))
+
+
+def test_property_other_error():
+    @dataclasses.dataclass
+    class Model:
+        width: int
+
+        @cached_property
+        def area(self) -> int:
+            raise ValueError('xxx')
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {'width': core_schema.typed_dict_field(core_schema.int_schema())},
+                computed_fields=[core_schema.computed_field('area', json_return_type='bytes')],
+            ),
+        )
+    )
+    with pytest.raises(ValueError, match='^xxx$'):
+        s.to_python(Model(3))
+
+    with pytest.raises(ValueError, match='^xxx$'):
+        s.to_python(Model(3), mode='json')
+
+    e = '^Error serializing to JSON: ValueError: xxx$'
+    with pytest.raises(PydanticSerializationError, match=e):
+        s.to_json(Model(3))
