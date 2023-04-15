@@ -32,7 +32,7 @@ impl BuildValidator for JsonOrPython {
         let python = build_validator(python_schema, config, build_context)?;
 
         let name = format!(
-            "{}[json={}, python={}]",
+            "{}[json={},python={}]",
             Self::EXPECTED_TYPE,
             json.get_name(),
             python.get_name(),
