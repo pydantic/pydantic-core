@@ -56,10 +56,9 @@ impl Validator for JsonOrPython {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         match input.get_type() {
-            InputType::Json => self.json.validate(py, input, extra, slots, recursion_guard),
-            // String gets treated the same as Json
-            InputType::String => self.json.validate(py, input, extra, slots, recursion_guard),
             InputType::Python => self.python.validate(py, input, extra, slots, recursion_guard),
+            // String gets treated the same as Json
+            _ => self.json.validate(py, input, extra, slots, recursion_guard),
         }
     }
 
