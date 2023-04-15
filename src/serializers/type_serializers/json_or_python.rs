@@ -36,11 +36,11 @@ impl BuildSerializer for JsonOrPythonSerializer {
             json.get_name(),
             python.get_name(),
         );
-        Ok(CombinedSerializer::JsonOrPython(Self {
+        Ok(Self {
             json: Box::new(json),
             python: Box::new(python),
             name,
-        }))
+        }.into())
     }
 }
 
