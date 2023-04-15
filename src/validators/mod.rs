@@ -35,6 +35,7 @@ mod int;
 mod is_instance;
 mod is_subclass;
 mod json;
+mod json_or_python;
 mod lax_or_strict;
 mod list;
 mod literal;
@@ -424,6 +425,8 @@ pub fn build_validator<'a>(
         chain::ChainValidator,
         // lax or strict
         lax_or_strict::LaxOrStrictValidator,
+        // json or python
+        json_or_python::JsonOrPython,
         // generator validators
         generator::GeneratorValidator,
         // custom error
@@ -567,6 +570,8 @@ pub enum CombinedValidator {
     MultiHostUrl(url::MultiHostUrlValidator),
     // reference to definition, useful for recursive (self-referencing) models
     DefinitionRef(definitions::DefinitionRefValidator),
+    // input dependent
+    JsonOrPython(json_or_python::JsonOrPython),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
