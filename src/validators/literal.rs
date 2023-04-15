@@ -3,7 +3,6 @@
 
 use ahash::AHashSet;
 use pyo3::intern;
-use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -28,36 +27,6 @@ pub struct LiteralValidator {
     name: String,
 }
 
-static PY_INT_TYPE: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
-
-#[inline(always)]
-fn get_py_int_type(py: Python) -> &Py<PyAny> {
-    PY_INT_TYPE.get_or_init(py, || 1.to_object(py).as_ref(py).get_type().into())
-}
-
-#[inline(always)]
-fn extract_int_strict(py: Python, item: &PyAny) -> Option<i64> {
-    if item.get_type().is(get_py_int_type(py)) {
-        return Some(item.extract().unwrap());
-    }
-    None
-}
-
-static PY_STR_TYPE: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
-
-#[inline(always)]
-fn get_py_str_type(py: Python) -> &Py<PyAny> {
-    PY_STR_TYPE.get_or_init(py, || "a".to_object(py).as_ref(py).get_type().into())
-}
-
-#[inline(always)]
-fn extract_str_strict(py: Python, item: &PyAny) -> Option<String> {
-    if item.get_type().is(get_py_str_type(py)) {
-        return Some(item.extract().unwrap());
-    }
-    None
-}
-
 impl BuildValidator for LiteralValidator {
     const EXPECTED_TYPE: &'static str = "literal";
 
@@ -78,18 +47,15 @@ impl BuildValidator for LiteralValidator {
         let mut repr_args: Vec<String> = Vec::new();
         for item in expected.iter() {
             repr_args.push(item.repr()?.extract()?);
-            if let Some(int) = extract_int_strict(py, item) {
+            if let Some(int) = item.as_int_strict() {
                 expected_int.insert(int);
-            } else if let Some(string) = extract_str_strict(py, item) {
-                expected_str.insert(string.to_string());
+            } else if let Some(str) = item.as_str_strict() {
+                expected_str.insert(str.to_string());
             } else {
                 expected_py.set_item(item, item)?;
             }
         }
         let (expected_repr, name) = expected_repr_name(repr_args, "literal");
-        // make sure we've initialized the GILOnceCell objects
-        get_py_int_type(py);
-        get_py_str_type(py);
         Ok(CombinedValidator::Literal(Self {
             expected_int: (!expected_int.is_empty()).then_some(expected_int),
             expected_str: (!expected_str.is_empty()).then_some(expected_str),
@@ -110,20 +76,20 @@ impl Validator for LiteralValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(expected_ints) = &self.expected_int {
-            if let Some(int) = extract_int_strict(py, input.to_object(py).as_ref(py)) {
+            if let Some(int) = input.as_int_strict() {
                 if expected_ints.contains(&int) {
                     return Ok(input.to_object(py));
                 }
             }
         }
         if let Some(expected_strings) = &self.expected_str {
-            if let Some(string) = extract_str_strict(py, input.to_object(py).as_ref(py)) {
-                if expected_strings.contains(&string) {
+            if let Some(str) = input.as_str_strict() {
+                if expected_strings.contains(str) {
                     return Ok(input.to_object(py));
                 }
             }
         }
-        // must be an enum of bytes
+        // must be an enum or bytes
         if let Some(expected_py) = &self.expected_py {
             if let Some(v) = expected_py.as_ref(py).get_item(input) {
                 return Ok(v.into());
