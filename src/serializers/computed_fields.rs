@@ -57,9 +57,9 @@ impl ComputedFields {
         extra: &Extra,
     ) -> Result<(), S::Error> {
         for computed_field in self.0.iter() {
-            let property_name = computed_field.property_name.as_ref(model.py());
+            let property_name_py = computed_field.property_name_py.as_ref(model.py());
             if let Some((next_include, next_exclude)) = filter
-                .key_filter(property_name, include, exclude)
+                .key_filter(property_name_py, include, exclude)
                 .map_err(py_err_se_err)?
             {
                 let cfs = ComputedFieldSerializer {
@@ -69,7 +69,11 @@ impl ComputedFields {
                     exclude: next_exclude,
                     extra,
                 };
-                map.serialize_entry(&computed_field.alias, &cfs)?;
+                let key = match extra.by_alias {
+                    true => computed_field.alias.as_str(),
+                    false => computed_field.property_name.as_str(),
+                };
+                map.serialize_entry(key, &cfs)?;
             }
         }
         Ok(())
@@ -78,7 +82,8 @@ impl ComputedFields {
 
 #[derive(Debug, Clone)]
 struct ComputedField {
-    property_name: Py<PyString>,
+    property_name: String,
+    property_name_py: Py<PyString>,
     return_ob_type: Option<ObType>,
     alias: String,
     alias_py: Py<PyString>,
@@ -92,7 +97,8 @@ impl ComputedField {
         let return_ob_type = get_json_return_type(schema)?;
         let alias_py: &PyString = schema.get_as(intern!(py, "alias"))?.unwrap_or(property_name);
         Ok(Self {
-            property_name: property_name.into_py(py),
+            property_name: property_name.extract()?,
+            property_name_py: property_name.into_py(py),
             return_ob_type,
             alias: alias_py.extract()?,
             alias_py: alias_py.into_py(py),
@@ -109,17 +115,21 @@ impl ComputedField {
         extra: &Extra,
     ) -> PyResult<()> {
         let py = model.py();
-        let property_name = self.property_name.as_ref(py);
+        let property_name_py = self.property_name_py.as_ref(py);
 
-        if let Some((next_include, next_exclude)) = filter.key_filter(property_name, include, exclude)? {
-            let next_value = model.getattr(property_name)?;
+        if let Some((next_include, next_exclude)) = filter.key_filter(property_name_py, include, exclude)? {
+            let next_value = model.getattr(property_name_py)?;
 
             // TODO fix include & exclude
             let value = match self.return_ob_type {
                 Some(ref ob_type) => infer_to_python_known(ob_type, next_value, next_include, next_exclude, extra),
                 None => infer_to_python(next_value, next_include, next_exclude, extra),
             }?;
-            output_dict.set_item(self.alias_py.as_ref(py), value)?;
+            let key = match extra.by_alias {
+                true => self.alias_py.as_ref(py),
+                false => property_name_py,
+            };
+            output_dict.set_item(key, value)?;
         }
         Ok(())
     }
@@ -136,8 +146,8 @@ pub(crate) struct ComputedFieldSerializer<'py> {
 impl<'py> Serialize for ComputedFieldSerializer<'py> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let py = self.model.py();
-        let property_name = self.computed_field.property_name.as_ref(py);
-        let next_value = self.model.getattr(property_name).map_err(py_err_se_err)?;
+        let property_name_py = self.computed_field.property_name_py.as_ref(py);
+        let next_value = self.model.getattr(property_name_py).map_err(py_err_se_err)?;
 
         match self.computed_field.return_ob_type {
             Some(ref ob_type) => {

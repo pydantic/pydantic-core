@@ -94,10 +94,11 @@ impl BuildSerializer for TypedDictSerializer {
         let mut exclude: Vec<Py<PyString>> = Vec::with_capacity(fields_dict.len());
 
         for (key, value) in fields_dict.iter() {
-            let key: String = key.extract()?;
+            let key_py: &PyString = key.downcast()?;
+            let key: String = key_py.extract()?;
             let field_info: &PyDict = value.downcast()?;
 
-            let key_py: Py<PyString> = PyString::intern(py, &key).into_py(py);
+            let key_py: Py<PyString> = key_py.into_py(py);
 
             if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
                 exclude.push(key_py.clone_ref(py));

@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import platform
+from random import randint
 from typing import Any, ClassVar
 
 try:
@@ -694,3 +695,51 @@ def test_property_include_exclude():
     assert s.to_json(Model(1), exclude={'b'}) == b'{"a":1}'
     assert s.to_json(Model(1), include={'a'}) == b'{"a":1}'
     assert s.to_json(Model(1), exclude={'b': [0]}) == b'{"a":1,"b":[2,"3"]}'
+
+
+def test_property_setter():
+    class Square:
+        side: float
+
+        def __init__(self, **kwargs):
+            self.__dict__ = kwargs
+
+        @property
+        def area(self) -> float:
+            return self.side**2
+
+        @area.setter
+        def area(self, area: float) -> None:
+            self.side = area**0.5
+
+        @area.deleter
+        def area(self) -> None:
+            self.side = 0.0
+
+        @cached_property
+        def random_n(self) -> int:
+            return randint(0, 1_000)
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Square,
+            core_schema.typed_dict_schema(
+                {'side': core_schema.typed_dict_field(core_schema.float_schema())},
+                computed_fields=[
+                    core_schema.computed_field('area', json_return_type='float'),
+                    core_schema.computed_field('random_n', alias='The random number', json_return_type='int'),
+                ],
+            ),
+        )
+    )
+
+    sq = Square(side=10.0)
+    the_random_n = sq.random_n
+    assert s.to_python(sq, by_alias=True) == {'side': 10.0, 'area': 100.0, 'The random number': the_random_n}
+    assert s.to_json(sq, by_alias=True) == b'{"side":10.0,"area":100.0,"The random number":%d}' % the_random_n
+    sq.area = 49.0
+    assert s.to_python(sq, by_alias=False) == {'side': 7, 'area': 49, 'random_n': the_random_n}
+    assert s.to_json(sq, by_alias=False) == b'{"side":7.0,"area":49.0,"random_n":%d}' % the_random_n
+    del sq.area
+    assert s.to_python(sq, by_alias=False) == {'side': 0, 'area': 0, 'random_n': the_random_n}
+    assert s.to_python(sq, exclude={'random_n'}) == {'side': 0, 'area': 0}
