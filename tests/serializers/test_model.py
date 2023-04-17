@@ -697,6 +697,7 @@ def test_property_include_exclude():
     assert s.to_json(Model(1), exclude={'b': [0]}) == b'{"a":1,"b":[2,"3"]}'
 
 
+@pytest.mark.skipif(cached_property is None, reason='cached_property is not available')
 def test_property_setter():
     class Square:
         side: float
