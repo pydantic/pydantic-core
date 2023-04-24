@@ -71,15 +71,6 @@ pub struct TypedDictSerializer {
     filter: SchemaFilter<isize>,
 }
 
-impl TypedDictSerializer {
-    pub fn n_computed_fields(&self) -> usize {
-        match self.computed_fields {
-            None => 0,
-            Some(ref computed_fields) => computed_fields.len(),
-        }
-    }
-}
-
 impl BuildSerializer for TypedDictSerializer {
     const EXPECTED_TYPE: &'static str = "typed-dict";
 
@@ -150,6 +141,13 @@ impl TypedDictSerializer {
             include_extra,
             filter,
             computed_fields,
+        }
+    }
+
+    pub fn n_computed_fields(&self) -> usize {
+        match self.computed_fields {
+            None => 0,
+            Some(ref computed_fields) => computed_fields.len(),
         }
     }
 
