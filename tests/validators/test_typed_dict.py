@@ -19,7 +19,7 @@ class Cls:
             setattr(self, k, v)
 
     def __repr__(self):
-        return 'Cls({})'.format(', '.join(f'{k}={v!r}' for k, v in self.__dict__.items()))
+        return f"Cls({', '.join(f'{k}={v!r}' for k, v in self.__dict__.items())})"
 
 
 class Map(Mapping):
@@ -36,7 +36,7 @@ class Map(Mapping):
         return self._d[__k]
 
     def __repr__(self):
-        return 'Map({})'.format(', '.join(f'{k}={v!r}' for k, v in self._d.items()))
+        return f"Map({', '.join(f'{k}={v!r}' for k, v in self._d.items())})"
 
 
 def test_simple():

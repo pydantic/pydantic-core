@@ -115,7 +115,7 @@ def type_dict_schema(typed_dict) -> dict[str, Any]:  # noqa: C901
         required = field_name in required_keys
         schema = None
         fr_arg = None
-        if type(field_type) == ForwardRef:
+        if isinstance(field_type, ForwardRef):
             fr_arg = field_type.__forward_arg__
 
             fr_arg, matched = re.subn(r'Required\[(.+)]', r'\1', fr_arg)

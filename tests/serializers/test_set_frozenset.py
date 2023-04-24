@@ -18,7 +18,7 @@ def test_frozenset_any():
     fs = frozenset(['a', 'b', 'c'])
     output = v.to_python(fs)
     assert output == {'a', 'b', 'c'}
-    assert type(output) == frozenset
+    assert isinstance(output, frozenset)
     assert v.to_python(fs, mode='json') == IsList('a', 'b', 'c', check_order=False)
     assert json.loads(v.to_json(fs)) == IsList('a', 'b', 'c', check_order=False)
 

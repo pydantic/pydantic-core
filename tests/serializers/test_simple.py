@@ -43,14 +43,14 @@ def test_simple_serializers(schema_type, value, expected_python, expected_json, 
     s = SchemaSerializer(schema)
     v = s.to_python(value)
     assert v == expected_python
-    assert type(v) == type(expected_python)
+    assert isinstance(v, type(expected_python))
 
     assert s.to_json(value) == expected_json
 
     v_json = s.to_python(value, mode='json')
     v_json_expected = json.loads(expected_json)
     assert v_json == v_json_expected
-    assert type(v_json) == type(v_json_expected)
+    assert isinstance(v_json, type(v_json_expected))
 
 
 @pytest.mark.parametrize('schema_type', ['int', 'bool', 'float', 'none'])

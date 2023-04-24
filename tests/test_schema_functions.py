@@ -23,7 +23,7 @@ def ids_function(val):
     if callable(val):
         return val.__name__
     elif isinstance(val, tuple) and len(val) == 2:
-        return '({})'.format(', '.join([repr(a) for a in val[0]] + [f'{k}={v!r}' for k, v in val[1].items()]))
+        return f"({', '.join([repr(a) for a in val[0]] + [f'{k}={v!r}' for k, v in val[1].items()])})"
     else:
         return repr(val)
 

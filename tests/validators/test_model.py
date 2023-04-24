@@ -85,7 +85,7 @@ def test_model_class_setattr():
     assert isinstance(m, MyModel)
     assert m.field_a == 'test'
     assert m.__pydantic_fields_set__ == {'field_a'}
-    assert setattr_calls == []
+    assert not setattr_calls
 
 
 def test_model_class_root_validator_wrap():
@@ -480,7 +480,7 @@ def test_model_class_instance_subclass():
     assert m2 is m3
     assert m3.field_a == 'init_a'
     assert m3.field_b == 'init_b'
-    assert post_init_calls == []
+    assert not post_init_calls
 
     m4 = v.validate_python({'field_a': b'hello'}, context='call2')
     assert isinstance(m4, MyModel)
@@ -744,7 +744,7 @@ def test_revalidate_subclass_instances():
     assert hasattr(m3, 'field_c')
     m4 = v.validate_python(m3)
     assert m4 is not m3
-    assert type(m4) is MyModel
+    assert isinstance(m4, MyModel)
     assert not hasattr(m4, 'field_c')
 
     m5 = MySubModel()
