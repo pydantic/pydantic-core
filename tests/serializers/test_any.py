@@ -36,7 +36,7 @@ class MyDataclass:
 
 
 class MyModel:
-    __pydantic_validator__ = 42
+    __pydantic_serializer__ = 42
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -243,7 +243,7 @@ def test_include_dict(any_serializer):
 
 
 class FieldsSetModel:
-    __pydantic_validator__ = 42
+    __pydantic_serializer__ = 42
     __slots__ = '__dict__', '__pydantic_fields_set__'
 
     def __init__(self, **kwargs):
