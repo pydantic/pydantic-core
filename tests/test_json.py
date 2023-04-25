@@ -263,6 +263,7 @@ def test_to_jsonable_python_schema_serializer():
     assert to_jsonable_python(instance) == {'myFoo': 1, 'myBar': 'a'}
     assert to_jsonable_python(instance, by_alias=False) == {'my_foo': 1, 'my_bar': 'a'}
     assert to_json(instance) == b'{"myFoo":1,"myBar":"a"}'
+    assert to_json(instance, by_alias=False) == b'{"my_foo":1,"my_bar":"a"}'
 
 
 def test_cycle_same():
