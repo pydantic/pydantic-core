@@ -61,7 +61,7 @@ impl ArgsKwargs {
     }
 }
 
-pub(crate) const VALIDATED_DATA_KEY: &str = "__validated_data__";
+pub(crate) const VALIDATED_DATA_KEY: &str = "validated_data";
 
 #[pyclass(module = "pydantic_core._pydantic_core", frozen, get_all, freelist = 100)]
 #[derive(Debug, Clone)]

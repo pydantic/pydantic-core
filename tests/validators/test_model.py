@@ -1170,7 +1170,7 @@ def test_custom_init():
         __slots__ = '__dict__', '__pydantic_fields_set__'
 
         def __init__(self, **kwargs):
-            validated_data = kwargs['__validated_data__']
+            validated_data = kwargs['validated_data']
             self.a = validated_data.model_dict['a']
             self.b = validated_data.model_dict['b']
             self.__pydantic_fields_set__ = validated_data.fields_set
@@ -1196,4 +1196,67 @@ def test_custom_init():
     assert m.a == 1
     assert m.b == 2
     assert m.__pydantic_fields_set__ == {'b'}
-    assert calls == ["{'__validated_data__': ValidatedData(model_dict={'a': 1, 'b': 2}, fields_set={'b'})}"]
+    assert calls == ["{'validated_data': ValidatedData(model_dict={'a': 1, 'b': 2}, fields_set={'b'})}"]
+
+
+def test_custom_init_nested():
+    calls = []
+
+    class ModelInner:
+        __slots__ = '__dict__', '__pydantic_fields_set__'
+        a: int
+        b: int
+
+        def __init__(self, **data):
+            calls.append(f'inner: {data!r}')
+            self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+    inner_schema = core_schema.model_schema(
+        ModelInner,
+        core_schema.typed_dict_schema(
+            {
+                'a': core_schema.typed_dict_field(core_schema.with_default_schema(core_schema.int_schema(), default=1)),
+                'b': core_schema.typed_dict_field(core_schema.int_schema()),
+            },
+            return_fields_set=True,
+        ),
+        custom_init=True,
+    )
+    ModelInner.__pydantic_validator__ = SchemaValidator(inner_schema)
+
+    class ModelOuter:
+        __slots__ = '__dict__', '__pydantic_fields_set__'
+        a: int
+        b: ModelInner
+
+        def __init__(self, **data):
+            calls.append(f'outer: {data!r}')
+            self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+    ModelOuter.__pydantic_validator__ = SchemaValidator(
+        core_schema.model_schema(
+            ModelOuter,
+            core_schema.typed_dict_schema(
+                {
+                    'a': core_schema.typed_dict_field(
+                        core_schema.with_default_schema(core_schema.int_schema(), default=1)
+                    ),
+                    'b': core_schema.typed_dict_field(inner_schema),
+                },
+                return_fields_set=True,
+            ),
+            custom_init=True,
+        )
+    )
+
+    m = ModelOuter(a=2, b={'b': 3})
+    assert m.__pydantic_fields_set__ == {'a', 'b'}
+    assert m.a == 2
+    assert isinstance(m.b, ModelInner)
+    assert m.b.a == 1
+    assert m.b.b == 3
+    # insert_assert(calls)
+    assert calls == [
+        "outer: {'a': 2, 'b': {'b': 3}}",
+        "inner: {'validated_data': ValidatedData(model_dict={'a': 1, 'b': 3}, fields_set={'b'})}",
+    ]

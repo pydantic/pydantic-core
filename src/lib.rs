@@ -9,7 +9,7 @@ use pyo3::prelude::*;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-mod args_kwargs;
+mod argument_markers;
 mod build_context;
 mod build_tools;
 mod errors;
@@ -23,7 +23,7 @@ mod validators;
 
 // required for benchmarks
 pub use self::url::{PyMultiHostUrl, PyUrl};
-pub use args_kwargs::ArgsKwargs;
+pub use argument_markers::ArgsKwargs;
 pub use build_tools::SchemaError;
 pub use errors::{list_all_errors, PydanticCustomError, PydanticKnownError, PydanticOmit, ValidationError};
 pub use serializers::{
