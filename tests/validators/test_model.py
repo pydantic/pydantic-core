@@ -15,18 +15,15 @@ def test_model_class():
         field_b: int
 
     v = SchemaValidator(
-        {
-            'type': 'model',
-            'cls': MyModel,
-            'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
-                'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
-                },
-            },
-        }
+        core_schema.model_schema(
+            MyModel,
+            core_schema.model_fields_schema(
+                {
+                    'field_a': core_schema.model_field(core_schema.str_schema()),
+                    'field_b': core_schema.model_field(core_schema.int_schema()),
+                }
+            ),
+        )
     )
     assert repr(v).startswith('SchemaValidator(title="MyModel", validator=Model(\n')
     m = v.validate_python({'field_a': 'test', 'field_b': 12})
@@ -72,9 +69,8 @@ def test_model_class_setattr():
             'type': 'model',
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
-                'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
+                'type': 'model-fields',
+                'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}},
             },
         }
     )
@@ -102,10 +98,7 @@ def test_model_class_root_validator_wrap():
     schema = core_schema.model_schema(
         MyModel,
         core_schema.general_wrap_validator_function(
-            f,
-            core_schema.typed_dict_schema(
-                {'field_a': core_schema.typed_dict_field(core_schema.int_schema())}, return_fields_set=True
-            ),
+            f, core_schema.model_fields_schema({'field_a': core_schema.model_field(core_schema.int_schema())})
         ),
     )
 
@@ -139,10 +132,7 @@ def test_model_class_root_validator_before():
     schema = core_schema.model_schema(
         MyModel,
         core_schema.general_before_validator_function(
-            f,
-            core_schema.typed_dict_schema(
-                {'field_a': core_schema.typed_dict_field(core_schema.int_schema())}, return_fields_set=True
-            ),
+            f, core_schema.model_fields_schema({'field_a': core_schema.model_field(core_schema.int_schema())})
         ),
     )
 
@@ -177,10 +167,7 @@ def test_model_class_root_validator_after():
     schema = core_schema.model_schema(
         MyModel,
         core_schema.general_after_validator_function(
-            f,
-            core_schema.typed_dict_schema(
-                {'field_a': core_schema.typed_dict_field(core_schema.int_schema())}, return_fields_set=True
-            ),
+            f, core_schema.model_fields_schema({'field_a': core_schema.model_field(core_schema.int_schema())})
         ),
     )
 
@@ -218,9 +205,8 @@ def test_function_ask(mode):
                 'type': f'function-{mode}',
                 'function': {'type': 'general', 'function': f},
                 'schema': {
-                    'type': 'typed-dict',
-                    'return_fields_set': True,
-                    'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
+                    'type': 'model-fields',
+                    'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}},
                 },
             },
         }
@@ -258,16 +244,8 @@ def test_union_sub_schema():
             'schema': {
                 'type': 'union',
                 'choices': [
-                    {
-                        'type': 'typed-dict',
-                        'return_fields_set': True,
-                        'fields': {'foo': {'type': 'typed-dict-field', 'schema': {'type': 'int'}}},
-                    },
-                    {
-                        'type': 'typed-dict',
-                        'return_fields_set': True,
-                        'fields': {'bar': {'type': 'typed-dict-field', 'schema': {'type': 'int'}}},
-                    },
+                    {'type': 'model-fields', 'fields': {'foo': {'type': 'model-field', 'schema': {'type': 'int'}}}},
+                    {'type': 'model-fields', 'fields': {'bar': {'type': 'model-field', 'schema': {'type': 'int'}}}},
                 ],
             },
         }
@@ -295,20 +273,18 @@ def test_tagged_union_sub_schema():
                 'discriminator': 'foo',
                 'choices': {
                     'apple': {
-                        'type': 'typed-dict',
-                        'return_fields_set': True,
+                        'type': 'model-fields',
                         'fields': {
-                            'foo': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                            'bar': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                            'foo': {'type': 'model-field', 'schema': {'type': 'str'}},
+                            'bar': {'type': 'model-field', 'schema': {'type': 'int'}},
                         },
                     },
                     'banana': {
-                        'type': 'typed-dict',
-                        'return_fields_set': True,
+                        'type': 'model-fields',
                         'fields': {
-                            'foo': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
+                            'foo': {'type': 'model-field', 'schema': {'type': 'str'}},
                             'spam': {
-                                'type': 'typed-dict-field',
+                                'type': 'model-field',
                                 'schema': {'type': 'list', 'items_schema': {'type': 'int'}},
                             },
                         },
@@ -352,9 +328,8 @@ def test_model_class_function_after():
                 'type': 'function-after',
                 'function': {'type': 'general', 'function': f},
                 'schema': {
-                    'type': 'typed-dict',
-                    'return_fields_set': True,
-                    'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
+                    'type': 'model-fields',
+                    'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}},
                 },
             },
         }
@@ -372,9 +347,8 @@ def test_model_class_not_type():
                 'type': 'model',
                 'cls': 123,
                 'schema': {
-                    'type': 'typed-dict',
-                    'return_fields_set': True,
-                    'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
+                    'type': 'model-fields',
+                    'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}},
                 },
             }
         )
@@ -393,9 +367,8 @@ def test_model_class_instance_direct():
             'type': 'model',
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
-                'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
+                'type': 'model-fields',
+                'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}},
             },
         }
     )
@@ -435,9 +408,8 @@ def test_model_class_instance_subclass():
             'type': 'model',
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
-                'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
+                'type': 'model-fields',
+                'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}},
             },
             'post_init': 'model_post_init',
         }
@@ -483,9 +455,8 @@ def test_model_class_instance_subclass_revalidate():
             'type': 'model',
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
-                'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
+                'type': 'model-fields',
+                'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}},
             },
             'post_init': 'model_post_init',
             'revalidate_instances': 'always',
@@ -522,11 +493,10 @@ def test_model_class_strict():
             'strict': True,
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                 },
             },
         }
@@ -578,13 +548,12 @@ def test_model_class_strict_json():
             'strict': True,
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                     'field_c': {
-                        'type': 'typed-dict-field',
+                        'type': 'model-field',
                         'schema': {'type': 'default', 'default': 42, 'schema': {'type': 'int'}},
                     },
                 },
@@ -604,11 +573,7 @@ def test_internal_error():
         {
             'type': 'model',
             'cls': int,
-            'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
-                'fields': {'f': {'type': 'typed-dict-field', 'schema': {'type': 'int'}}},
-            },
+            'schema': {'type': 'model-fields', 'fields': {'f': {'type': 'model-field', 'schema': {'type': 'int'}}}},
         }
     )
     with pytest.raises(AttributeError, match=re.escape("'int' object has no attribute '__dict__'")):
@@ -631,12 +596,11 @@ def test_revalidate_always():
             'cls': MyModel,
             'revalidate_instances': 'always',
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'from_attributes': True,
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                 },
             },
         }
@@ -694,12 +658,11 @@ def test_revalidate_subclass_instances():
             'cls': MyModel,
             'revalidate_instances': 'subclass-instances',
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'from_attributes': True,
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                 },
             },
         }
@@ -734,13 +697,12 @@ def test_revalidate_extra():
             'type': 'model',
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'from_attributes': True,
                 'extra_behavior': 'allow',
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                 },
             },
             'config': {'revalidate_instances': 'always'},
@@ -784,11 +746,10 @@ def test_post_init():
             'cls': MyModel,
             'post_init': 'call_me_maybe',
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                 },
             },
         }
@@ -815,12 +776,11 @@ def test_revalidate_post_init():
             'cls': MyModel,
             'post_init': 'call_me_maybe',
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'from_attributes': True,
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                 },
             },
             'config': {'revalidate_instances': 'always'},
@@ -862,9 +822,8 @@ def test_post_init_validation_error():
             'cls': MyModel,
             'post_init': 'call_me_maybe',
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
-                'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
+                'type': 'model-fields',
+                'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}},
             },
         }
     )
@@ -899,9 +858,8 @@ def test_post_init_internal_error():
             'cls': MyModel,
             'post_init': 'wrong_signature',
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
-                'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}}},
+                'type': 'model-fields',
+                'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}},
             },
         }
     )
@@ -925,11 +883,10 @@ def test_post_init_mutate():
             'cls': MyModel,
             'post_init': 'call_me_maybe',
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                 },
             },
         }
@@ -954,11 +911,10 @@ def test_validate_assignment():
             'type': 'model',
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                 },
             },
         }
@@ -993,15 +949,14 @@ def test_validate_assignment_function():
     v = SchemaValidator(
         core_schema.model_schema(
             MyModel,
-            core_schema.typed_dict_schema(
+            core_schema.model_fields_schema(
                 {
-                    'field_a': core_schema.typed_dict_field(core_schema.str_schema()),
-                    'field_b': core_schema.typed_dict_field(
+                    'field_a': core_schema.model_field(core_schema.str_schema()),
+                    'field_b': core_schema.model_field(
                         core_schema.field_after_validator_function(func, core_schema.int_schema())
                     ),
-                    'field_c': core_schema.typed_dict_field(core_schema.int_schema()),
-                },
-                return_fields_set=True,
+                    'field_c': core_schema.model_field(core_schema.int_schema()),
+                }
             ),
         )
     )
@@ -1031,11 +986,10 @@ def test_validate_assignment_no_fields_set():
             'type': 'model',
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                 },
             },
         }
@@ -1064,9 +1018,7 @@ def test_frozen():
     v = SchemaValidator(
         core_schema.model_schema(
             MyModel,
-            core_schema.typed_dict_schema(
-                {'f': core_schema.typed_dict_field(core_schema.str_schema())}, return_fields_set=True
-            ),
+            core_schema.model_fields_schema({'f': core_schema.model_field(core_schema.str_schema())}),
             frozen=True,
         )
     )
@@ -1137,14 +1089,13 @@ def test_validate_assignment_model_validator_function(function_schema: Any, call
             Model,
             function_schema(
                 f,
-                core_schema.typed_dict_schema(
+                core_schema.model_fields_schema(
                     {
-                        'a': core_schema.typed_dict_field(
+                        'a': core_schema.model_field(
                             core_schema.with_default_schema(core_schema.int_schema(), default=1)
                         ),
-                        'b': core_schema.typed_dict_field(core_schema.int_schema()),
-                    },
-                    return_fields_set=True,
+                        'b': core_schema.model_field(core_schema.int_schema()),
+                    }
                 ),
             ),
         )
@@ -1179,14 +1130,11 @@ def test_custom_init():
     v = SchemaValidator(
         core_schema.model_schema(
             Model,
-            core_schema.typed_dict_schema(
+            core_schema.model_fields_schema(
                 {
-                    'a': core_schema.typed_dict_field(
-                        core_schema.with_default_schema(core_schema.int_schema(), default=1)
-                    ),
-                    'b': core_schema.typed_dict_field(core_schema.int_schema()),
-                },
-                return_fields_set=True,
+                    'a': core_schema.model_field(core_schema.with_default_schema(core_schema.int_schema(), default=1)),
+                    'b': core_schema.model_field(core_schema.int_schema()),
+                }
             ),
             custom_init=True,
         )
@@ -1213,12 +1161,11 @@ def test_custom_init_nested():
 
     inner_schema = core_schema.model_schema(
         ModelInner,
-        core_schema.typed_dict_schema(
+        core_schema.model_fields_schema(
             {
-                'a': core_schema.typed_dict_field(core_schema.with_default_schema(core_schema.int_schema(), default=1)),
-                'b': core_schema.typed_dict_field(core_schema.int_schema()),
-            },
-            return_fields_set=True,
+                'a': core_schema.model_field(core_schema.with_default_schema(core_schema.int_schema(), default=1)),
+                'b': core_schema.model_field(core_schema.int_schema()),
+            }
         ),
         custom_init=True,
     )
@@ -1236,14 +1183,11 @@ def test_custom_init_nested():
     ModelOuter.__pydantic_validator__ = SchemaValidator(
         core_schema.model_schema(
             ModelOuter,
-            core_schema.typed_dict_schema(
+            core_schema.model_fields_schema(
                 {
-                    'a': core_schema.typed_dict_field(
-                        core_schema.with_default_schema(core_schema.int_schema(), default=1)
-                    ),
-                    'b': core_schema.typed_dict_field(inner_schema),
-                },
-                return_fields_set=True,
+                    'a': core_schema.model_field(core_schema.with_default_schema(core_schema.int_schema(), default=1)),
+                    'b': core_schema.model_field(inner_schema),
+                }
             ),
             custom_init=True,
         )
@@ -1284,9 +1228,7 @@ def test_custom_init_mock():
     v = SchemaValidator(
         core_schema.model_schema(
             Model,
-            core_schema.typed_dict_schema(
-                {'a': core_schema.typed_dict_field(core_schema.int_schema())}, return_fields_set=True
-            ),
+            core_schema.model_fields_schema({'a': core_schema.model_field(core_schema.int_schema())}),
             custom_init=True,
         )
     )
@@ -1311,9 +1253,7 @@ def test_custom_init_validated_data_field():
     v = SchemaValidator(
         core_schema.model_schema(
             Model,
-            core_schema.typed_dict_schema(
-                {'validated_data': core_schema.typed_dict_field(core_schema.int_schema())}, return_fields_set=True
-            ),
+            core_schema.model_fields_schema({'validated_data': core_schema.model_field(core_schema.int_schema())}),
             custom_init=True,
         )
     )

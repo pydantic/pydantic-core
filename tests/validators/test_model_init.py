@@ -14,11 +14,10 @@ def test_model_init():
             'type': 'model',
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                    'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                    'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                 },
             },
         }
@@ -47,21 +46,19 @@ def test_model_init_nested():
             'type': 'model',
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'fields': {
-                    'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
+                    'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
                     'field_b': {
-                        'type': 'typed-dict-field',
+                        'type': 'model-field',
                         'schema': {
                             'type': 'model',
                             'cls': MyModel,
                             'schema': {
-                                'type': 'typed-dict',
-                                'return_fields_set': True,
+                                'type': 'model-fields',
                                 'fields': {
-                                    'x_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                                    'x_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                                    'x_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                                    'x_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                                 },
                             },
                         },
@@ -101,11 +98,10 @@ def test_function_before():
                 'type': 'model',
                 'cls': MyModel,
                 'schema': {
-                    'type': 'typed-dict',
-                    'return_fields_set': True,
+                    'type': 'model-fields',
                     'fields': {
-                        'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                        'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                        'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                        'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                     },
                 },
             },
@@ -138,11 +134,10 @@ def test_function_after():
                 'type': 'model',
                 'cls': MyModel,
                 'schema': {
-                    'type': 'typed-dict',
-                    'return_fields_set': True,
+                    'type': 'model-fields',
                     'fields': {
-                        'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                        'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                        'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                        'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                     },
                 },
             },
@@ -177,11 +172,10 @@ def test_function_wrap():
                 'type': 'model',
                 'cls': MyModel,
                 'schema': {
-                    'type': 'typed-dict',
-                    'return_fields_set': True,
+                    'type': 'model-fields',
                     'fields': {
-                        'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                        'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                        'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                        'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                     },
                 },
             },

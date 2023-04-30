@@ -97,11 +97,10 @@ def test_validation_error_multiple():
             'type': 'model',
             'cls': MyModel,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'fields': {
-                    'x': {'type': 'typed-dict-field', 'schema': {'type': 'float'}},
-                    'y': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'x': {'type': 'model-field', 'schema': {'type': 'float'}},
+                    'y': {'type': 'model-field', 'schema': {'type': 'int'}},
                 },
             },
         }

@@ -287,11 +287,10 @@ def test_model_class():
             'schema': {
                 'type': 'default',
                 'schema': {
-                    'type': 'typed-dict',
-                    'return_fields_set': True,
+                    'type': 'model-fields',
                     'fields': {
-                        'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                        'field_b': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                        'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                        'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                     },
                 },
                 'default': ({'field_a': '[default-a]', 'field_b': '[default-b]'}, set()),

@@ -1,7 +1,7 @@
 from typing import Optional
 
 import pytest
-from dirty_equals import AnyThing, HasAttributes, IsInstance, IsList, IsPartialDict, IsStr, IsTuple
+from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict, IsStr, IsTuple
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
@@ -27,7 +27,6 @@ def test_branch_nullable():
             },
         }
     )
-    assert 'return_fields_set:false' in plain_repr(v)
 
     assert v.validate_python({'name': 'root'}) == {'name': 'root', 'sub_branch': None}
     assert plain_repr(v).startswith(
@@ -249,12 +248,11 @@ def test_model_class():
             'ref': 'Branch',
             'cls': Branch,
             'schema': {
-                'type': 'typed-dict',
-                'return_fields_set': True,
+                'type': 'model-fields',
                 'fields': {
-                    'width': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+                    'width': {'type': 'model-field', 'schema': {'type': 'int'}},
                     'branch': {
-                        'type': 'typed-dict-field',
+                        'type': 'model-field',
                         'schema': {
                             'type': 'default',
                             'schema': {
@@ -785,48 +783,3 @@ def test_error_inside_definition_wrapper():
         '  SchemaError: Error building "default" validator:\n'
         "  SchemaError: 'default' and 'default_factory' cannot be used together"
     )
-
-
-def test_model_td_recursive():
-    class Foobar:
-        __slots__ = '__dict__', '__pydantic_fields_set__'
-
-    v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'ref': '__main__.Foobar',
-            'return_fields_set': True,
-            'fields': {
-                'x': {'type': 'typed-dict-field', 'schema': {'type': 'int'}, 'required': True},
-                'y': {
-                    'type': 'typed-dict-field',
-                    'schema': {
-                        'type': 'default',
-                        'schema': {
-                            'type': 'union',
-                            'choices': [
-                                {
-                                    'type': 'model',
-                                    'cls': Foobar,
-                                    'schema': {'type': 'definition-ref', 'schema_ref': '__main__.Foobar'},
-                                },
-                                {'type': 'none'},
-                            ],
-                        },
-                        'default': None,
-                    },
-                    'required': False,
-                },
-            },
-        }
-    )
-    assert 'return_fields_set:true' in plain_repr(v)
-    d, fields_set = v.validate_python(dict(x=1, y={'x': 2}))
-    assert d == {'x': 1, 'y': IsInstance(Foobar)}
-    assert fields_set == {'y', 'x'}
-
-    f = d['y']
-    assert isinstance(f, Foobar)
-    assert f.x == 2
-    assert f.y is None
-    assert f.__pydantic_fields_set__ == {'x'}
