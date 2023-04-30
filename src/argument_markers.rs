@@ -60,3 +60,30 @@ impl ArgsKwargs {
         }
     }
 }
+
+pub(crate) const VALIDATED_DATA_KEY: &str = "validated_data";
+
+#[pyclass(module = "pydantic_core._pydantic_core", frozen, get_all, freelist = 100)]
+#[derive(Debug, Clone)]
+pub struct ValidatedData {
+    pub model_dict: PyObject,
+    pub fields_set: PyObject,
+}
+
+impl ValidatedData {
+    pub(crate) fn new(model_dict: &PyAny, fields_set: &PyAny) -> Self {
+        Self {
+            model_dict: model_dict.to_object(model_dict.py()),
+            fields_set: fields_set.to_object(model_dict.py()),
+        }
+    }
+}
+
+#[pymethods]
+impl ValidatedData {
+    fn __repr__(&self, py: Python) -> String {
+        let model_dict = safe_repr(self.model_dict.as_ref(py));
+        let fields_set = safe_repr(self.fields_set.as_ref(py));
+        format!("ValidatedData(model_dict={model_dict}, fields_set={fields_set})")
+    }
+}
