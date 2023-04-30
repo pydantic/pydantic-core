@@ -132,10 +132,10 @@ def test_validate_assignment_with_context():
 
     m1, model_extra, fields_set = v.validate_python({'f1': '1', 'f2': '2'}, strict=None, context={'x': 'y'})
     assert m1 == {'f1': "1| context: {'x': 'y', 'f1': '1'}", 'f2': "2| context: {'x': 'y', 'f1': '1', 'f2': '2'}"}
-    assert model_extra == {}
+    assert model_extra is None
     assert fields_set == {'f1', 'f2'}
 
     m2, model_extra, fields_set = v.validate_assignment(m1, 'f1', '3', context={'x': 'y'})
     assert m2 == {'f1': "3| context: {'x': 'y', 'f1': '3'}", 'f2': "2| context: {'x': 'y', 'f1': '1', 'f2': '2'}"}
-    assert model_extra == {}
+    assert model_extra is None
     assert fields_set == {'f1'}

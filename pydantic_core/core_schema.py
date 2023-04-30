@@ -2807,7 +2807,7 @@ def model_fields_schema(
     )
     v = SchemaValidator(wrapper_schema)
     print(v.validate_python({'a': 'hello'}))
-    #> ({'a': 'hello'}, {}, {'a'})
+    #> ({'a': 'hello'}, None, {'a'})
     ```
 
     Args:

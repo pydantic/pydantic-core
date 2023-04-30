@@ -783,8 +783,8 @@ def test_typed_dict_data() -> None:
         ('before', {'value': {'x': b'input', 'y': '123'}}, {'value': {'x': 'different', 'y': 123}}),
         (
             'after',
-            {'value': ({'x': 'input', 'y': 123}, {}, {'y', 'x'})},
-            {'value': ({'x': 'different', 'y': 123}, {}, {'x'})},
+            {'value': ({'x': 'input', 'y': 123}, None, {'y', 'x'})},
+            {'value': ({'x': 'different', 'y': 123}, None, {'x'})},
         ),
         ('wrap', {'value': {'x': b'input', 'y': '123'}}, {'value': {'x': 'different', 'y': 123}}),
     ],

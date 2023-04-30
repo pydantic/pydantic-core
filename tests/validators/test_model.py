@@ -30,7 +30,7 @@ def test_model_class():
     assert isinstance(m, MyModel)
     assert m.field_a == 'test'
     assert m.field_b == 12
-    assert m.__pydantic_extra__ == {}
+    assert m.__pydantic_extra__ is None
     assert m.__pydantic_fields_set__ == {'field_a', 'field_b'}
     assert m.__dict__ == {'field_a': 'test', 'field_b': 12}
 
@@ -329,7 +329,7 @@ def test_tagged_union_sub_schema():
         'foo': 'apple',
         'bar': 123,
         '__pydantic_fields_set__': {'foo', 'bar'},
-        '__pydantic_extra__': {},
+        '__pydantic_extra__': None,
     }
 
     m = v.validate_python({'foo': 'banana', 'spam': [1, 2, 3]})
@@ -339,7 +339,7 @@ def test_tagged_union_sub_schema():
         'foo': 'banana',
         'spam': [1, 2, 3],
         '__pydantic_fields_set__': {'spam', 'foo'},
-        '__pydantic_extra__': {},
+        '__pydantic_extra__': None,
     }
 
 
@@ -678,7 +678,7 @@ def test_revalidate_always():
     ]
 
     m5 = MyModel('x', 5, None)
-    with pytest.raises(AttributeError, match="'MyModel' object has no attribute '__pydantic_fields_set__'"):
+    with pytest.raises(AttributeError, match='__pydantic_fields_set__'):
         v.validate_python(m5)
 
 
@@ -1092,8 +1092,8 @@ def test_frozen():
     [
         (
             core_schema.general_after_validator_function,
-            (({'a': 1, 'b': 2}, {}, {'b'}), 'ValidationInfo(config=None, context=None)'),
-            (({'a': 10, 'b': 2}, {}, {'a'}), 'ValidationInfo(config=None, context=None)'),
+            (({'a': 1, 'b': 2}, None, {'b'}), 'ValidationInfo(config=None, context=None)'),
+            (({'a': 10, 'b': 2}, None, {'a'}), 'ValidationInfo(config=None, context=None)'),
         ),
         (
             core_schema.general_before_validator_function,
@@ -1196,7 +1196,9 @@ def test_custom_init():
     assert m.a == 1
     assert m.b == 2
     assert m.__pydantic_fields_set__ == {'b'}
-    assert calls == ["{'validated_data': ValidatedData(model_dict={'a': 1, 'b': 2}, model_extra={}, fields_set={'b'})}"]
+    assert calls == [
+        "{'validated_data': ValidatedData(model_dict={'a': 1, 'b': 2}, model_extra=None, fields_set={'b'})}"
+    ]
 
 
 def test_custom_init_nested():
@@ -1254,7 +1256,7 @@ def test_custom_init_nested():
     # insert_assert(calls)
     assert calls == [
         "outer: {'a': 2, 'b': {'b': 3}}",
-        "inner: {'validated_data': ValidatedData(model_dict={'a': 1, 'b': 3}, model_extra={}, fields_set={'b'})}",
+        "inner: {'validated_data': ValidatedData(model_dict={'a': 1, 'b': 3}, model_extra=None, fields_set={'b'})}",
     ]
 
 
@@ -1287,7 +1289,7 @@ def test_custom_init_mock():
 
     m = v.validate_python({'a': 2})
     assert m.a == 2
-    assert calls == ["ValidatedData(model_dict={'a': 2}, model_extra={}, fields_set={'a'})"]
+    assert calls == ["ValidatedData(model_dict={'a': 2}, model_extra=None, fields_set={'a'})"]
 
     with pytest.raises(ValidationError, match=r'Field required \[type=missing,'):
         v.validate_python({'validated_data': BadValidatedData({'a': 2}, {'a'})})
@@ -1312,7 +1314,7 @@ def test_custom_init_validated_data_field():
 
     m = v.validate_python({'validated_data': 2})
     assert m.validated_data == 2
-    assert calls == ["ValidatedData(model_dict={'validated_data': 2}, model_extra={}, fields_set={'validated_data'})"]
+    assert calls == ["ValidatedData(model_dict={'validated_data': 2}, model_extra=None, fields_set={'validated_data'})"]
 
     with pytest.raises(ValidationError, match='Input should be a valid integer'):
         v.validate_python({'validated_data': BadValidatedData({'a': 2}, {'a'})})

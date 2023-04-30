@@ -133,12 +133,17 @@ impl Validator for ModelValidator {
                 let dict = input.input_get_attr(intern!(py, DUNDER_DICT)).unwrap()?;
                 let model_extra = input.input_get_attr(intern!(py, DUNDER_MODEL_EXTRA_KEY)).unwrap()?;
 
-                let full_model_dict = dict.downcast::<PyDict>()?.copy()?;
-                full_model_dict.update(model_extra.downcast()?)?;
+                let full_model_dict: &PyAny = if model_extra.is_none() {
+                    dict
+                } else {
+                    let full_model_dict = dict.downcast::<PyDict>()?.copy()?;
+                    full_model_dict.update(model_extra.downcast()?)?;
+                    full_model_dict
+                };
 
                 let output = self
                     .validator
-                    .validate(py, full_model_dict as &PyAny, extra, slots, recursion_guard)?;
+                    .validate(py, full_model_dict, extra, slots, recursion_guard)?;
 
                 let (model_dict, model_extra, _): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
                 let instance = self.create_class(model_dict, model_extra, fields_set)?;
@@ -185,7 +190,7 @@ impl Validator for ModelValidator {
             self.validator
                 .validate_assignment(py, new_dict, field_name, field_value, extra, slots, recursion_guard)?;
 
-        let (output, _, updated_fields_set): (&PyDict, &PyDict, &PySet) = output.extract(py)?;
+        let (output, _, updated_fields_set): (&PyDict, &PyAny, &PySet) = output.extract(py)?;
 
         if let Ok(fields_set) = model.input_get_attr(intern!(py, DUNDER_FIELDS_SET_KEY)).unwrap() {
             let fields_set: &PySet = fields_set.downcast()?;

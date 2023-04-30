@@ -113,7 +113,7 @@ impl Validator for ModelFieldsValidator {
         let dict = input.validate_model_fields(strict, self.from_attributes)?;
 
         let model_dict = PyDict::new(py);
-        let model_extra_dict = PyDict::new(py);
+        let mut model_extra_dict_op: Option<&PyDict> = None;
         let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
         let mut fields_set_vec: Vec<Py<PyString>> = Vec::with_capacity(self.fields.len());
 
@@ -182,6 +182,7 @@ impl Validator for ModelFieldsValidator {
                 }
 
                 if let Some(ref mut used_keys) = used_keys {
+                    let model_extra_dict = PyDict::new(py);
                     for item_result in <$iter>::new($dict)? {
                         let (raw_key, value) = item_result?;
                         let either_str = match raw_key.strict_str() {
@@ -233,6 +234,7 @@ impl Validator for ModelFieldsValidator {
                             }
                         }
                     }
+                    model_extra_dict_op = Some(model_extra_dict);
                 }
             }};
         }
@@ -247,7 +249,7 @@ impl Validator for ModelFieldsValidator {
             Err(ValError::LineErrors(errors))
         } else {
             let fields_set = PySet::new(py, &fields_set_vec)?;
-            Ok((model_dict, model_extra_dict, fields_set).to_object(py))
+            Ok((model_dict, model_extra_dict_op, fields_set).to_object(py))
         }
     }
 
@@ -335,8 +337,7 @@ impl Validator for ModelFieldsValidator {
         }?;
 
         let fields_set: &PySet = PySet::new(py, &[field_name.to_string()])?;
-        let model_extra = PyDict::new(py);
-        Ok((new_data, model_extra, fields_set.to_object(py)).to_object(py))
+        Ok((new_data, py.None(), fields_set.to_object(py)).to_object(py))
     }
 
     fn different_strict_behavior(
