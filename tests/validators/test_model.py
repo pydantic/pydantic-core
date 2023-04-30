@@ -1260,3 +1260,67 @@ def test_custom_init_nested():
         "outer: {'a': 2, 'b': {'b': 3}}",
         "inner: {'validated_data': ValidatedData(model_dict={'a': 1, 'b': 3}, fields_set={'b'})}",
     ]
+
+
+class BadValidatedData:
+    """
+    Attempt to confuse validation with a mock of ValidatedData should fail
+    """
+
+    def __init__(self, model_dict: Dict[str, Any], fields_set: Set[str]):
+        self.model_dict = model_dict
+        self.fields_set = fields_set
+
+
+def test_custom_init_mock():
+    calls = []
+
+    class Model:
+        def __init__(self, **kwargs):
+            validated_data = kwargs['validated_data']
+            self.a = validated_data.model_dict['a']
+            calls.append(repr(validated_data))
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {'a': core_schema.typed_dict_field(core_schema.int_schema())}, return_fields_set=True
+            ),
+            custom_init=True,
+        )
+    )
+
+    m = v.validate_python({'a': 2})
+    assert m.a == 2
+    assert calls == ["ValidatedData(model_dict={'a': 2}, fields_set={'a'})"]
+
+    with pytest.raises(ValidationError, match=r'Field required \[type=missing,'):
+        v.validate_python({'validated_data': BadValidatedData({'a': 2}, {'a'})})
+
+
+def test_custom_init_validated_data_field():
+    calls = []
+
+    class Model:
+        def __init__(self, **kwargs):
+            validated_data = kwargs['validated_data']
+            self.validated_data = validated_data.model_dict['validated_data']
+            calls.append(repr(validated_data))
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.typed_dict_schema(
+                {'validated_data': core_schema.typed_dict_field(core_schema.int_schema())}, return_fields_set=True
+            ),
+            custom_init=True,
+        )
+    )
+
+    m = v.validate_python({'validated_data': 2})
+    assert m.validated_data == 2
+    assert calls == ["ValidatedData(model_dict={'validated_data': 2}, fields_set={'validated_data'})"]
+
+    with pytest.raises(ValidationError, match='Input should be a valid integer'):
+        v.validate_python({'validated_data': BadValidatedData({'a': 2}, {'a'})})
