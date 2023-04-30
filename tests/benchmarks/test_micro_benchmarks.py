@@ -127,7 +127,7 @@ class TestModelLarge:
         benchmark(core_model_validator.validate_python, self.data)
 
     @pytest.mark.benchmark(group='large model - JSON')
-    def test_core_json(self, core_model_validator, benchmark):
+    def test_core_json_fs(self, core_model_validator, benchmark):
         json_data = json.dumps(self.data)
         m = core_model_validator.validate_json(json_data)
         assert m.field_0 == 99
