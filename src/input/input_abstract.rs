@@ -3,7 +3,6 @@ use std::fmt;
 use pyo3::prelude::*;
 use pyo3::types::{PyString, PyType};
 
-use crate::argument_markers::ValidatedData;
 use crate::errors::{InputValue, LocItem, ValResult};
 use crate::{PyMultiHostUrl, PyUrl};
 
@@ -42,11 +41,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn input_get_attr(&self, _name: &PyString) -> Option<PyResult<&PyAny>> {
-        None
-    }
-
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validated_data(&self) -> Option<ValidatedData> {
         None
     }
 

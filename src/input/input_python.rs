@@ -11,7 +11,6 @@ use pyo3::types::{
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
-use crate::argument_markers::{ValidatedData, VALIDATED_DATA_KEY};
 use crate::build_tools::safe_repr;
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValResult};
 use crate::{ArgsKwargs, PyMultiHostUrl, PyUrl};
@@ -101,16 +100,6 @@ impl<'a> Input<'a> for PyAny {
 
     fn input_get_attr(&self, name: &PyString) -> Option<PyResult<&PyAny>> {
         Some(self.getattr(name))
-    }
-
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validated_data(&self) -> Option<ValidatedData> {
-        if let Ok(v) = self.get_item(intern!(self.py(), VALIDATED_DATA_KEY)) {
-            if let Ok(validated_data) = v.extract::<ValidatedData>() {
-                return Some(validated_data);
-            }
-        }
-        None
     }
 
     fn input_is_instance(&self, class: &PyAny, _json_mask: u8) -> PyResult<bool> {

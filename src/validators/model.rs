@@ -7,7 +7,6 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
 use pyo3::{ffi, intern};
 
-use crate::argument_markers::{ValidatedData, VALIDATED_DATA_KEY};
 use crate::build_tools::{py_err, schema_or_config_same, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{py_error_on_minusone, Input};
@@ -52,7 +51,6 @@ pub struct ModelValidator {
     post_init: Option<Py<PyString>>,
     name: String,
     frozen: bool,
-    custom_init: bool,
 }
 
 impl BuildValidator for ModelValidator {
@@ -89,7 +87,6 @@ impl BuildValidator for ModelValidator {
             // which is not what we want here
             name: class.getattr(intern!(py, "__name__"))?.extract()?,
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
-            custom_init: schema.get_as(intern!(py, "custom_init"))?.unwrap_or(false),
         }
         .into())
     }
@@ -230,18 +227,6 @@ impl ModelValidator {
             ..*extra
         };
 
-        if self.custom_init {
-            if let Some(validated_data) = input.validated_data() {
-                set_model_attrs(
-                    self_instance,
-                    validated_data.model_dict.as_ref(py),
-                    validated_data.fields_set.as_ref(py),
-                )?;
-                // we don't call post_init here, it'll be called by the original validator
-                return Ok(self_instance.into_py(py));
-            }
-        }
-
         let output = self.validator.validate(py, input, &new_extra, slots, recursion_guard)?;
         let (model_dict, fields_set): (&PyAny, &PyAny) = output.extract(py)?;
         set_model_attrs(self_instance, model_dict, fields_set)?;
@@ -265,16 +250,9 @@ impl ModelValidator {
 
     fn create_class(&self, model_dict: &PyAny, fields_set: &PyAny) -> PyResult<PyObject> {
         let py = model_dict.py();
-        if self.custom_init {
-            let kwargs = PyDict::new(py);
-            let vd = ValidatedData::new(model_dict, fields_set);
-            kwargs.set_item(intern!(py, VALIDATED_DATA_KEY), vd.into_py(py))?;
-            self.class.call(py, (), Some(kwargs))
-        } else {
-            let instance = create_class(self.class.as_ref(py))?;
-            set_model_attrs(instance.as_ref(py), model_dict, fields_set)?;
-            Ok(instance)
-        }
+        let instance = create_class(self.class.as_ref(py))?;
+        set_model_attrs(instance.as_ref(py), model_dict, fields_set)?;
+        Ok(instance)
     }
 }
 

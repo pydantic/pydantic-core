@@ -2737,7 +2737,6 @@ class ModelSchema(TypedDict, total=False):
     revalidate_instances: Literal['always', 'never', 'subclass-instances']  # default: 'never'
     strict: bool
     frozen: bool
-    custom_init: bool
     config: CoreConfig
     ref: str
     metadata: Any
@@ -2752,7 +2751,6 @@ def model_schema(
     revalidate_instances: Literal['always', 'never', 'subclass-instances'] | None = None,
     strict: bool | None = None,
     frozen: bool | None = None,
-    custom_init: bool | None = None,
     config: CoreConfig | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -2793,7 +2791,6 @@ def model_schema(
           should re-validate defaults to config.revalidate_instances, else 'never'
         strict: Whether the model is strict
         frozen: Whether the model is frozen
-        custom_init: Whether the model has a custom init method
         config: The config to use for the model
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -2807,7 +2804,6 @@ def model_schema(
         revalidate_instances=revalidate_instances,
         strict=strict,
         frozen=frozen,
-        custom_init=custom_init,
         config=config,
         ref=ref,
         metadata=metadata,
