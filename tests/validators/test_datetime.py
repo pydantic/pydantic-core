@@ -194,6 +194,14 @@ def test_tz_info_deepcopy():
     assert c == output
 
 
+def test_tz_info_copy():
+    output = SchemaValidator({'type': 'datetime'}).validate_python('2023-02-15T16:23:44.037Z')
+    c = copy.copy(output)
+    assert repr(output.tzinfo) == 'TzInfo(UTC)'
+    assert repr(c.tzinfo) == 'TzInfo(UTC)'
+    assert c == output
+
+
 def test_custom_tz():
     class CustomTz(tzinfo):
         def utcoffset(self, _dt):

@@ -1,12 +1,13 @@
-use super::Input;
-use crate::errors::{ErrorType, ValError, ValResult};
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyTime, PyTzInfo};
+use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyTzInfo};
 use speedate::{Date, DateTime, Duration, ParseError, Time};
 use std::borrow::Cow;
 use strum::EnumMessage;
+
+use crate::errors::{ErrorType, ValError, ValResult};
+
+use super::Input;
 
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub enum EitherDate<'a> {
