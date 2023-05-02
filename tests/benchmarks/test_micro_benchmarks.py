@@ -235,8 +235,8 @@ def test_core_string_lax_wrong(benchmark):
     def t():
         try:
             validator.validate_python(123)
-        except ValidationError as e:
-            str(e)
+        except ValidationError:
+            pass
 
 
 @pytest.mark.benchmark(group='string')
@@ -251,6 +251,21 @@ def test_core_string_strict(benchmark):
 
 @pytest.mark.benchmark(group='string')
 def test_core_string_strict_wrong(benchmark):
+    validator = SchemaValidator(core_schema.str_schema(strict=True))
+
+    with pytest.raises(ValidationError, match='Input should be a valid string'):
+        validator.validate_python(123)
+
+    @benchmark
+    def t():
+        try:
+            validator.validate_python(123)
+        except ValidationError:
+            pass
+
+
+@pytest.mark.benchmark(group='string')
+def test_core_string_strict_wrong_str_e(benchmark):
     validator = SchemaValidator(core_schema.str_schema(strict=True))
 
     with pytest.raises(ValidationError, match='Input should be a valid string'):
