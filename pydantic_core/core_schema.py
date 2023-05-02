@@ -2659,7 +2659,6 @@ class TypedDictSchema(TypedDict, total=False):
     extra_behavior: ExtraBehavior
     total: bool  # default: True
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
-    from_attributes: bool
     ref: str
     metadata: Any
     serialization: SerSchema
@@ -2674,7 +2673,6 @@ def typed_dict_schema(
     extra_behavior: ExtraBehavior | None = None,
     total: bool | None = None,
     populate_by_name: bool | None = None,
-    from_attributes: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
@@ -2702,7 +2700,6 @@ def typed_dict_schema(
         extra_behavior: The extra behavior to use for the typed dict
         total: Whether the typed dict is total
         populate_by_name: Whether the typed dict should populate by name
-        from_attributes: Whether the typed dict should be populated from attributes
         serialization: Custom serialization schema
     """
     return dict_not_none(
@@ -2714,7 +2711,6 @@ def typed_dict_schema(
         extra_behavior=extra_behavior,
         total=total,
         populate_by_name=populate_by_name,
-        from_attributes=from_attributes,
         ref=ref,
         metadata=metadata,
         serialization=serialization,

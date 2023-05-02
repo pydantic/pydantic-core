@@ -30,7 +30,6 @@ pub struct TypedDictValidator {
     extra_behavior: ExtraBehavior,
     extra_validator: Option<Box<CombinedValidator>>,
     strict: bool,
-    from_attributes: bool,
     loc_by_alias: bool,
 }
 
@@ -47,7 +46,6 @@ impl BuildValidator for TypedDictValidator {
 
         let total =
             schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
-        let from_attributes = schema_or_config_same(schema, config, intern!(py, "from_attributes"))?.unwrap_or(false);
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
@@ -119,7 +117,6 @@ impl BuildValidator for TypedDictValidator {
             extra_behavior,
             extra_validator,
             strict,
-            from_attributes,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
         }
         .into())
@@ -136,7 +133,7 @@ impl Validator for TypedDictValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let strict = extra.strict.unwrap_or(self.strict);
-        let dict = input.validate_model_fields(strict, self.from_attributes)?;
+        let dict = input.validate_dict(strict)?;
 
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());

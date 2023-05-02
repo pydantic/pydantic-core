@@ -361,10 +361,6 @@ def test_recursion_branch():
         'branch': {'name': 'b1', 'branch': None},
     }
 
-    data = Cls(name='root')
-    data.branch = Cls(name='b1', branch=None)
-    assert v.validate_python(data) == {'name': 'root', 'branch': {'name': 'b1', 'branch': None}}
-
     b = {'name': 'recursive'}
     b['branch'] = b
     with pytest.raises(ValidationError) as exc_info:
@@ -378,6 +374,40 @@ def test_recursion_branch():
             'input': {'name': 'recursive', 'branch': IsPartialDict(name='recursive')},
         }
     ]
+
+
+def test_recursion_branch_from_attributes():
+    v = SchemaValidator(
+        {
+            'type': 'model-fields',
+            'ref': 'Branch',
+            'fields': {
+                'name': {'type': 'model-field', 'schema': {'type': 'str'}},
+                'branch': {
+                    'type': 'model-field',
+                    'schema': {
+                        'type': 'default',
+                        'schema': {'type': 'nullable', 'schema': {'type': 'definition-ref', 'schema_ref': 'Branch'}},
+                        'default': None,
+                    },
+                },
+            },
+        },
+        {'from_attributes': True},
+    )
+
+    assert v.validate_python({'name': 'root'}) == ({'name': 'root', 'branch': None}, None, {'name'})
+    model_dict, model_extra, fields_set = v.validate_python({'name': 'root', 'branch': {'name': 'b1', 'branch': None}})
+    assert model_dict == {'name': 'root', 'branch': ({'name': 'b1', 'branch': None}, None, {'name', 'branch'})}
+    assert model_extra is None
+    assert fields_set == {'name', 'branch'}
+
+    data = Cls(name='root')
+    data.branch = Cls(name='b1', branch=None)
+    model_dict, model_extra, fields_set = v.validate_python(data)
+    assert model_dict == {'name': 'root', 'branch': ({'name': 'b1', 'branch': None}, None, {'name', 'branch'})}
+    assert model_extra is None
+    assert fields_set == {'name', 'branch'}
 
     data = Cls(name='root')
     data.branch = data
