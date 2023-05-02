@@ -1,10 +1,9 @@
+use pyo3::exceptions::PyKeyError;
 use pyo3::intern;
 use pyo3::prelude::*;
+use pyo3::types::{PyDict, PySet, PyString, PyType};
 
 use ahash::AHashSet;
-use pyo3::exceptions::PyKeyError;
-use pyo3::types::PyTuple;
-use pyo3::types::{PyDict, PySet, PyString, PyType};
 
 use crate::build_tools::{is_strict, py_err, schema_or_config_same, ExtraBehavior, SchemaDict};
 use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
@@ -113,7 +112,8 @@ impl Validator for ModelFieldsValidator {
         let strict = extra.strict.unwrap_or(self.strict);
         let dict = input.validate_model_fields(strict, self.from_attributes)?;
 
-        let output_dict = PyDict::new(py);
+        let model_dict = PyDict::new(py);
+        let model_extra_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
         let mut fields_set_vec: Vec<Py<PyString>> = Vec::with_capacity(self.fields.len());
 
@@ -129,7 +129,7 @@ impl Validator for ModelFieldsValidator {
             ($dict:ident, $get_method:ident, $iter:ty $(,$kwargs:ident)?) => {{
                 for field in &self.fields {
                     let extra = Extra {
-                        data: Some(output_dict),
+                        data: Some(model_dict),
                         field_name: Some(&field.name),
                         ..*extra
                     };
@@ -157,7 +157,7 @@ impl Validator for ModelFieldsValidator {
                             .validate(py, value, &extra, slots, recursion_guard)
                         {
                             Ok(value) => {
-                                output_dict.set_item(&field.name_py, value)?;
+                                model_dict.set_item(&field.name_py, value)?;
                                 fields_set_vec.push(field.name_py.clone_ref(py));
                             }
                             Err(ValError::Omit) => continue,
@@ -170,7 +170,7 @@ impl Validator for ModelFieldsValidator {
                         }
                         continue;
                     } else if let Some(value) = field.validator.default_value(py, Some(field.name.as_str()), &extra, slots, recursion_guard)? {
-                        output_dict.set_item(&field.name_py, value)?;
+                        model_dict.set_item(&field.name_py, value)?;
                     } else {
                         errors.push(field.lookup_key.error(
                             ErrorType::Missing,
@@ -216,7 +216,7 @@ impl Validator for ModelFieldsValidator {
                                 if let Some(ref validator) = self.extra_validator {
                                     match validator.validate(py, value, &extra, slots, recursion_guard) {
                                         Ok(value) => {
-                                            output_dict.set_item(py_key, value)?;
+                                            model_extra_dict.set_item(py_key, value)?;
                                             fields_set_vec.push(py_key.into_py(py));
                                         }
                                         Err(ValError::LineErrors(line_errors)) => {
@@ -227,7 +227,7 @@ impl Validator for ModelFieldsValidator {
                                         Err(err) => return Err(err),
                                     }
                                 } else {
-                                    output_dict.set_item(py_key, value.to_object(py))?;
+                                    model_extra_dict.set_item(py_key, value.to_object(py))?;
                                     fields_set_vec.push(py_key.into_py(py));
                                 };
                             }
@@ -247,7 +247,7 @@ impl Validator for ModelFieldsValidator {
             Err(ValError::LineErrors(errors))
         } else {
             let fields_set = PySet::new(py, &fields_set_vec)?;
-            Ok((output_dict, fields_set).to_object(py))
+            Ok((model_dict, model_extra_dict, fields_set).to_object(py))
         }
     }
 
@@ -335,7 +335,8 @@ impl Validator for ModelFieldsValidator {
         }?;
 
         let fields_set: &PySet = PySet::new(py, &[field_name.to_string()])?;
-        Ok(PyTuple::new(py, [new_data, fields_set.to_object(py)]).to_object(py))
+        let model_extra = PyDict::new(py);
+        Ok((new_data, model_extra, fields_set.to_object(py)).to_object(py))
     }
 
     fn different_strict_behavior(

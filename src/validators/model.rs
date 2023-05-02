@@ -16,6 +16,10 @@ use crate::recursion_guard::RecursionGuard;
 use super::function::convert_err;
 use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
 
+const DUNDER_DICT: &str = "__dict__";
+const DUNDER_FIELDS_SET_KEY: &str = "__pydantic_fields_set__";
+const DUNDER_MODEL_EXTRA_KEY: &str = "__pydantic_extra__";
+
 #[derive(Debug, Clone)]
 pub(super) enum Revalidate {
     Always,
@@ -123,17 +127,21 @@ impl Validator for ModelValidator {
         // mask 0 so JSON is input is never true here
         if input.input_is_instance(class, 0)? {
             if self.revalidate.should_revalidate(input, class) {
-                let fields_set = match input.input_get_attr(intern!(py, "__pydantic_fields_set__")) {
-                    Some(fields_set) => fields_set.ok(),
-                    None => None,
-                };
-                // get dict here so from_attributes logic doesn't apply
-                let dict = input.input_get_attr(intern!(py, "__dict__")).unwrap()?;
-                let output = self.validator.validate(py, dict, extra, slots, recursion_guard)?;
+                let fields_set = input.input_get_attr(intern!(py, DUNDER_FIELDS_SET_KEY)).unwrap()?;
 
-                let (model_dict, validation_fields_set): (&PyAny, &PyAny) = output.extract(py)?;
-                let fields_set = fields_set.unwrap_or(validation_fields_set);
-                let instance = self.create_class(model_dict, fields_set)?;
+                // get dict here so from_attributes logic doesn't apply
+                let dict = input.input_get_attr(intern!(py, DUNDER_DICT)).unwrap()?;
+                let model_extra = input.input_get_attr(intern!(py, DUNDER_MODEL_EXTRA_KEY)).unwrap()?;
+
+                let full_model_dict = dict.downcast::<PyDict>()?.copy()?;
+                full_model_dict.update(model_extra.downcast()?)?;
+
+                let output = self
+                    .validator
+                    .validate(py, full_model_dict as &PyAny, extra, slots, recursion_guard)?;
+
+                let (model_dict, model_extra, _): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
+                let instance = self.create_class(model_dict, model_extra, fields_set)?;
 
                 self.call_post_init(py, instance, input, extra)
             } else {
@@ -148,8 +156,8 @@ impl Validator for ModelValidator {
             ))
         } else {
             let output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
-            let (model_dict, fields_set): (&PyAny, &PyAny) = output.extract(py)?;
-            let instance = self.create_class(model_dict, fields_set)?;
+            let (model_dict, model_extra, fields_set): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
+            let instance = self.create_class(model_dict, model_extra, fields_set)?;
             self.call_post_init(py, instance, input, extra)
         }
     }
@@ -167,7 +175,7 @@ impl Validator for ModelValidator {
         if self.frozen {
             return Err(ValError::new(ErrorType::FrozenInstance, field_value));
         }
-        let dict_py_str = intern!(py, "__dict__");
+        let dict_py_str = intern!(py, DUNDER_DICT);
         let dict: &PyDict = model.getattr(dict_py_str)?.downcast()?;
 
         let new_dict = dict.copy()?;
@@ -177,9 +185,9 @@ impl Validator for ModelValidator {
             self.validator
                 .validate_assignment(py, new_dict, field_name, field_value, extra, slots, recursion_guard)?;
 
-        let (output, updated_fields_set): (&PyDict, &PySet) = output.extract(py)?;
+        let (output, _, updated_fields_set): (&PyDict, &PyDict, &PySet) = output.extract(py)?;
 
-        if let Ok(fields_set) = model.input_get_attr(intern!(py, "__pydantic_fields_set__")).unwrap() {
+        if let Ok(fields_set) = model.input_get_attr(intern!(py, DUNDER_FIELDS_SET_KEY)).unwrap() {
             let fields_set: &PySet = fields_set.downcast()?;
             for field_name in updated_fields_set {
                 fields_set.add(field_name)?;
@@ -235,6 +243,7 @@ impl ModelValidator {
                 set_model_attrs(
                     self_instance,
                     validated_data.model_dict.as_ref(py),
+                    validated_data.model_extra.as_ref(py),
                     validated_data.fields_set.as_ref(py),
                 )?;
                 // we don't call post_init here, it'll be called by the original validator
@@ -243,8 +252,8 @@ impl ModelValidator {
         }
 
         let output = self.validator.validate(py, input, &new_extra, slots, recursion_guard)?;
-        let (model_dict, fields_set): (&PyAny, &PyAny) = output.extract(py)?;
-        set_model_attrs(self_instance, model_dict, fields_set)?;
+        let (model_dict, model_extra, fields_set): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
+        set_model_attrs(self_instance, model_dict, model_extra, fields_set)?;
         self.call_post_init(py, self_instance.into_py(py), input, extra)
     }
 
@@ -263,16 +272,16 @@ impl ModelValidator {
         Ok(instance)
     }
 
-    fn create_class(&self, model_dict: &PyAny, fields_set: &PyAny) -> PyResult<PyObject> {
+    fn create_class(&self, model_dict: &PyAny, model_extra: &PyAny, fields_set: &PyAny) -> PyResult<PyObject> {
         let py = model_dict.py();
         if self.custom_init {
             let kwargs = PyDict::new(py);
-            let vd = ValidatedData::new(model_dict, fields_set);
+            let vd = ValidatedData::new(model_dict, model_extra, fields_set);
             kwargs.set_item(intern!(py, VALIDATED_DATA_KEY), vd.into_py(py))?;
             self.class.call(py, (), Some(kwargs))
         } else {
             let instance = create_class(self.class.as_ref(py))?;
-            set_model_attrs(instance.as_ref(py), model_dict, fields_set)?;
+            set_model_attrs(instance.as_ref(py), model_dict, model_extra, fields_set)?;
             Ok(instance)
         }
     }
@@ -299,10 +308,11 @@ pub(super) fn create_class(class: &PyType) -> PyResult<PyObject> {
     }
 }
 
-fn set_model_attrs(instance: &PyAny, model_dict: &PyAny, fields_set: &PyAny) -> PyResult<()> {
+fn set_model_attrs(instance: &PyAny, model_dict: &PyAny, model_extra: &PyAny, fields_set: &PyAny) -> PyResult<()> {
     let py = instance.py();
-    force_setattr(py, instance, intern!(py, "__dict__"), model_dict)?;
-    force_setattr(py, instance, intern!(py, "__pydantic_fields_set__"), fields_set)?;
+    force_setattr(py, instance, intern!(py, DUNDER_DICT), model_dict)?;
+    force_setattr(py, instance, intern!(py, DUNDER_MODEL_EXTRA_KEY), model_extra)?;
+    force_setattr(py, instance, intern!(py, DUNDER_FIELDS_SET_KEY), fields_set)?;
     Ok(())
 }
 

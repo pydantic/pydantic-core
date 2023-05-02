@@ -23,7 +23,7 @@ class TestBenchmarkSimpleModel:
     @pytest.fixture(scope='class')
     def core_schema(self):
         class CoreModel:
-            __slots__ = '__dict__', '__pydantic_fields_set__'
+            __slots__ = '__dict__', '__pydantic_extra__', '__pydantic_fields_set__'
 
         return {
             'type': 'model',
@@ -288,7 +288,7 @@ def test_core_model_json(benchmark, basic_model_serializer):
 
 
 class FieldsSetModel:
-    __slots__ = '__dict__', '__pydantic_fields_set__'
+    __slots__ = '__dict__', '__pydantic_extra__', '__pydantic_fields_set__'
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():

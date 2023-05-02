@@ -52,6 +52,7 @@ def test_simple():
 
     assert v.validate_python({'field_a': b'abc', 'field_b': 1}) == (
         {'field_a': 'abc', 'field_b': 1},
+        {},
         {'field_a', 'field_b'},
     )
 
@@ -70,6 +71,7 @@ def test_strict():
 
     assert v.validate_python({'field_a': 'hello', 'field_b': 12}) == (
         {'field_a': 'hello', 'field_b': 12},
+        {},
         {'field_a', 'field_b'},
     )
 
@@ -95,9 +97,10 @@ def test_with_default():
         }
     )
 
-    assert v.validate_python({'field_a': b'abc'}) == ({'field_a': 'abc', 'field_b': 666}, {'field_a'})
+    assert v.validate_python({'field_a': b'abc'}) == ({'field_a': 'abc', 'field_b': 666}, {}, {'field_a'})
     assert v.validate_python({'field_a': b'abc', 'field_b': 1}) == (
         {'field_a': 'abc', 'field_b': 1},
+        {},
         {'field_b', 'field_a'},
     )
 
@@ -126,15 +129,15 @@ field_b
 @pytest.mark.parametrize(
     'config,input_value,expected',
     [
-        ({}, {'a': '123'}, ({'a': 123, 'b': 4.2}, {'a'})),
-        ({}, Map(a=123), ({'a': 123, 'b': 4.2}, {'a'})),
+        ({}, {'a': '123'}, ({'a': 123, 'b': 4.2}, {}, {'a'})),
+        ({}, Map(a=123), ({'a': 123, 'b': 4.2}, {}, {'a'})),
         ({}, {b'a': '123'}, Err('Field required [type=missing,')),
-        ({}, {'a': '123', 'c': 4}, ({'a': 123, 'b': 4.2}, {'a'})),
-        ({'extra_fields_behavior': 'allow'}, {'a': '123', 'c': 4}, ({'a': 123, 'c': 4, 'b': 4.2}, {'a', 'c'})),
+        ({}, {'a': '123', 'c': 4}, ({'a': 123, 'b': 4.2}, {}, {'a'})),
+        ({'extra_fields_behavior': 'allow'}, {'a': '123', 'c': 4}, ({'a': 123, 'b': 4.2}, {'c': 4}, {'a', 'c'})),
         ({'extra_fields_behavior': 'allow'}, {'a': '123', b'c': 4}, Err('Keys should be strings [type=invalid_key,')),
         ({'strict': True}, Map(a=123), Err('Input should be a valid dictionary [type=dict_type,')),
-        ({}, {'a': '123', 'b': '4.7'}, ({'a': 123, 'b': 4.7}, {'a', 'b'})),
-        ({}, {'a': '123', 'b': 'nan'}, ({'a': 123, 'b': FunctionCheck(math.isnan)}, {'a', 'b'})),
+        ({}, {'a': '123', 'b': '4.7'}, ({'a': 123, 'b': 4.7}, {}, {'a', 'b'})),
+        ({}, {'a': '123', 'b': 'nan'}, ({'a': 123, 'b': FunctionCheck(math.isnan)}, {}, {'a', 'b'})),
         (
             {'allow_inf_nan': False},
             {'a': '123', 'b': 'nan'},
@@ -162,8 +165,8 @@ def test_config(config: CoreConfig, input_value, expected):
             val = v.validate_python(input_value)
             print(f'UNEXPECTED OUTPUT: {val!r}')
     else:
-        output_dict = v.validate_python(input_value)
-        assert output_dict == expected
+        result = v.validate_python(input_value)
+        assert result == expected
 
 
 def test_ignore_extra():
@@ -179,6 +182,7 @@ def test_ignore_extra():
 
     assert v.validate_python({'field_a': b'123', 'field_b': 1, 'field_c': 123}) == (
         {'field_a': '123', 'field_b': 1},
+        {},
         {'field_b', 'field_a'},
     )
 
@@ -217,7 +221,7 @@ def test_str_config():
         {'type': 'model-fields', 'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}}},
         {'str_max_length': 5},
     )
-    assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
+    assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {}, {'field_a'})
 
     with pytest.raises(ValidationError, match='String should have at most 5 characters'):
         v.validate_python({'field_a': 'test long'})
@@ -228,10 +232,10 @@ def test_validate_assignment():
         {'type': 'model-fields', 'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}}}
     )
 
-    assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
+    assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {}, {'field_a'})
 
     data = {'field_a': 'test'}
-    assert v.validate_assignment(data, 'field_a', b'abc') == ({'field_a': 'abc'}, {'field_a'})
+    assert v.validate_assignment(data, 'field_a', b'abc') == ({'field_a': 'abc'}, {}, {'field_a'})
     assert data == {'field_a': 'abc'}
 
 
@@ -243,7 +247,7 @@ def test_validate_assignment_strict_field():
         }
     )
 
-    assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
+    assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {}, {'field_a'})
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_assignment({'field_a': 'test'}, 'field_a', b'abc')
@@ -289,6 +293,7 @@ def test_validate_assignment_functions():
 
     assert v.validate_python({'field_a': 'test', 'field_b': 12.0}) == (
         {'field_a': 'testtest', 'field_b': 6},
+        {},
         {'field_a', 'field_b'},
     )
 
@@ -297,6 +302,7 @@ def test_validate_assignment_functions():
 
     assert v.validate_assignment({'field_a': 'testtest', 'field_b': 6}, 'field_a', 'new-val') == (
         {'field_a': 'new-valnew-val', 'field_b': 6},
+        {},
         {'field_a'},
     )
     assert calls == [('func_a', 'new-val')]
@@ -307,7 +313,7 @@ def test_validate_assignment_ignore_extra():
         {'type': 'model-fields', 'fields': {'field_a': {'type': 'model-field', 'schema': {'type': 'str'}}}}
     )
 
-    assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
+    assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {}, {'field_a'})
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_assignment({'field_a': 'test'}, 'other_field', 456)
@@ -333,10 +339,11 @@ def test_validate_assignment_allow_extra():
         }
     )
 
-    assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {'field_a'})
+    assert v.validate_python({'field_a': 'test'}) == ({'field_a': 'test'}, {}, {'field_a'})
 
     assert v.validate_assignment({'field_a': 'test'}, 'other_field', 456) == (
         {'field_a': 'test', 'other_field': 456},
+        {},
         {'other_field'},
     )
 
@@ -353,6 +360,7 @@ def test_validate_assignment_allow_extra_validate():
 
     assert v.validate_assignment({'field_a': 'test'}, 'other_field', '456') == (
         {'field_a': 'test', 'other_field': 456},
+        {},
         {'other_field'},
     )
 
@@ -379,8 +387,9 @@ def test_validate_assignment_with_strict():
         }
     )
 
-    r, fields_set = v.validate_python({'x': 'a', 'y': '123'})
+    r, model_extra, fields_set = v.validate_python({'x': 'a', 'y': '123'})
     assert r == {'x': 'a', 'y': 123}
+    assert model_extra == {}
     assert fields_set == {'x', 'y'}
 
     v.validate_assignment(r, 'y', '124')
@@ -431,7 +440,7 @@ def test_fields_required_by_default():
         }
     )
 
-    assert v.validate_python({'x': 'pika', 'y': 'chu'}) == ({'x': 'pika', 'y': 'chu'}, {'x', 'y'})
+    assert v.validate_python({'x': 'pika', 'y': 'chu'}) == ({'x': 'pika', 'y': 'chu'}, {}, {'x', 'y'})
 
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python({'x': 'pika'})
@@ -455,8 +464,8 @@ def test_fields_required_by_default_with_default():
         }
     )
 
-    assert v.validate_python({'x': 'pika', 'y': 'chu'}) == ({'x': 'pika', 'y': 'chu'}, {'x', 'y'})
-    assert v.validate_python({'x': 'pika'}) == ({'x': 'pika', 'y': 'bulbi'}, {'x'})
+    assert v.validate_python({'x': 'pika', 'y': 'chu'}) == ({'x': 'pika', 'y': 'chu'}, {}, {'x', 'y'})
+    assert v.validate_python({'x': 'pika'}) == ({'x': 'pika', 'y': 'bulbi'}, {}, {'x'})
 
 
 def test_alias(py_and_json: PyAndJson):
@@ -466,7 +475,7 @@ def test_alias(py_and_json: PyAndJson):
             'fields': {'field_a': {'validation_alias': 'FieldA', 'type': 'model-field', 'schema': {'type': 'int'}}},
         }
     )
-    assert v.validate_test({'FieldA': '123'}) == ({'field_a': 123}, {'field_a'})
+    assert v.validate_test({'FieldA': '123'}) == ({'field_a': 123}, {}, {'field_a'})
     with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
         assert v.validate_test({'foobar': '123'})
     with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
@@ -475,7 +484,7 @@ def test_alias(py_and_json: PyAndJson):
 
 def test_empty_string_field_name(py_and_json: PyAndJson):
     v = py_and_json({'type': 'model-fields', 'fields': {'': {'type': 'model-field', 'schema': {'type': 'int'}}}})
-    assert v.validate_test({'': 123}) == ({'': 123}, {''})
+    assert v.validate_test({'': 123}) == ({'': 123}, {}, {''})
 
 
 def test_empty_string_aliases(py_and_json: PyAndJson):
@@ -485,7 +494,7 @@ def test_empty_string_aliases(py_and_json: PyAndJson):
             'fields': {'field_a': {'validation_alias': '', 'type': 'model-field', 'schema': {'type': 'int'}}},
         }
     )
-    assert v.validate_test({'': 123}) == ({'field_a': 123}, {'field_a'})
+    assert v.validate_test({'': 123}) == ({'field_a': 123}, {}, {'field_a'})
 
     v = py_and_json(
         {
@@ -493,7 +502,7 @@ def test_empty_string_aliases(py_and_json: PyAndJson):
             'fields': {'field_a': {'validation_alias': ['', ''], 'type': 'model-field', 'schema': {'type': 'int'}}},
         }
     )
-    assert v.validate_test({'': {'': 123}}) == ({'field_a': 123}, {'field_a'})
+    assert v.validate_test({'': {'': 123}}) == ({'field_a': 123}, {}, {'field_a'})
 
 
 def test_alias_allow_pop(py_and_json: PyAndJson):
@@ -504,9 +513,9 @@ def test_alias_allow_pop(py_and_json: PyAndJson):
             'fields': {'field_a': {'validation_alias': 'FieldA', 'type': 'model-field', 'schema': {'type': 'int'}}},
         }
     )
-    assert v.validate_test({'FieldA': '123'}) == ({'field_a': 123}, {'field_a'})
-    assert v.validate_test({'field_a': '123'}) == ({'field_a': 123}, {'field_a'})
-    assert v.validate_test({'FieldA': '1', 'field_a': '2'}) == ({'field_a': 1}, {'field_a'})
+    assert v.validate_test({'FieldA': '123'}) == ({'field_a': 123}, {}, {'field_a'})
+    assert v.validate_test({'field_a': '123'}) == ({'field_a': 123}, {}, {'field_a'})
+    assert v.validate_test({'FieldA': '1', 'field_a': '2'}) == ({'field_a': 1}, {}, {'field_a'})
     with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
         assert v.validate_test({'foobar': '123'})
 
@@ -514,7 +523,7 @@ def test_alias_allow_pop(py_and_json: PyAndJson):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        ({'foo': {'bar': '123'}}, ({'field_a': 123}, {'field_a'})),
+        ({'foo': {'bar': '123'}}, ({'field_a': 123}, {}, {'field_a'})),
         ({'x': '123'}, Err(r'foo.bar\n +Field required \[type=missing,')),
         ({'foo': '123'}, Err(r'foo.bar\n +Field required \[type=missing,')),
         ({'foo': [1, 2, 3]}, Err(r'foo.bar\n +Field required \[type=missing,')),
@@ -542,11 +551,11 @@ def test_alias_path(py_and_json: PyAndJson, input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        ({'foo': {'bar': {'bat': '123'}}}, ({'field_a': 123}, {'field_a'})),
-        ({'foo': [1, 2, 3, 4]}, ({'field_a': 4}, {'field_a'})),
-        ({'foo': (1, 2, 3, 4)}, ({'field_a': 4}, {'field_a'})),
-        ({'spam': 5}, ({'field_a': 5}, {'field_a'})),
-        ({'spam': 1, 'foo': {'bar': {'bat': 2}}}, ({'field_a': 2}, {'field_a'})),
+        ({'foo': {'bar': {'bat': '123'}}}, ({'field_a': 123}, {}, {'field_a'})),
+        ({'foo': [1, 2, 3, 4]}, ({'field_a': 4}, {}, {'field_a'})),
+        ({'foo': (1, 2, 3, 4)}, ({'field_a': 4}, {}, {'field_a'})),
+        ({'spam': 5}, ({'field_a': 5}, {}, {'field_a'})),
+        ({'spam': 1, 'foo': {'bar': {'bat': 2}}}, ({'field_a': 2}, {}, {'field_a'})),
         ({'foo': {'x': 2}}, Err(r'field_a\n +Field required \[type=missing,')),
         ({'x': '123'}, Err(r'field_a\n +Field required \[type=missing,')),
         ({'x': {2: 33}}, Err(r'field_a\n +Field required \[type=missing,')),
@@ -581,9 +590,9 @@ def test_aliases_path_multiple(py_and_json: PyAndJson, input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        ({'foo': {-2: '123'}}, ({'field_a': 123}, {'field_a'})),
+        ({'foo': {-2: '123'}}, ({'field_a': 123}, {}, {'field_a'})),
         # negatives indexes work fine
-        ({'foo': [1, 42, 'xx']}, ({'field_a': 42}, {'field_a'})),
+        ({'foo': [1, 42, 'xx']}, ({'field_a': 42}, {}, {'field_a'})),
         ({'foo': [42, 'xxx', 42]}, Err(r'Input should be a valid integer,')),
         ({'foo': [42]}, Err(r'field_a\n +Field required \[type=missing,')),
         ({'foo': {'xx': '123'}}, Err(r'field_a\n +Field required \[type=missing,')),
@@ -614,7 +623,7 @@ def test_aliases_path_negative(input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        ({'foo': [1, 42, 'xx']}, ({'field_a': 42}, {'field_a'})),
+        ({'foo': [1, 42, 'xx']}, ({'field_a': 42}, {}, {'field_a'})),
         ({'foo': [42, 'xxx', 42]}, Err(r'Input should be a valid integer,')),
         ({'foo': [42]}, Err(r'foo.-2\n +Field required \[type=missing,')),
     ],
@@ -667,7 +676,7 @@ def get_int_key():
             },
         }
     )
-    assert v.validate_python({'foo': {3: 33}}) == ({'field_a': 33}, {'field_a'})
+    assert v.validate_python({'foo': {3: 33}}) == ({'field_a': 33}, {}, {'field_a'})
 
 
 class GetItemThing:
@@ -683,8 +692,8 @@ def get_custom_getitem():
             'fields': {'field_a': {'validation_alias': ['foo'], 'type': 'model-field', 'schema': {'type': 'int'}}},
         }
     )
-    assert v.validate_python(GetItemThing()) == ({'field_a': 321}, {'field_a'})
-    assert v.validate_python({'bar': GetItemThing()}) == ({'field_a': 321}, {'field_a'})
+    assert v.validate_python(GetItemThing()) == ({'field_a': 321}, {}, {'field_a'})
+    assert v.validate_python({'bar': GetItemThing()}) == ({'field_a': 321}, {}, {'field_a'})
 
 
 @pytest.mark.parametrize('input_value', [{'foo': {'bar': 42}}, {'foo': 42}, {'field_a': 42}], ids=repr)
@@ -702,7 +711,7 @@ def test_paths_allow_by_name(py_and_json: PyAndJson, input_value):
             'populate_by_name': True,
         }
     )
-    assert v.validate_test(input_value) == ({'field_a': 42}, {'field_a'})
+    assert v.validate_test(input_value) == ({'field_a': 42}, {}, {'field_a'})
 
 
 @pytest.mark.parametrize(
@@ -741,9 +750,9 @@ def test_alias_error_loc_alias(py_and_json: PyAndJson):
         },
         {'loc_by_alias': True},  # this is the default
     )
-    assert v.validate_test({'foo': {'x': 42}}) == ({'field_a': 42}, {'field_a'})
-    assert v.validate_python({'bar': ['x', {-1: 42}]}) == ({'field_a': 42}, {'field_a'})
-    assert v.validate_test({'bar': ['x', [1, 2, 42]]}) == ({'field_a': 42}, {'field_a'})
+    assert v.validate_test({'foo': {'x': 42}}) == ({'field_a': 42}, {}, {'field_a'})
+    assert v.validate_python({'bar': ['x', {-1: 42}]}) == ({'field_a': 42}, {}, {'field_a'})
+    assert v.validate_test({'bar': ['x', [1, 2, 42]]}) == ({'field_a': 42}, {}, {'field_a'})
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test({'foo': {'x': 'not_int'}})
     # insert_assert(exc_info.value.errors())
@@ -786,8 +795,8 @@ def test_alias_error_loc_field_names(py_and_json: PyAndJson):
         },
         {'loc_by_alias': False},
     )
-    assert v.validate_test({'foo': 42}) == ({'field_a': 42}, {'field_a'})
-    assert v.validate_test({'bar': ['x', [1, 2, 42]]}) == ({'field_a': 42}, {'field_a'})
+    assert v.validate_test({'foo': 42}) == ({'field_a': 42}, {}, {'field_a'})
+    assert v.validate_test({'bar': ['x', [1, 2, 42]]}) == ({'field_a': 42}, {}, {'field_a'})
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test({'foo': 'not_int'})
     # insert_assert(exc_info.value.errors())
@@ -818,12 +827,12 @@ def test_alias_error_loc_field_names(py_and_json: PyAndJson):
 
 def test_empty_model():
     v = SchemaValidator({'type': 'model-fields', 'fields': {}})
-    assert v.validate_python({}) == ({}, set())
+    assert v.validate_python({}) == ({}, {}, set())
     with pytest.raises(ValidationError, match=re.escape('Input should be a valid dictionary [type=dict_type,')):
         v.validate_python('x')
 
 
-def test_model_deep():
+def test_model_fields_deep():
     v = SchemaValidator(
         {
             'type': 'model-fields',
@@ -851,16 +860,18 @@ def test_model_deep():
             },
         }
     )
-    output, fields_set = v.validate_python(
+    model_dict, model_extra, fields_set = v.validate_python(
         {'field_a': '1', 'field_b': {'field_c': '2', 'field_d': {'field_e': '4', 'field_f': 4}}}
     )
-    assert output == {
+    assert model_dict == {
         'field_a': '1',
         'field_b': (
-            {'field_c': '2', 'field_d': ({'field_e': '4', 'field_f': 4}, {'field_f', 'field_e'})},
+            {'field_c': '2', 'field_d': ({'field_e': '4', 'field_f': 4}, {}, {'field_f', 'field_e'})},
+            {},
             {'field_d', 'field_c'},
         ),
     }
+    assert model_extra == {}
     assert fields_set == {'field_a', 'field_b'}
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python({'field_a': '1', 'field_b': {'field_c': '2', 'field_d': {'field_e': '4', 'field_f': 'xx'}}})
@@ -895,15 +906,15 @@ class MyDataclass:
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        (ClassWithAttributes(), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
-        (MyDataclass(), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
-        (Cls(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
-        (dict(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
-        (Map(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
-        ((Cls(a=1, b=2), dict(c='ham')), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
-        ((Cls(a=1, b=2), dict(c='bacon')), ({'a': 1, 'b': 2, 'c': 'bacon'}, {'a', 'b', 'c'})),
-        ((Cls(a=1, b=2, c='ham'), dict(c='bacon')), ({'a': 1, 'b': 2, 'c': 'bacon'}, {'a', 'b', 'c'})),
-        ((Cls(a=1, b=2, c='ham'), dict(d='bacon')), ({'a': 1, 'b': 2, 'c': 'ham'}, {'a', 'b', 'c'})),
+        (ClassWithAttributes(), ({'a': 1, 'b': 2, 'c': 'ham'}, {}, {'a', 'b', 'c'})),
+        (MyDataclass(), ({'a': 1, 'b': 2, 'c': 'ham'}, {}, {'a', 'b', 'c'})),
+        (Cls(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {}, {'a', 'b', 'c'})),
+        (dict(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {}, {'a', 'b', 'c'})),
+        (Map(a=1, b=2, c='ham'), ({'a': 1, 'b': 2, 'c': 'ham'}, {}, {'a', 'b', 'c'})),
+        ((Cls(a=1, b=2), dict(c='ham')), ({'a': 1, 'b': 2, 'c': 'ham'}, {}, {'a', 'b', 'c'})),
+        ((Cls(a=1, b=2), dict(c='bacon')), ({'a': 1, 'b': 2, 'c': 'bacon'}, {}, {'a', 'b', 'c'})),
+        ((Cls(a=1, b=2, c='ham'), dict(c='bacon')), ({'a': 1, 'b': 2, 'c': 'bacon'}, {}, {'a', 'b', 'c'})),
+        ((Cls(a=1, b=2, c='ham'), dict(d='bacon')), ({'a': 1, 'b': 2, 'c': 'ham'}, {}, {'a', 'b', 'c'})),
         # using type gives `__module__ == 'builtins'`
         (type('Testing', (), {}), Err('[type=dict_attributes_type,')),
         (
@@ -970,8 +981,8 @@ def test_from_attributes_by_name():
             'populate_by_name': True,
         }
     )
-    assert v.validate_python(Cls(a_alias=1)) == ({'a': 1}, {'a'})
-    assert v.validate_python(Cls(a=1)) == ({'a': 1}, {'a'})
+    assert v.validate_python(Cls(a_alias=1)) == ({'a': 1}, {}, {'a'})
+    assert v.validate_python(Cls(a=1)) == ({'a': 1}, {}, {'a'})
 
 
 def test_from_attributes_missing():
@@ -1091,11 +1102,11 @@ def test_from_attributes_extra():
         }
     )
 
-    assert v.validate_python(Foobar()) == ({'a': 1}, {'a'})
-    assert v.validate_python(MyDataclass()) == ({'a': 1}, {'a'})
-    assert v.validate_python(Cls(a=1, b=2, c='ham')) == ({'a': 1}, {'a'})
-    assert v.validate_python(Cls(a=1, b=datetime(2000, 1, 1))) == ({'a': 1}, {'a'})
-    assert v.validate_python(Cls(a=1, b=datetime.now, c=lambda: 42)) == ({'a': 1}, {'a'})
+    assert v.validate_python(Foobar()) == ({'a': 1}, {}, {'a'})
+    assert v.validate_python(MyDataclass()) == ({'a': 1}, {}, {'a'})
+    assert v.validate_python(Cls(a=1, b=2, c='ham')) == ({'a': 1}, {}, {'a'})
+    assert v.validate_python(Cls(a=1, b=datetime(2000, 1, 1))) == ({'a': 1}, {}, {'a'})
+    assert v.validate_python(Cls(a=1, b=datetime.now, c=lambda: 42)) == ({'a': 1}, {}, {'a'})
 
 
 def test_from_attributes_extra_ignore_no_attributes_accessed() -> None:
@@ -1118,7 +1129,7 @@ def test_from_attributes_extra_ignore_no_attributes_accessed() -> None:
             accessed.append(__name)
             return super().__getattribute__(__name)
 
-    assert v.validate_python(Source()) == ({'a': 1}, {'a'})
+    assert v.validate_python(Source()) == ({'a': 1}, {}, {'a'})
     assert 'a' in accessed and 'b' not in accessed
 
 
@@ -1136,7 +1147,7 @@ def test_from_attributes_extra_forbid() -> None:
         }
     )
 
-    assert v.validate_python(Source()) == ({'a': 1}, {'a'})
+    assert v.validate_python(Source()) == ({'a': 1}, {}, {'a'})
 
 
 def foobar():
@@ -1163,8 +1174,9 @@ def test_from_attributes_function(input_value, expected):
         }
     )
 
-    model_dict, fields_set = v.validate_python(input_value)
+    model_dict, model_extra, fields_set = v.validate_python(input_value)
     assert model_dict == expected
+    assert model_extra == {}
     assert fields_set == {'a'}
 
 
@@ -1256,8 +1268,9 @@ def test_from_attributes_path(input_value, expected):
             val = v.validate_python(input_value)
             print(f'UNEXPECTED OUTPUT: {val!r}')
     else:
-        model_dict, fields_set = v.validate_python(input_value)
+        model_dict, model_extra, fields_set = v.validate_python(input_value)
         assert model_dict == expected
+        assert model_extra == {}
         assert fields_set == {'my_field'}
 
 
@@ -1309,12 +1322,12 @@ def test_alias_extra(py_and_json: PyAndJson):
         },
         {'loc_by_alias': False},
     )
-    assert v.validate_test({'FieldA': 1}) == ({'field_a': 1}, {'field_a'})
-    assert v.validate_test({'foo': [1, 2, 3]}) == ({'field_a': 3}, {'field_a'})
+    assert v.validate_test({'FieldA': 1}) == ({'field_a': 1}, {}, {'field_a'})
+    assert v.validate_test({'foo': [1, 2, 3]}) == ({'field_a': 3}, {}, {'field_a'})
 
     # used_keys should be populated either though validation fails so "FieldA" is skipped in extra
     with pytest.raises(ValidationError) as exc_info:
-        assert v.validate_test({'FieldA': '...'}) == ({'field_a': 1}, {'field_a'})
+        assert v.validate_test({'FieldA': '...'}) == ({'field_a': 1}, {}, {'field_a'})
 
     assert exc_info.value.errors() == [
         {
@@ -1341,10 +1354,10 @@ def test_alias_extra_from_attributes():
             },
         }
     )
-    assert v.validate_python({'FieldA': 1}) == ({'field_a': 1}, {'field_a'})
-    assert v.validate_python(Cls(FieldA=1)) == ({'field_a': 1}, {'field_a'})
-    assert v.validate_python(Cls(foo=[1, 2, 3])) == ({'field_a': 3}, {'field_a'})
-    assert v.validate_python({'foo': [1, 2, 3]}) == ({'field_a': 3}, {'field_a'})
+    assert v.validate_python({'FieldA': 1}) == ({'field_a': 1}, {}, {'field_a'})
+    assert v.validate_python(Cls(FieldA=1)) == ({'field_a': 1}, {}, {'field_a'})
+    assert v.validate_python(Cls(foo=[1, 2, 3])) == ({'field_a': 3}, {}, {'field_a'})
+    assert v.validate_python({'foo': [1, 2, 3]}) == ({'field_a': 3}, {}, {'field_a'})
 
 
 def test_alias_extra_by_name(py_and_json: PyAndJson):
@@ -1357,10 +1370,10 @@ def test_alias_extra_by_name(py_and_json: PyAndJson):
             'fields': {'field_a': {'validation_alias': 'FieldA', 'type': 'model-field', 'schema': {'type': 'int'}}},
         }
     )
-    assert v.validate_test({'FieldA': 1}) == ({'field_a': 1}, {'field_a'})
-    assert v.validate_test({'field_a': 1}) == ({'field_a': 1}, {'field_a'})
-    assert v.validate_python(Cls(FieldA=1)) == ({'field_a': 1}, {'field_a'})
-    assert v.validate_python(Cls(field_a=1)) == ({'field_a': 1}, {'field_a'})
+    assert v.validate_test({'FieldA': 1}) == ({'field_a': 1}, {}, {'field_a'})
+    assert v.validate_test({'field_a': 1}) == ({'field_a': 1}, {}, {'field_a'})
+    assert v.validate_python(Cls(FieldA=1)) == ({'field_a': 1}, {}, {'field_a'})
+    assert v.validate_python(Cls(field_a=1)) == ({'field_a': 1}, {}, {'field_a'})
 
 
 def test_alias_extra_forbid(py_and_json: PyAndJson):
@@ -1371,7 +1384,7 @@ def test_alias_extra_forbid(py_and_json: PyAndJson):
             'fields': {'field_a': {'type': 'model-field', 'validation_alias': 'FieldA', 'schema': {'type': 'int'}}},
         }
     )
-    assert v.validate_test({'FieldA': 1}) == ({'field_a': 1}, {'field_a'})
+    assert v.validate_test({'FieldA': 1}) == ({'field_a': 1}, {}, {'field_a'})
 
 
 def test_with_default_factory():
@@ -1387,8 +1400,8 @@ def test_with_default_factory():
         }
     )
 
-    assert v.validate_python({}) == ({'x': 'pikachu'}, set())
-    assert v.validate_python({'x': 'bulbi'}) == ({'x': 'bulbi'}, {'x'})
+    assert v.validate_python({}) == ({'x': 'pikachu'}, {}, set())
+    assert v.validate_python({'x': 'bulbi'}) == ({'x': 'bulbi'}, {}, {'x'})
 
 
 @pytest.mark.parametrize(
@@ -1445,7 +1458,7 @@ class TestOnError:
 
     def test_on_error_raise_by_default(self, py_and_json: PyAndJson):
         v = py_and_json({'type': 'model-fields', 'fields': {'x': {'type': 'model-field', 'schema': {'type': 'str'}}}})
-        assert v.validate_test({'x': 'foo'}) == ({'x': 'foo'}, {'x'})
+        assert v.validate_test({'x': 'foo'}) == ({'x': 'foo'}, {}, {'x'})
         with pytest.raises(ValidationError) as exc_info:
             v.validate_test({'x': ['foo']})
         assert exc_info.value.errors() == [
@@ -1464,7 +1477,7 @@ class TestOnError:
                 },
             }
         )
-        assert v.validate_test({'x': 'foo'}) == ({'x': 'foo'}, {'x'})
+        assert v.validate_test({'x': 'foo'}) == ({'x': 'foo'}, {}, {'x'})
         with pytest.raises(ValidationError) as exc_info:
             v.validate_test({'x': ['foo']})
         assert exc_info.value.errors() == [
@@ -1488,8 +1501,8 @@ class TestOnError:
                 },
             }
         )
-        assert v.validate_test({'x': 'foo'}) == ({'x': 'foo'}, {'x'})
-        assert v.validate_test({'x': ['foo']}) == ({'x': 'pika'}, {'x'})
+        assert v.validate_test({'x': 'foo'}) == ({'x': 'foo'}, {}, {'x'})
+        assert v.validate_test({'x': ['foo']}) == ({'x': 'pika'}, {}, {'x'})
 
     def test_on_error_default_factory(self, py_and_json: PyAndJson):
         v = py_and_json(
@@ -1508,8 +1521,8 @@ class TestOnError:
                 },
             }
         )
-        assert v.validate_test({'x': 'foo'}) == ({'x': 'foo'}, {'x'})
-        assert v.validate_test({'x': ['foo']}) == ({'x': 'pika'}, {'x'})
+        assert v.validate_test({'x': 'foo'}) == ({'x': 'foo'}, {}, {'x'})
+        assert v.validate_test({'x': ['foo']}) == ({'x': 'pika'}, {}, {'x'})
 
     def test_wrap_on_error(self, py_and_json: PyAndJson):
         def wrap_function(input_value, validator, info):
@@ -1540,10 +1553,10 @@ class TestOnError:
                 },
             }
         )
-        assert v.validate_test({'x': 'foo'}) == ({'x': 'foo'}, {'x'})
-        assert v.validate_test({'x': ['foo']}) == ({'x': '1'}, {'x'})
-        assert v.validate_test({'x': ['foo', 'bar']}) == ({'x': '2'}, {'x'})
-        assert v.validate_test({'x': {'a': 'b'}}) == ({'x': "{'a': 'b'}"}, {'x'})
+        assert v.validate_test({'x': 'foo'}) == ({'x': 'foo'}, {}, {'x'})
+        assert v.validate_test({'x': ['foo']}) == ({'x': '1'}, {}, {'x'})
+        assert v.validate_test({'x': ['foo', 'bar']}) == ({'x': '2'}, {}, {'x'})
+        assert v.validate_test({'x': {'a': 'b'}}) == ({'x': "{'a': 'b'}"}, {}, {'x'})
 
 
 def test_frozen_field():
@@ -1561,8 +1574,9 @@ def test_frozen_field():
             },
         }
     )
-    r1, fields_set = v.validate_python({'name': 'Samuel', 'age': '36'})
+    r1, model_extra, fields_set = v.validate_python({'name': 'Samuel', 'age': '36'})
     assert r1 == {'name': 'Samuel', 'age': 36, 'is_developer': True}
+    assert model_extra == {}
     assert fields_set == {'name', 'age'}
     v.validate_assignment(r1, 'age', '35')
     assert r1 == {'name': 'Samuel', 'age': 35, 'is_developer': True}
@@ -1601,8 +1615,9 @@ def test_extra_behavior_allow(
         config=config,
     )
 
-    m, fields_set = v.validate_python({'f': 'x', 'extra_field': '123'})
-    assert m == {'f': 'x', 'extra_field': expected_extra_value}
+    m, model_extra, fields_set = v.validate_python({'f': 'x', 'extra_field': '123'})
+    assert m == {'f': 'x'}
+    assert model_extra == {'extra_field': expected_extra_value}
     assert fields_set == {'f', 'extra_field'}
 
     v.validate_assignment(m, 'f', 'y')
@@ -1630,7 +1645,7 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
         config=config,
     )
 
-    m, fields_set = v.validate_python({'f': 'x'})
+    m, model_extra, fields_set = v.validate_python({'f': 'x'})
     assert m == {'f': 'x'}
     assert fields_set == {'f'}
 
@@ -1677,8 +1692,9 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
         config=config,
     )
 
-    m, fields_set = v.validate_python({'f': 'x', 'extra_field': 123})
+    m, model_extra, fields_set = v.validate_python({'f': 'x', 'extra_field': 123})
     assert m == {'f': 'x'}
+    assert model_extra == {}
     assert fields_set == {'f'}
 
     v.validate_assignment(m, 'f', 'y')

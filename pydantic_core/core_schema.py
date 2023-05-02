@@ -2877,7 +2877,7 @@ def model_schema(
     from pydantic_core import CoreConfig, SchemaValidator, core_schema
 
     class MyModel:
-        __slots__ = '__dict__', '__pydantic_fields_set__'
+        __slots__ = '__dict__', '__pydantic_extra__', '__pydantic_fields_set__'
 
     schema = core_schema.model_schema(
         cls=MyModel,
@@ -3356,7 +3356,7 @@ def json_schema(
     )
 
     class MyModel:
-        __slots__ = '__dict__', '__pydantic_fields_set__'
+        __slots__ = '__dict__', '__pydantic_extra__', '__pydantic_fields_set__'
         field_a: str
         field_b: bool
 

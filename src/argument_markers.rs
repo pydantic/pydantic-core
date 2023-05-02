@@ -67,13 +67,15 @@ pub(crate) const VALIDATED_DATA_KEY: &str = "validated_data";
 #[derive(Debug, Clone)]
 pub struct ValidatedData {
     pub model_dict: PyObject,
+    pub model_extra: PyObject,
     pub fields_set: PyObject,
 }
 
 impl ValidatedData {
-    pub(crate) fn new(model_dict: &PyAny, fields_set: &PyAny) -> Self {
+    pub(crate) fn new(model_dict: &PyAny, model_extra: &PyAny, fields_set: &PyAny) -> Self {
         Self {
             model_dict: model_dict.to_object(model_dict.py()),
+            model_extra: model_extra.to_object(model_dict.py()),
             fields_set: fields_set.to_object(model_dict.py()),
         }
     }
@@ -83,7 +85,8 @@ impl ValidatedData {
 impl ValidatedData {
     fn __repr__(&self, py: Python) -> String {
         let model_dict = safe_repr(self.model_dict.as_ref(py));
+        let model_extra = safe_repr(self.model_extra.as_ref(py));
         let fields_set = safe_repr(self.fields_set.as_ref(py));
-        format!("ValidatedData(model_dict={model_dict}, fields_set={fields_set})")
+        format!("ValidatedData(model_dict={model_dict}, model_extra={model_extra}, fields_set={fields_set})")
     }
 }

@@ -276,7 +276,7 @@ def test_build_default_and_default_factory():
 
 def test_model_class():
     class MyModel:
-        __slots__ = '__dict__', '__pydantic_fields_set__'
+        __slots__ = '__dict__', '__pydantic_extra__', '__pydantic_fields_set__'
         field_a: str
         field_b: int
 
@@ -293,7 +293,7 @@ def test_model_class():
                         'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
                     },
                 },
-                'default': ({'field_a': '[default-a]', 'field_b': '[default-b]'}, set()),
+                'default': ({'field_a': '[default-a]', 'field_b': '[default-b]'}, None, set()),
                 'on_error': 'default',
             },
         }

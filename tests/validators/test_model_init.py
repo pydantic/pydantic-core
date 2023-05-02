@@ -3,7 +3,7 @@ from pydantic_core import SchemaValidator
 
 class MyModel:
     # this is not required, but it avoids `__pydantic_fields_set__` being included in `__dict__`
-    __slots__ = '__dict__', '__pydantic_fields_set__'
+    __slots__ = '__dict__', '__pydantic_extra__', '__pydantic_fields_set__'
     field_a: str
     field_b: int
 
@@ -39,7 +39,7 @@ def test_model_init():
 def test_model_init_nested():
     class MyModel:
         # this is not required, but it avoids `__pydantic_fields_set__` being included in `__dict__`
-        __slots__ = '__dict__', '__pydantic_fields_set__'
+        __slots__ = '__dict__', '__pydantic_extra__', '__pydantic_fields_set__'
 
     v = SchemaValidator(
         {
