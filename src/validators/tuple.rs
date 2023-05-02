@@ -8,7 +8,7 @@ use crate::input::{GenericCollection, Input};
 use crate::recursion_guard::RecursionGuard;
 
 use super::list::{get_items_schema, length_check};
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct TupleVariableValidator {
@@ -24,10 +24,10 @@ impl BuildValidator for TupleVariableValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext<CombinedValidator>,
+        definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let item_validator = get_items_schema(schema, config, build_context)?;
+        let item_validator = get_items_schema(schema, config, definitions)?;
         let inner_name = item_validator.as_ref().map(|v| v.get_name()).unwrap_or("any");
         let name = format!("tuple[{inner_name}, ...]");
         Ok(Self {
@@ -78,12 +78,12 @@ impl Validator for TupleVariableValidator {
 
     fn different_strict_behavior(
         &self,
-        build_context: Option<&BuildContext<CombinedValidator>>,
+        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
         if ultra_strict {
             match self.item_validator {
-                Some(ref v) => v.different_strict_behavior(build_context, true),
+                Some(ref v) => v.different_strict_behavior(definitions, true),
                 None => false,
             }
         } else {
@@ -95,9 +95,9 @@ impl Validator for TupleVariableValidator {
         &self.name
     }
 
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
+    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
         match self.item_validator {
-            Some(ref mut v) => v.complete(build_context),
+            Some(ref mut v) => v.complete(definitions),
             None => Ok(()),
         }
     }
@@ -116,13 +116,13 @@ impl BuildValidator for TuplePositionalValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext<CombinedValidator>,
+        definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let items: &PyList = schema.get_as_req(intern!(py, "items_schema"))?;
         let validators: Vec<CombinedValidator> = items
             .iter()
-            .map(|item| build_validator(item, config, build_context))
+            .map(|item| build_validator(item, config, definitions))
             .collect::<PyResult<_>>()?;
 
         let descr = validators.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
@@ -130,7 +130,7 @@ impl BuildValidator for TuplePositionalValidator {
             strict: is_strict(schema, config)?,
             items_validators: validators,
             extra_validator: match schema.get_item(intern!(py, "extra_schema")) {
-                Some(v) => Some(Box::new(build_validator(v, config, build_context)?)),
+                Some(v) => Some(Box::new(build_validator(v, config, definitions)?)),
                 None => None,
             },
             name: format!("tuple[{descr}]"),
@@ -240,18 +240,18 @@ impl Validator for TuplePositionalValidator {
 
     fn different_strict_behavior(
         &self,
-        build_context: Option<&BuildContext<CombinedValidator>>,
+        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
         if ultra_strict {
             if self
                 .items_validators
                 .iter()
-                .any(|v| v.different_strict_behavior(build_context, true))
+                .any(|v| v.different_strict_behavior(definitions, true))
             {
                 true
             } else if let Some(ref v) = self.extra_validator {
-                v.different_strict_behavior(build_context, true)
+                v.different_strict_behavior(definitions, true)
             } else {
                 false
             }
@@ -264,12 +264,12 @@ impl Validator for TuplePositionalValidator {
         &self.name
     }
 
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
+    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
         self.items_validators
             .iter_mut()
-            .try_for_each(|v| v.complete(build_context))?;
+            .try_for_each(|v| v.complete(definitions))?;
         match &mut self.extra_validator {
-            Some(v) => v.complete(build_context),
+            Some(v) => v.complete(definitions),
             None => Ok(()),
         }
     }

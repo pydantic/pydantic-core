@@ -13,7 +13,7 @@ use crate::input::{
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 struct TypedDictField {
@@ -39,7 +39,7 @@ impl BuildValidator for TypedDictValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext<CombinedValidator>,
+        definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let strict = is_strict(schema, config)?;
@@ -51,7 +51,7 @@ impl BuildValidator for TypedDictValidator {
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
         let extra_validator = match (schema.get_item(intern!(py, "extra_validator")), &extra_behavior) {
-            (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(v, config, build_context)?)),
+            (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(v, config, definitions)?)),
             (Some(_), _) => return py_err!("extra_validator can only be used if extra_behavior=allow"),
             (_, _) => None,
         };
@@ -65,7 +65,7 @@ impl BuildValidator for TypedDictValidator {
 
             let schema = field_info.get_as_req(intern!(py, "schema"))?;
 
-            let validator = match build_validator(schema, config, build_context) {
+            let validator = match build_validator(schema, config, definitions) {
                 Ok(v) => v,
                 Err(err) => return py_err!("Field \"{}\":\n  {}", field_name, err),
             };
@@ -270,24 +270,24 @@ impl Validator for TypedDictValidator {
 
     fn different_strict_behavior(
         &self,
-        build_context: Option<&BuildContext<CombinedValidator>>,
+        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
         self.fields
             .iter()
-            .any(|f| f.validator.different_strict_behavior(build_context, ultra_strict))
+            .any(|f| f.validator.different_strict_behavior(definitions, ultra_strict))
     }
 
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
 
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
+    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
         self.fields
             .iter_mut()
-            .try_for_each(|f| f.validator.complete(build_context))?;
+            .try_for_each(|f| f.validator.complete(definitions))?;
         match &mut self.extra_validator {
-            Some(v) => v.complete(build_context),
+            Some(v) => v.complete(definitions),
             None => Ok(()),
         }
     }

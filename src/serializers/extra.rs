@@ -155,7 +155,7 @@ impl SerCheck {
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) struct ExtraOwned {
     mode: SerMode,
-    slots: Vec<CombinedSerializer>,
+    definitions: Vec<CombinedSerializer>,
     warnings: CollectWarnings,
     by_alias: bool,
     exclude_unset: bool,
@@ -175,7 +175,7 @@ impl ExtraOwned {
     pub fn new(extra: &Extra) -> Self {
         Self {
             mode: extra.mode.clone(),
-            slots: extra.slots.to_vec(),
+            definitions: extra.slots.to_vec(),
             warnings: extra.warnings.clone(),
             by_alias: extra.by_alias,
             exclude_unset: extra.exclude_unset,
@@ -195,7 +195,7 @@ impl ExtraOwned {
     pub fn to_extra<'py>(&'py self, py: Python<'py>) -> Extra<'py> {
         Extra {
             mode: &self.mode,
-            slots: &self.slots,
+            slots: &self.definitions,
             ob_type_lookup: ObTypeLookup::cached(py),
             warnings: &self.warnings,
             by_alias: self.by_alias,
@@ -267,6 +267,10 @@ pub(crate) struct CollectWarnings {
 }
 
 impl CollectWarnings {
+    pub(crate) fn is_active(&self) -> bool {
+        self.active
+    }
+
     pub(crate) fn new(active: bool) -> Self {
         Self {
             active,
@@ -351,7 +355,7 @@ impl CollectWarnings {
 #[derive(Default, Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct RecursionInfo {
-    ids: AHashSet<usize>,
+    ids: AHashSet<(usize, usize)>, // first element is the object's id, the second is the serializer's id
     /// as with `src/recursion_guard.rs` this is used as a backup in case the identity check recursion guard fails
     /// see #143
     depth: u16,
@@ -366,12 +370,12 @@ pub struct SerRecursionGuard {
 impl SerRecursionGuard {
     const MAX_DEPTH: u16 = 200;
 
-    pub fn add(&self, value: &PyAny) -> PyResult<usize> {
+    pub fn add(&self, value: &PyAny, def_ref_id: usize) -> PyResult<usize> {
         // https://doc.rust-lang.org/std/collections/struct.HashSet.html#method.insert
         // "If the set did not have this value present, `true` is returned."
         let id = value.as_ptr() as usize;
         let mut info = self.info.borrow_mut();
-        if !info.ids.insert(id) {
+        if !info.ids.insert((id, def_ref_id)) {
             Err(PyValueError::new_err("Circular reference detected (id repeated)"))
         } else if info.depth > Self::MAX_DEPTH {
             Err(PyValueError::new_err("Circular reference detected (depth exceeded)"))
@@ -381,9 +385,9 @@ impl SerRecursionGuard {
         }
     }
 
-    pub fn pop(&self, id: usize) {
+    pub fn pop(&self, id: usize, def_ref_id: usize) {
         let mut info = self.info.borrow_mut();
         info.depth -= 1;
-        info.ids.remove(&id);
+        info.ids.remove(&(id, def_ref_id));
     }
 }

@@ -7,7 +7,7 @@ use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct IsSubclassValidator {
@@ -22,7 +22,7 @@ impl BuildValidator for IsSubclassValidator {
     fn build(
         schema: &PyDict,
         _config: Option<&PyDict>,
-        _build_context: &mut BuildContext<CombinedValidator>,
+        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
@@ -63,7 +63,7 @@ impl Validator for IsSubclassValidator {
 
     fn different_strict_behavior(
         &self,
-        _build_context: Option<&BuildContext<CombinedValidator>>,
+        _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         _ultra_strict: bool,
     ) -> bool {
         false
@@ -73,7 +73,7 @@ impl Validator for IsSubclassValidator {
         &self.name
     }
 
-    fn complete(&mut self, _build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
+    fn complete(&mut self, _definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
         Ok(())
     }
 }

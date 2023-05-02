@@ -7,7 +7,7 @@ use crate::errors::{LocItem, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub enum DefaultType {
@@ -61,7 +61,7 @@ impl BuildValidator for WithDefaultValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext<CombinedValidator>,
+        definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let default = DefaultType::new(schema)?;
@@ -80,7 +80,7 @@ impl BuildValidator for WithDefaultValidator {
         };
 
         let sub_schema: &PyAny = schema.get_as_req(intern!(schema.py(), "schema"))?;
-        let validator = Box::new(build_validator(sub_schema, config, build_context)?);
+        let validator = Box::new(build_validator(sub_schema, config, definitions)?);
         let name = format!("{}[{}]", Self::EXPECTED_TYPE, validator.get_name());
 
         Ok(Self {
@@ -146,18 +146,18 @@ impl Validator for WithDefaultValidator {
 
     fn different_strict_behavior(
         &self,
-        build_context: Option<&BuildContext<CombinedValidator>>,
+        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
-        self.validator.different_strict_behavior(build_context, ultra_strict)
+        self.validator.different_strict_behavior(definitions, ultra_strict)
     }
 
     fn get_name(&self) -> &str {
         &self.name
     }
 
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
-        self.validator.complete(build_context)
+    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
+        self.validator.complete(definitions)
     }
 }
 

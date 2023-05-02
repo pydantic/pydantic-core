@@ -1,4 +1,5 @@
-from typing import Optional
+from dataclasses import dataclass
+from typing import List, Optional
 
 import pytest
 from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict, IsStr, IsTuple
@@ -91,9 +92,7 @@ def test_unused_ref():
             },
         }
     )
-    assert plain_repr(v).startswith('SchemaValidator(title="typed-dict",validator=TypedDict(TypedDictValidator')
     assert v.validate_python({'name': 'root', 'other': '4'}) == {'name': 'root', 'other': 4}
-    assert ',slots=[]' in plain_repr(v)
 
 
 def test_nullable_error():
@@ -283,7 +282,7 @@ def test_model_class():
 
 
 def test_invalid_schema():
-    with pytest.raises(SchemaError, match="Slots Error: ref 'Branch' not found"):
+    with pytest.raises(SchemaError, match='Definitions error: attempted to use `Branch` before it was filled'):
         SchemaValidator(
             {
                 'type': 'list',
@@ -330,8 +329,6 @@ def test_outside_parent():
         'tuple1': (1, 1, 'frog'),
         'tuple2': (2, 2, 'toad'),
     }
-    # the definition goes into reusable and gets "inlined" into the schema
-    assert ',slots=[]' in plain_repr(v)
 
 
 def test_recursion_branch():
@@ -813,3 +810,83 @@ def test_error_inside_definition_wrapper():
         '  SchemaError: Error building "default" validator:\n'
         "  SchemaError: 'default' and 'default_factory' cannot be used together"
     )
+
+
+def test_recursive_definitions_schema() -> None:
+    s = core_schema.definitions_schema(
+        core_schema.definition_reference_schema(schema_ref='a'),
+        [
+            core_schema.typed_dict_schema(
+                {
+                    'b': core_schema.typed_dict_field(
+                        core_schema.list_schema(core_schema.definition_reference_schema('b'))
+                    )
+                },
+                ref='a',
+            ),
+            core_schema.typed_dict_schema(
+                {
+                    'a': core_schema.typed_dict_field(
+                        core_schema.list_schema(core_schema.definition_reference_schema('a'))
+                    )
+                },
+                ref='b',
+            ),
+        ],
+    )
+
+    v = SchemaValidator(s)
+
+    assert v.validate_python({'b': [{'a': []}]}) == {'b': [{'a': []}]}
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python({'b': [{'a': {}}]})
+
+    assert exc_info.value.errors() == [
+        {'type': 'list_type', 'loc': ('b', 0, 'a'), 'msg': 'Input should be a valid list', 'input': {}}
+    ]
+
+
+def test_unsorted_definitions_schema() -> None:
+    s = core_schema.definitions_schema(
+        core_schema.definition_reference_schema(schema_ref='td'),
+        [
+            core_schema.typed_dict_schema(
+                {'x': core_schema.typed_dict_field(core_schema.definition_reference_schema('int'))}, ref='td'
+            ),
+            core_schema.int_schema(ref='int'),
+        ],
+    )
+
+    v = SchemaValidator(s)
+
+    assert v.validate_python({'x': 123}) == {'x': 123}
+
+    with pytest.raises(ValidationError):
+        v.validate_python({'x': 'abc'})
+
+
+def test_validate_assignment() -> None:
+    @dataclass
+    class Model:
+        x: List['Model']
+
+    schema = core_schema.dataclass_schema(
+        Model,
+        core_schema.dataclass_args_schema(
+            'Model',
+            [
+                core_schema.dataclass_field(
+                    name='x',
+                    schema=core_schema.list_schema(core_schema.definition_reference_schema('model')),
+                    kw_only=False,
+                )
+            ],
+        ),
+        ref='model',
+    )
+    v = SchemaValidator(schema)
+
+    instance = Model(x=[])
+    v.validate_assignment(instance, 'x', [Model(x=[])])
+    assert instance.x == [Model(x=[])]

@@ -14,7 +14,7 @@ use crate::validators::function::convert_err;
 
 use super::arguments::{json_get, json_slice, py_get, py_slice};
 use super::model::{create_class, force_setattr, Revalidate};
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 struct Field {
@@ -44,7 +44,7 @@ impl BuildValidator for DataclassArgsValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext<CombinedValidator>,
+        definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
@@ -73,7 +73,7 @@ impl BuildValidator for DataclassArgsValidator {
 
             let schema: &PyAny = field.get_as_req(intern!(py, "schema"))?;
 
-            let validator = match build_validator(schema, config, build_context) {
+            let validator = match build_validator(schema, config, definitions) {
                 Ok(v) => v,
                 Err(err) => return py_err!("Field '{}':\n  {}", name, err),
             };
@@ -386,22 +386,22 @@ impl Validator for DataclassArgsValidator {
 
     fn different_strict_behavior(
         &self,
-        build_context: Option<&BuildContext<CombinedValidator>>,
+        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
         self.fields
             .iter()
-            .any(|f| f.validator.different_strict_behavior(build_context, ultra_strict))
+            .any(|f| f.validator.different_strict_behavior(definitions, ultra_strict))
     }
 
     fn get_name(&self) -> &str {
         &self.validator_name
     }
 
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
+    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
         self.fields
             .iter_mut()
-            .try_for_each(|field| field.validator.complete(build_context))
+            .try_for_each(|field| field.validator.complete(definitions))
     }
 }
 
@@ -422,13 +422,13 @@ impl BuildValidator for DataclassValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext<CombinedValidator>,
+        definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
         let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
         let sub_schema: &PyAny = schema.get_as_req(intern!(py, "schema"))?;
-        let validator = build_validator(sub_schema, config, build_context)?;
+        let validator = build_validator(sub_schema, config, definitions)?;
 
         let post_init = if schema.get_as::<bool>(intern!(py, "post_init"))?.unwrap_or(false) {
             Some(PyString::intern(py, "__post_init__").into_py(py))
@@ -530,11 +530,11 @@ impl Validator for DataclassValidator {
 
     fn different_strict_behavior(
         &self,
-        build_context: Option<&BuildContext<CombinedValidator>>,
+        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
         if ultra_strict {
-            self.validator.different_strict_behavior(build_context, ultra_strict)
+            self.validator.different_strict_behavior(definitions, ultra_strict)
         } else {
             true
         }
@@ -544,8 +544,8 @@ impl Validator for DataclassValidator {
         &self.name
     }
 
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
-        self.validator.complete(build_context)
+    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
+        self.validator.complete(definitions)
     }
 }
 

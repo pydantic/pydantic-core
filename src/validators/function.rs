@@ -11,7 +11,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
 use super::generator::InternalValidator;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 fn destructure_function_schema(schema: &PyDict) -> PyResult<(bool, bool, &PyAny)> {
     let func_dict: &PyDict = schema.get_as_req(intern!(schema.py(), "function"))?;
@@ -33,10 +33,10 @@ macro_rules! impl_build {
             fn build(
                 schema: &PyDict,
                 config: Option<&PyDict>,
-                build_context: &mut BuildContext<CombinedValidator>,
+                definitions: &mut DefinitionsBuilder<CombinedValidator>,
             ) -> PyResult<CombinedValidator> {
                 let py = schema.py();
-                let validator = build_validator(schema.get_as_req(intern!(py, "schema"))?, config, build_context)?;
+                let validator = build_validator(schema.get_as_req(intern!(py, "schema"))?, config, definitions)?;
                 let (is_field_validator, info_arg, function) = destructure_function_schema(schema)?;
                 let name = format!(
                     "{}[{}(), {}]",
@@ -95,12 +95,12 @@ macro_rules! impl_validator {
 
             fn different_strict_behavior(
                 &self,
-                build_context: Option<&BuildContext<CombinedValidator>>,
+                definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
                 ultra_strict: bool,
             ) -> bool {
                 if ultra_strict {
                     self.validator
-                        .different_strict_behavior(build_context, ultra_strict)
+                        .different_strict_behavior(definitions, ultra_strict)
                 } else {
                     true
                 }
@@ -110,8 +110,8 @@ macro_rules! impl_validator {
                 &self.name
             }
 
-            fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
-                self.validator.complete(build_context)
+            fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
+                self.validator.complete(definitions)
             }
         }
     };
@@ -198,7 +198,7 @@ impl BuildValidator for FunctionPlainValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        _build_context: &mut BuildContext<CombinedValidator>,
+        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let (is_field_validator, info_arg, function) = destructure_function_schema(schema)?;
@@ -236,7 +236,7 @@ impl Validator for FunctionPlainValidator {
 
     fn different_strict_behavior(
         &self,
-        _build_context: Option<&BuildContext<CombinedValidator>>,
+        _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
         // best guess, should we change this?
@@ -247,7 +247,7 @@ impl Validator for FunctionPlainValidator {
         &self.name
     }
 
-    fn complete(&mut self, _build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
+    fn complete(&mut self, _definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
         Ok(())
     }
 }
@@ -322,11 +322,11 @@ impl Validator for FunctionWrapValidator {
 
     fn different_strict_behavior(
         &self,
-        build_context: Option<&BuildContext<CombinedValidator>>,
+        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
         if ultra_strict {
-            self.validator.different_strict_behavior(build_context, ultra_strict)
+            self.validator.different_strict_behavior(definitions, ultra_strict)
         } else {
             true
         }
@@ -336,8 +336,8 @@ impl Validator for FunctionWrapValidator {
         &self.name
     }
 
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
-        self.validator.complete(build_context)
+    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
+        self.validator.complete(definitions)
     }
 }
 

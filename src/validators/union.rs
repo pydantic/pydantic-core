@@ -16,7 +16,7 @@ use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 
 use super::custom_error::CustomError;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct UnionValidator {
@@ -34,13 +34,13 @@ impl BuildValidator for UnionValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext<CombinedValidator>,
+        definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let choices: Vec<CombinedValidator> = schema
             .get_as_req::<&PyList>(intern!(py, "choices"))?
             .iter()
-            .map(|choice| build_validator(choice, config, build_context))
+            .map(|choice| build_validator(choice, config, definitions))
             .collect::<PyResult<Vec<CombinedValidator>>>()?;
 
         let auto_collapse = || schema.get_as_req(intern!(py, "auto_collapse")).unwrap_or(true);
@@ -52,7 +52,7 @@ impl BuildValidator for UnionValidator {
 
                 Ok(Self {
                     choices,
-                    custom_error: CustomError::build(schema, config, build_context)?,
+                    custom_error: CustomError::build(schema, config, definitions)?,
                     strict: is_strict(schema, config)?,
                     name: format!("{}[{descr}]", Self::EXPECTED_TYPE),
                     strict_required: true,
@@ -165,22 +165,22 @@ impl Validator for UnionValidator {
 
     fn different_strict_behavior(
         &self,
-        build_context: Option<&BuildContext<CombinedValidator>>,
+        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
         self.choices
             .iter()
-            .any(|v| v.different_strict_behavior(build_context, ultra_strict))
+            .any(|v| v.different_strict_behavior(definitions, ultra_strict))
     }
 
     fn get_name(&self) -> &str {
         &self.name
     }
 
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
-        self.choices.iter_mut().try_for_each(|v| v.complete(build_context))?;
-        self.strict_required = self.different_strict_behavior(Some(build_context), false);
-        self.ultra_strict_required = self.different_strict_behavior(Some(build_context), true);
+    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
+        self.choices.iter_mut().try_for_each(|v| v.complete(definitions))?;
+        self.strict_required = self.different_strict_behavior(Some(definitions), false);
+        self.ultra_strict_required = self.different_strict_behavior(Some(definitions), true);
         Ok(())
     }
 }
@@ -280,7 +280,7 @@ impl BuildValidator for TaggedUnionValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext<CombinedValidator>,
+        definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let discriminator = Discriminator::new(py, schema.get_as_req(intern!(py, "discriminator"))?)?;
@@ -301,7 +301,7 @@ impl BuildValidator for TaggedUnionValidator {
                 continue;
             }
 
-            let validator = build_validator(value, config, build_context)?;
+            let validator = build_validator(value, config, definitions)?;
             let tag_repr = tag.repr();
             if first {
                 first = false;
@@ -353,7 +353,7 @@ impl BuildValidator for TaggedUnionValidator {
             discriminator,
             from_attributes,
             strict: is_strict(schema, config)?,
-            custom_error: CustomError::build(schema, config, build_context)?,
+            custom_error: CustomError::build(schema, config, definitions)?,
             tags_repr,
             discriminator_repr,
             name: format!("{}[{descr}]", Self::EXPECTED_TYPE),
@@ -420,22 +420,22 @@ impl Validator for TaggedUnionValidator {
 
     fn different_strict_behavior(
         &self,
-        build_context: Option<&BuildContext<CombinedValidator>>,
+        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
         self.choices
             .values()
-            .any(|v| v.different_strict_behavior(build_context, ultra_strict))
+            .any(|v| v.different_strict_behavior(definitions, ultra_strict))
     }
 
     fn get_name(&self) -> &str {
         &self.name
     }
 
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
+    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
         self.choices
             .iter_mut()
-            .try_for_each(|(_, validator)| validator.complete(build_context))
+            .try_for_each(|(_, validator)| validator.complete(definitions))
     }
 }
 

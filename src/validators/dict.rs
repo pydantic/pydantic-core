@@ -11,7 +11,7 @@ use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
 use super::list::length_check;
-use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
@@ -29,16 +29,16 @@ impl BuildValidator for DictValidator {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext<CombinedValidator>,
+        definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let key_validator = match schema.get_item(intern!(py, "keys_schema")) {
-            Some(schema) => Box::new(build_validator(schema, config, build_context)?),
-            None => Box::new(AnyValidator::build(schema, config, build_context)?),
+            Some(schema) => Box::new(build_validator(schema, config, definitions)?),
+            None => Box::new(AnyValidator::build(schema, config, definitions)?),
         };
         let value_validator = match schema.get_item(intern!(py, "values_schema")) {
-            Some(d) => Box::new(build_validator(d, config, build_context)?),
-            None => Box::new(AnyValidator::build(schema, config, build_context)?),
+            Some(d) => Box::new(build_validator(d, config, definitions)?),
+            None => Box::new(AnyValidator::build(schema, config, definitions)?),
         };
         let name = format!(
             "{}[{},{}]",
@@ -82,12 +82,12 @@ impl Validator for DictValidator {
 
     fn different_strict_behavior(
         &self,
-        build_context: Option<&BuildContext<CombinedValidator>>,
+        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
         if ultra_strict {
-            self.key_validator.different_strict_behavior(build_context, true)
-                || self.value_validator.different_strict_behavior(build_context, true)
+            self.key_validator.different_strict_behavior(definitions, true)
+                || self.value_validator.different_strict_behavior(definitions, true)
         } else {
             true
         }
@@ -97,9 +97,9 @@ impl Validator for DictValidator {
         &self.name
     }
 
-    fn complete(&mut self, build_context: &BuildContext<CombinedValidator>) -> PyResult<()> {
-        self.key_validator.complete(build_context)?;
-        self.value_validator.complete(build_context)
+    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
+        self.key_validator.complete(definitions)?;
+        self.value_validator.complete(definitions)
     }
 }
 
