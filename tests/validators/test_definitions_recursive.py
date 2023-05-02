@@ -885,8 +885,22 @@ def test_validate_assignment() -> None:
         ),
         ref='model',
     )
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema, config=core_schema.CoreConfig(revalidate_instances='always'))
 
+    data = [Model(x=[Model(x=[])])]
     instance = Model(x=[])
-    v.validate_assignment(instance, 'x', [Model(x=[])])
-    assert instance.x == [Model(x=[])]
+    v.validate_assignment(instance, 'x', data)
+    assert instance.x == data
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_assignment(instance, 'x', [Model(x=[Model(x=[Model(x=[123])])])])
+
+    assert exc_info.value.errors() == [
+        {
+            'type': 'dataclass_type',
+            'loc': ('x', 0, 'x', 0, 'x', 0, 'x', 0),
+            'msg': 'Input should be a dictionary or an instance of Model',
+            'input': 123,
+            'ctx': {'dataclass_name': 'Model'},
+        }
+    ]
