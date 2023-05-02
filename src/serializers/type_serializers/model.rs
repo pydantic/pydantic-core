@@ -1,9 +1,10 @@
-use ahash::AHashMap;
 use std::borrow::Cow;
 
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString, PyType};
+
+use ahash::AHashMap;
 
 use crate::build_context::BuildContext;
 use crate::build_tools::{py_error_type, ExtraBehavior, SchemaDict};
