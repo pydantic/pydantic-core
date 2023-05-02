@@ -139,9 +139,11 @@ def test_validation_error_multiple():
         'x\n'
         '  Input should be a valid number, unable to parse string as an number '
         "[type=float_parsing, input_value='xxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxx', input_type=str]\n"
+        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/float_parsing\n'
         'y\n'
         '  Input should be a valid integer, unable to parse string as an integer '
-        "[type=int_parsing, input_value='y', input_type=str]"
+        "[type=int_parsing, input_value='y', input_type=str]\n"
+        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/int_parsing'
     )
 
 

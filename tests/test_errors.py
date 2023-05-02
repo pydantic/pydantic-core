@@ -74,7 +74,8 @@ def test_pydantic_value_error_invalid_dict():
     assert str(exc_info.value) == (
         '1 validation error for function-plain[my_function()]\n'
         "  (error rendering message: TypeError: 'tuple' object cannot be converted to 'PyString') "
-        '[type=my_error, input_value=42, input_type=int]'
+        '[type=my_error, input_value=42, input_type=int]\n'
+        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/my_error'
     )
     with pytest.raises(TypeError, match="'tuple' object cannot be converted to 'PyString'"):
         exc_info.value.errors(include_url=False)
@@ -418,7 +419,8 @@ def test_error_on_repr():
     assert str(exc_info.value) == (
         '1 validation error for int\n'
         '  Input should be a valid integer '
-        '[type=int_type, input_value=<unprintable BadRepr object>, input_type=BadRepr]'
+        '[type=int_type, input_value=<unprintable BadRepr object>, input_type=BadRepr]\n'
+        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/int_type'
     )
     assert exc_info.value.errors(include_url=False) == [
         {'type': 'int_type', 'loc': (), 'msg': 'Input should be a valid integer', 'input': IsInstance(BadRepr)}
@@ -627,7 +629,8 @@ def test_loc_with_dots():
         "1 validation error for typed-dict\n"
         "`foo.bar`.0\n"
         "  Input should be a valid integer, unable to parse string as an integer "
-        "[type=int_parsing, input_value='x', input_type=str]"
+        "[type=int_parsing, input_value='x', input_type=str]\n"
+        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/int_parsing'
     )
 
 

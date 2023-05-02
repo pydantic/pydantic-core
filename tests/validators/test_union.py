@@ -1,7 +1,7 @@
 import pytest
 from dirty_equals import IsFloat, IsInt
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, __version__, core_schema
 
 from ..conftest import plain_repr
 
@@ -239,7 +239,8 @@ def test_no_choices():
     assert str(exc_info.value) == (
         'Invalid Schema:\n'
         'union.choices\n'
-        "  Field required [type=missing, input_value={'type': 'union'}, input_type=dict]"
+        "  Field required [type=missing, input_value={'type': 'union'}, input_type=dict]\n"
+        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/missing'
     )
     assert exc_info.value.error_count() == 1
     assert exc_info.value.errors() == [

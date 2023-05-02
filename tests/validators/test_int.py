@@ -5,7 +5,7 @@ from typing import Any, Dict
 import pytest
 from dirty_equals import IsStr
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError, __version__
 
 from ..conftest import Err, PyAndJson, plain_repr
 
@@ -225,7 +225,8 @@ def test_long_int(py_and_json: PyAndJson):
         '1 validation error for int\n'
         '  Input should be a finite number '
         '[type=finite_number, '
-        "input_value='111111111111111111111111...11111111111111111111111', input_type=str]"
+        "input_value='111111111111111111111111...11111111111111111111111', input_type=str]\n"
+        f"    For further information visit https://errors.pydantic.dev/{__version__}/v/finite_number"
     )
 
 

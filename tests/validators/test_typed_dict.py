@@ -5,7 +5,7 @@ from typing import Any, Dict, Mapping, Union
 import pytest
 from dirty_equals import FunctionCheck
 
-from pydantic_core import CoreConfig, SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import CoreConfig, SchemaError, SchemaValidator, ValidationError, __version__, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -102,12 +102,12 @@ def test_missing_error():
     )
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python({'field_a': b'abc'})
-    assert (
-        str(exc_info.value)
-        == """\
-1 validation error for typed-dict
-field_b
-  Field required [type=missing, input_value={'field_a': b'abc'}, input_type=dict]"""
+    # insert_assert(str(exc_info.value))
+    assert str(exc_info.value) == (
+        "1 validation error for typed-dict\n"
+        "field_b\n"
+        "  Field required [type=missing, input_value={'field_a': b'abc'}, input_type=dict]\n"
+        f"    For further information visit https://errors.pydantic.dev/{__version__}/v/missing"
     )
 
 

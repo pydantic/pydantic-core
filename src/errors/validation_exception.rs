@@ -92,7 +92,7 @@ static URL_ENV_VAR: GILOnceCell<bool> = GILOnceCell::new();
 fn _get_include_url_env() -> bool {
     match std::env::var("PYDANTIC_ERRORS_OMIT_URL") {
         Ok(val) => val.is_empty(),
-        Err(_) => false, // TODO change
+        Err(_) => true,
     }
 }
 

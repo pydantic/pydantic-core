@@ -6,7 +6,7 @@ from typing import Any, get_type_hints
 
 import pytest
 
-from pydantic_core import ArgsKwargs, SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import ArgsKwargs, SchemaError, SchemaValidator, ValidationError, __version__, core_schema
 
 from ..conftest import Err, PyAndJson, plain_repr
 
@@ -1012,7 +1012,8 @@ def test_error_display():
         "1 validation error for arguments\n"
         "b\n"
         "  Missing required argument [type=missing_argument, "
-        "input_value=ArgsKwargs((), {'a': 1}), input_type=ArgsKwargs]"
+        "input_value=ArgsKwargs((), {'a': 1}), input_type=ArgsKwargs]\n"
+        f"    For further information visit https://errors.pydantic.dev/{__version__}/v/missing_argument"
     )
     # insert_assert(exc_info.value.json(include_url=False))
     assert exc_info.value.json(include_url=False) == (
