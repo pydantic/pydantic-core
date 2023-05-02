@@ -1,3 +1,8 @@
+/// Definition / reference management
+/// Our definitions system is very similar to json schema's: there's ref strings and a definitions section
+/// Unlike json schema we let you put definitions inline, not just in a single '#/$defs/' block or similar.
+/// We use DefinitionsBuilder to collect the references / definitions into a single vector
+/// and then get a definition from a reference using an integer id (just for performance of not using a HashMap)
 use std::collections::hash_map::Entry;
 
 use pyo3::prelude::*;
