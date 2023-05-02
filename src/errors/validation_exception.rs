@@ -2,7 +2,6 @@ use std::fmt;
 use std::fmt::{Display, Write};
 use std::str::from_utf8;
 
-use crate::errors::LocItem;
 use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::ffi::Py_ssize_t;
 use pyo3::prelude::*;
@@ -10,15 +9,18 @@ use pyo3::types::{PyDict, PyList, PyString};
 use pyo3::{ffi, intern};
 use serde::ser::{Error, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
+
 use serde_json::ser::PrettyFormatter;
 
 use crate::build_tools::{py_error_type, safe_repr, SchemaDict};
+use crate::errors::LocItem;
+use crate::get_version;
 use crate::serializers::{SerMode, SerializationState};
-use crate::PydanticCustomError;
 
 use super::line_error::ValLineError;
 use super::location::Location;
 use super::types::{ErrorMode, ErrorType};
+use super::value_exception::PydanticCustomError;
 use super::ValError;
 
 #[pyclass(subclass, extends=PyValueError, module="pydantic_core._pydantic_core")]
@@ -114,7 +116,8 @@ impl ValidationError {
         self.line_errors.len()
     }
 
-    pub fn errors(&self, py: Python, include_context: Option<bool>) -> PyResult<Py<PyList>> {
+    #[pyo3(signature = (*, include_url = true, include_context = true))]
+    pub fn errors(&self, py: Python, include_url: bool, include_context: bool) -> PyResult<Py<PyList>> {
         // taken approximately from the pyo3, but modified to return the error during iteration
         // https://github.com/PyO3/pyo3/blob/a3edbf4fcd595f0e234c87d4705eb600a9779130/src/types/list.rs#L27-L55
         unsafe {
@@ -126,7 +129,7 @@ impl ValidationError {
             let list: Py<PyList> = Py::from_owned_ptr(py, ptr);
 
             for (index, line_error) in (0_isize..).zip(&self.line_errors) {
-                let item = line_error.as_dict(py, include_context, &self.error_mode)?;
+                let item = line_error.as_dict(py, include_url, include_context, &self.error_mode)?;
                 ffi::PyList_SET_ITEM(ptr, index, item.into_ptr());
             }
 
@@ -134,18 +137,21 @@ impl ValidationError {
         }
     }
 
+    #[pyo3(signature = (*, indent = None, include_url = true, include_context = true))]
     pub fn json<'py>(
         &self,
         py: Python<'py>,
         indent: Option<usize>,
-        include_context: Option<bool>,
+        include_url: bool,
+        include_context: bool,
     ) -> PyResult<&'py PyString> {
         let state = SerializationState::new(None, None);
         let extra = state.extra(py, &SerMode::Json, true, false, false, true, None);
         let serializer = ValidationErrorSerializer {
             py,
             line_errors: &self.line_errors,
-            include_context: include_context.unwrap_or(true),
+            include_url,
+            include_context,
             extra: &extra,
             error_mode: &self.error_mode,
         };
@@ -274,16 +280,33 @@ impl TryFrom<&PyAny> for PyLineError {
 }
 
 impl PyLineError {
-    pub fn as_dict(&self, py: Python, include_context: Option<bool>, error_mode: &ErrorMode) -> PyResult<PyObject> {
+    fn get_error_url(&self) -> String {
+        let version = get_version();
+        format!(
+            "https://errors.pydantic.dev/{version}/v/{}",
+            self.error_type.type_string()
+        )
+    }
+
+    pub fn as_dict(
+        &self,
+        py: Python,
+        include_url: bool,
+        include_context: bool,
+        error_mode: &ErrorMode,
+    ) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
         dict.set_item("type", self.error_type.type_string())?;
         dict.set_item("loc", self.location.to_object(py))?;
         dict.set_item("msg", self.error_type.render_message(py, error_mode)?)?;
         dict.set_item("input", &self.input_value)?;
-        if include_context.unwrap_or(true) {
+        if include_context {
             if let Some(context) = self.error_type.py_dict(py)? {
                 dict.set_item("ctx", context)?;
             }
+        }
+        if include_url {
+            dict.set_item("url", self.get_error_url())?;
         }
         Ok(dict.into_py(py))
     }
@@ -324,6 +347,7 @@ where
 struct ValidationErrorSerializer<'py> {
     py: Python<'py>,
     line_errors: &'py [PyLineError],
+    include_url: bool,
     include_context: bool,
     extra: &'py crate::serializers::Extra<'py>,
     error_mode: &'py ErrorMode,
@@ -339,6 +363,7 @@ impl<'py> Serialize for ValidationErrorSerializer<'py> {
             let line_s = PyLineErrorSerializer {
                 py: self.py,
                 line_error,
+                include_url: self.include_url,
                 include_context: self.include_context,
                 extra: self.extra,
                 error_mode: self.error_mode,
@@ -352,6 +377,7 @@ impl<'py> Serialize for ValidationErrorSerializer<'py> {
 struct PyLineErrorSerializer<'py> {
     py: Python<'py>,
     line_error: &'py PyLineError,
+    include_url: bool,
     include_context: bool,
     extra: &'py crate::serializers::Extra<'py>,
     error_mode: &'py ErrorMode,
@@ -363,7 +389,13 @@ impl<'py> Serialize for PyLineErrorSerializer<'py> {
         S: Serializer,
     {
         let py = self.py;
-        let size = if self.include_context { 5 } else { 4 };
+        let mut size = 4;
+        if self.include_url {
+            size += 1;
+        }
+        if self.include_context {
+            size += 1;
+        }
         let mut map = serializer.serialize_map(Some(size))?;
 
         map.serialize_entry("type", &self.line_error.error_type.type_string())?;
@@ -386,6 +418,9 @@ impl<'py> Serialize for PyLineErrorSerializer<'py> {
             if let Some(context) = self.line_error.error_type.py_dict(py).map_err(py_err_json::<S>)? {
                 map.serialize_entry("ctx", &self.extra.serialize_infer(context.as_ref(py)))?;
             }
+        }
+        if self.include_url {
+            map.serialize_entry("url", &self.line_error.get_error_url())?;
         }
         map.end()
     }

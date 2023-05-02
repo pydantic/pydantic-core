@@ -152,7 +152,7 @@ def test_int_kwargs(py_and_json: PyAndJson, kwargs: Dict[str, Any], input_value,
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
 
-        errors = exc_info.value.errors()
+        errors = exc_info.value.errors(include_url=False)
         assert len(errors) == 1
         if 'ctx' in errors[0]:
             assert errors[0]['ctx'] == kwargs
@@ -169,7 +169,7 @@ def test_union_int(py_and_json: PyAndJson):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test('5')
 
-    assert exc_info.value.errors() == [
+    assert exc_info.value.errors(include_url=False) == [
         {'type': 'int_type', 'loc': ('int',), 'msg': 'Input should be a valid integer', 'input': '5'},
         {
             'type': 'multiple_of',
@@ -187,7 +187,7 @@ def test_union_int_simple(py_and_json: PyAndJson):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test('xxx')
 
-    assert exc_info.value.errors() == [
+    assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'int_parsing',
             'loc': ('int',),
@@ -218,7 +218,7 @@ def test_long_int(py_and_json: PyAndJson):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test('1' * 400)
 
-    assert exc_info.value.errors() == [
+    assert exc_info.value.errors(include_url=False) == [
         {'type': 'finite_number', 'loc': (), 'msg': 'Input should be a finite number', 'input': '1' * 400}
     ]
     assert repr(exc_info.value) == (

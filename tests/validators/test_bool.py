@@ -64,7 +64,7 @@ def test_bool_error():
         '  Input should be a valid boolean, '
         "unable to interpret input [type=bool_parsing, input_value='wrong', input_type=str]"
     )
-    assert exc_info.value.errors() == [
+    assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'bool_parsing',
             'loc': (),

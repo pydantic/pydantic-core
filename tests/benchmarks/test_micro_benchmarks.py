@@ -1134,8 +1134,8 @@ def test_int_error(benchmark):
     try:
         validator.validate_python('bar')
     except ValidationError as e:
-        # insert_assert(e.errors())
-        assert e.errors() == [
+        # insert_assert(e.errors(include_url=False))
+        assert e.errors(include_url=False) == [
             {
                 'type': 'int_parsing',
                 'loc': (),
@@ -1151,7 +1151,7 @@ def test_int_error(benchmark):
         try:
             validator.validate_python('foobar', strict=True)
         except ValidationError as e:
-            e.errors()
+            e.errors(include_url=False)
 
 
 @pytest.mark.benchmark(group='definition')
