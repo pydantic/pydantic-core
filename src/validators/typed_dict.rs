@@ -129,7 +129,7 @@ impl Validator for TypedDictValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let strict = extra.strict.unwrap_or(self.strict);
@@ -175,7 +175,7 @@ impl Validator for TypedDictValidator {
                         }
                         match field
                             .validator
-                            .validate(py, value, &extra, slots, recursion_guard)
+                            .validate(py, value, &extra, definitions, recursion_guard)
                         {
                             Ok(value) => {
                                 output_dict.set_item(&field.name_py, value)?;
@@ -189,7 +189,7 @@ impl Validator for TypedDictValidator {
                             Err(err) => return Err(err),
                         }
                         continue;
-                    } else if let Some(value) = field.validator.default_value(py, Some(field.name.as_str()), &extra, slots, recursion_guard)? {
+                    } else if let Some(value) = field.validator.default_value(py, Some(field.name.as_str()), &extra, definitions, recursion_guard)? {
                         output_dict.set_item(&field.name_py, value)?;
                     } else if field.required {
                         errors.push(field.lookup_key.error(
@@ -234,7 +234,7 @@ impl Validator for TypedDictValidator {
                             ExtraBehavior::Allow => {
                             let py_key = either_str.as_py_string(py);
                                 if let Some(ref validator) = self.extra_validator {
-                                    match validator.validate(py, value, &extra, slots, recursion_guard) {
+                                    match validator.validate(py, value, &extra, definitions, recursion_guard) {
                                         Ok(value) => {
                                             output_dict.set_item(py_key, value)?;
                                         }

@@ -69,11 +69,11 @@ macro_rules! impl_validator {
                 py: Python<'data>,
                 input: &'data impl Input<'data>,
                 extra: &Extra,
-                slots: &'data [CombinedValidator],
+                definitions: &'data [CombinedValidator],
                 recursion_guard: &'s mut RecursionGuard,
             ) -> ValResult<'data, PyObject> {
                 let validate =
-                    move |v: &'data PyAny, e: &Extra| self.validator.validate(py, v, e, slots, recursion_guard);
+                    move |v: &'data PyAny, e: &Extra| self.validator.validate(py, v, e, definitions, recursion_guard);
                 self._validate(validate, py, input.to_object(py).into_ref(py), extra)
             }
             fn validate_assignment<'s, 'data: 's>(
@@ -83,12 +83,12 @@ macro_rules! impl_validator {
                 field_name: &'data str,
                 field_value: &'data PyAny,
                 extra: &Extra,
-                slots: &'data [CombinedValidator],
+                definitions: &'data [CombinedValidator],
                 recursion_guard: &'s mut RecursionGuard,
             ) -> ValResult<'data, PyObject> {
                 let validate = move |v: &'data PyAny, e: &Extra| {
                     self.validator
-                        .validate_assignment(py, v, field_name, field_value, e, slots, recursion_guard)
+                        .validate_assignment(py, v, field_name, field_value, e, definitions, recursion_guard)
                 };
                 self._validate(validate, py, obj, extra)
             }
@@ -222,7 +222,7 @@ impl Validator for FunctionPlainValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _slots: &'data [CombinedValidator],
+        _definitions: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let r = if self.info_arg {
@@ -288,11 +288,18 @@ impl Validator for FunctionWrapValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let handler = ValidatorCallable {
-            validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
+            validator: InternalValidator::new(
+                py,
+                "ValidatorCallable",
+                &self.validator,
+                definitions,
+                extra,
+                recursion_guard,
+            ),
         };
         self._validate(
             Py::new(py, handler)?.into_ref(py),
@@ -309,11 +316,18 @@ impl Validator for FunctionWrapValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let handler = AssignmentValidatorCallable {
-            validator: InternalValidator::new(py, "ValidatorCallable", &self.validator, slots, extra, recursion_guard),
+            validator: InternalValidator::new(
+                py,
+                "ValidatorCallable",
+                &self.validator,
+                definitions,
+                extra,
+                recursion_guard,
+            ),
             updated_field_name: field_name.to_string(),
             updated_field_value: field_value.to_object(py),
         };

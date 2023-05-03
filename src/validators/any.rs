@@ -29,7 +29,7 @@ impl Validator for AnyValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         _extra: &Extra,
-        _slots: &'data [CombinedValidator],
+        _definitions: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         // Ok(input.clone().into_py(py))

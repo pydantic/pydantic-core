@@ -65,7 +65,7 @@ impl Validator for FloatValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _slots: &'data [CombinedValidator],
+        _definitions: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
@@ -109,7 +109,7 @@ impl Validator for ConstrainedFloatValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _slots: &'data [CombinedValidator],
+        _definitions: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;

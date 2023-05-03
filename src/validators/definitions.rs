@@ -77,7 +77,7 @@ impl Validator for DefinitionRefValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(id) = input.identity() {
@@ -88,13 +88,13 @@ impl Validator for DefinitionRefValidator {
                 if recursion_guard.incr_depth() > BACKUP_GUARD_LIMIT {
                     return Err(ValError::new(ErrorType::RecursionLoop, input));
                 }
-                let output = validate(self.validator_id, py, input, extra, slots, recursion_guard);
+                let output = validate(self.validator_id, py, input, extra, definitions, recursion_guard);
                 recursion_guard.remove(id, self.validator_id);
                 recursion_guard.decr_depth();
                 output
             }
         } else {
-            validate(self.validator_id, py, input, extra, slots, recursion_guard)
+            validate(self.validator_id, py, input, extra, definitions, recursion_guard)
         }
     }
 
@@ -105,7 +105,7 @@ impl Validator for DefinitionRefValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(id) = obj.identity() {
@@ -123,7 +123,7 @@ impl Validator for DefinitionRefValidator {
                     field_name,
                     field_value,
                     extra,
-                    slots,
+                    definitions,
                     recursion_guard,
                 );
                 recursion_guard.remove(id, self.validator_id);
@@ -138,7 +138,7 @@ impl Validator for DefinitionRefValidator {
                 field_name,
                 field_value,
                 extra,
-                slots,
+                definitions,
                 recursion_guard,
             )
         }
@@ -184,11 +184,11 @@ fn validate<'s, 'data>(
     py: Python<'data>,
     input: &'data impl Input<'data>,
     extra: &Extra,
-    slots: &'data [CombinedValidator],
+    definitions: &'data [CombinedValidator],
     recursion_guard: &'s mut RecursionGuard,
 ) -> ValResult<'data, PyObject> {
-    let validator = slots.get(validator_id).unwrap();
-    validator.validate(py, input, extra, slots, recursion_guard)
+    let validator = definitions.get(validator_id).unwrap();
+    validator.validate(py, input, extra, definitions, recursion_guard)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -199,9 +199,9 @@ fn validate_assignment<'data>(
     field_name: &'data str,
     field_value: &'data PyAny,
     extra: &Extra,
-    slots: &'data [CombinedValidator],
+    definitions: &'data [CombinedValidator],
     recursion_guard: &mut RecursionGuard,
 ) -> ValResult<'data, PyObject> {
-    let validator = slots.get(validator_id).unwrap();
-    validator.validate_assignment(py, obj, field_name, field_value, extra, slots, recursion_guard)
+    let validator = definitions.get(validator_id).unwrap();
+    validator.validate_assignment(py, obj, field_name, field_value, extra, definitions, recursion_guard)
 }

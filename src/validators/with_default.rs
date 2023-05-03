@@ -100,15 +100,15 @@ impl Validator for WithDefaultValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        match self.validator.validate(py, input, extra, slots, recursion_guard) {
+        match self.validator.validate(py, input, extra, definitions, recursion_guard) {
             Ok(v) => Ok(v),
             Err(e) => match self.on_error {
                 OnError::Raise => Err(e),
                 OnError::Default => Ok(self
-                    .default_value(py, None::<usize>, extra, slots, recursion_guard)?
+                    .default_value(py, None::<usize>, extra, definitions, recursion_guard)?
                     .unwrap()),
                 OnError::Omit => Err(ValError::Omit),
             },
@@ -120,13 +120,13 @@ impl Validator for WithDefaultValidator {
         py: Python<'data>,
         outer_loc: Option<impl Into<LocItem>>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, Option<PyObject>> {
         match self.default.default_value(py)? {
             Some(dft) => {
                 if self.validate_default {
-                    match self.validate(py, dft.into_ref(py), extra, slots, recursion_guard) {
+                    match self.validate(py, dft.into_ref(py), extra, definitions, recursion_guard) {
                         Ok(v) => Ok(Some(v)),
                         Err(e) => {
                             if let Some(outer_loc) = outer_loc {

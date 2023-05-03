@@ -71,12 +71,12 @@ impl Validator for CallValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let args = self
             .arguments_validator
-            .validate(py, input, extra, slots, recursion_guard)?;
+            .validate(py, input, extra, definitions, recursion_guard)?;
 
         let return_value = if let Ok((args, kwargs)) = args.extract::<(&PyTuple, &PyDict)>(py) {
             self.function.call(py, args, Some(kwargs))?
@@ -89,7 +89,7 @@ impl Validator for CallValidator {
 
         if let Some(return_validator) = &self.return_validator {
             return_validator
-                .validate(py, return_value.into_ref(py), extra, slots, recursion_guard)
+                .validate(py, return_value.into_ref(py), extra, definitions, recursion_guard)
                 .map_err(|e| e.with_outer_location("return".into()))
         } else {
             Ok(return_value.to_object(py))

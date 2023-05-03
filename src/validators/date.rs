@@ -40,7 +40,7 @@ impl Validator for DateValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _slots: &'data [CombinedValidator],
+        _definitions: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let date = match input.validate_date(extra.strict.unwrap_or(self.strict)) {

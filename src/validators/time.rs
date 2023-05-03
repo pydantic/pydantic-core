@@ -60,7 +60,7 @@ impl Validator for TimeValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _slots: &'data [CombinedValidator],
+        _definitions: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let time = input.validate_time(extra.strict.unwrap_or(self.strict))?;

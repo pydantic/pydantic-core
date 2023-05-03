@@ -72,15 +72,15 @@ impl Validator for ChainValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let mut steps_iter = self.steps.iter();
         let first_step = steps_iter.next().unwrap();
-        let value = first_step.validate(py, input, extra, slots, recursion_guard)?;
+        let value = first_step.validate(py, input, extra, definitions, recursion_guard)?;
 
         steps_iter.try_fold(value, |v, step| {
-            step.validate(py, v.into_ref(py), extra, slots, recursion_guard)
+            step.validate(py, v.into_ref(py), extra, definitions, recursion_guard)
         })
     }
 

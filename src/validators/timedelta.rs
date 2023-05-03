@@ -59,7 +59,7 @@ impl Validator for TimeDeltaValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _slots: &'data [CombinedValidator],
+        _definitions: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let timedelta = input.validate_timedelta(extra.strict.unwrap_or(self.strict))?;

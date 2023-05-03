@@ -71,7 +71,7 @@ impl SerializationState {
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) struct Extra<'a> {
     pub mode: &'a SerMode,
-    pub slots: &'a [CombinedSerializer],
+    pub definitions: &'a [CombinedSerializer],
     pub ob_type_lookup: &'a ObTypeLookup,
     pub warnings: &'a CollectWarnings,
     pub by_alias: bool,
@@ -97,7 +97,7 @@ impl<'a> Extra<'a> {
     pub fn new(
         py: Python<'a>,
         mode: &'a SerMode,
-        slots: &'a [CombinedSerializer],
+        definitions: &'a [CombinedSerializer],
         by_alias: bool,
         warnings: &'a CollectWarnings,
         exclude_unset: bool,
@@ -111,7 +111,7 @@ impl<'a> Extra<'a> {
     ) -> Self {
         Self {
             mode,
-            slots,
+            definitions,
             ob_type_lookup: ObTypeLookup::cached(py),
             warnings,
             by_alias,
@@ -175,7 +175,7 @@ impl ExtraOwned {
     pub fn new(extra: &Extra) -> Self {
         Self {
             mode: extra.mode.clone(),
-            definitions: extra.slots.to_vec(),
+            definitions: extra.definitions.to_vec(),
             warnings: extra.warnings.clone(),
             by_alias: extra.by_alias,
             exclude_unset: extra.exclude_unset,
@@ -195,7 +195,7 @@ impl ExtraOwned {
     pub fn to_extra<'py>(&'py self, py: Python<'py>) -> Extra<'py> {
         Extra {
             mode: &self.mode,
-            slots: &self.definitions,
+            definitions: &self.definitions,
             ob_type_lookup: ObTypeLookup::cached(py),
             warnings: &self.warnings,
             by_alias: self.by_alias,

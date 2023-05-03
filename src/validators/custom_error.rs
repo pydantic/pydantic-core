@@ -88,11 +88,11 @@ impl Validator for CustomErrorValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         self.validator
-            .validate(py, input, extra, slots, recursion_guard)
+            .validate(py, input, extra, definitions, recursion_guard)
             .map_err(|_| self.custom_error.as_val_error(input))
     }
 

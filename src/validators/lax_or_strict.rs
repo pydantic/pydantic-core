@@ -54,13 +54,15 @@ impl Validator for LaxOrStrictValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if extra.strict.unwrap_or(self.strict) {
-            self.strict_validator.validate(py, input, extra, slots, recursion_guard)
+            self.strict_validator
+                .validate(py, input, extra, definitions, recursion_guard)
         } else {
-            self.lax_validator.validate(py, input, extra, slots, recursion_guard)
+            self.lax_validator
+                .validate(py, input, extra, definitions, recursion_guard)
         }
     }
 

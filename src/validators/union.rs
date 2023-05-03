@@ -84,7 +84,7 @@ impl Validator for UnionValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if self.ultra_strict_required {
@@ -93,7 +93,7 @@ impl Validator for UnionValidator {
             if let Some(res) = self
                 .choices
                 .iter()
-                .map(|validator| validator.validate(py, input, &ultra_strict_extra, slots, recursion_guard))
+                .map(|validator| validator.validate(py, input, &ultra_strict_extra, definitions, recursion_guard))
                 .find(ValResult::is_ok)
             {
                 return res;
@@ -108,7 +108,7 @@ impl Validator for UnionValidator {
             let strict_extra = extra.as_strict(false);
 
             for validator in &self.choices {
-                let line_errors = match validator.validate(py, input, &strict_extra, slots, recursion_guard) {
+                let line_errors = match validator.validate(py, input, &strict_extra, definitions, recursion_guard) {
                     Err(ValError::LineErrors(line_errors)) => line_errors,
                     otherwise => return otherwise,
                 };
@@ -131,7 +131,7 @@ impl Validator for UnionValidator {
                 if let Some(res) = self
                     .choices
                     .iter()
-                    .map(|validator| validator.validate(py, input, &strict_extra, slots, recursion_guard))
+                    .map(|validator| validator.validate(py, input, &strict_extra, definitions, recursion_guard))
                     .find(ValResult::is_ok)
                 {
                     return res;
@@ -145,7 +145,7 @@ impl Validator for UnionValidator {
 
             // 2nd pass: check if the value can be coerced into one of the Union types, e.g. use validate
             for validator in &self.choices {
-                let line_errors = match validator.validate(py, input, extra, slots, recursion_guard) {
+                let line_errors = match validator.validate(py, input, extra, definitions, recursion_guard) {
                     Err(ValError::LineErrors(line_errors)) => line_errors,
                     success => return success,
                 };
@@ -368,7 +368,7 @@ impl Validator for TaggedUnionValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         match self.discriminator {
@@ -396,7 +396,7 @@ impl Validator for TaggedUnionValidator {
                     GenericMapping::PyMapping(mapping) => find_validator!(py_get_mapping_item, mapping),
                     GenericMapping::JsonObject(mapping) => find_validator!(json_get, mapping),
                 }?;
-                self.find_call_validator(py, &tag, input, extra, slots, recursion_guard)
+                self.find_call_validator(py, &tag, input, extra, definitions, recursion_guard)
             }
             Discriminator::Function(ref func) => {
                 let tag = func.call1(py, (input.to_object(py),))?;
@@ -404,7 +404,14 @@ impl Validator for TaggedUnionValidator {
                     Err(self.tag_not_found(input))
                 } else {
                     let tag: &PyAny = tag.downcast(py)?;
-                    self.find_call_validator(py, &(ChoiceKey::from_py(tag)?), input, extra, slots, recursion_guard)
+                    self.find_call_validator(
+                        py,
+                        &(ChoiceKey::from_py(tag)?),
+                        input,
+                        extra,
+                        definitions,
+                        recursion_guard,
+                    )
                 }
             }
             Discriminator::SelfSchema => self.find_call_validator(
@@ -412,7 +419,7 @@ impl Validator for TaggedUnionValidator {
                 &ChoiceKey::Str(self.self_schema_tag(py, input)?.into_owned()),
                 input,
                 extra,
-                slots,
+                definitions,
                 recursion_guard,
             ),
         }
@@ -491,18 +498,18 @@ impl TaggedUnionValidator {
         tag: &ChoiceKey,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(validator) = self.choices.get(tag) {
-            return match validator.validate(py, input, extra, slots, recursion_guard) {
+            return match validator.validate(py, input, extra, definitions, recursion_guard) {
                 Ok(res) => Ok(res),
                 Err(err) => Err(err.with_outer_location(tag.into())),
             };
         } else if let Some(ref repeat_choices) = self.repeat_choices {
             if let Some(choice_tag) = repeat_choices.get(tag) {
                 let validator = &self.choices[choice_tag];
-                return match validator.validate(py, input, extra, slots, recursion_guard) {
+                return match validator.validate(py, input, extra, definitions, recursion_guard) {
                     Ok(res) => Ok(res),
                     Err(err) => Err(err.with_outer_location(tag.into())),
                 };

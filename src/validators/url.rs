@@ -62,7 +62,7 @@ impl Validator for UrlValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _slots: &'data [CombinedValidator],
+        _definitions: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let mut lib_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
@@ -191,7 +191,7 @@ impl Validator for MultiHostUrlValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _slots: &'data [CombinedValidator],
+        _definitions: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let mut multi_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;

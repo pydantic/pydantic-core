@@ -68,7 +68,7 @@ impl TypeSerializer for DefinitionRefSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let value_id = extra.rec_guard.add(value, self.serializer_id)?;
-        let comb_serializer = extra.slots.get(self.serializer_id).unwrap();
+        let comb_serializer = extra.definitions.get(self.serializer_id).unwrap();
         let r = comb_serializer.to_python(value, include, exclude, extra);
         extra.rec_guard.pop(value_id, self.serializer_id);
         r
@@ -87,7 +87,7 @@ impl TypeSerializer for DefinitionRefSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let value_id = extra.rec_guard.add(value, self.serializer_id).map_err(py_err_se_err)?;
-        let comb_serializer = extra.slots.get(self.serializer_id).unwrap();
+        let comb_serializer = extra.definitions.get(self.serializer_id).unwrap();
         let r = comb_serializer.serde_serialize(value, serializer, include, exclude, extra);
         extra.rec_guard.pop(value_id, self.serializer_id);
         r

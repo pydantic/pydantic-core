@@ -147,7 +147,7 @@ impl SchemaSerializer {
 
     pub fn __repr__(&self) -> String {
         format!(
-            "SchemaSerializer(serializer={:#?}, slots={:#?})",
+            "SchemaSerializer(serializer={:#?}, definitions={:#?})",
             self.serializer, self.definitions
         )
     }

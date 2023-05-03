@@ -49,14 +49,14 @@ impl Validator for GeneratorValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let iterator = input.validate_iter()?;
         let validator = self
             .item_validator
             .as_ref()
-            .map(|v| InternalValidator::new(py, "ValidatorIterator", v, slots, extra, recursion_guard));
+            .map(|v| InternalValidator::new(py, "ValidatorIterator", v, definitions, extra, recursion_guard));
 
         let v_iterator = ValidatorIterator {
             iterator,
@@ -215,14 +215,14 @@ impl InternalValidator {
         py: Python,
         name: &str,
         validator: &CombinedValidator,
-        slots: &[CombinedValidator],
+        definitions: &[CombinedValidator],
         extra: &Extra,
         recursion_guard: &RecursionGuard,
     ) -> Self {
         Self {
             name: name.to_string(),
             validator: validator.clone(),
-            definitions: slots.to_vec(),
+            definitions: definitions.to_vec(),
             data: extra.data.map(|d| d.into_py(py)),
             strict: extra.strict,
             context: extra.context.map(|d| d.into_py(py)),

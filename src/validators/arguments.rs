@@ -155,7 +155,7 @@ impl Validator for ArgumentsValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let args = input.validate_args()?;
@@ -196,7 +196,7 @@ impl Validator for ArgumentsValidator {
                         (Some(pos_value), None) => {
                             match parameter
                                 .validator
-                                .validate(py, pos_value, extra, slots, recursion_guard)
+                                .validate(py, pos_value, extra, definitions, recursion_guard)
                             {
                                 Ok(value) => output_args.push(value),
                                 Err(ValError::LineErrors(line_errors)) => {
@@ -208,7 +208,7 @@ impl Validator for ArgumentsValidator {
                         (None, Some((lookup_path, kw_value))) => {
                             match parameter
                                 .validator
-                                .validate(py, kw_value, extra, slots, recursion_guard)
+                                .validate(py, kw_value, extra, definitions, recursion_guard)
                             {
                                 Ok(value) => output_kwargs.set_item(parameter.kwarg_key.as_ref().unwrap(), value)?,
                                 Err(ValError::LineErrors(line_errors)) => {
@@ -220,7 +220,7 @@ impl Validator for ArgumentsValidator {
                             }
                         }
                         (None, None) => {
-                            if let Some(value) = parameter.validator.default_value(py, Some(parameter.name.as_str()), extra, slots, recursion_guard)? {
+                            if let Some(value) = parameter.validator.default_value(py, Some(parameter.name.as_str()), extra, definitions, recursion_guard)? {
                                 if let Some(ref kwarg_key) = parameter.kwarg_key {
                                     output_kwargs.set_item(kwarg_key, value)?;
                                 } else {
@@ -250,7 +250,7 @@ impl Validator for ArgumentsValidator {
                     if len > self.positional_params_count {
                         if let Some(ref validator) = self.var_args_validator {
                             for (index, item) in $slice_macro!(args, self.positional_params_count, len).iter().enumerate() {
-                                match validator.validate(py, item, extra, slots, recursion_guard) {
+                                match validator.validate(py, item, extra, definitions, recursion_guard) {
                                     Ok(value) => output_args.push(value),
                                     Err(ValError::LineErrors(line_errors)) => {
                                         errors.extend(
@@ -292,7 +292,7 @@ impl Validator for ArgumentsValidator {
                             };
                             if !used_kwargs.contains(either_str.as_cow()?.as_ref()) {
                                 match self.var_kwargs_validator {
-                                    Some(ref validator) => match validator.validate(py, value, extra, slots, recursion_guard) {
+                                    Some(ref validator) => match validator.validate(py, value, extra, definitions, recursion_guard) {
                                         Ok(value) => output_kwargs.set_item(either_str.as_py_string(py), value)?,
                                         Err(ValError::LineErrors(line_errors)) => {
                                             for err in line_errors {

@@ -99,7 +99,7 @@ impl Validator for ListValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_list(extra.strict.unwrap_or(self.strict), self.allow_any_iter)?;
@@ -113,7 +113,7 @@ impl Validator for ListValidator {
                 self.max_length,
                 v,
                 extra,
-                slots,
+                definitions,
                 recursion_guard,
             )?,
             None => match seq {

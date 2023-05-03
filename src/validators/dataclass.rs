@@ -127,7 +127,7 @@ impl Validator for DataclassArgsValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let args = input.validate_dataclass_args(&self.dataclass_name)?;
@@ -192,7 +192,7 @@ impl Validator for DataclassArgsValidator {
                         (Some(pos_value), None) => {
                             match field
                                 .validator
-                                .validate(py, pos_value, &extra, slots, recursion_guard)
+                                .validate(py, pos_value, &extra, definitions, recursion_guard)
                             {
                                 Ok(value) => set_item!(field, value),
                                 Err(ValError::LineErrors(line_errors)) => {
@@ -209,7 +209,7 @@ impl Validator for DataclassArgsValidator {
                         (None, Some((lookup_path, kw_value))) => {
                             match field
                                 .validator
-                                .validate(py, kw_value, &extra, slots, recursion_guard)
+                                .validate(py, kw_value, &extra, definitions, recursion_guard)
                             {
                                 Ok(value) => set_item!(field, value),
                                 Err(ValError::LineErrors(line_errors)) => {
@@ -228,7 +228,7 @@ impl Validator for DataclassArgsValidator {
                                 py,
                                 Some(field.name.as_str()),
                                 &extra,
-                                slots,
+                                definitions,
                                 recursion_guard,
                             )? {
                                 set_item!(field, value);
@@ -316,7 +316,7 @@ impl Validator for DataclassArgsValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let dict: &PyDict = obj.downcast()?;
@@ -353,7 +353,7 @@ impl Validator for DataclassArgsValidator {
             };
             match field
                 .validator
-                .validate(py, field_value, &next_extra, slots, recursion_guard)
+                .validate(py, field_value, &next_extra, definitions, recursion_guard)
             {
                 Ok(output) => ok(output),
                 Err(ValError::LineErrors(line_errors)) => {
@@ -461,12 +461,12 @@ impl Validator for DataclassValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(self_instance) = extra.self_instance {
             // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
-            return self.validate_init(py, self_instance, input, extra, slots, recursion_guard);
+            return self.validate_init(py, self_instance, input, extra, definitions, recursion_guard);
         }
 
         // same logic as on models
@@ -474,7 +474,9 @@ impl Validator for DataclassValidator {
         if input.input_is_instance(class, 0)? {
             if self.revalidate.should_revalidate(input, class) {
                 let input = input.input_get_attr(intern!(py, "__dict__")).unwrap()?;
-                let val_output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
+                let val_output = self
+                    .validator
+                    .validate(py, input, extra, definitions, recursion_guard)?;
                 let dc = create_class(self.class.as_ref(py))?;
                 self.set_dict_call(py, dc.as_ref(py), val_output, input)?;
                 Ok(dc)
@@ -489,7 +491,9 @@ impl Validator for DataclassValidator {
                 input,
             ))
         } else {
-            let val_output = self.validator.validate(py, input, extra, slots, recursion_guard)?;
+            let val_output = self
+                .validator
+                .validate(py, input, extra, definitions, recursion_guard)?;
             let dc = create_class(self.class.as_ref(py))?;
             self.set_dict_call(py, dc.as_ref(py), val_output, input)?;
             Ok(dc)
@@ -503,7 +507,7 @@ impl Validator for DataclassValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if self.frozen {
@@ -517,9 +521,15 @@ impl Validator for DataclassValidator {
 
         // Discard the second return value, which is `init_only_args` but is always
         // None anyway for validate_assignment; see validate_assignment in DataclassArgsValidator
-        let val_assignment_result =
-            self.validator
-                .validate_assignment(py, new_dict, field_name, field_value, extra, slots, recursion_guard)?;
+        let val_assignment_result = self.validator.validate_assignment(
+            py,
+            new_dict,
+            field_name,
+            field_value,
+            extra,
+            definitions,
+            recursion_guard,
+        )?;
 
         let (dc_dict, _): (&PyDict, PyObject) = val_assignment_result.extract(py)?;
 
@@ -557,7 +567,7 @@ impl DataclassValidator {
         self_instance: &'s PyAny,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         // we need to set `self_instance` to None for nested validators as we don't want to operate on the self_instance
@@ -566,7 +576,9 @@ impl DataclassValidator {
             self_instance: None,
             ..*extra
         };
-        let val_output = self.validator.validate(py, input, &new_extra, slots, recursion_guard)?;
+        let val_output = self
+            .validator
+            .validate(py, input, &new_extra, definitions, recursion_guard)?;
 
         self.set_dict_call(py, self_instance, val_output, input)?;
 

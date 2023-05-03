@@ -47,7 +47,7 @@ impl Validator for TupleVariableValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
@@ -61,7 +61,7 @@ impl Validator for TupleVariableValidator {
                 self.max_length,
                 v,
                 extra,
-                slots,
+                definitions,
                 recursion_guard,
             )?,
             None => match seq {
@@ -145,7 +145,7 @@ impl Validator for TuplePositionalValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let collection = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
@@ -157,7 +157,7 @@ impl Validator for TuplePositionalValidator {
             ($collection_iter:expr) => {{
                 for (index, validator) in self.items_validators.iter().enumerate() {
                     match $collection_iter.next() {
-                        Some(item) => match validator.validate(py, item, extra, slots, recursion_guard) {
+                        Some(item) => match validator.validate(py, item, extra, definitions, recursion_guard) {
                             Ok(item) => output.push(item),
                             Err(ValError::LineErrors(line_errors)) => {
                                 errors.extend(
@@ -170,7 +170,7 @@ impl Validator for TuplePositionalValidator {
                         },
                         None => {
                             if let Some(value) =
-                                validator.default_value(py, Some(index), extra, slots, recursion_guard)?
+                                validator.default_value(py, Some(index), extra, definitions, recursion_guard)?
                             {
                                 output.push(value);
                             } else {
@@ -182,7 +182,7 @@ impl Validator for TuplePositionalValidator {
                 for (index, item) in $collection_iter.enumerate() {
                     match self.extra_validator {
                         Some(ref extra_validator) => {
-                            match extra_validator.validate(py, item, extra, slots, recursion_guard) {
+                            match extra_validator.validate(py, item, extra, definitions, recursion_guard) {
                                 Ok(item) => output.push(item),
                                 Err(ValError::LineErrors(line_errors)) => {
                                     errors.extend(

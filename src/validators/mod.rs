@@ -198,7 +198,7 @@ impl SchemaValidator {
 
     pub fn __repr__(&self, py: Python) -> String {
         format!(
-            "SchemaValidator(title={:?}, validator={:#?}, slots={:#?})",
+            "SchemaValidator(title={:?}, validator={:#?}, definitions={:#?})",
             self.title.extract::<&str>(py).unwrap(),
             self.validator,
             self.definitions,
@@ -584,7 +584,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject>;
 
@@ -594,7 +594,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         _py: Python<'data>,
         _outer_loc: Option<impl Into<LocItem>>,
         _extra: &Extra,
-        _slots: &'data [CombinedValidator],
+        _definitions: &'data [CombinedValidator],
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, Option<PyObject>> {
         Ok(None)

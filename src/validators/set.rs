@@ -61,7 +61,7 @@ impl Validator for SetValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_set(extra.strict.unwrap_or(self.strict))?;
@@ -77,7 +77,7 @@ impl Validator for SetValidator {
                     self.generator_max_length,
                     v,
                     extra,
-                    slots,
+                    definitions,
                     recursion_guard,
                 )?,
             )?,

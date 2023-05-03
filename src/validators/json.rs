@@ -48,12 +48,12 @@ impl Validator for JsonValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        slots: &'data [CombinedValidator],
+        definitions: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let json_value = input.parse_json()?;
         match self.validator {
-            Some(ref validator) => match validator.validate(py, &json_value, extra, slots, recursion_guard) {
+            Some(ref validator) => match validator.validate(py, &json_value, extra, definitions, recursion_guard) {
                 Ok(v) => Ok(v),
                 Err(err) => Err(err.duplicate(py)),
             },
