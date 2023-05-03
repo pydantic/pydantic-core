@@ -4,7 +4,9 @@ Tools to process a CoreSchema
 from __future__ import annotations as _annotations
 
 from collections import defaultdict
-from typing import Callable, TypeGuard, TypeVar, Union, cast, get_args
+from typing import Callable, TypeVar, Union, cast
+
+from typing_extensions import TypeGuard, get_args
 
 from pydantic_core import core_schema as cs
 
