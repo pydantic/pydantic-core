@@ -12,7 +12,12 @@ use ahash::AHashMap;
 use crate::build_tools::py_err;
 
 // An integer id for the reference
-type ReferenceId = usize;
+pub type ReferenceId = usize;
+
+/// Definitions for validators or serializers
+/// They get indexed by a ReferenceId,
+/// which are handed out and managed by DefinitionsBuilder
+pub type Definitions<T> = [T];
 
 #[derive(Clone, Debug)]
 struct Definition<T> {

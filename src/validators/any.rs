@@ -5,7 +5,7 @@ use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 /// This might seem useless, but it's useful in DictValidator to avoid Option<Validator> a lot
 #[derive(Debug, Clone)]
@@ -29,7 +29,7 @@ impl Validator for AnyValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         _extra: &Extra,
-        _definitions: &'data [CombinedValidator],
+        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         // Ok(input.clone().into_py(py))

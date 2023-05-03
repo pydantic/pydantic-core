@@ -14,7 +14,7 @@ use crate::validators::function::convert_err;
 
 use super::arguments::{json_get, json_slice, py_get, py_slice};
 use super::model::{create_class, force_setattr, Revalidate};
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 struct Field {
@@ -127,7 +127,7 @@ impl Validator for DataclassArgsValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let args = input.validate_dataclass_args(&self.dataclass_name)?;
@@ -316,7 +316,7 @@ impl Validator for DataclassArgsValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let dict: &PyDict = obj.downcast()?;
@@ -461,7 +461,7 @@ impl Validator for DataclassValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(self_instance) = extra.self_instance {
@@ -507,7 +507,7 @@ impl Validator for DataclassValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if self.frozen {
@@ -567,7 +567,7 @@ impl DataclassValidator {
         self_instance: &'s PyAny,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         // we need to set `self_instance` to None for nested validators as we don't want to operate on the self_instance

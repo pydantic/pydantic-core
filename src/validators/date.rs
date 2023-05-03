@@ -10,7 +10,7 @@ use crate::input::{EitherDate, Input};
 use crate::recursion_guard::RecursionGuard;
 use crate::validators::datetime::{NowConstraint, NowOp};
 
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DateValidator {
@@ -40,7 +40,7 @@ impl Validator for DateValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data [CombinedValidator],
+        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let date = match input.validate_date(extra.strict.unwrap_or(self.strict)) {

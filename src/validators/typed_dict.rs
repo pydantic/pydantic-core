@@ -13,7 +13,7 @@ use crate::input::{
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 struct TypedDictField {
@@ -129,7 +129,7 @@ impl Validator for TypedDictValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let strict = extra.strict.unwrap_or(self.strict);

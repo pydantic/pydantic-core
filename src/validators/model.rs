@@ -13,7 +13,7 @@ use crate::input::{py_error_on_minusone, Input};
 use crate::recursion_guard::RecursionGuard;
 
 use super::function::convert_err;
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 const DUNDER_DICT: &str = "__dict__";
 const DUNDER_FIELDS_SET_KEY: &str = "__pydantic_fields_set__";
@@ -108,7 +108,7 @@ impl Validator for ModelValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(self_instance) = extra.self_instance {
@@ -173,7 +173,7 @@ impl Validator for ModelValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if self.frozen {
@@ -238,7 +238,7 @@ impl ModelValidator {
         self_instance: &'s PyAny,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         // we need to set `self_instance` to None for nested validators as we don't want to operate on self_instance

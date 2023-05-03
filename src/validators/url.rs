@@ -16,7 +16,7 @@ use crate::recursion_guard::RecursionGuard;
 use crate::url::{schema_is_special, PyMultiHostUrl, PyUrl};
 
 use super::literal::expected_repr_name;
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 type AllowedSchemas = Option<(AHashSet<String>, String)>;
 
@@ -62,7 +62,7 @@ impl Validator for UrlValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data [CombinedValidator],
+        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let mut lib_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
@@ -191,7 +191,7 @@ impl Validator for MultiHostUrlValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data [CombinedValidator],
+        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let mut multi_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;

@@ -7,7 +7,7 @@ use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct NullableValidator {
@@ -36,7 +36,7 @@ impl Validator for NullableValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         match input.is_none() {

@@ -11,7 +11,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
 use super::generator::InternalValidator;
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 fn destructure_function_schema(schema: &PyDict) -> PyResult<(bool, bool, &PyAny)> {
     let func_dict: &PyDict = schema.get_as_req(intern!(schema.py(), "function"))?;
@@ -69,7 +69,7 @@ macro_rules! impl_validator {
                 py: Python<'data>,
                 input: &'data impl Input<'data>,
                 extra: &Extra,
-                definitions: &'data [CombinedValidator],
+                definitions: &'data Definitions<CombinedValidator>,
                 recursion_guard: &'s mut RecursionGuard,
             ) -> ValResult<'data, PyObject> {
                 let validate =
@@ -83,7 +83,7 @@ macro_rules! impl_validator {
                 field_name: &'data str,
                 field_value: &'data PyAny,
                 extra: &Extra,
-                definitions: &'data [CombinedValidator],
+                definitions: &'data Definitions<CombinedValidator>,
                 recursion_guard: &'s mut RecursionGuard,
             ) -> ValResult<'data, PyObject> {
                 let validate = move |v: &'data PyAny, e: &Extra| {
@@ -222,7 +222,7 @@ impl Validator for FunctionPlainValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data [CombinedValidator],
+        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let r = if self.info_arg {
@@ -288,7 +288,7 @@ impl Validator for FunctionWrapValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let handler = ValidatorCallable {
@@ -316,7 +316,7 @@ impl Validator for FunctionWrapValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let handler = AssignmentValidatorCallable {

@@ -8,7 +8,7 @@ use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{EitherTimedelta, Input};
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct TimeDeltaValidator {
@@ -59,7 +59,7 @@ impl Validator for TimeDeltaValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data [CombinedValidator],
+        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let timedelta = input.validate_timedelta(extra.strict.unwrap_or(self.strict))?;

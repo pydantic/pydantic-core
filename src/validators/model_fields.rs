@@ -6,7 +6,6 @@ use pyo3::types::{PyDict, PySet, PyString, PyType};
 use ahash::AHashSet;
 
 use crate::build_tools::{is_strict, py_err, schema_or_config_same, ExtraBehavior, SchemaDict};
-use crate::definitions::DefinitionsBuilder;
 use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{
     AttributesGenericIterator, DictGenericIterator, GenericMapping, Input, JsonObjectGenericIterator,
@@ -15,7 +14,7 @@ use crate::input::{
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 struct Field {
@@ -107,7 +106,7 @@ impl Validator for ModelFieldsValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let strict = extra.strict.unwrap_or(self.strict);
@@ -261,7 +260,7 @@ impl Validator for ModelFieldsValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let dict: &PyDict = obj.downcast()?;

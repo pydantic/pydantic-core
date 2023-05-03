@@ -6,7 +6,7 @@ use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct BoolValidator {
@@ -34,7 +34,7 @@ impl Validator for BoolValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data [CombinedValidator],
+        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool

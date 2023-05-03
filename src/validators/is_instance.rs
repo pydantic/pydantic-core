@@ -8,7 +8,7 @@ use crate::input::{Input, JsonType};
 use crate::recursion_guard::RecursionGuard;
 
 use super::function::convert_err;
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct IsInstanceValidator {
@@ -67,7 +67,7 @@ impl Validator for IsInstanceValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         _extra: &Extra,
-        _definitions: &'data [CombinedValidator],
+        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         match input.input_is_instance(self.class.as_ref(py), self.json_types)? {

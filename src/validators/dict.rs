@@ -11,7 +11,7 @@ use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
 use super::list::length_check;
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
@@ -64,7 +64,7 @@ impl Validator for DictValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let dict = input.validate_dict(extra.strict.unwrap_or(self.strict))?;
@@ -113,7 +113,7 @@ macro_rules! build_validate {
             input: &'data impl Input<'data>,
             dict: &'data $dict_type,
             extra: &Extra,
-            definitions: &'data [CombinedValidator],
+            definitions: &'data Definitions<CombinedValidator>,
             recursion_guard: &'s mut RecursionGuard,
         ) -> ValResult<'data, PyObject> {
             let output = PyDict::new(py);

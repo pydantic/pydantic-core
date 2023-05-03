@@ -12,6 +12,7 @@ use super::config::SerializationConfig;
 use super::errors::{PydanticSerializationUnexpectedValue, UNEXPECTED_TYPE_SER_MARKER};
 use super::ob_type::ObTypeLookup;
 use super::shared::CombinedSerializer;
+use crate::definitions::Definitions;
 
 /// this is ugly, would be much better if extra could be stored in `SerializationState`
 /// then `SerializationState` got a `serialize_infer` method, but I couldn't get it to work
@@ -71,7 +72,7 @@ impl SerializationState {
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) struct Extra<'a> {
     pub mode: &'a SerMode,
-    pub definitions: &'a [CombinedSerializer],
+    pub definitions: &'a Definitions<CombinedSerializer>,
     pub ob_type_lookup: &'a ObTypeLookup,
     pub warnings: &'a CollectWarnings,
     pub by_alias: bool,
@@ -97,7 +98,7 @@ impl<'a> Extra<'a> {
     pub fn new(
         py: Python<'a>,
         mode: &'a SerMode,
-        definitions: &'a [CombinedSerializer],
+        definitions: &'a Definitions<CombinedSerializer>,
         by_alias: bool,
         warnings: &'a CollectWarnings,
         exclude_unset: bool,

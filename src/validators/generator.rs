@@ -10,7 +10,7 @@ use crate::recursion_guard::RecursionGuard;
 use crate::ValidationError;
 
 use super::list::get_items_schema;
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct GeneratorValidator {
@@ -49,7 +49,7 @@ impl Validator for GeneratorValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let iterator = input.validate_iter()?;

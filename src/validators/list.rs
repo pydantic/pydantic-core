@@ -6,7 +6,7 @@ use crate::errors::ValResult;
 use crate::input::{GenericCollection, Input};
 use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ListValidator {
@@ -99,7 +99,7 @@ impl Validator for ListValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_list(extra.strict.unwrap_or(self.strict), self.allow_any_iter)?;

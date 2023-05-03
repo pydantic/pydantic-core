@@ -7,7 +7,7 @@ use crate::errors::{LocItem, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub enum DefaultType {
@@ -100,7 +100,7 @@ impl Validator for WithDefaultValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         match self.validator.validate(py, input, extra, definitions, recursion_guard) {
@@ -120,7 +120,7 @@ impl Validator for WithDefaultValidator {
         py: Python<'data>,
         outer_loc: Option<impl Into<LocItem>>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, Option<PyObject>> {
         match self.default.default_value(py)? {

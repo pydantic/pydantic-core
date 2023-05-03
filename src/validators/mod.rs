@@ -9,7 +9,7 @@ use pyo3::types::{PyAny, PyDict};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_err, py_error_type, SchemaDict, SchemaError};
-use crate::definitions::DefinitionsBuilder;
+use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::errors::{ErrorMode, LocItem, ValError, ValResult, ValidationError};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -584,7 +584,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject>;
 
@@ -594,7 +594,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         _py: Python<'data>,
         _outer_loc: Option<impl Into<LocItem>>,
         _extra: &Extra,
-        _definitions: &'data [CombinedValidator],
+        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, Option<PyObject>> {
         Ok(None)
@@ -609,7 +609,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         _field_name: &'data str,
         _field_value: &'data PyAny,
         _extra: &Extra,
-        _definitions: &'data [CombinedValidator],
+        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let py_err = PyTypeError::new_err(format!("validate_assignment is not supported for {}", self.get_name()));

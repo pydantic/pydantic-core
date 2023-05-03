@@ -3,12 +3,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::SchemaDict;
-use crate::definitions::DefinitionsBuilder;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{build_validator, BuildValidator, CombinedValidator, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DefinitionsValidatorBuilder;
@@ -77,7 +76,7 @@ impl Validator for DefinitionRefValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(id) = input.identity() {
@@ -105,7 +104,7 @@ impl Validator for DefinitionRefValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(id) = obj.identity() {
@@ -184,7 +183,7 @@ fn validate<'s, 'data>(
     py: Python<'data>,
     input: &'data impl Input<'data>,
     extra: &Extra,
-    definitions: &'data [CombinedValidator],
+    definitions: &'data Definitions<CombinedValidator>,
     recursion_guard: &'s mut RecursionGuard,
 ) -> ValResult<'data, PyObject> {
     let validator = definitions.get(validator_id).unwrap();
@@ -199,7 +198,7 @@ fn validate_assignment<'data>(
     field_name: &'data str,
     field_value: &'data PyAny,
     extra: &Extra,
-    definitions: &'data [CombinedValidator],
+    definitions: &'data Definitions<CombinedValidator>,
     recursion_guard: &mut RecursionGuard,
 ) -> ValResult<'data, PyObject> {
     let validator = definitions.get(validator_id).unwrap();

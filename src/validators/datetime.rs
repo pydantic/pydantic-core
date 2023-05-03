@@ -11,7 +11,7 @@ use crate::errors::{py_err_string, ErrorType, ValError, ValResult};
 use crate::input::{EitherDateTime, Input};
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DateTimeValidator {
@@ -41,7 +41,7 @@ impl Validator for DateTimeValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data [CombinedValidator],
+        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let datetime = input.validate_datetime(extra.strict.unwrap_or(self.strict))?;

@@ -16,7 +16,7 @@ use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 
 use super::custom_error::CustomError;
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct UnionValidator {
@@ -84,7 +84,7 @@ impl Validator for UnionValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if self.ultra_strict_required {
@@ -368,7 +368,7 @@ impl Validator for TaggedUnionValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         match self.discriminator {
@@ -498,7 +498,7 @@ impl TaggedUnionValidator {
         tag: &ChoiceKey,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data [CombinedValidator],
+        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(validator) = self.choices.get(tag) {
