@@ -84,6 +84,30 @@ from pydantic_core.utils import simplify_schema_references
             ),
             cs.list_schema(cs.list_schema(cs.int_schema())),
         ),
+        # Test case 8: Reference is used in multiple places
+        (
+            cs.definitions_schema(
+                cs.union_schema(
+                    [
+                        cs.definition_reference_schema('list_of_ints'),
+                        cs.tuple_variable_schema(cs.definition_reference_schema('int')),
+                    ]
+                ),
+                definitions=[
+                    cs.list_schema(cs.definition_reference_schema('int'), ref='list_of_ints'),
+                    cs.int_schema(ref='int'),
+                ],
+            ),
+            cs.definitions_schema(
+                cs.union_schema(
+                    [
+                        cs.list_schema(cs.definition_reference_schema('int')),
+                        cs.tuple_variable_schema(cs.definition_reference_schema('int')),
+                    ]
+                ),
+                definitions=[cs.int_schema(ref='int')],
+            ),
+        ),
     ],
 )
 def test_build_definitions_schema(input_schema: cs.CoreSchema, expected_output: cs.CoreSchema):
