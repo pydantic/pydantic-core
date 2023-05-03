@@ -14,9 +14,16 @@ use crate::build_tools::py_err;
 // An integer id for the reference
 pub type ReferenceId = usize;
 
-/// Definitions for validators or serializers
-/// They get indexed by a ReferenceId,
-/// which are handed out and managed by DefinitionsBuilder
+/// Definitions are validators and serializers that are
+/// shared by reference.
+/// They come into play whenever there is recursion, e.g.
+/// if you have validators A -> B -> A then A will be shared
+/// by reference so that the SchemaValidator itself can own it.
+/// These primarily get used by DefinitionRefValidator and DefinitionRefSerializer,
+/// other validators / serializers primarily pass them around without interacting with them.
+/// They get indexed by a ReferenceId, which are integer identifiers
+/// that are handed out and managed by DefinitionsBuilder when the Schema{Validator,Serializer}
+/// gets build.
 pub type Definitions<T> = [T];
 
 #[derive(Clone, Debug)]
