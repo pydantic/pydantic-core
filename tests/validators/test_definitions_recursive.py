@@ -4,7 +4,7 @@ from typing import List, Optional
 import pytest
 from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict, IsStr, IsTuple
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, __version__, core_schema
 
 from ..conftest import Err, plain_repr
 from .test_typed_dict import Cls
@@ -843,7 +843,13 @@ def test_recursive_definitions_schema() -> None:
         v.validate_python({'b': [{'a': {}}]})
 
     assert exc_info.value.errors() == [
-        {'type': 'list_type', 'loc': ('b', 0, 'a'), 'msg': 'Input should be a valid list', 'input': {}}
+        {
+            'type': 'list_type',
+            'loc': ('b', 0, 'a'),
+            'msg': 'Input should be a valid list',
+            'input': {},
+            'url': f'https://errors.pydantic.dev/{__version__}/v/list_type',
+        }
     ]
 
 
@@ -902,6 +908,6 @@ def test_validate_assignment() -> None:
             'msg': 'Input should be a dictionary or an instance of Model',
             'input': 123,
             'ctx': {'dataclass_name': 'Model'},
-            'url': 'https://errors.pydantic.dev/0.27.1/v/dataclass_type',
+            'url': f'https://errors.pydantic.dev/{__version__}/v/dataclass_type',
         }
     ]
