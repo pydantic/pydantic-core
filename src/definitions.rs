@@ -32,7 +32,7 @@ impl<T: Clone + std::fmt::Debug> DefinitionsBuilder<T> {
         }
     }
 
-    // Get a ReferenceId for the given reference string.
+    /// Get a ReferenceId for the given reference string.
     // This ReferenceId can later be used to retrieve a definition
     pub fn get_reference_id(&mut self, reference: &str) -> ReferenceId {
         let next_id = self.definitions.len();
@@ -51,7 +51,7 @@ impl<T: Clone + std::fmt::Debug> DefinitionsBuilder<T> {
         }
     }
 
-    // Add a definition, returning the ReferenceId that maps to it
+    /// Add a definition, returning the ReferenceId that maps to it
     pub fn add_definition(&mut self, reference: String, value: T) -> PyResult<ReferenceId> {
         let next_id = self.definitions.len();
         match self.definitions.entry(reference.clone()) {
@@ -69,8 +69,8 @@ impl<T: Clone + std::fmt::Debug> DefinitionsBuilder<T> {
         }
     }
 
-    // Retrieve an item definition using a ReferenceId
-    // Will raise an error if the definition for that reference does not yet exist
+    /// Retrieve an item definition using a ReferenceId
+    /// Will raise an error if the definition for that reference does not yet exist
     pub fn get_definition(&self, reference_id: ReferenceId) -> PyResult<&T> {
         let (reference, def) = match self.definitions.iter().find(|(_, def)| def.id == reference_id) {
             Some(v) => v,
@@ -85,7 +85,7 @@ impl<T: Clone + std::fmt::Debug> DefinitionsBuilder<T> {
         }
     }
 
-    // Consume this Definitions into a vector of items, indexed by each items ReferenceId
+    /// Consume this Definitions into a vector of items, indexed by each items ReferenceId
     pub fn finish(self) -> PyResult<Vec<T>> {
         // We need to create a vec of defs according to the order in their ids
         let mut defs: Vec<(usize, T)> = Vec::new();
