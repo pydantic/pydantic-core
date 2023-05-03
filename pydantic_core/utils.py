@@ -21,14 +21,6 @@ def is_definitions_schema(s: cs.CoreSchema) -> TypeGuard[cs.DefinitionsSchema]:
     return s['type'] == 'definitions'
 
 
-def is_list_schema(s: cs.CoreSchema) -> TypeGuard[cs.ListSchema]:
-    return s['type'] == 'list'
-
-
-def is_int_schema(s: cs.CoreSchema) -> TypeGuard[cs.IntSchema]:
-    return s['type'] == 'int'
-
-
 AnyFunctionSchema = Union[
     cs.AfterValidatorFunctionSchema,
     cs.BeforeValidatorFunctionSchema,
@@ -206,16 +198,28 @@ _dispatch = _WalkCoreSchema().walk
 
 
 def walk_core_schema(schema: cs.CoreSchema, f: Walk) -> cs.CoreSchema:
+    """Recursively traverse a CoreSchema.
+
+    Args:
+        schema (cs.CoreSchema): The CoreSchema to process, it will not be modified.
+        f (Walk): A function to apply. This function takes two arguments:
+          1. The current CoreSchema that is being processed
+             (not the same one you passed into this function, one level down).
+          2. The "next" `f` to call. This lets you for example use `f=functools.partial(some_method, some_context)`
+             to pass data down the recursive calls without using globals or other mutable state.
+
+    Returns:
+        cs.CoreSchema: A processed CoreSchema.
+    """
     return f(schema.copy(), _dispatch)
 
 
 def simplify_schema_references(schema: cs.CoreSchema) -> cs.CoreSchema:  # noqa: C901
     """
-    Pull all references into a DefinitionsSchema.
-
-    Any schemas with a single references will be inlined, even if they were previously references.
-
-    Any DefinitionRef schemas that are the only reference to another schema will inline it.
+    Simplify schema references by:
+      1. Grouping all definitions into a single top-level `definitions` schema, similar to a JSON schema's `#/$defs`.
+      2. Inlining any definitions that are only referenced in one place and are not involved in a cycle.
+      3. Removing any unused `ref` references from schemas.
     """
     all_defs: dict[str, cs.CoreSchema] = {}
 
