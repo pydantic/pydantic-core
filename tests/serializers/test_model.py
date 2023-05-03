@@ -741,3 +741,31 @@ def test_property_setter():
     del sq.area
     assert s.to_python(sq, by_alias=False) == {'side': 0, 'area': 0, 'random_n': the_random_n}
     assert s.to_python(sq, exclude={'random_n'}) == {'side': 0, 'area': 0}
+
+
+def test_extra():
+    class MyModel:
+        # this is not required, but it avoids `__pydantic_fields_set__` being included in `__dict__`
+        __slots__ = '__dict__', '__pydantic_extra__', '__pydantic_fields_set__'
+        field_a: str
+        field_b: int
+
+    schema = core_schema.model_schema(
+        MyModel,
+        core_schema.model_fields_schema(
+            {
+                'field_a': core_schema.model_field(core_schema.str_schema()),
+                'field_b': core_schema.model_field(core_schema.int_schema()),
+            },
+            extra_behavior='allow',
+        ),
+    )
+    v = SchemaValidator(schema)
+    m = v.validate_python({'field_a': 'test', 'field_b': 12, 'field_c': 'extra'})
+    assert isinstance(m, MyModel)
+    assert m.__dict__ == {'field_a': 'test', 'field_b': 12}
+    assert m.__pydantic_extra__ == {'field_c': 'extra'}
+    assert m.__pydantic_fields_set__ == {'field_a', 'field_b', 'field_c'}
+
+    s = SchemaSerializer(schema)
+    assert s.to_python(m) == {'field_a': 'test', 'field_b': 12, 'field_c': 'extra'}
