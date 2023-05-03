@@ -89,7 +89,7 @@ impl<T: Clone + std::fmt::Debug> DefinitionsBuilder<T> {
     }
 
     // Consume this Definitions into a vector of items, indexed by each items ReferenceId
-    pub fn build(self) -> PyResult<Vec<T>> {
+    pub fn finish(self) -> PyResult<Vec<T>> {
         // We need to create a vec of defs according to the order in their ids
         let mut defs: Vec<(usize, T)> = Vec::new();
         for (reference, def) in self.definitions.into_iter() {

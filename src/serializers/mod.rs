@@ -44,7 +44,7 @@ impl SchemaSerializer {
         let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut definitions_builder)?;
         Ok(Self {
             serializer,
-            definitions: definitions_builder.build()?,
+            definitions: definitions_builder.finish()?,
             json_size: 1024,
             config: SerializationConfig::from_config(config)?,
         })
