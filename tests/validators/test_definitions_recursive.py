@@ -902,5 +902,6 @@ def test_validate_assignment() -> None:
             'msg': 'Input should be a dictionary or an instance of Model',
             'input': 123,
             'ctx': {'dataclass_name': 'Model'},
+            'url': 'https://errors.pydantic.dev/0.27.1/v/dataclass_type',
         }
     ]
