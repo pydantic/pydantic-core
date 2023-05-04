@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt;
 
@@ -278,5 +279,44 @@ impl ExtraBehavior {
             None => default,
         };
         Ok(res)
+    }
+}
+
+pub(crate) fn build_model_config<'a>(
+    py: Python<'a>,
+    schema: &'a PyDict,
+    parent_config: Option<&'a PyDict>,
+) -> PyResult<Option<&'a PyDict>> {
+    let child_config: Option<&PyDict> = schema.get_as(intern!(py, "config"))?;
+    match (parent_config, child_config) {
+        (Some(parent), None) => Ok(Some(parent)),
+        (None, Some(child)) => Ok(Some(child)),
+        (None, None) => Ok(None),
+        (Some(parent), Some(child)) => {
+            let key = intern!(py, "config_choose_priority");
+            let parent_choose: i32 = parent.get_as(key)?.unwrap_or_default();
+            let child_choose: i32 = child.get_as(key)?.unwrap_or_default();
+            match parent_choose.cmp(&child_choose) {
+                Ordering::Greater => Ok(Some(parent)),
+                Ordering::Less => Ok(Some(child)),
+                Ordering::Equal => {
+                    let key = intern!(py, "config_merge_priority");
+                    let parent_merge: i32 = parent.get_as(key)?.unwrap_or_default();
+                    let child_merge: i32 = child.get_as(key)?.unwrap_or_default();
+                    let update = intern!(py, "update");
+                    match parent_merge.cmp(&child_merge) {
+                        Ordering::Greater => {
+                            child.getattr(update)?.call1((parent,))?;
+                            Ok(Some(child))
+                        }
+                        // otherwise child is the winner
+                        _ => {
+                            parent.getattr(update)?.call1((child,))?;
+                            Ok(Some(parent))
+                        }
+                    }
+                }
+            }
+        }
     }
 }

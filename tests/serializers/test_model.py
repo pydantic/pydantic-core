@@ -14,6 +14,8 @@ from dirty_equals import IsJson
 
 from pydantic_core import PydanticSerializationError, SchemaSerializer, SchemaValidator, core_schema
 
+from ..conftest import plain_repr
+
 on_pypy = platform.python_implementation() == 'PyPy'
 # pypy doesn't seem to maintain order of `__dict__`
 if on_pypy:
@@ -44,6 +46,8 @@ def test_model():
             ),
         )
     )
+    assert 'mode:SimpleDict' in plain_repr(s)
+    assert 'has_extra:false' in plain_repr(s)
     assert s.to_python(BasicModel(foo=1, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
     assert s.to_python(BasicSubModel(foo=1, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
     assert s.to_python(BasicModel(bar=b'more', foo=1)) == IsStrictDict(bar=b'more', foo=1)
@@ -775,6 +779,8 @@ def test_extra():
     assert m.__pydantic_fields_set__ == {'field_a', 'field_b', 'field_c'}
 
     s = SchemaSerializer(schema)
+    assert 'mode:ModelExtra' in plain_repr(s)
+    assert 'has_extra:true' in plain_repr(s)
     assert s.to_python(m) == {'field_a': b'test', 'field_b': 12, 'field_c': 'extra'}
     assert s.to_python(m, mode='json') == {'field_a': 'test', 'field_b': 12, 'field_c': 'extra'}
     assert s.to_json(m) == b'{"field_a":"test","field_b":12,"field_c":"extra"}'
@@ -802,3 +808,25 @@ def test_extra():
         'field_d': [2, 3],
     }
     assert s.to_json(m, exclude={'field_d': [0]}) == b'{"field_a":"test","field_b":12,"field_c":null,"field_d":[2,3]}'
+
+
+def test_extra_config():
+    class MyModel:
+        # this is not required, but it avoids `__pydantic_fields_set__` being included in `__dict__`
+        __slots__ = '__dict__', '__pydantic_extra__', '__pydantic_fields_set__'
+        field_a: str
+        field_b: int
+
+    schema = core_schema.model_schema(
+        MyModel,
+        core_schema.model_fields_schema(
+            {
+                'field_a': core_schema.model_field(core_schema.bytes_schema()),
+                'field_b': core_schema.model_field(core_schema.int_schema()),
+            }
+        ),
+        config=core_schema.CoreConfig(extra_fields_behavior='allow'),
+    )
+    s = SchemaSerializer(schema)
+    assert 'mode:ModelExtra' in plain_repr(s)
+    assert 'has_extra:true' in plain_repr(s)

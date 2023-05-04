@@ -30,7 +30,7 @@ class CoreConfig(TypedDict, total=False):
     config_choose_priority: int
     # if configs are merged, which should take precedence, default 0, default means child takes precedence
     config_merge_priority: int
-    # settings related to typed_dicts only
+    # settings related to typed dicts, model fields, dataclass fields
     extra_fields_behavior: ExtraBehavior
     typed_dict_total: bool  # default: True
     # used on typed-dicts and tagged union keys
