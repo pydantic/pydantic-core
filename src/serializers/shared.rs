@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyMapping, PySet};
+use pyo3::types::{PyDict, PySet};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use enum_dispatch::enum_dispatch;
@@ -329,36 +329,17 @@ pub(super) fn object_to_dict<'py>(value: &'py PyAny, is_model: bool, extra: &Ext
     let py = value.py();
     let attr = value.getattr(intern!(py, "__dict__"))?;
     let attrs: &PyDict = attr.downcast()?;
-    if is_model {
-        if let Some(extra) = get_pydantic_extra(value) {
-            attrs.update(extra)?;
-        }
+    if is_model && extra.exclude_unset {
+        let fields_set: &PySet = value.getattr(intern!(py, "__pydantic_fields_set__"))?.downcast()?;
 
-        if extra.exclude_unset {
-            let fields_set: &PySet = value.getattr(intern!(py, "__pydantic_fields_set__"))?.downcast()?;
-
-            let new_attrs = attrs.copy()?;
-            for key in new_attrs.keys() {
-                if !fields_set.contains(key)? {
-                    new_attrs.del_item(key)?;
-                }
+        let new_attrs = attrs.copy()?;
+        for key in new_attrs.keys() {
+            if !fields_set.contains(key)? {
+                new_attrs.del_item(key)?;
             }
-            Ok(new_attrs)
-        } else {
-            Ok(attrs)
         }
+        Ok(new_attrs)
     } else {
         Ok(attrs)
-    }
-}
-
-fn get_pydantic_extra(value: &PyAny) -> Option<&PyMapping> {
-    let extra = match value.getattr(intern!(value.py(), "__pydantic_extra__")) {
-        Ok(extra) => extra,
-        Err(_) => return None,
-    };
-    match extra.downcast::<PyMapping>() {
-        Ok(attrs) => Some(attrs),
-        Err(_) => None,
     }
 }

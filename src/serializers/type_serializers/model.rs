@@ -9,10 +9,10 @@ use ahash::AHashMap;
 use crate::build_tools::{py_error_type, ExtraBehavior, SchemaDict};
 use crate::definitions::DefinitionsBuilder;
 
-use super::typed_dict::TypedDictSerializer;
+use super::typed_dict::{FieldSerializer, TypedDictSerializer};
 use super::{
     infer_json_key, infer_json_key_known, infer_serialize, infer_to_python, object_to_dict, py_err_se_err,
-    BuildSerializer, CombinedSerializer, ComputedFields, Extra, FieldSerializer, ObType, SerCheck, TypeSerializer,
+    BuildSerializer, CombinedSerializer, ComputedFields, Extra, ObType, SerCheck, TypeSerializer,
 };
 
 pub struct ModelFieldsBuilder;
@@ -114,13 +114,19 @@ impl TypeSerializer for ModelSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
+        let py = value.py();
         let extra = Extra {
             model: Some(value),
             ..*extra
         };
         if self.allow_value(value, &extra)? {
             let dict = object_to_dict(value, true, &extra)?;
-            self.serializer.to_python(dict, include, exclude, &extra)
+            if let Some(pydantic_extra) = get_pydantic_extra(value) {
+                let py_tuple = (dict, pydantic_extra).to_object(py);
+                self.serializer.to_python(py_tuple.as_ref(py), include, exclude, &extra)
+            } else {
+                self.serializer.to_python(dict, include, exclude, &extra)
+            }
         } else {
             extra.warnings.on_fallback_py(self.get_name(), value, &extra)?;
             infer_to_python(value, include, exclude, &extra)
@@ -164,5 +170,16 @@ impl TypeSerializer for ModelSerializer {
 
     fn retry_with_lax_check(&self) -> bool {
         true
+    }
+}
+
+fn get_pydantic_extra(value: &PyAny) -> Option<&PyDict> {
+    let extra = match value.getattr(intern!(value.py(), "__pydantic_extra__")) {
+        Ok(extra) => extra,
+        Err(_) => return None,
+    };
+    match extra.downcast::<PyDict>() {
+        Ok(attrs) => Some(attrs),
+        Err(_) => None,
     }
 }

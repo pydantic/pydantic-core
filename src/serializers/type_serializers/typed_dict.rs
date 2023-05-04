@@ -12,10 +12,86 @@ use crate::definitions::DefinitionsBuilder;
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::{
-    exclude_default, infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer,
-    CombinedSerializer, ComputedFields, Extra, FieldSerializer, PydanticSerializer, SchemaFilter, SerializeInfer,
-    TypeSerializer,
+    infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer,
+    ComputedFields, Extra, PydanticSerializer, SchemaFilter, SerializeInfer, TypeSerializer,
 };
+
+/// representation of a field for serialization
+#[derive(Debug, Clone)]
+pub(super) struct FieldSerializer {
+    pub key_py: Py<PyString>,
+    pub alias: Option<String>,
+    pub alias_py: Option<Py<PyString>>,
+    // None serializer means exclude
+    pub serializer: Option<CombinedSerializer>,
+    pub required: bool,
+}
+
+impl FieldSerializer {
+    pub fn new(
+        py: Python,
+        key_py: Py<PyString>,
+        alias: Option<String>,
+        serializer: Option<CombinedSerializer>,
+        required: bool,
+    ) -> Self {
+        let alias_py = alias.as_ref().map(|alias| PyString::new(py, alias.as_str()).into());
+        Self {
+            key_py,
+            alias,
+            alias_py,
+            serializer,
+            required,
+        }
+    }
+
+    pub fn get_key_py<'py>(&'py self, py: Python<'py>, extra: &Extra) -> &'py PyAny {
+        if extra.by_alias {
+            if let Some(ref alias_py) = self.alias_py {
+                return alias_py.as_ref(py);
+            }
+        }
+        self.key_py.as_ref(py)
+    }
+
+    pub fn get_key_json<'a>(&'a self, key_str: &'a str, extra: &Extra) -> Cow<'a, str> {
+        if extra.by_alias {
+            if let Some(ref alias) = self.alias {
+                return Cow::Borrowed(alias.as_str());
+            }
+        }
+        Cow::Borrowed(key_str)
+    }
+
+    pub fn to_python(
+        &self,
+        output_dict: &PyDict,
+        value: &PyAny,
+        next_include: Option<&PyAny>,
+        next_exclude: Option<&PyAny>,
+        extra: &Extra,
+    ) -> PyResult<()> {
+        if let Some(ref serializer) = self.serializer {
+            if !exclude_default(value, extra, serializer)? {
+                let value = serializer.to_python(value, next_include, next_exclude, extra)?;
+                let output_key = self.get_key_py(output_dict.py(), extra);
+                output_dict.set_item(output_key, value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn exclude_default(value: &PyAny, extra: &Extra, serializer: &CombinedSerializer) -> PyResult<bool> {
+    if extra.exclude_defaults {
+        if let Some(default) = serializer.get_default(value.py())? {
+            if value.eq(default)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
 
 #[derive(Debug, Clone)]
 pub struct TypedDictSerializer {
@@ -114,56 +190,66 @@ impl TypeSerializer for TypedDictSerializer {
             model: extra.model.map_or_else(|| Some(value), Some),
             ..*extra
         };
-        match value.downcast::<PyDict>() {
-            Ok(py_dict) => {
-                // NOTE! we maintain the order of the input dict assuming that's right
-                let output_dict = PyDict::new(py);
-                let mut used_req_fields: usize = 0;
+        let (main_dict, extra_dict) = if let Ok(main_dict) = value.downcast::<PyDict>() {
+            (main_dict, None)
+        } else if let Ok((main_dict, extra_dict)) = value.extract::<(&PyDict, &PyDict)>() {
+            (main_dict, Some(extra_dict))
+        } else {
+            td_extra.warnings.on_fallback_py(self.get_name(), value, &td_extra)?;
+            return infer_to_python(value, include, exclude, &td_extra);
+        };
 
-                for (key, value) in py_dict {
-                    if extra.exclude_none && value.is_none() {
+        // NOTE! we maintain the order of the input dict assuming that's right
+        let output_dict = PyDict::new(py);
+        let mut used_req_fields: usize = 0;
+
+        for (key, value) in main_dict {
+            if extra.exclude_none && value.is_none() {
+                continue;
+            }
+            if let Some((next_include, next_exclude)) = self.filter.key_filter(key, include, exclude)? {
+                let extra = Extra {
+                    field_name: Some(key.extract()?),
+                    ..td_extra
+                };
+                if let Ok(key_py_str) = key.downcast::<PyString>() {
+                    let key_str = key_py_str.to_str()?;
+                    if let Some(field) = self.fields.get(key_str) {
+                        field.to_python(output_dict, value, next_include, next_exclude, &extra)?;
+
+                        if field.required {
+                            used_req_fields += 1;
+                        }
                         continue;
                     }
-                    if let Some((next_include, next_exclude)) = self.filter.key_filter(key, include, exclude)? {
-                        let extra = Extra {
-                            field_name: Some(key.extract()?),
-                            ..td_extra
-                        };
-                        if let Ok(key_py_str) = key.downcast::<PyString>() {
-                            let key_str = key_py_str.to_str()?;
-                            if let Some(field) = self.fields.get(key_str) {
-                                field.to_python(output_dict, value, next_include, next_exclude, &extra)?;
-
-                                if field.required {
-                                    used_req_fields += 1;
-                                }
-                                continue;
-                            }
-                        }
-                        if self.include_extra {
-                            // TODO test this
-                            let value = infer_to_python(value, next_include, next_exclude, &extra)?;
-                            output_dict.set_item(key, value)?;
-                        } else if extra.check.enabled() {
-                            return Err(PydanticSerializationUnexpectedValue::new_err(None));
-                        }
-                    }
                 }
-                if td_extra.check.enabled() && self.required_fields != used_req_fields {
+                if self.include_extra {
+                    // TODO test this
+                    let value = infer_to_python(value, next_include, next_exclude, &extra)?;
+                    output_dict.set_item(key, value)?;
+                } else if extra.check.enabled() {
                     return Err(PydanticSerializationUnexpectedValue::new_err(None));
                 }
-                if let Some(ref computed_fields) = self.computed_fields {
-                    if let Some(model) = td_extra.model {
-                        computed_fields.to_python(model, output_dict, &self.filter, include, exclude, extra)?;
-                    }
-                }
-                Ok(output_dict.into_py(py))
-            }
-            Err(_) => {
-                td_extra.warnings.on_fallback_py(self.get_name(), value, &td_extra)?;
-                infer_to_python(value, include, exclude, &td_extra)
             }
         }
+        // this is just used
+        if let Some(extra_dict) = extra_dict {
+            for (key, value) in extra_dict.iter() {
+                if let Some((next_include, next_exclude)) = self.filter.key_filter(key, include, exclude)? {
+                    let value = infer_to_python(value, next_include, next_exclude, &td_extra)?;
+                    output_dict.set_item(key, value)?;
+                }
+            }
+        }
+        if td_extra.check.enabled() && self.required_fields != used_req_fields {
+            return Err(PydanticSerializationUnexpectedValue::new_err(None));
+        }
+        if let Some(ref computed_fields) = self.computed_fields {
+            if let Some(model) = td_extra.model {
+                computed_fields.to_python(model, output_dict, &self.filter, include, exclude, &td_extra)?;
+            }
+        }
+        Ok(output_dict.into_py(py))
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {

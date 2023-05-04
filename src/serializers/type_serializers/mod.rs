@@ -27,7 +27,6 @@ pub(self) use super::computed_fields::ComputedFields;
 pub(self) use super::config::utf8_py_error;
 pub(self) use super::errors::{py_err_se_err, PydanticSerializationError};
 pub(self) use super::extra::{Extra, ExtraOwned, SerCheck, SerMode};
-pub(self) use super::fields::{exclude_default, FieldSerializer};
 pub(self) use super::filter::{AnyFilter, SchemaFilter};
 pub(self) use super::infer::{
     infer_json_key, infer_json_key_known, infer_serialize, infer_serialize_known, infer_to_python,
