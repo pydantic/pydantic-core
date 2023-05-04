@@ -643,3 +643,28 @@ def subclass_validation_error():
     e = MyValidationError('testing', [])
     assert e.body == 123
     assert e.title == 'testing'
+
+
+def test_merge() -> None:
+    v1 = ValidationError('foo', [{'type': 'greater_than', 'loc': ('a', 2), 'input': 4, 'ctx': {'gt': 5}}], 'json')
+    v2 = ValidationError('foo', [{'type': 'greater_than', 'loc': ('a',), 'input': 1, 'ctx': {'gt': 0}}], 'python')
+
+    m = v1.merge(v2)
+    assert m.errors() == [
+        {
+            'type': 'greater_than',
+            'loc': (2, 'a'),
+            'msg': 'Input should be greater than 5',
+            'input': 4,
+            'ctx': {'gt': 5},
+            'url': f'https://errors.pydantic.dev/{__version__}/v/greater_than',
+        },
+        {
+            'type': 'greater_than',
+            'loc': ('a',),
+            'msg': 'Input should be greater than 0',
+            'input': 1,
+            'ctx': {'gt': 0},
+            'url': f'https://errors.pydantic.dev/{__version__}/v/greater_than',
+        },
+    ]

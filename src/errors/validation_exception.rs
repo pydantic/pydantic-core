@@ -201,6 +201,23 @@ impl ValidationError {
         Ok(PyString::new(py, s))
     }
 
+    #[pyo3(signature = (other, /))]
+    pub fn merge(&mut self, py: Python, other: Py<ValidationError>) -> PyResult<Py<Self>> {
+        let other: ValidationError = other.extract(py)?;
+        let res = ValidationError {
+            title: self.title.clone(),
+            line_errors: self
+                .line_errors
+                .iter()
+                .cloned()
+                .chain(other.line_errors.into_iter())
+                .clone()
+                .collect(),
+            error_mode: self.error_mode.clone(),
+        };
+        Py::new(py, res)
+    }
+
     fn __repr__(&self, py: Python) -> String {
         self.display(py, None)
     }
