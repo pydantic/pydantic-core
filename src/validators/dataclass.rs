@@ -300,9 +300,11 @@ impl Validator for DataclassArgsValidator {
         }
         if errors.is_empty() {
             if let Some(init_only_args) = init_only_args {
-                Ok((output_dict, PyTuple::new(py, init_only_args)).to_object(py))
+                // TODO: Better support extra='allow'; this makes pydantic's root_validator work
+                Ok((output_dict, py.None(), PyTuple::new(py, init_only_args)).to_object(py))
             } else {
-                Ok((output_dict, py.None()).to_object(py))
+                // TODO: Better support extra='allow'; this makes pydantic's root_validator work
+                Ok((output_dict, py.None(), py.None()).to_object(py))
             }
         } else {
             Err(ValError::LineErrors(errors))
@@ -591,7 +593,8 @@ impl DataclassValidator {
         val_output: PyObject,
         input: &'data impl Input<'data>,
     ) -> ValResult<'data, ()> {
-        let (dc_dict, post_init_kwargs): (&PyAny, &PyAny) = val_output.extract(py)?;
+        // TODO: Adding _extra here makes root_validator work, but maybe we should use it?
+        let (dc_dict, _extra, post_init_kwargs): (&PyAny, &PyAny, &PyAny) = val_output.extract(py)?;
         force_setattr(py, dc, intern!(py, "__dict__"), dc_dict)?;
 
         if let Some(ref post_init) = self.post_init {
