@@ -52,6 +52,7 @@ pub struct WithDefaultValidator {
     on_error: OnError,
     validator: Box<CombinedValidator>,
     validate_default: bool,
+    copy_default: bool,
     name: String,
 }
 
@@ -81,6 +82,23 @@ impl BuildValidator for WithDefaultValidator {
 
         let sub_schema: &PyAny = schema.get_as_req(intern!(schema.py(), "schema"))?;
         let validator = Box::new(build_validator(sub_schema, config, definitions)?);
+
+        let copy_default = {
+            if let DefaultType::Default(default_obj) = &default {
+                let hash_value = default_obj
+                    .getattr(py, intern!(py, "__hash__"))
+                    .unwrap_or(py.NotImplemented());
+                hash_value.is_none(py) || hash_value.is(&py.NotImplemented())
+            } else {
+                false
+            }
+        };
+        if copy_default {
+            let message = format!("`{}` has a mutable default value that will be copied. Consider using `default_factory` instead for finer control.", validator.get_name());
+            let user_warning_type = py.import("builtins")?.getattr("UserWarning")?;
+            PyErr::warn(py, user_warning_type, &message, 0)?;
+        }
+
         let name = format!("{}[{}]", Self::EXPECTED_TYPE, validator.get_name());
 
         Ok(Self {
@@ -88,6 +106,7 @@ impl BuildValidator for WithDefaultValidator {
             on_error,
             validator,
             validate_default: schema_or_config_same(schema, config, intern!(py, "validate_default"))?.unwrap_or(false),
+            copy_default,
             name,
         }
         .into())
@@ -124,7 +143,13 @@ impl Validator for WithDefaultValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, Option<PyObject>> {
         match self.default.default_value(py)? {
-            Some(dft) => {
+            Some(stored_dft) => {
+                let dft: Py<PyAny> = if self.copy_default {
+                    let deepcopy_func = py.import("copy")?.getattr("deepcopy")?;
+                    deepcopy_func.call1((&stored_dft,))?.into_py(py)
+                } else {
+                    stored_dft
+                };
                 if self.validate_default {
                     match self.validate(py, dft.into_ref(py), extra, definitions, recursion_guard) {
                         Ok(v) => Ok(Some(v)),
