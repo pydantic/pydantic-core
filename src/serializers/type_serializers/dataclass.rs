@@ -4,11 +4,11 @@ use pyo3::types::{PyDict, PyList, PyString};
 
 use ahash::AHashMap;
 
-use crate::build_tools::{py_error_type, SchemaDict};
+use crate::build_tools::{py_error_type, ExtraBehavior, SchemaDict};
 use crate::definitions::DefinitionsBuilder;
 
 use super::model::ModelSerializer;
-use super::{BuildSerializer, CombinedSerializer, ComputedFields, GeneralFieldsSerializer, SerField};
+use super::{BuildSerializer, CombinedSerializer, ComputedFields, FieldsMode, GeneralFieldsSerializer, SerField};
 
 pub struct DataclassArgsBuilder;
 
@@ -24,6 +24,11 @@ impl BuildSerializer for DataclassArgsBuilder {
 
         let fields_list: &PyList = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: AHashMap<String, SerField> = AHashMap::with_capacity(fields_list.len());
+
+        let fields_mode = match ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)? {
+            ExtraBehavior::Allow => FieldsMode::TypedDictAllow,
+            _ => FieldsMode::SimpleDict,
+        };
 
         for (index, item) in fields_list.iter().enumerate() {
             let field_info: &PyDict = item.downcast()?;
@@ -45,7 +50,7 @@ impl BuildSerializer for DataclassArgsBuilder {
 
         let computed_fields = ComputedFields::new(schema)?;
 
-        Ok(GeneralFieldsSerializer::new(fields, false, computed_fields).into())
+        Ok(GeneralFieldsSerializer::new(fields, fields_mode, computed_fields).into())
     }
 }
 

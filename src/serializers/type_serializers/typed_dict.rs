@@ -7,7 +7,7 @@ use ahash::AHashMap;
 use crate::build_tools::{py_error_type, schema_or_config, ExtraBehavior, SchemaDict};
 use crate::definitions::DefinitionsBuilder;
 
-use super::{BuildSerializer, CombinedSerializer, ComputedFields, GeneralFieldsSerializer, SerField};
+use super::{BuildSerializer, CombinedSerializer, ComputedFields, FieldsMode, GeneralFieldsSerializer, SerField};
 
 #[derive(Debug, Clone)]
 pub struct TypedDictBuilder;
@@ -25,10 +25,10 @@ impl BuildSerializer for TypedDictBuilder {
         let total =
             schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
 
-        let include_extra = matches!(
-            ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?,
-            ExtraBehavior::Allow
-        );
+        let fields_mode = match ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)? {
+            ExtraBehavior::Allow => FieldsMode::TypedDictAllow,
+            _ => FieldsMode::SimpleDict,
+        };
 
         let fields_dict: &PyDict = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: AHashMap<String, SerField> = AHashMap::with_capacity(fields_dict.len());
@@ -55,6 +55,6 @@ impl BuildSerializer for TypedDictBuilder {
 
         let computed_fields = ComputedFields::new(schema)?;
 
-        Ok(GeneralFieldsSerializer::new(fields, include_extra, computed_fields).into())
+        Ok(GeneralFieldsSerializer::new(fields, fields_mode, computed_fields).into())
     }
 }

@@ -11,8 +11,8 @@ use crate::definitions::DefinitionsBuilder;
 
 use super::{
     infer_json_key, infer_json_key_known, infer_serialize, infer_to_python, object_to_dict, py_err_se_err,
-    BuildSerializer, CombinedSerializer, ComputedFields, Extra, GeneralFieldsSerializer, ObType, SerCheck, SerField,
-    TypeSerializer,
+    BuildSerializer, CombinedSerializer, ComputedFields, Extra, FieldsMode, GeneralFieldsSerializer, ObType, SerCheck,
+    SerField, TypeSerializer,
 };
 
 pub struct ModelFieldsBuilder;
@@ -27,10 +27,10 @@ impl BuildSerializer for ModelFieldsBuilder {
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
-        let include_extra = matches!(
-            ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?,
-            ExtraBehavior::Allow
-        );
+        let fields_mode = match has_extra(schema, config)? {
+            true => FieldsMode::ModelExtra,
+            false => FieldsMode::SimpleDict,
+        };
 
         let fields_dict: &PyDict = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: AHashMap<String, SerField> = AHashMap::with_capacity(fields_dict.len());
@@ -57,7 +57,7 @@ impl BuildSerializer for ModelFieldsBuilder {
 
         let computed_fields = ComputedFields::new(schema)?;
 
-        Ok(GeneralFieldsSerializer::new(fields, include_extra, computed_fields).into())
+        Ok(GeneralFieldsSerializer::new(fields, fields_mode, computed_fields).into())
     }
 }
 
@@ -65,6 +65,7 @@ impl BuildSerializer for ModelFieldsBuilder {
 pub struct ModelSerializer {
     class: Py<PyType>,
     serializer: Box<CombinedSerializer>,
+    has_extra: bool,
     name: String,
 }
 
@@ -84,10 +85,17 @@ impl BuildSerializer for ModelSerializer {
         Ok(Self {
             class: class.into(),
             serializer,
+            has_extra: has_extra(schema, config)?,
             name: class.getattr(intern!(py, "__name__"))?.extract()?,
         }
         .into())
     }
+}
+
+fn has_extra(schema: &PyDict, config: Option<&PyDict>) -> PyResult<bool> {
+    let py = schema.py();
+    let extra_behaviour = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
+    Ok(matches!(extra_behaviour, ExtraBehavior::Allow))
 }
 
 impl ModelSerializer {
@@ -103,16 +111,12 @@ impl ModelSerializer {
         let py = value.py();
         let dict = object_to_dict(value, true, extra)?;
 
-        let model_extra = match value.getattr(intern!(py, "__pydantic_extra__")) {
-            Ok(model_extra) => model_extra,
-            Err(_) => return Ok(dict),
-        };
-
-        if model_extra.is_none() {
-            Ok(dict)
-        } else {
+        if self.has_extra {
+            let model_extra = value.getattr(intern!(py, "__pydantic_extra__"))?;
             let py_tuple = (dict, model_extra).to_object(py);
             Ok(py_tuple.into_ref(py))
+        } else {
+            Ok(dict)
         }
     }
 }

@@ -10,6 +10,7 @@ except ImportError:
     cached_property = None
 
 import pytest
+from dirty_equals import IsJson
 
 from pydantic_core import PydanticSerializationError, SchemaSerializer, SchemaValidator, core_schema
 
@@ -117,16 +118,21 @@ def test_model_allow_extra():
                 },
                 extra_behavior='allow',
             ),
+            extra_behavior='allow',
         )
     )
-    assert s.to_python(BasicModel(foo=1, bar=b'more')) == IsStrictDict(foo=1, bar=b'more')
-    assert s.to_python(BasicModel(bar=b'more', foo=1)) == IsStrictDict(bar=b'more', foo=1)
-    assert s.to_python(BasicModel(foo=1, c=3, bar=b'more')) == IsStrictDict(foo=1, c=3, bar=b'more')
-    assert s.to_python(BasicModel(bar=b'more', c=3, foo=1), mode='json') == IsStrictDict(bar='more', c=3, foo=1)
+    assert s.to_python(BasicModel(foo=1, bar=b'more', __pydantic_extra__=None)) == IsStrictDict(foo=1, bar=b'more')
+    assert s.to_python(BasicModel(bar=b'more', foo=1, __pydantic_extra__=None)) == IsStrictDict(bar=b'more', foo=1)
+    assert s.to_python(BasicModel(foo=1, __pydantic_extra__=dict(c=3), bar=b'more')) == IsStrictDict(
+        foo=1, bar=b'more', c=3
+    )
+    assert s.to_python(BasicModel(bar=b'more', __pydantic_extra__=dict(c=3, foo=1)), mode='json') == IsStrictDict(
+        bar='more', c=3, foo=1
+    )
 
-    j = s.to_json(BasicModel(bar=b'more', foo=1, c=3))
+    j = s.to_json(BasicModel(bar=b'more', foo=1, __pydantic_extra__=dict(c=3)))
     if on_pypy:
-        assert json.loads(j) == {'bar': 'more', 'foo': 1, 'c': 3}
+        assert j == IsJson({'bar': 'more', 'foo': 1, 'c': 3})
     else:
         assert j == b'{"bar":"more","foo":1,"c":3}'
 
@@ -759,6 +765,7 @@ def test_extra():
             },
             extra_behavior='allow',
         ),
+        extra_behavior='allow',
     )
     v = SchemaValidator(schema)
     m = v.validate_python({'field_a': b'test', 'field_b': 12, 'field_c': 'extra'})

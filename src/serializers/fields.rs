@@ -62,24 +62,6 @@ impl SerField {
         }
         Cow::Borrowed(key_str)
     }
-
-    pub fn to_python(
-        &self,
-        output_dict: &PyDict,
-        value: &PyAny,
-        next_include: Option<&PyAny>,
-        next_exclude: Option<&PyAny>,
-        extra: &Extra,
-    ) -> PyResult<()> {
-        if let Some(ref serializer) = self.serializer {
-            if !exclude_default(value, extra, serializer)? {
-                let value = serializer.to_python(value, next_include, next_exclude, extra)?;
-                let output_key = self.get_key_py(output_dict.py(), extra);
-                output_dict.set_item(output_key, value)?;
-            }
-        }
-        Ok(())
-    }
 }
 
 fn exclude_default(value: &PyAny, extra: &Extra, serializer: &CombinedSerializer) -> PyResult<bool> {
@@ -93,12 +75,22 @@ fn exclude_default(value: &PyAny, extra: &Extra, serializer: &CombinedSerializer
     Ok(false)
 }
 
+#[derive(Debug, Clone)]
+pub(super) enum FieldsMode {
+    // typeddict with no extra items
+    SimpleDict,
+    // a model - get `__dict__` and `__pydantic_extra__` - `GeneralFieldsSerializer` will get a tuple
+    ModelExtra,
+    // typeddict with extra items - one dict with extra items
+    TypedDictAllow,
+}
+
 /// General purpose serializer for fields - used by dataclasses, models and typed_dicts
 #[derive(Debug, Clone)]
 pub struct GeneralFieldsSerializer {
     fields: AHashMap<String, SerField>,
     computed_fields: Option<ComputedFields>,
-    include_extra: bool,
+    mode: FieldsMode,
     // isize because we look up filter via `.hash()` which returns an isize
     filter: SchemaFilter<isize>,
     required_fields: usize,
@@ -107,13 +99,13 @@ pub struct GeneralFieldsSerializer {
 impl GeneralFieldsSerializer {
     pub(super) fn new(
         fields: AHashMap<String, SerField>,
-        include_extra: bool,
+        mode: FieldsMode,
         computed_fields: Option<ComputedFields>,
     ) -> Self {
         let required_fields = fields.values().filter(|f| f.required).count();
         Self {
             fields,
-            include_extra,
+            mode,
             filter: SchemaFilter::default(),
             computed_fields,
             required_fields,
@@ -121,12 +113,25 @@ impl GeneralFieldsSerializer {
     }
 
     fn extract_dicts<'a>(&self, value: &'a PyAny) -> Option<(&'a PyDict, Option<&'a PyDict>)> {
-        if let Ok(main_dict) = value.downcast::<PyDict>() {
-            Some((main_dict, None))
-        } else if let Ok((main_dict, extra_dict)) = value.extract::<(&PyDict, &PyDict)>() {
-            Some((main_dict, Some(extra_dict)))
-        } else {
-            None
+        match self.mode {
+            FieldsMode::ModelExtra => {
+                if let Ok((main_dict, extra_dict)) = value.extract::<(&PyDict, &PyAny)>() {
+                    if let Ok(extra_dict) = extra_dict.downcast::<PyDict>() {
+                        Some((main_dict, Some(extra_dict)))
+                    } else {
+                        Some((main_dict, None))
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => {
+                if let Ok(main_dict) = value.downcast::<PyDict>() {
+                    Some((main_dict, None))
+                } else {
+                    None
+                }
+            }
         }
     }
 }
@@ -163,32 +168,39 @@ impl TypeSerializer for GeneralFieldsSerializer {
             return infer_to_python(value, include, exclude, &td_extra);
         };
 
-        // NOTE! we maintain the order of the input dict assuming that's right
         let output_dict = PyDict::new(py);
         let mut used_req_fields: usize = 0;
 
+        // NOTE! we maintain the order of the input dict assuming that's right
         for (key, value) in main_dict {
+            let key_str = key_str(key)?;
+            let op_field = self.fields.get(key_str);
             if extra.exclude_none && value.is_none() {
-                continue;
-            }
-            if let Some((next_include, next_exclude)) = self.filter.key_filter(key, include, exclude)? {
-                let extra = Extra {
-                    field_name: Some(key.extract()?),
-                    ..td_extra
-                };
-                if let Ok(key_py_str) = key.downcast::<PyString>() {
-                    let key_str = key_py_str.to_str()?;
-                    if let Some(field) = self.fields.get(key_str) {
-                        field.to_python(output_dict, value, next_include, next_exclude, &extra)?;
-
-                        if field.required {
-                            used_req_fields += 1;
-                        }
-                        continue;
+                if let Some(field) = op_field {
+                    if field.required {
+                        used_req_fields += 1;
                     }
                 }
-                if self.include_extra {
-                    // TODO test this
+                continue;
+            }
+            let extra = Extra {
+                field_name: Some(key_str),
+                ..td_extra
+            };
+            if let Some((next_include, next_exclude)) = self.filter.key_filter(key, include, exclude)? {
+                if let Some(field) = op_field {
+                    if let Some(ref serializer) = field.serializer {
+                        if !exclude_default(value, &extra, serializer)? {
+                            let value = serializer.to_python(value, next_include, next_exclude, &extra)?;
+                            let output_key = field.get_key_py(output_dict.py(), &extra);
+                            output_dict.set_item(output_key, value)?;
+                        }
+                    }
+
+                    if field.required {
+                        used_req_fields += 1;
+                    }
+                } else if matches!(self.mode, FieldsMode::TypedDictAllow) {
                     let value = infer_to_python(value, next_include, next_exclude, &extra)?;
                     output_dict.set_item(key, value)?;
                 } else if extra.check.enabled() {
@@ -242,40 +254,37 @@ impl TypeSerializer for GeneralFieldsSerializer {
             model: extra.model.map_or_else(|| Some(value), Some),
             ..*extra
         };
-        let expected_len = match self.include_extra {
-            true => main_dict.len() + option_length!(self.computed_fields),
-            false => self.fields.len() + option_length!(extra_dict) + option_length!(self.computed_fields),
+        let expected_len = match self.mode {
+            FieldsMode::TypedDictAllow => main_dict.len() + option_length!(self.computed_fields),
+            _ => self.fields.len() + option_length!(extra_dict) + option_length!(self.computed_fields),
         };
         // NOTE! As above, we maintain the order of the input dict assuming that's right
         // we don't both with `used_fields` here because on unions, `to_python(..., mode='json')` is used
         let mut map = serializer.serialize_map(Some(expected_len))?;
 
         for (key, value) in main_dict {
-            let extra = Extra {
-                field_name: Some(key.extract().map_err(py_err_se_err)?),
-                ..td_extra
-            };
             if extra.exclude_none && value.is_none() {
                 continue;
             }
+            let key_str = key_str(key).map_err(py_err_se_err)?;
+            let extra = Extra {
+                field_name: Some(key_str),
+                ..td_extra
+            };
+
             let filter = self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
             if let Some((next_include, next_exclude)) = filter {
-                if let Ok(key_py_str) = key.downcast::<PyString>() {
-                    let key_str = key_py_str.to_str().map_err(py_err_se_err)?;
-                    if let Some(field) = self.fields.get(key_str) {
-                        if let Some(ref serializer) = field.serializer {
-                            if !exclude_default(value, &extra, serializer).map_err(py_err_se_err)? {
-                                let s = PydanticSerializer::new(value, serializer, next_include, next_exclude, &extra);
-                                let output_key = field.get_key_json(key_str, &extra);
-                                map.serialize_entry(&output_key, &s)?;
-                            }
-                            continue;
+                if let Some(field) = self.fields.get(key_str) {
+                    if let Some(ref serializer) = field.serializer {
+                        if !exclude_default(value, &extra, serializer).map_err(py_err_se_err)? {
+                            let s = PydanticSerializer::new(value, serializer, next_include, next_exclude, &extra);
+                            let output_key = field.get_key_json(key_str, &extra);
+                            map.serialize_entry(&output_key, &s)?;
                         }
                     }
-                }
-                if self.include_extra {
-                    let s = SerializeInfer::new(value, include, exclude, &extra);
+                } else if matches!(self.mode, FieldsMode::TypedDictAllow) {
                     let output_key = infer_json_key(key, &extra).map_err(py_err_se_err)?;
+                    let s = SerializeInfer::new(value, next_include, next_exclude, &extra);
                     map.serialize_entry(&output_key, &s)?
                 }
             }
@@ -302,4 +311,8 @@ impl TypeSerializer for GeneralFieldsSerializer {
     fn get_name(&self) -> &str {
         "fields"
     }
+}
+
+fn key_str(key: &PyAny) -> PyResult<&str> {
+    key.downcast::<PyString>()?.to_str()
 }
