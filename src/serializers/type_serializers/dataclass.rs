@@ -8,8 +8,8 @@ use crate::build_tools::{py_error_type, SchemaDict};
 use crate::definitions::DefinitionsBuilder;
 
 use super::model::ModelSerializer;
-use super::typed_dict::{FieldSerializer, TypedDictSerializer};
-use super::{BuildSerializer, CombinedSerializer, ComputedFields};
+use super::typed_dict::TypedDictSerializer;
+use super::{BuildSerializer, CombinedSerializer, ComputedFields, FieldSerializer};
 
 pub struct DataclassArgsBuilder;
 

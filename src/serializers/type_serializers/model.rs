@@ -8,15 +8,11 @@ use ahash::AHashMap;
 
 use crate::build_tools::{py_error_type, ExtraBehavior, SchemaDict};
 use crate::definitions::DefinitionsBuilder;
-use crate::serializers::computed_fields::ComputedFields;
-use crate::serializers::extra::SerCheck;
-use crate::serializers::infer::{infer_serialize, infer_to_python};
-use crate::serializers::ob_type::ObType;
-use crate::serializers::type_serializers::typed_dict::{FieldSerializer, TypedDictSerializer};
 
+use super::typed_dict::TypedDictSerializer;
 use super::{
-    infer_json_key, infer_json_key_known, object_to_dict, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
-    TypeSerializer,
+    infer_json_key, infer_json_key_known, infer_serialize, infer_to_python, object_to_dict, py_err_se_err,
+    BuildSerializer, CombinedSerializer, ComputedFields, Extra, FieldSerializer, ObType, SerCheck, TypeSerializer,
 };
 
 pub struct ModelFieldsBuilder;

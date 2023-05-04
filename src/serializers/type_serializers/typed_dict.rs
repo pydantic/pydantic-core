@@ -4,7 +4,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
-use ahash::{AHashMap, AHashSet};
+use ahash::AHashMap;
 use serde::ser::SerializeMap;
 
 use crate::build_tools::{py_error_type, schema_or_config, ExtraBehavior, SchemaDict};
@@ -12,57 +12,10 @@ use crate::definitions::DefinitionsBuilder;
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::{
-    infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer,
-    ComputedFields, Extra, PydanticSerializer, SchemaFilter, SerializeInfer, TypeSerializer,
+    exclude_default, infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer,
+    CombinedSerializer, ComputedFields, Extra, FieldSerializer, PydanticSerializer, SchemaFilter, SerializeInfer,
+    TypeSerializer,
 };
-
-/// representation of a field for serialization, used by `TypedDictSerializer` and `ModelFieldsSerializer`
-#[derive(Debug, Clone)]
-pub(super) struct FieldSerializer {
-    key_py: Py<PyString>,
-    alias: Option<String>,
-    alias_py: Option<Py<PyString>>,
-    // None serializer means exclude
-    serializer: Option<CombinedSerializer>,
-    required: bool,
-}
-
-impl FieldSerializer {
-    pub(super) fn new(
-        py: Python,
-        key_py: Py<PyString>,
-        alias: Option<String>,
-        serializer: Option<CombinedSerializer>,
-        required: bool,
-    ) -> Self {
-        let alias_py = alias.as_ref().map(|alias| PyString::new(py, alias.as_str()).into());
-        Self {
-            key_py,
-            alias,
-            alias_py,
-            serializer,
-            required,
-        }
-    }
-
-    fn get_key_py<'py>(&'py self, py: Python<'py>, extra: &Extra) -> &'py PyAny {
-        if extra.by_alias {
-            if let Some(ref alias_py) = self.alias_py {
-                return alias_py.as_ref(py);
-            }
-        }
-        self.key_py.as_ref(py)
-    }
-
-    fn get_key_json<'a>(&'a self, key_str: &'a str, extra: &Extra) -> Cow<'a, str> {
-        if extra.by_alias {
-            if let Some(ref alias) = self.alias {
-                return Cow::Borrowed(alias.as_str());
-            }
-        }
-        Cow::Borrowed(key_str)
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct TypedDictSerializer {
@@ -71,6 +24,7 @@ pub struct TypedDictSerializer {
     include_extra: bool,
     // isize because we look up filter via `.hash()` which returns an isize
     filter: SchemaFilter<isize>,
+    required_fields: usize,
 }
 
 impl BuildSerializer for TypedDictSerializer {
@@ -126,11 +80,13 @@ impl TypedDictSerializer {
         include_extra: bool,
         computed_fields: Option<ComputedFields>,
     ) -> Self {
+        let required_fields = fields.values().filter(|f| f.required).count();
         Self {
             fields,
             include_extra,
             filter: SchemaFilter::default(),
             computed_fields,
+            required_fields,
         }
     }
 
@@ -139,17 +95,6 @@ impl TypedDictSerializer {
             None => 0,
             Some(ref computed_fields) => computed_fields.len(),
         }
-    }
-
-    fn exclude_default(&self, value: &PyAny, extra: &Extra, serializer: &CombinedSerializer) -> PyResult<bool> {
-        if extra.exclude_defaults {
-            if let Some(default) = serializer.get_default(value.py())? {
-                if value.eq(default)? {
-                    return Ok(true);
-                }
-            }
-        }
-        Ok(false)
     }
 }
 
@@ -173,11 +118,7 @@ impl TypeSerializer for TypedDictSerializer {
             Ok(py_dict) => {
                 // NOTE! we maintain the order of the input dict assuming that's right
                 let output_dict = PyDict::new(py);
-                let mut used_fields = if td_extra.check.enabled() {
-                    Some(AHashSet::with_capacity(self.fields.len()))
-                } else {
-                    None
-                };
+                let mut used_req_fields: usize = 0;
 
                 for (key, value) in py_dict {
                     if extra.exclude_none && value.is_none() {
@@ -191,19 +132,10 @@ impl TypeSerializer for TypedDictSerializer {
                         if let Ok(key_py_str) = key.downcast::<PyString>() {
                             let key_str = key_py_str.to_str()?;
                             if let Some(field) = self.fields.get(key_str) {
-                                let serializer = match field.serializer {
-                                    Some(ref serializer) => serializer,
-                                    None => continue,
-                                };
-                                if self.exclude_default(value, &extra, serializer)? {
-                                    continue;
-                                }
-                                let value = serializer.to_python(value, next_include, next_exclude, &extra)?;
-                                let output_key = field.get_key_py(py, &extra);
-                                output_dict.set_item(output_key, value)?;
+                                field.to_python(output_dict, value, next_include, next_exclude, &extra)?;
 
-                                if let Some(ref mut used_fields) = used_fields {
-                                    used_fields.insert(key_str);
+                                if field.required {
+                                    used_req_fields += 1;
                                 }
                                 continue;
                             }
@@ -217,14 +149,8 @@ impl TypeSerializer for TypedDictSerializer {
                         }
                     }
                 }
-                if let Some(ref used_fields) = used_fields {
-                    let unused_fields = self
-                        .fields
-                        .iter()
-                        .any(|(k, v)| v.required && !used_fields.contains(k.as_str()));
-                    if unused_fields {
-                        return Err(PydanticSerializationUnexpectedValue::new_err(None));
-                    }
+                if td_extra.check.enabled() && self.required_fields != used_req_fields {
+                    return Err(PydanticSerializationUnexpectedValue::new_err(None));
                 }
                 if let Some(ref computed_fields) = self.computed_fields {
                     if let Some(model) = td_extra.model {
@@ -283,16 +209,19 @@ impl TypeSerializer for TypedDictSerializer {
                         if let Ok(key_py_str) = key.downcast::<PyString>() {
                             let key_str = key_py_str.to_str().map_err(py_err_se_err)?;
                             if let Some(field) = self.fields.get(key_str) {
-                                let serializer = match field.serializer {
-                                    Some(ref serializer) => serializer,
-                                    None => continue,
-                                };
-                                if self.exclude_default(value, &extra, serializer).map_err(py_err_se_err)? {
-                                    continue;
+                                if let Some(ref serializer) = field.serializer {
+                                    if !exclude_default(value, &extra, serializer).map_err(py_err_se_err)? {
+                                        let s = PydanticSerializer::new(
+                                            value,
+                                            serializer,
+                                            next_include,
+                                            next_exclude,
+                                            &extra,
+                                        );
+                                        let output_key = field.get_key_json(key_str, &extra);
+                                        map.serialize_entry(&output_key, &s)?;
+                                    }
                                 }
-                                let output_key = field.get_key_json(key_str, &extra);
-                                let s = PydanticSerializer::new(value, serializer, next_include, next_exclude, &extra);
-                                map.serialize_entry(&output_key, &s)?;
                                 continue;
                             }
                         }
