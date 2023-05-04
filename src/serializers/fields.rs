@@ -93,6 +93,7 @@ fn exclude_default(value: &PyAny, extra: &Extra, serializer: &CombinedSerializer
     Ok(false)
 }
 
+/// General purpose serializer for fields - used by dataclasses, models and typed_dicts
 #[derive(Debug, Clone)]
 pub struct GeneralFieldsSerializer {
     fields: AHashMap<String, SerField>,
@@ -119,12 +120,24 @@ impl GeneralFieldsSerializer {
         }
     }
 
-    pub fn n_computed_fields(&self) -> usize {
-        match self.computed_fields {
-            None => 0,
-            Some(ref computed_fields) => computed_fields.len(),
+    fn extract_dicts<'a>(&self, value: &'a PyAny) -> Option<(&'a PyDict, Option<&'a PyDict>)> {
+        if let Ok(main_dict) = value.downcast::<PyDict>() {
+            Some((main_dict, None))
+        } else if let Ok((main_dict, extra_dict)) = value.extract::<(&PyDict, &PyDict)>() {
+            Some((main_dict, Some(extra_dict)))
+        } else {
+            None
         }
     }
+}
+
+macro_rules! option_length {
+    ($op_has_len:expr) => {
+        match $op_has_len {
+            Some(ref has_len) => has_len.len(),
+            None => 0,
+        }
+    };
 }
 
 impl TypeSerializer for GeneralFieldsSerializer {
@@ -143,10 +156,8 @@ impl TypeSerializer for GeneralFieldsSerializer {
             model: extra.model.map_or_else(|| Some(value), Some),
             ..*extra
         };
-        let (main_dict, extra_dict) = if let Ok(main_dict) = value.downcast::<PyDict>() {
-            (main_dict, None)
-        } else if let Ok((main_dict, extra_dict)) = value.extract::<(&PyDict, &PyDict)>() {
-            (main_dict, Some(extra_dict))
+        let (main_dict, extra_dict) = if let Some(main_extra_dict) = self.extract_dicts(value) {
+            main_extra_dict
         } else {
             td_extra.warnings.on_fallback_py(self.get_name(), value, &td_extra)?;
             return infer_to_python(value, include, exclude, &td_extra);
@@ -217,72 +228,75 @@ impl TypeSerializer for GeneralFieldsSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        match value.downcast::<PyDict>() {
-            Ok(py_dict) => {
-                // If there is already a model registered (from a dataclass, BaseModel)
-                // then do not touch it
-                // If there is no model, we (a TypedDict) are the model
-                let td_extra = Extra {
-                    model: extra.model.map_or_else(|| Some(value), Some),
-                    ..*extra
-                };
-                let expected_len = match self.include_extra {
-                    true => py_dict.len(),
-                    false => self.fields.len() + self.n_computed_fields(),
-                };
-                // NOTE! As above, we maintain the order of the input dict assuming that's right
-                // we don't both with `used_fields` here because on unions, `to_python(..., mode='json')` is used
-                let mut map = serializer.serialize_map(Some(expected_len))?;
+        let (main_dict, extra_dict) = if let Some(main_extra_dict) = self.extract_dicts(value) {
+            main_extra_dict
+        } else {
+            extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
+            return infer_serialize(value, serializer, include, exclude, extra);
+        };
 
-                for (key, value) in py_dict {
-                    let extra = Extra {
-                        field_name: Some(key.extract().map_err(py_err_se_err)?),
-                        ..td_extra
-                    };
-                    if extra.exclude_none && value.is_none() {
-                        continue;
-                    }
-                    if let Some((next_include, next_exclude)) =
-                        self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?
-                    {
-                        if let Ok(key_py_str) = key.downcast::<PyString>() {
-                            let key_str = key_py_str.to_str().map_err(py_err_se_err)?;
-                            if let Some(field) = self.fields.get(key_str) {
-                                if let Some(ref serializer) = field.serializer {
-                                    if !exclude_default(value, &extra, serializer).map_err(py_err_se_err)? {
-                                        let s = PydanticSerializer::new(
-                                            value,
-                                            serializer,
-                                            next_include,
-                                            next_exclude,
-                                            &extra,
-                                        );
-                                        let output_key = field.get_key_json(key_str, &extra);
-                                        map.serialize_entry(&output_key, &s)?;
-                                    }
-                                }
-                                continue;
-                            }
-                        }
-                        if self.include_extra {
-                            let s = SerializeInfer::new(value, include, exclude, &extra);
-                            let output_key = infer_json_key(key, &extra).map_err(py_err_se_err)?;
-                            map.serialize_entry(&output_key, &s)?
-                        }
-                    }
-                }
-                if let Some(ref computed_fields) = self.computed_fields {
-                    if let Some(model) = td_extra.model {
-                        computed_fields.serde_serialize::<S>(model, &mut map, &self.filter, include, exclude, extra)?;
-                    }
-                }
-                map.end()
+        // If there is already a model registered (from a dataclass, BaseModel)
+        // then do not touch it
+        // If there is no model, we (a TypedDict) are the model
+        let td_extra = Extra {
+            model: extra.model.map_or_else(|| Some(value), Some),
+            ..*extra
+        };
+        let expected_len = match self.include_extra {
+            true => main_dict.len() + option_length!(self.computed_fields),
+            false => self.fields.len() + option_length!(extra_dict) + option_length!(self.computed_fields),
+        };
+        // NOTE! As above, we maintain the order of the input dict assuming that's right
+        // we don't both with `used_fields` here because on unions, `to_python(..., mode='json')` is used
+        let mut map = serializer.serialize_map(Some(expected_len))?;
+
+        for (key, value) in main_dict {
+            let extra = Extra {
+                field_name: Some(key.extract().map_err(py_err_se_err)?),
+                ..td_extra
+            };
+            if extra.exclude_none && value.is_none() {
+                continue;
             }
-            Err(_) => {
-                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
-                infer_serialize(value, serializer, include, exclude, extra)
+            let filter = self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
+            if let Some((next_include, next_exclude)) = filter {
+                if let Ok(key_py_str) = key.downcast::<PyString>() {
+                    let key_str = key_py_str.to_str().map_err(py_err_se_err)?;
+                    if let Some(field) = self.fields.get(key_str) {
+                        if let Some(ref serializer) = field.serializer {
+                            if !exclude_default(value, &extra, serializer).map_err(py_err_se_err)? {
+                                let s = PydanticSerializer::new(value, serializer, next_include, next_exclude, &extra);
+                                let output_key = field.get_key_json(key_str, &extra);
+                                map.serialize_entry(&output_key, &s)?;
+                            }
+                            continue;
+                        }
+                    }
+                }
+                if self.include_extra {
+                    let s = SerializeInfer::new(value, include, exclude, &extra);
+                    let output_key = infer_json_key(key, &extra).map_err(py_err_se_err)?;
+                    map.serialize_entry(&output_key, &s)?
+                }
             }
         }
+        // this is used to include `__pydantic_extra__` in serialization on models
+        if let Some(extra_dict) = extra_dict {
+            for (key, value) in extra_dict.iter() {
+                let filter = self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
+                if let Some((next_include, next_exclude)) = filter {
+                    let output_key = infer_json_key(key, &td_extra).map_err(py_err_se_err)?;
+                    let s = SerializeInfer::new(value, next_include, next_exclude, &td_extra);
+                    map.serialize_entry(&output_key, &s)?
+                }
+            }
+        }
+        if let Some(ref computed_fields) = self.computed_fields {
+            if let Some(model) = td_extra.model {
+                computed_fields.serde_serialize::<S>(model, &mut map, &self.filter, include, exclude, &td_extra)?;
+            }
+        }
+        map.end()
     }
 
     fn get_name(&self) -> &str {

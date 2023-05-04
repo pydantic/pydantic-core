@@ -754,18 +754,20 @@ def test_extra():
         MyModel,
         core_schema.model_fields_schema(
             {
-                'field_a': core_schema.model_field(core_schema.str_schema()),
+                'field_a': core_schema.model_field(core_schema.bytes_schema()),
                 'field_b': core_schema.model_field(core_schema.int_schema()),
             },
             extra_behavior='allow',
         ),
     )
     v = SchemaValidator(schema)
-    m = v.validate_python({'field_a': 'test', 'field_b': 12, 'field_c': 'extra'})
+    m = v.validate_python({'field_a': b'test', 'field_b': 12, 'field_c': 'extra'})
     assert isinstance(m, MyModel)
-    assert m.__dict__ == {'field_a': 'test', 'field_b': 12}
+    assert m.__dict__ == {'field_a': b'test', 'field_b': 12}
     assert m.__pydantic_extra__ == {'field_c': 'extra'}
     assert m.__pydantic_fields_set__ == {'field_a', 'field_b', 'field_c'}
 
     s = SchemaSerializer(schema)
-    assert s.to_python(m) == {'field_a': 'test', 'field_b': 12, 'field_c': 'extra'}
+    assert s.to_python(m) == {'field_a': b'test', 'field_b': 12, 'field_c': 'extra'}
+    assert s.to_python(m, mode='json') == {'field_a': 'test', 'field_b': 12, 'field_c': 'extra'}
+    assert s.to_json(m) == b'{"field_a":"test","field_b":12,"field_c":"extra"}'

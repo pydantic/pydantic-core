@@ -280,10 +280,34 @@ def test_core_model_py(benchmark, basic_model_serializer):
     benchmark(basic_model_serializer.to_python, m)
 
 
+@pytest.mark.benchmark(group='model-python')
+def test_core_model_py_extra(benchmark, basic_model_serializer):
+    m = BasicModel(a=1, b=2, c=3, d=4, e=5, f=6, g=7, h=8, __pydantic_extra__={'i': 9})
+    assert basic_model_serializer.to_python(m) == {
+        'a': 1,
+        'b': 2,
+        'c': 3,
+        'd': 4,
+        'e': 5,
+        'f': 6,
+        'g': 7,
+        'h': 8,
+        'i': 9,
+    }
+    benchmark(basic_model_serializer.to_python, m)
+
+
 @pytest.mark.benchmark(group='model-json')
 def test_core_model_json(benchmark, basic_model_serializer):
     m = BasicModel(a=1, b=2, c=3, d=4, e=5, f=6, g=7, h=8)
     assert basic_model_serializer.to_json(m) == b'{"a":1,"b":2,"c":3,"d":4,"e":5,"f":6,"g":7,"h":8}'
+    benchmark(basic_model_serializer.to_json, m)
+
+
+@pytest.mark.benchmark(group='model-json')
+def test_core_model_json_extra(benchmark, basic_model_serializer):
+    m = BasicModel(a=1, b=2, c=3, d=4, e=5, f=6, g=7, h=8, __pydantic_extra__={'i': 9})
+    assert basic_model_serializer.to_json(m) == b'{"a":1,"b":2,"c":3,"d":4,"e":5,"f":6,"g":7,"h":8,"i":9}'
     benchmark(basic_model_serializer.to_json, m)
 
 

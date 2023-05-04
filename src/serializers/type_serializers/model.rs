@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
-use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString, PyType};
+use pyo3::{intern, PyTraverseError, PyVisit};
 
 use ahash::AHashMap;
 
@@ -98,10 +98,27 @@ impl ModelSerializer {
             SerCheck::None => value.hasattr(intern!(value.py(), "__dict__")),
         }
     }
+
+    fn get_inner_value<'py>(&self, value: &'py PyAny, extra: &Extra) -> PyResult<&'py PyAny> {
+        let py = value.py();
+        let dict = object_to_dict(value, true, extra)?;
+
+        let model_extra = match value.getattr(intern!(py, "__pydantic_extra__")) {
+            Ok(model_extra) => model_extra,
+            Err(_) => return Ok(dict),
+        };
+
+        if model_extra.is_none() {
+            Ok(dict)
+        } else {
+            let py_tuple = (dict, model_extra).to_object(py);
+            Ok(py_tuple.into_ref(py))
+        }
+    }
 }
 
 impl TypeSerializer for ModelSerializer {
-    fn py_gc_traverse(&self, visit: &pyo3::PyVisit<'_>) -> Result<(), pyo3::PyTraverseError> {
+    fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
         visit.call(&self.class)?;
         self.serializer.py_gc_traverse(visit)?;
         Ok(())
@@ -114,19 +131,13 @@ impl TypeSerializer for ModelSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let py = value.py();
         let extra = Extra {
             model: Some(value),
             ..*extra
         };
         if self.allow_value(value, &extra)? {
-            let dict = object_to_dict(value, true, &extra)?;
-            if let Some(pydantic_extra) = get_pydantic_extra(value) {
-                let py_tuple = (dict, pydantic_extra).to_object(py);
-                self.serializer.to_python(py_tuple.as_ref(py), include, exclude, &extra)
-            } else {
-                self.serializer.to_python(dict, include, exclude, &extra)
-            }
+            let inner_value = self.get_inner_value(value, &extra)?;
+            self.serializer.to_python(inner_value, include, exclude, &extra)
         } else {
             extra.warnings.on_fallback_py(self.get_name(), value, &extra)?;
             infer_to_python(value, include, exclude, &extra)
@@ -155,9 +166,9 @@ impl TypeSerializer for ModelSerializer {
             ..*extra
         };
         if self.allow_value(value, &extra).map_err(py_err_se_err)? {
-            let dict = object_to_dict(value, true, &extra).map_err(py_err_se_err)?;
+            let inner_value = self.get_inner_value(value, &extra).map_err(py_err_se_err)?;
             self.serializer
-                .serde_serialize(dict, serializer, include, exclude, &extra)
+                .serde_serialize(inner_value, serializer, include, exclude, &extra)
         } else {
             extra.warnings.on_fallback_ser::<S>(self.get_name(), value, &extra)?;
             infer_serialize(value, serializer, include, exclude, &extra)
@@ -170,16 +181,5 @@ impl TypeSerializer for ModelSerializer {
 
     fn retry_with_lax_check(&self) -> bool {
         true
-    }
-}
-
-fn get_pydantic_extra(value: &PyAny) -> Option<&PyDict> {
-    let extra = match value.getattr(intern!(value.py(), "__pydantic_extra__")) {
-        Ok(extra) => extra,
-        Err(_) => return None,
-    };
-    match extra.downcast::<PyDict>() {
-        Ok(attrs) => Some(attrs),
-        Err(_) => None,
     }
 }
