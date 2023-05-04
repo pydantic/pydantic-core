@@ -210,6 +210,9 @@ impl TypeSerializer for GeneralFieldsSerializer {
         // this is used to include `__pydantic_extra__` in serialization on models
         if let Some(extra_dict) = extra_dict {
             for (key, value) in extra_dict.iter() {
+                if extra.exclude_none && value.is_none() {
+                    continue;
+                }
                 if let Some((next_include, next_exclude)) = self.filter.key_filter(key, include, exclude)? {
                     let value = infer_to_python(value, next_include, next_exclude, &td_extra)?;
                     output_dict.set_item(key, value)?;
@@ -288,6 +291,9 @@ impl TypeSerializer for GeneralFieldsSerializer {
         // this is used to include `__pydantic_extra__` in serialization on models
         if let Some(extra_dict) = extra_dict {
             for (key, value) in extra_dict.iter() {
+                if extra.exclude_none && value.is_none() {
+                    continue;
+                }
                 let filter = self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
                 if let Some((next_include, next_exclude)) = filter {
                     let output_key = infer_json_key(key, &td_extra).map_err(py_err_se_err)?;

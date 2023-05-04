@@ -778,3 +778,27 @@ def test_extra():
     assert s.to_python(m) == {'field_a': b'test', 'field_b': 12, 'field_c': 'extra'}
     assert s.to_python(m, mode='json') == {'field_a': 'test', 'field_b': 12, 'field_c': 'extra'}
     assert s.to_json(m) == b'{"field_a":"test","field_b":12,"field_c":"extra"}'
+
+    # test filtering
+    m = v.validate_python({'field_a': b'test', 'field_b': 12, 'field_c': None, 'field_d': [1, 2, 3]})
+    assert isinstance(m, MyModel)
+    assert m.__dict__ == {'field_a': b'test', 'field_b': 12}
+    assert m.__pydantic_extra__ == {'field_c': None, 'field_d': [1, 2, 3]}
+    assert m.__pydantic_fields_set__ == {'field_a', 'field_b', 'field_c', 'field_d'}
+
+    assert s.to_python(m) == {'field_a': b'test', 'field_b': 12, 'field_c': None, 'field_d': [1, 2, 3]}
+    assert s.to_json(m) == b'{"field_a":"test","field_b":12,"field_c":null,"field_d":[1,2,3]}'
+
+    assert s.to_python(m, exclude_none=True) == {'field_a': b'test', 'field_b': 12, 'field_d': [1, 2, 3]}
+    assert s.to_json(m, exclude_none=True) == b'{"field_a":"test","field_b":12,"field_d":[1,2,3]}'
+
+    assert s.to_python(m, exclude={'field_c'}) == {'field_a': b'test', 'field_b': 12, 'field_d': [1, 2, 3]}
+    assert s.to_json(m, exclude={'field_c'}) == b'{"field_a":"test","field_b":12,"field_d":[1,2,3]}'
+
+    assert s.to_python(m, exclude={'field_d': [0]}) == {
+        'field_a': b'test',
+        'field_b': 12,
+        'field_c': None,
+        'field_d': [2, 3],
+    }
+    assert s.to_json(m, exclude={'field_d': [0]}) == b'{"field_a":"test","field_b":12,"field_c":null,"field_d":[2,3]}'
