@@ -1084,7 +1084,7 @@ def test_from_attributes_extra():
         def static_method():
             return 'wrong'
 
-        # this is omitted along with the static method by the !PyFunction::is_type_of(attr) check in typed_dict.rs
+        # this is omitted along with the static method by the !PyFunction::is_type_of(attr) check in fields
         function_attribute = another_function
 
         @classmethod

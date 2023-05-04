@@ -9,10 +9,10 @@ use ahash::AHashMap;
 use crate::build_tools::{py_error_type, ExtraBehavior, SchemaDict};
 use crate::definitions::DefinitionsBuilder;
 
-use super::typed_dict::{FieldSerializer, TypedDictSerializer};
 use super::{
     infer_json_key, infer_json_key_known, infer_serialize, infer_to_python, object_to_dict, py_err_se_err,
-    BuildSerializer, CombinedSerializer, ComputedFields, Extra, ObType, SerCheck, TypeSerializer,
+    BuildSerializer, CombinedSerializer, ComputedFields, Extra, GeneralFieldsSerializer, ObType, SerCheck, SerField,
+    TypeSerializer,
 };
 
 pub struct ModelFieldsBuilder;
@@ -33,7 +33,7 @@ impl BuildSerializer for ModelFieldsBuilder {
         );
 
         let fields_dict: &PyDict = schema.get_as_req(intern!(py, "fields"))?;
-        let mut fields: AHashMap<String, FieldSerializer> = AHashMap::with_capacity(fields_dict.len());
+        let mut fields: AHashMap<String, SerField> = AHashMap::with_capacity(fields_dict.len());
 
         for (key, value) in fields_dict.iter() {
             let key_py: &PyString = key.downcast()?;
@@ -43,7 +43,7 @@ impl BuildSerializer for ModelFieldsBuilder {
             let key_py: Py<PyString> = key_py.into_py(py);
 
             if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
-                fields.insert(key, FieldSerializer::new(py, key_py, None, None, true));
+                fields.insert(key, SerField::new(py, key_py, None, None, true));
             } else {
                 let alias: Option<String> = field_info.get_as(intern!(py, "serialization_alias"))?;
 
@@ -51,13 +51,13 @@ impl BuildSerializer for ModelFieldsBuilder {
                 let serializer = CombinedSerializer::build(schema, config, definitions)
                     .map_err(|e| py_error_type!("Field `{}`:\n  {}", key, e))?;
 
-                fields.insert(key, FieldSerializer::new(py, key_py, alias, Some(serializer), true));
+                fields.insert(key, SerField::new(py, key_py, alias, Some(serializer), true));
             }
         }
 
         let computed_fields = ComputedFields::new(schema)?;
 
-        Ok(TypedDictSerializer::new(fields, include_extra, computed_fields).into())
+        Ok(GeneralFieldsSerializer::new(fields, include_extra, computed_fields).into())
     }
 }
 
