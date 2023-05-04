@@ -121,8 +121,8 @@ def test_model_allow_extra():
             extra_behavior='allow',
         )
     )
-    assert s.to_python(BasicModel(foo=1, bar=b'more', __pydantic_extra__=None)) == IsStrictDict(foo=1, bar=b'more')
-    assert s.to_python(BasicModel(bar=b'more', foo=1, __pydantic_extra__=None)) == IsStrictDict(bar=b'more', foo=1)
+    assert s.to_python(BasicModel(foo=1, bar=b'more', __pydantic_extra__={})) == IsStrictDict(foo=1, bar=b'more')
+    assert s.to_python(BasicModel(bar=b'more', foo=1, __pydantic_extra__={})) == IsStrictDict(bar=b'more', foo=1)
     assert s.to_python(BasicModel(foo=1, __pydantic_extra__=dict(c=3), bar=b'more')) == IsStrictDict(
         foo=1, bar=b'more', c=3
     )

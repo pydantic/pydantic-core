@@ -115,12 +115,8 @@ impl GeneralFieldsSerializer {
     fn extract_dicts<'a>(&self, value: &'a PyAny) -> Option<(&'a PyDict, Option<&'a PyDict>)> {
         match self.mode {
             FieldsMode::ModelExtra => {
-                if let Ok((main_dict, extra_dict)) = value.extract::<(&PyDict, &PyAny)>() {
-                    if let Ok(extra_dict) = extra_dict.downcast::<PyDict>() {
-                        Some((main_dict, Some(extra_dict)))
-                    } else {
-                        Some((main_dict, None))
-                    }
+                if let Ok((main_dict, extra_dict)) = value.extract::<(&PyDict, &PyDict)>() {
+                    Some((main_dict, Some(extra_dict)))
                 } else {
                     None
                 }
