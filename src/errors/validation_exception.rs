@@ -211,7 +211,6 @@ impl ValidationError {
                 .iter()
                 .cloned()
                 .chain(other.line_errors.into_iter())
-                .clone()
                 .collect(),
             error_mode: self.error_mode.clone(),
         };
