@@ -830,3 +830,32 @@ def test_extra_config():
     s = SchemaSerializer(schema)
     assert 'mode:ModelExtra' in plain_repr(s)
     assert 'has_extra:true' in plain_repr(s)
+
+
+def test_extra_config_nested_model():
+    class OuterModel:
+        pass
+
+    class InnerModel:
+        pass
+
+    schema = core_schema.model_schema(
+        OuterModel,
+        core_schema.model_fields_schema(
+            {
+                'sub_model': core_schema.model_field(
+                    core_schema.model_schema(
+                        InnerModel,
+                        core_schema.model_fields_schema({'int': core_schema.model_field(core_schema.int_schema())}),
+                        config=core_schema.CoreConfig(extra_fields_behavior='allow'),
+                    )
+                )
+            }
+        ),
+        config={},
+    )
+    s = SchemaSerializer(schema)
+    # debug(s)
+    s_repr = plain_repr(s)
+    assert 'has_extra:true,name:"InnerModel"' in s_repr
+    assert 'has_extra:false,name:"OuterModel"' in s_repr

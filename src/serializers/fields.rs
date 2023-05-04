@@ -311,7 +311,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
     }
 
     fn get_name(&self) -> &str {
-        "fields"
+        "general-fields"
     }
 }
 

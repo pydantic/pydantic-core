@@ -303,16 +303,17 @@ pub(crate) fn build_model_config<'a>(
                     let key = intern!(py, "config_merge_priority");
                     let parent_merge: i32 = parent.get_as(key)?.unwrap_or_default();
                     let child_merge: i32 = child.get_as(key)?.unwrap_or_default();
-                    let update = intern!(py, "update");
                     match parent_merge.cmp(&child_merge) {
                         Ordering::Greater => {
-                            child.getattr(update)?.call1((parent,))?;
-                            Ok(Some(child))
+                            let new_child = child.copy()?;
+                            new_child.update(parent.as_mapping())?;
+                            Ok(Some(new_child))
                         }
                         // otherwise child is the winner
                         _ => {
-                            parent.getattr(update)?.call1((child,))?;
-                            Ok(Some(parent))
+                            let new_parent = parent.copy()?;
+                            new_parent.update(child.as_mapping())?;
+                            Ok(Some(new_parent))
                         }
                     }
                 }
