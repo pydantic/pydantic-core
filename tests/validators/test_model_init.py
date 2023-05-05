@@ -33,9 +33,9 @@ def test_model_init():
     m2 = MyModel()
     ans = v.validate_python({'field_a': 'test', 'field_b': 12}, self_instance=m2)
     assert ans == m2
-    assert m.field_a == 'test'
-    assert m.field_b == 12
-    assert m.__pydantic_fields_set__ == {'field_a', 'field_b'}
+    assert ans.field_a == 'test'
+    assert ans.field_b == 12
+    assert ans.__pydantic_fields_set__ == {'field_a', 'field_b'}
 
 
 def test_model_init_nested():
