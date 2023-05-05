@@ -143,6 +143,12 @@ impl ToPyObject for Location {
     }
 }
 
+impl IntoPy<PyObject> for Location {
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        self.to_object(py)
+    }
+}
+
 impl From<&LookupPath> for Location {
     fn from(lookup_path: &LookupPath) -> Self {
         let v = lookup_path
@@ -181,6 +187,17 @@ impl Location {
                 *self = Self::new_some(loc_item);
             }
         };
+    }
+
+    pub fn with_prefix(&self, prefix: &Location) -> Location {
+        match (prefix, self) {
+            (Location::Empty, Location::Empty) => Location::Empty,
+            (Location::Empty, Location::List(_)) => self.clone(),
+            (Location::List(_), Location::Empty) => prefix.clone(),
+            (Location::List(prefix_list), Location::List(self_list)) => {
+                Location::List(prefix_list.iter().chain(self_list.iter()).cloned().collect())
+            }
+        }
     }
 }
 

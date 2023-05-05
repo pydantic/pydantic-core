@@ -11,7 +11,7 @@ else:
     from typing import TypedDict
 
 if sys.version_info < (3, 11):
-    from typing_extensions import Literal, LiteralString, NotRequired, TypeAlias
+    from typing_extensions import Literal, LiteralString, NotRequired, Self, TypeAlias
 else:
     from typing import Literal, LiteralString, NotRequired, TypeAlias
 
@@ -178,15 +178,22 @@ class SchemaError(Exception):
     def error_count(self) -> int: ...
     def errors(self) -> 'list[ErrorDetails]': ...
 
+Location = tuple[str | int, ...]
+
 class ValidationError(ValueError):
     def __init__(
-        self, title: str, errors: 'list[InitErrorDetails]', error_mode: Literal['python', 'json'] = 'python'
+        self,
+        title: str,
+        errors: 'list[InitErrorDetails | ValidationError]',
+        error_mode: Literal['python', 'json'] = 'python',
+        loc_prefix: Location | None = None,
     ) -> None: ...
     @property
     def title(self) -> str: ...
     def error_count(self) -> int: ...
     def errors(self, *, include_url: bool = True, include_context: bool = True) -> 'list[ErrorDetails]': ...
     def json(self, *, indent: 'int | None' = None, include_url: bool = True, include_context: bool = False) -> str: ...
+    def derive(self: Self, __exceptions: 'list[InitErrorDetails | ValidationError]') -> Self: ...
 
 class PydanticCustomError(ValueError):
     def __init__(

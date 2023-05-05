@@ -5,6 +5,7 @@ import pytest
 from dirty_equals import HasRepr, IsInstance, IsJson, IsStr
 
 from pydantic_core import (
+    InitErrorDetails,
     PydanticCustomError,
     PydanticKnownError,
     PydanticOmit,
@@ -633,12 +634,69 @@ def test_loc_with_dots():
     )
 
 
-def subclass_validation_error():
+def test_subclass_validation_error():
     class MyValidationError(ValidationError):
-        def __init__(self, title: str, errors, error_mode='python'):
-            self.body = 123
-            super().__init__(title, errors, error_mode)
+        def __init__(self, message: str, errors, body: int = 123):
+            self.body = body
+            super().__init__(message, errors, 'python')
+
+        def derive(self, __exceptions: list[InitErrorDetails | ValidationError]) -> 'MyValidationError':
+            return MyValidationError(message=self.title, errors=__exceptions, body=self.body)
 
     e = MyValidationError('testing', [])
+    assert isinstance(e, MyValidationError)
     assert e.body == 123
     assert e.title == 'testing'
+
+    e2 = e.derive([{'type': 'greater_than', 'loc': ('a', 2), 'input': 4, 'ctx': {'gt': 5}}])
+    assert isinstance(e2, MyValidationError)
+    assert e2.body == 123
+    assert e2.title == 'testing'
+
+
+def test_raise_validation_tree():
+    class MyValidationError(ValidationError):
+        pass
+
+    with pytest.raises(ValidationError) as exc_info1:
+        raise ValidationError(
+            'Foobar', [{'type': 'greater_than', 'loc': ('a', 2), 'input': 4, 'ctx': {'gt': 5}}], 'python', (123,)
+        )
+
+    with pytest.raises(ValidationError) as exc_info2:
+        raise MyValidationError('Foobar', [{'type': 'greater_than', 'loc': ('a', 1), 'input': 2, 'ctx': {'gt': 5}}])
+
+    v = ValidationError(
+        'merged',
+        [exc_info1.value, exc_info2.value, {'type': 'less_than', 'loc': ('a', 2), 'input': 8, 'ctx': {'lt': 1}}],
+        'python',
+        ('outer',),
+    )
+
+    assert v.error_count() == 3
+    assert v.errors() == [
+        {
+            'type': 'less_than',
+            'loc': (2, 'a'),
+            'msg': 'Input should be less than 1',
+            'input': 8,
+            'ctx': {'lt': 1},
+            'url': 'https://errors.pydantic.dev/0.28.1/v/less_than',
+        },
+        {
+            'type': 'greater_than',
+            'loc': (2, 'a'),
+            'msg': 'Input should be greater than 5',
+            'input': 4,
+            'ctx': {'gt': 5},
+            'url': 'https://errors.pydantic.dev/0.28.1/v/greater_than',
+        },
+        {
+            'type': 'greater_than',
+            'loc': (1, 'a'),
+            'msg': 'Input should be greater than 5',
+            'input': 2,
+            'ctx': {'gt': 5},
+            'url': 'https://errors.pydantic.dev/0.28.1/v/greater_than',
+        },
+    ]

@@ -1,12 +1,13 @@
 use std::fmt;
 use std::fmt::{Display, Write};
 use std::str::from_utf8;
+use std::sync::Arc;
 
 use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::ffi::Py_ssize_t;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyString};
+use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 use pyo3::{ffi, intern};
 use serde::ser::{Error, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
@@ -28,23 +29,45 @@ use super::ValError;
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct ValidationError {
-    line_errors: Vec<PyLineError>,
+    line_errors: Vec<Arc<PyLineError>>,
+    validation_errors: Vec<Arc<ValidationError>>,
     error_mode: ErrorMode,
-    title: PyObject,
+    #[pyo3(get)]
+    message: PyObject,
+    #[pyo3(get)]
+    loc_prefix: Location,
 }
 
 impl ValidationError {
-    pub fn new(line_errors: Vec<PyLineError>, title: PyObject, error_mode: ErrorMode) -> Self {
+    pub fn new(line_errors: Vec<PyLineError>, message: PyObject, error_mode: ErrorMode) -> Self {
+        Self {
+            line_errors: line_errors.into_iter().map(Arc::new).collect(),
+            validation_errors: Vec::new(),
+            message,
+            error_mode,
+            loc_prefix: Location::Empty,
+        }
+    }
+
+    pub fn new_with_val_errors(
+        line_errors: Vec<Arc<PyLineError>>,
+        validation_errors: Vec<Arc<ValidationError>>,
+        message: PyObject,
+        error_mode: ErrorMode,
+        loc_prefix: Location,
+    ) -> Self {
         Self {
             line_errors,
-            title,
+            validation_errors,
+            message,
             error_mode,
+            loc_prefix,
         }
     }
 
     pub fn from_val_error(
         py: Python,
-        title: PyObject,
+        message: PyObject,
         error_mode: ErrorMode,
         error: ValError,
         outer_location: Option<LocItem>,
@@ -58,7 +81,7 @@ impl ValidationError {
                         .collect(),
                     None => raw_errors.into_iter().map(|e| e.into_py(py)).collect(),
                 };
-                let validation_error = Self::new(line_errors, title, error_mode);
+                let validation_error = Self::new(line_errors, message, error_mode);
                 match Py::new(py, validation_error) {
                     Ok(err) => PyErr::from_value(err.into_ref(py)),
                     Err(err) => err,
@@ -77,8 +100,8 @@ impl ValidationError {
         } else {
             let count = self.line_errors.len();
             let plural = if count == 1 { "" } else { "s" };
-            let title: &str = self.title.extract(py).unwrap();
-            format!("{count} validation error{plural} for {title}\n{line_errors}")
+            let message: &str = self.message.extract(py).unwrap();
+            format!("{count} validation error{plural} for {message}\n{line_errors}")
         }
     }
 
@@ -115,46 +138,89 @@ impl<'a> IntoPy<ValError<'a>> for ValidationError {
     fn into_py(self, py: Python) -> ValError<'a> {
         self.line_errors
             .into_iter()
-            .map(|e| e.into_py(py))
+            .map(|e| (*e).clone().into_py(py))
             .collect::<Vec<_>>()
             .into()
     }
 }
 
+type LineErrors = Vec<Arc<PyLineError>>;
+type ValidationErrors = Vec<Arc<ValidationError>>;
+
+fn partition_errors(errors: &PyList) -> PyResult<(LineErrors, ValidationErrors)> {
+    let mut line_errors = Vec::new();
+    let mut validation_errors = Vec::new();
+
+    for py_exc in errors {
+        // Note: can we use a Py<> instead of an Arc to avoid the clone?
+        if let Ok(e) = py_exc.extract() {
+            validation_errors.push(Arc::new(e))
+        } else {
+            let e = PyLineError::try_from(py_exc)?;
+            line_errors.push(Arc::new(e))
+        }
+    }
+    Ok((line_errors, validation_errors))
+}
+
 #[pymethods]
 impl ValidationError {
+    #[pyo3(signature = (message, errors, error_mode = None, *_args, loc_prefix = None, **_kwargs))]
     #[new]
-    fn py_new(title: PyObject, line_errors: &PyList, error_mode: Option<&str>) -> PyResult<Self> {
+    fn py_new(
+        message: PyObject,
+        errors: &PyList,
+        error_mode: Option<&str>,
+        _args: &PyTuple,
+        loc_prefix: Option<&PyAny>,
+        _kwargs: Option<&PyDict>,
+    ) -> PyResult<Self> {
+        let (line_errors, validation_errors) = partition_errors(errors)?;
         Ok(Self {
-            line_errors: line_errors.iter().map(PyLineError::try_from).collect::<PyResult<_>>()?,
-            title,
-            error_mode: ErrorMode::try_from(error_mode)?,
+            line_errors,
+            validation_errors,
+            message,
+            error_mode: error_mode.try_into()?,
+            loc_prefix: loc_prefix.try_into()?,
         })
     }
 
     #[getter]
-    fn title(&self, py: Python) -> PyObject {
-        self.title.clone_ref(py)
+    fn title(&self) -> PyObject {
+        self.message.clone()
+    }
+
+    pub fn flatten_errors(&self) -> Vec<PyLineError> {
+        let mut res: Vec<_> = self.line_errors.iter().map(|v| (**v).clone()).collect();
+        for v in &self.validation_errors {
+            res.extend(v.flatten_errors().iter().map(|v| v.with_prefix(&self.loc_prefix)));
+        }
+        res
     }
 
     pub fn error_count(&self) -> usize {
-        self.line_errors.len()
+        let mut res = self.line_errors.len();
+        for v in &self.validation_errors {
+            res += v.error_count()
+        }
+        res
     }
 
     #[pyo3(signature = (*, include_url = true, include_context = true))]
     pub fn errors(&self, py: Python, include_url: bool, include_context: bool) -> PyResult<Py<PyList>> {
+        let line_errors = self.flatten_errors();
         let url_prefix = get_url_prefix(py, include_url);
         // taken approximately from the pyo3, but modified to return the error during iteration
         // https://github.com/PyO3/pyo3/blob/a3edbf4fcd595f0e234c87d4705eb600a9779130/src/types/list.rs#L27-L55
         unsafe {
-            let ptr = ffi::PyList_New(self.line_errors.len() as Py_ssize_t);
+            let ptr = ffi::PyList_New(line_errors.len() as Py_ssize_t);
 
             // We create the `Py` pointer here for two reasons:
             // - panics if the ptr is null
             // - its Drop cleans up the list if user code or the asserts panic.
             let list: Py<PyList> = Py::from_owned_ptr(py, ptr);
 
-            for (index, line_error) in (0_isize..).zip(&self.line_errors) {
+            for (index, line_error) in (0_isize..).zip(&line_errors) {
                 let item = line_error.as_dict(py, url_prefix, include_context, &self.error_mode)?;
                 ffi::PyList_SET_ITEM(ptr, index, item.into_ptr());
             }
@@ -201,6 +267,22 @@ impl ValidationError {
         Ok(PyString::new(py, s))
     }
 
+    fn derive(&self, py: Python, errors: &PyList) -> PyResult<Py<Self>> {
+        let (mut line_errors, mut validation_errors) = partition_errors(errors)?;
+        line_errors.extend(self.line_errors.iter().cloned());
+        validation_errors.extend(self.validation_errors.iter().cloned());
+        Py::new(
+            py,
+            Self::new_with_val_errors(
+                line_errors,
+                validation_errors,
+                self.message.clone(),
+                self.error_mode.clone(),
+                self.loc_prefix.clone(),
+            ),
+        )
+    }
+
     fn __repr__(&self, py: Python) -> String {
         self.display(py, None)
     }
@@ -228,7 +310,7 @@ macro_rules! truncate_input_value {
 pub fn pretty_py_line_errors<'a>(
     py: Python,
     error_mode: &ErrorMode,
-    line_errors_iter: impl Iterator<Item = &'a PyLineError>,
+    line_errors_iter: impl Iterator<Item = &'a Arc<PyLineError>>,
     url_prefix: Option<&str>,
 ) -> String {
     line_errors_iter
@@ -307,6 +389,14 @@ impl TryFrom<&PyAny> for PyLineError {
 }
 
 impl PyLineError {
+    pub fn with_prefix(&self, prefix: &Location) -> PyLineError {
+        PyLineError {
+            error_type: self.error_type.clone(),
+            location: self.location.with_prefix(prefix),
+            input_value: self.input_value.clone(),
+        }
+    }
+
     fn get_error_url(&self, url_prefix: &str) -> String {
         format!("{url_prefix}{}", self.error_type.type_string())
     }
@@ -392,7 +482,7 @@ where
 
 struct ValidationErrorSerializer<'py> {
     py: Python<'py>,
-    line_errors: &'py [PyLineError],
+    line_errors: &'py [Arc<PyLineError>],
     url_prefix: Option<&'py str>,
     include_context: bool,
     extra: &'py crate::serializers::Extra<'py>,
