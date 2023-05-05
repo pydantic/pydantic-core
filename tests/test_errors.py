@@ -674,22 +674,14 @@ def test_raise_validation_tree():
     )
 
     assert v.error_count() == 3
-    assert v.errors() == [
-        {
-            'type': 'less_than',
-            'loc': (2, 'a'),
-            'msg': 'Input should be less than 1',
-            'input': 8,
-            'ctx': {'lt': 1},
-            'url': 'https://errors.pydantic.dev/0.28.1/v/less_than',
-        },
+    assert v.errors(include_url=False) == [
+        {'type': 'less_than', 'loc': (2, 'a'), 'msg': 'Input should be less than 1', 'input': 8, 'ctx': {'lt': 1}},
         {
             'type': 'greater_than',
             'loc': (2, 'a'),
             'msg': 'Input should be greater than 5',
             'input': 4,
             'ctx': {'gt': 5},
-            'url': 'https://errors.pydantic.dev/0.28.1/v/greater_than',
         },
         {
             'type': 'greater_than',
@@ -697,6 +689,18 @@ def test_raise_validation_tree():
             'msg': 'Input should be greater than 5',
             'input': 2,
             'ctx': {'gt': 5},
-            'url': 'https://errors.pydantic.dev/0.28.1/v/greater_than',
         },
     ]
+    # fmt: off
+    assert repr(v) == f"""\
+3 validation errors for merged
+2.a
+  Input should be less than 1 [type=less_than, input_value=8, input_type=int]
+    For further information visit https://errors.pydantic.dev/{__version__}/v/less_than
+2.a
+  Input should be greater than 5 [type=greater_than, input_value=4, input_type=int]
+    For further information visit https://errors.pydantic.dev/{__version__}/v/greater_than
+1.a
+  Input should be greater than 5 [type=greater_than, input_value=2, input_type=int]
+    For further information visit https://errors.pydantic.dev/{__version__}/v/greater_than"""
+    # fmt: on
