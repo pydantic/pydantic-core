@@ -4,7 +4,7 @@ use pyo3::types::PyDict;
 
 use uuid::Uuid;
 
-use crate::build_tools::SchemaDict;
+use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -15,6 +15,7 @@ use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct UuidValidator {
+    strict: bool,
     version: Option<usize>,
 }
 
@@ -23,10 +24,11 @@ impl BuildValidator for UuidValidator {
 
     fn build(
         schema: &PyDict,
-        _config: Option<&PyDict>,
+        config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         Ok(Self {
+            strict: is_strict(schema, config)?,
             version: schema.get_as(intern!(schema.py(), "version"))?,
         }
         .into())
@@ -38,14 +40,12 @@ impl Validator for UuidValidator {
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        _extra: &Extra,
+        extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        match self.get_uuid(input) {
-            Ok(lib_uuid) => Ok(PyUuid::new(lib_uuid).into_py(py)),
-            Err(error_type) => Err(error_type),
-        }
+        let lib_uuid = self.get_uuid(input, extra.strict.unwrap_or(self.strict))?;
+        Ok(PyUuid::new(lib_uuid).into_py(py))
     }
 
     fn different_strict_behavior(
@@ -67,13 +67,25 @@ impl Validator for UuidValidator {
 
 #[allow(dead_code)]
 impl UuidValidator {
-    fn get_uuid<'s, 'data>(&'s self, input: &'data impl Input<'data>) -> ValResult<'data, Uuid> {
-        if let Some(py_uuid) = input.input_as_uuid() {
-            let lib_uuid = py_uuid.into_uuid();
-            self.check_version(input, lib_uuid)?;
-            Ok(lib_uuid)
-        } else {
-            Err(ValError::new(ErrorType::UuidType, input))
+    fn get_uuid<'s, 'data>(&'s self, input: &'data impl Input<'data>, strict: bool) -> ValResult<'data, Uuid> {
+        match input.validate_str(strict) {
+            Ok(either_uuid) => {
+                let cow = either_uuid.as_cow()?;
+                let uuid_str = cow.as_ref();
+                match Uuid::parse_str(uuid_str) {
+                    Ok(lib_uuid) => Ok(lib_uuid),
+                    Err(e) => Err(ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input)),
+                }
+            }
+            Err(_) => {
+                if let Some(py_uuid) = input.input_as_uuid() {
+                    let lib_uuid = py_uuid.into_uuid();
+                    self.check_version(input, lib_uuid)?;
+                    Ok(lib_uuid)
+                } else {
+                    Err(ValError::new(ErrorType::UuidType, input))
+                }
+            }
         }
     }
 

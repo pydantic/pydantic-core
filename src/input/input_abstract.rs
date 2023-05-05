@@ -10,6 +10,7 @@ use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
 use super::return_enums::{EitherBytes, EitherString};
 use super::{GenericArguments, GenericCollection, GenericIterator, GenericMapping, JsonInput};
 
+#[derive(Debug)]
 pub enum InputType {
     Python,
     Json,
