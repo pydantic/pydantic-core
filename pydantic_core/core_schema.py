@@ -3503,6 +3503,38 @@ def multi_host_url_schema(
     )
 
 
+class UuidSchema(TypedDict, total=False):
+    type: Required[Literal['uuid']]
+    version: int
+    ref: str
+    metadata: Any
+    serialization: SerSchema
+
+
+def uuid_schema(
+    *, version: int | None = None, ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
+) -> UuidSchema:
+    """
+    Returns a schema that matches a UUID value, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    schema = core_schema.uuid_schema()
+    v = SchemaValidator(schema)
+    print(v.validate_python('12345678-1234-5678-1234-567812345678'))
+    #> 12345678-1234-5678-1234-567812345678
+    ```
+
+    Args:
+        version: The UUID version number as per RFC 4122
+        ref: optional unique identifier of the schema, used to reference the schema in other places
+        metadata: Any other information you want to include with the schema, not used by pydantic-core
+        serialization: Custom serialization schema
+    """
+    return dict_not_none(type='uuid', version=version, ref=ref, metadata=metadata, serialization=serialization)
+
+
 class DefinitionsSchema(TypedDict, total=False):
     type: Required[Literal['definitions']]
     schema: Required[CoreSchema]
@@ -3613,6 +3645,7 @@ if not MYPY:
         JsonSchema,
         UrlSchema,
         MultiHostUrlSchema,
+        UuidSchema,
         DefinitionsSchema,
         DefinitionReferenceSchema,
     ]
@@ -3665,6 +3698,7 @@ CoreSchemaType = Literal[
     'json',
     'url',
     'multi-host-url',
+    'uuid',
     'definitions',
     'definition-ref',
 ]
@@ -3757,4 +3791,5 @@ ErrorType = Literal[
     'url_syntax_violation',
     'url_too_long',
     'url_scheme',
+    # TODO(martinabeleda): add error types
 ]

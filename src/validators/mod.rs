@@ -50,6 +50,7 @@ mod tuple;
 mod typed_dict;
 mod union;
 mod url;
+mod uuid;
 mod with_default;
 
 pub use with_default::DefaultType;
@@ -433,6 +434,8 @@ pub fn build_validator<'a>(
         // url types
         url::UrlValidator,
         url::MultiHostUrlValidator,
+        // uuid types
+        uuid::UuidValidator,
         // recursive (self-referencing) models
         definitions::DefinitionRefValidator,
         definitions::DefinitionsValidatorBuilder,
@@ -565,6 +568,8 @@ pub enum CombinedValidator {
     // url types
     Url(url::UrlValidator),
     MultiHostUrl(url::MultiHostUrlValidator),
+    // uuid types
+    Uuid(uuid::UuidValidator),
     // reference to definition, useful for recursive (self-referencing) models
     DefinitionRef(definitions::DefinitionRefValidator),
 }

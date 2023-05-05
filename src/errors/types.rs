@@ -294,6 +294,9 @@ pub enum ErrorType {
     UrlScheme {
         expected_schemes: String,
     },
+    // ---------------------
+    // UUID errors
+    // TODO(martinabeleda): define errors
 }
 
 macro_rules! render {

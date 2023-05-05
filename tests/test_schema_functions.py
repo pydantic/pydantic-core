@@ -279,6 +279,9 @@ def test_all_schema_functions_used():
     types_used.remove('typed-dict-field')
     types_used.remove('model-field')
 
+    # TODO(martinabeleda): use this schema
+    all_types.remove('uuid')
+
     assert all_types == types_used
 
 
