@@ -8,6 +8,7 @@ use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
+use crate::uuid::PyUuid;
 
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
@@ -41,8 +42,10 @@ impl Validator for UuidValidator {
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        // Ok(input.clone().into_py(py))
-        Ok(input.to_object(py))
+        match self.get_uuid(input) {
+            Ok(lib_uuid) => Ok(PyUuid::new(lib_uuid).into_py(py)),
+            Err(error_type) => Err(error_type),
+        }
     }
 
     fn different_strict_behavior(
@@ -64,7 +67,7 @@ impl Validator for UuidValidator {
 
 #[allow(dead_code)]
 impl UuidValidator {
-    fn get_uuid<'s, 'data>(&'s self, input: &'data impl Input<'data>, _strict: bool) -> ValResult<'data, Uuid> {
+    fn get_uuid<'s, 'data>(&'s self, input: &'data impl Input<'data>) -> ValResult<'data, Uuid> {
         if let Some(py_uuid) = input.input_as_uuid() {
             let lib_uuid = py_uuid.into_uuid();
             self.check_version(input, lib_uuid)?;
@@ -76,33 +79,19 @@ impl UuidValidator {
 
     fn check_version<'s, 'data>(&self, input: &'data impl Input<'data>, uuid: Uuid) -> ValResult<'data, ()> {
         if let Some(schema_version) = self.version {
-            match uuid.get_version() {
-                Some(_version) => {
-                    // TODO(martinabeleda): need to map `uuid::Version` enum to usize
-                    let version = 4;
-                    if version == schema_version {
-                        return Ok(());
-                    } else {
-                        return Err(ValError::new(
-                            ErrorType::UuidVersionMismatch {
-                                version,
-                                schema_version,
-                            },
-                            input,
-                        ));
-                    }
-                }
-                None => {
-                    return Err(ValError::new(
-                        ErrorType::UuidParsing {
-                            error: "Could not find version for uuid".to_string(),
-                        },
-                        input,
-                    ));
-                }
+            let version = uuid.get_version_num();
+            if schema_version == version {
+                return Ok(());
+            } else {
+                return Err(ValError::new(
+                    ErrorType::UuidVersionMismatch {
+                        version,
+                        schema_version,
+                    },
+                    input,
+                ));
             }
         }
-
         Ok(())
     }
 }

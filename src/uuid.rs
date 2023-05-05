@@ -46,7 +46,8 @@ impl PyUuid {
 
     #[getter]
     pub fn urn(&self) -> &str {
-        // self.lib_uuid.urn().encode_lower(&mut Uuid::encode_buffer())
+        let mut buffer = Uuid::encode_buffer();
+        self.lib_uuid.urn().encode_lower(&mut buffer);
         "foo"
     }
 
