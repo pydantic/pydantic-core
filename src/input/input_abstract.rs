@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyString, PyType};
 
 use crate::errors::{InputValue, LocItem, ValResult};
-use crate::{PyMultiHostUrl, PyUrl};
+use crate::{PyMultiHostUrl, PyUrl, PyUuid};
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
 use super::return_enums::{EitherBytes, EitherString};
@@ -64,6 +64,10 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
     }
 
     fn input_as_multi_host_url(&self) -> Option<PyMultiHostUrl> {
+        None
+    }
+
+    fn input_as_uuid(&self) -> Option<PyUuid> {
         None
     }
 

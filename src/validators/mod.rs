@@ -434,7 +434,7 @@ pub fn build_validator<'a>(
         // url types
         url::UrlValidator,
         url::MultiHostUrlValidator,
-        // uuid types
+        // uuids
         uuid::UuidValidator,
         // recursive (self-referencing) models
         definitions::DefinitionRefValidator,
@@ -568,7 +568,7 @@ pub enum CombinedValidator {
     // url types
     Url(url::UrlValidator),
     MultiHostUrl(url::MultiHostUrlValidator),
-    // uuid types
+    // uuid
     Uuid(uuid::UuidValidator),
     // reference to definition, useful for recursive (self-referencing) models
     DefinitionRef(definitions::DefinitionRefValidator),

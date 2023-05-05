@@ -3791,5 +3791,7 @@ ErrorType = Literal[
     'url_syntax_violation',
     'url_too_long',
     'url_scheme',
-    # TODO(martinabeleda): add error types
+    'uuid_type',
+    'uuid_parsing',
+    'uuid_version_mismatch',
 ]

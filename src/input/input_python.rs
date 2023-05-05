@@ -13,7 +13,7 @@ use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
 use crate::build_tools::safe_repr;
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValResult};
-use crate::{ArgsKwargs, PyMultiHostUrl, PyUrl};
+use crate::{ArgsKwargs, PyMultiHostUrl, PyUrl, PyUuid};
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, date_as_datetime, float_as_datetime,
@@ -131,6 +131,10 @@ impl<'a> Input<'a> for PyAny {
 
     fn input_as_multi_host_url(&self) -> Option<PyMultiHostUrl> {
         self.extract::<PyMultiHostUrl>().ok()
+    }
+
+    fn input_as_uuid(&self) -> Option<PyUuid> {
+        self.extract::<PyUuid>().ok()
     }
 
     fn callable(&self) -> bool {
