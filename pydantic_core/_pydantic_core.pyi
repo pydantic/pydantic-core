@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import decimal
 import sys
 from typing import Any, Callable
