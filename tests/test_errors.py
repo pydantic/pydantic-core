@@ -647,9 +647,11 @@ def subclass_validation_error():
 
 def test_merge() -> None:
     v1 = ValidationError('foo', [{'type': 'greater_than', 'loc': ('a', 2), 'input': 4, 'ctx': {'gt': 5}}], 'json')
-    v2 = ValidationError('foo', [{'type': 'greater_than', 'loc': ('a',), 'input': 1, 'ctx': {'gt': 0}}], 'python')
+    v2 = ValidationError('bar', [{'type': 'greater_than', 'loc': ('a',), 'input': 1, 'ctx': {'gt': 0}}], 'python')
 
     m = v1.merge(v2)
+    assert m.title == 'foo'
+    assert m.error_mode == 'json'
     assert m.errors() == [
         {
             'type': 'greater_than',

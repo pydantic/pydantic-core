@@ -137,6 +137,11 @@ impl ValidationError {
         self.title.clone_ref(py)
     }
 
+    #[getter]
+    fn error_mode(&self) -> String {
+        self.error_mode.to_string()
+    }
+
     pub fn error_count(&self) -> usize {
         self.line_errors.len()
     }

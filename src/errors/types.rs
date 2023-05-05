@@ -19,6 +19,15 @@ pub enum ErrorMode {
     Json,
 }
 
+impl fmt::Display for ErrorMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Python => write!(f, "python"),
+            Self::Json => write!(f, "json"),
+        }
+    }
+}
+
 impl TryFrom<Option<&str>> for ErrorMode {
     type Error = PyErr;
 
@@ -748,6 +757,7 @@ impl fmt::Display for Number {
         }
     }
 }
+
 impl ToPyObject for Number {
     fn to_object(&self, py: Python<'_>) -> PyObject {
         match self {
