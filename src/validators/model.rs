@@ -164,10 +164,8 @@ impl Validator for ModelValidator {
                 // Perhaps something similar to `validate_call`? Could probably make
                 // this work with from_attributes, and would essentially allow you to
                 // handle init vars by adding them to the __init__ signature.
-                // TODO: Should probably provide some nicer error if not a dict, though if I
-                //   understand correctly, this current logic actually seems to match v1 behavior..
-                if let Ok(py_dict) = input.to_object(py).downcast::<PyDict>(py) {
-                    return Ok(self.class.call(py, (), Some(py_dict))?);
+                if let Some(kwargs) = input.as_kwargs(py) {
+                    return Ok(self.class.call(py, (), Some(kwargs))?);
                 }
             }
             let output = self
