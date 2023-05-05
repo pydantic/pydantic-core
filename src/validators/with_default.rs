@@ -1,4 +1,5 @@
 use pyo3::intern;
+use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -8,6 +9,12 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+
+static COPY_DEEPCOPY: GILOnceCell<PyObject> = GILOnceCell::new();
+
+fn get_deepcopy(py: Python) -> PyResult<PyObject> {
+    Ok(py.import("copy")?.getattr("deepcopy")?.into_py(py))
+}
 
 #[derive(Debug, Clone)]
 pub enum DefaultType {
@@ -83,18 +90,13 @@ impl BuildValidator for WithDefaultValidator {
         let sub_schema: &PyAny = schema.get_as_req(intern!(schema.py(), "schema"))?;
         let validator = Box::new(build_validator(sub_schema, config, definitions)?);
 
-        let copy_default = {
-            if let DefaultType::Default(default_obj) = &default {
-                let hash_value = default_obj
-                    .getattr(py, intern!(py, "__hash__"))
-                    .unwrap_or(py.NotImplemented());
-                hash_value.is_none(py) || hash_value.is(&py.NotImplemented())
-            } else {
-                false
-            }
+        let copy_default = if let DefaultType::Default(default_obj) = &default {
+            default_obj.as_ref(py).hash().is_err()
+        } else {
+            false
         };
         if copy_default {
-            let message = format!("`{}` has a mutable default value that will be copied. Consider using `default_factory` instead for finer control.", validator.get_name());
+            let message = format!("`{}` has a mutable default value that will be deep copied during validation. Consider using `default_factory` instead for finer control.", validator.get_name());
             let user_warning_type = py.import("builtins")?.getattr("UserWarning")?;
             PyErr::warn(py, user_warning_type, &message, 0)?;
         }
@@ -145,8 +147,8 @@ impl Validator for WithDefaultValidator {
         match self.default.default_value(py)? {
             Some(stored_dft) => {
                 let dft: Py<PyAny> = if self.copy_default {
-                    let deepcopy_func = py.import("copy")?.getattr("deepcopy")?;
-                    deepcopy_func.call1((&stored_dft,))?.into_py(py)
+                    let deepcopy_func = COPY_DEEPCOPY.get_or_init(py, || get_deepcopy(py).unwrap());
+                    deepcopy_func.call1(py, (&stored_dft,))?.into_py(py)
                 } else {
                     stored_dft
                 };

@@ -278,24 +278,25 @@ def test_model_class():
         field_a: str
         field_b: int
 
-    v = SchemaValidator(
-        {
-            'type': 'model',
-            'cls': MyModel,
-            'schema': {
-                'type': 'default',
+    with pytest.warns(UserWarning):
+        v = SchemaValidator(
+            {
+                'type': 'model',
+                'cls': MyModel,
                 'schema': {
-                    'type': 'model-fields',
-                    'fields': {
-                        'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
-                        'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
+                    'type': 'default',
+                    'schema': {
+                        'type': 'model-fields',
+                        'fields': {
+                            'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
+                            'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
+                        },
                     },
+                    'default': ({'field_a': '[default-a]', 'field_b': '[default-b]'}, None, set()),
+                    'on_error': 'default',
                 },
-                'default': ({'field_a': '[default-a]', 'field_b': '[default-b]'}, None, set()),
-                'on_error': 'default',
-            },
-        }
-    )
+            }
+        )
     m = v.validate_python({'field_a': 'test', 'field_b': 12})
     assert isinstance(m, MyModel)
     assert m.field_a == 'test'
@@ -390,7 +391,7 @@ def test_deepcopy_mutable_defaults():
     with pytest.warns(
         UserWarning,
         match=(
-            r'`[Ll]ist\[int\]` has a mutable default value that will be copied.'
+            r'`[Ll]ist\[int\]` has a mutable default value that will be deep copied during validation.'
             r' Consider using `default_factory` instead for finer control.'
         ),
     ):
