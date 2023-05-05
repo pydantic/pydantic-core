@@ -94,14 +94,15 @@ impl ValidationError {
 
     pub fn display(&self, py: Python, prefix_override: Option<&'static str>) -> String {
         let url_prefix = get_url_prefix(py, include_url_env(py));
-        let line_errors = pretty_py_line_errors(py, &self.error_mode, self.line_errors.iter(), url_prefix);
+        let line_errors = self.flatten_errors();
+        let line_errors_string = pretty_py_line_errors(py, &self.error_mode, &line_errors, url_prefix);
         if let Some(prefix) = prefix_override {
-            format!("{prefix}\n{line_errors}")
+            format!("{prefix}\n{line_errors_string}")
         } else {
-            let count = self.line_errors.len();
+            let count = line_errors.len();
             let plural = if count == 1 { "" } else { "s" };
             let message: &str = self.message.extract(py).unwrap();
-            format!("{count} validation error{plural} for {message}\n{line_errors}")
+            format!("{count} validation error{plural} for {message}\n{line_errors_string}")
         }
     }
 
@@ -136,9 +137,9 @@ fn get_url_prefix(py: Python, include_url: bool) -> Option<&str> {
 // used to convert a validation error back to ValError for wrap functions
 impl<'a> IntoPy<ValError<'a>> for ValidationError {
     fn into_py(self, py: Python) -> ValError<'a> {
-        self.line_errors
+        self.flatten_errors()
             .into_iter()
-            .map(|e| (*e).clone().into_py(py))
+            .map(|e| e.into_py(py))
             .collect::<Vec<_>>()
             .into()
     }
@@ -239,16 +240,17 @@ impl ValidationError {
     ) -> PyResult<&'py PyString> {
         let state = SerializationState::new(None, None);
         let extra = state.extra(py, &SerMode::Json, true, false, false, true, None);
+        let line_errors = self.flatten_errors();
         let serializer = ValidationErrorSerializer {
             py,
-            line_errors: &self.line_errors,
+            line_errors: &line_errors,
             url_prefix: get_url_prefix(py, include_url),
             include_context,
             extra: &extra,
             error_mode: &self.error_mode,
         };
 
-        let writer: Vec<u8> = Vec::with_capacity(self.line_errors.len() * 200);
+        let writer: Vec<u8> = Vec::with_capacity(line_errors.len() * 200);
         let bytes = match indent {
             Some(indent) => {
                 let indent = vec![b' '; indent];
@@ -307,13 +309,14 @@ macro_rules! truncate_input_value {
     };
 }
 
-pub fn pretty_py_line_errors<'a>(
+pub fn pretty_py_line_errors(
     py: Python,
     error_mode: &ErrorMode,
-    line_errors_iter: impl Iterator<Item = &'a Arc<PyLineError>>,
+    line_errors_iter: &[PyLineError],
     url_prefix: Option<&str>,
 ) -> String {
     line_errors_iter
+        .iter()
         .map(|i| i.pretty(py, error_mode, url_prefix))
         .collect::<Result<Vec<_>, _>>()
         .unwrap_or_else(|err| vec![format!("[error formatting line errors: {err}]")])
@@ -482,7 +485,7 @@ where
 
 struct ValidationErrorSerializer<'py> {
     py: Python<'py>,
-    line_errors: &'py [Arc<PyLineError>],
+    line_errors: &'py [PyLineError],
     url_prefix: Option<&'py str>,
     include_context: bool,
     extra: &'py crate::serializers::Extra<'py>,
