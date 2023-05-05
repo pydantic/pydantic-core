@@ -45,16 +45,13 @@ impl PyUuid {
     }
 
     #[getter]
-    pub fn urn(&self) -> &str {
-        let mut buffer = Uuid::encode_buffer();
-        self.lib_uuid.urn().encode_lower(&mut buffer);
-        "foo"
+    pub fn urn(&self) -> String {
+        format!("{}", self.lib_uuid.urn())
     }
 
     #[getter]
-    pub fn variant(&self) -> &str {
-        // self.lib_uuid.get_variant().to_string().as_str()
-        "bar"
+    pub fn variant(&self) -> String {
+        format!("{}", self.lib_uuid.get_variant())
     }
 
     #[getter]
@@ -62,9 +59,8 @@ impl PyUuid {
         self.lib_uuid.get_version_num()
     }
 
-    pub fn __str__(&self) -> &str {
-        // self.lib_uuid.hyphenated().to_string().as_str()
-        "baz"
+    pub fn __str__(&self) -> String {
+        format!("{}", self.lib_uuid.hyphenated())
     }
 
     pub fn __repr__(&self) -> String {

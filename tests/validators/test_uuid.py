@@ -10,9 +10,9 @@ def test_uuid_ok(py_and_json: PyAndJson):
     assert isinstance(uuid, Uuid)
     assert str(uuid) == '12345678-1234-5678-1234-567812345678'
     assert repr(uuid) == "Uuid('12345678-1234-5678-1234-567812345678')"
-    assert uuid.version == 4
-    assert uuid.urn == 'foo'
-    assert uuid.variant == 'bar'
+    assert uuid.urn == 'urn:uuid:12345678-1234-5678-1234-567812345678'
+    assert uuid.version == 5
+    assert uuid.variant == 'NCS'
 
 
 def test_uuid_from_constructor_ok():
@@ -21,6 +21,6 @@ def test_uuid_from_constructor_ok():
     assert isinstance(uuid, Uuid)
     assert str(uuid) == '12345678-1234-5678-1234-567812345678'
     assert repr(uuid) == "Uuid('12345678-1234-5678-1234-567812345678')"
-    assert uuid.version == 4
-    assert uuid.urn == 'foo'
-    assert uuid.variant == 'bar'
+    assert uuid.urn == 'urn:uuid:12345678-1234-5678-1234-567812345678'
+    assert uuid.version == 5
+    assert uuid.variant == 'NCS'
