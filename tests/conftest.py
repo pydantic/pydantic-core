@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Type
 
-import hypothesis
 import pytest
 from typing_extensions import Literal
 
@@ -17,10 +16,6 @@ from pydantic_core import ArgsKwargs, SchemaValidator
 from pydantic_core.core_schema import CoreConfig
 
 __all__ = 'Err', 'PyAndJson', 'plain_repr', 'infinite_generator'
-
-hypothesis.settings.register_profile('fast', max_examples=2)
-hypothesis.settings.register_profile('slow', max_examples=1_000)
-hypothesis.settings.load_profile(os.getenv('HYPOTHESIS_PROFILE', 'fast'))
 
 
 def plain_repr(obj):

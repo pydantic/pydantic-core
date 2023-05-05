@@ -98,7 +98,6 @@ import importlib
 
 await micropip.install([
     'dirty-equals',
-    'hypothesis',
     'pytest-speed',
     'pytest-mock',
     'file:${wheel_path}',
