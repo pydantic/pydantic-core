@@ -183,10 +183,13 @@ impl Validator for ModelValidator {
                     field_name.to_string(),
                 ))
             } else {
-                // .validate(py, input, &new_extra, definitions, recursion_guard)?;
+                let field_extra = Extra {
+                    field_name: Some(field_name),
+                    ..*extra
+                };
                 let output = self
                     .validator
-                    .validate(py, field_value, extra, definitions, recursion_guard)?;
+                    .validate(py, field_value, &field_extra, definitions, recursion_guard)?;
 
                 force_setattr(py, model, intern!(py, ROOT_FIELD), output)?;
                 Ok(model.into_py(py))
@@ -292,9 +295,18 @@ impl ModelValidator {
                 return Ok(self.class.call(py, (), Some(kwargs))?);
             }
         }
-        let output = self
-            .validator
-            .validate(py, input, extra, definitions, recursion_guard)?;
+
+        let output = if self.root_model {
+            let field_extra = Extra {
+                field_name: Some(ROOT_FIELD),
+                ..*extra
+            };
+            self.validator
+                .validate(py, input, &field_extra, definitions, recursion_guard)?
+        } else {
+            self.validator
+                .validate(py, input, extra, definitions, recursion_guard)?
+        };
 
         let instance = create_class(self.class.as_ref(py))?;
         let instance_ref = instance.as_ref(py);
