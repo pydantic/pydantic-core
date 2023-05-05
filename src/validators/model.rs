@@ -54,6 +54,7 @@ pub struct ModelValidator {
     post_init: Option<Py<PyString>>,
     name: String,
     frozen: bool,
+    custom_init: bool,
 }
 
 impl BuildValidator for ModelValidator {
@@ -90,6 +91,7 @@ impl BuildValidator for ModelValidator {
             // which is not what we want here
             name: class.getattr(intern!(py, "__name__"))?.extract()?,
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
+            custom_init: schema.get_as(intern!(py, "custom_init"))?.unwrap_or(false),
         }
         .into())
     }
@@ -156,6 +158,18 @@ impl Validator for ModelValidator {
                 input,
             ))
         } else {
+            if self.custom_init {
+                // If we wanted, we could introspect the __init__ signature, and store the
+                // keyword arguments and types, and create a validator for them.
+                // Perhaps something similar to `validate_call`? Could probably make
+                // this work with from_attributes, and would essentially allow you to
+                // handle init vars by adding them to the __init__ signature.
+                // TODO: Should probably provide some nicer error if not a dict, though if I
+                //   understand correctly, this current logic actually seems to match v1 behavior..
+                if let Ok(py_dict) = input.to_object(py).downcast::<PyDict>(py) {
+                    return Ok(self.class.call(py, (), Some(py_dict))?);
+                }
+            }
             let output = self
                 .validator
                 .validate(py, input, extra, definitions, recursion_guard)?;
