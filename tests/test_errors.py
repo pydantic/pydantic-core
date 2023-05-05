@@ -640,7 +640,7 @@ def test_subclass_validation_error():
             self.body = body
             super().__init__(message, errors, 'python')
 
-        def derive(self, __exceptions: list[InitErrorDetails | ValidationError]) -> 'MyValidationError':
+        def derive(self, __exceptions: 'list[InitErrorDetails | ValidationError]') -> 'MyValidationError':
             return MyValidationError(message=self.title, errors=__exceptions, body=self.body)
 
     e = MyValidationError('testing', [])
