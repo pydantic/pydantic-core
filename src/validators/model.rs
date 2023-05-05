@@ -139,14 +139,14 @@ impl Validator for ModelValidator {
                     full_model_dict
                 };
 
-                let output = self
-                    .validator
-                    .validate(py, full_model_dict, extra, definitions, recursion_guard)?;
-
-                let (model_dict, model_extra, _): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
-                let instance = self.create_class(model_dict, model_extra, fields_set)?;
-
-                self.call_post_init(py, instance, input, extra)
+                self.validate_construct(
+                    py,
+                    full_model_dict,
+                    Some(fields_set),
+                    extra,
+                    definitions,
+                    recursion_guard,
+                )
             } else {
                 Ok(input.to_object(py))
             }
@@ -158,22 +158,7 @@ impl Validator for ModelValidator {
                 input,
             ))
         } else {
-            if self.custom_init {
-                // If we wanted, we could introspect the __init__ signature, and store the
-                // keyword arguments and types, and create a validator for them.
-                // Perhaps something similar to `validate_call`? Could probably make
-                // this work with from_attributes, and would essentially allow you to
-                // handle init vars by adding them to the __init__ signature.
-                if let Some(kwargs) = input.as_kwargs(py) {
-                    return Ok(self.class.call(py, (), Some(kwargs))?);
-                }
-            }
-            let output = self
-                .validator
-                .validate(py, input, extra, definitions, recursion_guard)?;
-            let (model_dict, model_extra, fields_set): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
-            let instance = self.create_class(model_dict, model_extra, fields_set)?;
-            self.call_post_init(py, instance, input, extra)
+            self.validate_construct(py, input, None, extra, definitions, recursion_guard)
         }
     }
 
@@ -265,6 +250,34 @@ impl ModelValidator {
         let (model_dict, model_extra, fields_set): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
         set_model_attrs(self_instance, model_dict, model_extra, fields_set)?;
         self.call_post_init(py, self_instance.into_py(py), input, extra)
+    }
+
+    fn validate_construct<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        existing_fields_set: Option<&'data PyAny>,
+        extra: &Extra,
+        definitions: &'data Definitions<CombinedValidator>,
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        if self.custom_init {
+            // If we wanted, we could introspect the __init__ signature, and store the
+            // keyword arguments and types, and create a validator for them.
+            // Perhaps something similar to `validate_call`? Could probably make
+            // this work with from_attributes, and would essentially allow you to
+            // handle init vars by adding them to the __init__ signature.
+            if let Some(kwargs) = input.as_kwargs(py) {
+                return Ok(self.class.call(py, (), Some(kwargs))?);
+            }
+        }
+        let output = self
+            .validator
+            .validate(py, input, extra, definitions, recursion_guard)?;
+        let (model_dict, model_extra, val_fields_set): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
+        let fields_set = existing_fields_set.unwrap_or(val_fields_set);
+        let instance = self.create_class(model_dict, model_extra, fields_set)?;
+        self.call_post_init(py, instance, input, extra)
     }
 
     fn call_post_init<'s, 'data>(
