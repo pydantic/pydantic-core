@@ -219,6 +219,7 @@ all_schema_functions = [
     ),
     (core_schema.json_schema, args({'type': 'int'}), {'type': 'json', 'schema': {'type': 'int'}}),
     (core_schema.url_schema, args(), {'type': 'url'}),
+    (core_schema.uuid_schema, args(), {'type': 'uuid'}),
     (core_schema.multi_host_url_schema, args(), {'type': 'multi-host-url'}),
     (
         core_schema.lax_or_strict_schema,
@@ -278,9 +279,6 @@ def test_all_schema_functions_used():
     # isn't a CoreSchema type
     types_used.remove('typed-dict-field')
     types_used.remove('model-field')
-
-    # TODO(martinabeleda): use this schema
-    all_types.remove('uuid')
 
     assert all_types == types_used
 

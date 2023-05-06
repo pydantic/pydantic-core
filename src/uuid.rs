@@ -85,7 +85,7 @@ impl PyUuid {
     }
 
     fn __bool__(&self) -> bool {
-        true // an empty string is not a valid UUID
+        true
     }
 
     pub fn __deepcopy__(&self, py: Python, _memo: &PyDict) -> Py<PyAny> {

@@ -125,6 +125,7 @@ combined_serializer! {
         Model: super::type_serializers::model::ModelSerializer;
         Url: super::type_serializers::url::UrlSerializer;
         MultiHostUrl: super::type_serializers::url::MultiHostUrlSerializer;
+        Uuid: super::type_serializers::uuid::UuidSerializer;
         Any: super::type_serializers::any::AnySerializer;
         Format: super::type_serializers::format::FormatSerializer;
         ToString: super::type_serializers::format::ToStringSerializer;

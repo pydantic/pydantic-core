@@ -21,6 +21,7 @@ pub mod tuple;
 pub mod typed_dict;
 pub mod union;
 pub mod url;
+pub mod uuid;
 pub mod with_default;
 
 pub(self) use super::computed_fields::ComputedFields;
