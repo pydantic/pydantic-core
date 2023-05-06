@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, FrozenSet, List, Optional, Set, Union
+from uuid import UUID
 
 import pytest
 from dirty_equals import IsStr
@@ -691,6 +692,57 @@ def test_bytes_pyd(benchmark):
         __root__: bytes
 
     benchmark(PydanticModel.parse_obj, some_bytes)
+
+
+class TestBenchmarkUuid:
+    @pytest.fixture(scope='class')
+    def pydantic_model(self):
+        class PydanticModel(BaseModel):
+            uuid: UUID
+
+        return PydanticModel
+
+    @pytest.fixture(scope='class')
+    def core_validator(self):
+        class CoreModel:
+            __slots__ = '__dict__', '__pydantic_extra__', '__pydantic_fields_set__'
+
+        return SchemaValidator(
+            {
+                'type': 'model',
+                'cls': CoreModel,
+                'schema': {
+                    'type': 'model-fields',
+                    'fields': {'uuid': {'type': 'model-field', 'schema': {'type': 'uuid'}}},
+                },
+            }
+        )
+
+    @pytest.fixture(scope='class')
+    def uuid_str(self):
+        return '12345678-1234-5678-1234-567812345678'
+
+    @pytest.fixture(scope='class')
+    def json_dict_data(self, uuid_str):
+        return json.dumps({'uuid': uuid_str})
+
+    @skip_pydantic
+    @pytest.mark.benchmark(group='uuid model - JSON')
+    def test_model_pyd_json(self, pydantic_model, benchmark, json_dict_data):
+        @benchmark
+        def pydantic_json():
+            obj = json.loads(json_dict_data)
+            return pydantic_model.parse_obj(obj)
+
+    @pytest.mark.benchmark(group='uuid model - JSON')
+    def test_model_core_json(self, core_validator, benchmark, json_dict_data):
+        benchmark(core_validator.validate_json, json_dict_data)
+
+    @pytest.mark.benchmark(group='uuid str')
+    def test_core_str(self, benchmark, uuid_str):
+        v = SchemaValidator({'type': 'uuid'})
+
+        benchmark(v.validate_python, uuid_str)
 
 
 class TestBenchmarkDateTime:
