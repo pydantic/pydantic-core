@@ -663,7 +663,7 @@ def test_raise_validation_tree():
 
     with pytest.raises(ValidationError) as exc_info1:
         raise ValidationError(
-            'Foobar', [{'type': 'greater_than', 'loc': ('a', 2), 'input': 4, 'ctx': {'gt': 5}}], 'python', (123,)
+            'Foobar', [{'type': 'greater_than', 'loc': ('a', 2), 'input': 4, 'ctx': {'gt': 5}}], loc_prefix=(123,)
         )
 
     with pytest.raises(ValidationError) as exc_info2:
@@ -672,8 +672,7 @@ def test_raise_validation_tree():
     v = ValidationError(
         'merged',
         [exc_info1.value, exc_info2.value, {'type': 'less_than', 'loc': ('a', 2), 'input': 8, 'ctx': {'lt': 1}}],
-        'python',
-        ('outer',),
+        loc_prefix=('outer',),
     )
 
     assert v.error_count() == 3
