@@ -15,7 +15,7 @@ else:
 if sys.version_info < (3, 11):
     from typing_extensions import Literal, LiteralString, NotRequired, Self, TypeAlias
 else:
-    from typing import Literal, LiteralString, NotRequired, TypeAlias
+    from typing import Literal, LiteralString, NotRequired, Self, TypeAlias
 
 from _typeshed import SupportsAllComparisons
 
@@ -185,13 +185,15 @@ Location = tuple[str | int, ...]
 class ValidationError(ValueError):
     def __init__(
         self,
-        title: str,
+        message: str,
         errors: 'list[InitErrorDetails | ValidationError]',
         error_mode: Literal['python', 'json'] = 'python',
         loc_prefix: Location | None = None,
     ) -> None: ...
     @property
-    def title(self) -> str: ...
+    def message(self) -> str: ...
+    @property
+    def error_mode(self) -> Literal['python', 'json']: ...
     def error_count(self) -> int: ...
     def errors(self, *, include_url: bool = True, include_context: bool = True) -> 'list[ErrorDetails]': ...
     def json(self, *, indent: 'int | None' = None, include_url: bool = True, include_context: bool = False) -> str: ...

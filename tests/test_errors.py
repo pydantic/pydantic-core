@@ -1,5 +1,6 @@
 import re
 from decimal import Decimal
+from typing import List
 
 import pytest
 from dirty_equals import HasRepr, IsInstance, IsJson, IsStr
@@ -636,17 +637,19 @@ def test_loc_with_dots():
 
 def test_subclass_validation_error():
     class MyValidationError(ValidationError):
-        def __init__(self, message: str, errors, body: int = 123):
-            self.body = body
-            super().__init__(message, errors, 'python')
+        def __new__(cls, message: str, errors: List[InitErrorDetails], _body: int = 123) -> 'MyValidationError':
+            return super().__new__(cls, message, errors)
 
-        def derive(self, __exceptions: 'list[InitErrorDetails | ValidationError]') -> 'MyValidationError':
-            return MyValidationError(message=self.title, errors=__exceptions, body=self.body)
+        def __init__(self, _message: str, _errors: List[InitErrorDetails], body: int = 123):
+            self.body = body
+
+        def derive(self, exceptions: 'list[ValidationError]') -> 'MyValidationError':
+            return MyValidationError(self.message, exceptions, self.body)
 
     e = MyValidationError('testing', [])
     assert isinstance(e, MyValidationError)
     assert e.body == 123
-    assert e.title == 'testing'
+    assert e.message == 'testing'
 
     e2 = e.derive([{'type': 'greater_than', 'loc': ('a', 2), 'input': 4, 'ctx': {'gt': 5}}])
     assert isinstance(e2, MyValidationError)
@@ -675,32 +678,39 @@ def test_raise_validation_tree():
 
     assert v.error_count() == 3
     assert v.errors(include_url=False) == [
-        {'type': 'less_than', 'loc': (2, 'a'), 'msg': 'Input should be less than 1', 'input': 8, 'ctx': {'lt': 1}},
         {
             'type': 'greater_than',
-            'loc': (2, 'a'),
+            'loc': ('outer', 123, 2, 'a'),
             'msg': 'Input should be greater than 5',
             'input': 4,
             'ctx': {'gt': 5},
         },
         {
             'type': 'greater_than',
-            'loc': (1, 'a'),
+            'loc': ('outer', 1, 'a'),
             'msg': 'Input should be greater than 5',
             'input': 2,
             'ctx': {'gt': 5},
         },
+        {
+            'type': 'less_than',
+            'loc': ('outer', 2, 'a'),
+            'msg': 'Input should be less than 1',
+            'input': 8,
+            'ctx': {'lt': 1},
+        },
     ]
+
     # fmt: off
     assert repr(v) == f"""\
 3 validation errors for merged
-2.a
-  Input should be less than 1 [type=less_than, input_value=8, input_type=int]
-    For further information visit https://errors.pydantic.dev/{__version__}/v/less_than
-2.a
+outer.123.2.a
   Input should be greater than 5 [type=greater_than, input_value=4, input_type=int]
     For further information visit https://errors.pydantic.dev/{__version__}/v/greater_than
-1.a
+outer.1.a
   Input should be greater than 5 [type=greater_than, input_value=2, input_type=int]
-    For further information visit https://errors.pydantic.dev/{__version__}/v/greater_than"""
+    For further information visit https://errors.pydantic.dev/{__version__}/v/greater_than
+outer.2.a
+  Input should be less than 1 [type=less_than, input_value=8, input_type=int]
+    For further information visit https://errors.pydantic.dev/{__version__}/v/less_than"""
     # fmt: on
