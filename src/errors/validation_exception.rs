@@ -24,7 +24,8 @@ use super::types::{ErrorMode, ErrorType};
 use super::value_exception::PydanticCustomError;
 use super::ValError;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 enum WrappedError {
     LineError(PyLineError),
     ValidationError(ValidationError),
@@ -327,7 +328,8 @@ pub fn pretty_py_line_errors(
 
 /// `PyLineError` are the public version of `ValLineError`, as help and used in `ValidationError`s
 #[pyclass]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PyLineError {
     error_type: ErrorType,
     location: Location,
