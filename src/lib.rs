@@ -25,7 +25,9 @@ mod validators;
 pub use self::url::{PyMultiHostUrl, PyUrl};
 pub use argument_markers::ArgsKwargs;
 pub use build_tools::SchemaError;
-pub use errors::{list_all_errors, PydanticCustomError, PydanticKnownError, PydanticOmit, ValidationError};
+pub use errors::{
+    list_all_errors, BaseExceptionGroup, PydanticCustomError, PydanticKnownError, PydanticOmit, ValidationError,
+};
 pub use serializers::{
     to_json, to_jsonable_python, PydanticSerializationError, PydanticSerializationUnexpectedValue, SchemaSerializer,
 };
@@ -47,6 +49,7 @@ fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("build_profile", env!("PROFILE"))?;
     m.add_class::<SchemaValidator>()?;
     m.add_class::<ValidationError>()?;
+    m.add_class::<BaseExceptionGroup>()?;
     m.add_class::<SchemaError>()?;
     m.add_class::<PydanticCustomError>()?;
     m.add_class::<PydanticKnownError>()?;

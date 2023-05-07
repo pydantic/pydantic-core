@@ -1,11 +1,13 @@
 use pyo3::prelude::*;
 
+mod exception_group;
 mod line_error;
 mod location;
 mod types;
 mod validation_exception;
 mod value_exception;
 
+pub use self::exception_group::BaseExceptionGroup;
 pub use self::line_error::{InputValue, ValError, ValLineError, ValResult};
 pub use self::location::LocItem;
 pub use self::types::{list_all_errors, ErrorMode, ErrorType};

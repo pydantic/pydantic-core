@@ -1,6 +1,6 @@
 import decimal
 import sys
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 from pydantic_core import ErrorDetails, InitErrorDetails
 from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
@@ -239,3 +239,19 @@ def list_all_errors() -> 'list[ErrorTypeInfo]':
     """
     Get information about all built-in errors.
     """
+
+class BaseExceptionGroup(BaseException):
+    def __new__(
+        cls, __message: str, __exceptions: Sequence[BaseException | 'BaseExceptionGroup']
+    ) -> BaseExceptionGroup: ...
+    def __init__(self, __message: str, __exceptions: Sequence[BaseException | 'BaseExceptionGroup']) -> None: ...
+    @property
+    def message(self) -> str: ...
+    @property
+    def exceptions(self) -> Sequence[BaseException | BaseExceptionGroup]: ...
+    def subgroup(
+        self, __condition: Callable[[BaseException | 'BaseExceptionGroup'], bool]
+    ) -> BaseExceptionGroup | None: ...
+    def split(
+        self, __condition: Callable[[BaseException | 'BaseExceptionGroup'], bool]
+    ) -> tuple[BaseExceptionGroup | None, BaseExceptionGroup | None]: ...
