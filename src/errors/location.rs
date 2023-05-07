@@ -114,8 +114,7 @@ impl Serialize for LocItem {
 /// Note: location in List is stored in **REVERSE** so adding an "outer" item to location involves
 /// pushing to the vec which is faster than inserting and shifting everything along.
 /// Then when "using" location in `Display` and `ToPyObject` order has to be reversed
-#[derive(Clone)]
-#[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(Clone, Debug)]
 pub enum Location {
     // no location, avoid creating an unnecessary vec
     Empty,
