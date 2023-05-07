@@ -190,13 +190,18 @@ impl Location {
     }
 
     pub fn with_prefix(&self, prefix: &Location) -> Location {
+        // Reminder: locations are reversed!
         match (prefix, self) {
             (Location::Empty, Location::Empty) => Location::Empty,
             (Location::Empty, Location::List(_)) => self.clone(),
-            (Location::List(_), Location::Empty) => prefix.clone(),
-            (Location::List(prefix_list), Location::List(self_list)) => {
-                Location::List(prefix_list.iter().chain(self_list.iter()).cloned().collect())
-            }
+            (Location::List(v), Location::Empty) => Location::List(v.iter().rev().cloned().collect()),
+            (Location::List(prefix_list), Location::List(self_list)) => Location::List(
+                self_list
+                    .iter()
+                    .cloned()
+                    .chain(prefix_list.iter().rev().cloned())
+                    .collect(),
+            ),
         }
     }
 }

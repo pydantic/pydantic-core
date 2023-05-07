@@ -1,13 +1,12 @@
 use std::fmt;
 use std::fmt::{Display, Write};
 use std::str::from_utf8;
-use std::sync::Arc;
 
 use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::ffi::Py_ssize_t;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyString, PyTuple};
+use pyo3::types::{PyDict, PyList, PyString};
 use pyo3::{ffi, intern};
 use serde::ser::{Error, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
@@ -25,12 +24,39 @@ use super::types::{ErrorMode, ErrorType};
 use super::value_exception::PydanticCustomError;
 use super::ValError;
 
+#[derive(Debug, Clone)]
+enum WrappedError {
+    LineError(PyLineError),
+    ValidationError(ValidationError),
+}
+
+impl From<PyLineError> for WrappedError {
+    fn from(value: PyLineError) -> Self {
+        WrappedError::LineError(value)
+    }
+}
+
+impl From<ValidationError> for WrappedError {
+    fn from(value: ValidationError) -> Self {
+        WrappedError::ValidationError(value)
+    }
+}
+
+impl<'source> FromPyObject<'source> for WrappedError {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        if let Ok(v) = ob.extract::<ValidationError>() {
+            Ok(WrappedError::ValidationError(v))
+        } else {
+            Ok(WrappedError::LineError(PyLineError::try_from(ob)?))
+        }
+    }
+}
+
 #[pyclass(subclass, extends=PyValueError, module="pydantic_core._pydantic_core")]
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct ValidationError {
-    line_errors: Vec<Arc<PyLineError>>,
-    validation_errors: Vec<Arc<ValidationError>>,
+    exceptions: Vec<WrappedError>,
     error_mode: ErrorMode,
     #[pyo3(get)]
     message: PyObject,
@@ -39,29 +65,12 @@ pub struct ValidationError {
 }
 
 impl ValidationError {
-    pub fn new(line_errors: Vec<PyLineError>, message: PyObject, error_mode: ErrorMode) -> Self {
+    pub fn new(exceptions: Vec<PyLineError>, message: PyObject, error_mode: ErrorMode) -> Self {
         Self {
-            line_errors: line_errors.into_iter().map(Arc::new).collect(),
-            validation_errors: Vec::new(),
+            exceptions: exceptions.into_iter().map(WrappedError::from).collect(),
             message,
             error_mode,
             loc_prefix: Location::Empty,
-        }
-    }
-
-    pub fn new_with_val_errors(
-        line_errors: Vec<Arc<PyLineError>>,
-        validation_errors: Vec<Arc<ValidationError>>,
-        message: PyObject,
-        error_mode: ErrorMode,
-        loc_prefix: Location,
-    ) -> Self {
-        Self {
-            line_errors,
-            validation_errors,
-            message,
-            error_mode,
-            loc_prefix,
         }
     }
 
@@ -106,6 +115,19 @@ impl ValidationError {
         }
     }
 
+    pub fn flatten_errors(&self) -> Vec<PyLineError> {
+        let mut res = Vec::with_capacity(self.error_count());
+        for e in &self.exceptions {
+            match e {
+                WrappedError::LineError(v) => res.push(v.with_prefix(&self.loc_prefix)),
+                WrappedError::ValidationError(v) => {
+                    res.extend(v.flatten_errors().iter().map(|v| v.with_prefix(&self.loc_prefix)))
+                }
+            }
+        }
+        res
+    }
+
     pub fn omit_error() -> PyErr {
         py_error_type!("Uncaught Omit error, please check your usage of `default` validators.")
     }
@@ -145,41 +167,18 @@ impl<'a> IntoPy<ValError<'a>> for ValidationError {
     }
 }
 
-type LineErrors = Vec<Arc<PyLineError>>;
-type ValidationErrors = Vec<Arc<ValidationError>>;
-
-fn partition_errors(errors: &PyList) -> PyResult<(LineErrors, ValidationErrors)> {
-    let mut line_errors = Vec::new();
-    let mut validation_errors = Vec::new();
-
-    for py_exc in errors {
-        // Note: can we use a Py<> instead of an Arc to avoid the clone?
-        if let Ok(e) = py_exc.extract() {
-            validation_errors.push(Arc::new(e))
-        } else {
-            let e = PyLineError::try_from(py_exc)?;
-            line_errors.push(Arc::new(e))
-        }
-    }
-    Ok((line_errors, validation_errors))
-}
-
 #[pymethods]
 impl ValidationError {
-    #[pyo3(signature = (message, errors, error_mode = None, *_args, loc_prefix = None, **_kwargs))]
+    #[pyo3(signature = (message, errors, error_mode = None, loc_prefix = None))]
     #[new]
     fn py_new(
         message: PyObject,
         errors: &PyList,
         error_mode: Option<&str>,
-        _args: &PyTuple,
         loc_prefix: Option<&PyAny>,
-        _kwargs: Option<&PyDict>,
     ) -> PyResult<Self> {
-        let (line_errors, validation_errors) = partition_errors(errors)?;
         Ok(Self {
-            line_errors,
-            validation_errors,
+            exceptions: errors.iter().map(WrappedError::extract).collect::<Result<_, _>>()?,
             message,
             error_mode: error_mode.try_into()?,
             loc_prefix: loc_prefix.try_into()?,
@@ -191,18 +190,21 @@ impl ValidationError {
         self.message.clone()
     }
 
-    pub fn flatten_errors(&self) -> Vec<PyLineError> {
-        let mut res: Vec<_> = self.line_errors.iter().map(|v| (**v).clone()).collect();
-        for v in &self.validation_errors {
-            res.extend(v.flatten_errors().iter().map(|v| v.with_prefix(&self.loc_prefix)));
+    #[getter]
+    fn error_mode(&self) -> &str {
+        match self.error_mode {
+            ErrorMode::Python => "python",
+            ErrorMode::Json => "json",
         }
-        res
     }
 
     pub fn error_count(&self) -> usize {
-        let mut res = self.line_errors.len();
-        for v in &self.validation_errors {
-            res += v.error_count()
+        let mut res = 0;
+        for v in &self.exceptions {
+            match v {
+                WrappedError::LineError(_) => res += 1,
+                WrappedError::ValidationError(v) => res += v.error_count(),
+            }
         }
         res
     }
@@ -270,18 +272,18 @@ impl ValidationError {
     }
 
     fn derive(&self, py: Python, errors: &PyList) -> PyResult<Py<Self>> {
-        let (mut line_errors, mut validation_errors) = partition_errors(errors)?;
-        line_errors.extend(self.line_errors.iter().cloned());
-        validation_errors.extend(self.validation_errors.iter().cloned());
         Py::new(
             py,
-            Self::new_with_val_errors(
-                line_errors,
-                validation_errors,
-                self.message.clone(),
-                self.error_mode.clone(),
-                self.loc_prefix.clone(),
-            ),
+            Self {
+                exceptions: errors
+                    .iter()
+                    .map(WrappedError::extract)
+                    .collect::<Result<_, _>>()
+                    .unwrap(),
+                message: self.message.clone(),
+                error_mode: self.error_mode.clone(),
+                loc_prefix: self.loc_prefix.clone(),
+            },
         )
     }
 
