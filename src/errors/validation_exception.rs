@@ -327,8 +327,7 @@ pub fn pretty_py_line_errors(
 
 /// `PyLineError` are the public version of `ValLineError`, as help and used in `ValidationError`s
 #[pyclass]
-#[derive(Clone)]
-#[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(Debug, Clone)]
 pub struct PyLineError {
     error_type: ErrorType,
     location: Location,
