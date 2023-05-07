@@ -1,3 +1,4 @@
+import sys
 from dataclasses import dataclass
 
 import pytest
@@ -87,3 +88,24 @@ def test_split() -> None:
 def test_raise() -> None:
     with pytest.raises(BaseExceptionGroup):
         raise BaseExceptionGroup('foo', [EqTypeError(), EqExc(x=2), BaseExceptionGroup('msg', [EqExc(x=1)])])
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='The standard library ExceptionGroup was added in 3.11')
+def test_stdlib_exception_group() -> None:
+    from builtins import BaseExceptionGroup as StdlibBaseExceptionGroup
+
+    te = EqTypeError()
+    ve = ValueErrorTypeError()
+    eg = BaseExceptionGroup('foo', [te, EqExc(x=2), StdlibBaseExceptionGroup('msg', [EqExc(x=1), EqExc(x=3), ve])])
+
+    keep, discard = eg.split(lambda e: isinstance(e, TypeError) or isinstance(e, EqExc) and e.x > 1)
+
+    assert keep is not None
+    keep_stdlib = keep.exceptions[2]
+    assert isinstance(keep_stdlib, StdlibBaseExceptionGroup)
+    assert list(keep_stdlib.exceptions) == [EqExc(x=3)]
+
+    assert discard is not None
+    keep_stdlib = discard.exceptions[0]
+    assert isinstance(keep_stdlib, StdlibBaseExceptionGroup)
+    assert list(keep_stdlib.exceptions) == [EqExc(x=1), ve]
