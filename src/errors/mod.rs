@@ -6,13 +6,15 @@ mod location;
 mod types;
 mod validation_exception;
 mod value_exception;
+mod exceptions;
 
-pub use self::exception_group::BaseExceptionGroup;
+pub use self::exception_group::ValidationException;
 pub use self::line_error::{InputValue, ValError, ValLineError, ValResult};
 pub use self::location::LocItem;
 pub use self::types::{list_all_errors, ErrorMode, ErrorType};
 pub use self::validation_exception::ValidationError;
 pub use self::value_exception::{PydanticCustomError, PydanticKnownError, PydanticOmit};
+pub use self::exceptions::{register_errors_module, PydanticException};
 
 pub fn py_err_string(py: Python, err: PyErr) -> String {
     let value = err.value(py);

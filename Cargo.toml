@@ -32,7 +32,7 @@ strum = { version = "0.24.1", features = ["derive"] }
 strum_macros = "0.24.3"
 serde_json = {version = "1.0.87", features = ["preserve_order"]}
 enum_dispatch = "0.3.8"
-serde = "1.0.147"
+serde = { version = "1.0.147", features = ["derive"]}
 mimalloc = { version = "0.1.30", default-features = false, optional = true }
 speedate = "0.7.0"
 ahash = "0.8.0"
@@ -40,6 +40,7 @@ url = "2.3.1"
 # idna is already required by url, added here to be explicit
 idna = "0.3.0"
 base64 = "0.13.1"
+pythonize = "0.18.0"
 
 [lib]
 name = "_pydantic_core"

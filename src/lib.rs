@@ -26,7 +26,7 @@ pub use self::url::{PyMultiHostUrl, PyUrl};
 pub use argument_markers::ArgsKwargs;
 pub use build_tools::SchemaError;
 pub use errors::{
-    list_all_errors, BaseExceptionGroup, PydanticCustomError, PydanticKnownError, PydanticOmit, ValidationError,
+    list_all_errors, ValidationException, PydanticCustomError, PydanticKnownError, PydanticOmit, ValidationError, register_errors_module
 };
 pub use serializers::{
     to_json, to_jsonable_python, PydanticSerializationError, PydanticSerializationUnexpectedValue, SchemaSerializer,
@@ -44,12 +44,11 @@ pub fn get_version() -> String {
 }
 
 #[pymodule]
-fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
+fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", get_version())?;
     m.add("build_profile", env!("PROFILE"))?;
     m.add_class::<SchemaValidator>()?;
     m.add_class::<ValidationError>()?;
-    m.add_class::<BaseExceptionGroup>()?;
     m.add_class::<SchemaError>()?;
     m.add_class::<PydanticCustomError>()?;
     m.add_class::<PydanticKnownError>()?;
@@ -63,5 +62,7 @@ fn _pydantic_core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(to_json, m)?)?;
     m.add_function(wrap_pyfunction!(to_jsonable_python, m)?)?;
     m.add_function(wrap_pyfunction!(list_all_errors, m)?)?;
+    crate::errors::register_errors_module(py, m)?;
+    m.add_class::<ValidationException>()?;
     Ok(())
 }
