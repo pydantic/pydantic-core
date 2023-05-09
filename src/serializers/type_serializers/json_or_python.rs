@@ -5,8 +5,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
-use crate::build_context::BuildContext;
 use crate::build_tools::SchemaDict;
+use crate::definitions::DefinitionsBuilder;
 
 #[derive(Debug, Clone)]
 pub struct JsonOrPythonSerializer {
@@ -21,14 +21,14 @@ impl BuildSerializer for JsonOrPythonSerializer {
     fn build(
         schema: &PyDict,
         config: Option<&PyDict>,
-        build_context: &mut BuildContext<CombinedSerializer>,
+        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let json_schema: &PyDict = schema.get_as_req(intern!(py, "json_schema"))?;
         let python_schema: &PyDict = schema.get_as_req(intern!(py, "python_schema"))?;
 
-        let json = CombinedSerializer::build(json_schema, config, build_context)?;
-        let python = CombinedSerializer::build(python_schema, config, build_context)?;
+        let json = CombinedSerializer::build(json_schema, config, definitions)?;
+        let python = CombinedSerializer::build(python_schema, config, definitions)?;
 
         let name = format!(
             "{}[json={}, python={}]",
@@ -40,7 +40,8 @@ impl BuildSerializer for JsonOrPythonSerializer {
             json: Box::new(json),
             python: Box::new(python),
             name,
-        }.into())
+        }
+        .into())
     }
 }
 

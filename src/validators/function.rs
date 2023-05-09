@@ -11,7 +11,10 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
 use super::generator::InternalValidator;
-use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{
+    build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, ValidationMode,
+    Validator,
+};
 
 fn destructure_function_schema(schema: &PyDict) -> PyResult<(bool, bool, &PyAny)> {
     let func_dict: &PyDict = schema.get_as_req(intern!(schema.py(), "function"))?;
@@ -467,6 +470,8 @@ pub struct ValidationInfo {
     context: Option<PyObject>,
     data: Option<Py<PyDict>>,
     field_name: Option<String>,
+    #[pyo3(get)]
+    mode: ValidationMode,
 }
 
 impl ValidationInfo {
@@ -479,6 +484,7 @@ impl ValidationInfo {
                         context: extra.context.map(|v| v.into()),
                         field_name: Some(field_name.to_string()),
                         data: extra.data.map(|v| v.into()),
+                        mode: extra.mode,
                     }
                 ),
                 _ => Err(PyRuntimeError::new_err("This validator expected to be run inside the context of a model field but no model field was found")),
@@ -489,6 +495,7 @@ impl ValidationInfo {
                 context: extra.context.map(|v| v.into()),
                 field_name: None,
                 data: None,
+                mode: extra.mode,
             })
         }
     }

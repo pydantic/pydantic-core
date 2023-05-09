@@ -124,6 +124,11 @@ class ValidationInfo(Protocol):
         """The CoreConfig that applies to this validation."""
         ...
 
+    @property
+    def mode(self) -> Literal['python', 'json']:
+        """The type of input data we are currently validating"""
+        ...
+
 
 class FieldValidationInfo(ValidationInfo, Protocol):
     """
