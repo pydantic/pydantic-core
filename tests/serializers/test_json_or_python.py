@@ -1,32 +1,19 @@
-import pytest
-
-from pydantic_core import SchemaValidator, ValidationError
-from pydantic_core import core_schema as cs
+from pydantic_core import SchemaSerializer, core_schema
 
 
 def test_json_or_python():
-    class Foo(str):
-        def __eq__(self, o: object) -> bool:
-            if isinstance(o, Foo) and super().__eq__(o):
-                return True
-            return False
+    def s1(v: int) -> int:
+        return v + 1
 
-    s = cs.json_or_python_schema(
-        json_schema=cs.no_info_after_validator_function(Foo, cs.str_schema()), python_schema=cs.is_instance_schema(Foo)
+    def s2(v: int) -> int:
+        return v + 2
+
+    s = SchemaSerializer(
+        core_schema.json_or_python_schema(
+            core_schema.int_schema(serialization=core_schema.plain_serializer_function_ser_schema(s1)),
+            core_schema.int_schema(serialization=core_schema.plain_serializer_function_ser_schema(s2)),
+        )
     )
-    v = SchemaValidator(s)
 
-    assert v.validate_python(Foo('abc')) == Foo('abc')
-    with pytest.raises(ValidationError) as exc_info:
-        v.validate_python('abc')
-    assert exc_info.value.errors(include_url=False) == [
-        {
-            'type': 'is_instance_of',
-            'loc': (),
-            'msg': 'Input should be an instance of test_json_or_python.<locals>.Foo',
-            'input': 'abc',
-            'ctx': {'class': 'test_json_or_python.<locals>.Foo'},
-        }
-    ]
-
-    assert v.validate_json('"abc"') == Foo('abc')
+    assert s.to_json(0) == b'1'
+    assert s.to_python(0) == 2
