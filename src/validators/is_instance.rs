@@ -1,22 +1,19 @@
 use pyo3::exceptions::PyNotImplementedError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySet, PyType};
+use pyo3::types::{PyDict, PyType};
 
 use crate::build_tools::{py_err, SchemaDict};
 use crate::errors::{ErrorType, ValError, ValResult};
-use crate::input::{Input, JsonType};
+use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
 use super::ValidationMode;
-use super::function::convert_err;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct IsInstanceValidator {
     class: PyObject,
-    json_types: u8,
-    json_function: Option<PyObject>,
     class_repr: String,
     name: String,
 }
@@ -48,14 +45,8 @@ impl BuildValidator for IsInstanceValidator {
             },
         };
         let name = format!("{}[{class_repr}]", Self::EXPECTED_TYPE);
-        let json_types = match schema.get_as::<&PySet>(intern!(py, "json_types"))? {
-            Some(s) => JsonType::combine(s)?,
-            None => 0,
-        };
         Ok(Self {
             class: class.into(),
-            json_types,
-            json_function: schema.get_item(intern!(py, "json_function")).map(|f| f.into_py(py)),
             class_repr,
             name,
         }
@@ -73,14 +64,10 @@ impl Validator for IsInstanceValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         match extra.mode {
-            ValidationMode::Json => Err(
-                ValError::InternalErr(
-                    PyNotImplementedError::new_err(
-                        "Cannot check isinstance when validating from json,\
-                            use a JsonOrPython validator instead."
-                    )
-                )
-            ),
+            ValidationMode::Json => Err(ValError::InternalErr(PyNotImplementedError::new_err(
+                "Cannot check isinstance when validating from json,\
+                            use a JsonOrPython validator instead.",
+            ))),
             ValidationMode::Python => {
                 let ob = input.to_object(py);
                 match ob.as_ref(py).is_instance(self.class.as_ref(py))? {
@@ -90,7 +77,7 @@ impl Validator for IsInstanceValidator {
                             class: self.class_repr.clone(),
                         },
                         input,
-                    ))
+                    )),
                 }
             }
         }

@@ -152,26 +152,6 @@ impl SchemaValidator {
         }
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, self_instance=None))]
-    pub fn isinstance_json(
-        &self,
-        py: Python,
-        input: &PyAny,
-        strict: Option<bool>,
-        context: Option<&PyAny>,
-        self_instance: Option<&PyAny>,
-    ) -> PyResult<bool> {
-        match input.parse_json() {
-            Ok(input) => match self._validate(py, &input, strict, context, self_instance) {
-                Ok(_) => Ok(true),
-                Err(ValError::InternalErr(err)) => Err(err),
-                Err(ValError::Omit) => Err(ValidationError::omit_error()),
-                Err(ValError::LineErrors(_)) => Ok(false),
-            },
-            Err(_) => Ok(false),
-        }
-    }
-
     #[pyo3(signature = (obj, field_name, field_value, *, strict=None, context=None))]
     pub fn validate_assignment(
         &self,

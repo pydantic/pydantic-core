@@ -23,8 +23,8 @@ use super::datetime::{
 use super::input_abstract::InputType;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
-    py_error_on_minusone, py_string_str, EitherBytes, EitherString, EitherTimedelta, GenericArguments,
-    GenericCollection, GenericIterator, GenericMapping, Input, JsonInput, PyArgs,
+    py_string_str, EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericCollection, GenericIterator,
+    GenericMapping, Input, JsonInput, PyArgs,
 };
 
 /// Extract generators and deques into a `GenericCollection`

@@ -1,4 +1,3 @@
-use pyo3::exceptions::PyNotImplementedError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -13,7 +12,7 @@ use super::parse_json::JsonArray;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
     EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericCollection, GenericIterator, GenericMapping,
-    Input, JsonArgs, JsonInput, JsonType,
+    Input, JsonArgs, JsonInput,
 };
 
 impl<'a> Input<'a> for JsonInput {
