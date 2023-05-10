@@ -20,7 +20,6 @@ use super::datetime::{
     float_as_duration, float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime,
     EitherTime,
 };
-use super::input_abstract::InputType;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
     py_string_str, EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericCollection, GenericIterator,
@@ -72,10 +71,6 @@ macro_rules! extract_dict_iter {
 }
 
 impl<'a> Input<'a> for PyAny {
-    fn get_type(&self) -> &'static InputType {
-        &InputType::Python
-    }
-
     fn as_loc_item(&self) -> LocItem {
         if let Ok(py_str) = self.downcast::<PyString>() {
             py_str.to_string_lossy().as_ref().into()

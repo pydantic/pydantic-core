@@ -11,7 +11,7 @@ use pyo3::{intern, PyTraverseError, PyVisit};
 use crate::build_tools::{py_err, py_error_type, SchemaDict, SchemaError};
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::errors::{ErrorMode, LocItem, ValError, ValResult, ValidationError};
-use crate::input::Input;
+use crate::input::{Input, InputType};
 use crate::recursion_guard::RecursionGuard;
 
 mod any;
@@ -113,7 +113,7 @@ impl SchemaValidator {
         context: Option<&PyAny>,
         self_instance: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        let r = self._validate(py, input, strict, context, self_instance);
+        let r = self._validate(py, input, InputType::Python, strict, context, self_instance);
         r.map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Python))
     }
 
@@ -126,7 +126,7 @@ impl SchemaValidator {
         context: Option<&PyAny>,
         self_instance: Option<&PyAny>,
     ) -> PyResult<bool> {
-        match self._validate(py, input, strict, context, self_instance) {
+        match self._validate(py, input, InputType::Python, strict, context, self_instance) {
             Ok(_) => Ok(true),
             Err(ValError::InternalErr(err)) => Err(err),
             Err(ValError::Omit) => Err(ValidationError::omit_error()),
@@ -145,7 +145,7 @@ impl SchemaValidator {
     ) -> PyResult<PyObject> {
         match input.parse_json() {
             Ok(input) => {
-                let r = self._validate(py, &input, strict, context, self_instance);
+                let r = self._validate(py, &input, InputType::Json, strict, context, self_instance);
                 r.map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Json))
             }
             Err(err) => Err(self.prepare_validation_err(py, err, ErrorMode::Json)),
@@ -163,7 +163,7 @@ impl SchemaValidator {
         context: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         let extra = Extra {
-            mode: ValidationMode::Python,
+            mode: InputType::Python,
             data: None,
             strict,
             ultra_strict: false,
@@ -209,6 +209,7 @@ impl SchemaValidator {
         &'data self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
+        mode: InputType,
         strict: Option<bool>,
         context: Option<&'data PyAny>,
         self_instance: Option<&PyAny>,
@@ -216,11 +217,6 @@ impl SchemaValidator {
     where
         's: 'data,
     {
-        let mode = match input.get_type() {
-            crate::input::InputType::Python => ValidationMode::Python,
-            crate::input::InputType::Json => ValidationMode::Json,
-            crate::input::InputType::String => ValidationMode::Json,
-        };
         self.validator.validate(
             py,
             input,
@@ -252,7 +248,7 @@ impl<'py> SelfValidator<'py> {
     }
 
     pub fn validate_schema(&self, py: Python<'py>, schema: &'py PyAny) -> PyResult<&'py PyAny> {
-        let extra = Extra::new(None, None, None, ValidationMode::Python);
+        let extra = Extra::new(None, None, None, InputType::Python);
         match self.validator.validator.validate(
             py,
             schema,
@@ -429,39 +425,12 @@ pub fn build_validator<'a>(
     )
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum ValidationMode {
-    Json,
-    Python,
-}
-
-impl<'source> FromPyObject<'source> for ValidationMode {
-    fn extract(ob: &'source PyAny) -> PyResult<Self> {
-        match ob.extract::<&str>()? {
-            "json" => Ok(ValidationMode::Json),
-            "python" => Ok(ValidationMode::Python),
-            other => Err(PyTypeError::new_err(format!(
-                "Expected one of 'json' or 'python', no validation mode '{other}'"
-            ))),
-        }
-    }
-}
-
-impl IntoPy<PyObject> for ValidationMode {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::Json => intern!(py, "json").into(),
-            Self::Python => intern!(py, "python").into(),
-        }
-    }
-}
-
 /// More (mostly immutable) data to pass between validators, should probably be class `Context`,
 /// but that would confuse it with context as per pydantic/pydantic#1549
 #[derive(Debug)]
 pub struct Extra<'a> {
     /// Validation mode
-    pub mode: ValidationMode,
+    pub mode: InputType,
     /// This is used as the `data` kwargs to validator functions
     pub data: Option<&'a PyDict>,
     /// Represents the fields of the model we are currently validating
@@ -482,7 +451,7 @@ impl<'a> Extra<'a> {
         strict: Option<bool>,
         context: Option<&'a PyAny>,
         self_instance: Option<&'a PyAny>,
-        mode: ValidationMode,
+        mode: InputType,
     ) -> Self {
         Extra {
             strict,

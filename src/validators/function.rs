@@ -12,8 +12,7 @@ use crate::recursion_guard::RecursionGuard;
 
 use super::generator::InternalValidator;
 use super::{
-    build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, ValidationMode,
-    Validator,
+    build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, InputType, Validator,
 };
 
 fn destructure_function_schema(schema: &PyDict) -> PyResult<(bool, bool, &PyAny)> {
@@ -471,7 +470,7 @@ pub struct ValidationInfo {
     data: Option<Py<PyDict>>,
     field_name: Option<String>,
     #[pyo3(get)]
-    mode: ValidationMode,
+    mode: InputType,
 }
 
 impl ValidationInfo {
