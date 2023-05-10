@@ -10,7 +10,7 @@ use crate::recursion_guard::RecursionGuard;
 use crate::ValidationError;
 
 use super::list::get_items_schema;
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, ValidationMode, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, InputType, Validator};
 
 #[derive(Debug, Clone)]
 pub struct GeneratorValidator {
@@ -202,7 +202,7 @@ pub struct InternalValidator {
     context: Option<PyObject>,
     self_instance: Option<PyObject>,
     recursion_guard: RecursionGuard,
-    validation_mode: ValidationMode,
+    validation_mode: InputType,
 }
 
 impl fmt::Debug for InternalValidator {

@@ -1055,8 +1055,6 @@ class IsInstanceSchema(TypedDict, total=False):
     type: Required[Literal['is-instance']]
     cls: Required[Any]
     cls_repr: str
-    json_types: Set[JsonType]
-    json_function: Callable[[Any], Any]
     ref: str
     metadata: Any
     serialization: SerSchema
@@ -1065,8 +1063,6 @@ class IsInstanceSchema(TypedDict, total=False):
 def is_instance_schema(
     cls: Any,
     *,
-    json_types: Set[JsonType] | None = None,
-    json_function: Callable[[Any], Any] | None = None,
     cls_repr: str | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1088,23 +1084,13 @@ def is_instance_schema(
 
     Args:
         cls: The value must be an instance of this class
-        json_types: When parsing JSON directly, the value must be one of these json types
-        json_function: When parsing JSON directly, If provided, the JSON value is passed to this
-            function and the return value used as the output value
         cls_repr: If provided this string is used in the validator name instead of `repr(cls)`
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
     return dict_not_none(
-        type='is-instance',
-        cls=cls,
-        json_types=json_types,
-        json_function=json_function,
-        cls_repr=cls_repr,
-        ref=ref,
-        metadata=metadata,
-        serialization=serialization,
+        type='is-instance', cls=cls, cls_repr=cls_repr, ref=ref, metadata=metadata, serialization=serialization
     )
 
 
