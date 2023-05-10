@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyNotImplementedError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -36,23 +37,6 @@ impl<'a> Input<'a> for JsonInput {
 
     fn is_none(&self) -> bool {
         matches!(self, JsonInput::Null)
-    }
-
-    fn input_is_instance(&self, _class: &PyAny, json_mask: u8) -> PyResult<bool> {
-        if json_mask == 0 {
-            Ok(false)
-        } else {
-            let json_type: JsonType = match self {
-                JsonInput::Null => JsonType::Null,
-                JsonInput::Bool(_) => JsonType::Bool,
-                JsonInput::Int(_) => JsonType::Int,
-                JsonInput::Float(_) => JsonType::Float,
-                JsonInput::String(_) => JsonType::String,
-                JsonInput::Array(_) => JsonType::Array,
-                JsonInput::Object(_) => JsonType::Object,
-            };
-            Ok(json_type.matches(json_mask))
-        }
     }
 
     fn as_kwargs(&'a self, py: Python<'a>) -> Option<&'a PyDict> {
@@ -345,14 +329,6 @@ impl<'a> Input<'a> for String {
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn is_none(&self) -> bool {
         false
-    }
-
-    fn input_is_instance(&self, _class: &PyAny, json_mask: u8) -> PyResult<bool> {
-        if json_mask == 0 {
-            Ok(false)
-        } else {
-            Ok(JsonType::String.matches(json_mask))
-        }
     }
 
     fn as_kwargs(&'a self, _py: Python<'a>) -> Option<&'a PyDict> {

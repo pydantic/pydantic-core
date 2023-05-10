@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyNotImplementedError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyType};
@@ -7,6 +8,7 @@ use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{Input, JsonType};
 use crate::recursion_guard::RecursionGuard;
 
+use super::ValidationMode;
 use super::function::convert_err;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
@@ -34,7 +36,7 @@ impl BuildValidator for IsInstanceValidator {
         // test that class works with isinstance to avoid errors at call time, reuse cls_key since it doesn't
         // matter what object is being checked
         let test_value: &PyAny = cls_key.as_ref();
-        if test_value.input_is_instance(class, 0).is_err() {
+        if test_value.is_instance(class).is_err() {
             return py_err!("'cls' must be valid as the first argument to 'isinstance'");
         }
 
@@ -66,27 +68,31 @@ impl Validator for IsInstanceValidator {
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        _extra: &Extra,
+        extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        match input.input_is_instance(self.class.as_ref(py), self.json_types)? {
-            true => {
-                if input.get_type().is_json() {
-                    if let Some(ref json_function) = self.json_function {
-                        return json_function
-                            .call1(py, (input.to_object(py),))
-                            .map_err(|e| convert_err(py, e, input));
-                    }
+        match extra.mode {
+            ValidationMode::Json => Err(
+                ValError::InternalErr(
+                    PyNotImplementedError::new_err(
+                        "Cannot check isinstance when validating from json,\
+                            use a JsonOrPython validator instead."
+                    )
+                )
+            ),
+            ValidationMode::Python => {
+                let ob = input.to_object(py);
+                match ob.as_ref(py).is_instance(self.class.as_ref(py))? {
+                    true => Ok(ob),
+                    false => Err(ValError::new(
+                        ErrorType::IsInstanceOf {
+                            class: self.class_repr.clone(),
+                        },
+                        input,
+                    ))
                 }
-                Ok(input.to_object(py))
             }
-            false => Err(ValError::new(
-                ErrorType::IsInstanceOf {
-                    class: self.class_repr.clone(),
-                },
-                input,
-            )),
         }
     }
 

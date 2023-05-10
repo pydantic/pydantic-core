@@ -126,7 +126,7 @@ impl Validator for ModelValidator {
         // but use from attributes to create a new instance of the model field type
         let class = self.class.as_ref(py);
         // mask 0 so JSON is input is never true here
-        if input.input_is_instance(class, 0)? {
+        if input.to_object(py).as_ref(py).is_instance(class)? {
             if self.revalidate.should_revalidate(input, class) {
                 if self.root_model {
                     let inner_input: &PyAny = input.input_get_attr(intern!(py, ROOT_FIELD)).unwrap()?;

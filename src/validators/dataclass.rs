@@ -471,7 +471,7 @@ impl Validator for DataclassValidator {
 
         // same logic as on models
         let class = self.class.as_ref(py);
-        if input.input_is_instance(class, 0)? {
+        if input.to_object(py).as_ref(py).is_instance(class)? {
             if self.revalidate.should_revalidate(input, class) {
                 let input = input.input_get_attr(intern!(py, "__dict__")).unwrap()?;
                 let val_output = self

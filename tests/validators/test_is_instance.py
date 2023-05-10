@@ -44,7 +44,7 @@ def test_is_instance():
     with pytest.raises(ValidationError, match='type=is_instance_of'):
         v.validate_python(Foo)
 
-    with pytest.raises(ValidationError, match='type=is_instance_of'):
+    with pytest.raises(NotImplementedError, match='use a JsonOrPython validator instead'):
         v.validate_json('"foo"')
 
 

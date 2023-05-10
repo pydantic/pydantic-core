@@ -102,14 +102,6 @@ impl<'a> Input<'a> for PyAny {
         Some(self.getattr(name))
     }
 
-    fn input_is_instance(&self, class: &PyAny, _json_mask: u8) -> PyResult<bool> {
-        // See PyO3/pyo3#2694 - we can't use `is_instance` here since it requires PyType,
-        // and some check objects are not types, this logic is lifted from `is_instance` in PyO3
-        let result = unsafe { ffi::PyObject_IsInstance(self.as_ptr(), class.as_ptr()) };
-        py_error_on_minusone(self.py(), result)?;
-        Ok(result == 1)
-    }
-
     fn is_exact_instance(&self, class: &PyType) -> bool {
         self.get_type().is(class)
     }
