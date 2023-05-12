@@ -236,7 +236,7 @@ impl<'a> Input<'a> for JsonInput {
 
     fn extract_iterable(&'a self) -> ValResult<super::any_iterable::AnyIterable<'a>> {
         match self {
-            JsonInput::Array(a) => Ok(super::any_iterable::AnyIterable::JsonArray(&a)),
+            JsonInput::Array(a) => Ok(super::any_iterable::AnyIterable::JsonArray(a)),
             _ => Err(ValError::new(ErrorType::IterableType, self)),
         }
     }

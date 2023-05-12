@@ -11,6 +11,14 @@ pub fn calculate_output_init_capacity(iterator_size: Option<usize>, max_length: 
     }
 }
 
+/// Validate an iterator by applying `validation_func`
+/// to each item and calling `output_func` with non-error, non-omitted items.
+/// This handles all of the complexity of accumulating errors and handling omitted items.
+/// Capacity checks are also handled by having `output_func` return the current size of
+/// the output, either from calling some `.len()` on whatever is accumulating the output
+/// or keeping track of the number of times it was called.
+/// This is implemented this way to account for collections that may not increase
+/// their size for each item in the input (e.g. a set).
 pub fn validate_with_errors<'a, 's, I, R, F, O>(
     iter: impl Iterator<Item = &'a I>,
     validation_func: &mut F,
