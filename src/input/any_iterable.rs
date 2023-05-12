@@ -1,7 +1,7 @@
 use super::parse_json::JsonInput;
 use pyo3::types::{
-    PyAny, PyDict, PyDictItems, PyDictKeys, PyDictValues, PyFrozenSet, PyIterator, PyList, PyMapping, PySequence,
-    PySet, PyTuple,
+    PyDict, PyDictItems, PyDictKeys, PyDictValues, PyFrozenSet, PyIterator, PyList, PyMapping, PySequence, PySet,
+    PyTuple,
 };
 
 pub enum AnyIterable<'a> {

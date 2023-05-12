@@ -2,9 +2,9 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::SchemaDict;
-use crate::errors::ValResult;
-use crate::input::{iterator, AnyIterable};
-use crate::input::{GenericCollection, Input};
+use crate::errors::{ErrorType, ValError, ValResult};
+use crate::input::Input;
+use crate::input::{iterator, AnyIterable, JsonInput};
 use crate::recursion_guard::RecursionGuard;
 
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
@@ -104,62 +104,84 @@ impl Validator for ListValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let strict = extra.strict.unwrap_or(self.strict);
-        let mut validation_func = |ob: &'data PyAny| -> ValResult<'data, PyObject> {
-            match &self.item_validator {
-                Some(v) => v.validate(py, ob, extra, definitions, recursion_guard),
-                None => Ok(ob.into_py(py)),
+
+        macro_rules! validate_python {
+            ($iter:expr, $len:expr) => {{
+                let init_capacity = iterator::calculate_output_init_capacity($len, self.max_length);
+                let mut output = Vec::with_capacity(init_capacity);
+
+                let mut validation_func = |ob: &'data PyAny| -> ValResult<'data, _> {
+                    match &self.item_validator {
+                        Some(v) => v.validate(py, ob, extra, definitions, recursion_guard),
+                        None => Ok(ob.into_py(py)),
+                    }
+                };
+
+                let mut output_func = |ob: PyObject| -> ValResult<'data, usize> {
+                    output.push(ob);
+                    Ok(output.len())
+                };
+                iterator::validate_with_errors(
+                    $iter,
+                    &mut validation_func,
+                    &mut output_func,
+                    self.min_length,
+                    self.max_length,
+                    "list",
+                    input,
+                )?;
+
+                output
+            }};
+        }
+
+        let make_err = || Err(ValError::new(ErrorType::TupleType, input));
+
+        let output = match (input.extract_iterable()?, strict) {
+            (AnyIterable::List(iter), _) => validate_python!(iter.iter().map(Ok), Some(iter.len())),
+            (AnyIterable::JsonArray(iter), _) => {
+                let init_capacity = iterator::calculate_output_init_capacity(Some(iter.len()), self.max_length);
+                let mut output = Vec::with_capacity(init_capacity);
+
+                let mut validation_func = |ob: &'data JsonInput| -> ValResult<'data, PyObject> {
+                    match &self.item_validator {
+                        Some(v) => v.validate(py, ob, extra, definitions, recursion_guard),
+                        None => Ok(ob.to_object(py)),
+                    }
+                };
+
+                let mut output_func = |ob: PyObject| -> ValResult<'data, usize> {
+                    output.push(ob);
+                    Ok(output.len())
+                };
+                iterator::validate_with_errors(
+                    iter.iter().map(Ok),
+                    &mut validation_func,
+                    &mut output_func,
+                    self.min_length,
+                    self.max_length,
+                    "list",
+                    input,
+                )?;
+                output
             }
-        };
-
-        let input_length = match input.extract_iterable()? {
-            AnyIterable::List(iter) => Some(iter.len()),
-            AnyIterable::Tuple(_) => todo!(),
-            AnyIterable::Set(_) => todo!(),
-            AnyIterable::FrozenSet(_) => todo!(),
-            AnyIterable::Dict(_) => todo!(),
-            AnyIterable::DictKeys(_) => todo!(),
-            AnyIterable::DictValues(_) => todo!(),
-            AnyIterable::DictItems(_) => todo!(),
-            AnyIterable::Mapping(_) => todo!(),
-            AnyIterable::Sequence(_) => todo!(),
-            AnyIterable::Iterator(_) => todo!(),
-            AnyIterable::JsonArray(_) => todo!(),
-        };
-
-        let init_capacity = iterator::calculate_output_init_capacity(input_length, self.max_length);
-
-        let mut output = Vec::with_capacity(init_capacity);
-
-        let mut output_func = |ob: PyObject| -> ValResult<'data, usize> {
-            output.push(ob);
-            Ok(output.len())
-        };
-
-        let min_length = self.min_length;
-        let max_length = self.max_length;
-        let field_type = "list";
-
-        match input.extract_iterable()? {
-            AnyIterable::List(iter) => iterator::validate_with_errors(
-                iter.iter(),
-                &mut validation_func,
-                &mut output_func,
-                min_length,
-                max_length,
-                field_type,
-                input,
-            )?,
-            AnyIterable::Tuple(_) => todo!(),
-            AnyIterable::Set(_) => todo!(),
-            AnyIterable::FrozenSet(_) => todo!(),
-            AnyIterable::Dict(_) => todo!(),
-            AnyIterable::DictKeys(_) => todo!(),
-            AnyIterable::DictValues(_) => todo!(),
-            AnyIterable::DictItems(_) => todo!(),
-            AnyIterable::Mapping(_) => todo!(),
-            AnyIterable::Sequence(_) => todo!(),
-            AnyIterable::Iterator(_) => todo!(),
-            AnyIterable::JsonArray(_) => todo!(),
+            (AnyIterable::Tuple(iter), false) => validate_python!(iter.iter().map(Ok), Some(iter.len())),
+            (AnyIterable::Set(iter), false) => validate_python!(iter.iter().map(Ok), Some(iter.len())),
+            (AnyIterable::FrozenSet(iter), false) => validate_python!(iter.iter().map(Ok), Some(iter.len())),
+            (AnyIterable::DictKeys(iter), false) => validate_python!(iter.iter()?, Some(iter.len()?)),
+            (AnyIterable::DictValues(iter), false) => validate_python!(iter.iter()?, Some(iter.len()?)),
+            (AnyIterable::DictItems(iter), false) => validate_python!(iter.iter()?, Some(iter.len()?)),
+            (AnyIterable::Sequence(iter), false) => validate_python!(iter.iter()?, Some(iter.len()?)),
+            (AnyIterable::Iterator(iter), false) => {
+                if self.allow_any_iter {
+                    validate_python!(iter.iter()?, Some(iter.len()?))
+                } else {
+                    return make_err();
+                }
+            }
+            (AnyIterable::Mapping(_), false) => return make_err(),
+            (AnyIterable::Dict(_), false) => return make_err(),
+            (_, _) => return make_err(),
         };
 
         Ok(output.into_py(py))
