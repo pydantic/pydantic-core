@@ -122,12 +122,13 @@ impl Validator for ListValidator {
                     Ok(output.len())
                 };
                 iterator::validate_with_errors(
+                    py,
                     $iter,
                     &mut validation_func,
                     &mut output_func,
                     self.min_length,
                     self.max_length,
-                    "list",
+                    "List",
                     input,
                 )?;
 
@@ -135,9 +136,26 @@ impl Validator for ListValidator {
             }};
         }
 
-        let make_err = || Err(ValError::new(ErrorType::TupleType, input));
+        macro_rules! validate_any_iter {
+            ($iter:expr, $len:expr) => {{
+                if self.allow_any_iter {
+                    validate_python!($iter, $len)
+                } else {
+                    return Err(ValError::new(ErrorType::ListType, input));
+                }
+            }};
+        }
 
-        let output = match (input.extract_iterable()?, strict) {
+        // We're a bit inconsistent with what we accept as inputs or don't
+        // E.g. sets are not a sequence but we accept them
+        let map_default_err = |_| {
+            if self.allow_any_iter {
+                ValError::new(ErrorType::IterableType, input)
+            } else {
+                ValError::new(ErrorType::ListType, input)
+            }
+        };
+        let output = match (input.extract_iterable().map_err(map_default_err)?, strict) {
             (AnyIterable::List(iter), _) => validate_python!(iter.iter().map(Ok), Some(iter.len())),
             (AnyIterable::JsonArray(iter), _) => {
                 let init_capacity = iterator::calculate_output_init_capacity(Some(iter.len()), self.max_length);
@@ -155,33 +173,28 @@ impl Validator for ListValidator {
                     Ok(output.len())
                 };
                 iterator::validate_with_errors(
+                    py,
                     iter.iter().map(Ok),
                     &mut validation_func,
                     &mut output_func,
                     self.min_length,
                     self.max_length,
-                    "list",
+                    "List",
                     input,
                 )?;
                 output
             }
             (AnyIterable::Tuple(iter), false) => validate_python!(iter.iter().map(Ok), Some(iter.len())),
-            (AnyIterable::Set(iter), false) => validate_python!(iter.iter().map(Ok), Some(iter.len())),
-            (AnyIterable::FrozenSet(iter), false) => validate_python!(iter.iter().map(Ok), Some(iter.len())),
-            (AnyIterable::DictKeys(iter), false) => validate_python!(iter.iter()?, Some(iter.len()?)),
-            (AnyIterable::DictValues(iter), false) => validate_python!(iter.iter()?, Some(iter.len()?)),
-            (AnyIterable::DictItems(iter), false) => validate_python!(iter.iter()?, Some(iter.len()?)),
-            (AnyIterable::Sequence(iter), false) => validate_python!(iter.iter()?, Some(iter.len()?)),
-            (AnyIterable::Iterator(iter), false) => {
-                if self.allow_any_iter {
-                    validate_python!(iter.iter()?, Some(iter.len()?))
-                } else {
-                    return make_err();
-                }
-            }
-            (AnyIterable::Mapping(_), false) => return make_err(),
-            (AnyIterable::Dict(_), false) => return make_err(),
-            (_, _) => return make_err(),
+            (AnyIterable::Set(iter), false) => validate_any_iter!(iter.iter().map(Ok), Some(iter.len())),
+            (AnyIterable::FrozenSet(iter), false) => validate_any_iter!(iter.iter().map(Ok), Some(iter.len())),
+            (AnyIterable::DictKeys(iter), false) => validate_python!(iter.iter()?, iter.len().ok()),
+            (AnyIterable::DictValues(iter), false) => validate_python!(iter.iter()?, iter.len().ok()),
+            (AnyIterable::DictItems(iter), false) => validate_python!(iter.iter()?, iter.len().ok()),
+            (AnyIterable::Sequence(iter), false) => validate_python!(iter.iter()?, iter.len().ok()),
+            (AnyIterable::Iterator(iter), false) => validate_any_iter!(iter.iter()?, iter.len().ok()),
+            (AnyIterable::Mapping(iter), false) => validate_any_iter!(iter.iter()?, iter.len().ok()),
+            (AnyIterable::Dict(iter), false) => validate_any_iter!(iter.as_ref().iter()?, Some(iter.len())),
+            (_, _) => return Err(ValError::new(ErrorType::ListType, input)),
         };
 
         Ok(output.into_py(py))

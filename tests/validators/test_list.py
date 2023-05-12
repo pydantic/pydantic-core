@@ -1,14 +1,14 @@
 import re
 from collections import deque
 from collections.abc import Sequence
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pytest
 from dirty_equals import HasRepr, IsInstance, IsStr
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError, core_schema
 
-from ..conftest import Err, PyAndJson, infinite_generator
+from ..conftest import Err, PyAndJson
 
 
 @pytest.mark.parametrize(
@@ -40,10 +40,21 @@ def test_list_strict():
     ]
 
 
-def gen_ints():
-    yield 1
-    yield 2
-    yield '3'
+class MySequence(Sequence[Any]):
+    def __init__(self, data: List[Any]):
+        self._data = data
+
+    def __getitem__(self, index: int) -> Any:
+        return self._data[index]
+
+    def __len__(self):
+        return len(self._data)
+
+    def count(self, value: Any):
+        return self._data.count(value)
+
+    def __repr__(self) -> str:
+        return f'MySequence({repr(self._data)})'
 
 
 @pytest.mark.parametrize(
@@ -53,18 +64,18 @@ def gen_ints():
         ((1, 2, '3'), [1, 2, 3]),
         (deque((1, 2, '3')), [1, 2, 3]),
         ({1, 2, '3'}, Err('Input should be a valid list [type=list_type,')),
-        (gen_ints(), [1, 2, 3]),
         (frozenset({1, 2, '3'}), Err('Input should be a valid list [type=list_type,')),
         ({1: 10, 2: 20, '3': '30'}.keys(), [1, 2, 3]),
         ({1: 10, 2: 20, '3': '30'}.values(), [10, 20, 30]),
         ({1: 10, 2: 20, '3': '30'}, Err('Input should be a valid list [type=list_type,')),
-        ((x for x in [1, 2, '3']), [1, 2, 3]),
+        (MySequence([1, 2, '3']), [1, 2, 3]),
+        ((x for x in [1, 2, 3]), Err('Input should be a valid list [type=list_type,')),
         ('456', Err("Input should be a valid list [type=list_type, input_value='456', input_type=str]")),
         (b'789', Err("Input should be a valid list [type=list_type, input_value=b'789', input_type=bytes]")),
     ],
     ids=repr,
 )
-def test_list_int(input_value, expected):
+def test_list_int(input_value: Any, expected: Any):
     v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -143,18 +154,28 @@ def test_list_error(input_value, index):
         (
             {'max_length': 3},
             [1, 2, 3, 4],
-            Err('List should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('List should have at most 3 items after validation, not >= 4 [type=too_long,'),
         ),
-        ({'max_length': 1}, [1, 2], Err('List should have at most 1 item after validation, not 2 [type=too_long,')),
+        ({'max_length': 1}, [1, 2], Err('List should have at most 1 item after validation, not >= 2 [type=too_long,')),
         (
             {'max_length': 44},
-            infinite_generator(),
-            Err('List should have at most 44 items after validation, not 45 [type=too_long,'),
+            [1] * 100,
+            Err('List should have at most 44 items after validation, not >= 45 [type=too_long,'),
+        ),
+        (
+            {'max_length': 3},
+            ['a', 'b', 'c', 'd'],
+            Err('List should have at most 3 items after validation, not >= 4 [type=too_long,'),
+        ),
+        (
+            {'min_length': 2},
+            ['a', 'b'],
+            Err('List should have at least 2 items after validation, not 0 [type=too_short,'),
         ),
     ],
 )
 def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
-    v = SchemaValidator({'type': 'list', **kwargs})
+    v = SchemaValidator({'type': 'list', 'items_schema': core_schema.int_schema(), **kwargs})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -166,7 +187,7 @@ def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
     'input_value,expected',
     [
         ([1, 2, 3, 4], [1, 2, 3, 4]),
-        ([1, 2, 3, 4, 5], Err('List should have at most 4 items after validation, not 5 [type=too_long,')),
+        ([1, 2, 3, 4, 5], Err('List should have at most 4 items after validation, not >= 5 [type=too_long,')),
         ([1, 2, 3, 'x', 4], [1, 2, 3, 4]),
     ],
 )
@@ -208,7 +229,7 @@ def test_length_ctx():
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 3 items after validation, not 4',
+            'msg': 'List should have at most 3 items after validation, not >= 4',
             'input': [1, 2, 3, 4],
             'ctx': {'field_type': 'List', 'max_length': 3, 'actual_length': 4},
         }
@@ -263,7 +284,7 @@ def test_generator_error():
             raise RuntimeError('error')
         yield 3
 
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_any_iter': True})
     assert v.validate_python(gen(False)) == [1, 2, 3]
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(gen(True))
@@ -303,49 +324,20 @@ def test_list_from_dict_items(input_value, items_schema, expected):
     assert output == expected
 
 
-@pytest.fixture(scope='session', name='MySequence')
-def my_sequence():
-    class MySequence(Sequence):
-        def __init__(self):
-            self._data = [1, 2, 3]
-
-        def __getitem__(self, index):
-            return self._data[index]
-
-        def __len__(self):
-            return len(self._data)
-
-        def count(self, value):
-            return self._data.count(value)
-
-    assert isinstance(MySequence(), Sequence)
-    return MySequence
-
-
-def test_sequence(MySequence):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
-    with pytest.raises(ValidationError) as exc_info:
-        v.validate_python(MySequence())
-    # insert_assert(exc_info.value.errors(include_url=False))
-    assert exc_info.value.errors(include_url=False) == [
-        {'type': 'list_type', 'loc': (), 'msg': 'Input should be a valid list', 'input': IsInstance(MySequence)}
-    ]
-
-
 @pytest.mark.parametrize(
     'input_value,expected',
     [
         ([1, 2, 3], [1, 2, 3]),
         ((1, 2, 3), [1, 2, 3]),
         (range(3), [0, 1, 2]),
-        (gen_ints(), [1, 2, 3]),
+        ((x for x in [1, 2, '3']), [1, 2, 3]),
         ({1: 2, 3: 4}, [1, 3]),
         ('123', [1, 2, 3]),
         (
             123,
             Err(
                 '1 validation error for list[int]',
-                [{'type': 'list_type', 'loc': (), 'msg': 'Input should be a valid list', 'input': 123}],
+                [{'type': 'iterable_type', 'loc': (), 'msg': 'Input should be iterable', 'input': 123}],
             ),
         ),
     ],
@@ -360,9 +352,9 @@ def test_allow_any_iter(input_value, expected):
         assert v.validate_python(input_value) == expected
 
 
-def test_sequence_allow_any_iter(MySequence):
+def test_sequence_allow_any_iter():
     v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_any_iter': True})
-    assert v.validate_python(MySequence()) == [1, 2, 3]
+    assert v.validate_python(MySequence([1, 2, '3'])) == [1, 2, 3]
 
 
 @pytest.mark.parametrize('items_schema', ['int', 'any'])

@@ -482,6 +482,8 @@ impl<'a> Input<'a> for PyAny {
             Ok(AnyIterable::Tuple(iterable))
         } else if let Ok(iterable) = self.downcast::<PySet>() {
             Ok(AnyIterable::Set(iterable))
+        } else if let Ok(iterable) = self.downcast::<PyFrozenSet>() {
+            Ok(AnyIterable::FrozenSet(iterable))
         } else if let Ok(iterable) = self.downcast::<PyDict>() {
             Ok(AnyIterable::Dict(iterable))
         } else if let Ok(iterable) = self.downcast::<PyDictKeys>() {
@@ -492,7 +494,14 @@ impl<'a> Input<'a> for PyAny {
             Ok(AnyIterable::DictItems(iterable))
         } else if let Ok(iterable) = self.downcast::<PyMapping>() {
             Ok(AnyIterable::Mapping(iterable))
-        } else if let Ok(iterable) = self.downcast::<PySequence>() {
+        } else if let (Ok(iterable), Err(_), Err(_)) = (
+            self.downcast::<PySequence>(),
+            // Explicitly disallow strings and bytes since they are sequences
+            // but you almost never want to treat it as one
+            // This can be worked around by allowing arbitrary iterables
+            self.downcast::<PyString>(),
+            self.downcast::<PyBytes>(),
+        ) {
             Ok(AnyIterable::Sequence(iterable))
         } else if let Ok(iterable) = PyIterator::from_object(self.py(), self) {
             Ok(AnyIterable::Iterator(iterable))

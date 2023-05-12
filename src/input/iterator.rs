@@ -1,8 +1,8 @@
-use pyo3::PyResult;
+use pyo3::{PyResult, Python};
 
 use super::Input;
 
-use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
+use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
 
 pub fn calculate_output_init_capacity(iterator_size: Option<usize>, max_length: Option<usize>) -> usize {
     // The smaller number of either the input size or the max output length
@@ -21,7 +21,9 @@ pub fn calculate_output_init_capacity(iterator_size: Option<usize>, max_length: 
 /// or keeping track of the number of times it was called.
 /// This is implemented this way to account for collections that may not increase
 /// their size for each item in the input (e.g. a set).
+#[allow(clippy::too_many_arguments)]
 pub fn validate_with_errors<'a, 's, I, R, F, O>(
+    py: Python,
     iter: impl Iterator<Item = PyResult<I>>,
     validation_func: &mut F,
     output_func: &mut O,
@@ -36,19 +38,19 @@ where
 {
     let mut errors: Vec<ValLineError> = Vec::new();
     let mut current_len = 0;
-    let index = 0;
+    let mut error_count = 0;
     for (index, item_result) in iter.enumerate() {
         match item_result {
             Ok(item) => match validation_func(item) {
                 Ok(item) => {
                     current_len = output_func(item)?;
                     if let Some(max_length) = max_length {
-                        if max_length <= current_len {
+                        if max_length < current_len + error_count {
                             return Err(ValError::new(
                                 ErrorType::TooLong {
                                     field_type: field_type.to_string(),
                                     max_length,
-                                    actual_length: index,
+                                    actual_length: current_len + error_count,
                                 },
                                 input,
                             ));
@@ -56,22 +58,43 @@ where
                     }
                 }
                 Err(ValError::LineErrors(line_errors)) => {
+                    error_count += 1;
                     errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
+                    if let Some(max_length) = max_length {
+                        if max_length < current_len + error_count {
+                            return Err(ValError::new(
+                                ErrorType::TooLong {
+                                    field_type: field_type.to_string(),
+                                    max_length,
+                                    actual_length: current_len + error_count,
+                                },
+                                input,
+                            ));
+                        }
+                    }
                 }
                 Err(ValError::Omit) => (),
                 Err(err) => return Err(err),
             },
-            Err(err) => return Err(ValError::InternalErr(err)), // Iterator failed
+            Err(err) => {
+                return Err(ValError::new_with_loc(
+                    ErrorType::IterationError {
+                        error: py_err_string(py, err),
+                    },
+                    input,
+                    index,
+                ))
+            } // Iterator failed
         }
     }
 
     if let Some(min_length) = min_length {
-        if min_length <= current_len {
+        if min_length > current_len {
             return Err(ValError::new(
                 ErrorType::TooShort {
                     field_type: field_type.to_string(),
                     min_length,
-                    actual_length: index,
+                    actual_length: current_len,
                 },
                 input,
             ));
