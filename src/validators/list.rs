@@ -187,11 +187,8 @@ impl Validator for ListValidator {
             (AnyIterable::Tuple(iter), false) => validate_python!(iter.iter().map(Ok), Some(iter.len())),
             (AnyIterable::Set(iter), false) => validate_any_iter!(iter.iter().map(Ok), Some(iter.len())),
             (AnyIterable::FrozenSet(iter), false) => validate_any_iter!(iter.iter().map(Ok), Some(iter.len())),
-            #[cfg(not(PyPy))]
             (AnyIterable::DictKeys(iter), false) => validate_python!(iter.iter()?, iter.len().ok()),
-            #[cfg(not(PyPy))]
             (AnyIterable::DictValues(iter), false) => validate_python!(iter.iter()?, iter.len().ok()),
-            #[cfg(not(PyPy))]
             (AnyIterable::DictItems(iter), false) => validate_python!(iter.iter()?, iter.len().ok()),
             (AnyIterable::Sequence(iter), false) => validate_python!(iter.iter()?, iter.len().ok()),
             (AnyIterable::Iterator(iter), false) => validate_any_iter!(iter.iter()?, iter.len().ok()),

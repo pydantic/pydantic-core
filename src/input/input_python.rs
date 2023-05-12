@@ -71,6 +71,67 @@ macro_rules! extract_dict_iter {
     };
 }
 
+/// Extract dict keys, values and items into a `GenericCollection`
+#[cfg(not(PyPy))]
+macro_rules! extract_dict_keys {
+    ($py:expr, $obj:ident) => {
+        $obj.downcast::<PyDictKeys>()
+            .ok()
+            .map(|v| PyIterator::from_object($py, v).unwrap())
+    };
+}
+
+#[cfg(PyPy)]
+macro_rules! extract_dict_keys {
+    ($py:expr, $obj:ident) => {
+        if is_dict_keys_type($obj) {
+            Some(PyIterator::from_object($py, $obj).unwrap())
+        } else {
+            None
+        }
+    };
+}
+
+#[cfg(not(PyPy))]
+macro_rules! extract_dict_values {
+    ($py:expr, $obj:ident) => {
+        $obj.downcast::<PyDictValues>()
+            .ok()
+            .map(|v| PyIterator::from_object($py, v).unwrap())
+    };
+}
+
+#[cfg(PyPy)]
+macro_rules! extract_dict_values {
+    ($py:expr, $obj:ident) => {
+        if is_dict_values_type($obj) {
+            Some(PyIterator::from_object($py, $obj).unwrap())
+        } else {
+            None
+        }
+    };
+}
+
+#[cfg(not(PyPy))]
+macro_rules! extract_dict_items {
+    ($py:expr, $obj:ident) => {
+        $obj.downcast::<PyDictItems>()
+            .ok()
+            .map(|v| PyIterator::from_object($py, v).unwrap())
+    };
+}
+
+#[cfg(PyPy)]
+macro_rules! extract_dict_items {
+    ($py:expr, $obj:ident) => {
+        if is_dict_items_type($obj) {
+            Some(PyIterator::from_object($py, $obj).unwrap())
+        } else {
+            None
+        }
+    };
+}
+
 impl<'a> Input<'a> for PyAny {
     fn as_loc_item(&self) -> LocItem {
         if let Ok(py_str) = self.downcast::<PyString>() {
@@ -486,11 +547,11 @@ impl<'a> Input<'a> for PyAny {
             Ok(AnyIterable::FrozenSet(iterable))
         } else if let Ok(iterable) = self.downcast::<PyDict>() {
             Ok(AnyIterable::Dict(iterable))
-        } else if let Ok(iterable) = self.downcast::<PyDictKeys>() {
+        } else if let Some(iterable) = extract_dict_keys!(self.py(), self) {
             Ok(AnyIterable::DictKeys(iterable))
-        } else if let Ok(iterable) = self.downcast::<PyDictValues>() {
+        } else if let Some(iterable) = extract_dict_values!(self.py(), self) {
             Ok(AnyIterable::DictValues(iterable))
-        } else if let Ok(iterable) = self.downcast::<PyDictItems>() {
+        } else if let Some(iterable) = extract_dict_items!(self.py(), self) {
             Ok(AnyIterable::DictItems(iterable))
         } else if let Ok(iterable) = self.downcast::<PyMapping>() {
             Ok(AnyIterable::Mapping(iterable))
