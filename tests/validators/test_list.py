@@ -40,7 +40,7 @@ def test_list_strict():
     ]
 
 
-class MySequence(Sequence[Any]):
+class MySequence(Sequence):
     def __init__(self, data: List[Any]):
         self._data = data
 
