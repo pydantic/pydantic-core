@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyString};
 
 use crate::build_tools::SchemaDict;
-use crate::errors::{ErrorType, ValError, ValResult};
+use crate::errors::{ErrorType, LocItem, ValError, ValResult};
 use crate::input::Input;
 use crate::input::{iterator, AnyIterable, JsonInput};
 use crate::recursion_guard::RecursionGuard;
@@ -105,14 +105,18 @@ impl Validator for ListValidator {
     ) -> ValResult<'data, PyObject> {
         let strict = extra.strict.unwrap_or(self.strict);
 
+        let field_type: &'static str = "List";
+
         macro_rules! validate_python {
             ($iter:expr, $len:expr) => {{
                 let init_capacity = iterator::calculate_output_init_capacity($len, self.max_length);
                 let mut output = Vec::with_capacity(init_capacity);
 
-                let mut validation_func = |ob: &'data PyAny| -> ValResult<'data, _> {
+                let mut validation_func = |loc: LocItem, ob: &'data PyAny| -> ValResult<'data, _> {
                     match &self.item_validator {
-                        Some(v) => v.validate(py, ob, extra, definitions, recursion_guard),
+                        Some(v) => v
+                            .validate(py, ob, extra, definitions, recursion_guard)
+                            .map_err(|e| e.with_outer_location(loc)),
                         None => Ok(ob.into_py(py)),
                     }
                 };
@@ -123,15 +127,51 @@ impl Validator for ListValidator {
                 };
                 iterator::validate_with_errors(
                     py,
-                    $iter,
+                    $iter
+                        .enumerate()
+                        .map(|(idx, result)| result.map(|v| (LocItem::from(idx), v))),
                     &mut validation_func,
                     &mut output_func,
                     self.min_length,
                     self.max_length,
-                    "List",
+                    field_type,
                     input,
                 )?;
 
+                output
+            }};
+        }
+
+        macro_rules! validate_json {
+            ($iter:expr, $len:expr) => {{
+                let init_capacity = iterator::calculate_output_init_capacity($len, self.max_length);
+                let mut output = Vec::with_capacity(init_capacity);
+
+                let mut validation_func = |loc: LocItem, ob: &'data JsonInput| -> ValResult<'data, PyObject> {
+                    match &self.item_validator {
+                        Some(v) => v
+                            .validate(py, ob, extra, definitions, recursion_guard)
+                            .map_err(|e| e.with_outer_location(loc)),
+                        None => Ok(ob.to_object(py)),
+                    }
+                };
+
+                let mut output_func = |ob: PyObject| -> ValResult<'data, usize> {
+                    output.push(ob);
+                    Ok(output.len())
+                };
+                iterator::validate_with_errors(
+                    py,
+                    $iter
+                        .enumerate()
+                        .map(|(idx, result)| result.map(|v| (LocItem::from(idx), v))),
+                    &mut validation_func,
+                    &mut output_func,
+                    self.min_length,
+                    self.max_length,
+                    field_type,
+                    input,
+                )?;
                 output
             }};
         }
@@ -157,33 +197,7 @@ impl Validator for ListValidator {
         };
         let output = match (input.extract_iterable().map_err(map_default_err)?, strict) {
             (AnyIterable::List(iter), _) => validate_python!(iter.iter().map(Ok), Some(iter.len())),
-            (AnyIterable::JsonArray(iter), _) => {
-                let init_capacity = iterator::calculate_output_init_capacity(Some(iter.len()), self.max_length);
-                let mut output = Vec::with_capacity(init_capacity);
-
-                let mut validation_func = |ob: &'data JsonInput| -> ValResult<'data, PyObject> {
-                    match &self.item_validator {
-                        Some(v) => v.validate(py, ob, extra, definitions, recursion_guard),
-                        None => Ok(ob.to_object(py)),
-                    }
-                };
-
-                let mut output_func = |ob: PyObject| -> ValResult<'data, usize> {
-                    output.push(ob);
-                    Ok(output.len())
-                };
-                iterator::validate_with_errors(
-                    py,
-                    iter.iter().map(Ok),
-                    &mut validation_func,
-                    &mut output_func,
-                    self.min_length,
-                    self.max_length,
-                    "List",
-                    input,
-                )?;
-                output
-            }
+            (AnyIterable::JsonArray(iter), _) => validate_json!(iter.iter().map(Ok), Some(iter.len())),
             (AnyIterable::Tuple(iter), false) => validate_python!(iter.iter().map(Ok), Some(iter.len())),
             (AnyIterable::Set(iter), false) => validate_any_iter!(iter.iter().map(Ok), Some(iter.len())),
             (AnyIterable::FrozenSet(iter), false) => validate_any_iter!(iter.iter().map(Ok), Some(iter.len())),
@@ -194,6 +208,17 @@ impl Validator for ListValidator {
             (AnyIterable::Iterator(iter), false) => validate_any_iter!(iter.iter()?, iter.len().ok()),
             (AnyIterable::Mapping(iter), false) => validate_any_iter!(iter.iter()?, iter.len().ok()),
             (AnyIterable::Dict(iter), false) => validate_any_iter!(iter.as_ref().iter()?, Some(iter.len())),
+            (AnyIterable::JsonObject(iter), false) => {
+                if self.allow_any_iter {
+                    // Iterate over the keys, same behavior as a Python dict
+                    validate_python!(
+                        iter.iter().map(|(k, _)| Ok(PyString::new(py, k).as_ref())),
+                        Some(iter.len())
+                    )
+                } else {
+                    return Err(ValError::new(ErrorType::ListType, input));
+                }
+            }
             (_, _) => return Err(ValError::new(ErrorType::ListType, input)),
         };
 

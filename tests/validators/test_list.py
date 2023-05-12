@@ -1,12 +1,12 @@
 import re
 from collections import deque
 from collections.abc import Sequence
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, Iterator, List
 
 import pytest
 from dirty_equals import HasRepr, IsInstance, IsStr
 
-from pydantic_core import SchemaValidator, ValidationError, core_schema
+from pydantic_core import PydanticOmit, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -393,3 +393,69 @@ def test_bad_iter(items_schema):
             'ctx': {'error': 'RuntimeError: broken'},
         }
     ]
+
+
+def infinite_int_gen() -> Iterator[int]:
+    num = 0
+    while True:
+        yield num
+        num += 1
+
+
+def infinite_str_gen() -> Iterator[str]:
+    num = 0
+    while True:
+        yield f'a_{num}'
+        num += 1
+
+
+@pytest.mark.parametrize('gen_factory,nxt', [(infinite_int_gen, 2), (infinite_str_gen, 'a_2')])
+def test_stop_iterating_on_error(gen_factory: Callable[[], Iterator[Any]], nxt: Any) -> None:
+    v = SchemaValidator(core_schema.list_schema(core_schema.int_schema(), allow_any_iter=True, max_length=1))
+
+    gen = gen_factory()
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(gen)
+
+    assert exc_info.value.errors(include_url=False) == [
+        {
+            'type': 'too_long',
+            'loc': (),
+            'msg': 'List should have at most 1 item after validation, not >= 2',
+            'input': gen,
+            'ctx': {'field_type': 'List', 'max_length': 1, 'actual_length': 2},
+        }
+    ]
+
+    assert next(gen) == nxt
+
+
+def test_stop_iterating_func_raises_omit() -> None:
+    def f(x: int) -> int:
+        if x < 100:
+            raise PydanticOmit
+        return x
+
+    v = SchemaValidator(
+        core_schema.list_schema(
+            core_schema.no_info_after_validator_function(f, core_schema.int_schema()), allow_any_iter=True, max_length=1
+        )
+    )
+
+    gen = infinite_int_gen()
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(gen)
+
+    assert exc_info.value.errors(include_url=False) == [
+        {
+            'type': 'too_long',
+            'loc': (),
+            'msg': 'List should have at most 1 item after validation, not >= 2',
+            'input': gen,
+            'ctx': {'field_type': 'List', 'max_length': 1, 'actual_length': 2},
+        }
+    ]
+
+    assert next(gen) == 102

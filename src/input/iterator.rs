@@ -2,7 +2,7 @@ use pyo3::{PyResult, Python};
 
 use super::Input;
 
-use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
+use crate::errors::{py_err_string, ErrorType, LocItem, ValError, ValLineError, ValResult};
 
 pub fn calculate_output_init_capacity(iterator_size: Option<usize>, max_length: Option<usize>) -> usize {
     // The smaller number of either the input size or the max output length
@@ -24,7 +24,7 @@ pub fn calculate_output_init_capacity(iterator_size: Option<usize>, max_length: 
 #[allow(clippy::too_many_arguments)]
 pub fn validate_with_errors<'a, 's, I, R, F, O>(
     py: Python,
-    iter: impl Iterator<Item = PyResult<I>>,
+    iter: impl Iterator<Item = PyResult<(LocItem, I)>>,
     validation_func: &mut F,
     output_func: &mut O,
     min_length: Option<usize>,
@@ -33,7 +33,7 @@ pub fn validate_with_errors<'a, 's, I, R, F, O>(
     input: &'a impl Input<'a>,
 ) -> ValResult<'a, ()>
 where
-    F: FnMut(I) -> ValResult<'a, R>,
+    F: FnMut(LocItem, I) -> ValResult<'a, R>,
     O: FnMut(R) -> ValResult<'a, usize>,
 {
     let mut errors: Vec<ValLineError> = Vec::new();
@@ -41,7 +41,7 @@ where
     let mut error_count = 0;
     for (index, item_result) in iter.enumerate() {
         match item_result {
-            Ok(item) => match validation_func(item) {
+            Ok((loc, item)) => match validation_func(loc, item) {
                 Ok(item) => {
                     current_len = output_func(item)?;
                     if let Some(max_length) = max_length {
@@ -59,7 +59,7 @@ where
                 }
                 Err(ValError::LineErrors(line_errors)) => {
                     error_count += 1;
-                    errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
+                    errors.extend(line_errors);
                     if let Some(max_length) = max_length {
                         if max_length < current_len + error_count {
                             return Err(ValError::new(

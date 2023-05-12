@@ -1,4 +1,4 @@
-use super::parse_json::JsonInput;
+use super::parse_json::{JsonInput, JsonObject};
 use pyo3::types::{PyDict, PyFrozenSet, PyIterator, PyList, PyMapping, PySequence, PySet, PyTuple};
 
 pub enum AnyIterable<'a> {
@@ -16,4 +16,5 @@ pub enum AnyIterable<'a> {
     Sequence(&'a PySequence),
     Iterator(&'a PyIterator),
     JsonArray(&'a [JsonInput]),
+    JsonObject(&'a JsonObject),
 }

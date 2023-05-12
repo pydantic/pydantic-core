@@ -1,7 +1,7 @@
 import re
 from collections import OrderedDict
 from collections.abc import Mapping
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pytest
 from dirty_equals import HasRepr, IsStr
@@ -166,8 +166,60 @@ def test_mapping_error():
     ]
 
 
-@pytest.mark.parametrize('mapping_items', [[(1,)], ['foobar'], [(1, 2, 3)], 'not list'])
-def test_mapping_error_yield_1(mapping_items):
+@pytest.mark.parametrize(
+    'mapping_items,errors',
+    [
+        (
+            [(1,)],
+            [
+                {
+                    'type': 'iteration_error',
+                    'loc': (0,),
+                    'msg': 'Error iterating over object, error: ValueError: expected tuple of length 2, but got tuple of length 1',  # noqa: E501
+                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                    'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 1'},
+                }
+            ],
+        ),
+        (
+            ['foobar'],
+            [
+                {
+                    'type': 'iteration_error',
+                    'loc': (0,),
+                    'msg': "Error iterating over object, error: TypeError: 'str' object cannot be converted to 'PyTuple'",  # noqa: E501
+                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                    'ctx': {'error': "TypeError: 'str' object cannot be converted to 'PyTuple'"},
+                }
+            ],
+        ),
+        (
+            [(1, 2, 3)],
+            [
+                {
+                    'type': 'iteration_error',
+                    'loc': (0,),
+                    'msg': 'Error iterating over object, error: ValueError: expected tuple of length 2, but got tuple of length 3',  # noqa: E501
+                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                    'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 3'},
+                }
+            ],
+        ),
+        (
+            'not list',
+            [
+                {
+                    'type': 'iteration_error',
+                    'loc': (0,),
+                    'msg': "Error iterating over object, error: TypeError: 'str' object cannot be converted to 'PyTuple'",  # noqa: E501
+                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                    'ctx': {'error': "TypeError: 'str' object cannot be converted to 'PyTuple'"},
+                }
+            ],
+        ),
+    ],
+)
+def test_mapping_error_yield_1(mapping_items: List[Any], errors: List[Any]):
     class BadMapping(Mapping):
         def items(self):
             return mapping_items
@@ -185,15 +237,7 @@ def test_mapping_error_yield_1(mapping_items):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(BadMapping())
 
-    assert exc_info.value.errors(include_url=False) == [
-        {
-            'type': 'mapping_type',
-            'loc': (),
-            'msg': 'Input should be a valid mapping, error: Mapping items must be tuples of (key, value) pairs',
-            'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
-            'ctx': {'error': 'Mapping items must be tuples of (key, value) pairs'},
-        }
-    ]
+    assert exc_info.value.errors(include_url=False) == errors
 
 
 @pytest.mark.parametrize(
