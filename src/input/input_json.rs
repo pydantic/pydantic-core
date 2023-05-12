@@ -234,6 +234,13 @@ impl<'a> Input<'a> for JsonInput {
         self.validate_frozenset(false)
     }
 
+    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::AnyIterable<'a>> {
+        match self {
+            JsonInput::Array(a) => Ok(super::any_iterable::AnyIterable::JsonArray(&a)),
+            _ => Err(ValError::new(ErrorType::IterableType, self)),
+        }
+    }
+
     fn validate_iter(&self) -> ValResult<GenericIterator> {
         match self {
             JsonInput::Array(a) => Ok(a.clone().into()),
@@ -411,6 +418,10 @@ impl<'a> Input<'a> for String {
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_list(&'a self) -> ValResult<GenericCollection<'a>> {
         self.validate_list(false, false)
+    }
+
+    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::AnyIterable<'a>> {
+        Err(ValError::new(ErrorType::IterableType, self))
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]

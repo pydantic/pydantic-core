@@ -5,12 +5,13 @@ use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyInt, PyIterator, PyList,
-    PyMapping, PySet, PyString, PyTime, PyTuple, PyType,
+    PyMapping, PySequence, PySet, PyString, PyTime, PyTuple, PyType,
 };
 #[cfg(not(PyPy))]
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
+use super::any_iterable::AnyIterable;
 use crate::build_tools::safe_repr;
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValResult};
 use crate::{ArgsKwargs, PyMultiHostUrl, PyUrl};
@@ -470,6 +471,33 @@ impl<'a> Input<'a> for PyAny {
             Ok(collection)
         } else {
             Err(ValError::new(ErrorType::FrozenSetType, self))
+        }
+    }
+
+    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::AnyIterable<'a>> {
+        // Handle concrete non-overlapping types first, then abstract types
+        if let Ok(iterable) = self.downcast::<PyList>() {
+            Ok(AnyIterable::List(iterable))
+        } else if let Ok(iterable) = self.downcast::<PyTuple>() {
+            Ok(AnyIterable::Tuple(iterable))
+        } else if let Ok(iterable) = self.downcast::<PySet>() {
+            Ok(AnyIterable::Set(iterable))
+        } else if let Ok(iterable) = self.downcast::<PyDict>() {
+            Ok(AnyIterable::Dict(iterable))
+        } else if let Ok(iterable) = self.downcast::<PyDictKeys>() {
+            Ok(AnyIterable::DictKeys(iterable))
+        } else if let Ok(iterable) = self.downcast::<PyDictValues>() {
+            Ok(AnyIterable::DictValues(iterable))
+        } else if let Ok(iterable) = self.downcast::<PyDictItems>() {
+            Ok(AnyIterable::DictItems(iterable))
+        } else if let Ok(iterable) = self.downcast::<PyMapping>() {
+            Ok(AnyIterable::Mapping(iterable))
+        } else if let Ok(iterable) = self.downcast::<PySequence>() {
+            Ok(AnyIterable::Sequence(iterable))
+        } else if let Ok(iterable) = PyIterator::from_object(self.py(), self) {
+            Ok(AnyIterable::Iterator(iterable))
+        } else {
+            Err(ValError::new(ErrorType::IterableType, self))
         }
     }
 

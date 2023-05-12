@@ -2,14 +2,17 @@ use std::os::raw::c_int;
 
 use pyo3::prelude::*;
 
+mod any_iterable;
 mod datetime;
 mod input_abstract;
 mod input_json;
 mod input_python;
+pub mod iterator;
 mod parse_json;
 mod return_enums;
 mod shared;
 
+pub(crate) use any_iterable::AnyIterable;
 pub(crate) use datetime::{
     pydate_as_date, pydatetime_as_datetime, pytime_as_time, pytimedelta_as_duration, EitherDate, EitherDateTime,
     EitherTime, EitherTimedelta,
