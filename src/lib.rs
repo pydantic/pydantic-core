@@ -1,6 +1,5 @@
 #![cfg_attr(has_no_coverage, feature(no_coverage))]
 #![allow(clippy::borrow_deref_ref)]
-#![feature(result_flattening)]
 
 extern crate core;
 
