@@ -71,7 +71,7 @@ def test_validation_error_include_context():
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 2 items after validation, not 3',
+            'msg': 'List should have at most 2 items after validation, not >= 3',
             'input': [1, 2, 3],
             'ctx': {'field_type': 'List', 'max_length': 2, 'actual_length': 3},
         }
@@ -81,7 +81,7 @@ def test_validation_error_include_context():
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 2 items after validation, not 3',
+            'msg': 'List should have at most 2 items after validation, not >= 3',
             'input': [1, 2, 3],
         }
     ]
