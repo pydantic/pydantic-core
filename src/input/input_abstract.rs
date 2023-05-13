@@ -6,7 +6,7 @@ use pyo3::{intern, prelude::*};
 use crate::errors::{InputValue, LocItem, ValResult};
 use crate::{PyMultiHostUrl, PyUrl};
 
-use super::any_iterable::AnyIterable;
+use super::any_iterable::GenericIterable;
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
 use super::return_enums::{EitherBytes, EitherString};
 use super::{GenericArguments, GenericCollection, GenericIterator, GenericMapping, JsonInput};
@@ -167,21 +167,7 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         self.validate_dict(strict)
     }
 
-    fn validate_list(&'a self, strict: bool, allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
-        if strict && !allow_any_iter {
-            self.strict_list()
-        } else {
-            self.lax_list(allow_any_iter)
-        }
-    }
-
-    fn strict_list(&'a self) -> ValResult<GenericCollection<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn lax_list(&'a self, _allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
-        self.strict_list()
-    }
-
-    fn extract_iterable(&'a self) -> ValResult<AnyIterable<'a>>;
+    fn extract_iterable(&'a self) -> ValResult<GenericIterable<'a>>;
 
     fn validate_tuple(&'a self, strict: bool) -> ValResult<GenericCollection<'a>> {
         if strict {

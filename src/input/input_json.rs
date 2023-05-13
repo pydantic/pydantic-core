@@ -187,17 +187,6 @@ impl<'a> Input<'a> for JsonInput {
         self.validate_dict(false)
     }
 
-    fn validate_list(&'a self, _strict: bool, _allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
-        match self {
-            JsonInput::Array(a) => Ok(a.into()),
-            _ => Err(ValError::new(ErrorType::ListType, self)),
-        }
-    }
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn strict_list(&'a self) -> ValResult<GenericCollection<'a>> {
-        self.validate_list(false, false)
-    }
-
     fn validate_tuple(&'a self, _strict: bool) -> ValResult<GenericCollection<'a>> {
         // just as in set's case, List has to be allowed
         match self {
@@ -234,10 +223,10 @@ impl<'a> Input<'a> for JsonInput {
         self.validate_frozenset(false)
     }
 
-    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::AnyIterable<'a>> {
+    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::GenericIterable<'a>> {
         match self {
-            JsonInput::Array(a) => Ok(super::any_iterable::AnyIterable::JsonArray(a)),
-            JsonInput::Object(o) => Ok(super::any_iterable::AnyIterable::JsonObject(o)),
+            JsonInput::Array(a) => Ok(super::any_iterable::GenericIterable::JsonArray(a)),
+            JsonInput::Object(o) => Ok(super::any_iterable::GenericIterable::JsonObject(o)),
             _ => Err(ValError::new(ErrorType::IterableType, self)),
         }
     }
@@ -412,16 +401,7 @@ impl<'a> Input<'a> for String {
         self.validate_dict(false)
     }
 
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validate_list(&'a self, _strict: bool, _allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
-        Err(ValError::new(ErrorType::ListType, self))
-    }
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn strict_list(&'a self) -> ValResult<GenericCollection<'a>> {
-        self.validate_list(false, false)
-    }
-
-    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::AnyIterable<'a>> {
+    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::GenericIterable<'a>> {
         Err(ValError::new(ErrorType::IterableType, self))
     }
 

@@ -7,7 +7,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Type
+from typing import Any, Type, TypeVar, Union
 
 import hypothesis
 import pytest
@@ -40,6 +40,11 @@ class Err:
             return f'Err({self.message!r}, errors={self.errors!r})'
         else:
             return f'Err({self.message!r})'
+
+
+T = TypeVar('T')
+
+Result = Union[T, Err]
 
 
 def json_default(obj):

@@ -28,7 +28,6 @@ mod datetime;
 mod definitions;
 mod dict;
 mod float;
-mod frozenset;
 mod function;
 mod generator;
 mod int;
@@ -43,7 +42,7 @@ mod model;
 mod model_fields;
 mod none;
 mod nullable;
-mod set;
+mod sets;
 mod string;
 mod time;
 mod timedelta;
@@ -368,7 +367,7 @@ pub fn build_validator<'a>(
         // list/arrays
         list::ListValidator,
         // sets - unique lists
-        set::SetValidator,
+        sets::SetValidator,
         // dicts/objects (recursive)
         dict::DictValidator,
         // None/null
@@ -393,7 +392,7 @@ pub fn build_validator<'a>(
         // datetimes
         datetime::DateTimeValidator,
         // frozensets
-        frozenset::FrozenSetValidator,
+        sets::FrozenSetValidator,
         // timedelta
         timedelta::TimeDeltaValidator,
         // introspection types
@@ -509,7 +508,7 @@ pub enum CombinedValidator {
     // lists
     List(list::ListValidator),
     // sets - unique lists
-    Set(set::SetValidator),
+    Set(sets::SetValidator),
     // tuples
     TuplePositional(tuple::TuplePositionalValidator),
     TupleVariable(tuple::TupleVariableValidator),
@@ -538,7 +537,7 @@ pub enum CombinedValidator {
     // datetimes
     Datetime(datetime::DateTimeValidator),
     // frozensets
-    FrozenSet(frozenset::FrozenSetValidator),
+    FrozenSet(sets::FrozenSetValidator),
     // timedelta
     Timedelta(timedelta::TimeDeltaValidator),
     // introspection types

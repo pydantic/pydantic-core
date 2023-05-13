@@ -11,7 +11,7 @@ use pyo3::types::{
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
-use super::any_iterable::AnyIterable;
+use super::any_iterable::GenericIterable;
 use crate::build_tools::safe_repr;
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValResult};
 use crate::{ArgsKwargs, PyMultiHostUrl, PyUrl};
@@ -437,30 +437,6 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_list(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(list) = self.downcast::<PyList>() {
-            Ok(list.into())
-        } else {
-            Err(ValError::new(ErrorType::ListType, self))
-        }
-    }
-
-    fn lax_list(&'a self, allow_any_iter: bool) -> ValResult<GenericCollection<'a>> {
-        if let Ok(list) = self.downcast::<PyList>() {
-            Ok(list.into())
-        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
-            Ok(tuple.into())
-        } else if let Some(collection) = extract_dict_iter!(self) {
-            Ok(collection)
-        } else if allow_any_iter && self.iter().is_ok() {
-            Ok(self.into())
-        } else if let Some(collection) = extract_shared_iter!(PyList, self) {
-            Ok(collection)
-        } else {
-            Err(ValError::new(ErrorType::ListType, self))
-        }
-    }
-
     fn strict_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
         if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
@@ -535,37 +511,36 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::AnyIterable<'a>> {
+    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::GenericIterable<'a>> {
         // Handle concrete non-overlapping types first, then abstract types
         if let Ok(iterable) = self.downcast::<PyList>() {
-            Ok(AnyIterable::List(iterable))
+            Ok(GenericIterable::List(iterable))
         } else if let Ok(iterable) = self.downcast::<PyTuple>() {
-            Ok(AnyIterable::Tuple(iterable))
+            Ok(GenericIterable::Tuple(iterable))
         } else if let Ok(iterable) = self.downcast::<PySet>() {
-            Ok(AnyIterable::Set(iterable))
+            Ok(GenericIterable::Set(iterable))
         } else if let Ok(iterable) = self.downcast::<PyFrozenSet>() {
-            Ok(AnyIterable::FrozenSet(iterable))
+            Ok(GenericIterable::FrozenSet(iterable))
         } else if let Ok(iterable) = self.downcast::<PyDict>() {
-            Ok(AnyIterable::Dict(iterable))
+            Ok(GenericIterable::Dict(iterable))
         } else if let Some(iterable) = extract_dict_keys!(self.py(), self) {
-            Ok(AnyIterable::DictKeys(iterable))
+            Ok(GenericIterable::DictKeys(iterable))
         } else if let Some(iterable) = extract_dict_values!(self.py(), self) {
-            Ok(AnyIterable::DictValues(iterable))
+            Ok(GenericIterable::DictValues(iterable))
         } else if let Some(iterable) = extract_dict_items!(self.py(), self) {
-            Ok(AnyIterable::DictItems(iterable))
+            Ok(GenericIterable::DictItems(iterable))
         } else if let Ok(iterable) = self.downcast::<PyMapping>() {
-            Ok(AnyIterable::Mapping(iterable))
-        } else if let (Ok(iterable), Err(_), Err(_)) = (
-            self.downcast::<PySequence>(),
-            // Explicitly disallow strings and bytes since they are sequences
-            // but you almost never want to treat it as one
-            // This can be worked around by allowing arbitrary iterables
-            self.downcast::<PyString>(),
-            self.downcast::<PyBytes>(),
-        ) {
-            Ok(AnyIterable::Sequence(iterable))
-        } else if let Ok(iterable) = PyIterator::from_object(self.py(), self) {
-            Ok(AnyIterable::Iterator(iterable))
+            Ok(GenericIterable::Mapping(iterable))
+        } else if let Ok(iterable) = self.downcast::<PyString>() {
+            Ok(GenericIterable::String(iterable))
+        } else if let Ok(iterable) = self.downcast::<PyBytes>() {
+            Ok(GenericIterable::Bytes(iterable))
+        } else if let Ok(iterable) = self.downcast::<PyByteArray>() {
+            Ok(GenericIterable::PyByteArray(iterable))
+        } else if let Ok(iterable) = self.downcast::<PySequence>() {
+            Ok(GenericIterable::Sequence(iterable))
+        } else if let Ok(iterable) = self.iter() {
+            Ok(GenericIterable::Iterator(iterable))
         } else {
             Err(ValError::new(ErrorType::IterableType, self))
         }

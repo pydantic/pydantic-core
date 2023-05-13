@@ -36,8 +36,8 @@ def test_no_copy():
     input_value = frozenset([1, 2, 3])
     output = v.validate_python(input_value)
     assert output == input_value
-    assert output is input_value
-    assert id(output) == id(input_value)
+    assert output is not input_value
+    assert id(output) != id(input_value)
 
 
 @pytest.mark.parametrize(
@@ -157,7 +157,7 @@ def generate_repeats():
         (
             {'max_length': 3},
             infinite_generator(),
-            Err('Frozenset should have at most 30 items after validation, not >= 31 [type=too_long,'),
+            Err('Frozenset should have at most 3 items after validation, not >= 4 [type=too_long,'),
         ),
         (
             {'max_length': 3, 'generator_max_length': 3},

@@ -1,6 +1,7 @@
+import collections.abc
 import re
 from collections import deque
-from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterator, List
 
 import pytest
@@ -8,7 +9,7 @@ from dirty_equals import HasRepr, IsInstance, IsStr
 
 from pydantic_core import PydanticOmit, SchemaValidator, ValidationError, core_schema
 
-from ..conftest import Err, PyAndJson
+from ..conftest import Err, PyAndJson, Result
 
 
 @pytest.mark.parametrize(
@@ -40,7 +41,7 @@ def test_list_strict():
     ]
 
 
-class MySequence(Sequence):
+class MySequence(collections.abc.Sequence):
     def __init__(self, data: List[Any]):
         self._data = data
 
@@ -50,26 +51,111 @@ class MySequence(Sequence):
     def __len__(self):
         return len(self._data)
 
-    def count(self, value: Any):
-        return self._data.count(value)
-
     def __repr__(self) -> str:
         return f'MySequence({repr(self._data)})'
+
+
+class MyMapping(collections.abc.Mapping):
+    def __init__(self, data: Dict[Any, Any]) -> None:
+        self._data = data
+
+    def __getitem__(self, key: Any) -> Any:
+        return self._data[key]
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(self._data)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __repr__(self) -> str:
+        return f'MyMapping({repr(self._data)})'
+
+
+@dataclass
+class ListInputTestCase:
+    input: Any
+    output: Result[Any]
+    strict: bool | None = None
+
+
+LAX_MODE_INPUTS: List[Any] = [
+    (1, 2, 3),
+    frozenset((1, 2, 3)),
+    set((1, 2, 3)),
+    deque([1, 2, 3]),
+    {1: 'a', 2: 'b', 3: 'c'},
+    {1: 'a', 2: 'b', 3: 'c'}.keys(),
+    {'a': 1, 'b': 2, 'c': 3}.values(),
+    MySequence([1, 2, 3]),
+    MyMapping({1: 'a', 2: 'b', 3: 'c'}),
+    MyMapping({1: 'a', 2: 'b', 3: 'c'}).keys(),
+    MyMapping({'a': 1, 'b': 2, 'c': 3}).values(),
+    (x for x in [1, 2, 3]),
+]
+
+
+@pytest.mark.parametrize(
+    'testcase',
+    [
+        *[ListInputTestCase([1, 2, 3], [1, 2, 3], strict) for strict in (True, False, None)],
+        *[
+            ListInputTestCase(inp, Err('Input should be a valid list [type=list_type,'), True)
+            for inp in [*LAX_MODE_INPUTS, '123', b'123']
+        ],
+        *[ListInputTestCase(inp, [1, 2, 3], False) for inp in LAX_MODE_INPUTS],
+        *[
+            ListInputTestCase(inp, Err('Input should be a valid list [type=list_type,'), False)
+            for inp in ['123', b'123']
+        ],
+    ],
+    ids=repr,
+)
+def test_list_allowed_inputs_python(testcase: ListInputTestCase):
+    v = SchemaValidator(core_schema.list_schema(core_schema.int_schema(), strict=testcase.strict))
+    if isinstance(testcase.output, Err):
+        with pytest.raises(ValidationError, match=re.escape(testcase.output.message)):
+            v.validate_python(testcase.input)
+    else:
+        output = v.validate_python(testcase.input)
+        assert output == testcase.output
+        assert output is not testcase.input
+
+
+@pytest.mark.parametrize(
+    'testcase',
+    [
+        ListInputTestCase({1: 1, 2: 2, 3: 3}.items(), Err('Input should be a valid list [type=list_type,'), True),
+        ListInputTestCase(
+            MyMapping({1: 1, 2: 2, 3: 3}).items(), Err('Input should be a valid list [type=list_type,'), True
+        ),
+        ListInputTestCase({1: 1, 2: 2, 3: 3}.items(), [(1, 1), (2, 2), (3, 3)], False),
+        ListInputTestCase(MyMapping({1: 1, 2: 2, 3: 3}).items(), [(1, 1), (2, 2), (3, 3)], False),
+    ],
+    ids=repr,
+)
+def test_list_dict_items_input(testcase: ListInputTestCase) -> None:
+    v = SchemaValidator(
+        core_schema.list_schema(
+            core_schema.tuple_positional_schema([core_schema.int_schema(), core_schema.int_schema()]),
+            strict=testcase.strict,
+        )
+    )
+    if isinstance(testcase.output, Err):
+        with pytest.raises(ValidationError, match=re.escape(testcase.output.message)):
+            v.validate_python(testcase.input)
+    else:
+        output = v.validate_python(testcase.input)
+        assert output == testcase.output
+        assert output is not testcase.input
 
 
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        ([1, 2, '3'], [1, 2, 3]),
-        ((1, 2, '3'), [1, 2, 3]),
-        (deque((1, 2, '3')), [1, 2, 3]),
-        ({1, 2, '3'}, Err('Input should be a valid list [type=list_type,')),
-        (frozenset({1, 2, '3'}), Err('Input should be a valid list [type=list_type,')),
-        ({1: 10, 2: 20, '3': '30'}.keys(), [1, 2, 3]),
-        ({1: 10, 2: 20, '3': '30'}.values(), [10, 20, 30]),
-        ({1: 10, 2: 20, '3': '30'}, Err('Input should be a valid list [type=list_type,')),
-        (MySequence([1, 2, '3']), [1, 2, 3]),
-        ((x for x in [1, 2, 3]), Err('Input should be a valid list [type=list_type,')),
+        ([1, b'2', '3'], [1, 2, 3]),
+        ((1, b'2', '3'), [1, 2, 3]),
+        ((x for x in (1, b'2', '3')), [1, 2, 3]),
         ('456', Err("Input should be a valid list [type=list_type, input_value='456', input_type=str]")),
         (b'789', Err("Input should be a valid list [type=list_type, input_value=b'789', input_type=bytes]")),
     ],
@@ -97,25 +183,10 @@ def test_list_json():
     ]
 
 
-@pytest.mark.parametrize(
-    'input_value,expected',
-    [
-        ([], []),
-        ([1, '2', b'3'], [1, '2', b'3']),
-        (frozenset([1, '2', b'3']), Err('Input should be a valid list [type=list_type,')),
-        ((), []),
-        ((1, '2', b'3'), [1, '2', b'3']),
-        (deque([1, '2', b'3']), [1, '2', b'3']),
-        ({1, '2', b'3'}, Err('Input should be a valid list [type=list_type,')),
-    ],
-)
+@pytest.mark.parametrize('input_value,expected', [([], []), ([1, '2', b'3'], [1, '2', b'3'])])
 def test_list_any(input_value, expected):
     v = SchemaValidator({'type': 'list'})
-    if isinstance(expected, Err):
-        with pytest.raises(ValidationError, match=re.escape(expected.message)):
-            v.validate_python(input_value)
-    else:
-        assert v.validate_python(input_value) == expected
+    assert v.validate_python(input_value) == expected
 
 
 @pytest.mark.parametrize(
@@ -322,39 +393,6 @@ def test_list_from_dict_items(input_value, items_schema, expected):
     output = v.validate_python(input_value)
     assert isinstance(output, list)
     assert output == expected
-
-
-@pytest.mark.parametrize(
-    'input_value,expected',
-    [
-        ([1, 2, 3], [1, 2, 3]),
-        ((1, 2, 3), [1, 2, 3]),
-        (range(3), [0, 1, 2]),
-        ((x for x in [1, 2, '3']), [1, 2, 3]),
-        ({1: 2, 3: 4}, [1, 3]),
-        ('123', [1, 2, 3]),
-        (
-            123,
-            Err(
-                '1 validation error for list[int]',
-                [{'type': 'iterable_type', 'loc': (), 'msg': 'Input should be iterable', 'input': 123}],
-            ),
-        ),
-    ],
-)
-def test_allow_any_iter(input_value, expected):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_any_iter': True})
-    if isinstance(expected, Err):
-        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
-            v.validate_python(input_value)
-        assert exc_info.value.errors(include_url=False) == expected.errors
-    else:
-        assert v.validate_python(input_value) == expected
-
-
-def test_sequence_allow_any_iter():
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_any_iter': True})
-    assert v.validate_python(MySequence([1, 2, '3'])) == [1, 2, 3]
 
 
 @pytest.mark.parametrize('items_schema', ['int', 'any'])
