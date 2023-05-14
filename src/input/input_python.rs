@@ -11,7 +11,7 @@ use pyo3::types::{
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
-use super::any_iterable::GenericIterable;
+use super::generic_iterable::GenericIterable;
 use crate::build_tools::safe_repr;
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValResult};
 use crate::{ArgsKwargs, PyMultiHostUrl, PyUrl};
@@ -459,7 +459,7 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::GenericIterable<'a>> {
+    fn extract_iterable(&'a self) -> ValResult<super::generic_iterable::GenericIterable<'a>> {
         // Handle concrete non-overlapping types first, then abstract types
         if let Ok(iterable) = self.downcast::<PyList>() {
             Ok(GenericIterable::List(iterable))

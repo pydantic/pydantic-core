@@ -199,10 +199,10 @@ impl<'a> Input<'a> for JsonInput {
         self.validate_tuple(false)
     }
 
-    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::GenericIterable<'a>> {
+    fn extract_iterable(&'a self) -> ValResult<super::generic_iterable::GenericIterable<'a>> {
         match self {
-            JsonInput::Array(a) => Ok(super::any_iterable::GenericIterable::JsonArray(a)),
-            JsonInput::Object(o) => Ok(super::any_iterable::GenericIterable::JsonObject(o)),
+            JsonInput::Array(a) => Ok(super::generic_iterable::GenericIterable::JsonArray(a)),
+            JsonInput::Object(o) => Ok(super::generic_iterable::GenericIterable::JsonObject(o)),
             _ => Err(ValError::new(ErrorType::IterableType, self)),
         }
     }
@@ -377,7 +377,7 @@ impl<'a> Input<'a> for String {
         self.validate_dict(false)
     }
 
-    fn extract_iterable(&'a self) -> ValResult<super::any_iterable::GenericIterable<'a>> {
+    fn extract_iterable(&'a self) -> ValResult<super::generic_iterable::GenericIterable<'a>> {
         Err(ValError::new(ErrorType::IterableType, self))
     }
 

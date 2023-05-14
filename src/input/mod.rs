@@ -2,8 +2,8 @@ use std::os::raw::c_int;
 
 use pyo3::prelude::*;
 
-mod any_iterable;
 mod datetime;
+mod generic_iterable;
 mod input_abstract;
 mod input_json;
 mod input_python;
@@ -12,11 +12,11 @@ mod parse_json;
 mod return_enums;
 mod shared;
 
-pub(crate) use any_iterable::GenericIterable;
 pub(crate) use datetime::{
     pydate_as_date, pydatetime_as_datetime, pytime_as_time, pytimedelta_as_duration, EitherDate, EitherDateTime,
     EitherTime, EitherTimedelta,
 };
+pub(crate) use generic_iterable::GenericIterable;
 pub(crate) use input_abstract::{Input, InputType};
 pub(crate) use parse_json::{JsonInput, JsonObject};
 pub(crate) use return_enums::{
