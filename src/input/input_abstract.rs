@@ -182,32 +182,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         self.strict_tuple()
     }
 
-    fn validate_set(&'a self, strict: bool) -> ValResult<GenericCollection<'a>> {
-        if strict {
-            self.strict_set()
-        } else {
-            self.lax_set()
-        }
-    }
-    fn strict_set(&'a self) -> ValResult<GenericCollection<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn lax_set(&'a self) -> ValResult<GenericCollection<'a>> {
-        self.strict_set()
-    }
-
-    fn validate_frozenset(&'a self, strict: bool) -> ValResult<GenericCollection<'a>> {
-        if strict {
-            self.strict_frozenset()
-        } else {
-            self.lax_frozenset()
-        }
-    }
-    fn strict_frozenset(&'a self) -> ValResult<GenericCollection<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn lax_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
-        self.strict_frozenset()
-    }
-
     fn validate_iter(&self) -> ValResult<GenericIterator>;
 
     fn validate_date(&self, strict: bool) -> ValResult<EitherDate> {

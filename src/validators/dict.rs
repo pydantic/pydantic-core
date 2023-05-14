@@ -150,7 +150,7 @@ impl Validator for DictValidator {
 
         let generic_iterable = input
             .extract_iterable()
-            .map_err(|_| ValError::new(ErrorType::ListType, input))?;
+            .map_err(|_| ValError::new(ErrorType::DictType, input))?;
         let output = match (generic_iterable, strict) {
             // Always allow actual dicts or JSON objects
             (GenericIterable::Dict(iter), _) => iterator::validate_mapping(
@@ -197,9 +197,9 @@ impl Validator for DictValidator {
                         false,
                     )
                 }
-                Err(_) => return Err(ValError::new(ErrorType::ListType, input)),
+                Err(_) => return Err(ValError::new(ErrorType::DictType, input)),
             },
-            _ => return Err(ValError::new(ErrorType::ListType, input)),
+            _ => return Err(ValError::new(ErrorType::DictType, input)),
         }?;
 
         Ok(output.into_py(py))

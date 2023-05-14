@@ -459,58 +459,6 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_set(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(set) = self.downcast::<PySet>() {
-            Ok(set.into())
-        } else {
-            Err(ValError::new(ErrorType::SetType, self))
-        }
-    }
-
-    fn lax_set(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(set) = self.downcast::<PySet>() {
-            Ok(set.into())
-        } else if let Ok(list) = self.downcast::<PyList>() {
-            Ok(list.into())
-        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
-            Ok(tuple.into())
-        } else if let Ok(frozen_set) = self.downcast::<PyFrozenSet>() {
-            Ok(frozen_set.into())
-        } else if let Some(collection) = extract_dict_iter!(self) {
-            Ok(collection)
-        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
-            Ok(collection)
-        } else {
-            Err(ValError::new(ErrorType::SetType, self))
-        }
-    }
-
-    fn strict_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(set) = self.downcast::<PyFrozenSet>() {
-            Ok(set.into())
-        } else {
-            Err(ValError::new(ErrorType::FrozenSetType, self))
-        }
-    }
-
-    fn lax_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(frozen_set) = self.downcast::<PyFrozenSet>() {
-            Ok(frozen_set.into())
-        } else if let Ok(set) = self.downcast::<PySet>() {
-            Ok(set.into())
-        } else if let Ok(list) = self.downcast::<PyList>() {
-            Ok(list.into())
-        } else if let Ok(tuple) = self.downcast::<PyTuple>() {
-            Ok(tuple.into())
-        } else if let Some(collection) = extract_dict_iter!(self) {
-            Ok(collection)
-        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
-            Ok(collection)
-        } else {
-            Err(ValError::new(ErrorType::FrozenSetType, self))
-        }
-    }
-
     fn extract_iterable(&'a self) -> ValResult<super::any_iterable::GenericIterable<'a>> {
         // Handle concrete non-overlapping types first, then abstract types
         if let Ok(iterable) = self.downcast::<PyList>() {

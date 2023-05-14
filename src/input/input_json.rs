@@ -199,30 +199,6 @@ impl<'a> Input<'a> for JsonInput {
         self.validate_tuple(false)
     }
 
-    fn validate_set(&'a self, _strict: bool) -> ValResult<GenericCollection<'a>> {
-        // we allow a list here since otherwise it would be impossible to create a set from JSON
-        match self {
-            JsonInput::Array(a) => Ok(a.into()),
-            _ => Err(ValError::new(ErrorType::SetType, self)),
-        }
-    }
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn strict_set(&'a self) -> ValResult<GenericCollection<'a>> {
-        self.validate_set(false)
-    }
-
-    fn validate_frozenset(&'a self, _strict: bool) -> ValResult<GenericCollection<'a>> {
-        // we allow a list here since otherwise it would be impossible to create a frozenset from JSON
-        match self {
-            JsonInput::Array(a) => Ok(a.into()),
-            _ => Err(ValError::new(ErrorType::FrozenSetType, self)),
-        }
-    }
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn strict_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
-        self.validate_frozenset(false)
-    }
-
     fn extract_iterable(&'a self) -> ValResult<super::any_iterable::GenericIterable<'a>> {
         match self {
             JsonInput::Array(a) => Ok(super::any_iterable::GenericIterable::JsonArray(a)),
@@ -412,24 +388,6 @@ impl<'a> Input<'a> for String {
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
         self.validate_tuple(false)
-    }
-
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validate_set(&'a self, _strict: bool) -> ValResult<GenericCollection<'a>> {
-        Err(ValError::new(ErrorType::SetType, self))
-    }
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn strict_set(&'a self) -> ValResult<GenericCollection<'a>> {
-        self.validate_set(false)
-    }
-
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validate_frozenset(&'a self, _strict: bool) -> ValResult<GenericCollection<'a>> {
-        Err(ValError::new(ErrorType::FrozenSetType, self))
-    }
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn strict_frozenset(&'a self) -> ValResult<GenericCollection<'a>> {
-        self.validate_frozenset(false)
     }
 
     fn validate_iter(&self) -> ValResult<GenericIterator> {
