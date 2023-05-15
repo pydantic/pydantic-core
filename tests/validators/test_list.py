@@ -84,11 +84,9 @@ LAX_MODE_INPUTS: List[Any] = [
     frozenset((1, 2, 3)),
     set((1, 2, 3)),
     deque([1, 2, 3]),
-    {1: 'a', 2: 'b', 3: 'c'},
     {1: 'a', 2: 'b', 3: 'c'}.keys(),
     {'a': 1, 'b': 2, 'c': 3}.values(),
     MySequence([1, 2, 3]),
-    MyMapping({1: 'a', 2: 'b', 3: 'c'}),
     MyMapping({1: 'a', 2: 'b', 3: 'c'}).keys(),
     MyMapping({'a': 1, 'b': 2, 'c': 3}).values(),
     (x for x in [1, 2, 3]),
@@ -106,7 +104,7 @@ LAX_MODE_INPUTS: List[Any] = [
         *[ListInputTestCase(inp, [1, 2, 3], False) for inp in LAX_MODE_INPUTS],
         *[
             ListInputTestCase(inp, Err('Input should be a valid list [type=list_type,'), False)
-            for inp in ['123', b'123']
+            for inp in ['123', b'123', MyMapping({1: 'a', 2: 'b', 3: 'c'}), {1: 'a', 2: 'b', 3: 'c'}]
         ],
     ],
     ids=repr,
@@ -243,6 +241,7 @@ def test_list_error(input_value, index):
             ['a', 'b'],
             Err('List should have at least 2 items after validation, not 0 [type=too_short,'),
         ),
+        ({'min_length': 1}, [], Err('List should have at least 1 item after validation, not 0 [type=too_short,')),
     ],
 )
 def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
@@ -447,6 +446,7 @@ def infinite_str_gen() -> Iterator[str]:
         num += 1
 
 
+# consumed the first item into an error, when we found a second item we errored so 3rd item is next
 @pytest.mark.parametrize('gen_factory,nxt', [(infinite_int_gen, 2), (infinite_str_gen, 'a_2')])
 def test_stop_iterating_on_error(gen_factory: Callable[[], Iterator[Any]], nxt: Any) -> None:
     v = SchemaValidator(core_schema.list_schema(core_schema.int_schema(), allow_any_iter=True, max_length=1))

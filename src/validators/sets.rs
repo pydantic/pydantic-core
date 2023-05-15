@@ -3,14 +3,17 @@ use pyo3::types::{PyDict, PyFrozenSet, PySet};
 
 use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorType, ValResult};
-use crate::input::Input;
+use crate::input::iterator::LengthConstraints;
+use crate::input::{
+    iterator::IterableValidator,  iterator::IterableValidatorBuilder, GenericIterable, Input,
+};
 use crate::recursion_guard::RecursionGuard;
 
 use super::list::get_items_schema;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 use crate::errors::{LocItem, ValError};
-use crate::input::{iterator, GenericIterable, JsonInput};
+use crate::input::JsonInput;
 
 const MAX_LENGTH_GEN_MULTIPLE: usize = 10;
 
@@ -24,14 +27,27 @@ struct IntoSetValidator {
     name: String,
 }
 
-// Grouping of parameters that get passed around to reduce number of fn params
-struct Extras<'s, 'data> {
-    py: Python<'data>,
-    extra: &'s Extra<'s>,
-    definitions: &'data Definitions<CombinedValidator>,
-    recursion_guard: &'s mut RecursionGuard,
+
+pub fn validate_into_set<'data, 'py, I, R, L, V, D, N>(
+    py: Python<'py>,
+    iterator: &mut IterableValidator<'data, 'py, I, R, L, V, D, N>,
+) -> ValResult<'data, &'data PySet>
+where
+    L: Into<LocItem>,
+    V: FnMut(Python<'py>, &L, R) -> ValResult<'data, N>,
+    I: Iterator<Item = ValResult<'data, (L, R)>>,
+    D: Input<'data>,
+    N: ToPyObject,
+{
+    let output = PySet::empty(py)?;
+    while let Some(result) = iterator.next(py, output.len()) {
+        let (_, data) = result?;
+        output.add(data)?;
+    }
+    Ok(output)
 }
 
+#[derive(Debug, Clone, Copy)]
 enum SetType {
     FrozenSet,
     Set,
@@ -64,134 +80,101 @@ impl IntoSetValidator {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn validate_into_set<'s, 'data>(
+    pub fn validate_into_set<'data, 's: 'data>(
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        extra: &'s Extra<'s>,
+        extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
-        recursion_guard: &'s mut RecursionGuard,
+        recursion_guard: &'data mut RecursionGuard,
         // small breakage of encapsulation to avoid a lot of code duplication / macros
         set_type: SetType,
     ) -> ValResult<'data, &'data PySet> {
-        let strict = extra.strict.unwrap_or(self.strict);
-
-        let mut extras: Extras = Extras {
-            py,
-            extra,
-            definitions,
-            recursion_guard,
-        };
-
-        let length_constraints = iterator::LengthConstraints {
-            min_length: self.min_length,
-            max_length: self.max_length,
-            max_input_length: self.generator_max_length,
-        };
-
-        let make_output = |_capacity: usize| PySet::new(py, Vec::<&PyAny>::new());
-
-        let mut output_func = |output: &mut &PySet, ob: PyObject| -> ValResult<'data, usize> {
-            output.add(ob)?;
-            Ok(output.len())
-        };
-
-        let mut json_validator_func =
-            |extras: &mut Extras<'s, 'data>, loc: LocItem, ob: &'data JsonInput| -> ValResult<'data, PyObject> {
-                match &self.item_validator {
-                    Some(v) => v
-                        .validate(extras.py, ob, extras.extra, extras.definitions, extras.recursion_guard)
-                        .map_err(|e| e.with_outer_location(loc)),
-                    None => Ok(ob.to_object(py)),
-                }
-            };
-
-        let mut python_validator_func =
-            |extras: &mut Extras<'s, 'data>, loc: LocItem, ob: &'data PyAny| -> ValResult<'data, PyObject> {
-                match &self.item_validator {
-                    Some(v) => v
-                        .validate(extras.py, ob, extras.extra, extras.definitions, extras.recursion_guard)
-                        .map_err(|e| e.with_outer_location(loc)),
-                    None => Ok(ob.to_object(py)),
-                }
-            };
-
-        let (field_type, error_type) = match set_type {
-            SetType::FrozenSet => ("Frozenset", ErrorType::FrozenSetType),
-            SetType::Set => ("Set", ErrorType::SetType),
+        let create_err = |input| match set_type {
+            SetType::FrozenSet => ValError::new(ErrorType::FrozenSetType, input),
+            SetType::Set => ValError::new(ErrorType::SetType, input),
         };
 
         let generic_iterable = input
             .extract_iterable()
-            .map_err(|_| ValError::new(error_type.clone(), input))?;
-        let output = match (generic_iterable, strict, set_type) {
-            // Always allow actual frozensets or JSON arrays
-            (GenericIterable::JsonArray(iter), _, _) => iterator::validate_iterable(
-                py,
-                iter.iter().map(Ok),
-                &mut json_validator_func,
-                &mut output_func,
-                length_constraints,
-                field_type,
-                input,
-                &mut extras,
-                make_output,
-                Some(iter.len()),
-                false,
-            ),
-            // See note above about accept_set_in_strict_mode and breaking encapsulation
-            // accept_set_in_strict_mode is being used as a flag to determine if we should treat Set or FrozenSet as our "strict" type
-            (GenericIterable::FrozenSet(iter), _, SetType::FrozenSet) => iterator::validate_iterable(
-                py,
-                iter.iter().map(Ok),
-                &mut python_validator_func,
-                &mut output_func,
-                length_constraints,
-                field_type,
-                input,
-                &mut extras,
-                make_output,
-                Some(iter.len()),
-                false,
-            ),
-            (GenericIterable::Set(iter), _, SetType::Set) => iterator::validate_iterable(
-                py,
-                iter.iter().map(Ok),
-                &mut python_validator_func,
-                &mut output_func,
-                length_constraints,
-                field_type,
-                input,
-                &mut extras,
-                make_output,
-                Some(iter.len()),
-                false,
-            ),
-            // If not in strict mode we also accept any iterable except str/bytes
-            (GenericIterable::String(_) | GenericIterable::Bytes(_), _, _) => {
-                return Err(ValError::new(error_type, input))
-            }
+            .map_err(|_| create_err(input))?;
+
+        let field_type = match set_type {
+            SetType::FrozenSet => "Frozenset",
+            SetType::Set => "Set",
+        };
+
+        let builder = IterableValidatorBuilder::new(
+            field_type,
+            LengthConstraints {
+                min_length: self.min_length,
+                max_length: self.max_length,
+                max_input_length: self.generator_max_length,
+            },
+            false,
+        );
+
+        let python_validation_func =
+            |py: Python<'data>, loc: &usize, input: &'data PyAny| -> ValResult<'data, PyObject> {
+                match &self.item_validator {
+                    Some(validator) => validator
+                        .validate(py, input, extra, definitions, recursion_guard)
+                        .map_err(|e| e.with_outer_location(loc.clone().into())),
+                    None => Ok(input.to_object(py)),
+                }
+            };
+
+        let strict = extra.strict.unwrap_or(self.strict);
+
+        let output: &PySet = match (generic_iterable, strict, set_type) {
+            // Always allow actual lists or JSON arrays
+            (GenericIterable::JsonArray(iter), _, _) => {
+                let mut iterator = builder.build(
+                    iter.into_iter().enumerate().map(Ok),
+                    |py: Python<'_>, loc: &usize, input: &JsonInput| -> ValResult<'data, PyObject> {
+                        match &self.item_validator {
+                            Some(validator) => validator
+                                .validate(py, input, extra, definitions, recursion_guard)
+                                .map_err(|e| e.with_outer_location(loc.clone().into())),
+                            None => Ok(input.to_object(py)),
+                        }
+                    },
+                    input,
+                );
+                validate_into_set(py, &mut iterator)?
+            },
+            (GenericIterable::Set(iter), _, SetType::Set) => {
+                let mut iterator = builder.build(iter.into_iter().enumerate().map(Ok), python_validation_func, input);
+                validate_into_set(py, &mut iterator)?
+            },
+            (GenericIterable::FrozenSet(iter), _, SetType::FrozenSet) => {
+                let mut iterator = builder.build(iter.into_iter().enumerate().map(Ok), python_validation_func, input);
+                validate_into_set(py, &mut iterator)?
+            },
+            // If not in strict mode we also accept any iterable except str, bytes or mappings
+            // This may seem counterintuitive since a Mapping is a less generic type than an arbitrary
+            // iterable (which we do accept) but doing something like `x: list[int] = {1: 'a'}` is commonly
+            // a mistake, so we don't parse it by default
+            (
+                GenericIterable::String(_)
+                | GenericIterable::Bytes(_)
+                | GenericIterable::Dict(_)
+                | GenericIterable::Mapping(_),
+                false, _
+            ) => return Err(create_err(input)),
             (generic_iterable, false, _) => match generic_iterable.into_sequence_iterator(py) {
                 Ok(iter) => {
-                    let len = iter.size_hint().1;
-                    iterator::validate_iterable(
-                        py,
-                        iter,
-                        &mut python_validator_func,
-                        &mut output_func,
-                        length_constraints,
-                        field_type,
-                        input,
-                        &mut extras,
-                        make_output,
-                        len,
-                        false,
-                    )
+                    let mut index = 0..;
+                    let iter = iter
+                        .into_iter()
+                        .map(|result| result.map_err(|e| ValError::from(e)).map(|v| (index.next().unwrap(), v)));
+                    let mut iterator = builder.build(iter, python_validation_func, input);
+                    validate_into_set(py, &mut iterator)?
                 }
-                Err(_) => return Err(ValError::new(error_type, input)),
+                Err(_) => return Err(create_err(input)),
             },
-            _ => return Err(ValError::new(error_type, input)),
-        }?;
+            _ => return Err(create_err(input)),
+        };
 
         Ok(output)
     }

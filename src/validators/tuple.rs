@@ -1,13 +1,21 @@
+use std::ops::RangeFrom;
+
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::{is_strict, SchemaDict};
+use crate::errors::LocItem;
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
-use crate::input::{GenericCollection, Input};
+use crate::input::iterator::IterableValidator;
+use crate::input::iterator::LengthConstraints;
+use crate::input::JsonInput;
+use crate::input::{
+    iterator::validate_into_vec, iterator::IterableValidatorBuilder, GenericCollection, GenericIterable, Input,
+};
 use crate::recursion_guard::RecursionGuard;
 
-use super::list::{get_items_schema, length_check};
+use super::list::get_items_schema;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -41,6 +49,7 @@ impl BuildValidator for TupleVariableValidator {
     }
 }
 
+
 impl Validator for TupleVariableValidator {
     fn validate<'s, 'data>(
         &'s self,
@@ -50,30 +59,81 @@ impl Validator for TupleVariableValidator {
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let seq = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
+        let generic_iterable = input
+            .extract_iterable()
+            .map_err(|_| ValError::new(ErrorType::TupleType, input))?;
 
-        let output = match self.item_validator {
-            Some(ref v) => seq.validate_to_vec(
-                py,
-                input,
-                self.max_length,
-                "Tuple",
-                self.max_length,
-                v,
-                extra,
-                definitions,
-                recursion_guard,
-            )?,
-            None => match seq {
-                GenericCollection::Tuple(tuple) => {
-                    length_check!(input, "Tuple", self.min_length, self.max_length, tuple);
-                    return Ok(tuple.into_py(py));
-                }
-                _ => seq.to_vec(py, input, "Tuple", self.max_length)?,
+        let builder = IterableValidatorBuilder::new(
+            "Tuple",
+            LengthConstraints {
+                min_length: self.min_length,
+                max_length: self.max_length,
+                max_input_length: None,
             },
+            false,
+        );
+
+        let python_validation_func =
+            |py: Python<'data>, loc: &usize, input: &'data PyAny| -> ValResult<'data, PyObject> {
+                match &self.item_validator {
+                    Some(validator) => validator
+                        .validate(py, input, extra, definitions, recursion_guard)
+                        .map_err(|e| e.with_outer_location(loc.clone().into())),
+                    None => Ok(input.to_object(py)),
+                }
+            };
+
+        let strict = extra.strict.unwrap_or(self.strict);
+
+        let output: Vec<PyObject> = match (generic_iterable, strict) {
+            // Always allow actual lists or JSON arrays
+            (GenericIterable::JsonArray(iter), _) => {
+                let len = iter.len();
+                let mut iterator = builder.build(
+                    iter.into_iter().enumerate().map(Ok),
+                    |py: Python<'_>, loc: &usize, value: &JsonInput| -> ValResult<'data, PyObject> {
+                        match &self.item_validator {
+                            Some(validator) => validator
+                                .validate(py, value, extra, definitions, recursion_guard)
+                                .map_err(|e| e.with_outer_location(loc.clone().into())),
+                            None => Ok(input.to_object(py)),
+                        }
+                    },
+                    input,
+                );
+                validate_into_vec(py, len, &mut iterator)?
+            }
+            (GenericIterable::Tuple(iter), _) => {
+                let len = iter.len();
+                let mut iterator = builder.build(iter.into_iter().enumerate().map(Ok), python_validation_func, input);
+                validate_into_vec(py, len, &mut iterator)?
+            }
+            // If not in strict mode we also accept any iterable except str, bytes or mappings
+            // This may seem counterintuitive since a Mapping is a less generic type than an arbitrary
+            // iterable (which we do accept) but doing something like `x: list[int] = {1: 'a'}` is commonly
+            // a mistake, so we don't parse it by default
+            (
+                GenericIterable::String(_)
+                | GenericIterable::Bytes(_)
+                | GenericIterable::Dict(_)
+                | GenericIterable::Mapping(_),
+                _,
+            ) => return Err(ValError::new(ErrorType::TupleType, input)),
+            (generic_iterable, false) => match generic_iterable.into_sequence_iterator(py) {
+                Ok(iter) => {
+                    let mut index = 0..;
+                    let capacity = iter.size_hint().1.unwrap_or(0);
+                    let iter = iter
+                        .into_iter()
+                        .map(|result| result.map_err(|e| ValError::from(e)).map(|v| (index.next().unwrap(), v)));
+                    let mut iterator = builder.build(iter, python_validation_func, input);
+                    validate_into_vec(py, capacity, &mut iterator)?
+                }
+                Err(_) => return Err(ValError::new(ErrorType::TupleType, input)),
+            },
+            _ => return Err(ValError::new(ErrorType::TupleType, input)),
         };
-        length_check!(input, "Tuple", self.min_length, self.max_length, output);
-        Ok(PyTuple::new(py, &output).into_py(py))
+        Ok(PyTuple::new(py, output.into_iter()).into_py(py))
     }
 
     fn different_strict_behavior(
@@ -101,6 +161,14 @@ impl Validator for TupleVariableValidator {
             None => Ok(()),
         }
     }
+}
+
+
+#[derive(Debug, Clone)]
+enum TuplePositionalItem<'s, T> {
+    ValidatorAndItem((&'s CombinedValidator, T)),
+    ExtraItem((&'s Box<CombinedValidator>, T)),
+    DefaultValue(&'s CombinedValidator),
 }
 
 #[derive(Debug, Clone)]
@@ -139,6 +207,80 @@ impl BuildValidator for TuplePositionalValidator {
     }
 }
 
+
+struct TuplePositionalInputIterator<'a, S, I> {
+    input: &'a I,
+    iter: S,
+    item_validators: &'a [CombinedValidator],
+    extra_validator: &'a Option<Box<CombinedValidator>>,
+    current_index: RangeFrom<usize>,
+}
+
+impl<'a, S, I> TuplePositionalInputIterator<'a, S, I> {
+    pub fn new(
+        input: &'a I,
+        iter: S,
+        item_validators: &'a [CombinedValidator],
+        extra_validator: &'a Option<Box<CombinedValidator>>,
+    ) -> Self {
+        Self { input, iter, item_validators, extra_validator, current_index: 0.. }
+    }
+}
+
+impl<'a, S, I, R> Iterator for TuplePositionalInputIterator<'a, S, I>
+where
+    S: Iterator<Item =  ValResult<'a, R>>,
+    I: Input<'a>,
+{
+    type Item = ValResult<'a, (usize, TuplePositionalItem<'a, R>)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let index = self.current_index.next().unwrap();
+        match self.iter.next() {
+            Some(result) => match result {
+                Err(err) => Some(Err(err)),
+                Ok(input) => {
+                    let validator = self.item_validators.get(0);
+                    self.item_validators = &self.item_validators[1..];
+                    match validator {
+                        Some(validator) => Some(Ok((index, TuplePositionalItem::ValidatorAndItem((validator, input))))),
+                        None => {
+                            // Extra input item
+                            match &self.extra_validator {
+                                Some(validator) => Some(Ok((index, TuplePositionalItem::ExtraItem((validator, input))))),
+                                None => Some(Err(ValError::LineErrors(
+                                    vec![
+                                            ValLineError::new(
+                                                ErrorType::TooLong {
+                                                    field_type: "Tuple".to_string(),
+                                                    max_length: self.item_validators.len(),
+                                                    actual_length: index,
+                                                },
+                                                self.input,
+                                            )
+                                        ]
+                                ))),
+                            }
+                        }
+                    }
+                }
+            }
+            None => {
+                // We've exhausted the input
+                // Check if we still have any required slots to fill in and if so try to get those
+                // from default values
+                let validator = self.item_validators.get(0);
+                self.item_validators = &self.item_validators[1..];
+                match validator {
+                    Some(validator) => Some(Ok((index, TuplePositionalItem::DefaultValue(validator)))),
+                    None => None,
+                }
+            }
+        }
+    }
+}
+
+
 impl Validator for TuplePositionalValidator {
     fn validate<'s, 'data>(
         &'s self,
@@ -148,94 +290,158 @@ impl Validator for TuplePositionalValidator {
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let collection = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
-        let expected_length = self.items_validators.len();
+        let generic_iterable = input
+            .extract_iterable()
+            .map_err(|_| ValError::new(ErrorType::TupleType, input))?;
 
-        let mut output: Vec<PyObject> = Vec::with_capacity(expected_length);
-        let mut errors: Vec<ValLineError> = Vec::new();
-        macro_rules! iter {
-            ($collection_iter:expr) => {{
-                for (index, validator) in self.items_validators.iter().enumerate() {
-                    match $collection_iter.next() {
-                        Some(item) => match validator.validate(py, item, extra, definitions, recursion_guard) {
-                            Ok(item) => output.push(item),
-                            Err(ValError::LineErrors(line_errors)) => {
-                                errors.extend(
-                                    line_errors
-                                        .into_iter()
-                                        .map(|err| err.with_outer_location(index.into())),
-                                );
-                            }
-                            Err(err) => return Err(err),
-                        },
-                        None => {
-                            if let Some(value) =
-                                validator.default_value(py, Some(index), extra, definitions, recursion_guard)?
-                            {
-                                output.push(value);
-                            } else {
-                                errors.push(ValLineError::new_with_loc(ErrorType::Missing, input, index));
-                            }
+        let length_constraints = LengthConstraints {
+            min_length: Some(self.items_validators.len()),
+            // If we don't have an extra_validator fail the length check
+            max_length: match &self.extra_validator {
+                Some(_) => None,
+                None => Some(self.items_validators.len()),
+            },
+            max_input_length: None,
+        };
+
+        let builder = IterableValidatorBuilder::new(
+            "Tuple",
+            length_constraints,
+            false,
+        );
+
+        let python_validation_func =
+            |py: Python<'data>, loc: &usize, item: TuplePositionalItem<'s, &'data PyAny>| -> ValResult<'data, PyObject> {
+                let mut validate_inner = |validator: &'s CombinedValidator, maybe_item: Option<&'data PyAny>| {
+                    match maybe_item {
+                        Some(item) => validator
+                        .validate(py, item, extra, definitions, recursion_guard)
+                        .map_err(|e| e.with_outer_location(loc.clone().into())),
+                        None => match validator.default_value(py, Some(*loc), extra, definitions, recursion_guard)? {
+                            Some(default_value) => Ok(default_value),
+                            None => Err(
+                                ValError::LineErrors(
+                                    vec![
+                                        ValLineError::new(
+                                            ErrorType::TooShort {
+                                                field_type: "Tuple".to_string(),
+                                                min_length: self.items_validators.len().clone(),
+                                                actual_length: loc.clone(),
+                                            },
+                                            input,
+                                        )
+                                    ]
+                                )
+                            ),
                         }
                     }
+                };
+                match item {
+                    TuplePositionalItem::ValidatorAndItem((validator, input)) => validate_inner(validator, Some(input)),
+                    TuplePositionalItem::ExtraItem((extra_validator, item)) => validate_inner(&(*extra_validator), Some(item)),
+                    TuplePositionalItem::DefaultValue(validator) => validate_inner(validator, None),
                 }
-                for (index, item) in $collection_iter.enumerate() {
-                    match self.extra_validator {
-                        Some(ref extra_validator) => {
-                            match extra_validator.validate(py, item, extra, definitions, recursion_guard) {
-                                Ok(item) => output.push(item),
-                                Err(ValError::LineErrors(line_errors)) => {
-                                    errors.extend(
-                                        line_errors
-                                            .into_iter()
-                                            .map(|err| err.with_outer_location((index + expected_length).into())),
-                                    );
-                                }
-                                Err(ValError::Omit) => (),
-                                Err(err) => return Err(err),
+            };
+
+        let strict = extra.strict.unwrap_or(self.strict);
+
+        let output: Vec<PyObject> = match (generic_iterable, strict) {
+            // Always allow actual lists or JSON arrays
+            (GenericIterable::JsonArray(iter), _) => {
+                let capacity = iter.len();
+                let input_iter = TuplePositionalInputIterator::new(
+                    input,
+                    iter.iter().map(Ok),
+                    &self.items_validators,
+                    &self.extra_validator,
+                );
+                let json_validation_func =
+                |py: Python<'data>, loc: &usize, item: TuplePositionalItem<'s, &'data JsonInput>| -> ValResult<'data, PyObject> {
+                    let mut validate_inner = |validator: &'s CombinedValidator, maybe_item: Option<&'data JsonInput>| {
+                        match maybe_item {
+                            Some(item) => validator
+                            .validate(py, item, extra, definitions, recursion_guard)
+                            .map_err(|e| e.with_outer_location(loc.clone().into())),
+                            None => match validator.default_value(py, Some(*loc), extra, definitions, recursion_guard)? {
+                                Some(default_value) => Ok(default_value),
+                                None => Err(
+                                    ValError::LineErrors(
+                                        vec![
+                                            ValLineError::new(
+                                                ErrorType::TooShort {
+                                                    field_type: "Tuple".to_string(),
+                                                    min_length: self.items_validators.len().clone(),
+                                                    actual_length: loc.clone(),
+                                                },
+                                                input,
+                                            )
+                                        ]
+                                    )
+                                ),
                             }
                         }
-                        None => {
-                            errors.push(ValLineError::new(
-                                ErrorType::TooLong {
-                                    field_type: "Tuple".to_string(),
-                                    max_length: expected_length,
-                                    actual_length: collection.generic_len()?,
-                                },
-                                input,
-                            ));
-                            // no need to continue through further items
-                            break;
-                        }
+                    };
+                    match item {
+                        TuplePositionalItem::ValidatorAndItem((validator, item)) => validate_inner(validator, Some(item)),
+                        TuplePositionalItem::ExtraItem((extra_validator, item)) => validate_inner(&(*extra_validator), Some(item)),
+                        TuplePositionalItem::DefaultValue(validator) => validate_inner(validator, None),
                     }
+                };
+                let mut iterator = builder.build(
+                    input_iter,
+                    json_validation_func,
+                    input,
+                );
+                let res = validate_into_vec(py, capacity, &mut iterator)?;
+                res
+            }
+            (GenericIterable::Tuple(iter), _) => {
+                let capacity = iter.len();
+                let input_iter = TuplePositionalInputIterator::new(
+                    input,
+                    iter.iter().map(Ok),
+                    &self.items_validators,
+                    &self.extra_validator,
+                );
+                let mut iterator = builder.build(
+                    input_iter,
+                    python_validation_func,
+                    input,
+                );
+                validate_into_vec(py, capacity, &mut iterator)?
+            }
+            // If not in strict mode we also accept any iterable except str, bytes or mappings
+            // This may seem counterintuitive since a Mapping is a less generic type than an arbitrary
+            // iterable (which we do accept) but doing something like `x: list[int] = {1: 'a'}` is commonly
+            // a mistake, so we don't parse it by default
+            (
+                GenericIterable::String(_)
+                | GenericIterable::Bytes(_)
+                | GenericIterable::Dict(_)
+                | GenericIterable::Mapping(_),
+                _,
+            ) => return Err(ValError::new(ErrorType::TupleType, input)),
+            (generic_iterable, false) => match generic_iterable.into_sequence_iterator(py) {
+                Ok(iter) => {
+                    let capacity = iter.size_hint().1.unwrap_or(0);
+                    let input_iter = TuplePositionalInputIterator::new(
+                        input,
+                        iter.map(|v| v.map_err(|e| ValError::from(e))),
+                        &self.items_validators,
+                        &self.extra_validator,
+                    );
+                    let mut iterator = builder.build(
+                        input_iter,
+                        python_validation_func,
+                        input,
+                    );
+                    validate_into_vec(py, capacity, &mut iterator)?
                 }
-            }};
-        }
-        match collection {
-            GenericCollection::List(collection) => {
-                let mut iter = collection.iter();
-                iter!(iter)
-            }
-            GenericCollection::Tuple(collection) => {
-                let mut iter = collection.iter();
-                iter!(iter)
-            }
-            GenericCollection::PyAny(collection) => {
-                let vec: Vec<&PyAny> = collection.iter()?.collect::<PyResult<_>>()?;
-                let mut iter = vec.into_iter();
-                iter!(iter)
-            }
-            GenericCollection::JsonArray(collection) => {
-                let mut iter = collection.iter();
-                iter!(iter)
-            }
-            _ => unreachable!(),
-        }
-        if errors.is_empty() {
-            Ok(PyTuple::new(py, &output).into_py(py))
-        } else {
-            Err(ValError::LineErrors(errors))
-        }
+                Err(_) => return Err(ValError::new(ErrorType::TupleType, input)),
+            },
+            _ => return Err(ValError::new(ErrorType::TupleType, input)),
+        };
+        Ok(PyTuple::new(py, output.into_iter()).into_py(py))
     }
 
     fn different_strict_behavior(
