@@ -9,7 +9,7 @@ use crate::{PyMultiHostUrl, PyUrl};
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
 use super::generic_iterable::GenericIterable;
 use super::return_enums::{EitherBytes, EitherString};
-use super::{GenericArguments, GenericCollection, GenericIterator, GenericMapping, JsonInput};
+use super::{GenericArguments, GenericIterator, GenericMapping, JsonInput};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InputType {
@@ -168,19 +168,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
     }
 
     fn extract_iterable(&'a self) -> ValResult<GenericIterable<'a>>;
-
-    fn validate_tuple(&'a self, strict: bool) -> ValResult<GenericCollection<'a>> {
-        if strict {
-            self.strict_tuple()
-        } else {
-            self.lax_tuple()
-        }
-    }
-    fn strict_tuple(&'a self) -> ValResult<GenericCollection<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn lax_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
-        self.strict_tuple()
-    }
 
     fn validate_iter(&self) -> ValResult<GenericIterator>;
 

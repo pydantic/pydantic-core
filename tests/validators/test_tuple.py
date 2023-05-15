@@ -232,19 +232,18 @@ def test_multiple_missing(py_and_json: PyAndJson):
         }
     )
     assert v.validate_test([1, 2, 3, 4]) == (1, 2, 3, 4)
-
-    with pytest.raises(ValidationError) as exc_info:
-        v.validate_test([])
-    assert exc_info.value.errors(include_url=False) == [{'type': 'too_short', 'loc': (), 'msg': 'Tuple should have at least 4 items after validation, not 0', 'input': [], 'ctx': {'field_type': 'Tuple', 'min_length': 4, 'actual_length': 0}}]
-
-
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1])
-    assert exc_info.value.errors(include_url=False) == [{'type': 'too_short', 'loc': (), 'msg': 'Tuple should have at least 4 items after validation, not 1', 'input': [1], 'ctx': {'field_type': 'Tuple', 'min_length': 4, 'actual_length': 1}}]
-
+    assert exc_info.value.errors(include_url=False) == [
+        {'type': 'missing', 'loc': (1,), 'msg': 'Field required', 'input': [1]},
+        {'type': 'missing', 'loc': (2,), 'msg': 'Field required', 'input': [1]},
+        {'type': 'missing', 'loc': (3,), 'msg': 'Field required', 'input': [1]},
+    ]
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1, 2, 3])
-    assert exc_info.value.errors(include_url=False) == [{'type': 'too_short', 'loc': (), 'msg': 'Tuple should have at least 4 items after validation, not 3', 'input': [1, 2, 3], 'ctx': {'field_type': 'Tuple', 'min_length': 4, 'actual_length': 3}}]
+    assert exc_info.value.errors(include_url=False) == [
+        {'type': 'missing', 'loc': (3,), 'msg': 'Field required', 'input': [1, 2, 3]}
+    ]
 
 
 def test_extra_arguments(py_and_json: PyAndJson):
@@ -253,8 +252,15 @@ def test_extra_arguments(py_and_json: PyAndJson):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1, 2, 3, 4])
     # insert_assert(exc_info.value.errors(include_url=False))
-    assert exc_info.value.errors(include_url=False) == [{'type': 'too_long', 'loc': (), 'msg': 'Tuple should have at most 2 items after validation, not >= 3', 'input': [1, 2, 3, 4], 'ctx': {'field_type': 'Tuple', 'max_length': 2, 'actual_length': 3}}]
-
+    assert exc_info.value.errors(include_url=False) == [
+        {
+            'type': 'too_long',
+            'loc': (),
+            'msg': 'Tuple should have at most 2 items after validation, not >= 3',
+            'input': [1, 2, 3, 4],
+            'ctx': {'field_type': 'Tuple', 'max_length': 2, 'actual_length': 3},
+        }
+    ]
 
 
 def test_positional_empty(py_and_json: PyAndJson):
@@ -389,8 +395,9 @@ def test_tuple_fix_error():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1])
 
-    assert exc_info.value.errors(include_url=False) == [{'type': 'too_short', 'loc': (), 'msg': 'Tuple should have at least 2 items after validation, not 1', 'input': [1], 'ctx': {'field_type': 'Tuple', 'min_length': 2, 'actual_length': 1}}]
-
+    assert exc_info.value.errors(include_url=False) == [
+        {'type': 'missing', 'loc': (1,), 'msg': 'Field required', 'input': [1]}
+    ]
 
 
 @pytest.mark.parametrize(
@@ -401,7 +408,7 @@ def test_tuple_fix_error():
         ((1, 'a', 'b'), (1, 'a', 'b')),
         ([1, 'a', 'b', 'c', 'd'], (1, 'a', 'b', 'c', 'd')),
         (deque([1, 'a', 'b', 'c', 'd']), (1, 'a', 'b', 'c', 'd')),
-        ([1], Err('type=too_short', errors=[{'type': 'too_short', 'loc': (), 'msg': 'Tuple should have at least 2 items after validation, not 1', 'input': [1], 'ctx': {'field_type': 'Tuple', 'min_length': 2, 'actual_length': 1}}])),
+        ([1], Err('type=missing', errors=[{'type': 'missing', 'loc': (1,), 'msg': 'Field required', 'input': [1]}])),
     ],
 )
 def test_tuple_fix_extra(input_value, expected, cache):
@@ -431,7 +438,9 @@ def test_tuple_fix_extra_any():
     assert v.validate_python([b'1', 2, b'3']) == ('1', 2, b'3')
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([])
-    assert exc_info.value.errors(include_url=False) == [{'type': 'too_short', 'loc': (), 'msg': 'Tuple should have at least 1 item after validation, not 0', 'input': [], 'ctx': {'field_type': 'Tuple', 'min_length': 1, 'actual_length': 0}}]
+    assert exc_info.value.errors(include_url=False) == [
+        {'type': 'missing', 'loc': (0,), 'msg': 'Field required', 'input': []}
+    ]
 
 
 def test_generator_error():

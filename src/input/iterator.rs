@@ -1,5 +1,3 @@
-use std::{marker::PhantomData, mem};
-
 use pyo3::{PyObject, PyResult, Python};
 
 use super::Input;
@@ -36,17 +34,18 @@ impl IterableValidatorBuilder {
             fail_fast,
         }
     }
-    pub fn build<'data, 'py, I, R, L, V, D, N>(
+    pub fn build<'data, I, R, L, V, D, N>(
         self,
         iter: I,
         validation_func: V,
         input: &'data D,
-    ) -> IterableValidator<'data, 'py, I, R, L, V, D, N>
+    ) -> IterableValidator<'data, I, R, L, V, D, N>
     where
-        L: Into<LocItem>,
-        V: FnMut(Python<'py>, &L, R) -> ValResult<'data, N>,
+        L: Into<LocItem> + std::fmt::Debug,
+        V: FnMut(Python<'data>, &L, R) -> ValResult<'data, N>,
         I: Iterator<Item = ValResult<'data, (L, R)>>,
         D: Input<'data>,
+        R: std::fmt::Debug,
     {
         IterableValidator::new(
             iter,
@@ -60,12 +59,13 @@ impl IterableValidatorBuilder {
 }
 
 // Almost like an Iterator, but accepts some extra arguments
-pub struct IterableValidator<'data, 'py: 'data, I, R, L, V, D, N>
+pub struct IterableValidator<'data, I, R, L, V, D, N>
 where
     L: Into<LocItem>,
-    V: FnMut(Python<'py>, &L, R) -> ValResult<'data, N>,
+    V: FnMut(Python<'data>, &L, R) -> ValResult<'data, N>,
     I: Iterator<Item = ValResult<'data, (L, R)>>,
     D: Input<'data>,
+    R: std::fmt::Debug,
 {
     iter: I,
     validation_func: V,
@@ -76,15 +76,15 @@ where
     errors: Vec<ValLineError<'data>>,
     done: bool,
     current_index: usize,
-    p: PhantomData<Python<'py>>,
 }
 
-impl<'data, 'py, I, R, L, V, D, N> IterableValidator<'data, 'py, I, R, L, V, D, N>
+impl<'data, I, R, L, V, D, N> IterableValidator<'data, I, R, L, V, D, N>
 where
-    L: Into<LocItem>,
-    V: FnMut(Python<'py>, &L, R) -> ValResult<'data, N>,
+    L: Into<LocItem> + std::fmt::Debug,
+    V: FnMut(Python<'data>, &L, R) -> ValResult<'data, N>,
     I: Iterator<Item = ValResult<'data, (L, R)>>,
     D: Input<'data>,
+    R: std::fmt::Debug,
 {
     fn check_max_length(&self, current_length: usize, max_length: Option<usize>) -> ValResult<'data, ()> {
         if let Some(max_length) = max_length {
@@ -126,10 +126,9 @@ where
             errors: vec![],
             done: false,
             current_index: 0,
-            p: PhantomData,
         }
     }
-    pub fn next(&mut self, py: Python<'py>, current_output_length: usize) -> Option<ValResult<'data, (L, N)>> {
+    pub fn next(&mut self, py: Python<'data>, current_output_length: usize) -> Option<ValResult<'data, (L, N)>> {
         if self.done {
             return None;
         }
@@ -145,23 +144,25 @@ where
             self.current_index += 1;
             match self.iter.next() {
                 None => {
-                    if self.errors.is_empty() {
-                        // check min len and return
-                        if let Some(min_length) = self.length_constraints.min_length {
-                            if min_length > current_output_length {
-                                return Some(Err(ValError::new(
-                                    ErrorType::TooShort {
-                                        field_type: self.field_type.to_string(),
-                                        min_length,
-                                        actual_length: current_output_length,
-                                    },
-                                    self.input,
-                                )));
-                            }
+                    self.done = true;
+                    // check min len and return
+                    if let Some(min_length) = self.length_constraints.min_length {
+                        if min_length > current_output_length {
+                            let err = ValLineError::new(
+                                ErrorType::TooShort {
+                                    field_type: self.field_type.to_string(),
+                                    min_length,
+                                    actual_length: current_output_length,
+                                },
+                                self.input,
+                            );
+                            self.errors.push(err);
                         }
+                    }
+                    if self.errors.is_empty() {
                         return None;
                     }
-                    return Some(Err(ValError::LineErrors(mem::replace(&mut self.errors, vec![]))));
+                    return Some(Err(ValError::LineErrors(std::mem::take(&mut self.errors))));
                 }
                 Some(iter_result) => match iter_result {
                     Ok((loc, item)) => match (self.validation_func)(py, &loc, item) {
@@ -202,16 +203,17 @@ where
     }
 }
 
-pub fn validate_into_vec<'data, 'py, I, R, L, V, D, N>(
-    py: Python<'py>,
+pub fn validate_into_vec<'data, I, R, L, V, D, N>(
+    py: Python<'data>,
     capacity: usize,
-    iterator: &mut IterableValidator<'data, 'py, I, R, L, V, D, N>,
+    iterator: &mut IterableValidator<'data, I, R, L, V, D, N>,
 ) -> ValResult<'data, Vec<N>>
 where
-    L: Into<LocItem>,
-    V: FnMut(Python<'py>, &L, R) -> ValResult<'data, N>,
+    L: Into<LocItem> + std::fmt::Debug,
+    V: FnMut(Python<'data>, &L, R) -> ValResult<'data, N>,
     I: Iterator<Item = ValResult<'data, (L, R)>>,
     D: Input<'data>,
+    R: std::fmt::Debug,
 {
     let mut output = Vec::with_capacity(capacity);
     while let Some(result) = iterator.next(py, output.len()) {
@@ -313,7 +315,6 @@ where
         Err(ValError::LineErrors(errors))
     }
 }
-
 
 /// Utility wrapper used by dicts and mappings
 #[allow(clippy::too_many_arguments)]

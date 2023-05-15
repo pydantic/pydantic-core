@@ -4,9 +4,7 @@ use pyo3::types::{PyDict, PyFrozenSet, PySet};
 use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorType, ValResult};
 use crate::input::iterator::LengthConstraints;
-use crate::input::{
-    iterator::IterableValidator,  iterator::IterableValidatorBuilder, GenericIterable, Input,
-};
+use crate::input::{iterator::IterableValidator, iterator::IterableValidatorBuilder, GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 
 use super::list::get_items_schema;
@@ -27,17 +25,17 @@ struct IntoSetValidator {
     name: String,
 }
 
-
-pub fn validate_into_set<'data, 'py, I, R, L, V, D, N>(
-    py: Python<'py>,
-    iterator: &mut IterableValidator<'data, 'py, I, R, L, V, D, N>,
+pub fn validate_into_set<'data, I, R, L, V, D, N>(
+    py: Python<'data>,
+    iterator: &mut IterableValidator<'data, I, R, L, V, D, N>,
 ) -> ValResult<'data, &'data PySet>
 where
-    L: Into<LocItem>,
-    V: FnMut(Python<'py>, &L, R) -> ValResult<'data, N>,
+    L: Into<LocItem> + std::fmt::Debug,
+    V: FnMut(Python<'data>, &L, R) -> ValResult<'data, N>,
     I: Iterator<Item = ValResult<'data, (L, R)>>,
     D: Input<'data>,
     N: ToPyObject,
+    R: std::fmt::Debug,
 {
     let output = PySet::empty(py)?;
     while let Some(result) = iterator.next(py, output.len()) {
@@ -80,13 +78,13 @@ impl IntoSetValidator {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn validate_into_set<'data, 's: 'data>(
+    pub fn validate_into_set<'s, 'data>(
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
-        recursion_guard: &'data mut RecursionGuard,
+        recursion_guard: &'s mut RecursionGuard,
         // small breakage of encapsulation to avoid a lot of code duplication / macros
         set_type: SetType,
     ) -> ValResult<'data, &'data PySet> {
@@ -95,9 +93,7 @@ impl IntoSetValidator {
             SetType::Set => ValError::new(ErrorType::SetType, input),
         };
 
-        let generic_iterable = input
-            .extract_iterable()
-            .map_err(|_| create_err(input))?;
+        let generic_iterable = input.extract_iterable().map_err(|_| create_err(input))?;
 
         let field_type = match set_type {
             SetType::FrozenSet => "Frozenset",
@@ -119,7 +115,7 @@ impl IntoSetValidator {
                 match &self.item_validator {
                     Some(validator) => validator
                         .validate(py, input, extra, definitions, recursion_guard)
-                        .map_err(|e| e.with_outer_location(loc.clone().into())),
+                        .map_err(|e| e.with_outer_location((*loc).into())),
                     None => Ok(input.to_object(py)),
                 }
             };
@@ -130,27 +126,27 @@ impl IntoSetValidator {
             // Always allow actual lists or JSON arrays
             (GenericIterable::JsonArray(iter), _, _) => {
                 let mut iterator = builder.build(
-                    iter.into_iter().enumerate().map(Ok),
+                    iter.iter().enumerate().map(Ok),
                     |py: Python<'_>, loc: &usize, input: &JsonInput| -> ValResult<'data, PyObject> {
                         match &self.item_validator {
                             Some(validator) => validator
                                 .validate(py, input, extra, definitions, recursion_guard)
-                                .map_err(|e| e.with_outer_location(loc.clone().into())),
+                                .map_err(|e| e.with_outer_location((*loc).into())),
                             None => Ok(input.to_object(py)),
                         }
                     },
                     input,
                 );
                 validate_into_set(py, &mut iterator)?
-            },
+            }
             (GenericIterable::Set(iter), _, SetType::Set) => {
                 let mut iterator = builder.build(iter.into_iter().enumerate().map(Ok), python_validation_func, input);
                 validate_into_set(py, &mut iterator)?
-            },
+            }
             (GenericIterable::FrozenSet(iter), _, SetType::FrozenSet) => {
                 let mut iterator = builder.build(iter.into_iter().enumerate().map(Ok), python_validation_func, input);
                 validate_into_set(py, &mut iterator)?
-            },
+            }
             // If not in strict mode we also accept any iterable except str, bytes or mappings
             // This may seem counterintuitive since a Mapping is a less generic type than an arbitrary
             // iterable (which we do accept) but doing something like `x: list[int] = {1: 'a'}` is commonly
@@ -160,14 +156,15 @@ impl IntoSetValidator {
                 | GenericIterable::Bytes(_)
                 | GenericIterable::Dict(_)
                 | GenericIterable::Mapping(_),
-                false, _
+                false,
+                _,
             ) => return Err(create_err(input)),
             (generic_iterable, false, _) => match generic_iterable.into_sequence_iterator(py) {
                 Ok(iter) => {
                     let mut index = 0..;
                     let iter = iter
                         .into_iter()
-                        .map(|result| result.map_err(|e| ValError::from(e)).map(|v| (index.next().unwrap(), v)));
+                        .map(|result| result.map_err(ValError::from).map(|v| (index.next().unwrap(), v)));
                     let mut iterator = builder.build(iter, python_validation_func, input);
                     validate_into_set(py, &mut iterator)?
                 }
@@ -226,11 +223,11 @@ impl BuildValidator for FrozenSetValidator {
 }
 
 impl Validator for FrozenSetValidator {
-    fn validate<'s, 'data>(
+    fn validate<'s, 'data, 'a>(
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        extra: &Extra,
+        extra: &'a Extra<'a>,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {

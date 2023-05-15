@@ -91,7 +91,7 @@ impl Validator for ListValidator {
                 match &self.item_validator {
                     Some(validator) => validator
                         .validate(py, input, extra, definitions, recursion_guard)
-                        .map_err(|e| e.with_outer_location(loc.clone().into())),
+                        .map_err(|e| e.with_outer_location((*loc).into())),
                     None => Ok(input.to_object(py)),
                 }
             };
@@ -103,12 +103,12 @@ impl Validator for ListValidator {
             (GenericIterable::JsonArray(iter), _) => {
                 let len = iter.len();
                 let mut iterator = builder.build(
-                    iter.into_iter().enumerate().map(Ok),
+                    iter.iter().enumerate().map(Ok),
                     |py: Python<'_>, loc: &usize, input: &JsonInput| -> ValResult<'data, PyObject> {
                         match &self.item_validator {
                             Some(validator) => validator
                                 .validate(py, input, extra, definitions, recursion_guard)
-                                .map_err(|e| e.with_outer_location(loc.clone().into())),
+                                .map_err(|e| e.with_outer_location((*loc).into())),
                             None => Ok(input.to_object(py)),
                         }
                     },
@@ -138,7 +138,7 @@ impl Validator for ListValidator {
                     let capacity = iter.size_hint().1.unwrap_or(0);
                     let iter = iter
                         .into_iter()
-                        .map(|result| result.map_err(|e| ValError::from(e)).map(|v| (index.next().unwrap(), v)));
+                        .map(|result| result.map_err(ValError::from).map(|v| (index.next().unwrap(), v)));
                     let mut iterator = builder.build(iter, python_validation_func, input);
                     validate_into_vec(py, capacity, &mut iterator)?
                 }

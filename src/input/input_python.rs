@@ -23,38 +23,9 @@ use super::datetime::{
 };
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
-    py_string_str, EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericCollection, GenericIterator,
-    GenericMapping, Input, JsonInput, PyArgs,
+    py_string_str, EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericIterator, GenericMapping,
+    Input, JsonInput, PyArgs,
 };
-
-/// Extract generators and deques into a `GenericCollection`
-macro_rules! extract_shared_iter {
-    ($type:ty, $obj:ident) => {
-        if $obj.downcast::<PyIterator>().is_ok() {
-            Some($obj.into())
-        } else if is_deque($obj) {
-            Some($obj.into())
-        } else {
-            None
-        }
-    };
-}
-
-/// Extract dict keys, values and items into a `GenericCollection`
-#[cfg(not(PyPy))]
-macro_rules! extract_dict_iter {
-    ($obj:ident) => {
-        if $obj.is_instance_of::<PyDictKeys>().unwrap_or(false) {
-            Some($obj.into())
-        } else if $obj.is_instance_of::<PyDictValues>().unwrap_or(false) {
-            Some($obj.into())
-        } else if $obj.is_instance_of::<PyDictItems>().unwrap_or(false) {
-            Some($obj.into())
-        } else {
-            None
-        }
-    };
-}
 
 #[cfg(PyPy)]
 macro_rules! extract_dict_iter {
@@ -71,7 +42,6 @@ macro_rules! extract_dict_iter {
     };
 }
 
-/// Extract dict keys, values and items into a `GenericCollection`
 #[cfg(not(PyPy))]
 macro_rules! extract_dict_keys {
     ($py:expr, $obj:ident) => {
@@ -437,28 +407,6 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(tuple) = self.downcast::<PyTuple>() {
-            Ok(tuple.into())
-        } else {
-            Err(ValError::new(ErrorType::TupleType, self))
-        }
-    }
-
-    fn lax_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
-        if let Ok(tuple) = self.downcast::<PyTuple>() {
-            Ok(tuple.into())
-        } else if let Ok(list) = self.downcast::<PyList>() {
-            Ok(list.into())
-        } else if let Some(collection) = extract_dict_iter!(self) {
-            Ok(collection)
-        } else if let Some(collection) = extract_shared_iter!(PyTuple, self) {
-            Ok(collection)
-        } else {
-            Err(ValError::new(ErrorType::TupleType, self))
-        }
-    }
-
     fn extract_iterable(&'a self) -> ValResult<super::generic_iterable::GenericIterable<'a>> {
         // Handle concrete non-overlapping types first, then abstract types
         if let Ok(iterable) = self.downcast::<PyList>() {
@@ -642,21 +590,6 @@ fn maybe_as_string(v: &PyAny, unicode_error: ErrorType) -> ValResult<Option<Cow<
     } else {
         Ok(None)
     }
-}
-
-static DEQUE_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
-
-fn is_deque(v: &PyAny) -> bool {
-    let py = v.py();
-    let deque_type = DEQUE_TYPE
-        .get_or_init(py, || import_type(py, "collections", "deque").unwrap())
-        .as_ref(py);
-    v.is_instance(deque_type).unwrap_or(false)
-}
-
-fn import_type(py: Python, module: &str, attr: &str) -> PyResult<Py<PyType>> {
-    let obj = py.import(module)?.getattr(attr)?;
-    Ok(obj.downcast::<PyType>()?.into())
 }
 
 fn is_builtin_str(py_str: &PyString) -> bool {

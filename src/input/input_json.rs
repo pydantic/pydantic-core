@@ -10,8 +10,8 @@ use super::datetime::{
 use super::parse_json::JsonArray;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
-    EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericCollection, GenericIterator, GenericMapping,
-    Input, JsonArgs, JsonInput,
+    EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericIterator, GenericMapping, Input, JsonArgs,
+    JsonInput,
 };
 
 impl<'a> Input<'a> for JsonInput {
@@ -185,18 +185,6 @@ impl<'a> Input<'a> for JsonInput {
     #[cfg_attr(has_no_coverage, no_coverage)]
     fn strict_dict(&'a self) -> ValResult<GenericMapping<'a>> {
         self.validate_dict(false)
-    }
-
-    fn validate_tuple(&'a self, _strict: bool) -> ValResult<GenericCollection<'a>> {
-        // just as in set's case, List has to be allowed
-        match self {
-            JsonInput::Array(a) => Ok(a.into()),
-            _ => Err(ValError::new(ErrorType::TupleType, self)),
-        }
-    }
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn strict_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
-        self.validate_tuple(false)
     }
 
     fn extract_iterable(&'a self) -> ValResult<super::generic_iterable::GenericIterable<'a>> {
@@ -379,15 +367,6 @@ impl<'a> Input<'a> for String {
 
     fn extract_iterable(&'a self) -> ValResult<super::generic_iterable::GenericIterable<'a>> {
         Err(ValError::new(ErrorType::IterableType, self))
-    }
-
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn validate_tuple(&'a self, _strict: bool) -> ValResult<GenericCollection<'a>> {
-        Err(ValError::new(ErrorType::TupleType, self))
-    }
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn strict_tuple(&'a self) -> ValResult<GenericCollection<'a>> {
-        self.validate_tuple(false)
     }
 
     fn validate_iter(&self) -> ValResult<GenericIterator> {
