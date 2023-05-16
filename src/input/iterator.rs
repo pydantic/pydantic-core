@@ -132,10 +132,6 @@ where
         if self.done {
             return None;
         }
-        if let Err(err) = self.check_max_lengths(self.current_index, current_output_length) {
-            self.done = true;
-            return Some(Err(err));
-        }
         let nxt = loop {
             if let Err(err) = self.check_max_lengths(self.current_index, current_output_length) {
                 self.done = true;
