@@ -81,7 +81,6 @@ impl<'data> IterableValidationChecks<'data> {
         }
         res
     }
-
     pub fn check_output_length<I: Input<'data>>(
         &mut self,
         output_length: usize,
@@ -93,7 +92,6 @@ impl<'data> IterableValidationChecks<'data> {
         }
         Ok(())
     }
-
     pub fn finish<I: Input<'data>>(&mut self, input: &'data I) -> ValResult<'data, ()> {
         if self.min_length > self.output_length {
             let err = ValLineError::new(
@@ -112,7 +110,6 @@ impl<'data> IterableValidationChecks<'data> {
             Err(ValError::LineErrors(std::mem::take(&mut self.errors)))
         }
     }
-
     fn check_max_length<I: Input<'data>>(
         &self,
         current_length: usize,

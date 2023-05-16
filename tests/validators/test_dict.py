@@ -1,7 +1,6 @@
 import re
 from collections import OrderedDict
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import Any, Dict, List
 
 import pytest
@@ -22,11 +21,6 @@ def test_dict(py_and_json: PyAndJson):
         v.validate_test([])
 
 
-@dataclass
-class Foobar:
-    x = 1
-
-
 @pytest.mark.parametrize(
     'input_value,expected',
     [
@@ -39,7 +33,9 @@ class Foobar:
         ([('x', '1'), ('z', b'2')], {'x': 1, 'z': 2}),
         ((), {}),
         ((('x', '1'),), {'x': 1}),
-        (Foobar(), Err('Input should be a valid dictionary [type=dict_type,')),
+        pytest.param(
+            (type('Foobar', (), {'x': 1})()), Err('Input should be a valid dictionary [type=dict_type,'), id='Foobar'
+        ),
     ],
     ids=repr,
 )
@@ -172,59 +168,51 @@ def test_mapping_error():
 
 
 @pytest.mark.parametrize(
-    'mapping_items,errors',
+    'mapping_items,error',
     [
         (
             [(1,)],
-            [
-                {
-                    'type': 'iteration_error',
-                    'loc': (),
-                    'msg': 'Error iterating over object, error: ValueError: expected tuple of length 2, but got tuple of length 1',  # noqa: E501
-                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
-                    'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 1'},
-                }
-            ],
+            {
+                'type': 'iteration_error',
+                'loc': (),
+                'msg': 'Error iterating over object, error: ValueError: expected tuple of length 2, but got tuple of length 1',  # noqa: E501
+                'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 1'},
+            },
         ),
         (
             ['foobar'],
-            [
-                {
-                    'type': 'iteration_error',
-                    'loc': (),
-                    'msg': "Error iterating over object, error: TypeError: 'str' object cannot be converted to 'PyTuple'",  # noqa: E501
-                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
-                    'ctx': {'error': "TypeError: 'str' object cannot be converted to 'PyTuple'"},
-                }
-            ],
+            {
+                'type': 'iteration_error',
+                'loc': (),
+                'msg': "Error iterating over object, error: TypeError: 'str' object cannot be converted to 'PyTuple'",  # noqa: E501
+                'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                'ctx': {'error': "TypeError: 'str' object cannot be converted to 'PyTuple'"},
+            },
         ),
         (
             [(1, 2, 3)],
-            [
-                {
-                    'type': 'iteration_error',
-                    'loc': (),
-                    'msg': 'Error iterating over object, error: ValueError: expected tuple of length 2, but got tuple of length 3',  # noqa: E501
-                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
-                    'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 3'},
-                }
-            ],
+            {
+                'type': 'iteration_error',
+                'loc': (),
+                'msg': 'Error iterating over object, error: ValueError: expected tuple of length 2, but got tuple of length 3',  # noqa: E501
+                'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 3'},
+            },
         ),
         (
             'not list',
-            [
-                {
-                    'type': 'iteration_error',
-                    'loc': (),
-                    'msg': "Error iterating over object, error: TypeError: 'str' object cannot be converted to 'PyTuple'",  # noqa: E501
-                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
-                    'ctx': {'error': "TypeError: 'str' object cannot be converted to 'PyTuple'"},
-                }
-            ],
+            {
+                'type': 'iteration_error',
+                'loc': (),
+                'msg': "Error iterating over object, error: TypeError: 'str' object cannot be converted to 'PyTuple'",  # noqa: E501
+                'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                'ctx': {'error': "TypeError: 'str' object cannot be converted to 'PyTuple'"},
+            },
         ),
     ],
 )
-def test_mapping_error_yield_1(mapping_items: List[Any], errors: List[Any]):
+def test_mapping_error_yield_1(mapping_items: List[Any], error: Any):
     class BadMapping(Mapping):
         def items(self):
             return mapping_items
@@ -242,7 +230,7 @@ def test_mapping_error_yield_1(mapping_items: List[Any], errors: List[Any]):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(BadMapping())
 
-    assert exc_info.value.errors(include_url=False) == errors
+    assert exc_info.value.errors(include_url=False) == [error]
 
 
 @pytest.mark.parametrize(
