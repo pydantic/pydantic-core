@@ -416,7 +416,7 @@ def test_bad_iter(items_schema):
             else:
                 raise RuntimeError('broken')
 
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': items_schema}, 'allow_any_iter': True})
+    v = SchemaValidator({'type': 'list', 'items_schema': {'type': items_schema}})
     assert v.validate_python(BadIter(True)) == [1]
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(BadIter(False))

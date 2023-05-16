@@ -1188,7 +1188,6 @@ class ListSchema(TypedDict, total=False):
     min_length: int
     max_length: int
     strict: bool
-    allow_any_iter: bool
     ref: str
     metadata: Any
     serialization: IncExSeqOrElseSerSchema
@@ -1200,7 +1199,6 @@ def list_schema(
     min_length: int | None = None,
     max_length: int | None = None,
     strict: bool | None = None,
-    allow_any_iter: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
     serialization: IncExSeqOrElseSerSchema | None = None,
@@ -1221,7 +1219,6 @@ def list_schema(
         min_length: The value must be a list with at least this many items
         max_length: The value must be a list with at most this many items
         strict: The value must be a list with exactly this many items
-        allow_any_iter: Whether the value can be any iterable
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
@@ -1232,7 +1229,6 @@ def list_schema(
         min_length=min_length,
         max_length=max_length,
         strict=strict,
-        allow_any_iter=allow_any_iter,
         ref=ref,
         metadata=metadata,
         serialization=serialization,

@@ -16,7 +16,6 @@ use super::{build_validator, BuildValidator, CombinedValidator, Definitions, Def
 #[derive(Debug, Clone)]
 pub struct ListValidator {
     strict: bool,
-    _allow_any_iter: bool,
     item_validator: Box<CombinedValidator>,
     min_length: usize,
     max_length: Option<usize>,
@@ -57,7 +56,6 @@ impl BuildValidator for ListValidator {
         let name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
         Ok(Self {
             strict: crate::build_tools::is_strict(schema, config)?,
-            _allow_any_iter: schema.get_as(pyo3::intern!(py, "allow_any_iter"))?.unwrap_or(false),
             item_validator: Box::new(item_validator),
             min_length: schema.get_as(pyo3::intern!(py, "min_length"))?.unwrap_or_default(),
             max_length: schema.get_as(pyo3::intern!(py, "max_length"))?,
