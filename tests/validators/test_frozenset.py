@@ -248,9 +248,9 @@ def test_repr():
         'SchemaValidator('
         'title="frozenset[any]",'
         'validator=FrozenSet(FrozenSetValidator{'
-        'inner:IntoSetValidator{strict:true,item_validator:Any(AnyValidator),min_length:42,max_length:None,generator_max_length:None,'
+        'strict:true,item_validator:Any(AnyValidator),min_length:42,max_length:None,generator_max_length:None,'
         'name:"frozenset[any]"'
-        r'}}),definitions=[])'
+        '}),definitions=[])'
     )
 
 
