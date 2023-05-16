@@ -178,7 +178,6 @@ impl Validator for TupleVariableValidator {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct TuplePositionalValidator {
     strict: bool,

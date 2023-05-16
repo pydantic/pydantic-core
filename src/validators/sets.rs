@@ -10,7 +10,7 @@ use crate::recursion_guard::RecursionGuard;
 use super::any::AnyValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
-use crate::errors::{ValError};
+use crate::errors::ValError;
 
 const MAX_LENGTH_GEN_MULTIPLE: usize = 10;
 
@@ -23,7 +23,6 @@ struct IntoSetValidator {
     generator_max_length: Option<usize>,
     name: String,
 }
-
 
 #[derive(Debug, Clone, Copy)]
 enum SetType {
