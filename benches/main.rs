@@ -265,6 +265,7 @@ fn dict_python(bench: &mut Bencher) {
                 .collect::<Vec<String>>()
                 .join(", ")
         );
+        dbg!(code.clone());
         let input = py.eval(&code, None, None).unwrap();
         let input = black_box(input);
         bench.iter(|| {

@@ -40,6 +40,26 @@ fn extract_items(item: PyResult<&PyAny>) -> PyResult<PyMappingItems<'_>> {
 }
 
 impl<'a, 'py: 'a> GenericIterable<'a> {
+    pub fn len(&self) -> Option<usize> {
+        match &self {
+            GenericIterable::List(iter) => Some(iter.len()),
+            GenericIterable::Tuple(iter) => Some(iter.len()),
+            GenericIterable::Set(iter) => Some(iter.len()),
+            GenericIterable::FrozenSet(iter) => Some(iter.len()),
+            GenericIterable::Dict(iter) => Some(iter.len()),
+            GenericIterable::DictKeys(iter) => iter.len().ok(),
+            GenericIterable::DictValues(iter) => iter.len().ok(),
+            GenericIterable::DictItems(iter) => iter.len().ok(),
+            GenericIterable::Mapping(iter) => iter.len().ok(),
+            GenericIterable::String(iter) => iter.len().ok(),
+            GenericIterable::Bytes(iter) => iter.len().ok(),
+            GenericIterable::PyByteArray(iter) => Some(iter.len()),
+            GenericIterable::Sequence(iter) => iter.len().ok(),
+            GenericIterable::Iterator(iter) => iter.len().ok(),
+            GenericIterable::JsonArray(iter) => Some(iter.len()),
+            GenericIterable::JsonObject(iter) => Some(iter.len()),
+        }
+    }
     pub fn into_sequence_iterator(
         self,
         py: Python<'py>,

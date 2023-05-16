@@ -3,21 +3,20 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorType, ValError, ValResult};
+use crate::input::iterator::{calculate_output_init_capacity, map_iter_error, IterableValidationChecks};
 use crate::input::Input;
-use crate::input::{
-    iterator::validate_into_vec, iterator::IterableValidatorBuilder, iterator::LengthConstraints, GenericIterable,
-    JsonInput,
-};
+use crate::input::{iterator::LengthConstraints, GenericIterable};
 use crate::recursion_guard::RecursionGuard;
 
+use super::any::AnyValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ListValidator {
     strict: bool,
     _allow_any_iter: bool,
-    item_validator: Option<Box<CombinedValidator>>,
-    min_length: Option<usize>,
+    item_validator: Box<CombinedValidator>,
+    min_length: usize,
     max_length: Option<usize>,
     name: String,
 }
@@ -48,20 +47,25 @@ impl BuildValidator for ListValidator {
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let item_validator = get_items_schema(schema, config, definitions)?;
-        let inner_name = item_validator.as_ref().map(|v| v.get_name()).unwrap_or("any");
+        let item_validator = match schema.get_item(pyo3::intern!(schema.py(), "items_schema")) {
+            Some(d) => build_validator(d, config, definitions)?,
+            None => CombinedValidator::Any(AnyValidator),
+        };
+        let inner_name = item_validator.get_name();
         let name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
         Ok(Self {
             strict: crate::build_tools::is_strict(schema, config)?,
             _allow_any_iter: schema.get_as(pyo3::intern!(py, "allow_any_iter"))?.unwrap_or(false),
-            item_validator,
-            min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
+            item_validator: Box::new(item_validator),
+            min_length: schema.get_as(pyo3::intern!(py, "min_length"))?.unwrap_or_default(),
             max_length: schema.get_as(pyo3::intern!(py, "max_length"))?,
             name,
         }
         .into())
     }
 }
+
+const FIELD_TYPE: &str = "List";
 
 impl Validator for ListValidator {
     fn validate<'s, 'data>(
@@ -76,51 +80,42 @@ impl Validator for ListValidator {
             .extract_iterable()
             .map_err(|_| ValError::new(ErrorType::ListType, input))?;
 
-        let builder = IterableValidatorBuilder::new(
-            "List",
-            LengthConstraints {
-                min_length: self.min_length,
-                max_length: self.max_length,
-                max_input_length: None,
-            },
-            false,
-        );
-
-        let python_validation_func =
-            |py: Python<'data>, loc: &usize, input: &'data PyAny| -> ValResult<'data, PyObject> {
-                match &self.item_validator {
-                    Some(validator) => validator
-                        .validate(py, input, extra, definitions, recursion_guard)
-                        .map_err(|e| e.with_outer_location((*loc).into())),
-                    None => Ok(input.to_object(py)),
-                }
-            };
-
         let strict = extra.strict.unwrap_or(self.strict);
 
-        let output: Vec<PyObject> = match (generic_iterable, strict) {
+        let length_constraints = LengthConstraints {
+            min_length: self.min_length,
+            max_length: self.max_length,
+            max_input_length: None,
+        };
+
+        let mut checks = IterableValidationChecks::new(false, length_constraints, FIELD_TYPE);
+
+        let mut output = Vec::with_capacity(calculate_output_init_capacity(generic_iterable.len(), self.max_length));
+
+        match (generic_iterable, strict) {
             // Always allow actual lists or JSON arrays
-            (GenericIterable::JsonArray(iter), _) => {
-                let len = iter.len();
-                let mut iterator = builder.build(
-                    iter.iter().enumerate().map(Ok),
-                    |py: Python<'_>, loc: &usize, input: &JsonInput| -> ValResult<'data, PyObject> {
-                        match &self.item_validator {
-                            Some(validator) => validator
-                                .validate(py, input, extra, definitions, recursion_guard)
-                                .map_err(|e| e.with_outer_location((*loc).into())),
-                            None => Ok(input.to_object(py)),
-                        }
-                    },
-                    input,
-                );
-                validate_into_vec(py, len, &mut iterator)?
-            }
-            (GenericIterable::List(iter), _) => {
-                let len = iter.len();
-                let mut iterator = builder.build(iter.into_iter().enumerate().map(Ok), python_validation_func, input);
-                validate_into_vec(py, len, &mut iterator)?
-            }
+            (GenericIterable::JsonArray(iter), _) => validate_iterator(
+                py,
+                input,
+                extra,
+                definitions,
+                recursion_guard,
+                &mut checks,
+                iter.iter().map(Ok),
+                &self.item_validator,
+                &mut output,
+            )?,
+            (GenericIterable::List(iter), _) => validate_iterator(
+                py,
+                input,
+                extra,
+                definitions,
+                recursion_guard,
+                &mut checks,
+                iter.iter().map(Ok),
+                &self.item_validator,
+                &mut output,
+            )?,
             // If not in strict mode we also accept any iterable except str, bytes or mappings
             // This may seem counterintuitive since a Mapping is a less generic type than an arbitrary
             // iterable (which we do accept) but doing something like `x: list[int] = {1: 'a'}` is commonly
@@ -133,15 +128,17 @@ impl Validator for ListValidator {
                 _,
             ) => return Err(ValError::new(ErrorType::ListType, input)),
             (generic_iterable, false) => match generic_iterable.into_sequence_iterator(py) {
-                Ok(iter) => {
-                    let mut index = 0..;
-                    let capacity = iter.size_hint().1.unwrap_or(0);
-                    let iter = iter
-                        .into_iter()
-                        .map(|result| result.map_err(ValError::from).map(|v| (index.next().unwrap(), v)));
-                    let mut iterator = builder.build(iter, python_validation_func, input);
-                    validate_into_vec(py, capacity, &mut iterator)?
-                }
+                Ok(iter) => validate_iterator(
+                    py,
+                    input,
+                    extra,
+                    definitions,
+                    recursion_guard,
+                    &mut checks,
+                    iter,
+                    &self.item_validator,
+                    &mut output,
+                )?,
                 Err(_) => return Err(ValError::new(ErrorType::ListType, input)),
             },
             _ => return Err(ValError::new(ErrorType::ListType, input)),
@@ -155,10 +152,7 @@ impl Validator for ListValidator {
         ultra_strict: bool,
     ) -> bool {
         if ultra_strict {
-            match self.item_validator {
-                Some(ref v) => v.different_strict_behavior(definitions, true),
-                None => false,
-            }
+            self.item_validator.different_strict_behavior(definitions, true)
         } else {
             true
         }
@@ -169,11 +163,37 @@ impl Validator for ListValidator {
     }
 
     fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        if let Some(ref mut v) = self.item_validator {
-            v.complete(definitions)?;
-            let inner_name = v.get_name();
-            self.name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
-        }
+        self.item_validator.complete(definitions)?;
+        let inner_name = self.item_validator.get_name();
+        self.name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
         Ok(())
     }
+}
+
+fn validate_iterator<'s, 'data, V>(
+    py: Python<'data>,
+    input: &'data impl Input<'data>,
+    extra: &'s Extra<'s>,
+    definitions: &'data Definitions<CombinedValidator>,
+    recursion_guard: &'s mut RecursionGuard,
+    checks: &mut IterableValidationChecks<'data>,
+    iter: impl Iterator<Item = PyResult<&'data V>>,
+    items_validator: &'s CombinedValidator,
+    output: &mut Vec<PyObject>,
+) -> ValResult<'data, ()>
+where
+    V: Input<'data> + 'data,
+{
+    for (index, result) in iter.enumerate() {
+        let value = result.map_err(|e| map_iter_error(py, input, index, e))?;
+        let result = items_validator
+            .validate(py, value, extra, definitions, recursion_guard)
+            .map_err(|e| e.with_outer_location(index.into()));
+        if let Some(value) = checks.filter_validation_result(result, input)? {
+            output.push(value);
+        }
+        checks.check_output_length(output.len(), input)?;
+    }
+    checks.finish(input)?;
+    Ok(())
 }
