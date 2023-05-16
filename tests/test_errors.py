@@ -204,7 +204,7 @@ all_errors = [
     ),
     (
         'too_long',
-        'Foobar should have at most 42 items after validation, not >= 50',
+        'Foobar should have at most 42 items after validation, not 50',
         {'field_type': 'Foobar', 'max_length': 42, 'actual_length': 50},
     ),
     ('string_type', 'Input should be a valid string', None),

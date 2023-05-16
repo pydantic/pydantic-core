@@ -110,7 +110,7 @@ def test_too_long(py_and_json: PyAndJson):
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'Generator should have at most 2 items after validation, not >= 3',
+            'msg': 'Generator should have at most 2 items after validation, not 3',
             'input': [1, 2, 3],
             'ctx': {'field_type': 'Generator', 'max_length': 2, 'actual_length': 3},
         }
@@ -159,7 +159,7 @@ def test_generator_too_long():
             'type': 'too_long',
             'loc': (),
             'input': HasRepr(IsStr(regex='<generator object gen at .+>')),
-            'msg': 'Generator should have at most 2 items after validation, not >= 3',
+            'msg': 'Generator should have at most 2 items after validation, not 3',
             'ctx': {'field_type': 'Generator', 'max_length': 2, 'actual_length': 3},
         }
     ]

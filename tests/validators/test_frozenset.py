@@ -148,7 +148,7 @@ def generate_repeats():
         (
             {'max_length': 3},
             {1, 2, 3, 4},
-            Err('Frozenset should have at most 3 items after validation, not >= 4 [type=too_long,'),
+            Err('Frozenset should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
         # length check after set creation
         ({'max_length': 3}, [1, 1, 2, 2, 3, 3], {1, 2, 3}),
@@ -157,12 +157,12 @@ def generate_repeats():
         (
             {'max_length': 3},
             infinite_generator(),
-            Err('Frozenset should have at most 3 items after validation, not >= 4 [type=too_long,'),
+            Err('Frozenset should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
         (
             {'max_length': 3, 'generator_max_length': 3},
             infinite_generator(),
-            Err('Frozenset should have at most 3 items after validation, not >= 4 [type=too_long,'),
+            Err('Frozenset should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
     ],
 )

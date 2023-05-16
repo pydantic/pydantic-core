@@ -223,18 +223,18 @@ def test_list_error(input_value, index):
         (
             {'max_length': 3},
             [1, 2, 3, 4],
-            Err('List should have at most 3 items after validation, not >= 4 [type=too_long,'),
+            Err('List should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
-        ({'max_length': 1}, [1, 2], Err('List should have at most 1 item after validation, not >= 2 [type=too_long,')),
+        ({'max_length': 1}, [1, 2], Err('List should have at most 1 item after validation, not 2 [type=too_long,')),
         (
             {'max_length': 44},
             [1] * 100,
-            Err('List should have at most 44 items after validation, not >= 45 [type=too_long,'),
+            Err('List should have at most 44 items after validation, not 45 [type=too_long,'),
         ),
         (
             {'max_length': 3},
             ['a', 'b', 'c', 'd'],
-            Err('List should have at most 3 items after validation, not >= 4 [type=too_long,'),
+            Err('List should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
         (
             {'min_length': 2},
@@ -257,7 +257,7 @@ def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
     'input_value,expected',
     [
         ([1, 2, 3, 4], [1, 2, 3, 4]),
-        ([1, 2, 3, 4, 5], Err('List should have at most 4 items after validation, not >= 5 [type=too_long,')),
+        ([1, 2, 3, 4, 5], Err('List should have at most 4 items after validation, not 5 [type=too_long,')),
         ([1, 2, 3, 'x', 4], [1, 2, 3, 4]),
     ],
 )
@@ -299,7 +299,7 @@ def test_length_ctx():
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 3 items after validation, not >= 4',
+            'msg': 'List should have at most 3 items after validation, not 4',
             'input': [1, 2, 3, 4],
             'ctx': {'field_type': 'List', 'max_length': 3, 'actual_length': 4},
         }
@@ -460,7 +460,7 @@ def test_stop_iterating_on_error(gen_factory: Callable[[], Iterator[Any]], nxt: 
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 1 item after validation, not >= 2',
+            'msg': 'List should have at most 1 item after validation, not 2',
             'input': gen,
             'ctx': {'field_type': 'List', 'max_length': 1, 'actual_length': 2},
         }
@@ -488,7 +488,7 @@ def test_stop_iterating_func_raises_omit() -> None:
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 1 item after validation, not >= 2',
+            'msg': 'List should have at most 1 item after validation, not 2',
             'input': gen,
             'ctx': {'field_type': 'List', 'max_length': 1, 'actual_length': 2},
         }
