@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::{is_strict, SchemaDict};
+use crate::errors::ValLineError;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::iterator::calculate_output_init_capacity;
 use crate::input::iterator::map_iter_error;
@@ -48,6 +49,7 @@ impl BuildValidator for TupleVariableValidator {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_iterator<'s, 'data, V>(
     py: Python<'data>,
     input: &'data impl Input<'data>,
@@ -214,6 +216,7 @@ impl BuildValidator for TuplePositionalValidator {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_iterator_tuple_positional<'s, 'data, V>(
     py: Python<'data>,
     input: &'data impl Input<'data>,
@@ -266,17 +269,14 @@ where
         }
         checks.check_output_length(output.len(), input)?;
     }
-    if output.len() < items_validators.len() {
-        let remaining_item_validators = &items_validators[output.len()..];
-        for validator in remaining_item_validators {
-            let default = validator.default_value(py, Some(output.len()), extra, definitions, recursion_guard)?;
-            match default {
-                Some(v) => {
-                    output.push(v);
-                    checks.check_output_length(output.len(), input)?;
-                }
-                None => return Err(ValError::new_with_loc(ErrorType::Missing, input, output.len())),
+    for (idx, validator) in items_validators.iter().enumerate().skip(output.len()) {
+        let default = validator.default_value(py, Some(output.len()), extra, definitions, recursion_guard)?;
+        match default {
+            Some(v) => {
+                output.push(v);
+                checks.check_output_length(output.len(), input)?;
             }
+            None => checks.add_error(ValLineError::new_with_loc(ErrorType::Missing, input, idx)),
         }
     }
     checks.finish(input)?;

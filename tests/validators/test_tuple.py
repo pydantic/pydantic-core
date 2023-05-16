@@ -4,7 +4,7 @@ from collections import deque
 from typing import Any, Dict, Type
 
 import pytest
-from dirty_equals import IsNonNegative
+from dirty_equals import Contains, IsNonNegative
 
 from pydantic_core import SchemaValidator, ValidationError
 
@@ -214,14 +214,12 @@ def test_tuple_fix_len_errors(input_value, items, index):
     v = SchemaValidator({'type': 'tuple-positional', 'items_schema': items})
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python(input_value)
-    assert exc_info.value.errors(include_url=False) == [
-        {
-            'type': 'int_parsing',
-            'loc': (index,),
-            'msg': 'Input should be a valid integer, unable to parse string as an integer',
-            'input': 'wrong',
-        }
-    ]
+    assert {
+        'type': 'int_parsing',
+        'loc': (index,),
+        'msg': 'Input should be a valid integer, unable to parse string as an integer',
+        'input': 'wrong',
+    } in exc_info.value.errors(include_url=False)
 
 
 def test_multiple_missing(py_and_json: PyAndJson):
@@ -234,11 +232,12 @@ def test_multiple_missing(py_and_json: PyAndJson):
     assert v.validate_test([1, 2, 3, 4]) == (1, 2, 3, 4)
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1])
-    assert exc_info.value.errors(include_url=False) == [
+
+    assert exc_info.value.errors(include_url=False) == Contains(
         {'type': 'missing', 'loc': (1,), 'msg': 'Field required', 'input': [1]},
         {'type': 'missing', 'loc': (2,), 'msg': 'Field required', 'input': [1]},
         {'type': 'missing', 'loc': (3,), 'msg': 'Field required', 'input': [1]},
-    ]
+    )
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1, 2, 3])
     assert exc_info.value.errors(include_url=False) == [

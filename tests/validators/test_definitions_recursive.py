@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 import pytest
-from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict, IsStr, IsTuple
+from dirty_equals import AnyThing, Contains, HasAttributes, IsList, IsPartialDict, IsStr, IsTuple
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError, __version__, core_schema
 
@@ -509,7 +509,7 @@ def test_multiple_tuple_recursion(multiple_tuple_schema: SchemaValidator):
     with pytest.raises(ValidationError) as exc_info:
         multiple_tuple_schema.validate_python({'f1': data, 'f2': data})
 
-    assert exc_info.value.errors(include_url=False) == [
+    assert exc_info.value.errors(include_url=False) == Contains(
         {
             'type': 'recursion_loop',
             'loc': ('f1', 1),
@@ -522,7 +522,7 @@ def test_multiple_tuple_recursion(multiple_tuple_schema: SchemaValidator):
             'msg': 'Recursion error - cyclic reference detected',
             'input': [1, IsList(length=2)],
         },
-    ]
+    )
 
 
 def test_multiple_tuple_recursion_once(multiple_tuple_schema: SchemaValidator):
@@ -531,7 +531,7 @@ def test_multiple_tuple_recursion_once(multiple_tuple_schema: SchemaValidator):
     with pytest.raises(ValidationError) as exc_info:
         multiple_tuple_schema.validate_python({'f1': data, 'f2': data})
 
-    assert exc_info.value.errors(include_url=False) == [
+    assert exc_info.value.errors(include_url=False) == Contains(
         {
             'type': 'recursion_loop',
             'loc': ('f1', 1),
@@ -544,7 +544,7 @@ def test_multiple_tuple_recursion_once(multiple_tuple_schema: SchemaValidator):
             'msg': 'Recursion error - cyclic reference detected',
             'input': [1, IsList(length=2)],
         },
-    ]
+    )
 
 
 def test_definition_wrap():
@@ -571,14 +571,14 @@ def test_definition_wrap():
     t.append(t)
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(t)
-    assert exc_info.value.errors(include_url=False) == [
+    assert exc_info.value.errors(include_url=False) == Contains(
         {
             'type': 'recursion_loop',
             'loc': (1,),
             'msg': 'Recursion error - cyclic reference detected',
             'input': IsList(positions={0: 1}, length=2),
         }
-    ]
+    )
 
 
 def test_union_ref_strictness():

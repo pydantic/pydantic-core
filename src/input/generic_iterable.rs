@@ -1,4 +1,4 @@
-use crate::errors::ValError;
+use crate::errors::{py_err_string, ErrorType, ValError, ValResult};
 
 use super::parse_json::{JsonInput, JsonObject};
 use pyo3::{
@@ -6,7 +6,7 @@ use pyo3::{
     types::{
         PyByteArray, PyBytes, PyDict, PyFrozenSet, PyIterator, PyList, PyMapping, PySequence, PySet, PyString, PyTuple,
     },
-    PyAny, PyResult, Python, ToPyObject,
+    PyAny, PyErr, PyResult, Python, ToPyObject,
 };
 
 #[derive(Debug)]
@@ -39,6 +39,16 @@ fn extract_items(item: PyResult<&PyAny>) -> PyResult<PyMappingItems<'_>> {
         Ok(v) => v.extract::<PyMappingItems>(),
         Err(e) => Err(e),
     }
+}
+
+#[inline(always)]
+fn map_err<'data>(py: Python<'data>, err: PyErr, input: &'data PyAny) -> ValError<'data> {
+    ValError::new(
+        ErrorType::IterationError {
+            error: py_err_string(py, err),
+        },
+        input,
+    )
 }
 
 impl<'a, 'py: 'a> GenericIterable<'a> {
@@ -96,21 +106,52 @@ impl<'a, 'py: 'a> GenericIterable<'a> {
 
     pub fn into_mapping_items_iterator(
         self,
-        py: Python<'py>,
-    ) -> PyResult<Box<dyn Iterator<Item = PyResult<PyMappingItems<'a>>> + 'a>> {
+        py: Python<'a>,
+    ) -> PyResult<Box<dyn Iterator<Item = ValResult<'a, PyMappingItems<'a>>> + 'a>> {
+        let py2 = py;
         match self {
-            GenericIterable::List(iter) => Ok(Box::new(iter.iter().map(|v| extract_items(Ok(v))))),
-            GenericIterable::Tuple(iter) => Ok(Box::new(iter.iter().map(|v| extract_items(Ok(v))))),
-            GenericIterable::Set(iter) => Ok(Box::new(iter.iter().map(|v| extract_items(Ok(v))))),
-            GenericIterable::FrozenSet(iter) => Ok(Box::new(iter.iter().map(|v| extract_items(Ok(v))))),
+            GenericIterable::List(iter) => {
+                Ok(Box::new(iter.iter().map(move |v| {
+                    extract_items(Ok(v)).map_err(|e| map_err(py2, e, iter.as_ref()))
+                })))
+            }
+            GenericIterable::Tuple(iter) => {
+                Ok(Box::new(iter.iter().map(move |v| {
+                    extract_items(Ok(v)).map_err(|e| map_err(py2, e, iter.as_ref()))
+                })))
+            }
+            GenericIterable::Set(iter) => {
+                Ok(Box::new(iter.iter().map(move |v| {
+                    extract_items(Ok(v)).map_err(|e| map_err(py2, e, iter.as_ref()))
+                })))
+            }
+            GenericIterable::FrozenSet(iter) => {
+                Ok(Box::new(iter.iter().map(move |v| {
+                    extract_items(Ok(v)).map_err(|e| map_err(py2, e, iter.as_ref()))
+                })))
+            }
             // Note that we iterate over (key, value), unlike doing iter({}) in Python
             GenericIterable::Dict(iter) => Ok(Box::new(iter.iter().map(Ok))),
             // Keys or values can be tuples
-            GenericIterable::DictKeys(iter) => Ok(Box::new(iter.map(extract_items))),
-            GenericIterable::DictValues(iter) => Ok(Box::new(iter.map(extract_items))),
-            GenericIterable::DictItems(iter) => Ok(Box::new(iter.map(extract_items))),
+            GenericIterable::DictKeys(iter) => Ok(Box::new(
+                iter.map(extract_items)
+                    .map(move |r| r.map_err(|e| map_err(py2, e, iter.as_ref()))),
+            )),
+            GenericIterable::DictValues(iter) => Ok(Box::new(
+                iter.map(extract_items)
+                    .map(move |r| r.map_err(|e| map_err(py2, e, iter.as_ref()))),
+            )),
+            GenericIterable::DictItems(iter) => Ok(Box::new(
+                iter.map(extract_items)
+                    .map(move |r| r.map_err(|e| map_err(py2, e, iter.as_ref()))),
+            )),
             // Note that we iterate over (key, value), unlike doing iter({}) in Python
-            GenericIterable::Mapping(iter) => Ok(Box::new(iter.items()?.iter()?.map(extract_items))),
+            GenericIterable::Mapping(iter) => Ok(Box::new(
+                iter.items()?
+                    .iter()?
+                    .map(extract_items)
+                    .map(move |r| r.map_err(|e| map_err(py2, e, iter.as_ref()))),
+            )),
             // In Python if you do dict("foobar") you get "dictionary update sequence element #0 has length 1; 2 is required"
             // This is similar but arguably a better error message
             GenericIterable::String(_) => Err(PyTypeError::new_err(
@@ -124,11 +165,20 @@ impl<'a, 'py: 'a> GenericIterable<'a> {
             )),
             // Obviously these may be things that are not convertible to a tuple of (Hashable, Any)
             // Python fails with a similar error message to above, ours will be slightly different (PyO3 will fail to extract) but similar enough
-            GenericIterable::Sequence(iter) => Ok(Box::new(iter.iter()?.map(extract_items))),
-            GenericIterable::Iterator(iter) => Ok(Box::new(iter.iter()?.map(extract_items))),
+            GenericIterable::Sequence(iter) => Ok(Box::new(
+                iter.iter()?
+                    .map(extract_items)
+                    .map(move |r| r.map_err(|e| map_err(py2, e, iter.as_ref()))),
+            )),
+            GenericIterable::Iterator(iter) => Ok(Box::new(
+                iter.iter()?
+                    .map(extract_items)
+                    .map(move |r| r.map_err(|e| map_err(py2, e, iter.as_ref()))),
+            )),
             GenericIterable::JsonArray(iter) => Ok(Box::new(
                 iter.iter()
-                    .map(move |v| extract_items(Ok(v.to_object(py).into_ref(py)))),
+                    .map(move |v| extract_items(Ok(v.to_object(py).into_ref(py))))
+                    .map(move |r| r.map_err(|e| map_err(py2, e, iter.to_object(py).into_ref(py)))),
             )),
             // Note that we iterate over (key, value), unlike doing iter({}) in Python
             GenericIterable::JsonObject(iter) => Ok(Box::new(iter.iter().map(move |(k, v)| {

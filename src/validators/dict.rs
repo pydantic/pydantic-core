@@ -60,6 +60,7 @@ impl BuildValidator for DictValidator {
 
 const FIELD_TYPE: &str = "Dictionary";
 
+#[allow(clippy::too_many_arguments)]
 fn validation_function<'s, 'data, K, V>(
     py: Python<'data>,
     extra: &'s Extra<'s>,
@@ -86,6 +87,7 @@ where
     Ok((v_key, v_value))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_mapping<'s, 'data, K, V>(
     py: Python<'data>,
     input: &'data impl Input<'data>,
@@ -93,7 +95,7 @@ fn validate_mapping<'s, 'data, K, V>(
     definitions: &'data Definitions<CombinedValidator>,
     recursion_guard: &'s mut RecursionGuard,
     checks: &mut IterableValidationChecks<'data>,
-    iter: impl Iterator<Item = PyResult<(&'data K, &'data V)>>,
+    iter: impl Iterator<Item = ValResult<'data, (&'data K, &'data V)>>,
     key_validator: &'s CombinedValidator,
     value_validator: &'s CombinedValidator,
     output: &'data PyDict,

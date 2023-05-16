@@ -2,7 +2,7 @@ import re
 from decimal import Decimal
 
 import pytest
-from dirty_equals import HasRepr, IsInstance, IsJson, IsStr
+from dirty_equals import Contains, HasRepr, IsInstance, IsJson, IsStr
 
 from pydantic_core import (
     PydanticCustomError,
@@ -615,21 +615,25 @@ def test_loc_with_dots():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python({'foo.bar': ('x', 42)})
     # insert_assert(exc_info.value.errors(include_url=False))
-    assert exc_info.value.errors(include_url=False) == [
+    assert exc_info.value.errors(include_url=False) == Contains(
         {
             'type': 'int_parsing',
             'loc': ('foo.bar', 0),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'x',
         }
-    ]
+    )
     # insert_assert(str(exc_info.value))
-    assert str(exc_info.value) == (
-        "1 validation error for typed-dict\n"
-        "`foo.bar`.0\n"
-        "  Input should be a valid integer, unable to parse string as an integer "
-        "[type=int_parsing, input_value='x', input_type=str]\n"
-        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/int_parsing'
+    assert (
+        str(exc_info.value)
+        == f"""\
+2 validation errors for typed-dict
+`foo.bar`.0
+  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='x', input_type=str]
+    For further information visit https://errors.pydantic.dev/{__version__}/v/int_parsing
+`foo.bar`.1
+  Field required [type=missing, input_value=('x', 42), input_type=tuple]
+    For further information visit https://errors.pydantic.dev/{__version__}/v/missing"""  # noqa: E501
     )
 
 

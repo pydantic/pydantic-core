@@ -179,7 +179,7 @@ def test_mapping_error():
             [
                 {
                     'type': 'iteration_error',
-                    'loc': (0,),
+                    'loc': (),
                     'msg': 'Error iterating over object, error: ValueError: expected tuple of length 2, but got tuple of length 1',  # noqa: E501
                     'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
                     'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 1'},
@@ -191,7 +191,7 @@ def test_mapping_error():
             [
                 {
                     'type': 'iteration_error',
-                    'loc': (0,),
+                    'loc': (),
                     'msg': "Error iterating over object, error: TypeError: 'str' object cannot be converted to 'PyTuple'",  # noqa: E501
                     'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
                     'ctx': {'error': "TypeError: 'str' object cannot be converted to 'PyTuple'"},
@@ -203,7 +203,7 @@ def test_mapping_error():
             [
                 {
                     'type': 'iteration_error',
-                    'loc': (0,),
+                    'loc': (),
                     'msg': 'Error iterating over object, error: ValueError: expected tuple of length 2, but got tuple of length 3',  # noqa: E501
                     'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
                     'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 3'},
@@ -215,7 +215,7 @@ def test_mapping_error():
             [
                 {
                     'type': 'iteration_error',
-                    'loc': (0,),
+                    'loc': (),
                     'msg': "Error iterating over object, error: TypeError: 'str' object cannot be converted to 'PyTuple'",  # noqa: E501
                     'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
                     'ctx': {'error': "TypeError: 'str' object cannot be converted to 'PyTuple'"},

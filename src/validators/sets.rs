@@ -80,9 +80,7 @@ impl IntoSetValidator {
             SetType::Set => "Set",
         };
 
-        let generic_iterable = input
-            .extract_iterable()
-            .map_err(|_| ValError::new(ErrorType::ListType, input))?;
+        let generic_iterable = input.extract_iterable().map_err(|_| create_err(input))?;
 
         let strict = extra.strict.unwrap_or(self.strict);
 
@@ -286,6 +284,7 @@ impl Validator for SetValidator {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_iterator<'s, 'data, V>(
     py: Python<'data>,
     input: &'data impl Input<'data>,

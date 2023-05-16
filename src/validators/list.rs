@@ -170,6 +170,7 @@ impl Validator for ListValidator {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_iterator<'s, 'data, V>(
     py: Python<'data>,
     input: &'data impl Input<'data>,

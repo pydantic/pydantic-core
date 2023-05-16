@@ -40,6 +40,9 @@ impl<'data> IterableValidationChecks<'data> {
             errors: vec![],
         }
     }
+    pub fn add_error(&mut self, error: ValLineError<'data>) {
+        self.errors.push(error)
+    }
     pub fn filter_validation_result<R, I: Input<'data>>(
         &mut self,
         result: ValResult<'data, R>,
