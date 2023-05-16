@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::{Display, Write};
 use std::str::from_utf8;
 
-use pyo3::exceptions::{PyException, PyKeyError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::ffi::Py_ssize_t;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
@@ -24,7 +24,7 @@ use super::types::{ErrorMode, ErrorType};
 use super::value_exception::PydanticCustomError;
 use super::ValError;
 
-#[pyclass(extends=PyException, module="pydantic_core._pydantic_core")]
+#[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct ValidationError {
