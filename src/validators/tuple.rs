@@ -5,9 +5,10 @@ use pyo3::types::{PyDict, PyList, PyTuple};
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::ValLineError;
 use crate::errors::{ErrorType, ValError, ValResult};
+use crate::input::iterator::validate_infallible_iterator;
 use crate::input::iterator::IterableValidationChecks;
 use crate::input::iterator::LengthConstraints;
-use crate::input::iterator::{calculate_output_init_capacity, map_iter_error, validate_iterator};
+use crate::input::iterator::{calculate_output_init_capacity, map_iter_error, validate_fallible_iterator};
 use crate::input::{GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 
@@ -82,27 +83,27 @@ impl Validator for TupleVariableValidator {
 
         match (generic_iterable, strict) {
             // Always allow actual lists or JSON arrays
-            (GenericIterable::JsonArray(iter), _) => validate_iterator(
+            (GenericIterable::JsonArray(iter), _) => validate_infallible_iterator(
                 py,
                 input,
                 extra,
                 definitions,
                 recursion_guard,
                 &mut checks,
-                iter.iter().map(Ok),
+                iter.iter(),
                 &self.item_validator,
                 &mut output,
                 &mut write,
                 &len,
             )?,
-            (GenericIterable::Tuple(iter), _) => validate_iterator(
+            (GenericIterable::Tuple(iter), _) => validate_infallible_iterator(
                 py,
                 input,
                 extra,
                 definitions,
                 recursion_guard,
                 &mut checks,
-                iter.iter().map(Ok),
+                iter.iter(),
                 &self.item_validator,
                 &mut output,
                 &mut write,
@@ -120,7 +121,7 @@ impl Validator for TupleVariableValidator {
                 _,
             ) => return Err(ValError::new(ErrorType::TupleType, input)),
             (generic_iterable, false) => match generic_iterable.into_sequence_iterator(py) {
-                Ok(iter) => validate_iterator(
+                Ok(iter) => validate_fallible_iterator(
                     py,
                     input,
                     extra,
@@ -214,7 +215,7 @@ where
     V: Input<'data> + 'data,
 {
     for (index, result) in iter.enumerate() {
-        let value = result.map_err(|e| map_iter_error(py, input, index, e))?;
+        let value = result.map_err(|e| map_iter_error(py, input, e))?;
         match items_validators.get(output.len()) {
             Some(item_validator) => {
                 let result = item_validator

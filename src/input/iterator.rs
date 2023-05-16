@@ -5,7 +5,7 @@ use super::Input;
 use crate::validators::Validator;
 use crate::{
     definitions::Definitions,
-    errors::{py_err_string, ErrorType, LocItem, ValError, ValLineError, ValResult},
+    errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult},
     recursion_guard::RecursionGuard,
     validators::CombinedValidator,
     validators::Extra,
@@ -113,7 +113,6 @@ impl<'data> IterableValidationChecks<'data> {
         }
     }
 
-    #[inline(always)]
     fn check_max_length<I: Input<'data>>(
         &self,
         current_length: usize,
@@ -134,24 +133,49 @@ impl<'data> IterableValidationChecks<'data> {
     }
 }
 
-#[inline(always)]
-pub fn map_iter_error<'data>(
-    py: Python<'data>,
-    input: &'data impl Input<'data>,
-    loc: impl Into<LocItem>,
-    err: PyErr,
-) -> ValError<'data> {
-    ValError::new_with_loc(
+pub fn map_iter_error<'data>(py: Python<'data>, input: &'data impl Input<'data>, err: PyErr) -> ValError<'data> {
+    ValError::new(
         ErrorType::IterationError {
             error: py_err_string(py, err),
         },
         input,
-        loc.into(),
     )
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn validate_iterator<'s, 'data, V, O, W, L>(
+pub fn validate_infallible_iterator<'s, 'data, V, O, W, L>(
+    py: Python<'data>,
+    input: &'data impl Input<'data>,
+    extra: &'s Extra<'s>,
+    definitions: &'data Definitions<CombinedValidator>,
+    recursion_guard: &'s mut RecursionGuard,
+    checks: &mut IterableValidationChecks<'data>,
+    iter: impl Iterator<Item = &'data V>,
+    items_validator: &'s CombinedValidator,
+    output: &mut O,
+    write: &mut W,
+    len: &L,
+) -> ValResult<'data, ()>
+where
+    V: Input<'data> + 'data,
+    W: FnMut(&mut O, PyObject) -> PyResult<()>,
+    L: Fn(&O) -> usize,
+{
+    for (index, value) in iter.enumerate() {
+        let result = items_validator
+            .validate(py, value, extra, definitions, recursion_guard)
+            .map_err(|e| e.with_outer_location(index.into()));
+        if let Some(value) = checks.filter_validation_result(result, input)? {
+            write(output, value)?;
+            checks.check_output_length(len(output), input)?;
+        }
+    }
+    checks.finish(input)?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn validate_fallible_iterator<'s, 'data, V, O, W, L>(
     py: Python<'data>,
     input: &'data impl Input<'data>,
     extra: &'s Extra<'s>,
@@ -170,7 +194,15 @@ where
     L: Fn(&O) -> usize,
 {
     for (index, result) in iter.enumerate() {
-        let value = result.map_err(|e| map_iter_error(py, input, index, e))?;
+        let value = result.map_err(|err| {
+            ValError::new_with_loc(
+                ErrorType::IterationError {
+                    error: py_err_string(py, err),
+                },
+                input,
+                index,
+            )
+        })?;
         let result = items_validator
             .validate(py, value, extra, definitions, recursion_guard)
             .map_err(|e| e.with_outer_location(index.into()));
