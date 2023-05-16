@@ -2,7 +2,7 @@ import collections.abc
 import re
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterator, List
+from typing import Any, Callable, Dict, Iterator, List, Union
 
 import pytest
 from dirty_equals import HasRepr, IsInstance, IsStr
@@ -76,7 +76,7 @@ class MyMapping(collections.abc.Mapping):
 class ListInputTestCase:
     input: Any
     output: Result[Any]
-    strict: bool | None = None
+    strict: Union[bool, None] = None
 
 
 LAX_MODE_INPUTS: List[Any] = [
