@@ -442,7 +442,7 @@ macro_rules! py_err_string {
 /// Only `ValueError` (including `PydanticCustomError` and `ValidationError`) and `AssertionError` are considered
 /// as validation errors, `TypeError` is now considered as a runtime error to catch errors in function signatures
 pub fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> ValError<'a> {
-    if let Ok(validation_error) = err.value(py).extract::<ValidationError>() {
+    if let Ok(validation_error) = err.is_instance_of::<ValidationError>(py) {
         validation_error.into_py(py)
     } else if err.is_instance_of::<PyValueError>(py) {
         if let Ok(pydantic_value_error) = err.value(py).extract::<PydanticCustomError>() {
