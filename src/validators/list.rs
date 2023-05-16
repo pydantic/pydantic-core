@@ -2,18 +2,21 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::SchemaDict;
-use crate::errors::ValResult;
-use crate::input::{GenericCollection, Input};
+use crate::errors::{ErrorType, ValError, ValResult};
+use crate::input::iterator::{calculate_output_init_capacity, validate_iterator, IterableValidationChecks};
+use crate::input::Input;
+use crate::input::{iterator::LengthConstraints, GenericIterable};
 use crate::recursion_guard::RecursionGuard;
 
+use super::any::AnyValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ListValidator {
     strict: bool,
-    allow_any_iter: bool,
-    item_validator: Option<Box<CombinedValidator>>,
-    min_length: Option<usize>,
+    _allow_any_iter: bool,
+    item_validator: Box<CombinedValidator>,
+    min_length: usize,
     max_length: Option<usize>,
     name: String,
 }
@@ -35,40 +38,6 @@ pub fn get_items_schema(
     }
 }
 
-macro_rules! length_check {
-    ($input:ident, $field_type:literal, $min_length:expr, $max_length:expr, $obj:ident) => {{
-        let mut op_actual_length: Option<usize> = None;
-        if let Some(min_length) = $min_length {
-            let actual_length = $obj.len();
-            if actual_length < min_length {
-                return Err(crate::errors::ValError::new(
-                    crate::errors::ErrorType::TooShort {
-                        field_type: $field_type.to_string(),
-                        min_length,
-                        actual_length,
-                    },
-                    $input,
-                ));
-            }
-            op_actual_length = Some(actual_length);
-        }
-        if let Some(max_length) = $max_length {
-            let actual_length = op_actual_length.unwrap_or_else(|| $obj.len());
-            if actual_length > max_length {
-                return Err(crate::errors::ValError::new(
-                    crate::errors::ErrorType::TooLong {
-                        field_type: $field_type.to_string(),
-                        max_length,
-                        actual_length,
-                    },
-                    $input,
-                ));
-            }
-        }
-    }};
-}
-pub(crate) use length_check;
-
 impl BuildValidator for ListValidator {
     const EXPECTED_TYPE: &'static str = "list";
 
@@ -78,14 +47,17 @@ impl BuildValidator for ListValidator {
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let item_validator = get_items_schema(schema, config, definitions)?;
-        let inner_name = item_validator.as_ref().map(|v| v.get_name()).unwrap_or("any");
+        let item_validator = match schema.get_item(pyo3::intern!(schema.py(), "items_schema")) {
+            Some(d) => build_validator(d, config, definitions)?,
+            None => CombinedValidator::Any(AnyValidator),
+        };
+        let inner_name = item_validator.get_name();
         let name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
         Ok(Self {
             strict: crate::build_tools::is_strict(schema, config)?,
-            allow_any_iter: schema.get_as(pyo3::intern!(py, "allow_any_iter"))?.unwrap_or(false),
-            item_validator,
-            min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
+            _allow_any_iter: schema.get_as(pyo3::intern!(py, "allow_any_iter"))?.unwrap_or(false),
+            item_validator: Box::new(item_validator),
+            min_length: schema.get_as(pyo3::intern!(py, "min_length"))?.unwrap_or_default(),
             max_length: schema.get_as(pyo3::intern!(py, "max_length"))?,
             name,
         }
@@ -93,38 +65,97 @@ impl BuildValidator for ListValidator {
     }
 }
 
+const FIELD_TYPE: &str = "List";
+
 impl Validator for ListValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        extra: &Extra,
+        extra: &'s Extra<'s>,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let seq = input.validate_list(extra.strict.unwrap_or(self.strict), self.allow_any_iter)?;
+        let generic_iterable = input
+            .extract_iterable()
+            .map_err(|_| ValError::new(ErrorType::ListType, input))?;
 
-        let output = match self.item_validator {
-            Some(ref v) => seq.validate_to_vec(
+        let strict = extra.strict.unwrap_or(self.strict);
+
+        let length_constraints = LengthConstraints {
+            min_length: self.min_length,
+            max_length: self.max_length,
+            max_input_length: None,
+        };
+
+        let mut checks = IterableValidationChecks::new(false, length_constraints, FIELD_TYPE);
+
+        let mut output: Vec<PyObject> =
+            Vec::with_capacity(calculate_output_init_capacity(generic_iterable.len(), self.max_length));
+
+        let len = |output: &Vec<PyObject>| output.len();
+        let mut write = |output: &mut Vec<PyObject>, ob: PyObject| {
+            output.push(ob);
+            Ok(())
+        };
+
+        match (generic_iterable, strict) {
+            // Always allow actual lists or JSON arrays
+            (GenericIterable::JsonArray(iter), _) => validate_iterator(
                 py,
                 input,
-                self.max_length,
-                "List",
-                self.max_length,
-                v,
                 extra,
                 definitions,
                 recursion_guard,
+                &mut checks,
+                iter.iter().map(Ok),
+                &self.item_validator,
+                &mut output,
+                &mut write,
+                &len,
             )?,
-            None => match seq {
-                GenericCollection::List(list) => {
-                    length_check!(input, "List", self.min_length, self.max_length, list);
-                    return Ok(list.into_py(py));
-                }
-                _ => seq.to_vec(py, input, "List", self.max_length)?,
+            (GenericIterable::List(iter), _) => validate_iterator(
+                py,
+                input,
+                extra,
+                definitions,
+                recursion_guard,
+                &mut checks,
+                iter.iter().map(Ok),
+                &self.item_validator,
+                &mut output,
+                &mut write,
+                &len,
+            )?,
+            // If not in strict mode we also accept any iterable except str, bytes or mappings
+            // This may seem counterintuitive since a Mapping is a less generic type than an arbitrary
+            // iterable (which we do accept) but doing something like `x: list[int] = {1: 'a'}` is commonly
+            // a mistake, so we don't parse it by default
+            (
+                GenericIterable::String(_)
+                | GenericIterable::Bytes(_)
+                | GenericIterable::Dict(_)
+                | GenericIterable::Mapping(_),
+                _,
+            ) => return Err(ValError::new(ErrorType::ListType, input)),
+            (generic_iterable, false) => match generic_iterable.into_sequence_iterator(py) {
+                Ok(iter) => validate_iterator(
+                    py,
+                    input,
+                    extra,
+                    definitions,
+                    recursion_guard,
+                    &mut checks,
+                    iter,
+                    &self.item_validator,
+                    &mut output,
+                    &mut write,
+                    &len,
+                )?,
+                Err(_) => return Err(ValError::new(ErrorType::ListType, input)),
             },
+            _ => return Err(ValError::new(ErrorType::ListType, input)),
         };
-        length_check!(input, "List", self.min_length, self.max_length, output);
         Ok(output.into_py(py))
     }
 
@@ -134,10 +165,7 @@ impl Validator for ListValidator {
         ultra_strict: bool,
     ) -> bool {
         if ultra_strict {
-            match self.item_validator {
-                Some(ref v) => v.different_strict_behavior(definitions, true),
-                None => false,
-            }
+            self.item_validator.different_strict_behavior(definitions, true)
         } else {
             true
         }
@@ -148,11 +176,9 @@ impl Validator for ListValidator {
     }
 
     fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        if let Some(ref mut v) = self.item_validator {
-            v.complete(definitions)?;
-            let inner_name = v.get_name();
-            self.name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
-        }
+        self.item_validator.complete(definitions)?;
+        let inner_name = self.item_validator.get_name();
+        self.name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
         Ok(())
     }
 }

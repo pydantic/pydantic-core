@@ -3,9 +3,11 @@ use std::os::raw::c_int;
 use pyo3::prelude::*;
 
 mod datetime;
+mod generic_iterable;
 mod input_abstract;
 mod input_json;
 mod input_python;
+pub mod iterator;
 mod parse_json;
 mod return_enums;
 mod shared;
@@ -14,12 +16,12 @@ pub(crate) use datetime::{
     pydate_as_date, pydatetime_as_datetime, pytime_as_time, pytimedelta_as_duration, EitherDate, EitherDateTime,
     EitherTime, EitherTimedelta,
 };
+pub(crate) use generic_iterable::GenericIterable;
 pub(crate) use input_abstract::{Input, InputType};
 pub(crate) use parse_json::{JsonInput, JsonObject};
 pub(crate) use return_enums::{
     py_string_str, AttributesGenericIterator, DictGenericIterator, EitherBytes, EitherString, GenericArguments,
-    GenericCollection, GenericIterator, GenericMapping, JsonArgs, JsonObjectGenericIterator, MappingGenericIterator,
-    PyArgs,
+    GenericIterator, GenericMapping, JsonArgs, JsonObjectGenericIterator, MappingGenericIterator, PyArgs,
 };
 
 // Defined here as it's not exported by pyo3

@@ -1,13 +1,14 @@
+import itertools
 import re
 from collections import deque
 from typing import Any, Dict, Type
 
 import pytest
-from dirty_equals import IsNonNegative
+from dirty_equals import Contains, IsNonNegative
 
 from pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import Err, PyAndJson, infinite_generator
+from ..conftest import AnyOf, Err, PyAndJson, infinite_generator
 
 
 @pytest.mark.parametrize(
@@ -39,13 +40,13 @@ def test_tuple_json(py_and_json: PyAndJson, mode, items, input_value, expected):
         assert v.validate_test(input_value) == expected
 
 
-def test_any_no_copy():
+def test_any_copied():
     v = SchemaValidator({'type': 'tuple-variable'})
     input_value = (1, '2', b'3')
     output = v.validate_python(input_value)
     assert output == input_value
-    assert output is input_value
-    assert id(output) == id(input_value)
+    assert output is not input_value
+    assert id(output) != id(input_value)
 
 
 @pytest.mark.parametrize(
@@ -73,7 +74,7 @@ def test_empty_positional_tuple():
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'Tuple should have at most 0 items after validation, not 1',
+            'msg': 'Tuple should have at most 0 items after validation, not >= 1',
             'input': (1,),
             'ctx': {'field_type': 'Tuple', 'max_length': 0, 'actual_length': 1},
         }
@@ -108,17 +109,17 @@ def test_tuple_strict_fails_without_tuple(wrong_coll_type: Type[Any], mode, item
         (
             {'max_length': 3},
             (1, 2, 3, 4),
-            Err('Tuple should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Tuple should have at most 3 items after validation, not >= 4 [type=too_long,'),
         ),
         (
             {'max_length': 3},
             [1, 2, 3, 4],
-            Err('Tuple should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Tuple should have at most 3 items after validation, not >= 4 [type=too_long,'),
         ),
         (
             {'max_length': 3},
             infinite_generator(),
-            Err('Tuple should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Tuple should have at most 3 items after validation, not >= 4 [type=too_long,'),
         ),
     ],
     ids=repr,
@@ -144,8 +145,8 @@ def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
         ({1: 10, 2: 20, '3': '30'}.keys(), (1, 2, 3)),
         ({1: 10, 2: 20, '3': '30'}.values(), (10, 20, 30)),
         ({1: 10, 2: 20, '3': '30'}, Err('Input should be a valid tuple [type=tuple_type,')),
-        ({1, 2, '3'}, Err('Input should be a valid tuple [type=tuple_type,')),
-        (frozenset([1, 2, '3']), Err('Input should be a valid tuple [type=tuple_type,')),
+        ({1, 2, '3'}, AnyOf([tuple(o) for o in sorted(itertools.permutations([1, 2, 3]))])),
+        (frozenset([1, 2, '3']), AnyOf([tuple(o) for o in sorted(itertools.permutations([1, 2, 3]))])),
     ],
     ids=repr,
 )
@@ -154,6 +155,8 @@ def test_tuple_validate(input_value, expected, mode, items):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
+    elif isinstance(expected, AnyOf):
+        assert v.validate_python(input_value) in expected.expected
     else:
         assert v.validate_python(input_value) == expected
 
@@ -211,14 +214,12 @@ def test_tuple_fix_len_errors(input_value, items, index):
     v = SchemaValidator({'type': 'tuple-positional', 'items_schema': items})
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python(input_value)
-    assert exc_info.value.errors(include_url=False) == [
-        {
-            'type': 'int_parsing',
-            'loc': (index,),
-            'msg': 'Input should be a valid integer, unable to parse string as an integer',
-            'input': 'wrong',
-        }
-    ]
+    assert {
+        'type': 'int_parsing',
+        'loc': (index,),
+        'msg': 'Input should be a valid integer, unable to parse string as an integer',
+        'input': 'wrong',
+    } in exc_info.value.errors(include_url=False)
 
 
 def test_multiple_missing(py_and_json: PyAndJson):
@@ -231,11 +232,12 @@ def test_multiple_missing(py_and_json: PyAndJson):
     assert v.validate_test([1, 2, 3, 4]) == (1, 2, 3, 4)
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1])
-    assert exc_info.value.errors(include_url=False) == [
+
+    assert exc_info.value.errors(include_url=False) == Contains(
         {'type': 'missing', 'loc': (1,), 'msg': 'Field required', 'input': [1]},
         {'type': 'missing', 'loc': (2,), 'msg': 'Field required', 'input': [1]},
         {'type': 'missing', 'loc': (3,), 'msg': 'Field required', 'input': [1]},
-    ]
+    )
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test([1, 2, 3])
     assert exc_info.value.errors(include_url=False) == [
@@ -253,9 +255,9 @@ def test_extra_arguments(py_and_json: PyAndJson):
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'Tuple should have at most 2 items after validation, not 4',
+            'msg': 'Tuple should have at most 2 items after validation, not >= 3',
             'input': [1, 2, 3, 4],
-            'ctx': {'field_type': 'Tuple', 'max_length': 2, 'actual_length': 4},
+            'ctx': {'field_type': 'Tuple', 'max_length': 2, 'actual_length': 3},
         }
     ]
 
@@ -485,7 +487,7 @@ def test_frozenset_from_dict_items(input_value, items_schema, expected):
     'input_value,expected',
     [
         ([1, 2, 3, 4], (1, 2, 3, 4)),
-        ([1, 2, 3, 4, 5], Err('Tuple should have at most 4 items after validation, not 5 [type=too_long,')),
+        ([1, 2, 3, 4, 5], Err('Tuple should have at most 4 items after validation, not >= 5 [type=too_long,')),
         ([1, 2, 3, 'x', 4], (1, 2, 3, 4)),
     ],
 )

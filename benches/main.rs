@@ -5,7 +5,7 @@ extern crate test;
 use test::{black_box, Bencher};
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::{PyDict, PySet, PyString};
 
 use _pydantic_core::SchemaValidator;
 
@@ -265,6 +265,7 @@ fn dict_python(bench: &mut Bencher) {
                 .collect::<Vec<String>>()
                 .join(", ")
         );
+        dbg!(code.clone());
         let input = py.eval(&code, None, None).unwrap();
         let input = black_box(input);
         bench.iter(|| {
@@ -694,5 +695,60 @@ class Foo(Enum):
             let input = black_box(input);
             bench.iter(|| black_box(validator.validate_python(py, input, None, None, None).unwrap()))
         }
+    })
+}
+
+const COLLECTION_SIZE: usize = 100_000;
+
+#[bench]
+fn constructing_pyset_from_vec_without_capacity(bench: &mut Bencher) {
+    Python::with_gil(|py| {
+        let input: Vec<PyObject> = (0..COLLECTION_SIZE).map(|v| v.to_object(py)).collect();
+
+        bench.iter(|| {
+            black_box({
+                let mut output = Vec::new();
+                for x in &input {
+                    output.push(x);
+                }
+                let set = PySet::new(py, output.iter()).unwrap();
+                set
+            })
+        })
+    })
+}
+
+#[bench]
+fn constructing_pyset_from_vec_with_capacity(bench: &mut Bencher) {
+    Python::with_gil(|py| {
+        let input: Vec<PyObject> = (0..COLLECTION_SIZE).map(|v| v.to_object(py)).collect();
+
+        bench.iter(|| {
+            black_box({
+                let mut output = Vec::with_capacity(COLLECTION_SIZE);
+                for x in &input {
+                    output.push(x);
+                }
+                let set = PySet::new(py, output.iter()).unwrap();
+                set
+            })
+        })
+    })
+}
+
+#[bench]
+fn constructing_pyset_from_vec_directly(bench: &mut Bencher) {
+    Python::with_gil(|py| {
+        let input: Vec<PyObject> = (0..COLLECTION_SIZE).map(|v| v.to_object(py)).collect();
+
+        bench.iter(|| {
+            black_box({
+                let output = PySet::new(py, &Vec::<i64>::new()).unwrap();
+                for x in &input {
+                    output.add(x).unwrap();
+                }
+                output
+            })
+        })
     })
 }

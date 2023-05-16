@@ -1,7 +1,8 @@
 import re
 from collections import OrderedDict
 from collections.abc import Mapping
-from typing import Any, Dict
+from dataclasses import dataclass
+from typing import Any, Dict, List
 
 import pytest
 from dirty_equals import HasRepr, IsStr
@@ -21,24 +22,29 @@ def test_dict(py_and_json: PyAndJson):
         v.validate_test([])
 
 
+@dataclass
+class Foobar:
+    x = 1
+
+
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        ({'1': b'1', '2': b'2'}, {'1': '1', '2': '2'}),
-        (OrderedDict(a=b'1', b='2'), {'a': '1', 'b': '2'}),
+        ({'1': b'1', '2': b'2'}, {'1': 1, '2': 2}),
+        (OrderedDict(a=b'1', b='2'), {'a': 1, 'b': 2}),
         ({}, {}),
         ('foobar', Err("Input should be a valid dictionary [type=dict_type, input_value='foobar', input_type=str]")),
-        ([], Err('Input should be a valid dictionary [type=dict_type,')),
-        ([('x', 'y')], Err('Input should be a valid dictionary [type=dict_type,')),
-        ([('x', 'y'), ('z', 'z')], Err('Input should be a valid dictionary [type=dict_type,')),
-        ((), Err('Input should be a valid dictionary [type=dict_type,')),
-        ((('x', 'y'),), Err('Input should be a valid dictionary [type=dict_type,')),
-        ((type('Foobar', (), {'x': 1})()), Err('Input should be a valid dictionary [type=dict_type,')),
+        ([], {}),
+        ([('x', '1')], {'x': 1}),
+        ([('x', '1'), ('z', b'2')], {'x': 1, 'z': 2}),
+        ((), {}),
+        ((('x', '1'),), {'x': 1}),
+        (Foobar(), Err('Input should be a valid dictionary [type=dict_type,')),
     ],
     ids=repr,
 )
 def test_dict_cases(input_value, expected):
-    v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'str'}})
+    v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'int'}})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -157,17 +163,68 @@ def test_mapping_error():
 
     assert exc_info.value.errors(include_url=False) == [
         {
-            'type': 'mapping_type',
+            'type': 'dict_type',
             'loc': (),
-            'msg': 'Input should be a valid mapping, error: RuntimeError: intentional error',
+            'msg': 'Input should be a valid dictionary',
             'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
-            'ctx': {'error': 'RuntimeError: intentional error'},
         }
     ]
 
 
-@pytest.mark.parametrize('mapping_items', [[(1,)], ['foobar'], [(1, 2, 3)], 'not list'])
-def test_mapping_error_yield_1(mapping_items):
+@pytest.mark.parametrize(
+    'mapping_items,errors',
+    [
+        (
+            [(1,)],
+            [
+                {
+                    'type': 'iteration_error',
+                    'loc': (),
+                    'msg': 'Error iterating over object, error: ValueError: expected tuple of length 2, but got tuple of length 1',  # noqa: E501
+                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                    'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 1'},
+                }
+            ],
+        ),
+        (
+            ['foobar'],
+            [
+                {
+                    'type': 'iteration_error',
+                    'loc': (),
+                    'msg': "Error iterating over object, error: TypeError: 'str' object cannot be converted to 'PyTuple'",  # noqa: E501
+                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                    'ctx': {'error': "TypeError: 'str' object cannot be converted to 'PyTuple'"},
+                }
+            ],
+        ),
+        (
+            [(1, 2, 3)],
+            [
+                {
+                    'type': 'iteration_error',
+                    'loc': (),
+                    'msg': 'Error iterating over object, error: ValueError: expected tuple of length 2, but got tuple of length 3',  # noqa: E501
+                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                    'ctx': {'error': 'ValueError: expected tuple of length 2, but got tuple of length 3'},
+                }
+            ],
+        ),
+        (
+            'not list',
+            [
+                {
+                    'type': 'iteration_error',
+                    'loc': (),
+                    'msg': "Error iterating over object, error: TypeError: 'str' object cannot be converted to 'PyTuple'",  # noqa: E501
+                    'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
+                    'ctx': {'error': "TypeError: 'str' object cannot be converted to 'PyTuple'"},
+                }
+            ],
+        ),
+    ],
+)
+def test_mapping_error_yield_1(mapping_items: List[Any], errors: List[Any]):
     class BadMapping(Mapping):
         def items(self):
             return mapping_items
@@ -185,15 +242,7 @@ def test_mapping_error_yield_1(mapping_items):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(BadMapping())
 
-    assert exc_info.value.errors(include_url=False) == [
-        {
-            'type': 'mapping_type',
-            'loc': (),
-            'msg': 'Input should be a valid mapping, error: Mapping items must be tuples of (key, value) pairs',
-            'input': HasRepr(IsStr(regex='.+BadMapping object at.+')),
-            'ctx': {'error': 'Mapping items must be tuples of (key, value) pairs'},
-        }
-    ]
+    assert exc_info.value.errors(include_url=False) == errors
 
 
 @pytest.mark.parametrize(
@@ -214,7 +263,7 @@ def test_mapping_error_yield_1(mapping_items):
         (
             {'max_length': 3},
             {'1': 1, '2': 2, '3': 3.0, '4': [1, 2, 3, 4]},
-            Err('Dictionary should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Dictionary should have at most 3 items after validation, not >= 4 [type=too_long,'),
         ),
     ],
 )

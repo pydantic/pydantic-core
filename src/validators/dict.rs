@@ -1,16 +1,16 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyMapping};
+use pyo3::types::PyDict;
 
 use crate::build_tools::{is_strict, SchemaDict};
-use crate::errors::{ValError, ValLineError, ValResult};
-use crate::input::{
-    DictGenericIterator, GenericMapping, Input, JsonObject, JsonObjectGenericIterator, MappingGenericIterator,
-};
+
+use crate::errors::{ErrorType, ValError, ValResult};
+use crate::input::iterator::IterableValidationChecks;
+use crate::input::Input;
+use crate::input::{iterator, GenericIterable};
 use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
-use super::list::length_check;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -58,28 +58,143 @@ impl BuildValidator for DictValidator {
     }
 }
 
+const FIELD_TYPE: &str = "Dictionary";
+
+#[allow(clippy::too_many_arguments)]
+fn validation_function<'s, 'data, K, V>(
+    py: Python<'data>,
+    extra: &'s Extra<'s>,
+    definitions: &'data Definitions<CombinedValidator>,
+    recursion_guard: &'s mut RecursionGuard,
+    key_validator: &'s CombinedValidator,
+    value_validator: &'s CombinedValidator,
+    key: &'data K,
+    value: &'data V,
+) -> ValResult<'data, (PyObject, PyObject)>
+where
+    K: Input<'data>,
+    V: Input<'data>,
+{
+    let v_key = key_validator
+        .validate(py, key, extra, definitions, recursion_guard)
+        .map_err(|e| {
+            e.with_outer_location("[key]".into())
+                .with_outer_location(key.as_loc_item())
+        })?;
+    let v_value = value_validator
+        .validate(py, value, extra, definitions, recursion_guard)
+        .map_err(|e| e.with_outer_location(key.as_loc_item()))?;
+    Ok((v_key, v_value))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_mapping<'s, 'data, K, V>(
+    py: Python<'data>,
+    input: &'data impl Input<'data>,
+    extra: &'s Extra<'s>,
+    definitions: &'data Definitions<CombinedValidator>,
+    recursion_guard: &'s mut RecursionGuard,
+    checks: &mut IterableValidationChecks<'data>,
+    iter: impl Iterator<Item = ValResult<'data, (&'data K, &'data V)>>,
+    key_validator: &'s CombinedValidator,
+    value_validator: &'s CombinedValidator,
+    output: &'data PyDict,
+) -> ValResult<'data, ()>
+where
+    K: Input<'data> + 'data,
+    V: Input<'data> + 'data,
+{
+    for result in iter {
+        let (key, value) = result?; // TODO: handle error
+        let result = validation_function(
+            py,
+            extra,
+            definitions,
+            recursion_guard,
+            key_validator,
+            value_validator,
+            key,
+            value,
+        );
+        if let Some((key, value)) = checks.filter_validation_result(result, input)? {
+            output.set_item(key, value)?;
+            checks.check_output_length(output.len(), input)?;
+        }
+    }
+    checks.finish(input)?;
+    Ok(())
+}
+
 impl Validator for DictValidator {
     fn validate<'s, 'data>(
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        extra: &Extra,
+        extra: &'s Extra<'s>,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let dict = input.validate_dict(extra.strict.unwrap_or(self.strict))?;
-        match dict {
-            GenericMapping::PyDict(py_dict) => {
-                self.validate_dict(py, input, py_dict, extra, definitions, recursion_guard)
-            }
-            GenericMapping::PyMapping(mapping) => {
-                self.validate_mapping(py, input, mapping, extra, definitions, recursion_guard)
-            }
-            GenericMapping::PyGetAttr(_, _) => unreachable!(),
-            GenericMapping::JsonObject(json_object) => {
-                self.validate_json_object(py, input, json_object, extra, definitions, recursion_guard)
-            }
-        }
+        let strict = extra.strict.unwrap_or(self.strict);
+
+        let length_constraints = iterator::LengthConstraints {
+            min_length: self.min_length.unwrap_or_default(),
+            max_length: self.max_length,
+            max_input_length: None,
+        };
+
+        let mut checks = IterableValidationChecks::new(false, length_constraints, FIELD_TYPE);
+
+        let output = PyDict::new(py);
+
+        let generic_iterable = input
+            .extract_iterable()
+            .map_err(|_| ValError::new(ErrorType::DictType, input))?;
+        match (generic_iterable, strict) {
+            // Always allow actual dicts or JSON objects
+            (GenericIterable::Dict(iter), _) => validate_mapping(
+                py,
+                input,
+                extra,
+                definitions,
+                recursion_guard,
+                &mut checks,
+                iter.iter().map(Ok),
+                &self.key_validator,
+                &self.value_validator,
+                output,
+            )?,
+            (GenericIterable::JsonObject(iter), _) => validate_mapping(
+                py,
+                input,
+                extra,
+                definitions,
+                recursion_guard,
+                &mut checks,
+                iter.iter().map(|(k, v)| (k, v)).map(Ok),
+                &self.key_validator,
+                &self.value_validator,
+                output,
+            )?,
+            // If we're not in strict mode, accept other iterables, equivalent to calling dict(thing)
+            (generic_iterable, false) => match generic_iterable.into_mapping_items_iterator(py) {
+                Ok(iter) => validate_mapping(
+                    py,
+                    input,
+                    extra,
+                    definitions,
+                    recursion_guard,
+                    &mut checks,
+                    iter,
+                    &self.key_validator,
+                    &self.value_validator,
+                    output,
+                )?,
+                Err(_) => return Err(ValError::new(ErrorType::DictType, input)),
+            },
+            _ => return Err(ValError::new(ErrorType::DictType, input)),
+        };
+
+        Ok(output.into_py(py))
     }
 
     fn different_strict_behavior(
@@ -103,69 +218,4 @@ impl Validator for DictValidator {
         self.key_validator.complete(definitions)?;
         self.value_validator.complete(definitions)
     }
-}
-
-macro_rules! build_validate {
-    ($name:ident, $dict_type:ty, $iter:ty) => {
-        fn $name<'s, 'data>(
-            &'s self,
-            py: Python<'data>,
-            input: &'data impl Input<'data>,
-            dict: &'data $dict_type,
-            extra: &Extra,
-            definitions: &'data Definitions<CombinedValidator>,
-            recursion_guard: &'s mut RecursionGuard,
-        ) -> ValResult<'data, PyObject> {
-            let output = PyDict::new(py);
-            let mut errors: Vec<ValLineError> = Vec::new();
-
-            let key_validator = self.key_validator.as_ref();
-            let value_validator = self.value_validator.as_ref();
-            for item_result in <$iter>::new(dict)? {
-                let (key, value) = item_result?;
-                let output_key = match key_validator.validate(py, key, extra, definitions, recursion_guard) {
-                    Ok(value) => Some(value),
-                    Err(ValError::LineErrors(line_errors)) => {
-                        for err in line_errors {
-                            // these are added in reverse order so [key] is shunted along by the second call
-                            errors.push(
-                                err.with_outer_location("[key]".into())
-                                    .with_outer_location(key.as_loc_item()),
-                            );
-                        }
-                        None
-                    }
-                    Err(ValError::Omit) => continue,
-                    Err(err) => return Err(err),
-                };
-                let output_value = match value_validator.validate(py, value, extra, definitions, recursion_guard) {
-                    Ok(value) => Some(value),
-                    Err(ValError::LineErrors(line_errors)) => {
-                        for err in line_errors {
-                            errors.push(err.with_outer_location(key.as_loc_item()));
-                        }
-                        None
-                    }
-                    Err(ValError::Omit) => continue,
-                    Err(err) => return Err(err),
-                };
-                if let (Some(key), Some(value)) = (output_key, output_value) {
-                    output.set_item(key, value)?;
-                }
-            }
-
-            if errors.is_empty() {
-                length_check!(input, "Dictionary", self.min_length, self.max_length, output);
-                Ok(output.into())
-            } else {
-                Err(ValError::LineErrors(errors))
-            }
-        }
-    };
-}
-
-impl DictValidator {
-    build_validate!(validate_dict, PyDict, DictGenericIterator);
-    build_validate!(validate_mapping, PyMapping, MappingGenericIterator);
-    build_validate!(validate_json_object, JsonObject, JsonObjectGenericIterator);
 }

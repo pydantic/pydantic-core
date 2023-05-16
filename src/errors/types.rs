@@ -469,7 +469,7 @@ impl ErrorType {
             Self::MultipleOf {..} => "Input should be a multiple of {multiple_of}",
             Self::FiniteNumber => "Input should be a finite number",
             Self::TooShort {..} => "{field_type} should have at least {min_length} item{expected_plural} after validation, not {actual_length}",
-            Self::TooLong {..} => "{field_type} should have at most {max_length} item{expected_plural} after validation, not {actual_length}",
+            Self::TooLong {..} => "{field_type} should have at most {max_length} item{expected_plural} after validation, not >= {actual_length}",
             Self::IterableType => "Input should be iterable",
             Self::IterationError {..} => "Error iterating over object, error: {error}",
             Self::StringType => "Input should be a valid string",
