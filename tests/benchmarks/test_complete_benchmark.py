@@ -134,7 +134,7 @@ def test_complete_core_error(benchmark):
     def f():
         try:
             v.validate_python(data)
-        except ValidationError:
+        except ValueError:
             pass
         else:
             raise RuntimeError('expected ValueError')
