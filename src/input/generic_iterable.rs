@@ -1,3 +1,5 @@
+use crate::errors::ValError;
+
 use super::parse_json::{JsonInput, JsonObject};
 use pyo3::{
     exceptions::PyTypeError,

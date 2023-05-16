@@ -275,16 +275,7 @@ where
                     output.push(v);
                     checks.check_output_length(output.len(), input)?;
                 }
-                None => {
-                    return Err(ValError::new(
-                        ErrorType::TooShort {
-                            field_type: "Tuple".to_string(),
-                            min_length: items_validators.len(),
-                            actual_length: output.len(),
-                        },
-                        input,
-                    ))
-                }
+                None => return Err(ValError::new_with_loc(ErrorType::Missing, input, output.len())),
             }
         }
     }
