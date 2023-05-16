@@ -150,7 +150,6 @@ pub fn map_iter_error<'data>(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[inline(always)]
 pub fn validate_iterator<'s, 'data, V, O, W, L>(
     py: Python<'data>,
     input: &'data impl Input<'data>,
