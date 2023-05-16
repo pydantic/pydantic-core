@@ -117,16 +117,10 @@ impl<'data> IterableValidationChecks<'data> {
         input: &'data I,
     ) -> ValResult<'data, ()> {
         if max_length < current_length {
-            return Err(ValError::new(
-                ErrorType::TooLong {
-                    field_type: self.field_type.to_string(),
-                    max_length,
-                    actual_length: current_length,
-                },
-                input,
-            ));
+            Ok(())
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 }
 
