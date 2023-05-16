@@ -31,7 +31,9 @@ pub struct IterableValidationChecks<'data> {
     input_length: usize,
     output_length: usize,
     fail_fast: bool,
-    length_constraints: LengthConstraints,
+    min_length: usize,
+    max_length: Option<usize>,
+    max_input_length: Option<usize>,
     field_type: &'static str,
     errors: Vec<ValLineError<'data>>,
 }
@@ -42,7 +44,9 @@ impl<'data> IterableValidationChecks<'data> {
             input_length: 0,
             output_length: 0,
             fail_fast,
-            length_constraints,
+            min_length: length_constraints.min_length,
+            max_length: length_constraints.max_length,
+            max_input_length: length_constraints.max_input_length,
             field_type,
             errors: vec![],
         }
@@ -69,12 +73,12 @@ impl<'data> IterableValidationChecks<'data> {
             Err(e) => Err(e),
         };
         self.input_length += 1;
-        self.check_max_length(self.input_length, self.length_constraints.max_input_length, input)?;
-        self.check_max_length(
-            self.output_length + self.errors.len(),
-            self.length_constraints.max_length,
-            input,
-        )?;
+        if let Some(max_length) = self.max_input_length {
+            self.check_max_length(self.input_length, max_length, input)?;
+        }
+        if let Some(max_length) = self.max_length {
+            self.check_max_length(self.output_length + self.errors.len(), max_length, input)?;
+        }
         res
     }
 
@@ -84,19 +88,18 @@ impl<'data> IterableValidationChecks<'data> {
         input: &'data I,
     ) -> ValResult<'data, ()> {
         self.output_length = output_length;
-        self.check_max_length(
-            output_length + self.errors.len(),
-            self.length_constraints.max_length,
-            input,
-        )
+        if let Some(max_length) = self.max_length {
+            self.check_max_length(output_length + self.errors.len(), max_length, input)?;
+        }
+        Ok(())
     }
 
     pub fn finish<I: Input<'data>>(&mut self, input: &'data I) -> ValResult<'data, ()> {
-        if self.length_constraints.min_length > self.output_length {
+        if self.min_length > self.output_length {
             let err = ValLineError::new(
                 ErrorType::TooShort {
                     field_type: self.field_type.to_string(),
-                    min_length: self.length_constraints.min_length,
+                    min_length: self.min_length,
                     actual_length: self.output_length,
                 },
                 input,
@@ -114,20 +117,18 @@ impl<'data> IterableValidationChecks<'data> {
     fn check_max_length<I: Input<'data>>(
         &self,
         current_length: usize,
-        max_length: Option<usize>,
+        max_length: usize,
         input: &'data I,
     ) -> ValResult<'data, ()> {
-        if let Some(max_length) = max_length {
-            if max_length < current_length {
-                return Err(ValError::new(
-                    ErrorType::TooLong {
-                        field_type: self.field_type.to_string(),
-                        max_length,
-                        actual_length: current_length,
-                    },
-                    input,
-                ));
-            }
+        if max_length < current_length {
+            return Err(ValError::new(
+                ErrorType::TooLong {
+                    field_type: self.field_type.to_string(),
+                    max_length,
+                    actual_length: current_length,
+                },
+                input,
+            ));
         }
         Ok(())
     }
