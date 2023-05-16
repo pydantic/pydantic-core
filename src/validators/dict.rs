@@ -105,7 +105,44 @@ where
     V: Input<'data> + 'data,
 {
     for result in iter {
-        let (key, value) = result?; // TODO: handle error
+        let (key, value) = result?;
+        let result = validation_function(
+            py,
+            extra,
+            definitions,
+            recursion_guard,
+            key_validator,
+            value_validator,
+            key,
+            value,
+        );
+        if let Some((key, value)) = checks.filter_validation_result(result, input)? {
+            output.set_item(key, value)?;
+            checks.check_output_length(output.len(), input)?;
+        }
+    }
+    checks.finish(input)?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_infallible_mapping<'s, 'data, K, V>(
+    py: Python<'data>,
+    input: &'data impl Input<'data>,
+    extra: &'s Extra<'s>,
+    definitions: &'data Definitions<CombinedValidator>,
+    recursion_guard: &'s mut RecursionGuard,
+    checks: &mut IterableValidationChecks<'data>,
+    iter: impl Iterator<Item = (&'data K, &'data V)>,
+    key_validator: &'s CombinedValidator,
+    value_validator: &'s CombinedValidator,
+    output: &'data PyDict,
+) -> ValResult<'data, ()>
+where
+    K: Input<'data> + 'data,
+    V: Input<'data> + 'data,
+{
+    for (key, value) in iter {
         let result = validation_function(
             py,
             extra,
@@ -151,26 +188,26 @@ impl Validator for DictValidator {
             .map_err(|_| ValError::new(ErrorType::DictType, input))?;
         match (generic_iterable, strict) {
             // Always allow actual dicts or JSON objects
-            (GenericIterable::Dict(iter), _) => validate_mapping(
+            (GenericIterable::Dict(iter), _) => validate_infallible_mapping(
                 py,
                 input,
                 extra,
                 definitions,
                 recursion_guard,
                 &mut checks,
-                iter.iter().map(Ok),
+                iter.iter(),
                 &self.key_validator,
                 &self.value_validator,
                 output,
             )?,
-            (GenericIterable::JsonObject(iter), _) => validate_mapping(
+            (GenericIterable::JsonObject(iter), _) => validate_infallible_mapping(
                 py,
                 input,
                 extra,
                 definitions,
                 recursion_guard,
                 &mut checks,
-                iter.iter().map(|(k, v)| (k, v)).map(Ok),
+                iter.iter().map(|(k, v)| (k, v)),
                 &self.key_validator,
                 &self.value_validator,
                 output,

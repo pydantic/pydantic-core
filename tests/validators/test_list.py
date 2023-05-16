@@ -361,7 +361,7 @@ def test_generator_error():
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'iteration_error',
-            'loc': (2,),
+            'loc': (),
             'msg': 'Error iterating over object, error: RuntimeError: error',
             'input': HasRepr(IsStr(regex='<generator object test_generator_error.<locals>.gen at 0x[0-9a-fA-F]+>')),
             'ctx': {'error': 'RuntimeError: error'},
@@ -424,7 +424,7 @@ def test_bad_iter(items_schema):
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'iteration_error',
-            'loc': (1,),
+            'loc': (),
             'msg': 'Error iterating over object, error: RuntimeError: broken',
             'input': IsInstance(BadIter),
             'ctx': {'error': 'RuntimeError: broken'},

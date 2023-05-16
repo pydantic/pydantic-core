@@ -1,11 +1,11 @@
-use pyo3::{PyErr, PyObject, PyResult, Python};
+use pyo3::{PyObject, PyResult, Python};
 
 use super::Input;
 
 use crate::validators::Validator;
 use crate::{
     definitions::Definitions,
-    errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult},
+    errors::{ErrorType, ValError, ValLineError, ValResult},
     recursion_guard::RecursionGuard,
     validators::CombinedValidator,
     validators::Extra,
@@ -130,15 +130,6 @@ impl<'data> IterableValidationChecks<'data> {
     }
 }
 
-pub fn map_iter_error<'data>(py: Python<'data>, input: &'data impl Input<'data>, err: PyErr) -> ValError<'data> {
-    ValError::new(
-        ErrorType::IterationError {
-            error: py_err_string(py, err),
-        },
-        input,
-    )
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn validate_infallible_iterator<'s, 'data, V, O, W, L>(
     py: Python<'data>,
@@ -179,7 +170,7 @@ pub fn validate_fallible_iterator<'s, 'data, V, O, W, L>(
     definitions: &'data Definitions<CombinedValidator>,
     recursion_guard: &'s mut RecursionGuard,
     checks: &mut IterableValidationChecks<'data>,
-    iter: impl Iterator<Item = PyResult<&'data V>>,
+    iter: impl Iterator<Item = ValResult<'data, &'data V>>,
     items_validator: &'s CombinedValidator,
     output: &mut O,
     write: &mut W,
@@ -191,15 +182,7 @@ where
     L: Fn(&O) -> usize,
 {
     for (index, result) in iter.enumerate() {
-        let value = result.map_err(|err| {
-            ValError::new_with_loc(
-                ErrorType::IterationError {
-                    error: py_err_string(py, err),
-                },
-                input,
-                index,
-            )
-        })?;
+        let value = result?;
         let result = items_validator
             .validate(py, value, extra, definitions, recursion_guard)
             .map_err(|e| e.with_outer_location(index.into()));

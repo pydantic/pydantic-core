@@ -8,7 +8,7 @@ use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::iterator::validate_infallible_iterator;
 use crate::input::iterator::IterableValidationChecks;
 use crate::input::iterator::LengthConstraints;
-use crate::input::iterator::{calculate_output_init_capacity, map_iter_error, validate_fallible_iterator};
+use crate::input::iterator::{calculate_output_init_capacity, validate_fallible_iterator};
 use crate::input::{GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 
@@ -206,7 +206,7 @@ fn validate_iterator_tuple_positional<'s, 'data, V>(
     definitions: &'data Definitions<CombinedValidator>,
     recursion_guard: &'s mut RecursionGuard,
     checks: &mut IterableValidationChecks<'data>,
-    iter: impl Iterator<Item = PyResult<&'data V>>,
+    iter: impl Iterator<Item = ValResult<'data, &'data V>>,
     items_validators: &[CombinedValidator],
     extra_validator: &Option<Box<CombinedValidator>>,
     output: &mut Vec<PyObject>,
@@ -215,7 +215,7 @@ where
     V: Input<'data> + 'data,
 {
     for (index, result) in iter.enumerate() {
-        let value = result.map_err(|e| map_iter_error(py, input, e))?;
+        let value = result?;
         match items_validators.get(output.len()) {
             Some(item_validator) => {
                 let result = item_validator
