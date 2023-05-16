@@ -31,6 +31,7 @@ impl BuildValidator for FrozenSetValidator {
     set_build!();
 }
 
+// See https://github.com/PyO3/pyo3/pull/3156
 fn frozen_set_add<K>(set: &PyFrozenSet, key: K) -> PyResult<()>
 where
     K: ToPyObject,
