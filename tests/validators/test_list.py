@@ -449,7 +449,7 @@ def infinite_str_gen() -> Iterator[str]:
 # consumed the first item into an error, when we found a second item we errored so 3rd item is next
 @pytest.mark.parametrize('gen_factory,nxt', [(infinite_int_gen, 2), (infinite_str_gen, 'a_2')])
 def test_stop_iterating_on_error(gen_factory: Callable[[], Iterator[Any]], nxt: Any) -> None:
-    v = SchemaValidator(core_schema.list_schema(core_schema.int_schema(), allow_any_iter=True, max_length=1))
+    v = SchemaValidator(core_schema.list_schema(core_schema.int_schema(), max_length=1))
 
     gen = gen_factory()
 
@@ -476,9 +476,7 @@ def test_stop_iterating_func_raises_omit() -> None:
         return x
 
     v = SchemaValidator(
-        core_schema.list_schema(
-            core_schema.no_info_after_validator_function(f, core_schema.int_schema()), allow_any_iter=True, max_length=1
-        )
+        core_schema.list_schema(core_schema.no_info_after_validator_function(f, core_schema.int_schema()), max_length=1)
     )
 
     gen = infinite_int_gen()
