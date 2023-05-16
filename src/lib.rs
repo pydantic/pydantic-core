@@ -13,6 +13,7 @@ mod argument_markers;
 mod build_tools;
 mod definitions;
 mod errors;
+mod hashed_any;
 mod input;
 mod lazy_index_map;
 mod lookup_key;

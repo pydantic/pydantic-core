@@ -1,3 +1,4 @@
+use ahash::HashMapExt;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -5,6 +6,8 @@ use pyo3::types::PyDict;
 use crate::build_tools::{is_strict, SchemaDict};
 
 use crate::errors::{ErrorType, ValError, ValResult};
+use crate::hashed_any::HashedAny;
+use crate::hashed_any::HashedAnyMap;
 use crate::input::iterator::IterableValidationChecks;
 use crate::input::Input;
 use crate::input::{iterator, GenericIterable};
@@ -98,7 +101,7 @@ fn validate_mapping<'s, 'data, K, V>(
     iter: impl Iterator<Item = ValResult<'data, (&'data K, &'data V)>>,
     key_validator: &'s CombinedValidator,
     value_validator: &'s CombinedValidator,
-    output: &'data PyDict,
+    output: &mut HashedAnyMap<PyObject>,
 ) -> ValResult<'data, ()>
 where
     K: Input<'data> + 'data,
@@ -117,7 +120,8 @@ where
             value,
         );
         if let Some((key, value)) = checks.filter_validation_result(result, input)? {
-            output.set_item(key, value)?;
+            let key = HashedAny::extract(key.as_ref(py))?;
+            output.insert(key, value);
         }
         checks.check_output_length(output.len(), input)?;
     }
@@ -144,11 +148,12 @@ impl Validator for DictValidator {
 
         let mut checks = IterableValidationChecks::new(false, length_constraints, FIELD_TYPE);
 
-        let output = PyDict::new(py);
-
         let generic_iterable = input
             .extract_iterable()
             .map_err(|_| ValError::new(ErrorType::DictType, input))?;
+
+        let mut output = HashedAnyMap::with_capacity(generic_iterable.len().unwrap_or_default());
+
         match (generic_iterable, strict) {
             // Always allow actual dicts or JSON objects
             (GenericIterable::Dict(iter), _) => validate_mapping(
@@ -161,7 +166,7 @@ impl Validator for DictValidator {
                 iter.iter().map(Ok),
                 &self.key_validator,
                 &self.value_validator,
-                output,
+                &mut output,
             )?,
             (GenericIterable::JsonObject(iter), _) => validate_mapping(
                 py,
@@ -173,7 +178,7 @@ impl Validator for DictValidator {
                 iter.iter().map(|(k, v)| (k, v)).map(Ok),
                 &self.key_validator,
                 &self.value_validator,
-                output,
+                &mut output,
             )?,
             // If we're not in strict mode, accept other iterables, equivalent to calling dict(thing)
             (generic_iterable, false) => match generic_iterable.into_mapping_items_iterator(py) {
@@ -187,7 +192,7 @@ impl Validator for DictValidator {
                     iter,
                     &self.key_validator,
                     &self.value_validator,
-                    output,
+                    &mut output,
                 )?,
                 Err(_) => return Err(ValError::new(ErrorType::DictType, input)),
             },
