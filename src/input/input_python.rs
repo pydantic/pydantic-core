@@ -375,6 +375,10 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(tuple.into())
+        } else if let Ok(set) = self.downcast::<PySet>() {
+            Ok(set.into())
+        } else if let Ok(frozen_set) = self.downcast::<PyFrozenSet>() {
+            Ok(frozen_set.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
         } else if (allow_any_iter && self.iter().is_ok()) || self.downcast::<PyIterator>().is_ok() || is_deque(self) {
@@ -397,6 +401,10 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Ok(list) = self.downcast::<PyList>() {
             Ok(list.into())
+        } else if let Ok(set) = self.downcast::<PySet>() {
+            Ok(set.into())
+        } else if let Ok(frozen_set) = self.downcast::<PyFrozenSet>() {
+            Ok(frozen_set.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
         } else if self.downcast::<PyIterator>().is_ok() || is_deque(self) {

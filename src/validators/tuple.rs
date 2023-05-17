@@ -213,6 +213,14 @@ impl Validator for TuplePositionalValidator {
                 let mut iter = collection.iter();
                 iter!(iter)
             }
+            GenericCollection::Set(collection) => {
+                let mut iter = collection.iter();
+                iter!(iter)
+            }
+            GenericCollection::FrozenSet(collection) => {
+                let mut iter = collection.iter();
+                iter!(iter)
+            }
             GenericCollection::PyAny(collection) => {
                 let vec: Vec<&PyAny> = collection.iter()?.collect::<PyResult<_>>()?;
                 let mut iter = vec.into_iter();
@@ -222,7 +230,6 @@ impl Validator for TuplePositionalValidator {
                 let mut iter = collection.iter();
                 iter!(iter)
             }
-            _ => unreachable!(),
         }
         if errors.is_empty() {
             Ok(PyTuple::new(py, &output).into_py(py))

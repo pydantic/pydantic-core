@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from typing import Any, Dict
 
 import pytest
-from dirty_equals import HasRepr, IsInstance, IsStr
+from dirty_equals import HasRepr, IsInstance, IsList, IsStr
 
 from pydantic_core import SchemaValidator, ValidationError
 
@@ -52,9 +52,9 @@ def gen_ints():
         ([1, 2, '3'], [1, 2, 3]),
         ((1, 2, '3'), [1, 2, 3]),
         (deque((1, 2, '3')), [1, 2, 3]),
-        ({1, 2, '3'}, Err('Input should be a valid list [type=list_type,')),
+        ({1, 2, '3'}, IsList(1, 2, 3, check_order=False)),
         (gen_ints(), [1, 2, 3]),
-        (frozenset({1, 2, '3'}), Err('Input should be a valid list [type=list_type,')),
+        (frozenset({1, 2, '3'}), IsList(1, 2, 3, check_order=False)),
         ({1: 10, 2: 20, '3': '30'}.keys(), [1, 2, 3]),
         ({1: 10, 2: 20, '3': '30'}.values(), [10, 20, 30]),
         ({1: 10, 2: 20, '3': '30'}, Err('Input should be a valid list [type=list_type,')),
@@ -91,11 +91,11 @@ def test_list_json():
     [
         ([], []),
         ([1, '2', b'3'], [1, '2', b'3']),
-        (frozenset([1, '2', b'3']), Err('Input should be a valid list [type=list_type,')),
+        (frozenset([1, '2', b'3']), IsList(1, '2', b'3', check_order=False)),
         ((), []),
         ((1, '2', b'3'), [1, '2', b'3']),
         (deque([1, '2', b'3']), [1, '2', b'3']),
-        ({1, '2', b'3'}, Err('Input should be a valid list [type=list_type,')),
+        ({1, '2', b'3'}, IsList(1, '2', b'3', check_order=False)),
     ],
 )
 def test_list_any(input_value, expected):
