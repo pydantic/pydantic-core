@@ -12,12 +12,11 @@ use pyo3::types::PyFunction;
 use pyo3::PyTypeInfo;
 
 use crate::errors::{py_err_string, ErrorType, InputValue, ValError, ValLineError, ValResult};
-use crate::input::py_error_on_minusone;
 use crate::recursion_guard::RecursionGuard;
 use crate::validators::{CombinedValidator, Extra, Validator};
 
 use super::parse_json::{JsonArray, JsonInput, JsonObject};
-use super::Input;
+use super::{py_error_on_minusone, Input};
 
 /// Container for all the collections (sized iterable containers) types, which
 /// can mostly be converted to each other in lax mode.

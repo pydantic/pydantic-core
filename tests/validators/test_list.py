@@ -40,6 +40,11 @@ def test_list_strict():
     ]
 
 
+def test_list_no_copy():
+    v = SchemaValidator({'type': 'list'})
+    assert v.validate_python([1, 2, 3]) is not [1, 2, 3]
+
+
 def gen_ints():
     yield 1
     yield 2
@@ -148,7 +153,7 @@ def test_list_error(input_value, index):
         (
             {'max_length': 3},
             [1, 2, 3, 4, 5, 6, 7],
-            Err('List should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('List should have at most 3 items after validation, not 7 [type=too_long,'),
         ),
         ({'max_length': 1}, [1, 2], Err('List should have at most 1 item after validation, not 2 [type=too_long,')),
         (
