@@ -34,9 +34,10 @@ impl Validator for FrozenSetValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let collection = input.validate_frozenset(extra.strict.unwrap_or(self.strict))?;
-
-        let set = collection.validate_to_set(
+        let f_set = PyFrozenSet::empty(py)?;
+        collection.validate_to_set(
             py,
+            f_set,
             input,
             self.max_length,
             "Frozenset",
@@ -45,8 +46,7 @@ impl Validator for FrozenSetValidator {
             definitions,
             recursion_guard,
         )?;
-        min_length_check!(input, "Frozenset", self.min_length, set);
-        let f_set = PyFrozenSet::new(py, set)?;
+        min_length_check!(input, "Frozenset", self.min_length, f_set);
         Ok(f_set.into_py(py))
     }
 

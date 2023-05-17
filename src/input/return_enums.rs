@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 use std::slice::Iter as SliceIter;
 
-use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::iter::PyDictIterator;
 use pyo3::types::{PyBytes, PyDict, PyFrozenSet, PyIterator, PyList, PyMapping, PySet, PyString, PyTuple};
+use pyo3::{ffi, intern, AsPyPointer, PyNativeType};
 
 #[cfg(not(PyPy))]
 use pyo3::types::PyFunction;
@@ -12,6 +12,7 @@ use pyo3::types::PyFunction;
 use pyo3::PyTypeInfo;
 
 use crate::errors::{py_err_string, ErrorType, InputValue, ValError, ValLineError, ValResult};
+use crate::input::py_error_on_minusone;
 use crate::recursion_guard::RecursionGuard;
 use crate::validators::{CombinedValidator, Extra, Validator};
 
@@ -131,9 +132,41 @@ fn validate_iter_to_vec<'a, 's>(
     }
 }
 
+pub trait BuildSet {
+    fn build_add(&self, item: PyObject) -> PyResult<()>;
+
+    fn build_len(&self) -> usize;
+}
+
+impl BuildSet for &PySet {
+    fn build_add(&self, item: PyObject) -> PyResult<()> {
+        self.add(item)
+    }
+
+    fn build_len(&self) -> usize {
+        self.len()
+    }
+}
+
+impl BuildSet for &PyFrozenSet {
+    fn build_add(&self, item: PyObject) -> PyResult<()> {
+        unsafe {
+            py_error_on_minusone(
+                self.py(),
+                ffi::PySet_Add(self.as_ptr(), item.to_object(self.py()).as_ptr()),
+            )
+        }
+    }
+
+    fn build_len(&self) -> usize {
+        self.len()
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn validate_iter_to_set<'a, 's>(
     py: Python<'a>,
+    set: impl BuildSet,
     iter: impl Iterator<Item = PyResult<&'a (impl Input<'a> + 'a)>>,
     input: &'a (impl Input<'a> + 'a),
     field_type: &'static str,
@@ -142,16 +175,15 @@ fn validate_iter_to_set<'a, 's>(
     extra: &Extra,
     definitions: &'a [CombinedValidator],
     recursion_guard: &'s mut RecursionGuard,
-) -> ValResult<'a, &'a PySet> {
-    let set = PySet::empty(py)?;
+) -> ValResult<'a, ()> {
     let mut errors: Vec<ValLineError> = Vec::new();
     for (index, item_result) in iter.enumerate() {
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
         match validator.validate(py, item, extra, definitions, recursion_guard) {
             Ok(item) => {
-                set.add(item)?;
+                set.build_add(item)?;
                 if let Some(max_length) = max_length {
-                    let actual_length = set.len();
+                    let actual_length = set.build_len();
                     if actual_length > max_length {
                         return Err(ValError::new(
                             ErrorType::TooLong {
@@ -173,7 +205,7 @@ fn validate_iter_to_set<'a, 's>(
     }
 
     if errors.is_empty() {
-        Ok(set)
+        Ok(())
     } else {
         Err(ValError::LineErrors(errors))
     }
@@ -252,6 +284,7 @@ impl<'a> GenericCollection<'a> {
     pub fn validate_to_set<'s>(
         &'s self,
         py: Python<'a>,
+        set: impl BuildSet,
         input: &'a impl Input<'a>,
         max_length: Option<usize>,
         field_type: &'static str,
@@ -259,11 +292,12 @@ impl<'a> GenericCollection<'a> {
         extra: &Extra,
         definitions: &'a [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'a, &'a PySet> {
+    ) -> ValResult<'a, ()> {
         macro_rules! validate_set {
             ($iter:expr) => {
                 validate_iter_to_set(
                     py,
+                    set,
                     $iter,
                     input,
                     field_type,

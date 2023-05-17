@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PySet};
 
 use crate::build_tools::SchemaDict;
 use crate::errors::ValResult;
@@ -65,8 +65,10 @@ impl Validator for SetValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let collection = input.validate_set(extra.strict.unwrap_or(self.strict))?;
-        let set = collection.validate_to_set(
+        let set = PySet::empty(py)?;
+        collection.validate_to_set(
             py,
+            set,
             input,
             self.max_length,
             "Set",
