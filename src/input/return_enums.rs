@@ -84,9 +84,22 @@ impl<'a, INPUT: Input<'a>> MaxLengthCheck<'a, INPUT> {
     }
 }
 
+macro_rules! any_next_error {
+    ($py:expr, $err:ident, $input:expr, $index:ident) => {
+        ValError::new_with_loc(
+            ErrorType::IterationError {
+                error: py_err_string($py, $err),
+            },
+            $input,
+            $index,
+        )
+    };
+}
+
+#[allow(clippy::too_many_arguments)]
 fn validate_iter_to_vec<'a, 's>(
     py: Python<'a>,
-    iter: impl Iterator<Item = &'a (impl Input<'a> + 'a)>,
+    iter: impl Iterator<Item = PyResult<&'a (impl Input<'a> + 'a)>>,
     capacity: usize,
     mut max_length_check: MaxLengthCheck<'a, impl Input<'a>>,
     validator: &'s CombinedValidator,
@@ -96,7 +109,8 @@ fn validate_iter_to_vec<'a, 's>(
 ) -> ValResult<'a, Vec<PyObject>> {
     let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
-    for (index, item) in iter.enumerate() {
+    for (index, item_result) in iter.enumerate() {
+        let item = item_result.map_err(|e| any_next_error!(py, e, max_length_check.input, index))?;
         match validator.validate(py, item, extra, definitions, recursion_guard) {
             Ok(item) => {
                 max_length_check.incr()?;
@@ -129,18 +143,6 @@ fn no_validator_iter_to_vec<'a, 's>(
     .collect()
 }
 
-macro_rules! any_next_error {
-    ($py:expr, $err:ident, $input:ident, $index:ident) => {
-        ValError::new_with_loc(
-            ErrorType::IterationError {
-                error: py_err_string($py, $err),
-            },
-            $input,
-            $index,
-        )
-    };
-}
-
 // pretty arbitrary default capacity when creating vecs from iteration
 static DEFAULT_CAPACITY: usize = 10;
 
@@ -163,7 +165,6 @@ impl<'a> GenericCollection<'a> {
         input: &'a impl Input<'a>,
         max_length: Option<usize>,
         field_type: &'static str,
-        generator_max_length: Option<usize>,
         validator: &'s CombinedValidator,
         extra: &Extra,
         definitions: &'a [CombinedValidator],
@@ -176,7 +177,7 @@ impl<'a> GenericCollection<'a> {
         match self {
             Self::List(collection) => validate_iter_to_vec(
                 py,
-                collection.iter(),
+                collection.iter().map(Ok),
                 capacity,
                 max_length_check,
                 validator,
@@ -186,7 +187,7 @@ impl<'a> GenericCollection<'a> {
             ),
             Self::Tuple(collection) => validate_iter_to_vec(
                 py,
-                collection.iter(),
+                collection.iter().map(Ok),
                 capacity,
                 max_length_check,
                 validator,
@@ -196,7 +197,7 @@ impl<'a> GenericCollection<'a> {
             ),
             Self::Set(collection) => validate_iter_to_vec(
                 py,
-                collection.iter(),
+                collection.iter().map(Ok),
                 capacity,
                 max_length_check,
                 validator,
@@ -206,7 +207,7 @@ impl<'a> GenericCollection<'a> {
             ),
             Self::FrozenSet(collection) => validate_iter_to_vec(
                 py,
-                collection.iter(),
+                collection.iter().map(Ok),
                 capacity,
                 max_length_check,
                 validator,
@@ -214,35 +215,19 @@ impl<'a> GenericCollection<'a> {
                 definitions,
                 recursion_guard,
             ),
-            Self::PyAny(collection) => {
-                let iter = collection.iter()?;
-                let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
-                let mut errors: Vec<ValLineError> = Vec::new();
-                let mut max_length_check = MaxLengthCheck::new(generator_max_length, field_type, input);
-                for (index, item_result) in iter.enumerate() {
-                    let item = item_result.map_err(|e| any_next_error!(collection.py(), e, input, index))?;
-                    match validator.validate(py, item, extra, definitions, recursion_guard) {
-                        Ok(item) => {
-                            max_length_check.incr()?;
-                            output.push(item);
-                        }
-                        Err(ValError::LineErrors(line_errors)) => {
-                            errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
-                        }
-                        Err(ValError::Omit) => (),
-                        Err(err) => return Err(err),
-                    }
-                }
-
-                if errors.is_empty() {
-                    Ok(output)
-                } else {
-                    Err(ValError::LineErrors(errors))
-                }
-            }
+            Self::PyAny(collection) => validate_iter_to_vec(
+                py,
+                collection.iter()?,
+                capacity,
+                max_length_check,
+                validator,
+                extra,
+                definitions,
+                recursion_guard,
+            ),
             Self::JsonArray(collection) => validate_iter_to_vec(
                 py,
-                collection.iter(),
+                collection.iter().map(Ok),
                 capacity,
                 max_length_check,
                 validator,

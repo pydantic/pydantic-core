@@ -377,11 +377,7 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
-        } else if allow_any_iter && self.iter().is_ok() {
-            Ok(self.into())
-        } else if self.downcast::<PyIterator>().is_ok() {
-            Ok(self.into())
-        } else if is_deque(self) {
+        } else if (allow_any_iter && self.iter().is_ok()) || self.downcast::<PyIterator>().is_ok() || is_deque(self) {
             Ok(self.into())
         } else {
             Err(ValError::new(ErrorType::ListType, self))
@@ -403,9 +399,7 @@ impl<'a> Input<'a> for PyAny {
             Ok(list.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
-        } else if self.downcast::<PyIterator>().is_ok() {
-            Ok(self.into())
-        } else if is_deque(self) {
+        } else if self.downcast::<PyIterator>().is_ok() || is_deque(self) {
             Ok(self.into())
         } else {
             Err(ValError::new(ErrorType::TupleType, self))
@@ -431,9 +425,7 @@ impl<'a> Input<'a> for PyAny {
             Ok(frozen_set.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
-        } else if self.downcast::<PyIterator>().is_ok() {
-            Ok(self.into())
-        } else if is_deque(self) {
+        } else if self.downcast::<PyIterator>().is_ok() || is_deque(self) {
             Ok(self.into())
         } else {
             Err(ValError::new(ErrorType::SetType, self))
@@ -459,9 +451,7 @@ impl<'a> Input<'a> for PyAny {
             Ok(tuple.into())
         } else if let Some(collection) = extract_dict_iter!(self) {
             Ok(collection)
-        } else if self.downcast::<PyIterator>().is_ok() {
-            Ok(self.into())
-        } else if is_deque(self) {
+        } else if self.downcast::<PyIterator>().is_ok() || is_deque(self) {
             Ok(self.into())
         } else {
             Err(ValError::new(ErrorType::FrozenSetType, self))

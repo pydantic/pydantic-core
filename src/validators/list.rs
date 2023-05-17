@@ -95,7 +95,6 @@ impl Validator for ListValidator {
                 input,
                 self.max_length,
                 "List",
-                self.max_length,
                 v,
                 extra,
                 definitions,

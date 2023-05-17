@@ -58,7 +58,6 @@ impl Validator for TupleVariableValidator {
                 input,
                 self.max_length,
                 "Tuple",
-                self.max_length,
                 v,
                 extra,
                 definitions,

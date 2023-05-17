@@ -44,7 +44,6 @@ impl Validator for FrozenSetValidator {
                     input,
                     self.max_length,
                     "Frozenset",
-                    self.generator_max_length,
                     v,
                     extra,
                     definitions,

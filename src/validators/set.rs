@@ -74,7 +74,6 @@ impl Validator for SetValidator {
                     input,
                     self.max_length,
                     "Set",
-                    self.generator_max_length,
                     v,
                     extra,
                     definitions,
