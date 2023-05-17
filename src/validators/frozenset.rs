@@ -7,9 +7,7 @@ use super::{build_validator, BuildValidator, CombinedValidator, Definitions, Def
 use crate::build_tools::SchemaDict;
 use crate::errors::ErrorType;
 use crate::errors::ValResult;
-use crate::input::iterator::{
-    validate_fallible_iterator, validate_infallible_iterator, IterableValidationChecks, LengthConstraints,
-};
+use crate::input::iterator::{validate_iterator, IterableValidationChecks, LengthConstraints};
 use crate::input::Input;
 use crate::input::{py_error_on_minusone, GenericIterable};
 use crate::recursion_guard::RecursionGuard;
@@ -69,27 +67,27 @@ impl Validator for FrozenSetValidator {
 
         match (generic_iterable, strict) {
             // Always allow actual lists or JSON arrays
-            (GenericIterable::JsonArray(iter), _) => validate_infallible_iterator(
+            (GenericIterable::JsonArray(iter), _) => validate_iterator(
                 py,
                 input,
                 extra,
                 definitions,
                 recursion_guard,
                 &mut checks,
-                iter.iter(),
+                iter.iter().map(Ok),
                 &self.item_validator,
                 &mut output,
                 &mut write,
                 &len,
             )?,
-            (GenericIterable::FrozenSet(iter), _) => validate_infallible_iterator(
+            (GenericIterable::FrozenSet(iter), _) => validate_iterator(
                 py,
                 input,
                 extra,
                 definitions,
                 recursion_guard,
                 &mut checks,
-                iter.iter(),
+                iter.iter().map(Ok),
                 &self.item_validator,
                 &mut output,
                 &mut write,
@@ -107,7 +105,7 @@ impl Validator for FrozenSetValidator {
                 false,
             ) => return Err(create_err(input)),
             (generic_iterable, false) => match generic_iterable.into_sequence_iterator(py) {
-                Ok(iter) => validate_fallible_iterator(
+                Ok(iter) => validate_iterator(
                     py,
                     input,
                     extra,

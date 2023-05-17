@@ -5,10 +5,10 @@ use pyo3::types::{PyDict, PyList, PyTuple};
 use crate::build_tools::{is_strict, SchemaDict};
 use crate::errors::ValLineError;
 use crate::errors::{ErrorType, ValError, ValResult};
-use crate::input::iterator::validate_infallible_iterator;
+use crate::input::iterator::calculate_output_init_capacity;
+use crate::input::iterator::validate_iterator;
 use crate::input::iterator::IterableValidationChecks;
 use crate::input::iterator::LengthConstraints;
-use crate::input::iterator::{calculate_output_init_capacity, validate_fallible_iterator};
 use crate::input::{GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 
@@ -82,27 +82,27 @@ impl Validator for TupleVariableValidator {
 
         match (generic_iterable, strict) {
             // Always allow actual lists or JSON arrays
-            (GenericIterable::JsonArray(iter), _) => validate_infallible_iterator(
+            (GenericIterable::JsonArray(iter), _) => validate_iterator(
                 py,
                 input,
                 extra,
                 definitions,
                 recursion_guard,
                 &mut checks,
-                iter.iter(),
+                iter.iter().map(Ok),
                 &self.item_validator,
                 &mut output,
                 &mut write,
                 &len,
             )?,
-            (GenericIterable::Tuple(iter), _) => validate_infallible_iterator(
+            (GenericIterable::Tuple(iter), _) => validate_iterator(
                 py,
                 input,
                 extra,
                 definitions,
                 recursion_guard,
                 &mut checks,
-                iter.iter(),
+                iter.iter().map(Ok),
                 &self.item_validator,
                 &mut output,
                 &mut write,
@@ -120,7 +120,7 @@ impl Validator for TupleVariableValidator {
                 _,
             ) => return Err(ValError::new(ErrorType::TupleType, input)),
             (generic_iterable, false) => match generic_iterable.into_sequence_iterator(py) {
-                Ok(iter) => validate_fallible_iterator(
+                Ok(iter) => validate_iterator(
                     py,
                     input,
                     extra,

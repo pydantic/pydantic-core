@@ -115,39 +115,7 @@ impl<'data> IterableValidationChecks<'data> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn validate_infallible_iterator<'s, 'data, V, O, W, L>(
-    py: Python<'data>,
-    input: &'data impl Input<'data>,
-    extra: &'s Extra<'s>,
-    definitions: &'data Definitions<CombinedValidator>,
-    recursion_guard: &'s mut RecursionGuard,
-    checks: &mut IterableValidationChecks<'data>,
-    iter: impl Iterator<Item = &'data V>,
-    items_validator: &'s CombinedValidator,
-    output: &mut O,
-    write: &mut W,
-    len: &L,
-) -> ValResult<'data, ()>
-where
-    V: Input<'data> + 'data,
-    W: FnMut(&mut O, PyObject) -> PyResult<()>,
-    L: Fn(&O) -> usize,
-{
-    for (index, value) in iter.enumerate() {
-        let result = items_validator
-            .validate(py, value, extra, definitions, recursion_guard)
-            .map_err(|e| e.with_outer_location(index.into()));
-        if let Some(value) = checks.filter_validation_result(result, input)? {
-            write(output, value)?;
-            checks.check_output_length(len(output), input)?;
-        }
-    }
-    checks.finish(input)?;
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn validate_fallible_iterator<'s, 'data, V, O, W, L>(
+pub fn validate_iterator<'s, 'data, V, O, W, L>(
     py: Python<'data>,
     input: &'data impl Input<'data>,
     extra: &'s Extra<'s>,

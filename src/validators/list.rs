@@ -3,9 +3,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::SchemaDict;
 use crate::errors::{ErrorType, ValError, ValResult};
-use crate::input::iterator::{
-    calculate_output_init_capacity, validate_fallible_iterator, validate_infallible_iterator, IterableValidationChecks,
-};
+use crate::input::iterator::{calculate_output_init_capacity, validate_iterator, IterableValidationChecks};
 use crate::input::Input;
 use crate::input::{iterator::LengthConstraints, GenericIterable};
 use crate::recursion_guard::RecursionGuard;
@@ -100,27 +98,27 @@ impl Validator for ListValidator {
 
         match (generic_iterable, strict) {
             // Always allow actual lists or JSON arrays
-            (GenericIterable::JsonArray(iter), _) => validate_infallible_iterator(
+            (GenericIterable::JsonArray(iter), _) => validate_iterator(
                 py,
                 input,
                 extra,
                 definitions,
                 recursion_guard,
                 &mut checks,
-                iter.iter(),
+                iter.iter().map(Ok),
                 &self.item_validator,
                 &mut output,
                 &mut write,
                 &len,
             )?,
-            (GenericIterable::List(iter), _) => validate_infallible_iterator(
+            (GenericIterable::List(iter), _) => validate_iterator(
                 py,
                 input,
                 extra,
                 definitions,
                 recursion_guard,
                 &mut checks,
-                iter.iter(),
+                iter.iter().map(Ok),
                 &self.item_validator,
                 &mut output,
                 &mut write,
@@ -138,7 +136,7 @@ impl Validator for ListValidator {
                 _,
             ) => return Err(ValError::new(ErrorType::ListType, input)),
             (generic_iterable, false) => match generic_iterable.into_sequence_iterator(py) {
-                Ok(iter) => validate_fallible_iterator(
+                Ok(iter) => validate_iterator(
                     py,
                     input,
                     extra,
