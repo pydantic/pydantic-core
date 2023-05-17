@@ -10,7 +10,6 @@ use crate::input::{
 use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
-use super::list::length_check;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -104,6 +103,40 @@ impl Validator for DictValidator {
         self.value_validator.complete(definitions)
     }
 }
+
+macro_rules! length_check {
+    ($input:ident, $field_type:literal, $min_length:expr, $max_length:expr, $obj:ident) => {{
+        let mut op_actual_length: Option<usize> = None;
+        if let Some(min_length) = $min_length {
+            let actual_length = $obj.len();
+            if actual_length < min_length {
+                return Err(crate::errors::ValError::new(
+                    crate::errors::ErrorType::TooShort {
+                        field_type: $field_type.to_string(),
+                        min_length,
+                        actual_length,
+                    },
+                    $input,
+                ));
+            }
+            op_actual_length = Some(actual_length);
+        }
+        if let Some(max_length) = $max_length {
+            let actual_length = op_actual_length.unwrap_or_else(|| $obj.len());
+            if actual_length > max_length {
+                return Err(crate::errors::ValError::new(
+                    crate::errors::ErrorType::TooLong {
+                        field_type: $field_type.to_string(),
+                        max_length,
+                        actual_length,
+                    },
+                    $input,
+                ));
+            }
+        }
+    }};
+}
+pub(crate) use length_check;
 
 macro_rules! build_validate {
     ($name:ident, $dict_type:ty, $iter:ty) => {

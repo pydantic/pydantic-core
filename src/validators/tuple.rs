@@ -7,7 +7,7 @@ use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{GenericCollection, Input};
 use crate::recursion_guard::RecursionGuard;
 
-use super::list::{get_items_schema, length_check};
+use super::list::{get_items_schema, min_length_check};
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -31,10 +31,10 @@ impl BuildValidator for TupleVariableValidator {
         let inner_name = item_validator.as_ref().map(|v| v.get_name()).unwrap_or("any");
         let name = format!("tuple[{inner_name}, ...]");
         Ok(Self {
-            strict: crate::build_tools::is_strict(schema, config)?,
+            strict: is_strict(schema, config)?,
             item_validator,
-            min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
-            max_length: schema.get_as(pyo3::intern!(py, "max_length"))?,
+            min_length: schema.get_as(intern!(py, "min_length"))?,
+            max_length: schema.get_as(intern!(py, "max_length"))?,
             name,
         }
         .into())
@@ -64,15 +64,9 @@ impl Validator for TupleVariableValidator {
                 definitions,
                 recursion_guard,
             )?,
-            None => match seq {
-                GenericCollection::Tuple(tuple) => {
-                    length_check!(input, "Tuple", self.min_length, self.max_length, tuple);
-                    return Ok(tuple.into_py(py));
-                }
-                _ => seq.to_vec(py, input, "Tuple", self.max_length)?,
-            },
+            None => seq.to_vec(py, input, "Tuple", self.max_length)?,
         };
-        length_check!(input, "Tuple", self.min_length, self.max_length, output);
+        min_length_check!(input, "Tuple", self.min_length, output);
         Ok(PyTuple::new(py, &output).into_py(py))
     }
 

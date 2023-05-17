@@ -124,12 +124,12 @@ def generate_repeats():
         ({'min_length': 3}, {1, 2, 3}, {1, 2, 3}),
         ({'min_length': 3}, {1, 2}, Err('Set should have at least 3 items after validation, not 2 [type=too_short,')),
         (
-            {'max_length': 3},
+            {'max_length': 3, 'generator_max_length': 3},
             {1, 2, 3, 4},
             Err('Set should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
         (
-            {'max_length': 3},
+            {'max_length': 3, 'generator_max_length': 3},
             [1, 2, 3, 4],
             Err('Set should have at most 3 items after validation, not 4 [type=too_long,'),
         ),

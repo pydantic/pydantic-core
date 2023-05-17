@@ -3,10 +3,10 @@ use pyo3::types::{PyDict, PyFrozenSet};
 
 use crate::build_tools::SchemaDict;
 use crate::errors::ValResult;
-use crate::input::{GenericCollection, Input};
+use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::list::{get_items_schema, length_check};
+use super::list::{get_items_schema, min_length_check};
 use super::set::set_build;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
@@ -51,12 +51,9 @@ impl Validator for FrozenSetValidator {
                     recursion_guard,
                 )?,
             )?,
-            None => match seq {
-                GenericCollection::FrozenSet(f_set) => f_set,
-                _ => PyFrozenSet::new(py, &seq.to_vec(py, input, "Frozenset", self.generator_max_length)?)?,
-            },
+            None => PyFrozenSet::new(py, &seq.to_vec(py, input, "Frozenset", self.generator_max_length)?)?,
         };
-        length_check!(input, "Frozenset", self.min_length, self.max_length, f_set);
+        min_length_check!(input, "Frozenset", self.min_length, f_set);
         Ok(f_set.into_py(py))
     }
 

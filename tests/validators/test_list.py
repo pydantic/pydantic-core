@@ -145,6 +145,11 @@ def test_list_error(input_value, index):
             [1, 2, 3, 4],
             Err('List should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
+        (
+            {'max_length': 3},
+            [1, 2, 3, 4, 5, 6, 7],
+            Err('List should have at most 3 items after validation, not 4 [type=too_long,'),
+        ),
         ({'max_length': 1}, [1, 2], Err('List should have at most 1 item after validation, not 2 [type=too_long,')),
         (
             {'max_length': 44},

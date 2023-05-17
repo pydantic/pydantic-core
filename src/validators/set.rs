@@ -3,10 +3,10 @@ use pyo3::types::{PyDict, PySet};
 
 use crate::build_tools::SchemaDict;
 use crate::errors::ValResult;
-use crate::input::{GenericCollection, Input};
+use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::list::{get_items_schema, length_check};
+use super::list::{get_items_schema, min_length_check};
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -81,12 +81,9 @@ impl Validator for SetValidator {
                     recursion_guard,
                 )?,
             )?,
-            None => match seq {
-                GenericCollection::Set(set) => set,
-                _ => PySet::new(py, &seq.to_vec(py, input, "Set", self.generator_max_length)?)?,
-            },
+            None => PySet::new(py, &seq.to_vec(py, input, "Set", self.generator_max_length)?)?,
         };
-        length_check!(input, "Set", self.min_length, self.max_length, set);
+        min_length_check!(input, "Set", self.min_length, set);
         Ok(set.into_py(py))
     }
 

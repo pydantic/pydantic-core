@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::SchemaDict;
 use crate::errors::ValResult;
-use crate::input::{GenericCollection, Input};
+use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
@@ -35,9 +35,8 @@ pub fn get_items_schema(
     }
 }
 
-macro_rules! length_check {
-    ($input:ident, $field_type:literal, $min_length:expr, $max_length:expr, $obj:ident) => {{
-        let mut op_actual_length: Option<usize> = None;
+macro_rules! min_length_check {
+    ($input:ident, $field_type:literal, $min_length:expr, $obj:ident) => {{
         if let Some(min_length) = $min_length {
             let actual_length = $obj.len();
             if actual_length < min_length {
@@ -50,24 +49,10 @@ macro_rules! length_check {
                     $input,
                 ));
             }
-            op_actual_length = Some(actual_length);
-        }
-        if let Some(max_length) = $max_length {
-            let actual_length = op_actual_length.unwrap_or_else(|| $obj.len());
-            if actual_length > max_length {
-                return Err(crate::errors::ValError::new(
-                    crate::errors::ErrorType::TooLong {
-                        field_type: $field_type.to_string(),
-                        max_length,
-                        actual_length,
-                    },
-                    $input,
-                ));
-            }
         }
     }};
 }
-pub(crate) use length_check;
+pub(crate) use min_length_check;
 
 impl BuildValidator for ListValidator {
     const EXPECTED_TYPE: &'static str = "list";
@@ -116,15 +101,9 @@ impl Validator for ListValidator {
                 definitions,
                 recursion_guard,
             )?,
-            None => match seq {
-                GenericCollection::List(list) => {
-                    length_check!(input, "List", self.min_length, self.max_length, list);
-                    return Ok(list.into_py(py));
-                }
-                _ => seq.to_vec(py, input, "List", self.max_length)?,
-            },
+            None => seq.to_vec(py, input, "List", self.max_length)?,
         };
-        length_check!(input, "List", self.min_length, self.max_length, output);
+        min_length_check!(input, "List", self.min_length, output);
         Ok(output.into_py(py))
     }
 
