@@ -59,27 +59,26 @@ impl<'data> IterableValidationChecks<'data> {
         result: ValResult<'data, R>,
         input: &'data I,
     ) -> ValResult<'data, Option<R>> {
-        let res = match result {
+        self.input_length += 1;
+        if let Some(max_length) = self.max_input_length {
+            self.check_max_length(self.input_length, max_length, input)?;
+        }
+        match result {
             Ok(v) => Ok(Some(v)),
             Err(ValError::LineErrors(line_errors)) => {
                 if self.fail_fast {
                     Err(ValError::LineErrors(line_errors))
                 } else {
                     self.errors.extend(line_errors);
+                    if let Some(max_length) = self.max_length {
+                        self.check_max_length(self.output_length + self.errors.len(), max_length, input)?;
+                    }
                     Ok(None)
                 }
             }
             Err(ValError::Omit) => Ok(None),
             Err(e) => Err(e),
-        };
-        self.input_length += 1;
-        if let Some(max_length) = self.max_input_length {
-            self.check_max_length(self.input_length, max_length, input)?;
         }
-        if let Some(max_length) = self.max_length {
-            self.check_max_length(self.output_length + self.errors.len(), max_length, input)?;
-        }
-        res
     }
     pub fn check_output_length<I: Input<'data>>(
         &mut self,
