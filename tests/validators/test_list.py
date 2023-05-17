@@ -436,7 +436,7 @@ def test_max_length_fail_fast(error_in_func: bool) -> None:
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(data)
 
-    assert len(calls) <= 10, len(calls)
+    assert len(calls) <= 11, len(calls)  # we still run validation on the "extra" item
 
     assert exc_info.value.errors(include_url=False) == Contains(
         {
