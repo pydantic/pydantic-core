@@ -3141,7 +3141,7 @@ def dataclass_schema(
     Args:
         cls: The dataclass type, used to to perform subclass checks
         schema: The schema to use for the dataclass fields
-        cls_name: The name to use for the class in error locs, etc; this is useful for generics (default: cls.__name__)
+        cls_name: The name to use for the class in error locs, etc; this is useful for generics (default: `cls.__name__`)
         post_init: Whether to call `__post_init__` after validation
         revalidate_instances: whether instances of models and dataclasses (including subclass instances)
             should re-validate defaults to config.revalidate_instances, else 'never'
