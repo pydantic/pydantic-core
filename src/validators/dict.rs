@@ -176,7 +176,6 @@ impl Validator for DictValidator {
         let length_constraints = iterator::LengthConstraints {
             min_length: self.min_length.unwrap_or_default(),
             max_length: self.max_length,
-            max_input_length: None,
         };
 
         let mut checks = IterableValidationChecks::new(false, length_constraints, FIELD_TYPE);

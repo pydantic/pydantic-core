@@ -159,11 +159,6 @@ def generate_repeats():
             infinite_generator(),
             Err('Frozenset should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
-        (
-            {'max_length': 3, 'generator_max_length': 3},
-            infinite_generator(),
-            Err('Frozenset should have at most 3 items after validation, not 4 [type=too_long,'),
-        ),
     ],
 )
 def test_frozenset_kwargs_python(kwargs: Dict[str, Any], input_value, expected):
@@ -248,7 +243,7 @@ def test_repr():
         'SchemaValidator('
         'title="frozenset[any]",'
         'validator=FrozenSet(FrozenSetValidator{'
-        'strict:true,item_validator:Any(AnyValidator),min_length:42,max_length:None,generator_max_length:None,'
+        'strict:true,item_validator:Any(AnyValidator),min_length:42,max_length:None,'
         'name:"frozenset[any]"'
         '}),definitions=[])'
     )

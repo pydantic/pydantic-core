@@ -22,7 +22,6 @@ pub struct FrozenSetValidator {
     item_validator: Box<CombinedValidator>,
     min_length: usize,
     max_length: Option<usize>,
-    generator_max_length: Option<usize>,
     name: String,
 }
 
@@ -59,7 +58,6 @@ impl Validator for FrozenSetValidator {
         let length_constraints = LengthConstraints {
             min_length: self.min_length,
             max_length: self.max_length,
-            max_input_length: self.generator_max_length,
         };
 
         let mut checks = IterableValidationChecks::new(false, length_constraints, field_type);

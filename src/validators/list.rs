@@ -85,7 +85,6 @@ impl Validator for ListValidator {
         let length_constraints = LengthConstraints {
             min_length: self.min_length,
             max_length: self.max_length,
-            max_input_length: None,
         };
 
         let mut checks = IterableValidationChecks::new(false, length_constraints, FIELD_TYPE);

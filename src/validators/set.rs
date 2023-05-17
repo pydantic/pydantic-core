@@ -18,10 +18,8 @@ pub struct SetValidator {
     item_validator: Box<CombinedValidator>,
     min_length: usize,
     max_length: Option<usize>,
-    generator_max_length: Option<usize>,
     name: String,
 }
-pub static MAX_LENGTH_GEN_MULTIPLE: usize = 10;
 
 macro_rules! set_build {
     () => {
@@ -37,10 +35,6 @@ macro_rules! set_build {
             };
             let inner_name = item_validator.get_name();
             let max_length = schema.get_as(pyo3::intern!(py, "max_length"))?;
-            let generator_max_length = match schema.get_as(pyo3::intern!(py, "generator_max_length"))? {
-                Some(v) => Some(v),
-                None => max_length.map(|v| v * super::set::MAX_LENGTH_GEN_MULTIPLE),
-            };
             let name = format!("{}[{}]", Self::EXPECTED_TYPE, inner_name);
             Ok(Self {
                 strict: crate::build_tools::is_strict(schema, config)?,
@@ -49,7 +43,6 @@ macro_rules! set_build {
                     .get_as(pyo3::intern!(py, "min_length"))?
                     .unwrap_or_default(),
                 max_length,
-                generator_max_length,
                 name,
             }
             .into())
@@ -83,7 +76,6 @@ impl Validator for SetValidator {
         let length_constraints = LengthConstraints {
             min_length: self.min_length,
             max_length: self.max_length,
-            max_input_length: self.generator_max_length,
         };
 
         let mut checks = IterableValidationChecks::new(false, length_constraints, field_type);

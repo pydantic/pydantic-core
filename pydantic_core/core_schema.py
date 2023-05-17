@@ -1349,7 +1349,6 @@ class SetSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
-    generator_max_length: int
     strict: bool
     ref: str
     metadata: Any
@@ -1361,7 +1360,6 @@ def set_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
-    generator_max_length: int | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1384,9 +1382,6 @@ def set_schema(
         items_schema: The value must be a set with items that match this schema
         min_length: The value must be a set with at least this many items
         max_length: The value must be a set with at most this many items
-        generator_max_length: At most this many items will be read from a generator before failing validation
-            This is important because generators can be infinite, and even with a `max_length` on the set,
-            an infinite generator could run forever without producing more than `max_length` distinct items.
         strict: The value must be a set with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1397,7 +1392,6 @@ def set_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
-        generator_max_length=generator_max_length,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -1410,7 +1404,6 @@ class FrozenSetSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
-    generator_max_length: int
     strict: bool
     ref: str
     metadata: Any
@@ -1422,7 +1415,6 @@ def frozenset_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
-    generator_max_length: int | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1445,7 +1437,6 @@ def frozenset_schema(
         items_schema: The value must be a frozenset with items that match this schema
         min_length: The value must be a frozenset with at least this many items
         max_length: The value must be a frozenset with at most this many items
-        generator_max_length: The value must generate a frozenset with at most this many items
         strict: The value must be a frozenset with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1456,7 +1447,6 @@ def frozenset_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
-        generator_max_length=generator_max_length,
         strict=strict,
         ref=ref,
         metadata=metadata,

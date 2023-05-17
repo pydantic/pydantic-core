@@ -24,16 +24,13 @@ pub fn calculate_output_init_capacity(iterator_size: Option<usize>, max_length: 
 pub struct LengthConstraints {
     pub min_length: usize,
     pub max_length: Option<usize>,
-    pub max_input_length: Option<usize>,
 }
 
 pub struct IterableValidationChecks<'data> {
-    input_length: usize,
     output_length: usize,
     fail_fast: bool,
     min_length: usize,
     max_length: Option<usize>,
-    max_input_length: Option<usize>,
     field_type: &'static str,
     errors: Vec<ValLineError<'data>>,
 }
@@ -41,12 +38,10 @@ pub struct IterableValidationChecks<'data> {
 impl<'data> IterableValidationChecks<'data> {
     pub fn new(fail_fast: bool, length_constraints: LengthConstraints, field_type: &'static str) -> Self {
         Self {
-            input_length: 0,
             output_length: 0,
             fail_fast,
             min_length: length_constraints.min_length,
             max_length: length_constraints.max_length,
-            max_input_length: length_constraints.max_input_length,
             field_type,
             errors: vec![],
         }
@@ -59,10 +54,6 @@ impl<'data> IterableValidationChecks<'data> {
         result: ValResult<'data, R>,
         input: &'data I,
     ) -> ValResult<'data, Option<R>> {
-        self.input_length += 1;
-        if let Some(max_length) = self.max_input_length {
-            self.check_max_length(self.input_length, max_length, input)?;
-        }
         match result {
             Ok(v) => Ok(Some(v)),
             Err(ValError::LineErrors(line_errors)) => {

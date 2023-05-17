@@ -144,11 +144,6 @@ def generate_repeats():
             infinite_generator(),
             Err('Set should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
-        (
-            {'max_length': 3, 'generator_max_length': 3},
-            infinite_generator(),
-            Err('Set should have at most 3 items after validation, not 4 [type=too_long,'),
-        ),
     ],
     ids=repr,
 )
