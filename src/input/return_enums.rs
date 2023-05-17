@@ -131,6 +131,54 @@ fn validate_iter_to_vec<'a, 's>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn validate_iter_to_set<'a, 's>(
+    py: Python<'a>,
+    iter: impl Iterator<Item = PyResult<&'a (impl Input<'a> + 'a)>>,
+    input: &'a (impl Input<'a> + 'a),
+    field_type: &'static str,
+    max_length: Option<usize>,
+    validator: &'s CombinedValidator,
+    extra: &Extra,
+    definitions: &'a [CombinedValidator],
+    recursion_guard: &'s mut RecursionGuard,
+) -> ValResult<'a, &'a PySet> {
+    let set = PySet::empty(py)?;
+    let mut errors: Vec<ValLineError> = Vec::new();
+    for (index, item_result) in iter.enumerate() {
+        let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
+        match validator.validate(py, item, extra, definitions, recursion_guard) {
+            Ok(item) => {
+                set.add(item)?;
+                if let Some(max_length) = max_length {
+                    let actual_length = set.len();
+                    if actual_length > max_length {
+                        return Err(ValError::new(
+                            ErrorType::TooLong {
+                                field_type: field_type.to_string(),
+                                max_length,
+                                actual_length,
+                            },
+                            input,
+                        ));
+                    }
+                }
+            }
+            Err(ValError::LineErrors(line_errors)) => {
+                errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
+            }
+            Err(ValError::Omit) => (),
+            Err(err) => return Err(err),
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(set)
+    } else {
+        Err(ValError::LineErrors(errors))
+    }
+}
+
 fn no_validator_iter_to_vec<'a, 's>(
     py: Python<'a>,
     iter: impl Iterator<Item = &'a (impl Input<'a> + 'a)>,
@@ -174,67 +222,67 @@ impl<'a> GenericCollection<'a> {
             .generic_len()
             .unwrap_or_else(|_| max_length.unwrap_or(DEFAULT_CAPACITY));
         let max_length_check = MaxLengthCheck::new(max_length, field_type, input);
+
+        macro_rules! validate {
+            ($iter:expr) => {
+                validate_iter_to_vec(
+                    py,
+                    $iter,
+                    capacity,
+                    max_length_check,
+                    validator,
+                    extra,
+                    definitions,
+                    recursion_guard,
+                )
+            };
+        }
+
         match self {
-            Self::List(collection) => validate_iter_to_vec(
-                py,
-                collection.iter().map(Ok),
-                capacity,
-                max_length_check,
-                validator,
-                extra,
-                definitions,
-                recursion_guard,
-            ),
-            Self::Tuple(collection) => validate_iter_to_vec(
-                py,
-                collection.iter().map(Ok),
-                capacity,
-                max_length_check,
-                validator,
-                extra,
-                definitions,
-                recursion_guard,
-            ),
-            Self::Set(collection) => validate_iter_to_vec(
-                py,
-                collection.iter().map(Ok),
-                capacity,
-                max_length_check,
-                validator,
-                extra,
-                definitions,
-                recursion_guard,
-            ),
-            Self::FrozenSet(collection) => validate_iter_to_vec(
-                py,
-                collection.iter().map(Ok),
-                capacity,
-                max_length_check,
-                validator,
-                extra,
-                definitions,
-                recursion_guard,
-            ),
-            Self::PyAny(collection) => validate_iter_to_vec(
-                py,
-                collection.iter()?,
-                capacity,
-                max_length_check,
-                validator,
-                extra,
-                definitions,
-                recursion_guard,
-            ),
-            Self::JsonArray(collection) => validate_iter_to_vec(
-                py,
-                collection.iter().map(Ok),
-                capacity,
-                max_length_check,
-                validator,
-                extra,
-                definitions,
-                recursion_guard,
-            ),
+            Self::List(collection) => validate!(collection.iter().map(Ok)),
+            Self::Tuple(collection) => validate!(collection.iter().map(Ok)),
+            Self::Set(collection) => validate!(collection.iter().map(Ok)),
+            Self::FrozenSet(collection) => validate!(collection.iter().map(Ok)),
+            Self::PyAny(collection) => validate!(collection.iter()?),
+            Self::JsonArray(collection) => validate!(collection.iter().map(Ok)),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn validate_to_set<'s>(
+        &'s self,
+        py: Python<'a>,
+        input: &'a impl Input<'a>,
+        max_length: Option<usize>,
+        field_type: &'static str,
+        validator: &'s CombinedValidator,
+        extra: &Extra,
+        definitions: &'a [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'a, &'a PySet> {
+        macro_rules! validate_set {
+            ($iter:expr) => {
+                validate_iter_to_set(
+                    py,
+                    $iter,
+                    input,
+                    field_type,
+                    max_length,
+                    validator,
+                    extra,
+                    definitions,
+                    recursion_guard,
+                )
+            };
+        }
+
+        match self {
+            Self::List(collection) => validate_set!(collection.iter().map(Ok)),
+            Self::Tuple(collection) => validate_set!(collection.iter().map(Ok)),
+            Self::Set(collection) => validate_set!(collection.iter().map(Ok)),
+            Self::FrozenSet(collection) => validate_set!(collection.iter().map(Ok)),
+            Self::PyAny(collection) => validate_set!(collection.iter()?),
+            Self::JsonArray(collection) => validate_set!(collection.iter().map(Ok)),
         }
     }
 

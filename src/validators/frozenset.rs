@@ -6,17 +6,16 @@ use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::list::{get_items_schema, min_length_check};
+use super::list::min_length_check;
 use super::set::set_build;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct FrozenSetValidator {
     strict: bool,
-    item_validator: Option<Box<CombinedValidator>>,
+    item_validator: Box<CombinedValidator>,
     min_length: Option<usize>,
     max_length: Option<usize>,
-    generator_max_length: Option<usize>,
     name: String,
 }
 
@@ -34,25 +33,20 @@ impl Validator for FrozenSetValidator {
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let seq = input.validate_frozenset(extra.strict.unwrap_or(self.strict))?;
+        let collection = input.validate_frozenset(extra.strict.unwrap_or(self.strict))?;
 
-        let f_set = match self.item_validator {
-            Some(ref v) => PyFrozenSet::new(
-                py,
-                &seq.validate_to_vec(
-                    py,
-                    input,
-                    self.max_length,
-                    "Frozenset",
-                    v,
-                    extra,
-                    definitions,
-                    recursion_guard,
-                )?,
-            )?,
-            None => PyFrozenSet::new(py, &seq.to_vec(py, input, "Frozenset", self.generator_max_length)?)?,
-        };
-        min_length_check!(input, "Frozenset", self.min_length, f_set);
+        let set = collection.validate_to_set(
+            py,
+            input,
+            self.max_length,
+            "Frozenset",
+            &self.item_validator,
+            extra,
+            definitions,
+            recursion_guard,
+        )?;
+        min_length_check!(input, "Frozenset", self.min_length, set);
+        let f_set = PyFrozenSet::new(py, set)?;
         Ok(f_set.into_py(py))
     }
 
@@ -62,10 +56,7 @@ impl Validator for FrozenSetValidator {
         ultra_strict: bool,
     ) -> bool {
         if ultra_strict {
-            match self.item_validator {
-                Some(ref v) => v.different_strict_behavior(definitions, true),
-                None => false,
-            }
+            self.item_validator.different_strict_behavior(definitions, true)
         } else {
             true
         }
@@ -76,9 +67,6 @@ impl Validator for FrozenSetValidator {
     }
 
     fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        match self.item_validator {
-            Some(ref mut v) => v.complete(definitions),
-            None => Ok(()),
-        }
+        self.item_validator.complete(definitions)
     }
 }

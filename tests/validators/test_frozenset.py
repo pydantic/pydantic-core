@@ -146,7 +146,7 @@ def generate_repeats():
         ),
         ({'max_length': 3}, {1, 2, 3}, {1, 2, 3}),
         (
-            {'generator_max_length': 3},
+            {'max_length': 3},
             {1, 2, 3, 4},
             Err('Frozenset should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
@@ -158,14 +158,8 @@ def generate_repeats():
         # length check after set creation
         ({'max_length': 3}, [1, 1, 2, 2, 3, 3], {1, 2, 3}),
         ({'max_length': 3}, generate_repeats(), {1, 2, 3}),
-        # because of default max_length * 10
         (
             {'max_length': 3},
-            infinite_generator(),
-            Err('Frozenset should have at most 30 items after validation, not 31 [type=too_long,'),
-        ),
-        (
-            {'max_length': 3, 'generator_max_length': 3},
             infinite_generator(),
             Err('Frozenset should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
@@ -253,7 +247,7 @@ def test_repr():
         'SchemaValidator('
         'title="frozenset[any]",'
         'validator=FrozenSet(FrozenSetValidator{'
-        'strict:true,item_validator:None,min_length:Some(42),max_length:None,generator_max_length:None,'
+        'strict:true,item_validator:Any(AnyValidator),min_length:Some(42),max_length:None,'
         'name:"frozenset[any]"'
         '}),definitions=[])'
     )
