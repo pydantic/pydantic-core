@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterator, List, Union
 
 import pytest
-from dirty_equals import HasRepr, IsInstance, IsStr
+from dirty_equals import Contains, HasRepr, IsInstance, IsStr
 
 from pydantic_core import PydanticOmit, SchemaValidator, ValidationError, core_schema
 
@@ -495,3 +495,37 @@ def test_stop_iterating_func_raises_omit() -> None:
     ]
 
     assert next(gen) == 102
+
+
+@pytest.mark.parametrize('error_in_func', [True, False])
+def test_max_length_fail_fast(error_in_func: bool) -> None:
+    calls: list[int] = []
+
+    def f(v: int) -> int:
+        calls.append(v)
+        if error_in_func:
+            assert v < 10
+        return v
+
+    s = core_schema.list_schema(
+        core_schema.no_info_after_validator_function(f, core_schema.int_schema()), max_length=10
+    )
+
+    v = SchemaValidator(s)
+
+    data = list(range(15))
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(data)
+
+    assert len(calls) <= 11, len(calls)  # we still run validation on the "extra" item
+
+    assert exc_info.value.errors(include_url=False) == Contains(
+        {
+            'type': 'too_long',
+            'loc': (),
+            'msg': 'List should have at most 10 items after validation, not 11',
+            'input': data,
+            'ctx': {'field_type': 'List', 'max_length': 10, 'actual_length': 11},
+        }
+    )
