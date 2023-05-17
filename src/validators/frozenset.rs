@@ -60,7 +60,7 @@ impl Validator for FrozenSetValidator {
             max_length: self.max_length,
         };
 
-        let mut checks = IterableValidationChecks::new(false, length_constraints, field_type);
+        let mut checks = IterableValidationChecks::new(length_constraints, field_type);
 
         let mut output = PyFrozenSet::empty(py)?;
 

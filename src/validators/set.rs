@@ -78,7 +78,7 @@ impl Validator for SetValidator {
             max_length: self.max_length,
         };
 
-        let mut checks = IterableValidationChecks::new(false, length_constraints, field_type);
+        let mut checks = IterableValidationChecks::new(length_constraints, field_type);
 
         let mut output = PySet::empty(py)?;
 

@@ -28,7 +28,6 @@ pub struct LengthConstraints {
 
 pub struct IterableValidationChecks<'data> {
     output_length: usize,
-    fail_fast: bool,
     min_length: usize,
     max_length: Option<usize>,
     field_type: &'static str,
@@ -36,10 +35,9 @@ pub struct IterableValidationChecks<'data> {
 }
 
 impl<'data> IterableValidationChecks<'data> {
-    pub fn new(fail_fast: bool, length_constraints: LengthConstraints, field_type: &'static str) -> Self {
+    pub fn new(length_constraints: LengthConstraints, field_type: &'static str) -> Self {
         Self {
             output_length: 0,
-            fail_fast,
             min_length: length_constraints.min_length,
             max_length: length_constraints.max_length,
             field_type,
@@ -57,15 +55,11 @@ impl<'data> IterableValidationChecks<'data> {
         match result {
             Ok(v) => Ok(Some(v)),
             Err(ValError::LineErrors(line_errors)) => {
-                if self.fail_fast {
-                    Err(ValError::LineErrors(line_errors))
-                } else {
-                    self.errors.extend(line_errors);
-                    if let Some(max_length) = self.max_length {
-                        self.check_max_length(self.output_length + self.errors.len(), max_length, input)?;
-                    }
-                    Ok(None)
+                self.errors.extend(line_errors);
+                if let Some(max_length) = self.max_length {
+                    self.check_max_length(self.output_length + self.errors.len(), max_length, input)?;
                 }
+                Ok(None)
             }
             Err(ValError::Omit) => Ok(None),
             Err(e) => Err(e),

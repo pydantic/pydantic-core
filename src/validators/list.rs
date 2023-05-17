@@ -87,7 +87,7 @@ impl Validator for ListValidator {
             max_length: self.max_length,
         };
 
-        let mut checks = IterableValidationChecks::new(false, length_constraints, FIELD_TYPE);
+        let mut checks = IterableValidationChecks::new(length_constraints, FIELD_TYPE);
 
         let mut output: Vec<PyObject> =
             Vec::with_capacity(calculate_output_init_capacity(generic_iterable.len(), self.max_length));

@@ -71,7 +71,7 @@ impl Validator for TupleVariableValidator {
             max_length: self.max_length,
         };
 
-        let mut checks = IterableValidationChecks::new(false, length_constraints, FIELD_TYPE);
+        let mut checks = IterableValidationChecks::new(length_constraints, FIELD_TYPE);
 
         let mut output = Vec::with_capacity(calculate_output_init_capacity(generic_iterable.len(), self.max_length));
         let len = |output: &Vec<PyObject>| output.len();
@@ -285,7 +285,7 @@ impl Validator for TuplePositionalValidator {
             max_length: None,
         };
 
-        let mut checks = IterableValidationChecks::new(false, length_constraints, FIELD_TYPE);
+        let mut checks = IterableValidationChecks::new(length_constraints, FIELD_TYPE);
 
         let mut output = Vec::with_capacity(calculate_output_init_capacity(generic_iterable.len(), None));
 
