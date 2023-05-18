@@ -176,30 +176,22 @@ fn validate_iter_to_set<'a, 's>(
     recursion_guard: &'s mut RecursionGuard,
 ) -> ValResult<'a, ()> {
     let mut errors: Vec<ValLineError> = Vec::new();
-    let mut spaces_left = max_length.unwrap_or(0);
     for (index, item_result) in iter.enumerate() {
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
         match validator.validate(py, item, extra, definitions, recursion_guard) {
             Ok(item) => {
                 set.build_add(item)?;
                 if let Some(max_length) = max_length {
-                    match spaces_left.checked_sub(1) {
-                        Some(spaces) => spaces_left = spaces,
-                        None => {
-                            let actual_length = set.build_len();
-                            if actual_length > max_length {
-                                return Err(ValError::new(
-                                    ErrorType::TooLong {
-                                        field_type: field_type.to_string(),
-                                        max_length,
-                                        actual_length,
-                                    },
-                                    input,
-                                ));
-                            } else {
-                                spaces_left = max_length - actual_length;
-                            }
-                        }
+                    let actual_length = set.build_len();
+                    if actual_length > max_length {
+                        return Err(ValError::new(
+                            ErrorType::TooLong {
+                                field_type: field_type.to_string(),
+                                max_length,
+                                actual_length,
+                            },
+                            input,
+                        ));
                     }
                 }
             }
