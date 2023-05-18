@@ -88,19 +88,20 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn validate_mapping<'s, 'data, K, V>(
+fn validate_mapping<'s, 'data, K, V, I>(
     py: Python<'data>,
-    input: &'data impl Input<'data>,
+    input: &'data I,
     extra: &'s Extra<'s>,
     definitions: &'data Definitions<CombinedValidator>,
     recursion_guard: &'s mut RecursionGuard,
-    checks: &mut IterableValidationChecks<'data>,
+    checks: &mut IterableValidationChecks<'data, I>,
     iter: impl Iterator<Item = ValResult<'data, (&'data K, &'data V)>>,
     key_validator: &'s CombinedValidator,
     value_validator: &'s CombinedValidator,
     output: &'data PyDict,
 ) -> ValResult<'data, ()>
 where
+    I: Input<'data> + 'data,
     K: Input<'data> + 'data,
     V: Input<'data> + 'data,
 {

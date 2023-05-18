@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use pyo3::{PyObject, PyResult, Python};
 
 use super::Input;
@@ -26,15 +28,16 @@ pub struct LengthConstraints {
     pub max_length: Option<usize>,
 }
 
-pub struct IterableValidationChecks<'data> {
+pub struct IterableValidationChecks<'data, I> {
     output_length: usize,
     min_length: usize,
     max_length: Option<usize>,
     field_type: &'static str,
     errors: Vec<ValLineError<'data>>,
+    p: PhantomData<I>,
 }
 
-impl<'data> IterableValidationChecks<'data> {
+impl<'data, I: Input<'data> + 'data> IterableValidationChecks<'data, I> {
     pub fn new(length_constraints: LengthConstraints, field_type: &'static str) -> Self {
         Self {
             output_length: 0,
@@ -42,12 +45,13 @@ impl<'data> IterableValidationChecks<'data> {
             max_length: length_constraints.max_length,
             field_type,
             errors: vec![],
+            p: PhantomData,
         }
     }
     pub fn add_error(&mut self, error: ValLineError<'data>) {
         self.errors.push(error)
     }
-    pub fn filter_validation_result<R, I: Input<'data>>(
+    pub fn filter_validation_result<R>(
         &mut self,
         result: ValResult<'data, R>,
         input: &'data I,
@@ -65,18 +69,14 @@ impl<'data> IterableValidationChecks<'data> {
             Err(e) => Err(e),
         }
     }
-    pub fn check_output_length<I: Input<'data>>(
-        &mut self,
-        output_length: usize,
-        input: &'data I,
-    ) -> ValResult<'data, ()> {
+    pub fn check_output_length(&mut self, output_length: usize, input: &'data I) -> ValResult<'data, ()> {
         self.output_length = output_length;
         if let Some(max_length) = self.max_length {
             self.check_max_length(output_length + self.errors.len(), max_length, input)?;
         }
         Ok(())
     }
-    pub fn finish<I: Input<'data>>(&mut self, input: &'data I) -> ValResult<'data, ()> {
+    pub fn finish(&mut self, input: &'data I) -> ValResult<'data, ()> {
         if self.min_length > self.output_length {
             let err = ValLineError::new(
                 ErrorType::TooShort {
@@ -94,12 +94,7 @@ impl<'data> IterableValidationChecks<'data> {
             Err(ValError::LineErrors(std::mem::take(&mut self.errors)))
         }
     }
-    fn check_max_length<I: Input<'data>>(
-        &self,
-        current_length: usize,
-        max_length: usize,
-        input: &'data I,
-    ) -> ValResult<'data, ()> {
+    fn check_max_length(&self, current_length: usize, max_length: usize, input: &'data I) -> ValResult<'data, ()> {
         if max_length < current_length {
             return Err(ValError::new(
                 ErrorType::TooLong {
@@ -115,13 +110,13 @@ impl<'data> IterableValidationChecks<'data> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn validate_iterator<'s, 'data, V, O, W, L>(
+pub fn validate_iterator<'s, 'data, V, O, W, L, I>(
     py: Python<'data>,
-    input: &'data impl Input<'data>,
+    input: &'data I,
     extra: &'s Extra<'s>,
     definitions: &'data Definitions<CombinedValidator>,
     recursion_guard: &'s mut RecursionGuard,
-    checks: &mut IterableValidationChecks<'data>,
+    checks: &mut IterableValidationChecks<'data, I>,
     iter: impl Iterator<Item = ValResult<'data, &'data V>>,
     items_validator: &'s CombinedValidator,
     output: &mut O,
@@ -129,6 +124,7 @@ pub fn validate_iterator<'s, 'data, V, O, W, L>(
     len: &L,
 ) -> ValResult<'data, ()>
 where
+    I: Input<'data> + 'data,
     V: Input<'data> + 'data,
     W: FnMut(&mut O, PyObject) -> PyResult<()>,
     L: Fn(&O) -> usize,
