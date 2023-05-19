@@ -7,7 +7,7 @@ from pydantic_core import SchemaValidator, ValidationError, core_schema
 
 def test_model_root():
     class RootModel:
-        __slots__ = 'root'
+        __slots__ = ('root', '__pydantic_extra__')
         root: List[int]
 
     v = SchemaValidator(
@@ -35,7 +35,7 @@ def test_model_root():
 
 def test_revalidate():
     class RootModel:
-        __slots__ = 'root'
+        __slots__ = ('root', '__pydantic_extra__')
         root: List[int]
 
     v = SchemaValidator(
@@ -55,7 +55,7 @@ def test_revalidate():
 
 def test_init():
     class RootModel:
-        __slots__ = 'root'
+        __slots__ = ('root', '__pydantic_extra__')
         root: str
 
     v = SchemaValidator(
@@ -70,7 +70,7 @@ def test_init():
 
 def test_assignment():
     class RootModel:
-        __slots__ = 'root'
+        __slots__ = ('root', '__pydantic_extra__')
         root: str
 
     v = SchemaValidator(core_schema.model_schema(RootModel, core_schema.str_schema(), root_model=True))
@@ -101,7 +101,7 @@ def test_field_function():
     call_infos = []
 
     class RootModel:
-        __slots__ = 'root'
+        __slots__ = ('root', '__pydantic_extra__')
         root: str
 
     def f(input_value: str, info):
@@ -125,3 +125,16 @@ def test_field_function():
         "ValidationInfo(config=None, context='call 1', field_name='root')",
         "ValidationInfo(config=None, context='assignment call', field_name='root')",
     ]
+
+
+def test_extra():
+    class RootModel:
+        __slots__ = ('root', '__pydantic_extra__')
+        root: int
+
+    v = SchemaValidator(core_schema.model_schema(RootModel, core_schema.int_schema(), root_model=True))
+
+    m = v.validate_python(1)
+
+    with pytest.raises(AttributeError):
+        m.__pydantic_extra__
