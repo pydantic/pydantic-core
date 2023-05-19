@@ -1,7 +1,6 @@
 import collections.abc
 import re
 from collections import deque
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Union
 
@@ -315,68 +314,6 @@ def test_list_from_dict_items(input_value, items_schema, expected):
     assert output == expected
 
 
-@pytest.fixture(scope='session', name='MySequence')
-def my_sequence():
-    class MySequence(Sequence):
-        def __init__(self):
-            self._data = [1, 2, 3]
-
-        def __getitem__(self, index):
-            return self._data[index]
-
-        def __len__(self):
-            return len(self._data)
-
-        def count(self, value):
-            return self._data.count(value)
-
-    assert isinstance(MySequence(), Sequence)
-    return MySequence
-
-
-def test_sequence(MySequence):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
-    with pytest.raises(ValidationError) as exc_info:
-        v.validate_python(MySequence())
-    # insert_assert(exc_info.value.errors(include_url=False))
-    assert exc_info.value.errors(include_url=False) == [
-        {'type': 'list_type', 'loc': (), 'msg': 'Input should be a valid list', 'input': IsInstance(MySequence)}
-    ]
-
-
-@pytest.mark.parametrize(
-    'input_value,expected',
-    [
-        ([1, 2, 3], [1, 2, 3]),
-        ((1, 2, 3), [1, 2, 3]),
-        (range(3), [0, 1, 2]),
-        (gen_ints(), [1, 2, 3]),
-        ({1: 2, 3: 4}, [1, 3]),
-        ('123', [1, 2, 3]),
-        (
-            123,
-            Err(
-                '1 validation error for list[int]',
-                [{'type': 'list_type', 'loc': (), 'msg': 'Input should be a valid list', 'input': 123}],
-            ),
-        ),
-    ],
-)
-def test_allow_any_iter(input_value, expected):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_any_iter': True})
-    if isinstance(expected, Err):
-        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
-            v.validate_python(input_value)
-        assert exc_info.value.errors(include_url=False) == expected.errors
-    else:
-        assert v.validate_python(input_value) == expected
-
-
-def test_sequence_allow_any_iter(MySequence):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'allow_any_iter': True})
-    assert v.validate_python(MySequence()) == [1, 2, 3]
-
-
 @pytest.mark.parametrize('items_schema', ['int', 'any'])
 def test_bad_iter(items_schema):
     class BadIter:
@@ -399,7 +336,7 @@ def test_bad_iter(items_schema):
             else:
                 raise RuntimeError('broken')
 
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': items_schema}, 'allow_any_iter': True})
+    v = SchemaValidator({'type': 'list', 'items_schema': {'type': items_schema}})
     assert v.validate_python(BadIter(True)) == [1]
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(BadIter(False))
