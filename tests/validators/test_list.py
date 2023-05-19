@@ -1,12 +1,14 @@
+import collections.abc
 import re
 from collections import deque
 from collections.abc import Sequence
-from typing import Any, Dict
+from dataclasses import dataclass
+from typing import Any, Dict, Iterator, List, Union
 
 import pytest
-from dirty_equals import HasRepr, IsInstance, IsList, IsStr
+from dirty_equals import Contains, HasRepr, IsInstance, IsList, IsStr
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson, infinite_generator
 
@@ -411,3 +413,144 @@ def test_bad_iter(items_schema):
             'ctx': {'error': 'RuntimeError: broken'},
         }
     ]
+
+
+@pytest.mark.parametrize('error_in_func', [True, False])
+def test_max_length_fail_fast(error_in_func: bool) -> None:
+    calls: list[int] = []
+
+    def f(v: int) -> int:
+        calls.append(v)
+        if error_in_func:
+            assert v < 10
+        return v
+
+    s = core_schema.list_schema(
+        core_schema.no_info_after_validator_function(f, core_schema.int_schema()), max_length=10
+    )
+
+    v = SchemaValidator(s)
+
+    data = list(range(15))
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(data)
+
+    assert len(calls) <= 11, len(calls)  # we still run validation on the "extra" item
+
+    assert exc_info.value.errors(include_url=False) == Contains(
+        {
+            'type': 'too_long',
+            'loc': (),
+            'msg': 'List should have at most 10 items after validation, not 11',
+            'input': data,
+            'ctx': {'field_type': 'List', 'max_length': 10, 'actual_length': 11},
+        }
+    )
+
+
+class MySequence(collections.abc.Sequence):
+    def __init__(self, data: List[Any]):
+        self._data = data
+
+    def __getitem__(self, index: int) -> Any:
+        return self._data[index]
+
+    def __len__(self):
+        return len(self._data)
+
+    def __repr__(self) -> str:
+        return f'MySequence({repr(self._data)})'
+
+
+class MyMapping(collections.abc.Mapping):
+    def __init__(self, data: Dict[Any, Any]) -> None:
+        self._data = data
+
+    def __getitem__(self, key: Any) -> Any:
+        return self._data[key]
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(self._data)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __repr__(self) -> str:
+        return f'MyMapping({repr(self._data)})'
+
+
+@dataclass
+class ListInputTestCase:
+    input: Any
+    output: Union[Any, Err]
+    strict: Union[bool, None] = None
+
+
+LAX_MODE_INPUTS: List[Any] = [
+    (1, 2, 3),
+    frozenset((1, 2, 3)),
+    set((1, 2, 3)),
+    deque([1, 2, 3]),
+    {1: 'a', 2: 'b', 3: 'c'}.keys(),
+    {'a': 1, 'b': 2, 'c': 3}.values(),
+    MySequence([1, 2, 3]),
+    MyMapping({1: 'a', 2: 'b', 3: 'c'}).keys(),
+    MyMapping({'a': 1, 'b': 2, 'c': 3}).values(),
+    (x for x in [1, 2, 3]),
+]
+
+
+@pytest.mark.parametrize(
+    'testcase',
+    [
+        *[ListInputTestCase([1, 2, 3], [1, 2, 3], strict) for strict in (True, False, None)],
+        *[
+            ListInputTestCase(inp, Err('Input should be a valid list [type=list_type,'), True)
+            for inp in [*LAX_MODE_INPUTS, '123', b'123']
+        ],
+        *[ListInputTestCase(inp, [1, 2, 3], False) for inp in LAX_MODE_INPUTS],
+        *[
+            ListInputTestCase(inp, Err('Input should be a valid list [type=list_type,'), False)
+            for inp in ['123', b'123', MyMapping({1: 'a', 2: 'b', 3: 'c'}), {1: 'a', 2: 'b', 3: 'c'}]
+        ],
+    ],
+    ids=repr,
+)
+def test_list_allowed_inputs_python(testcase: ListInputTestCase):
+    v = SchemaValidator(core_schema.list_schema(core_schema.int_schema(), strict=testcase.strict))
+    if isinstance(testcase.output, Err):
+        with pytest.raises(ValidationError, match=re.escape(testcase.output.message)):
+            v.validate_python(testcase.input)
+    else:
+        output = v.validate_python(testcase.input)
+        assert output == testcase.output
+        assert output is not testcase.input
+
+
+@pytest.mark.parametrize(
+    'testcase',
+    [
+        ListInputTestCase({1: 1, 2: 2, 3: 3}.items(), Err('Input should be a valid list [type=list_type,'), True),
+        ListInputTestCase(
+            MyMapping({1: 1, 2: 2, 3: 3}).items(), Err('Input should be a valid list [type=list_type,'), True
+        ),
+        ListInputTestCase({1: 1, 2: 2, 3: 3}.items(), [(1, 1), (2, 2), (3, 3)], False),
+        ListInputTestCase(MyMapping({1: 1, 2: 2, 3: 3}).items(), [(1, 1), (2, 2), (3, 3)], False),
+    ],
+    ids=repr,
+)
+def test_list_dict_items_input(testcase: ListInputTestCase) -> None:
+    v = SchemaValidator(
+        core_schema.list_schema(
+            core_schema.tuple_positional_schema([core_schema.int_schema(), core_schema.int_schema()]),
+            strict=testcase.strict,
+        )
+    )
+    if isinstance(testcase.output, Err):
+        with pytest.raises(ValidationError, match=re.escape(testcase.output.message)):
+            v.validate_python(testcase.input)
+    else:
+        output = v.validate_python(testcase.input)
+        assert output == testcase.output
+        assert output is not testcase.input
