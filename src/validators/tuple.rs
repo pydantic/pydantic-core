@@ -132,6 +132,7 @@ impl BuildValidator for TuplePositionalValidator {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, I: Input<'data> + 'data>(
     py: Python<'data>,
     input: &'data impl Input<'data>,
@@ -141,7 +142,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
     output: &mut Vec<PyObject>,
     errors: &mut Vec<ValLineError<'data>>,
     extra_validator: &Option<Box<CombinedValidator>>,
-    items_validators: &Vec<CombinedValidator>,
+    items_validators: &[CombinedValidator],
     collection_iter: &mut T,
     collection_len: Option<usize>,
     expected_length: usize,
@@ -237,7 +238,7 @@ impl Validator for TuplePositionalValidator {
             GenericIterable::List(collection_iter) => iter!(collection_iter.iter().map(Ok)),
             GenericIterable::Tuple(collection_iter) => iter!(collection_iter.iter().map(Ok)),
             GenericIterable::JsonArray(collection_iter) => iter!(collection_iter.iter().map(Ok)),
-            other => iter!(other.into_sequence_iterator(py)?),
+            other => iter!(other.as_sequence_iterator(py)?),
         }
         if errors.is_empty() {
             Ok(PyTuple::new(py, &output).into_py(py))

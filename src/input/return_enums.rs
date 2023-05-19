@@ -47,7 +47,7 @@ pub enum GenericIterable<'a> {
 }
 
 impl<'a, 'py: 'a> GenericIterable<'a> {
-    pub fn into_sequence_iterator(
+    pub fn as_sequence_iterator(
         &self,
         py: Python<'py>,
     ) -> PyResult<Box<dyn Iterator<Item = PyResult<&'a PyAny>> + 'a>> {
@@ -335,7 +335,7 @@ impl<'a> GenericIterable<'a> {
             GenericIterable::Sequence(collection) => validate!(collection.iter()?),
             GenericIterable::Iterator(collection) => validate!(collection.iter()?),
             GenericIterable::JsonArray(collection) => validate!(collection.iter().map(Ok)),
-            other => validate!(other.into_sequence_iterator(py)?),
+            other => validate!(other.as_sequence_iterator(py)?),
         }
     }
 
@@ -377,7 +377,7 @@ impl<'a> GenericIterable<'a> {
             GenericIterable::Sequence(collection) => validate_set!(collection.iter()?),
             GenericIterable::Iterator(collection) => validate_set!(collection.iter()?),
             GenericIterable::JsonArray(collection) => validate_set!(collection.iter().map(Ok)),
-            other => validate_set!(other.into_sequence_iterator(py)?),
+            other => validate_set!(other.as_sequence_iterator(py)?),
         }
     }
 
@@ -412,7 +412,7 @@ impl<'a> GenericIterable<'a> {
             GenericIterable::JsonArray(collection) => {
                 no_validator_iter_to_vec(py, input, collection.iter().map(Ok), max_length_check)
             }
-            other => no_validator_iter_to_vec(py, input, other.into_sequence_iterator(py)?, max_length_check),
+            other => no_validator_iter_to_vec(py, input, other.as_sequence_iterator(py)?, max_length_check),
         }
     }
 }
