@@ -252,6 +252,12 @@ all_schema_functions = [
         args(MyModel, {'type': 'int'}),
         {'type': 'dataclass', 'schema': {'type': 'int'}, 'cls': MyModel, 'slots': False},
     ),
+    (
+        core_schema.dataclass_schema,
+        # MyModel should be a dataclass, but I'm being lazy here
+        args(MyModel, {'type': 'int'}, slots=True),
+        {'type': 'dataclass', 'schema': {'type': 'int'}, 'cls': MyModel, 'slots': True},
+    ),
 ]
 
 

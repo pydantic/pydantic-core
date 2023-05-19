@@ -3134,6 +3134,7 @@ def dataclass_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
         frozen: Whether the dataclass is frozen
+        slots: Whether the slots is enabled on dataclass
     """
     return dict_not_none(
         type='dataclass',
