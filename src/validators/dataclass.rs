@@ -454,7 +454,7 @@ impl BuildValidator for DataclassValidator {
             )?)?,
             name,
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
-            slots: schema.get_as(intern!(py, "slots"))?.unwrap_or(false),
+            slots: matches!(class.hasattr(intern!(class.py(), "__slots__")), Ok(true)),
         }
         .into())
     }
