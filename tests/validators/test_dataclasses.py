@@ -1,5 +1,6 @@
 import dataclasses
 import re
+import sys
 from typing import Any, Dict, List, Optional, Union
 
 import pytest
@@ -1190,3 +1191,34 @@ def test_custom_dataclass_names():
         },
         {'input': 123, 'loc': ('foo', 'none'), 'msg': 'Input should be None', 'type': 'none_required'},
     ]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
+def test_slots() -> None:
+    kwargs = {'slots': True}
+
+    @dataclasses.dataclass(**kwargs)
+    class Model:
+        x: int
+
+    schema = core_schema.dataclass_schema(
+        Model,
+        core_schema.dataclass_args_schema(
+            'Model', [core_schema.dataclass_field(name='x', schema=core_schema.int_schema())]
+        ),
+    )
+
+    val = SchemaValidator(schema)
+    m: Model
+
+    m = val.validate_python({'x': 123})
+    assert m == Model(x=1)
+
+    with pytest.raises(ValidationError):
+        val.validate_python({'x': 'abc'})
+
+    val.validate_assignment(m, 'x', 456)
+    assert m.x == 456
+
+    with pytest.raises(ValidationError):
+        val.validate_assignment(m, 'x', 'abc')
