@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::SchemaDict;
 use crate::errors::ValResult;
-use crate::input::{GenericCollection, Input};
+use crate::input::{GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
@@ -11,7 +11,6 @@ use super::{build_validator, BuildValidator, CombinedValidator, Definitions, Def
 #[derive(Debug, Clone)]
 pub struct ListValidator {
     strict: bool,
-    allow_any_iter: bool,
     item_validator: Option<Box<CombinedValidator>>,
     min_length: Option<usize>,
     max_length: Option<usize>,
@@ -102,7 +101,6 @@ impl BuildValidator for ListValidator {
         let name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
         Ok(Self {
             strict: crate::build_tools::is_strict(schema, config)?,
-            allow_any_iter: schema.get_as(pyo3::intern!(py, "allow_any_iter"))?.unwrap_or(false),
             item_validator,
             min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
             max_length: schema.get_as(pyo3::intern!(py, "max_length"))?,
@@ -121,7 +119,7 @@ impl Validator for ListValidator {
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let seq = input.validate_list(extra.strict.unwrap_or(self.strict), self.allow_any_iter)?;
+        let seq = input.validate_list(extra.strict.unwrap_or(self.strict))?;
 
         let output = match self.item_validator {
             Some(ref v) => seq.validate_to_vec(
@@ -135,7 +133,7 @@ impl Validator for ListValidator {
                 recursion_guard,
             )?,
             None => match seq {
-                GenericCollection::List(list) => {
+                GenericIterable::List(list) => {
                     length_check!(input, "List", self.min_length, self.max_length, list);
                     let list_copy = list.get_slice(0, usize::MAX);
                     return Ok(list_copy.into_py(py));
