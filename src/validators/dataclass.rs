@@ -415,6 +415,7 @@ pub struct DataclassValidator {
     revalidate: Revalidate,
     name: String,
     frozen: bool,
+    slots: bool,
 }
 
 impl BuildValidator for DataclassValidator {
@@ -453,6 +454,7 @@ impl BuildValidator for DataclassValidator {
             )?)?,
             name,
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
+            slots: schema.get_as(intern!(py, "slots"))?.unwrap_or(false),
         }
         .into())
     }
@@ -595,7 +597,13 @@ impl DataclassValidator {
         input: &'data impl Input<'data>,
     ) -> ValResult<'data, ()> {
         let (dc_dict, post_init_kwargs): (&PyAny, &PyAny) = val_output.extract(py)?;
-        force_setattr(py, dc, intern!(py, "__dict__"), dc_dict)?;
+        if self.slots {
+            for (key, value) in dc_dict.downcast::<PyDict>()?.iter() {
+                force_setattr(py, dc, key, value)?;
+            }
+        } else {
+            force_setattr(py, dc, intern!(py, "__dict__"), dc_dict)?;
+        }
 
         if let Some(ref post_init) = self.post_init {
             let post_init = post_init.as_ref(py);

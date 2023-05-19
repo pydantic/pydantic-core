@@ -3101,6 +3101,7 @@ class DataclassSchema(TypedDict, total=False):
     ref: str
     metadata: Any
     serialization: SerSchema
+    slots: bool
 
 
 def dataclass_schema(
@@ -3115,6 +3116,7 @@ def dataclass_schema(
     metadata: Any = None,
     serialization: SerSchema | None = None,
     frozen: bool | None = None,
+    slots: bool = False,
 ) -> DataclassSchema:
     """
     Returns a schema for a dataclass. As with `ModelSchema`, this schema can only be used as a field within
@@ -3145,6 +3147,7 @@ def dataclass_schema(
         metadata=metadata,
         serialization=serialization,
         frozen=frozen,
+        slots=slots,
     )
 
 

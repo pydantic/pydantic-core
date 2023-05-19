@@ -250,7 +250,7 @@ all_schema_functions = [
         core_schema.dataclass_schema,
         # MyModel should be a dataclass, but I'm being lazy here
         args(MyModel, {'type': 'int'}),
-        {'type': 'dataclass', 'schema': {'type': 'int'}, 'cls': MyModel},
+        {'type': 'dataclass', 'schema': {'type': 'int'}, 'cls': MyModel, 'slots': False},
     ),
 ]
 
