@@ -43,11 +43,11 @@ macro_rules! extract_shared_iter {
 #[cfg(not(PyPy))]
 macro_rules! extract_dict_iter {
     ($obj:ident) => {
-        if $obj.is_instance_of::<PyDictKeys>().unwrap_or(false) {
+        if $obj.is_instance_of::<PyDictKeys>() {
             Some($obj.into())
-        } else if $obj.is_instance_of::<PyDictValues>().unwrap_or(false) {
+        } else if $obj.is_instance_of::<PyDictValues>() {
             Some($obj.into())
-        } else if $obj.is_instance_of::<PyDictItems>().unwrap_or(false) {
+        } else if $obj.is_instance_of::<PyDictItems>() {
             Some($obj.into())
         } else {
             None
@@ -297,7 +297,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn ultra_strict_float(&self) -> ValResult<f64> {
-        if matches!(self.is_instance_of::<PyInt>(), Ok(true)) {
+        if self.is_instance_of::<PyInt>() {
             Err(ValError::new(ErrorType::FloatType, self))
         } else if let Ok(float) = self.extract::<f64>() {
             Ok(float)
