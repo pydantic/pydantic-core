@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValResult};
+use crate::input::EitherInt;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
@@ -84,7 +85,7 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
-    fn as_str_strict(&self) -> Option<&str> {
+    fn strict_str_exact(&self) -> Option<&str> {
         match self {
             JsonInput::String(s) => Some(s.as_str()),
             _ => None,
@@ -121,14 +122,14 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
-    fn strict_int(&self) -> ValResult<i64> {
+    fn strict_int(&'a self) -> ValResult<EitherInt<'a>> {
         match self {
-            JsonInput::Int(i) => Ok(*i),
+            JsonInput::Int(i) => Ok(EitherInt::Rust(*i)),
             _ => Err(ValError::new(ErrorType::IntType, self)),
         }
     }
-    fn lax_int(&self) -> ValResult<i64> {
-        match self {
+    fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
+        let int_result = match self {
             JsonInput::Bool(b) => match *b {
                 true => Ok(1),
                 false => Ok(0),
@@ -137,10 +138,11 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::Float(f) => float_as_int(self, *f),
             JsonInput::String(str) => str_as_int(self, str),
             _ => Err(ValError::new(ErrorType::IntType, self)),
-        }
+        };
+        int_result.map(EitherInt::Rust)
     }
 
-    fn as_int_strict(&self) -> Option<i64> {
+    fn strict_int_exact(&self) -> Option<i64> {
         match self {
             JsonInput::Int(i) => Some(*i),
             _ => None,
@@ -356,7 +358,7 @@ impl<'a> Input<'a> for String {
         self.validate_str(false)
     }
 
-    fn as_str_strict(&self) -> Option<&str> {
+    fn strict_str_exact(&self) -> Option<&str> {
         Some(self.as_str())
     }
 
@@ -375,17 +377,17 @@ impl<'a> Input<'a> for String {
         str_as_bool(self, self)
     }
 
-    fn strict_int(&self) -> ValResult<i64> {
+    fn strict_int(&'a self) -> ValResult<EitherInt<'a>> {
         Err(ValError::new(ErrorType::IntType, self))
     }
-    fn lax_int(&self) -> ValResult<i64> {
+    fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
         match self.parse() {
-            Ok(i) => Ok(i),
+            Ok(i) => Ok(EitherInt::Rust(i)),
             Err(_) => Err(ValError::new(ErrorType::IntParsing, self)),
         }
     }
 
-    fn as_int_strict(&self) -> Option<i64> {
+    fn strict_int_exact(&self) -> Option<i64> {
         None
     }
 

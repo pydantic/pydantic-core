@@ -380,7 +380,7 @@ impl Validator for TaggedUnionValidator {
                         match lookup_key.$get_method($( $dict ),+)? {
                             Some((_, value)) => {
                                 if let Ok(int) = value.validate_int(self.strict) {
-                                    Ok(ChoiceKey::Int(int))
+                                    Ok(ChoiceKey::Int(int.into()))
                                 } else {
                                     Ok(ChoiceKey::Str(value.validate_str(self.strict)?.as_cow()?.as_ref().to_string()))
                                 }

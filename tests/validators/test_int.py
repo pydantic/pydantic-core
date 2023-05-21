@@ -59,8 +59,10 @@ def test_int_py_and_json(py_and_json: PyAndJson, input_value, expected):
         (Decimal('1'), 1),
         (Decimal('1.0'), 1),
         (i64_max, i64_max),
-        (i64_max + 1, i64_max),
-        (i64_max * 2, i64_max),
+        # (i64_max + 1, i64_max),
+        (i64_max + 1, i64_max + 1),
+        # (i64_max * 2, i64_max),
+        (i64_max * 2, i64_max * 2),
         pytest.param(
             Decimal('1.001'),
             Err(

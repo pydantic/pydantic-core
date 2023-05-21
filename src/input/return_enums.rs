@@ -817,3 +817,27 @@ impl<'a> IntoPy<PyObject> for EitherBytes<'a> {
         }
     }
 }
+
+#[cfg_attr(debug_assertions, derive(Debug))]
+pub enum EitherInt<'py> {
+    Rust(i64),
+    Py(&'py PyAny),
+}
+
+impl<'py> From<EitherInt<'py>> for i64 {
+    fn from(int: EitherInt<'py>) -> i64 {
+        match int {
+            EitherInt::Rust(i) => i,
+            EitherInt::Py(i) => i.extract().unwrap(),
+        }
+    }
+}
+
+impl<'py> ToPyObject for EitherInt<'py> {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        match self {
+            Self::Rust(int) => (*int).into_py(py),
+            Self::Py(int) => int.into_py(py),
+        }
+    }
+}

@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::str::from_utf8;
 
-use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFrozenSet, PyInt, PyIterator, PyList,
@@ -13,6 +12,7 @@ use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
 use crate::build_tools::safe_repr;
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValResult};
+use crate::input::EitherInt;
 use crate::{ArgsKwargs, PyMultiHostUrl, PyUrl};
 
 use super::datetime::{
@@ -227,8 +227,8 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn as_str_strict(&self) -> Option<&str> {
-        if self.get_type().is(get_py_str_type(self.py())) {
+    fn strict_str_exact(&self) -> Option<&str> {
+        if PyString::is_exact_type_of(self) {
             self.extract().ok()
         } else {
             None
@@ -281,33 +281,36 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_int(&self) -> ValResult<i64> {
-        if let Ok(int) = self.extract::<i64>() {
-            // bools are cast to ints as either 0 or 1, so check for bool type in this specific case
-            if (int == 0 || int == 1) && PyBool::is_exact_type_of(self) {
+    fn strict_int(&'a self) -> ValResult<EitherInt<'a>> {
+        if PyInt::is_exact_type_of(self) {
+            Ok(EitherInt::Py(self))
+        } else if PyInt::is_type_of(self) {
+            // bools are a subclass of int, so check for bool type in this specific case
+            if PyBool::is_exact_type_of(self) {
                 Err(ValError::new(ErrorType::IntType, self))
             } else {
-                Ok(int)
+                Ok(EitherInt::Py(self))
             }
         } else {
             Err(ValError::new(ErrorType::IntType, self))
         }
     }
 
-    fn lax_int(&self) -> ValResult<i64> {
-        if let Ok(int) = self.extract::<i64>() {
-            Ok(int)
+    fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
+        if PyInt::is_exact_type_of(self) {
+            Ok(EitherInt::Py(self))
         } else if let Some(cow_str) = maybe_as_string(self, ErrorType::IntParsing)? {
-            str_as_int(self, &cow_str)
+            let int = str_as_int(self, &cow_str)?;
+            Ok(EitherInt::Rust(int))
         } else if let Ok(float) = self.extract::<f64>() {
-            float_as_int(self, float)
+            Ok(EitherInt::Rust(float_as_int(self, float)?))
         } else {
             Err(ValError::new(ErrorType::IntType, self))
         }
     }
 
-    fn as_int_strict(&self) -> Option<i64> {
-        if self.get_type().is(get_py_int_type(self.py())) {
+    fn strict_int_exact(&'a self) -> Option<i64> {
+        if PyInt::is_exact_type_of(self) {
             self.extract().ok()
         } else {
             None
@@ -726,16 +729,4 @@ pub fn list_as_tuple(list: &PyList) -> &PyTuple {
         Py::from_owned_ptr(list.py(), tuple_ptr)
     };
     py_tuple.into_ref(list.py())
-}
-
-static PY_INT_TYPE: GILOnceCell<PyObject> = GILOnceCell::new();
-
-fn get_py_int_type(py: Python) -> &PyObject {
-    PY_INT_TYPE.get_or_init(py, || PyInt::type_object(py).into())
-}
-
-static PY_STR_TYPE: GILOnceCell<PyObject> = GILOnceCell::new();
-
-fn get_py_str_type(py: Python) -> &PyObject {
-    PY_STR_TYPE.get_or_init(py, || PyString::type_object(py).into())
 }

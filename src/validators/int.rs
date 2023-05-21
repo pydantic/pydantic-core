@@ -48,7 +48,7 @@ impl Validator for IntValidator {
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.validate_int(extra.strict.unwrap_or(self.strict))?.into_py(py))
+        Ok(input.validate_int(extra.strict.unwrap_or(self.strict))?.to_object(py))
     }
 
     fn different_strict_behavior(
@@ -88,6 +88,7 @@ impl Validator for ConstrainedIntValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let int = input.validate_int(extra.strict.unwrap_or(self.strict))?;
+        let int: i64 = int.into();
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
                 return Err(ValError::new(
@@ -118,7 +119,7 @@ impl Validator for ConstrainedIntValidator {
                 return Err(ValError::new(ErrorType::GreaterThan { gt: gt.into() }, input));
             }
         }
-        Ok(int.into_py(py))
+        Ok(int.to_object(py))
     }
 
     fn different_strict_behavior(

@@ -47,9 +47,9 @@ impl BuildValidator for LiteralValidator {
         let mut repr_args: Vec<String> = Vec::new();
         for item in expected.iter() {
             repr_args.push(item.repr()?.extract()?);
-            if let Some(int) = item.as_int_strict() {
+            if let Some(int) = item.strict_int_exact() {
                 expected_int.insert(int);
-            } else if let Some(str) = item.as_str_strict() {
+            } else if let Some(str) = item.strict_str_exact() {
                 expected_str.insert(str.to_string());
             } else {
                 expected_py.set_item(item, item)?;
@@ -76,14 +76,14 @@ impl Validator for LiteralValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(expected_ints) = &self.expected_int {
-            if let Some(int) = input.as_int_strict() {
+            if let Some(int) = input.strict_int_exact() {
                 if expected_ints.contains(&int) {
                     return Ok(input.to_object(py));
                 }
             }
         }
         if let Some(expected_strings) = &self.expected_str {
-            if let Some(str) = input.as_str_strict() {
+            if let Some(str) = input.strict_str_exact() {
                 if expected_strings.contains(str) {
                     return Ok(input.to_object(py));
                 }
