@@ -282,11 +282,13 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_int(&self) -> ValResult<i64> {
-        // bool check has to come before int check as bools would be cast to ints below
-        if self.extract::<bool>().is_ok() {
-            Err(ValError::new(ErrorType::IntType, self))
-        } else if let Ok(int) = self.extract::<i64>() {
-            Ok(int)
+        if let Ok(int) = self.extract::<i64>() {
+            // bools are cast to ints as either 0 or 1, so check for bool type in this specific case
+            if (int == 0 || int == 1) && PyBool::is_exact_type_of(self) {
+                Err(ValError::new(ErrorType::IntType, self))
+            } else {
+                Ok(int)
+            }
         } else {
             Err(ValError::new(ErrorType::IntType, self))
         }
@@ -322,10 +324,13 @@ impl<'a> Input<'a> for PyAny {
         }
     }
     fn strict_float(&self) -> ValResult<f64> {
-        if self.extract::<bool>().is_ok() {
-            Err(ValError::new(ErrorType::FloatType, self))
-        } else if let Ok(float) = self.extract::<f64>() {
-            Ok(float)
+        if let Ok(float) = self.extract::<f64>() {
+            // bools are cast to floats as either 0.0 or 1.0, so check for bool type in this specific case
+            if (float == 0.0 || float == 1.0) && PyBool::is_exact_type_of(self) {
+                Err(ValError::new(ErrorType::FloatType, self))
+            } else {
+                Ok(float)
+            }
         } else {
             Err(ValError::new(ErrorType::FloatType, self))
         }
@@ -515,7 +520,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_date(&self) -> ValResult<EitherDate> {
-        if self.downcast::<PyDateTime>().is_ok() {
+        if PyDateTime::is_type_of(self) {
             // have to check if it's a datetime first, otherwise the line below converts to a date
             Err(ValError::new(ErrorType::DateType, self))
         } else if let Ok(date) = self.downcast::<PyDate>() {
@@ -526,7 +531,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_date(&self) -> ValResult<EitherDate> {
-        if self.downcast::<PyDateTime>().is_ok() {
+        if PyDateTime::is_type_of(self) {
             // have to check if it's a datetime first, otherwise the line below converts to a date
             // even if we later try coercion from a datetime, we don't want to return a datetime now
             Err(ValError::new(ErrorType::DateType, self))
@@ -558,7 +563,7 @@ impl<'a> Input<'a> for PyAny {
             bytes_as_time(self, str.as_bytes())
         } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
             bytes_as_time(self, py_bytes.as_bytes())
-        } else if self.downcast::<PyBool>().is_ok() {
+        } else if PyBool::is_exact_type_of(self) {
             Err(ValError::new(ErrorType::TimeType, self))
         } else if let Ok(int) = self.extract::<i64>() {
             int_as_time(self, int, 0)
@@ -585,7 +590,7 @@ impl<'a> Input<'a> for PyAny {
             bytes_as_datetime(self, str.as_bytes())
         } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
             bytes_as_datetime(self, py_bytes.as_bytes())
-        } else if self.downcast::<PyBool>().is_ok() {
+        } else if PyBool::is_exact_type_of(self) {
             Err(ValError::new(ErrorType::DatetimeType, self))
         } else if let Ok(int) = self.extract::<i64>() {
             int_as_datetime(self, int, 0)
