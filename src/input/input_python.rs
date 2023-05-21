@@ -704,7 +704,7 @@ fn is_dict_values_type(v: &PyAny) -> bool {
 }
 
 #[cfg(PyPy)]
-static DICT_ITEMS_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+static DICT_ITEMS_TYPE: pyo3::once_cell::GILOnceCell<Py<PyType>> = pyo3::once_cell::GILOnceCell::new();
 
 #[cfg(PyPy)]
 fn is_dict_items_type(v: &PyAny) -> bool {
