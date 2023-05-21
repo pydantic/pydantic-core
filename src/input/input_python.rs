@@ -226,14 +226,6 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_str_exact(&self) -> Option<&str> {
-        if PyString::is_exact_type_of(self) {
-            self.extract().ok()
-        } else {
-            None
-        }
-    }
-
     fn strict_bytes(&'a self) -> ValResult<EitherBytes<'a>> {
         if let Ok(py_bytes) = self.downcast::<PyBytes>() {
             Ok(py_bytes.into())
@@ -305,14 +297,6 @@ impl<'a> Input<'a> for PyAny {
             Ok(EitherInt::Rust(float_as_int(self, float)?))
         } else {
             Err(ValError::new(ErrorType::IntType, self))
-        }
-    }
-
-    fn strict_int_exact(&'a self) -> Option<i64> {
-        if PyInt::is_exact_type_of(self) {
-            self.extract().ok()
-        } else {
-            None
         }
     }
 

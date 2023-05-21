@@ -84,13 +84,6 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
-    fn strict_str_exact(&self) -> Option<&str> {
-        match self {
-            JsonInput::String(s) => Some(s.as_str()),
-            _ => None,
-        }
-    }
-
     fn validate_bytes(&'a self, _strict: bool) -> ValResult<EitherBytes<'a>> {
         match self {
             JsonInput::String(s) => Ok(s.as_bytes().into()),
@@ -139,13 +132,6 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorType::IntType, self)),
         };
         int_result.map(EitherInt::Rust)
-    }
-
-    fn strict_int_exact(&self) -> Option<i64> {
-        match self {
-            JsonInput::Int(i) => Some(*i),
-            _ => None,
-        }
     }
 
     fn ultra_strict_float(&self) -> ValResult<f64> {
@@ -357,10 +343,6 @@ impl<'a> Input<'a> for String {
         self.validate_str(false)
     }
 
-    fn strict_str_exact(&self) -> Option<&str> {
-        Some(self.as_str())
-    }
-
     fn validate_bytes(&'a self, _strict: bool) -> ValResult<EitherBytes<'a>> {
         Ok(self.as_bytes().into())
     }
@@ -384,10 +366,6 @@ impl<'a> Input<'a> for String {
             Ok(i) => Ok(EitherInt::Rust(i)),
             Err(_) => Err(ValError::new(ErrorType::IntParsing, self)),
         }
-    }
-
-    fn strict_int_exact(&self) -> Option<i64> {
-        None
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
