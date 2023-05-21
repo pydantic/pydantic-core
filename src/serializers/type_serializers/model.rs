@@ -6,7 +6,7 @@ use pyo3::{intern, PyTraverseError, PyVisit};
 
 use ahash::AHashMap;
 
-use crate::build_tools::{build_model_config, py_error_type, ExtraBehavior, SchemaDict};
+use crate::build_tools::{py_error_type, ExtraBehavior, SchemaDict};
 use crate::definitions::DefinitionsBuilder;
 
 use super::{
@@ -14,6 +14,8 @@ use super::{
     BuildSerializer, CombinedSerializer, ComputedFields, Extra, FieldsMode, GeneralFieldsSerializer, ObType, SerCheck,
     SerField, TypeSerializer,
 };
+
+const ROOT_FIELD: &str = "root";
 
 pub struct ModelFieldsBuilder;
 
@@ -66,6 +68,7 @@ pub struct ModelSerializer {
     class: Py<PyType>,
     serializer: Box<CombinedSerializer>,
     has_extra: bool,
+    root_model: bool,
     name: String,
 }
 
@@ -74,22 +77,24 @@ impl BuildSerializer for ModelSerializer {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        _config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
         // models ignore the parent config and always use the config from this model
-        let config = build_model_config(py, schema, config)?;
+        let config = schema.get_as(intern!(py, "config"))?;
 
         let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
         let sub_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
         let serializer = Box::new(CombinedSerializer::build(sub_schema, config, definitions)?);
+        let root_model = schema.get_as(intern!(py, "root_model"))?.unwrap_or(false);
 
         Ok(Self {
             class: class.into(),
             serializer,
             has_extra: has_extra(schema, config)?,
+            root_model,
             name: class.getattr(intern!(py, "__name__"))?.extract()?,
         }
         .into())
@@ -139,11 +144,16 @@ impl TypeSerializer for ModelSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let extra = Extra {
+        let mut extra = Extra {
             model: Some(value),
             ..*extra
         };
-        if self.allow_value(value, &extra)? {
+        if self.root_model {
+            extra.field_name = Some(ROOT_FIELD);
+            let py = value.py();
+            let root = value.getattr(intern!(py, ROOT_FIELD))?;
+            self.serializer.to_python(root, include, exclude, &extra)
+        } else if self.allow_value(value, &extra)? {
             let inner_value = self.get_inner_value(value, &extra)?;
             self.serializer.to_python(inner_value, include, exclude, &extra)
         } else {
@@ -169,11 +179,17 @@ impl TypeSerializer for ModelSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let extra = Extra {
+        let mut extra = Extra {
             model: Some(value),
             ..*extra
         };
-        if self.allow_value(value, &extra).map_err(py_err_se_err)? {
+        if self.root_model {
+            extra.field_name = Some(ROOT_FIELD);
+            let py = value.py();
+            let root = value.getattr(intern!(py, ROOT_FIELD)).map_err(py_err_se_err)?;
+            self.serializer
+                .serde_serialize(root, serializer, include, exclude, &extra)
+        } else if self.allow_value(value, &extra).map_err(py_err_se_err)? {
             let inner_value = self.get_inner_value(value, &extra).map_err(py_err_se_err)?;
             self.serializer
                 .serde_serialize(inner_value, serializer, include, exclude, &extra)
