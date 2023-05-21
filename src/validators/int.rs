@@ -119,7 +119,7 @@ impl Validator for ConstrainedIntValidator {
                 return Err(ValError::new(ErrorType::GreaterThan { gt: gt.into() }, input));
             }
         }
-        Ok(int.to_object(py))
+        Ok(int.into_py(py))
     }
 
     fn different_strict_behavior(

@@ -12,7 +12,6 @@ use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
 use crate::build_tools::safe_repr;
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValResult};
-use crate::input::EitherInt;
 use crate::{ArgsKwargs, PyMultiHostUrl, PyUrl};
 
 use super::datetime::{
@@ -22,8 +21,8 @@ use super::datetime::{
 };
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
-    py_string_str, EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericIterable, GenericIterator,
-    GenericMapping, Input, JsonInput, PyArgs,
+    py_string_str, EitherBytes, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable,
+    GenericIterator, GenericMapping, Input, JsonInput, PyArgs,
 };
 
 #[cfg(not(PyPy))]
@@ -669,7 +668,7 @@ fn is_builtin_str(py_str: &PyString) -> bool {
 }
 
 #[cfg(PyPy)]
-static DICT_KEYS_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+static DICT_KEYS_TYPE: pyo3::once_cell::GILOnceCell<Py<PyType>> = pyo3::once_cell::GILOnceCell::new();
 
 #[cfg(PyPy)]
 fn is_dict_keys_type(v: &PyAny) -> bool {
@@ -687,7 +686,7 @@ fn is_dict_keys_type(v: &PyAny) -> bool {
 }
 
 #[cfg(PyPy)]
-static DICT_VALUES_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+static DICT_VALUES_TYPE: pyo3::once_cell::GILOnceCell<Py<PyType>> = pyo3::once_cell::GILOnceCell::new();
 
 #[cfg(PyPy)]
 fn is_dict_values_type(v: &PyAny) -> bool {

@@ -2,7 +2,6 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValResult};
-use crate::input::EitherInt;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
@@ -11,8 +10,8 @@ use super::datetime::{
 use super::parse_json::JsonArray;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
-    EitherBytes, EitherString, EitherTimedelta, GenericArguments, GenericIterable, GenericIterator, GenericMapping,
-    Input, JsonArgs, JsonInput,
+    EitherBytes, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable, GenericIterator,
+    GenericMapping, Input, JsonArgs, JsonInput,
 };
 
 impl<'a> Input<'a> for JsonInput {
