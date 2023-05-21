@@ -379,8 +379,9 @@ impl Validator for TaggedUnionValidator {
                         // errors when getting attributes which should be "raised"
                         match lookup_key.$get_method($( $dict ),+)? {
                             Some((_, value)) => {
-                                if let Ok(int) = value.validate_int(self.strict) {
-                                    Ok(ChoiceKey::Int(int.into()))
+                                if let Ok(either_int) = value.validate_int(self.strict) {
+                                    let int = either_int.into_int()?;
+                                    Ok(ChoiceKey::Int(int))
                                 } else {
                                     Ok(ChoiceKey::Str(value.validate_str(self.strict)?.as_cow()?.as_ref().to_string()))
                                 }

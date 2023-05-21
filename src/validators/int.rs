@@ -88,7 +88,7 @@ impl Validator for ConstrainedIntValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let int = input.validate_int(extra.strict.unwrap_or(self.strict))?;
-        let int: i64 = int.into();
+        let int: i64 = int.into_int()?;
         if let Some(multiple_of) = self.multiple_of {
             if int % multiple_of != 0 {
                 return Err(ValError::new(
