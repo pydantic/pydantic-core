@@ -187,26 +187,22 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
-        if let Ok(py_str) = self.downcast::<PyString>() {
-            if PyString::is_exact_type_of(self) {
-                Ok(py_str.into())
-            } else {
-                Err(ValError::new(ErrorType::StringSubType, self))
-            }
+        if let Ok(py_str) = <PyString as PyTryFrom>::try_from_exact(self) {
+            Ok(py_str.into())
+        } else if PyString::is_type_of(self) {
+            Err(ValError::new(ErrorType::StringSubType, self))
         } else {
             Err(ValError::new(ErrorType::StringType, self))
         }
     }
 
     fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
-        if let Ok(py_str) = self.downcast::<PyString>() {
-            if PyString::is_exact_type_of(self) {
-                Ok(py_str.into())
-            } else {
-                // force to a rust string to make sure behaviour is consistent whether or not we go via a
-                // rust string in StrConstrainedValidator - e.g. to_lower
-                Ok(py_string_str(py_str)?.into())
-            }
+        if let Ok(py_str) = <PyString as PyTryFrom>::try_from_exact(self) {
+            Ok(py_str.into())
+        } else if let Ok(py_str) = self.downcast::<PyString>() {
+            // force to a rust string to make sure behaviour is consistent whether or not we go via a
+            // rust string in StrConstrainedValidator - e.g. to_lower
+            Ok(py_string_str(py_str)?.into())
         } else if let Ok(bytes) = self.downcast::<PyBytes>() {
             let str = match from_utf8(bytes.as_bytes()) {
                 Ok(s) => s,
