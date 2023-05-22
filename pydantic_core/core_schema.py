@@ -3101,7 +3101,7 @@ class DataclassSchema(TypedDict, total=False):
     ref: str
     metadata: Any
     serialization: SerSchema
-    slots: bool
+    slots: List[str]
 
 
 def dataclass_schema(
@@ -3116,7 +3116,7 @@ def dataclass_schema(
     metadata: Any = None,
     serialization: SerSchema | None = None,
     frozen: bool | None = None,
-    slots: bool = False,
+    slots: List[str] | None = None,
 ) -> DataclassSchema:
     """
     Returns a schema for a dataclass. As with `ModelSchema`, this schema can only be used as a field within
@@ -3134,7 +3134,7 @@ def dataclass_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
         frozen: Whether the dataclass is frozen
-        slots: Whether the slots is enabled on dataclass
+        slots: The slots to use for the dataclass, set only if `slots=True` on the dataclass
     """
     return dict_not_none(
         type='dataclass',

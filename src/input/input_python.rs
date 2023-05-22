@@ -113,8 +113,12 @@ impl<'a> Input<'a> for PyAny {
         Some(self.getattr(name))
     }
 
-    fn is_exact_instance(&self, class: &PyType) -> bool {
-        self.get_type().is(class)
+    fn input_is_instance(&self, class: &PyType) -> Option<&PyAny> {
+        if self.is_instance(class).unwrap_or(false) {
+            Some(self)
+        } else {
+            None
+        }
     }
 
     fn is_python(&self) -> bool {

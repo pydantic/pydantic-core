@@ -1204,6 +1204,7 @@ def test_slots() -> None:
         core_schema.dataclass_args_schema(
             'Model', [core_schema.dataclass_field(name='x', schema=core_schema.int_schema())]
         ),
+        slots=['x'],
     )
 
     val = SchemaValidator(schema)
@@ -1248,6 +1249,7 @@ def test_dataclass_slots_field_before_validator():
                 ),
             ],
         ),
+        slots=['a', 'b'],
     )
 
     v = SchemaValidator(schema)
@@ -1281,6 +1283,7 @@ def test_dataclass_slots_field_after_validator():
                 ),
             ],
         ),
+        slots=['a', 'b'],
     )
 
     v = SchemaValidator(schema)
@@ -1366,7 +1369,7 @@ def test_slots_dataclass_subclass(revalidate_instances, input_value, expected):
             extra_behavior='forbid',
         ),
         revalidate_instances=revalidate_instances,
-        slots=True,
+        slots=['a', 'b'],
     )
     v = SchemaValidator(schema)
 

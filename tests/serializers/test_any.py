@@ -473,3 +473,14 @@ def test_any_model():
         assert j == b'{"a":"hello"}'
 
     assert s.to_python(Foo(a='hello', b=b'more'), exclude={'a'}) == IsStrictDict()
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
+def test_dataclass_slots(any_serializer):
+    @dataclasses.dataclass(slots=True)
+    class Foo:
+        a: int
+        b: str
+
+    foo = Foo(1, 'a')
+    assert any_serializer.to_python(foo) == IsStrictDict(a=1, b='a')

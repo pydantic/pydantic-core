@@ -45,8 +45,8 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         None
     }
 
-    fn is_exact_instance(&self, _class: &PyType) -> bool {
-        false
+    fn input_is_instance(&self, _class: &PyType) -> Option<&PyAny> {
+        None
     }
 
     fn is_python(&self) -> bool {
