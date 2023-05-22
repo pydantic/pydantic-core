@@ -454,7 +454,7 @@ impl BuildValidator for DataclassValidator {
             )?)?,
             name,
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
-            slots: matches!(class.hasattr(intern!(class.py(), "__slots__")), Ok(true)),
+            slots: matches!(class.hasattr(intern!(class.py(), "__slots__")), Ok(true)) | schema.get_as(intern!(py, "slots"))?.unwrap_or(false),
         }
         .into())
     }
@@ -478,10 +478,19 @@ impl Validator for DataclassValidator {
         let class = self.class.as_ref(py);
         if matches!(extra.mode, InputType::Python) && input.to_object(py).as_ref(py).is_instance(class)? {
             if self.revalidate.should_revalidate(input, class) {
-                let input = input.input_get_attr(intern!(py, "__dict__")).unwrap()?;
+                let mut validator_input = PyDict::new(py);
+                if self.slots {
+                    let slots = input.input_get_attr(intern!(py, "__slots__")).unwrap()?.downcast::<PyTuple>()?;
+                    for key in slots.iter() {
+                        let key: &PyString = key.downcast()?;
+                        validator_input.set_item(key, input.input_get_attr(key).unwrap()?)?;
+                    }
+                } else {
+                    validator_input = input.input_get_attr(intern!(py, "__dict__")).unwrap()?.downcast::<PyDict>()?;
+                }
                 let val_output = self
                     .validator
-                    .validate(py, input, extra, definitions, recursion_guard)?;
+                    .validate(py, validator_input.downcast::<PyAny>()?, extra, definitions, recursion_guard)?;
                 let dc = create_class(self.class.as_ref(py))?;
                 self.set_dict_call(py, dc.as_ref(py), val_output, input)?;
                 Ok(dc)
@@ -518,8 +527,19 @@ impl Validator for DataclassValidator {
         if self.frozen {
             return Err(ValError::new(ErrorType::FrozenInstance, field_value));
         }
+
+        let mut dict = PyDict::new(py);
         let dict_py_str = intern!(py, "__dict__");
-        let dict: &PyDict = obj.getattr(dict_py_str)?.downcast()?;
+
+        if self.slots {
+            let slots = obj.input_get_attr(intern!(py, "__slots__")).unwrap()?.downcast::<PyTuple>()?;
+            for key in slots.iter() {
+                let key: &PyString = key.downcast()?;
+                dict.set_item(key, obj.input_get_attr(key).unwrap()?)?;
+            }
+        } else {
+            dict = obj.getattr(dict_py_str)?.downcast()?;
+        }
 
         let new_dict = dict.copy()?;
         new_dict.set_item(field_name, field_value)?;
@@ -538,7 +558,11 @@ impl Validator for DataclassValidator {
 
         let (dc_dict, _): (&PyDict, PyObject) = val_assignment_result.extract(py)?;
 
-        force_setattr(py, obj, dict_py_str, dc_dict)?;
+        if self.slots {
+            force_setattr(py, obj, field_name, field_value)?;
+        } else {
+            force_setattr(py, obj, dict_py_str, dc_dict)?;
+        }
 
         Ok(obj.to_object(py))
     }

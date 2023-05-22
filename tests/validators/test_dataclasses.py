@@ -1195,9 +1195,7 @@ def test_custom_dataclass_names():
 
 @pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
 def test_slots() -> None:
-    kwargs = {'slots': True}
-
-    @dataclasses.dataclass(**kwargs)
+    @dataclasses.dataclass(slots=True)
     class Model:
         x: int
 
@@ -1290,3 +1288,91 @@ def test_dataclass_slots_field_after_validator():
     v = SchemaValidator(schema)
     foo = v.validate_python({'a': 1, 'b': b'hello'})
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
+
+
+@dataclasses.dataclass(slots=True)
+class FooDataclassSlots:
+    a: str
+    b: bool
+
+
+@dataclasses.dataclass(slots=True)
+class FooDataclassSameSlots(FooDataclassSlots):
+    pass
+
+
+@dataclasses.dataclass(slots=True)
+class FooDataclassMoreSlots(FooDataclassSlots):
+    c: str
+
+
+@dataclasses.dataclass(slots=True)
+class DuplicateDifferentSlots:
+    a: str
+    b: bool
+
+
+@pytest.mark.parametrize(
+    'revalidate_instances,input_value,expected',
+    [
+        ('always', {'a': 'hello', 'b': True}, {'a': 'hello', 'b': True}),
+        ('always', FooDataclassSlots(a='hello', b=True), {'a': 'hello', 'b': True}),
+        ('always', FooDataclassSameSlots(a='hello', b=True), {'a': 'hello', 'b': True}),
+        ('always', FooDataclassMoreSlots(a='hello', b=True, c='more'), Err(r'c\s+Unexpected keyword argument')),
+        (
+            'always',
+            DuplicateDifferentSlots(a='hello', b=True),
+            Err('should be a dictionary or an instance of FooDataclass'),
+        ),
+        # revalidate_instances='subclass-instances'
+        ('subclass-instances', {'a': 'hello', 'b': True}, {'a': 'hello', 'b': True}),
+        ('subclass-instances', FooDataclassSlots(a='hello', b=True), {'a': 'hello', 'b': True}),
+        ('subclass-instances', FooDataclassSlots(a=b'hello', b='true'), {'a': b'hello', 'b': 'true'}),
+        ('subclass-instances', FooDataclassSameSlots(a='hello', b=True), {'a': 'hello', 'b': True}),
+        ('subclass-instances', FooDataclassSameSlots(a=b'hello', b='true'), {'a': 'hello', 'b': True}),
+        ('subclass-instances', FooDataclassMoreSlots(a='hello', b=True, c='more'), Err('Unexpected keyword argument')),
+        (
+            'subclass-instances',
+            DuplicateDifferentSlots(a='hello', b=True),
+            Err('dictionary or an instance of FooDataclass'),
+        ),
+        # revalidate_instances='never'
+        ('never', {'a': 'hello', 'b': True}, {'a': 'hello', 'b': True}),
+        ('never', FooDataclassSlots(a='hello', b=True), {'a': 'hello', 'b': True}),
+        ('never', FooDataclassSameSlots(a='hello', b=True), {'a': 'hello', 'b': True}),
+        ('never', FooDataclassMoreSlots(a='hello', b=True, c='more'), {'a': 'hello', 'b': True, 'c': 'more'}),
+        ('never', FooDataclassMoreSlots(a='hello', b='wrong', c='more'), {'a': 'hello', 'b': 'wrong', 'c': 'more'}),
+        (
+            'never',
+            DuplicateDifferentSlots(a='hello', b=True),
+            Err('should be a dictionary or an instance of FooDataclass'),
+        ),
+    ],
+)
+def test_slots_dataclass_subclass(revalidate_instances, input_value, expected):
+    schema = core_schema.dataclass_schema(
+        FooDataclassSlots,
+        core_schema.dataclass_args_schema(
+            'FooDataclass',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+                core_schema.dataclass_field(name='b', schema=core_schema.bool_schema()),
+            ],
+            extra_behavior='forbid',
+        ),
+        revalidate_instances=revalidate_instances,
+        slots=True,
+    )
+    v = SchemaValidator(schema)
+
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=expected.message) as exc_info:
+            print(v.validate_python(input_value))
+
+        # debug(exc_info.value.errors(include_url=False))
+        if expected.errors is not None:
+            assert exc_info.value.errors(include_url=False) == expected.errors
+    else:
+        dc = v.validate_python(input_value)
+        assert dataclasses.is_dataclass(dc)
+        assert dataclasses.asdict(dc) == expected
