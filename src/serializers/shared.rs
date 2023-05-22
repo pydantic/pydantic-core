@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySet, PyString, PyTuple};
+use pyo3::types::{PyDict, PySet, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use enum_dispatch::enum_dispatch;
@@ -331,16 +331,9 @@ pub(super) fn object_to_dict<'py>(value: &'py PyAny, is_model: bool, extra: &Ext
     let py = value.py();
     let attrs: &PyDict = match value.getattr(intern!(py, "__dict__")) {
         Ok(attr) => attr.downcast()?,
-        Err(_) => {
-            let slots: &PyTuple = value.getattr(intern!(py, "__slots__"))?.downcast()?;
-            let dict = PyDict::new(py);
-            for slot in slots {
-                let slot: &PyString = slot.downcast()?;
-                dict.set_item(slot, value.getattr(slot)?)?;
-            }
-            dict
-        }
+        Err(_) => return slots_dc_dict(value),
     };
+
     if is_model && extra.exclude_unset {
         let fields_set: &PySet = value.getattr(intern!(py, "__pydantic_fields_set__"))?.downcast()?;
 
@@ -354,4 +347,15 @@ pub(super) fn object_to_dict<'py>(value: &'py PyAny, is_model: bool, extra: &Ext
     } else {
         Ok(attrs)
     }
+}
+
+pub(crate) fn slots_dc_dict(value: &PyAny) -> PyResult<&PyDict> {
+    let py = value.py();
+    let dc_fields: &PyDict = value.getattr(intern!(py, "__dataclass_fields__"))?.downcast()?;
+    let dict = PyDict::new(py);
+    for field in dc_fields.keys() {
+        let field: &PyString = field.downcast()?;
+        dict.set_item(field, value.getattr(field)?)?;
+    }
+    Ok(dict)
 }

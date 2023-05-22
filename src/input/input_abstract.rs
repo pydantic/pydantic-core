@@ -1,6 +1,6 @@
 use std::fmt;
 
-use pyo3::types::{PyDict, PyString, PyType};
+use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*};
 
 use crate::errors::{InputValue, LocItem, ValResult};
@@ -39,11 +39,6 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
     }
 
     fn is_none(&self) -> bool;
-
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn input_get_attr(&self, _name: &PyString) -> Option<PyResult<&PyAny>> {
-        None
-    }
 
     fn input_is_instance(&self, _class: &PyType) -> Option<&PyAny> {
         None

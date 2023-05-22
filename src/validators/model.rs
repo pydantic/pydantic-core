@@ -211,7 +211,7 @@ impl Validator for ModelValidator {
 
         let (output, _, updated_fields_set): (&PyDict, &PyAny, &PySet) = output.extract(py)?;
 
-        if let Ok(fields_set) = model.input_get_attr(intern!(py, DUNDER_FIELDS_SET_KEY)).unwrap() {
+        if let Ok(fields_set) = model.getattr(intern!(py, DUNDER_FIELDS_SET_KEY)) {
             let fields_set: &PySet = fields_set.downcast()?;
             for field_name in updated_fields_set {
                 fields_set.add(field_name)?;

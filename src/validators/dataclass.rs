@@ -10,6 +10,7 @@ use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{GenericArguments, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
+use crate::serializers::slots_dc_dict;
 use crate::validators::function::convert_err;
 
 use super::arguments::{json_get, json_slice, py_get, py_slice};
@@ -490,17 +491,7 @@ impl Validator for DataclassValidator {
             if self.revalidate.should_revalidate(py_input, class) {
                 let input_dict = match py_input.getattr(intern!(py, "__dict__")) {
                     Ok(attr) => attr,
-                    Err(_) => {
-                        // we inspect `__slots__` to get the attributes instead of using `self.slots` as a
-                        // subclass could have `slots=True`
-                        let slots: &PyTuple = py_input.getattr(intern!(py, "__slots__"))?.downcast()?;
-                        let dict = PyDict::new(py);
-                        for slot in slots {
-                            let slot: &PyString = slot.downcast()?;
-                            dict.set_item(slot, py_input.getattr(slot)?)?;
-                        }
-                        dict
-                    }
+                    Err(_) => slots_dc_dict(py_input)?,
                 };
                 let val_output = self
                     .validator

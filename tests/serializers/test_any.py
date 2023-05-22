@@ -484,3 +484,10 @@ def test_dataclass_slots(any_serializer):
 
     foo = Foo(1, 'a')
     assert any_serializer.to_python(foo) == IsStrictDict(a=1, b='a')
+
+    @dataclasses.dataclass(slots=True)
+    class Foo2(Foo):
+        pass
+
+    foo2 = Foo2(2, 'b')
+    assert any_serializer.to_python(foo2) == IsStrictDict(a=2, b='b')
