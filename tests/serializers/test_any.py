@@ -475,6 +475,24 @@ def test_any_model():
     assert s.to_python(Foo(a='hello', b=b'more'), exclude={'a'}) == IsStrictDict()
 
 
+def test_dataclass_classvar(any_serializer):
+    @dataclasses.dataclass(slots=True)
+    class Foo:
+        a: int
+        b: str
+        c: ClassVar[int] = 1
+
+    foo = Foo(1, 'a')
+    assert any_serializer.to_python(foo) == IsStrictDict(a=1, b='a')
+
+    @dataclasses.dataclass(slots=True)
+    class Foo2(Foo):
+        pass
+
+    foo2 = Foo2(2, 'b')
+    assert any_serializer.to_python(foo2) == IsStrictDict(a=2, b='b')
+
+
 @pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
 def test_dataclass_slots(any_serializer):
     @dataclasses.dataclass(slots=True)
@@ -491,3 +509,16 @@ def test_dataclass_slots(any_serializer):
 
     foo2 = Foo2(2, 'b')
     assert any_serializer.to_python(foo2) == IsStrictDict(a=2, b='b')
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
+def test_dataclass_slots_init_vars(any_serializer):
+    @dataclasses.dataclass(slots=True)
+    class Foo:
+        a: int
+        b: str
+        c: dataclasses.InitVar[int]
+        d: ClassVar[int] = 42
+
+    foo = Foo(1, 'a', 42)
+    assert any_serializer.to_python(foo) == IsStrictDict(a=1, b='a')
