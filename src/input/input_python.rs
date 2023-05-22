@@ -188,7 +188,7 @@ impl<'a> Input<'a> for PyAny {
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
         if let Ok(py_str) = self.downcast::<PyString>() {
-            if is_builtin_str(py_str) {
+            if PyString::is_exact_type_of(self) {
                 Ok(py_str.into())
             } else {
                 Err(ValError::new(ErrorType::StringSubType, self))
@@ -200,7 +200,7 @@ impl<'a> Input<'a> for PyAny {
 
     fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
         if let Ok(py_str) = self.downcast::<PyString>() {
-            if is_builtin_str(py_str) {
+            if PyString::is_exact_type_of(self) {
                 Ok(py_str.into())
             } else {
                 // force to a rust string to make sure behaviour is consistent whether or not we go via a
@@ -645,10 +645,6 @@ fn maybe_as_string(v: &PyAny, unicode_error: ErrorType) -> ValResult<Option<Cow<
     } else {
         Ok(None)
     }
-}
-
-fn is_builtin_str(py_str: &PyString) -> bool {
-    py_str.get_type().is(PyString::type_object(py_str.py()))
 }
 
 #[cfg(PyPy)]
