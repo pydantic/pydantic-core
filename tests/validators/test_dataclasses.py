@@ -1193,7 +1193,7 @@ def test_custom_dataclass_names():
     ]
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python >= 3.10')
 def test_slots() -> None:
     @dataclasses.dataclass(slots=True)
     class Model:
@@ -1223,7 +1223,7 @@ def test_slots() -> None:
         val.validate_assignment(m, 'x', 'abc')
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python >= 3.10')
 def test_dataclass_slots_field_before_validator():
     @dataclasses.dataclass(slots=True)
     class Foo:
@@ -1257,7 +1257,7 @@ def test_dataclass_slots_field_before_validator():
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python >= 3.10')
 def test_dataclass_slots_field_after_validator():
     @dataclasses.dataclass(slots=True)
     class Foo:
@@ -1356,7 +1356,7 @@ class DuplicateDifferentSlots:
         ),
     ],
 )
-@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python >= 3.10')
 def test_slots_dataclass_subclass(revalidate_instances, input_value, expected):
     schema = core_schema.dataclass_schema(
         FooDataclassSlots,
