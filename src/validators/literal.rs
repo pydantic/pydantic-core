@@ -49,7 +49,7 @@ impl BuildValidator for LiteralValidator {
             repr_args.push(item.repr()?.extract()?);
             if let Ok(either_int) = item.strict_int() {
                 let int = either_int
-                    .into_int()
+                    .try_into()
                     .map_err(|_| py_error_type!("error extracting int {:?}", item))?;
                 expected_int.insert(int);
             } else if let Ok(either_str) = item.strict_str() {
@@ -83,7 +83,7 @@ impl Validator for LiteralValidator {
     ) -> ValResult<'data, PyObject> {
         if let Some(expected_ints) = &self.expected_int {
             if let Ok(either_int) = input.strict_int() {
-                let int = either_int.into_int()?;
+                let int = either_int.try_into()?;
                 if expected_ints.contains(&int) {
                     return Ok(input.to_object(py));
                 }
