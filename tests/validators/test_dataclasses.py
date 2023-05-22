@@ -1222,10 +1222,9 @@ def test_slots() -> None:
         val.validate_assignment(m, 'x', 'abc')
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
 def test_dataclass_slots_field_before_validator():
-    kwargs = {'slots': True}
-
-    @dataclasses.dataclass(**kwargs)
+    @dataclasses.dataclass(slots=True)
     class Foo:
         a: int
         b: str
@@ -1256,10 +1255,9 @@ def test_dataclass_slots_field_before_validator():
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
 def test_dataclass_slots_field_after_validator():
-    kwargs = {'slots': True}
-
-    @dataclasses.dataclass(**kwargs)
+    @dataclasses.dataclass(slots=True)
     class Foo:
         a: int
         b: str
@@ -1290,23 +1288,29 @@ def test_dataclass_slots_field_after_validator():
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
 
 
-@dataclasses.dataclass(slots=True)
+if sys.version_info < (3, 10):
+    kwargs = {}
+else:
+    kwargs = {'slots': True}
+
+
+@dataclasses.dataclass(**kwargs)
 class FooDataclassSlots:
     a: str
     b: bool
 
 
-@dataclasses.dataclass(slots=True)
+@dataclasses.dataclass(**kwargs)
 class FooDataclassSameSlots(FooDataclassSlots):
     pass
 
 
-@dataclasses.dataclass(slots=True)
+@dataclasses.dataclass(**kwargs)
 class FooDataclassMoreSlots(FooDataclassSlots):
     c: str
 
 
-@dataclasses.dataclass(slots=True)
+@dataclasses.dataclass(**kwargs)
 class DuplicateDifferentSlots:
     a: str
     b: bool
@@ -1349,6 +1353,7 @@ class DuplicateDifferentSlots:
         ),
     ],
 )
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
 def test_slots_dataclass_subclass(revalidate_instances, input_value, expected):
     schema = core_schema.dataclass_schema(
         FooDataclassSlots,
