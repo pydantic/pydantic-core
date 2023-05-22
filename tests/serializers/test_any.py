@@ -476,7 +476,7 @@ def test_any_model():
 
 
 def test_dataclass_classvar(any_serializer):
-    @dataclasses.dataclass(slots=True)
+    @dataclasses.dataclass
     class Foo:
         a: int
         b: str
@@ -485,7 +485,7 @@ def test_dataclass_classvar(any_serializer):
     foo = Foo(1, 'a')
     assert any_serializer.to_python(foo) == IsStrictDict(a=1, b='a')
 
-    @dataclasses.dataclass(slots=True)
+    @dataclasses.dataclass
     class Foo2(Foo):
         pass
 
