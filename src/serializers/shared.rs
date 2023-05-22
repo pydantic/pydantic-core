@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 
 use pyo3::exceptions::PyTypeError;
+use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
@@ -349,13 +350,26 @@ pub(super) fn object_to_dict<'py>(value: &'py PyAny, is_model: bool, extra: &Ext
     }
 }
 
-pub(crate) fn slots_dc_dict(value: &PyAny) -> PyResult<&PyDict> {
-    let py = value.py();
-    let dc_fields: &PyDict = value.getattr(intern!(py, "__dataclass_fields__"))?.downcast()?;
+static DC_FIELD_MARKER: GILOnceCell<PyObject> = GILOnceCell::new();
+
+pub(crate) fn slots_dc_dict(dc: &PyAny) -> PyResult<&PyDict> {
+    let py = dc.py();
+    let dc_fields: &PyDict = dc.getattr(intern!(py, "__dataclass_fields__"))?.downcast()?;
     let dict = PyDict::new(py);
-    for field in dc_fields.keys() {
-        let field: &PyString = field.downcast()?;
-        dict.set_item(field, value.getattr(field)?)?;
+
+    // need to match the logic from dataclasses.fields `tuple(f for f in fields.values() if f._field_type is _FIELD)`
+    let field_type_marker_obj = DC_FIELD_MARKER.get_or_try_init(py, || {
+        let field_ = py.import("dataclasses")?.getattr("_FIELD")?;
+        Ok::<PyObject, PyErr>(field_.into_py(py))
+    })?;
+    let field_type_marker = field_type_marker_obj.as_ref(py);
+
+    for (field_name, field) in dc_fields.iter() {
+        let field_type = field.getattr(intern!(py, "_field_type"))?;
+        if field_type.is(field_type_marker) {
+            let field_name: &PyString = field_name.downcast()?;
+            dict.set_item(field_name, dc.getattr(field_name)?)?;
+        }
     }
     Ok(dict)
 }
