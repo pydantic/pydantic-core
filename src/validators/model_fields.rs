@@ -115,7 +115,7 @@ impl Validator for ModelFieldsValidator {
         let model_dict = PyDict::new(py);
         let mut model_extra_dict_op: Option<&PyDict> = None;
         let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
-        let mut fields_set_vec: Vec<Py<PyString>> = Vec::with_capacity(self.fields.len());
+        let mut fields_set_vec: Vec<PyObject> = Vec::with_capacity(self.fields.len());
 
         // we only care about which keys have been used if we're iterating over the object for extra after
         // the first pass
@@ -158,7 +158,7 @@ impl Validator for ModelFieldsValidator {
                         {
                             Ok(value) => {
                                 model_dict.set_item(&field.name_py, value)?;
-                                fields_set_vec.push(field.name_py.clone_ref(py));
+                                fields_set_vec.push(field.name_py.clone_ref(py).into_py(py));
                             }
                             Err(ValError::Omit) => continue,
                             Err(ValError::LineErrors(line_errors)) => {
@@ -213,7 +213,7 @@ impl Validator for ModelFieldsValidator {
                             }
                             ExtraBehavior::Ignore => {}
                             ExtraBehavior::Allow => {
-                            let py_key = either_str.as_py_string(py);
+                                let py_key = either_str.as_py_any(py);
                                 if let Some(ref validator) = self.extra_validator {
                                     match validator.validate(py, value, &extra, definitions, recursion_guard) {
                                         Ok(value) => {

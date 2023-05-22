@@ -275,7 +275,7 @@ impl Validator for DataclassArgsValidator {
                                             }
                                             ExtraBehavior::Ignore => {}
                                             ExtraBehavior::Allow => {
-                                                output_dict.set_item(either_str.as_py_string(py), value)?
+                                                output_dict.set_item(either_str.as_py_any(py), value)?
                                             }
                                         }
                                     }

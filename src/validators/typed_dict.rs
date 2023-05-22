@@ -232,7 +232,7 @@ impl Validator for TypedDictValidator {
                             }
                             ExtraBehavior::Ignore => {}
                             ExtraBehavior::Allow => {
-                            let py_key = either_str.as_py_string(py);
+                            let py_key = either_str.as_py_any(py);
                                 if let Some(ref validator) = self.extra_validator {
                                     match validator.validate(py, value, &extra, definitions, recursion_guard) {
                                         Ok(value) => {

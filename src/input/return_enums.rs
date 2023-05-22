@@ -733,21 +733,27 @@ impl<'a> From<JsonArgs<'a>> for GenericArguments<'a> {
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub enum EitherString<'a> {
     Cow(Cow<'a, str>),
-    Py(&'a PyString),
+    Py(&'a PyAny),
 }
 
 impl<'a> EitherString<'a> {
     pub fn as_cow(&self) -> ValResult<'a, Cow<str>> {
         match self {
             Self::Cow(data) => Ok(data.clone()),
-            Self::Py(py_str) => Ok(Cow::Borrowed(py_string_str(py_str)?)),
+            Self::Py(py_any) => {
+                let py_str: &PyString = py_any.downcast()?;
+                let str = py_str.to_str().map_err(|_| {
+                    ValError::new_custom_input(ErrorType::StringUnicode, InputValue::PyAny(py_str as &PyAny))
+                })?;
+                Ok(Cow::Borrowed(str))
+            }
         }
     }
 
-    pub fn as_py_string(&'a self, py: Python<'a>) -> &'a PyString {
+    pub fn as_py_any(&'a self, py: Python<'a>) -> &'a PyAny {
         match self {
             Self::Cow(cow) => PyString::new(py, cow),
-            Self::Py(py_string) => py_string,
+            Self::Py(py_any) => py_any,
         }
     }
 }
@@ -758,15 +764,34 @@ impl<'a> From<&'a str> for EitherString<'a> {
     }
 }
 
-impl<'a> From<&'a PyString> for EitherString<'a> {
-    fn from(date: &'a PyString) -> Self {
+impl<'a> From<&'a PyAny> for EitherString<'a> {
+    fn from(date: &'a PyAny) -> Self {
         Self::Py(date)
     }
 }
 
+// impl<'a> IntoPy<&'a PyAny> for EitherString<'a> {
+//     fn into_py(self, py: Python<'_>) -> &'a PyAny {
+//         match self {
+//             Self::Cow(cow) => {
+//                 let py_str = PyString::new(py, &cow).to_object(py);
+//                 py_str.into_ref(py)
+//             },
+//             Self::Py(py_any) => py_any,
+//         }
+//     }
+// }
+
+// impl<'a> ToPyObject for EitherString<'a> {
+//     fn to_object(&self, py: Python<'_>) -> PyObject {
+//         let py_any: &PyAny = self.into_py(py);
+//         py_any.into_py(py)
+//     }
+// }
+
 impl<'a> IntoPy<PyObject> for EitherString<'a> {
     fn into_py(self, py: Python<'_>) -> PyObject {
-        self.as_py_string(py).into_py(py)
+        self.as_py_any(py).into_py(py)
     }
 }
 
