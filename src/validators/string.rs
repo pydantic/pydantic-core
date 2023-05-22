@@ -122,7 +122,7 @@ impl Validator for StrConstrainedValidator {
             PyString::new(py, str)
         } else {
             // we haven't modified the string, return the original as it might be a PyString
-            either_str.as_py_string(py)
+            return Ok(either_str.into_py(py));
         };
         Ok(py_string.into_py(py))
     }
