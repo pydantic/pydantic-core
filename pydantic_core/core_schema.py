@@ -3123,7 +3123,7 @@ def dataclass_schema(
     another schema, not as the root type.
 
     Args:
-        cls: The dataclass type, used to to perform subclass checks
+        cls: The dataclass type, used to perform subclass checks
         schema: The schema to use for the dataclass fields
         cls_name: The name to use in error locs, etc; this is useful for generics (default: `cls.__name__`)
         post_init: Whether to call `__post_init__` after validation

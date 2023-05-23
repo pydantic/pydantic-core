@@ -36,11 +36,17 @@ class MyDataclass:
 
 
 class MyModel:
-    __pydantic_serializer__ = 42
-
     def __init__(self, **kwargs):
+        fields = {}
         for key, value in kwargs.items():
             setattr(self, key, value)
+            fields[key] = core_schema.model_field(core_schema.any_schema())
+        self.__pydantic_serializer__ = SchemaSerializer(
+            core_schema.model_schema(MyModel, core_schema.model_fields_schema(fields))
+        )
+
+    def __repr__(self):
+        return f'MyModel({self.__dict__})'
 
 
 @pytest.mark.parametrize('value', [None, 1, 1.0, True, 'foo', [1, 2, 3], {'a': 1, 'b': 2}])
@@ -58,6 +64,7 @@ def test_any_json_round_trip(any_serializer, value):
         ({1, 2, 3}, {1, 2, 3}, IsList(1, 2, 3, check_order=False)),
         ({1, '2', b'3'}, {1, '2', b'3'}, IsList(1, '2', '3', check_order=False)),
     ],
+    ids=repr,
 )
 def test_any_python(any_serializer, input_value, expected_plain, expected_json_obj):
     assert any_serializer.to_python(input_value) == expected_plain
@@ -247,8 +254,13 @@ class FieldsSetModel:
     __slots__ = '__dict__', '__pydantic_extra__', '__pydantic_fields_set__'
 
     def __init__(self, **kwargs):
+        fields = {}
         for key, value in kwargs.items():
             setattr(self, key, value)
+            fields[key] = core_schema.model_field(core_schema.any_schema())
+        self.__pydantic_serializer__ = SchemaSerializer(
+            core_schema.model_schema(MyModel, core_schema.model_fields_schema(fields))
+        )
 
 
 def test_exclude_unset(any_serializer):
@@ -444,13 +456,10 @@ def test_any_dataclass():
 
 
 def test_any_model():
+    @dataclasses.dataclass
     class Foo:
         a: str
         b: bytes
-
-        def __init__(self, a: str, b: bytes):
-            self.a = a
-            self.b = b
 
     # Build a schema that does not include the field 'b', to test that it is not serialized
     schema = core_schema.dataclass_schema(
@@ -473,6 +482,7 @@ def test_any_model():
         assert j == b'{"a":"hello"}'
 
     assert s.to_python(Foo(a='hello', b=b'more'), exclude={'a'}) == IsStrictDict()
+    assert s.to_json(Foo(a='hello', b=b'more'), exclude={'a'}) == b'{}'
 
 
 def test_dataclass_classvar(any_serializer):
@@ -484,6 +494,7 @@ def test_dataclass_classvar(any_serializer):
 
     foo = Foo(1, 'a')
     assert any_serializer.to_python(foo) == IsStrictDict(a=1, b='a')
+    assert any_serializer.to_json(foo) == b'{"a":1,"b":"a"}'
 
     @dataclasses.dataclass
     class Foo2(Foo):
@@ -491,6 +502,7 @@ def test_dataclass_classvar(any_serializer):
 
     foo2 = Foo2(2, 'b')
     assert any_serializer.to_python(foo2) == IsStrictDict(a=2, b='b')
+    assert any_serializer.to_json(foo2) == b'{"a":2,"b":"b"}'
 
 
 @pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python >= 3.10')
@@ -502,6 +514,7 @@ def test_dataclass_slots(any_serializer):
 
     foo = Foo(1, 'a')
     assert any_serializer.to_python(foo) == IsStrictDict(a=1, b='a')
+    assert any_serializer.to_json(foo) == b'{"a":1,"b":"a"}'
 
     @dataclasses.dataclass(slots=True)
     class Foo2(Foo):
@@ -509,6 +522,7 @@ def test_dataclass_slots(any_serializer):
 
     foo2 = Foo2(2, 'b')
     assert any_serializer.to_python(foo2) == IsStrictDict(a=2, b='b')
+    assert any_serializer.to_json(foo2) == b'{"a":2,"b":"b"}'
 
 
 @pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python >= 3.10')
@@ -522,3 +536,25 @@ def test_dataclass_slots_init_vars(any_serializer):
 
     foo = Foo(1, 'a', 42)
     assert any_serializer.to_python(foo) == IsStrictDict(a=1, b='a')
+    assert any_serializer.to_json(foo) == b'{"a":1,"b":"a"}'
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
+def test_slots_mixed(any_serializer):
+    @dataclasses.dataclass(slots=True)
+    class Model:
+        x: int
+        y: dataclasses.InitVar[str]
+        z: ClassVar[str] = 'z-classvar'
+
+    @dataclasses.dataclass
+    class SubModel(Model):
+        x2: int
+        y2: dataclasses.InitVar[str]
+        z2: ClassVar[str] = 'z2-classvar'
+
+    dc = SubModel(x=1, y='a', x2=2, y2='b')
+    assert dataclasses.asdict(dc) == {'x': 1, 'x2': 2}
+
+    assert any_serializer.to_python(dc) == {'x': 1, 'x2': 2}
+    assert any_serializer.to_json(dc) == b'{"x":1,"x2":2}'

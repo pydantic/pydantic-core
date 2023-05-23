@@ -1,7 +1,7 @@
 import dataclasses
 import re
 import sys
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, ClassVar, Dict, List, Optional, Union
 
 import pytest
 from dirty_equals import IsListOrTuple, IsStr
@@ -1384,3 +1384,36 @@ def test_slots_dataclass_subclass(revalidate_instances, input_value, expected):
         dc = v.validate_python(input_value)
         assert dataclasses.is_dataclass(dc)
         assert dataclasses.asdict(dc) == expected
+
+
+def test_slots_mixed():
+    @dataclasses.dataclass(slots=True)
+    class Model:
+        x: int
+        y: dataclasses.InitVar[str]
+        z: ClassVar[str] = 'z-classvar'
+
+    @dataclasses.dataclass
+    class SubModel(Model):
+        x2: int
+        y2: dataclasses.InitVar[str]
+        z2: ClassVar[str] = 'z2-classvar'
+
+    schema = core_schema.dataclass_schema(
+        SubModel,
+        core_schema.dataclass_args_schema(
+            'SubModel',
+            [
+                core_schema.dataclass_field(name='x', schema=core_schema.int_schema()),
+                core_schema.dataclass_field(name='y', init_only=True, schema=core_schema.str_schema()),
+                core_schema.dataclass_field(name='x2', schema=core_schema.int_schema()),
+                core_schema.dataclass_field(name='y2', init_only=True, schema=core_schema.str_schema()),
+            ],
+        ),
+        slots=['x'],
+    )
+    v = SchemaValidator(schema)
+    dc = v.validate_python({'x': 1, 'y': 'a', 'x2': 2, 'y2': 'b'})
+    assert dc.x == 1
+    assert dc.x2 == 2
+    assert dataclasses.asdict(dc) == {'x': 1, 'x2': 2}

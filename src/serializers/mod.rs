@@ -11,7 +11,7 @@ use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
 use extra::{CollectWarnings, SerRecursionGuard};
 pub(crate) use extra::{Extra, SerMode, SerializationState};
-pub(crate) use shared::slots_dc_dict;
+pub(crate) use shared::dataclass_to_dict;
 pub use shared::CombinedSerializer;
 use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
 

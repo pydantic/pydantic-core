@@ -1,6 +1,10 @@
 import dataclasses
 import json
 import platform
+import sys
+from typing import ClassVar
+
+import pytest
 
 from pydantic_core import SchemaSerializer, core_schema
 
@@ -120,3 +124,38 @@ def test_properties():
 
     assert s.to_python(FooProp(a='hello', b=b'more'), exclude={'b'}) == IsStrictDict(a='hello', c='hello more')
     assert s.to_json(FooProp(a='hello', b=b'more'), include={'a'}) == b'{"a":"hello"}'
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='slots are only supported for dataclasses in Python > 3.10')
+def test_slots_mixed():
+    @dataclasses.dataclass(slots=True)
+    class Model:
+        x: int
+        y: dataclasses.InitVar[str]
+        z: ClassVar[str] = 'z-classvar'
+
+    @dataclasses.dataclass
+    class SubModel(Model):
+        x2: int
+        y2: dataclasses.InitVar[str]
+        z2: ClassVar[str] = 'z2-classvar'
+
+    schema = core_schema.dataclass_schema(
+        SubModel,
+        core_schema.dataclass_args_schema(
+            'SubModel',
+            [
+                core_schema.dataclass_field(name='x', schema=core_schema.int_schema()),
+                core_schema.dataclass_field(name='y', init_only=True, schema=core_schema.str_schema()),
+                core_schema.dataclass_field(name='x2', schema=core_schema.int_schema()),
+                core_schema.dataclass_field(name='y2', init_only=True, schema=core_schema.str_schema()),
+            ],
+        ),
+        slots=['x'],
+    )
+    dc = SubModel(x=1, y='a', x2=2, y2='b')
+    assert dataclasses.asdict(dc) == {'x': 1, 'x2': 2}
+
+    s = SchemaSerializer(schema)
+    assert s.to_python(dc) == {'x': 1, 'x2': 2}
+    assert s.to_json(dc) == b'{"x":1,"x2":2}'

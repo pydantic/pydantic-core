@@ -36,5 +36,5 @@ pub(self) use super::infer::{
 };
 pub(self) use super::ob_type::{IsType, ObType};
 pub(self) use super::shared::{
-    object_to_dict, to_json_bytes, BuildSerializer, CombinedSerializer, PydanticSerializer, TypeSerializer,
+    get_field_marker, to_json_bytes, BuildSerializer, CombinedSerializer, PydanticSerializer, TypeSerializer,
 };
