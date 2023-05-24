@@ -276,7 +276,10 @@ impl AnyFilter {
         index: usize,
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
+        len: Option<usize>,
     ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        let include = include.map(|v| map_negative_indices(v, len)).transpose()?;
+        let exclude = exclude.map(|v| map_negative_indices(v, len)).transpose()?;
         self.filter(index, index, include, exclude)
     }
 }

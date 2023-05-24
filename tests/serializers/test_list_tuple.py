@@ -99,6 +99,19 @@ def test_include(schema_func, seq_f):
 @pytest.mark.parametrize(
     'schema_func,seq_f', [(core_schema.list_schema, as_list), (core_schema.tuple_variable_schema, as_tuple)]
 )
+def test_negative(schema_func, seq_f):
+    v = SchemaSerializer(schema_func(core_schema.any_schema()))
+    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e')) == seq_f('a', 'b', 'c', 'd', 'e')
+    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e'), include={-1, -2}) == seq_f('d', 'e')
+    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e'), include={-1: None, -2: None}) == seq_f('d', 'e')
+    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e'), include={-1, -2}, mode='json') == ['d', 'e']
+    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e'), include={-1: None, -2: None}, mode='json') == ['d', 'e']
+    assert v.to_json(seq_f('a', 'b', 'c', 'd', 'e'), include={-1, -2}) == b'["d","e"]'
+
+
+@pytest.mark.parametrize(
+    'schema_func,seq_f', [(core_schema.list_schema, as_list), (core_schema.tuple_variable_schema, as_tuple)]
+)
 def test_include_dict(schema_func, seq_f):
     v = SchemaSerializer(
         schema_func(core_schema.any_schema(), serialization=core_schema.filter_seq_schema(include={1, 3, 5}))
