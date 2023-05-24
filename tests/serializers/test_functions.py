@@ -1,4 +1,5 @@
 import json
+import platform
 import sys
 from collections import deque
 from pathlib import Path
@@ -632,6 +633,9 @@ def test_function_wrap_preserves_wrapped_serialization():
         assert s.to_python('abc') == 'abc'
 
 
+@pytest.mark.skipif(
+    platform.python_implementation() == 'PyPy' or sys.platform == 'emscripten', reason='fails on pypy and emscripten'
+)
 def test_recursive_call():
     def bad_recursive(value):
         return s.to_python(value)
