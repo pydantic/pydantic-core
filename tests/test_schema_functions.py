@@ -255,13 +255,13 @@ all_schema_functions = [
     ),
     (
         core_schema.dataclass_schema,
-        args(MyDataclass, {'type': 'int'}),
-        {'type': 'dataclass', 'schema': {'type': 'int'}, 'cls': MyDataclass},
+        args(MyDataclass, {'type': 'int'}, ['foobar']),
+        {'type': 'dataclass', 'schema': {'type': 'int'}, 'fields': ['foobar'], 'cls': MyDataclass},
     ),
     (
         core_schema.dataclass_schema,
-        args(MyDataclass, {'type': 'int'}, slots=['a']),
-        {'type': 'dataclass', 'schema': {'type': 'int'}, 'cls': MyDataclass, 'slots': ['a']},
+        args(MyDataclass, {'type': 'int'}, ['foobar'], slots=True),
+        {'type': 'dataclass', 'schema': {'type': 'int'}, 'fields': ['foobar'], 'cls': MyDataclass, 'slots': True},
     ),
 ]
 

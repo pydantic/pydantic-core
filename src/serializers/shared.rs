@@ -339,7 +339,7 @@ pub(super) fn get_field_marker(py: Python<'_>) -> PyResult<&PyAny> {
     Ok(field_type_marker_obj.as_ref(py))
 }
 
-pub(crate) fn dataclass_to_dict(dc: &PyAny) -> PyResult<&PyDict> {
+pub(super) fn dataclass_to_dict(dc: &PyAny) -> PyResult<&PyDict> {
     let py = dc.py();
     let dc_fields: &PyDict = dc.getattr(intern!(py, "__dataclass_fields__"))?.downcast()?;
     let dict = PyDict::new(py);

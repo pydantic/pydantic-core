@@ -9,9 +9,9 @@ use crate::build_tools::{py_error_type, ExtraBehavior, SchemaDict};
 use crate::definitions::DefinitionsBuilder;
 
 use super::{
-    get_field_marker, infer_json_key, infer_json_key_known, infer_serialize, infer_to_python, py_err_se_err,
-    BuildSerializer, CombinedSerializer, ComputedFields, Extra, FieldsMode, GeneralFieldsSerializer, ObType, SerCheck,
-    SerField, TypeSerializer,
+    infer_json_key, infer_json_key_known, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer,
+    CombinedSerializer, ComputedFields, Extra, FieldsMode, GeneralFieldsSerializer, ObType, SerCheck, SerField,
+    TypeSerializer,
 };
 
 pub struct DataclassArgsBuilder;
@@ -83,17 +83,11 @@ impl BuildSerializer for DataclassSerializer {
         let sub_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
         let serializer = Box::new(CombinedSerializer::build(sub_schema, config, definitions)?);
 
-        let dc_fields: &PyDict = class.getattr(intern!(py, "__dataclass_fields__"))?.downcast()?;
-        let mut fields = Vec::with_capacity(dc_fields.len());
-
-        let field_type_marker = get_field_marker(py)?;
-        for (field_name, field) in dc_fields.iter() {
-            let field_type = field.getattr(intern!(py, "_field_type"))?;
-            if field_type.is(field_type_marker) {
-                let field_name: &PyString = field_name.downcast()?;
-                fields.push(field_name.into_py(py));
-            }
-        }
+        let fields = schema
+            .get_as_req::<&PyList>(intern!(py, "fields"))?
+            .iter()
+            .map(|s| Ok(s.downcast::<PyString>()?.into_py(py)))
+            .collect::<PyResult<Vec<_>>>()?;
 
         Ok(Self {
             class: class.into(),

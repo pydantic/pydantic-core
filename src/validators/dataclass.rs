@@ -10,7 +10,6 @@ use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{GenericArguments, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
-use crate::serializers::dataclass_to_dict;
 use crate::validators::function::convert_err;
 
 use super::arguments::{json_get, json_slice, py_get, py_slice};
@@ -411,11 +410,12 @@ pub struct DataclassValidator {
     strict: bool,
     validator: Box<CombinedValidator>,
     class: Py<PyType>,
+    fields: Vec<Py<PyString>>,
     post_init: Option<Py<PyString>>,
     revalidate: Revalidate,
     name: String,
     frozen: bool,
-    slots: Option<Vec<Py<PyString>>>,
+    slots: bool,
 }
 
 impl BuildValidator for DataclassValidator {
@@ -442,21 +442,17 @@ impl BuildValidator for DataclassValidator {
             None
         };
 
-        let slots = match schema.get_as::<&PyList>(intern!(py, "slots"))? {
-            Some(slots) => {
-                let slots = slots
-                    .iter()
-                    .map(|s| Ok(s.downcast::<PyString>()?.into_py(py)))
-                    .collect::<PyResult<Vec<_>>>()?;
-                Some(slots)
-            }
-            None => None,
-        };
+        let fields = schema
+            .get_as_req::<&PyList>(intern!(py, "fields"))?
+            .iter()
+            .map(|s| Ok(s.downcast::<PyString>()?.into_py(py)))
+            .collect::<PyResult<Vec<_>>>()?;
 
         Ok(Self {
             strict: is_strict(schema, config)?,
             validator: Box::new(validator),
             class: class.into(),
+            fields,
             post_init,
             revalidate: Revalidate::from_str(schema_or_config_same(
                 schema,
@@ -465,7 +461,7 @@ impl BuildValidator for DataclassValidator {
             )?)?,
             name,
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
-            slots,
+            slots: schema.get_as(intern!(py, "slots"))?.unwrap_or(false),
         }
         .into())
     }
@@ -489,7 +485,7 @@ impl Validator for DataclassValidator {
         let class = self.class.as_ref(py);
         if let Some(py_input) = input.input_is_instance(class) {
             if self.revalidate.should_revalidate(py_input, class) {
-                let input_dict: &PyAny = dataclass_to_dict(py_input)?;
+                let input_dict: &PyAny = self.dataclass_to_dict(py, py_input)?;
                 let val_output = self
                     .validator
                     .validate(py, input_dict, extra, definitions, recursion_guard)?;
@@ -530,17 +526,7 @@ impl Validator for DataclassValidator {
             return Err(ValError::new(ErrorType::FrozenInstance, field_value));
         }
 
-        let new_dict = if let Some(ref slots) = self.slots {
-            let slots_dict = PyDict::new(py);
-            for slot in slots {
-                let slot = slot.as_ref(py);
-                slots_dict.set_item(slot, obj.getattr(slot)?)?;
-            }
-            slots_dict
-        } else {
-            let dunder_dict: &PyDict = obj.getattr(intern!(py, "__dict__"))?.downcast()?;
-            dunder_dict.copy()?
-        };
+        let new_dict = self.dataclass_to_dict(py, obj)?;
 
         new_dict.set_item(field_name, field_value)?;
 
@@ -556,8 +542,10 @@ impl Validator for DataclassValidator {
 
         let (dc_dict, _): (&PyDict, PyObject) = val_assignment_result.extract(py)?;
 
-        if self.slots.is_some() {
-            let value = dc_dict.get_item(field_name).unwrap();
+        if self.slots {
+            let value = dc_dict
+                .get_item(field_name)
+                .ok_or_else(|| PyKeyError::new_err(field_name.to_string()))?;
             force_setattr(py, obj, field_name, value)?;
         } else {
             force_setattr(py, obj, intern!(py, "__dict__"), dc_dict)?;
@@ -613,6 +601,16 @@ impl DataclassValidator {
         Ok(self_instance.into_py(py))
     }
 
+    fn dataclass_to_dict<'py>(&self, py: Python<'py>, dc: &'py PyAny) -> PyResult<&'py PyDict> {
+        let dict = PyDict::new(py);
+
+        for field_name in &self.fields {
+            let field_name = field_name.as_ref(py);
+            dict.set_item(field_name, dc.getattr(field_name)?)?;
+        }
+        Ok(dict)
+    }
+
     fn set_dict_call<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -621,7 +619,7 @@ impl DataclassValidator {
         input: &'data impl Input<'data>,
     ) -> ValResult<'data, ()> {
         let (dc_dict, post_init_kwargs): (&PyAny, &PyAny) = val_output.extract(py)?;
-        if self.slots.is_some() {
+        if self.slots {
             let dc_dict: &PyDict = dc_dict.downcast()?;
             for (key, value) in dc_dict.iter() {
                 force_setattr(py, dc, key, value)?;

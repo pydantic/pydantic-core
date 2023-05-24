@@ -439,6 +439,7 @@ def test_any_dataclass():
         core_schema.dataclass_args_schema(
             'Foo', [core_schema.dataclass_field(name='a', schema=core_schema.str_schema())]
         ),
+        ['a'],
     )
     Foo.__pydantic_serializer__ = SchemaSerializer(schema)
 
@@ -467,6 +468,7 @@ def test_any_model():
         core_schema.dataclass_args_schema(
             'Foo', [core_schema.dataclass_field(name='a', schema=core_schema.str_schema())]
         ),
+        ['a'],
     )
     Foo.__pydantic_validator__ = SchemaValidator(schema)
     Foo.__pydantic_serializer__ = SchemaSerializer(schema)

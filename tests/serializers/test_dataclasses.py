@@ -32,6 +32,7 @@ def test_dataclass():
                 core_schema.dataclass_field(name='b', schema=core_schema.bytes_schema()),
             ],
         ),
+        ['a', 'b'],
     )
     s = SchemaSerializer(schema)
     assert s.to_python(Foo(a='hello', b=b'more')) == IsStrictDict(a='hello', b=b'more')
@@ -57,6 +58,7 @@ def test_serialization_exclude():
                 core_schema.dataclass_field(name='b', schema=core_schema.bytes_schema(), serialization_exclude=True),
             ],
         ),
+        ['a', 'b'],
     )
     s = SchemaSerializer(schema)
     assert s.to_python(Foo(a='hello', b=b'more')) == {'a': 'hello'}
@@ -79,6 +81,7 @@ def test_serialization_alias():
                 core_schema.dataclass_field(name='b', schema=core_schema.bytes_schema(), serialization_alias='BAR'),
             ],
         ),
+        ['a', 'b'],
     )
     s = SchemaSerializer(schema)
     assert s.to_python(Foo(a='hello', b=b'more')) == IsStrictDict(a='hello', BAR=b'more')
@@ -111,6 +114,7 @@ def test_properties():
             ],
             computed_fields=[core_schema.computed_field('c', core_schema.str_schema())],
         ),
+        ['a', 'b'],
     )
     s = SchemaSerializer(schema)
     assert s.to_python(FooProp(a='hello', b=b'more')) == IsStrictDict(a='hello', b=b'more', c='hello more')
@@ -151,7 +155,8 @@ def test_slots_mixed():
                 core_schema.dataclass_field(name='y2', init_only=True, schema=core_schema.str_schema()),
             ],
         ),
-        slots=['x'],
+        ['x', 'x2'],
+        slots=True,
     )
     dc = SubModel(x=1, y='a', x2=2, y2='b')
     assert dataclasses.asdict(dc) == {'x': 1, 'x2': 2}
