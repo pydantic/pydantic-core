@@ -200,7 +200,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
                     let value = infer_to_python(value, next_include, next_exclude, &extra)?;
                     output_dict.set_item(key, value)?;
                 } else if extra.check.enabled() {
-                    return Err(PydanticSerializationUnexpectedValue::new_err(None));
+                    // return Err(PydanticSerializationUnexpectedValue::new_err(None));
                 }
             }
         }

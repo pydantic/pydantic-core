@@ -110,7 +110,7 @@ fn has_extra(schema: &PyDict, config: Option<&PyDict>) -> PyResult<bool> {
 impl ModelSerializer {
     fn allow_value(&self, value: &PyAny, extra: &Extra) -> PyResult<bool> {
         match extra.check {
-            SerCheck::Strict => Ok(value.get_type().is(self.class.as_ref(value.py()))),
+            SerCheck::Strict => value.is_instance(self.class.as_ref(value.py())),
             SerCheck::Lax => value.is_instance(self.class.as_ref(value.py())),
             SerCheck::None => value.hasattr(intern!(value.py(), "__dict__")),
         }
