@@ -87,6 +87,13 @@ def test_include(schema_func, seq_f):
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), include=[6]) == seq_f('b', 'd', 'f', 'g')
     assert v.to_json(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), include={6}) == b'["b","d","f","g"]'
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), include={6: None}) == seq_f('b', 'd', 'f', 'g')
+    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), include={-1: None, -2: None}, mode='json') == [
+        'b',
+        'd',
+        'f',
+        'g',
+        'h',
+    ]
 
 
 @pytest.mark.parametrize(
@@ -116,7 +123,9 @@ def test_exclude(schema_func, seq_f):
     assert v.to_json(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')) == b'["a","c","e","g","h"]'
     # the two exclude lists are combined via union as they used to be
     assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), exclude={6}) == seq_f('a', 'c', 'e', 'h')
+    assert v.to_python(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), exclude={-1, -2}) == seq_f('a', 'c', 'e')
     assert v.to_json(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), exclude={6}) == b'["a","c","e","h"]'
+    assert v.to_json(seq_f('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), exclude={-1, -2}) == b'["a","c","e"]'
 
 
 @pytest.mark.parametrize('include,exclude', [({1, 3, 5}, {5, 6}), ([1, 3, 5], [5, 6])])

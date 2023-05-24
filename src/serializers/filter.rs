@@ -1,4 +1,5 @@
 use ahash::AHashSet;
+use pyo3::exceptions::PyValueError;
 use std::hash::Hash;
 
 use pyo3::exceptions::PyTypeError;
@@ -12,6 +13,48 @@ use crate::build_tools::SchemaDict;
 pub(crate) struct SchemaFilter<T> {
     include: Option<AHashSet<T>>,
     exclude: Option<AHashSet<T>>,
+}
+
+fn map_negative_index<'a, 'py: 'a>(py: Python<'py>, value: &'a PyAny, len: Option<usize>) -> PyResult<&'a PyAny> {
+    match len {
+        Some(len) => Ok(value
+            .call_method1(intern!(py, "__mod__"), (len,))
+            .map_or_else(|_| value, |v| v)),
+        None => {
+            // check that it's not negative
+            let negative: bool = value.call_method1(intern!(py, "__lt__"), (0,))?.extract()?;
+            if negative {
+                Err(PyValueError::new_err(
+                    "Negative indices cannot be used to exclude items on unsized iterables",
+                ))
+            } else {
+                Ok(value)
+            }
+        }
+    }
+}
+
+fn map_negative_indices<'a, 'py: 'a>(
+    py: Python<'py>,
+    include_or_exclude: &'a PyAny,
+    len: Option<usize>,
+) -> PyResult<&'a PyAny> {
+    if let Ok(exclude_dict) = include_or_exclude.downcast::<PyDict>() {
+        let out = PyDict::new(py);
+        for (k, v) in exclude_dict.iter() {
+            out.set_item(map_negative_index(py, k, len)?, v)?;
+        }
+        Ok(out)
+    } else if let Ok(exclude_set) = include_or_exclude.downcast::<PySet>() {
+        let mut values = Vec::with_capacity(exclude_set.len());
+        for v in exclude_set {
+            values.push(map_negative_index(py, v, len)?)
+        }
+        Ok(PySet::new(py, values)?)
+    } else {
+        // return as is and deal with the error later
+        Ok(include_or_exclude)
+    }
 }
 
 impl SchemaFilter<usize> {
@@ -48,10 +91,14 @@ impl SchemaFilter<usize> {
 
     pub fn index_filter<'py>(
         &self,
+        py: Python<'py>,
         index: usize,
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
+        len: Option<usize>,
     ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        let include = include.map(|v| map_negative_indices(py, v, len)).transpose()?;
+        let exclude = exclude.map(|v| map_negative_indices(py, v, len)).transpose()?;
         self.filter(index, index, include, exclude)
     }
 }
