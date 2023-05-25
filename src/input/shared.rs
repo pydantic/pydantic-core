@@ -58,6 +58,8 @@ pub fn float_as_int<'a>(input: &'a impl Input<'a>, float: f64) -> ValResult<'a, 
         Err(ValError::new(ErrorType::FiniteNumber, input))
     } else if float % 1.0 != 0.0 {
         Err(ValError::new(ErrorType::IntFromFloat, input))
+    } else if float > i64::MAX as f64 || float < i64::MIN as f64 {
+        Err(ValError::new(ErrorType::IntOverflow, input))
     } else {
         Ok(float as i64)
     }

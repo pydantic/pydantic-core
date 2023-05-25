@@ -820,16 +820,19 @@ impl<'a> IntoPy<PyObject> for EitherBytes<'a> {
 
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub enum EitherInt<'a> {
-    Rust(i64),
+    I64(i64),
+    U64(u64),
     Py(&'a PyAny),
 }
 
-impl<'a> TryInto<i64> for EitherInt<'a> {
-    type Error = ValError<'a>;
-
-    fn try_into(self) -> ValResult<'a, i64> {
+impl<'a> EitherInt<'a> {
+    pub fn into_i64(self, py: Python<'a>) -> ValResult<'a, i64> {
         match self {
-            EitherInt::Rust(i) => Ok(i),
+            EitherInt::I64(i) => Ok(i),
+            EitherInt::U64(u) => match i64::try_from(u) {
+                Ok(u) => Ok(u),
+                Err(_) => Err(ValError::new(ErrorType::IntOverflow, u.into_py(py).into_ref(py))),
+            },
             EitherInt::Py(i) => i.extract().map_err(|_| ValError::new(ErrorType::IntOverflow, i)),
         }
     }
@@ -838,7 +841,8 @@ impl<'a> TryInto<i64> for EitherInt<'a> {
 impl<'a> IntoPy<PyObject> for EitherInt<'a> {
     fn into_py(self, py: Python<'_>) -> PyObject {
         match self {
-            Self::Rust(int) => int.into_py(py),
+            Self::I64(int) => int.into_py(py),
+            Self::U64(int) => int.into_py(py),
             Self::Py(int) => int.into_py(py),
         }
     }

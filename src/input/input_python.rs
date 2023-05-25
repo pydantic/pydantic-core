@@ -288,9 +288,9 @@ impl<'a> Input<'a> for PyAny {
             Ok(EitherInt::Py(self))
         } else if let Some(cow_str) = maybe_as_string(self, ErrorType::IntParsing)? {
             let int = str_as_int(self, &cow_str)?;
-            Ok(EitherInt::Rust(int))
+            Ok(EitherInt::I64(int))
         } else if let Ok(float) = self.extract::<f64>() {
-            Ok(EitherInt::Rust(float_as_int(self, float)?))
+            Ok(EitherInt::I64(float_as_int(self, float)?))
         } else {
             Err(ValError::new(ErrorType::IntType, self))
         }

@@ -1,3 +1,4 @@
+import json
 import re
 from decimal import Decimal
 from typing import Any, Dict
@@ -59,8 +60,19 @@ def test_int_py_and_json(py_and_json: PyAndJson, input_value, expected):
         (Decimal('1'), 1),
         (Decimal('1.0'), 1),
         (i64_max, i64_max),
+        (str(i64_max), i64_max),
+        # (str(i64_max + 1), i64_max + 1),
+        (
+            str(i64_max * 2),
+            Err(
+                "Input integer too large to convert to 64-bit integer "
+                "[type=int_overflow, input_value='18446744073709551614', input_type=str]"
+            ),
+        ),
         (i64_max + 1, i64_max + 1),
+        (-i64_max + 1, -i64_max + 1),
         (i64_max * 2, i64_max * 2),
+        (-i64_max * 2, -i64_max * 2),
         pytest.param(
             Decimal('1.001'),
             Err(
@@ -93,21 +105,14 @@ def test_int(input_value, expected):
         (Decimal('1'), 1),
         (Decimal('1.0'), 1),
         (i64_max, i64_max),
+        (i64_max + 1, i64_max + 1),
         (
-            i64_max + 1,
-            Err(
-                'Input integer too large to convert to 64-bit integer '
-                '[type=int_overflow, input_value=9223372036854775808, input_type=int]'
-            ),
+            -i64_max + 1,
+            Err('Input should be greater than 0 [type=greater_than, input_value=-9223372036854775806, input_type=int]'),
         ),
-        (
-            i64_max * 2,
-            Err(
-                'Input integer too large to convert to 64-bit integer '
-                '[type=int_overflow, input_value=18446744073709551614, input_type=int]'
-            ),
-        ),
-        # (0, Err('Input should be greater than 0 [type=greater_than, input_value=-1, input_type=int]')),
+        (i64_max * 2, i64_max * 2),
+        (int('9' * 30), int('9' * 30)),
+        (0, Err('Input should be greater than 0 [type=greater_than, input_value=0, input_type=int]')),
         (-1, Err('Input should be greater than 0 [type=greater_than, input_value=-1, input_type=int]')),
         pytest.param(
             Decimal('1.001'),
@@ -131,6 +136,84 @@ def test_positive_int(input_value, expected):
             v.validate_python(input_value)
     else:
         output = v.validate_python(input_value)
+        assert output == expected
+        assert isinstance(output, int)
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        (-1, -1),
+        (0, Err('Input should be less than 0 [type=less_than, input_value=0, input_type=int]')),
+        (-i64_max, -i64_max),
+        (-i64_max - 1, -i64_max - 1),
+        (-int('9' * 30), -int('9' * 30)),
+    ],
+)
+def test_negative_int(input_value, expected):
+    v = SchemaValidator({'type': 'int', 'lt': 0})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        output = v.validate_python(input_value)
+        assert output == expected
+        assert isinstance(output, int)
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        (1, 1),
+        (i64_max, i64_max),
+        (i64_max + 1, i64_max + 1),
+        (i64_max * 2, i64_max * 2),
+        (
+            int(1e30),
+            Err(
+                'Input integer too large to convert to 64-bit integer '
+                '[type=int_overflow, input_value=1e+30, input_type=float]'
+            ),
+        ),
+        (0, Err('Input should be greater than 0 [type=greater_than, input_value=0, input_type=int]')),
+        (-1, Err('Input should be greater than 0 [type=greater_than, input_value=-1, input_type=int]')),
+        pytest.param(
+            [1, 2],
+            Err('Input should be a valid integer [type=int_type, input_value=[1, 2], input_type=list]'),
+            id='list',
+        ),
+    ],
+)
+def test_positive_json(input_value, expected):
+    v = SchemaValidator({'type': 'int', 'gt': 0})
+    json_input = json.dumps(input_value)
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_json(json_input)
+    else:
+        output = v.validate_json(json_input)
+        assert output == expected
+        assert isinstance(output, int)
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        (-1, -1),
+        (0, Err('Input should be less than 0 [type=less_than, input_value=0, input_type=int]')),
+        (-i64_max, -i64_max),
+        (-i64_max - 1, -i64_max - 1),
+        (-i64_max * 2, Err('Input integer too large to convert to 64-bit integer [type=int_overflow, input_value=')),
+    ],
+)
+def test_negative_json(input_value, expected):
+    v = SchemaValidator({'type': 'int', 'lt': 0})
+    json_input = json.dumps(input_value)
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_json(json_input)
+    else:
+        output = v.validate_json(json_input)
         assert output == expected
         assert isinstance(output, int)
 

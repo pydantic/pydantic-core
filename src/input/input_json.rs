@@ -116,7 +116,8 @@ impl<'a> Input<'a> for JsonInput {
 
     fn strict_int(&'a self) -> ValResult<EitherInt<'a>> {
         match self {
-            JsonInput::Int(i) => Ok(EitherInt::Rust(*i)),
+            JsonInput::Int(i) => Ok(EitherInt::I64(*i)),
+            JsonInput::Uint(u) => Ok(EitherInt::U64(*u)),
             _ => Err(ValError::new(ErrorType::IntType, self)),
         }
     }
@@ -127,11 +128,12 @@ impl<'a> Input<'a> for JsonInput {
                 false => Ok(0),
             },
             JsonInput::Int(i) => Ok(*i),
+            JsonInput::Uint(u) => return Ok(EitherInt::U64(*u)),
             JsonInput::Float(f) => float_as_int(self, *f),
             JsonInput::String(str) => str_as_int(self, str),
             _ => Err(ValError::new(ErrorType::IntType, self)),
         };
-        int_result.map(EitherInt::Rust)
+        int_result.map(EitherInt::I64)
     }
 
     fn ultra_strict_float(&self) -> ValResult<f64> {
@@ -144,6 +146,7 @@ impl<'a> Input<'a> for JsonInput {
         match self {
             JsonInput::Float(f) => Ok(*f),
             JsonInput::Int(i) => Ok(*i as f64),
+            JsonInput::Uint(u) => Ok(*u as f64),
             _ => Err(ValError::new(ErrorType::FloatType, self)),
         }
     }
@@ -155,6 +158,7 @@ impl<'a> Input<'a> for JsonInput {
             },
             JsonInput::Float(f) => Ok(*f),
             JsonInput::Int(i) => Ok(*i as f64),
+            JsonInput::Uint(u) => Ok(*u as f64),
             JsonInput::String(str) => match str.parse::<f64>() {
                 Ok(i) => Ok(i),
                 Err(_) => Err(ValError::new(ErrorType::FloatParsing, self)),
@@ -363,7 +367,7 @@ impl<'a> Input<'a> for String {
     }
     fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
         match self.parse() {
-            Ok(i) => Ok(EitherInt::Rust(i)),
+            Ok(i) => Ok(EitherInt::I64(i)),
             Err(_) => Err(ValError::new(ErrorType::IntParsing, self)),
         }
     }
