@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
-use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyString};
+use pyo3::types::{PyBool, PyDict, PyList, PyString};
+use pyo3::{intern, PyTypeInfo};
 
 use ahash::AHashSet;
 use serde::Serialize;
@@ -76,7 +76,7 @@ enum OutputValue<'a> {
 impl LiteralSerializer {
     fn check<'a>(&self, value: &'a PyAny, extra: &Extra) -> PyResult<OutputValue<'a>> {
         if extra.check.enabled() {
-            if !self.expected_int.is_empty() && value.extract::<bool>().is_err() {
+            if !self.expected_int.is_empty() && !PyBool::is_type_of(value) {
                 if let Ok(int) = extract_i64(value) {
                     if self.expected_int.contains(&int) {
                         return Ok(OutputValue::OkInt(int));

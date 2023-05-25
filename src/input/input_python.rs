@@ -244,16 +244,16 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_bool(&self) -> ValResult<bool> {
-        if let Ok(bool) = self.extract::<bool>() {
-            Ok(bool)
+        if let Ok(bool) = self.downcast::<PyBool>() {
+            Ok(bool.is_true())
         } else {
             Err(ValError::new(ErrorType::BoolType, self))
         }
     }
 
     fn lax_bool(&self) -> ValResult<bool> {
-        if let Ok(bool) = self.extract::<bool>() {
-            Ok(bool)
+        if let Ok(bool) = self.downcast::<PyBool>() {
+            Ok(bool.is_true())
         } else if let Some(cow_str) = maybe_as_string(self, ErrorType::BoolParsing)? {
             str_as_bool(self, &cow_str)
         } else if let Ok(int) = extract_i64(self) {
