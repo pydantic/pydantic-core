@@ -7,7 +7,7 @@ use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use crate::build_tools::{py_err, py_error_type};
+use crate::tools::{py_err, py_error_type};
 use strum::{Display, EnumMessage, IntoEnumIterator};
 use strum_macros::EnumIter;
 

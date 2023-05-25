@@ -10,8 +10,8 @@ use pyo3::types::{
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
 
-use crate::build_tools::safe_repr;
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValResult};
+use crate::tools::safe_repr;
 use crate::{ArgsKwargs, PyMultiHostUrl, PyUrl};
 
 use super::datetime::{

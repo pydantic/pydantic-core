@@ -7,8 +7,9 @@ use pyo3::types::{PyDict, PyList, PyString};
 use ahash::AHashSet;
 use serde::Serialize;
 
-use crate::build_tools::{py_err, SchemaDict};
+use crate::build_tools::py_schema_err;
 use crate::definitions::DefinitionsBuilder;
+use crate::tools::SchemaDict;
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
@@ -34,7 +35,7 @@ impl BuildSerializer for LiteralSerializer {
         let expected: &PyList = schema.get_as_req(intern!(schema.py(), "expected"))?;
 
         if expected.is_empty() {
-            return py_err!("`expected` should have length > 0");
+            return py_schema_err!("`expected` should have length > 0");
         }
         let mut expected_int = AHashSet::new();
         let mut expected_str = AHashSet::new();

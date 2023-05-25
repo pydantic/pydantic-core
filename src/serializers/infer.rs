@@ -10,11 +10,11 @@ use pyo3::types::{
 
 use serde::ser::{Error, Serialize, SerializeMap, SerializeSeq, Serializer};
 
-use crate::build_tools::{py_err, safe_repr};
 use crate::serializers::errors::SERIALIZATION_ERR_MARKER;
 use crate::serializers::filter::SchemaFilter;
 use crate::serializers::shared::{PydanticSerializer, TypeSerializer};
 use crate::serializers::SchemaSerializer;
+use crate::tools::{py_err, safe_repr};
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::errors::{py_err_se_err, PydanticSerializationError};
