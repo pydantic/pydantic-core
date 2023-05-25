@@ -44,13 +44,23 @@ pub fn int_as_bool<'a>(input: &'a impl Input<'a>, int: i64) -> ValResult<'a, boo
 }
 
 pub fn str_as_int<'s, 'l>(input: &'s impl Input<'s>, str: &'l str) -> ValResult<'s, i64> {
+    let str = strip_decimal_zeros(str);
     if let Ok(i) = str.parse::<i64>() {
         Ok(i)
-    } else if let Ok(f) = str.parse::<f64>() {
-        float_as_int(input, f)
     } else {
         Err(ValError::new(ErrorType::IntParsing, input))
     }
+}
+
+/// we don't want to parse as f64 then call `float_as_int` as it can loose precision for large ints, therefore
+/// we strip `.0+` manually
+fn strip_decimal_zeros(s: &str) -> &str {
+    if let Some(i) = s.find('.') {
+        if s[i + 1..].chars().all(|c| c == '0') {
+            return &s[..i];
+        }
+    }
+    s
 }
 
 pub fn float_as_int<'a>(input: &'a impl Input<'a>, float: f64) -> ValResult<'a, i64> {

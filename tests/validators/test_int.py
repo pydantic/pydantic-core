@@ -26,7 +26,7 @@ i64_max = 9_223_372_036_854_775_807
         (42.0, 42),
         ('42.0', 42),
         ('123456789.0', 123_456_789),
-        ('123456789123456.00001', 123_456_789_123_456),
+        ('123456789123456.00001', Err('Input should be a valid integer, unable to parse string as an integer')),
         (int(1e10), int(1e10)),
         (i64_max, i64_max),
         pytest.param(
@@ -61,12 +61,18 @@ def test_int_py_and_json(py_and_json: PyAndJson, input_value, expected):
         (Decimal('1.0'), 1),
         (i64_max, i64_max),
         (str(i64_max), i64_max),
-        # (str(i64_max + 1), i64_max + 1),
+        (
+            str(i64_max + 1),
+            Err(
+                "Input should be a valid integer, unable to parse string as an integer "
+                "[type=int_parsing, input_value='9223372036854775808', input_type=str]"
+            ),
+        ),
         (
             str(i64_max * 2),
             Err(
-                "Input integer too large to convert to 64-bit integer "
-                "[type=int_overflow, input_value='18446744073709551614', input_type=str]"
+                "Input should be a valid integer, unable to parse string as an integer "
+                "[type=int_parsing, input_value='18446744073709551614', input_type=str]"
             ),
         ),
         (i64_max + 1, i64_max + 1),
@@ -87,6 +93,7 @@ def test_int_py_and_json(py_and_json: PyAndJson, input_value, expected):
             id='tuple',
         ),
     ],
+    ids=repr,
 )
 def test_int(input_value, expected):
     v = SchemaValidator({'type': 'int'})
@@ -350,24 +357,29 @@ def test_long_int(py_and_json: PyAndJson):
         v.validate_test('1' * 400)
 
     assert exc_info.value.errors(include_url=False) == [
-        {'type': 'finite_number', 'loc': (), 'msg': 'Input should be a finite number', 'input': '1' * 400}
+        {
+            'type': 'int_parsing',
+            'loc': (),
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': '1' * 400,
+        }
     ]
+    # insert_assert(repr(exc_info.value))
     assert repr(exc_info.value) == (
-        '1 validation error for int\n'
-        '  Input should be a finite number '
-        '[type=finite_number, '
-        "input_value='111111111111111111111111...11111111111111111111111', input_type=str]\n"
-        f"    For further information visit https://errors.pydantic.dev/{__version__}/v/finite_number"
+        "1 validation error for int\n"
+        "  Input should be a valid integer, unable to parse string as an integer "
+        "[type=int_parsing, input_value='111111111111111111111111...11111111111111111111111', input_type=str]\n"
+        f"    For further information visit https://errors.pydantic.dev/{__version__}/v/int_parsing"
     )
 
 
 def test_finite_number(py_and_json: PyAndJson):
     v = py_and_json({'type': 'int'})
 
-    with pytest.raises(ValidationError, match='Input should be a finite number'):
+    with pytest.raises(ValidationError, match='Input should be a valid integer'):
         v.validate_test('-' + '1' * 400)
 
-    with pytest.raises(ValidationError, match='Input should be a finite number'):
+    with pytest.raises(ValidationError, match='Input should be a valid integer'):
         v.validate_test('nan')
 
 
