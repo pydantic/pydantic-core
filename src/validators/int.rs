@@ -1,6 +1,6 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyInt};
 
 use crate::build_tools::is_strict;
 use crate::errors::{ErrorType, ValError, ValResult};
@@ -72,11 +72,11 @@ impl Validator for IntValidator {
 #[derive(Debug, Clone)]
 pub struct ConstrainedIntValidator {
     strict: bool,
-    multiple_of: Option<i64>,
-    le: Option<i64>,
-    lt: Option<i64>,
-    ge: Option<i64>,
-    gt: Option<i64>,
+    multiple_of: Option<Py<PyInt>>,
+    le: Option<Py<PyInt>>,
+    lt: Option<Py<PyInt>>,
+    ge: Option<Py<PyInt>>,
+    gt: Option<Py<PyInt>>,
 }
 
 impl Validator for ConstrainedIntValidator {
@@ -89,38 +89,62 @@ impl Validator for ConstrainedIntValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let either_int = input.validate_int(extra.strict.unwrap_or(self.strict))?;
-        let int: i64 = either_int.try_into()?;
-        if let Some(multiple_of) = self.multiple_of {
-            if int % multiple_of != 0 {
+        let int_obj = either_int.into_py(py);
+        let int = int_obj.as_ref(py);
+
+        if let Some(ref multiple_of) = self.multiple_of {
+            let rem: i64 = int.call_method1(intern!(py, "__mod__"), (multiple_of,))?.extract()?;
+            if rem != 0 {
                 return Err(ValError::new(
                     ErrorType::MultipleOf {
-                        multiple_of: multiple_of.into(),
+                        multiple_of: multiple_of.extract::<i64>(py)?.into(),
                     },
                     input,
                 ));
             }
         }
-        if let Some(le) = self.le {
-            if int > le {
-                return Err(ValError::new(ErrorType::LessThanEqual { le: le.into() }, input));
+
+        if let Some(ref le) = self.le {
+            if !int.le(le)? {
+                return Err(ValError::new(
+                    ErrorType::LessThanEqual {
+                        le: le.extract::<i64>(py)?.into(),
+                    },
+                    input,
+                ));
             }
         }
-        if let Some(lt) = self.lt {
-            if int >= lt {
-                return Err(ValError::new(ErrorType::LessThan { lt: lt.into() }, input));
+        if let Some(ref lt) = self.lt {
+            if !int.lt(lt)? {
+                return Err(ValError::new(
+                    ErrorType::LessThan {
+                        lt: lt.extract::<i64>(py)?.into(),
+                    },
+                    input,
+                ));
             }
         }
-        if let Some(ge) = self.ge {
-            if int < ge {
-                return Err(ValError::new(ErrorType::GreaterThanEqual { ge: ge.into() }, input));
+        if let Some(ref ge) = self.ge {
+            if !int.ge(ge)? {
+                return Err(ValError::new(
+                    ErrorType::GreaterThanEqual {
+                        ge: ge.extract::<i64>(py)?.into(),
+                    },
+                    input,
+                ));
             }
         }
-        if let Some(gt) = self.gt {
-            if int <= gt {
-                return Err(ValError::new(ErrorType::GreaterThan { gt: gt.into() }, input));
+        if let Some(ref gt) = self.gt {
+            if !int.gt(gt)? {
+                return Err(ValError::new(
+                    ErrorType::GreaterThan {
+                        gt: gt.extract::<i64>(py)?.into(),
+                    },
+                    input,
+                ));
             }
         }
-        Ok(int.into_py(py))
+        Ok(int_obj)
     }
 
     fn different_strict_behavior(
