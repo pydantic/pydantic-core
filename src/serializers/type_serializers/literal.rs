@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::build_tools::py_schema_err;
 use crate::definitions::DefinitionsBuilder;
-use crate::tools::SchemaDict;
+use crate::tools::{extract_i64, SchemaDict};
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
@@ -44,7 +44,7 @@ impl BuildSerializer for LiteralSerializer {
         let mut repr_args: Vec<String> = Vec::new();
         for item in expected {
             repr_args.push(item.repr()?.extract()?);
-            if let Ok(int) = item.extract::<i64>() {
+            if let Ok(int) = extract_i64(item) {
                 expected_int.insert(int);
             } else if let Ok(py_str) = item.downcast::<PyString>() {
                 expected_str.insert(py_str.to_str()?.to_string());
@@ -77,7 +77,7 @@ impl LiteralSerializer {
     fn check<'a>(&self, value: &'a PyAny, extra: &Extra) -> PyResult<OutputValue<'a>> {
         if extra.check.enabled() {
             if !self.expected_int.is_empty() && value.extract::<bool>().is_err() {
-                if let Ok(int) = value.extract::<i64>() {
+                if let Ok(int) = extract_i64(value) {
                     if self.expected_int.contains(&int) {
                         return Ok(OutputValue::OkInt(int));
                     }

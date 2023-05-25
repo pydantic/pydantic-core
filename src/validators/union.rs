@@ -15,7 +15,7 @@ use crate::errors::{ErrorType, LocItem, ValError, ValLineError, ValResult};
 use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
-use crate::tools::{py_err, SchemaDict};
+use crate::tools::{extract_i64, py_err, SchemaDict};
 
 use super::custom_error::CustomError;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
@@ -228,7 +228,7 @@ enum ChoiceKey {
 
 impl ChoiceKey {
     fn from_py(raw: &PyAny) -> PyResult<Self> {
-        if let Ok(py_int) = raw.extract::<i64>() {
+        if let Ok(py_int) = extract_i64(raw) {
             Ok(Self::Int(py_int))
         } else if let Ok(py_str) = raw.downcast::<PyString>() {
             Ok(Self::Str(py_str.to_str()?.to_string()))

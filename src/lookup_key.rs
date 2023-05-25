@@ -8,7 +8,7 @@ use pyo3::types::{PyDict, PyList, PyMapping, PyString};
 use crate::build_tools::py_schema_err;
 use crate::errors::{ErrorType, ValLineError};
 use crate::input::{Input, JsonInput, JsonObject};
-use crate::tools::py_err;
+use crate::tools::{extract_i64, py_err};
 
 /// Used got getting items from python dicts, python objects, or JSON objects, in different ways
 #[derive(Debug, Clone)]
@@ -409,7 +409,7 @@ impl PathItem {
             } else {
                 Ok(Self::Pos(usize_key))
             }
-        } else if let Ok(int_key) = obj.extract::<i64>() {
+        } else if let Ok(int_key) = extract_i64(obj) {
             if index == 0 {
                 py_err!(PyTypeError; "The first item in an alias path should be a string")
             } else {

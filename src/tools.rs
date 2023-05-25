@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
-use pyo3::exceptions::PyKeyError;
+use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
-use pyo3::{intern, FromPyObject};
+use pyo3::types::{PyDict, PyInt, PyString};
+use pyo3::{intern, FromPyObject, PyTypeInfo};
 
 pub trait SchemaDict<'py> {
     fn get_as<T>(&'py self, key: &PyString) -> PyResult<Option<T>>
@@ -96,5 +96,13 @@ pub fn safe_repr(v: &PyAny) -> Cow<str> {
         format!("<unprintable {name} object>").into()
     } else {
         "<unprintable object>".into()
+    }
+}
+
+pub fn extract_i64(v: &PyAny) -> PyResult<i64> {
+    if PyInt::is_type_of(v) {
+        v.extract()
+    } else {
+        py_err!(PyTypeError; "expected int, got {}", safe_repr(v))
     }
 }
