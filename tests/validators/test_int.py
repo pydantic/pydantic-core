@@ -6,7 +6,7 @@ from typing import Any, Dict
 import pytest
 from dirty_equals import IsStr
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError, __version__
 
 from ..conftest import Err, PyAndJson, plain_repr
 
@@ -351,20 +351,20 @@ def test_too_long():
             'input': '1' * 4301,
         }
     ]
-    # # insert_assert(repr(exc_info.value))
-    # assert repr(exc_info.value) == (
-    #     "1 validation error for int\n"
-    #     "  Input should be a valid integer, unable to parse string as an integer "
-    #     "[type=int_parsing, input_value='111111111111111111111111...11111111111111111111111', input_type=str]\n"
-    #     f"    For further information visit https://errors.pydantic.dev/{__version__}/v/int_parsing"
-    # )
+    # insert_assert(repr(exc_info.value))
+    assert repr(exc_info.value) == (
+        "1 validation error for int\n"
+        "  Input should be a valid integer, unable to parse string as an integer "
+        "[type=int_parsing, input_value='111111111111111111111111...11111111111111111111111', input_type=str]\n"
+        f"    For further information visit https://errors.pydantic.dev/{__version__}/v/int_parsing"
+    )
 
 
-def test_long_int_python():
+def test_long_python():
     v = SchemaValidator({'type': 'int'})
 
-    s = v.validate_python('1' * 4300)
-    assert s == int('1' * 4300)
+    s = v.validate_python('1' * 4_300)
+    assert s == int('1' * 4_300)
 
     s = v.validate_python('-' + '1' * 400)
     assert s == -int('1' * 400)
@@ -373,7 +373,19 @@ def test_long_int_python():
         v.validate_python('nan')
 
 
-def test_long_int_json():
+def test_long_python_inequality():
+    v = SchemaValidator({'type': 'int', 'gt': 0, 'lt': int('1' * 4_300) - 5})
+
+    s = str(int('1' * 4_300) - 6)
+    s = v.validate_python(s)
+    assert s == int('1' * 4_300) - 6
+
+    s = str(int('1' * 4_300) - 5)
+    with pytest.raises(ValidationError, match='Input should be less than 1'):
+        v.validate_python(s)
+
+
+def test_long_json():
     v = SchemaValidator({'type': 'int'})
 
     with pytest.raises(ValidationError, match=r'number out of range at line 1 column 401 \[type=json_invalid,'):

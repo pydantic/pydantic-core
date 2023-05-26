@@ -871,6 +871,15 @@ impl<'a> EitherInt<'a> {
             },
         }
     }
+
+    pub fn as_bigint(&self) -> PyResult<BigInt> {
+        match self {
+            EitherInt::I64(i) => Ok(BigInt::from(*i)),
+            EitherInt::U64(u) => Ok(BigInt::from(*u)),
+            EitherInt::BigInt(i) => Ok(i.clone()),
+            EitherInt::Py(i) => i.extract(),
+        }
+    }
 }
 
 impl<'a> IntoPy<PyObject> for EitherInt<'a> {
