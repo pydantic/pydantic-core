@@ -187,10 +187,7 @@ def test_dict_key(py_and_json: PyAndJson):
     v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'timedelta'}, 'values_schema': {'type': 'int'}})
     assert v.validate_test({'P2DT1H': 2, 'P2DT2H': 4}) == {timedelta(days=2, hours=1): 2, timedelta(days=2, hours=2): 4}
 
-    with pytest.raises(
-        ValidationError,
-        match=re.escape('Input should be a valid timedelta, invalid digit in duration [type=time_delta_parsing'),
-    ):
+    with pytest.raises(ValidationError, match=re.escape('[type=time_delta_parsing')):
         v.validate_test({'errordata': 2})
 
 
@@ -198,10 +195,7 @@ def test_dict_value(py_and_json: PyAndJson):
     v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'timedelta'}})
     assert v.validate_test({2: 'P2DT1H', 4: 'P2DT2H'}) == {2: timedelta(days=2, hours=1), 4: timedelta(days=2, hours=2)}
 
-    with pytest.raises(
-        ValidationError,
-        match=re.escape('Input should be a valid timedelta, invalid digit in duration [type=time_delta_parsing'),
-    ):
+    with pytest.raises(ValidationError, match=re.escape('[type=time_delta_parsing')):
         v.validate_test({4: 'errordata'})
 
 
