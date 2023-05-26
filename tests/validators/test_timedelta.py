@@ -60,8 +60,8 @@ def test_timedelta(input_value, expected):
     'input_value,expected',
     [
         ('"P0Y0M3D2WT1H2M3.5S"', timedelta(days=3, weeks=2, hours=1, minutes=2, seconds=3, milliseconds=500)),
-        ('"errordata"', Err('Input should be a valid timedelta, invalid digit in duration [type=time_delta_parsing')),
-        ('true', Err('Input should be a valid timedelta [type=time_delta_type')),
+        ('"errordata"', Err('Input should be a valid duration, invalid digit in duration [type=time_delta_parsing')),
+        ('true', Err('Input should be a valid duration [type=time_delta_type')),
         ('3601', timedelta(hours=1, seconds=1)),
         ('3601.123456', timedelta(hours=1, seconds=1, microseconds=123456)),
         ('-3601', timedelta(hours=-2, seconds=3599)),
@@ -106,8 +106,8 @@ def test_timedelta_strict(input_value, expected):
     'input_value,expected',
     [
         ('"P0Y0M3D2WT1H2M3.5S"', timedelta(days=3, weeks=2, hours=1, minutes=2, seconds=3, milliseconds=500)),
-        ('"12345"', Err('Input should be a valid timedelta')),
-        ('true', Err('Input should be a valid timedelta [type=time_delta_type')),
+        ('"12345"', Err('Input should be a valid duration')),
+        ('true', Err('Input should be a valid duration [type=time_delta_type')),
     ],
 )
 def test_timedelta_strict_json(input_value, expected):

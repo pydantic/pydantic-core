@@ -541,8 +541,14 @@ impl ErrorType {
     pub fn message_template_json(&self) -> &'static str {
         match self {
             Self::NoneRequired => "Input should be null",
-            Self::ListType => "Input should be a valid array",
-            Self::DataclassType { .. } => "Input should be an object",
+            Self::DictAttributesType => "Input should be a valid object or instance to extract fields from",
+            Self::ListType | Self::TupleType | Self::IterableType | Self::SetType | Self::FrozenSetType => {
+                "Input should be a valid array"
+            }
+            Self::DictType | Self::DataclassType { .. } => "Input should be an object",
+            Self::TimeDeltaType => "Input should be a valid duration",
+            Self::TimeDeltaParsing { .. } => "Input should be a valid duration, {error}",
+            Self::ArgumentsType => "Arguments must be an array or an object",
             _ => self.message_template_python(),
         }
     }
