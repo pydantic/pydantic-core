@@ -17,7 +17,7 @@ def test_dict(py_and_json: PyAndJson):
     v = py_and_json({'type': 'dict', 'strict': True, 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
     assert v.validate_test({'1': 2, '3': 4}) == {1: 2, 3: 4}
     assert v.validate_test({}) == {}
-    with pytest.raises(ValidationError, match='Input should be (a valid dictionary|an object)'):
+    with pytest.raises(ValidationError, match=re.escape('[type=dict_type, input_value=[], input_type=list]')):
         v.validate_test([])
 
 
