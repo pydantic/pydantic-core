@@ -107,7 +107,7 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::String(s) => str_as_bool(self, s),
             JsonInput::Int(int) => int_as_bool(self, *int),
             JsonInput::Float(float) => match float_as_int(self, *float) {
-                Ok(int) => int_as_bool(self, int),
+                Ok(int) => int.as_bool().ok_or_else(|| ValError::new(ErrorType::BoolParsing, self)),
                 _ => Err(ValError::new(ErrorType::BoolType, self)),
             },
             _ => Err(ValError::new(ErrorType::BoolType, self)),
@@ -122,18 +122,17 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
     fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
-        let int_result = match self {
+        match self {
             JsonInput::Bool(b) => match *b {
-                true => Ok(1),
-                false => Ok(0),
+                true => Ok(EitherInt::I64(1)),
+                false => Ok(EitherInt::I64(0)),
             },
-            JsonInput::Int(i) => Ok(*i),
-            JsonInput::Uint(u) => return Ok(EitherInt::U64(*u)),
+            JsonInput::Int(i) => Ok(EitherInt::I64(*i)),
+            JsonInput::Uint(u) => Ok(EitherInt::U64(*u)),
             JsonInput::Float(f) => float_as_int(self, *f),
             JsonInput::String(str) => str_as_int(self, str),
             _ => Err(ValError::new(ErrorType::IntType, self)),
-        };
-        int_result.map(EitherInt::I64)
+        }
     }
 
     fn ultra_strict_float(&self) -> ValResult<f64> {

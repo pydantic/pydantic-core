@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 use std::slice::Iter as SliceIter;
 
+use num_bigint::BigInt;
+
 use pyo3::prelude::*;
 use pyo3::types::iter::PyDictIterator;
 use pyo3::types::{
@@ -822,6 +824,7 @@ impl<'a> IntoPy<PyObject> for EitherBytes<'a> {
 pub enum EitherInt<'a> {
     I64(i64),
     U64(u64),
+    BigInt(BigInt),
     Py(&'a PyAny),
 }
 
@@ -831,9 +834,41 @@ impl<'a> EitherInt<'a> {
             EitherInt::I64(i) => Ok(i),
             EitherInt::U64(u) => match i64::try_from(u) {
                 Ok(u) => Ok(u),
-                Err(_) => Err(ValError::new(ErrorType::IntOverflow, u.into_py(py).into_ref(py))),
+                Err(_) => Err(ValError::new(ErrorType::IntParsingSize, u.into_py(py).into_ref(py))),
             },
-            EitherInt::Py(i) => i.extract().map_err(|_| ValError::new(ErrorType::IntOverflow, i)),
+            EitherInt::BigInt(u) => match i64::try_from(u) {
+                Ok(u) => Ok(u),
+                Err(e) => Err(ValError::new(
+                    ErrorType::IntParsingSize,
+                    e.into_original().into_py(py).into_ref(py),
+                )),
+            },
+            EitherInt::Py(i) => i.extract().map_err(|_| ValError::new(ErrorType::IntParsingSize, i)),
+        }
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            EitherInt::I64(i) => match i {
+                0 => Some(false),
+                1 => Some(true),
+                _ => None,
+            },
+            EitherInt::U64(u) => match u {
+                0 => Some(false),
+                1 => Some(true),
+                _ => None,
+            },
+            EitherInt::BigInt(i) => match u8::try_from(i) {
+                Ok(0) => Some(false),
+                Ok(1) => Some(true),
+                _ => None,
+            },
+            EitherInt::Py(i) => match i.extract::<u8>() {
+                Ok(0) => Some(false),
+                Ok(1) => Some(true),
+                _ => None,
+            },
         }
     }
 }
@@ -843,6 +878,7 @@ impl<'a> IntoPy<PyObject> for EitherInt<'a> {
         match self {
             Self::I64(int) => int.into_py(py),
             Self::U64(int) => int.into_py(py),
+            Self::BigInt(int) => int.into_py(py),
             Self::Py(int) => int.into_py(py),
         }
     }
