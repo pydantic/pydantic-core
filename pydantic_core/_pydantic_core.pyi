@@ -1,6 +1,6 @@
 import decimal
 import sys
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 from pydantic_core import ErrorDetails, InitErrorDetails
 from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
@@ -35,6 +35,10 @@ __all__ = (
 __version__: str
 build_profile: str
 
+class Some(Protocol):
+    @property
+    def value(self) -> Any: ...
+
 class SchemaValidator:
     @property
     def title(self) -> str: ...
@@ -56,6 +60,7 @@ class SchemaValidator:
     def validate_assignment(
         self, obj: Any, field: str, input: Any, *, strict: 'bool | None' = None, context: Any = None
     ) -> 'dict[str, Any]': ...
+    def get_default_value(self, *, strict: 'bool | None' = None, context: Any = None) -> Some | None: ...
 
 IncEx: TypeAlias = 'set[int] | set[str] | dict[int, IncEx] | dict[str, IncEx] | None'
 

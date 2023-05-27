@@ -1,5 +1,5 @@
 from collections import deque
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import pytest
 
@@ -436,3 +436,82 @@ def test_deepcopy_mutable_defaults():
 
     assert m2.int_list_with_default is not m1.int_list_with_default
     assert m2.str_dict_with_default is not m1.str_dict_with_default
+
+
+def test_default_value() -> None:
+    s = core_schema.no_info_after_validator_function(
+        lambda x: [int(v) for v in x],
+        core_schema.with_default_schema(core_schema.list_schema(core_schema.str_schema()), default=['1', '2', '3']),
+    )
+
+    v = SchemaValidator(s)
+
+    r = v.get_default_value()
+    assert r is not None
+    assert r.value == [1, 2, 3]
+    assert repr(r) == 'Some([1, 2, 3])'
+
+    s = core_schema.no_info_after_validator_function(
+        lambda x: [int(v) for v in x], core_schema.list_schema(core_schema.int_schema())
+    )
+
+    v = SchemaValidator(s, config=core_schema.CoreConfig(validate_default=True))
+
+    r = v.get_default_value()
+    assert r is None
+
+    def bad(v: Any) -> Any:
+        assert False, 'bad'
+
+    s = core_schema.no_info_after_validator_function(bad, core_schema.list_schema(core_schema.str_schema()))
+
+    v = SchemaValidator(s)
+
+    defaults = [['1', '2', '3'], ['1', '2', '3'], ['a', 'b', 'c']]
+
+    s = core_schema.no_info_after_validator_function(
+        lambda x: x,
+        core_schema.with_default_schema(
+            core_schema.list_schema(core_schema.int_schema()), default_factory=lambda: defaults.pop(0)
+        ),
+    )
+
+    v = SchemaValidator(s, config=core_schema.CoreConfig(validate_default=True))
+
+    r = v.get_default_value(strict=False)
+    assert r is not None
+    assert r.value == [1, 2, 3]
+    assert defaults == [['1', '2', '3'], ['a', 'b', 'c']]
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.get_default_value(strict=True)
+    assert exc_info.value.errors(include_url=False) == [
+        {'type': 'int_type', 'loc': (0,), 'msg': 'Input should be a valid integer', 'input': '1'},
+        {'type': 'int_type', 'loc': (1,), 'msg': 'Input should be a valid integer', 'input': '2'},
+        {'type': 'int_type', 'loc': (2,), 'msg': 'Input should be a valid integer', 'input': '3'},
+    ]
+    assert defaults == [['a', 'b', 'c']]
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.get_default_value(strict=False)
+    assert exc_info.value.errors(include_url=False) == [
+        {
+            'type': 'int_parsing',
+            'loc': (0,),
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'a',
+        },
+        {
+            'type': 'int_parsing',
+            'loc': (1,),
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'b',
+        },
+        {
+            'type': 'int_parsing',
+            'loc': (2,),
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'c',
+        },
+    ]
+    assert defaults == []

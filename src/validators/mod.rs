@@ -58,6 +58,25 @@ pub use with_default::DefaultType;
 
 use self::definitions::DefinitionRefValidator;
 
+#[pyclass(module = "pydantic_core._pydantic_core", name = "Some")]
+pub struct PySome {
+    #[pyo3(get)]
+    value: PyObject,
+}
+
+impl PySome {
+    fn new(value: PyObject) -> Self {
+        Self { value }
+    }
+}
+
+#[pymethods]
+impl PySome {
+    pub fn __repr__(&self, py: Python) -> PyResult<String> {
+        Ok(format!("Some({})", self.value.as_ref(py).repr()?,))
+    }
+}
+
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {
@@ -180,6 +199,30 @@ impl SchemaValidator {
         self.validator
             .validate_assignment(py, obj, field_name, field_value, &extra, &self.definitions, guard)
             .map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Python))
+    }
+
+    #[pyo3(signature = (*, strict=None, context=None))]
+    pub fn get_default_value(&self, py: Python, strict: Option<bool>, context: Option<&PyAny>) -> PyResult<PyObject> {
+        let extra = Extra {
+            mode: InputType::Python,
+            data: None,
+            strict,
+            ultra_strict: false,
+            context,
+            field_name: None,
+            self_instance: None,
+        };
+        let recursion_guard = &mut RecursionGuard::default();
+        let r = self
+            .validator
+            .default_value(py, None::<i64>, &extra, &self.definitions, recursion_guard);
+        match r {
+            Ok(maybe_default) => match maybe_default {
+                Some(v) => Ok(PySome::new(v).into_py(py)),
+                None => Ok(py.None().into_py(py)),
+            },
+            Err(e) => Err(self.prepare_validation_err(py, e, ErrorMode::Python)),
+        }
     }
 
     pub fn __repr__(&self, py: Python) -> String {
