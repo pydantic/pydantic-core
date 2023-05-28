@@ -77,8 +77,8 @@ impl PySome {
     }
 
     #[classmethod]
-    pub fn __class_getitem__(cls: &PyType, py: Python, _args: &PyAny) -> Py<PyType> {
-        cls.into_py(py)
+    pub fn __class_getitem__(cls: &PyType, _args: &PyAny) -> Py<PyType> {
+        cls.into_py(cls.py())
     }
 }
 
