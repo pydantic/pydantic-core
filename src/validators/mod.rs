@@ -76,6 +76,11 @@ impl PySome {
         Ok(format!("Some({})", self.value.as_ref(py).repr()?,))
     }
 
+    #[new]
+    pub fn py_new(value: PyObject) -> Self {
+        Self { value }
+    }
+
     #[classmethod]
     pub fn __class_getitem__(cls: &PyType, _args: &PyAny) -> Py<PyType> {
         cls.into_py(cls.py())

@@ -536,7 +536,7 @@ def test_no_default_value(validate_default: bool) -> None:
 
 @pytest.mark.parametrize('validate_default', [True, False])
 def test_some(validate_default: bool) -> None:
-    def get_default() -> Some[int] | None:
+    def get_default() -> Union[Some[int], None]:
         s = core_schema.with_default_schema(core_schema.int_schema(), default=42)
         return SchemaValidator(s).get_default_value()
 
@@ -549,7 +549,7 @@ def test_some(validate_default: bool) -> None:
 @pytest.mark.skipif(sys.version_info < (3, 10), reason='pattern matching was added in 3.10')
 def test_some_pattern_match() -> None:
     code = """\
-def f(v: Some[Any] | None) -> str:
+def f(v: Union[Some[Any], None]) -> str:
     match v:
         case Some(1):
             return 'case1'
@@ -565,7 +565,7 @@ def f(v: Some[Any] | None) -> str:
 
     local_vars = {}
     exec(code, globals(), local_vars)
-    f = cast(Callable[[Some[Any] | None], str], local_vars['f'])
+    f = cast(Callable[[Union[Some[Any], None]], str], local_vars['f'])
 
     res = f(SchemaValidator(core_schema.with_default_schema(core_schema.int_schema(), default=1)).get_default_value())
     assert res == 'case1'
