@@ -45,7 +45,7 @@ impl BuildValidator for TypedDictValidator {
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
-        // typed dicts ignore the parent config and always use the config from this model
+        // typed dicts ignore the parent config and always use the config from this TypedDict
         let config = schema.get_as(intern!(py, "config"))?;
 
         let strict = is_strict(schema, config)?;
