@@ -65,7 +65,11 @@ isort = { known-first-party = ['pydantic_core', 'tests'] }
 [tool.pytest.ini_options]
 testpaths = 'tests'
 log_format = '%(name)s %(levelname)s: %(message)s'
-filterwarnings = 'error'
+filterwarnings = [
+    'error',
+    # Work around https://github.com/pytest-dev/pytest/issues/10977 for Python 3.12
+    'ignore:(ast\.Str|ast\.NameConstant|ast\.Num|Attribute s) is deprecated and will be removed.*:DeprecationWarning:',
+]
 timeout = 30
 xfail_strict = true
 # min, max, mean, stddev, median, iqr, outliers, ops, rounds, iterations
