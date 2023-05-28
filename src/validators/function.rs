@@ -95,29 +95,6 @@ macro_rules! impl_validator {
                 self._validate(validate, py, obj, extra)
             }
 
-            fn default_value<'s, 'data>(
-                &'s self,
-                py: Python<'data>,
-                outer_loc: Option<impl Into<LocItem>>,
-                extra: &Extra,
-                definitions: &'data Definitions<CombinedValidator>,
-                recursion_guard: &'s mut RecursionGuard,
-            ) -> ValResult<'data, Option<PyObject>> {
-                let value = self
-                    .validator
-                    .default_value(py, outer_loc, extra, definitions, recursion_guard)?;
-                match value {
-                    Some(v) => Ok(Some(self.validate(
-                        py,
-                        v.into_ref(py),
-                        extra,
-                        definitions,
-                        recursion_guard,
-                    )?)),
-                    None => Ok(None),
-                }
-            }
-
             fn different_strict_behavior(
                 &self,
                 definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
@@ -386,29 +363,6 @@ impl Validator for FunctionWrapValidator {
             updated_field_value: field_value.to_object(py),
         };
         self._validate(Py::new(py, handler)?.into_ref(py), py, obj, extra)
-    }
-
-    fn default_value<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        outer_loc: Option<impl Into<LocItem>>,
-        extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
-        recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, Option<PyObject>> {
-        let value = self
-            .validator
-            .default_value(py, outer_loc, extra, definitions, recursion_guard)?;
-        match value {
-            Some(v) => Ok(Some(self.validate(
-                py,
-                v.into_ref(py),
-                extra,
-                definitions,
-                recursion_guard,
-            )?)),
-            None => Ok(None),
-        }
     }
 
     fn different_strict_behavior(
