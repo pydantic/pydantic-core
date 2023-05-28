@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::str::FromStr;
 
 use pyo3::exceptions::{PyAttributeError, PyRecursionError, PyRuntimeError};
 use pyo3::intern;
@@ -8,7 +7,6 @@ use pyo3::types::PyDict;
 
 use pyo3::types::PyString;
 
-use crate::build_tools::py_schema_error_type;
 use crate::definitions::DefinitionsBuilder;
 use crate::tools::SchemaDict;
 use crate::tools::{function_name, py_err, py_error_type};
@@ -16,10 +14,10 @@ use crate::{PydanticOmit, PydanticSerializationUnexpectedValue};
 
 use super::format::WhenUsed;
 
+use super::any::AnySerializer;
 use super::{
-    infer_json_key, infer_json_key_known, infer_serialize, infer_serialize_known, infer_to_python,
-    infer_to_python_known, py_err_se_err, AnyFilter, BuildSerializer, CombinedSerializer, Extra, ExtraOwned, ObType,
-    PydanticSerializationError, SerMode, TypeSerializer,
+    infer_json_key, infer_serialize, infer_to_python, py_err_se_err, AnyFilter, BuildSerializer, CombinedSerializer,
+    Extra, ExtraOwned, PydanticSerializationError, SerMode, TypeSerializer,
 };
 
 pub struct FunctionBeforeSerializerBuilder;
@@ -76,7 +74,7 @@ pub struct FunctionPlainSerializer {
     func: PyObject,
     name: String,
     function_name: String,
-    json_return_ob_type: Option<ObType>,
+    return_serializer: Box<CombinedSerializer>,
     when_used: WhenUsed,
     is_field_serializer: bool,
     info_arg: bool,
@@ -98,8 +96,8 @@ impl BuildSerializer for FunctionPlainSerializer {
     /// (done this way to match `FunctionWrapSerializer` which requires the full schema)
     fn build(
         schema: &PyDict,
-        _config: Option<&PyDict>,
-        _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
+        config: Option<&PyDict>,
+        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
@@ -108,12 +106,17 @@ impl BuildSerializer for FunctionPlainSerializer {
         let (is_field_serializer, info_arg, function) = destructure_function_schema(ser_schema)?;
         let function_name = function_name(function)?;
 
+        let return_serializer = match ser_schema.get_as::<&PyDict>(intern!(py, "return_schema"))? {
+            Some(s) => CombinedSerializer::build(s, config, definitions)?,
+            None => AnySerializer::build(schema, config, definitions)?,
+        };
+
         let name = format!("plain_function[{function_name}]");
         Ok(Self {
             func: function.into_py(py),
             function_name,
             name,
-            json_return_ob_type: get_json_return_type(ser_schema)?,
+            return_serializer: Box::new(return_serializer),
             when_used: WhenUsed::new(ser_schema, WhenUsed::Always)?,
             is_field_serializer,
             info_arg,
@@ -187,17 +190,10 @@ macro_rules! function_type_serializer {
             ) -> PyResult<PyObject> {
                 let py = value.py();
                 match self.call(value, include, exclude, extra) {
-                    Ok(v) => {
-                        let next_value = v.as_ref(py);
-                        match extra.mode {
-                            // None for include/exclude here, as filtering should be done
-                            SerMode::Json => match self.json_return_ob_type {
-                                Some(ref ob_type) => infer_to_python_known(ob_type, next_value, None, None, extra),
-                                None => infer_to_python(next_value, None, None, extra),
-                            },
-                            _ => Ok(next_value.to_object(py)),
-                        }
-                    }
+                    // None for include/exclude here, as filtering should be done
+                    Ok(v) => self
+                        .return_serializer
+                        .to_python(v.into_ref(py), None, None, extra),
                     Err(err) => {
                         on_error(py, err, &self.function_name, extra)?;
                         infer_to_python(value, include, exclude, extra)
@@ -208,13 +204,7 @@ macro_rules! function_type_serializer {
             fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
                 let py = key.py();
                 match self.call(key, None, None, extra) {
-                    Ok(v) => {
-                        let next_key = v.into_ref(py);
-                        match self.json_return_ob_type {
-                            Some(ref ob_type) => infer_json_key_known(ob_type, next_key, extra),
-                            None => infer_json_key(next_key, extra),
-                        }
-                    }
+                    Ok(v) => self.return_serializer.json_key(v.into_ref(py), extra),
                     Err(err) => {
                         on_error(py, err, &self.function_name, extra)?;
                         infer_json_key(key, extra)
@@ -232,16 +222,10 @@ macro_rules! function_type_serializer {
             ) -> Result<S::Ok, S::Error> {
                 let py = value.py();
                 match self.call(value, include, exclude, extra) {
-                    Ok(v) => {
-                        let next_value = v.as_ref(py);
-                        // None for include/exclude here, as filtering should be done
-                        match self.json_return_ob_type {
-                            Some(ref ob_type) => {
-                                infer_serialize_known(ob_type, next_value, serializer, None, None, extra)
-                            }
-                            None => infer_serialize(next_value, serializer, None, None, extra),
-                        }
-                    }
+                    // None for include/exclude here, as filtering should be done
+                    Ok(v) => self
+                        .return_serializer
+                        .serde_serialize(v.into_ref(py), serializer, None, None, extra),
                     Err(err) => {
                         on_error(py, err, &self.function_name, extra).map_err(py_err_se_err)?;
                         infer_serialize(value, serializer, include, exclude, extra)
@@ -283,7 +267,7 @@ pub struct FunctionWrapSerializer {
     func: PyObject,
     name: String,
     function_name: String,
-    json_return_ob_type: Option<ObType>,
+    return_serializer: Box<CombinedSerializer>,
     when_used: WhenUsed,
     is_field_serializer: bool,
     info_arg: bool,
@@ -322,13 +306,18 @@ impl BuildSerializer for FunctionWrapSerializer {
 
         let serializer = CombinedSerializer::build(inner_schema, config, definitions)?;
 
+        let return_serializer = match ser_schema.get_as::<&PyDict>(intern!(py, "return_schema"))? {
+            Some(s) => CombinedSerializer::build(s, config, definitions)?,
+            None => AnySerializer::build(schema, config, definitions)?,
+        };
+
         let name = format!("wrap_function[{function_name}, {}]", serializer.get_name());
         Ok(Self {
             serializer: Box::new(serializer),
             func: function.into_py(py),
             function_name,
             name,
-            json_return_ob_type: get_json_return_type(ser_schema)?,
+            return_serializer: Box::new(return_serializer),
             when_used: WhenUsed::new(ser_schema, WhenUsed::Always)?,
             is_field_serializer,
             info_arg,
@@ -438,15 +427,6 @@ impl SerializationCallable {
 
     fn __str__(&self) -> PyResult<String> {
         self.__repr__()
-    }
-}
-
-pub fn get_json_return_type(schema: &PyDict) -> PyResult<Option<ObType>> {
-    match schema.get_as::<&str>(intern!(schema.py(), "json_return_type"))? {
-        Some(t) => Ok(Some(
-            ObType::from_str(t).map_err(|_| py_schema_error_type!("Unknown return type {:?}", t))?,
-        )),
-        None => Ok(None),
     }
 }
 
