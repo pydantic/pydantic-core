@@ -1,5 +1,6 @@
+import sys
 from collections import deque
-from typing import Dict, List, Union
+from typing import Any, Callable, Dict, List, Union, cast
 
 import pytest
 
@@ -543,3 +544,40 @@ def test_some(validate_default: bool) -> None:
     assert res is not None
     assert res.value == 42
     assert repr(res) == 'Some(42)'
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='pattern matching was added in 3.10')
+def test_some_pattern_match() -> None:
+    code = """\
+def f(v: Some[Any] | None) -> str:
+    match v:
+        case Some(1):
+            return 'case1'
+        case Some(value=2):
+            return 'case2'
+        case Some(int(value)):
+            return f'case3: {value}'
+        case Some(value):
+            return f'case4: {type(value).__name__}({value})'
+        case None:
+            return 'case5'
+"""
+
+    local_vars = {}
+    exec(code, globals(), local_vars)
+    f = cast(Callable[[Some[Any] | None], str], local_vars['f'])
+
+    res = f(SchemaValidator(core_schema.with_default_schema(core_schema.int_schema(), default=1)).get_default_value())
+    assert res == 'case1'
+
+    res = f(SchemaValidator(core_schema.with_default_schema(core_schema.int_schema(), default=2)).get_default_value())
+    assert res == 'case2'
+
+    res = f(SchemaValidator(core_schema.with_default_schema(core_schema.int_schema(), default=3)).get_default_value())
+    assert res == 'case3: 3'
+
+    res = f(SchemaValidator(core_schema.with_default_schema(core_schema.int_schema(), default='4')).get_default_value())
+    assert res == 'case4: str(4)'
+
+    res = f(SchemaValidator(core_schema.int_schema()).get_default_value())
+    assert res == 'case5'

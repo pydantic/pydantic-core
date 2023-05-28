@@ -5,7 +5,7 @@ use enum_dispatch::enum_dispatch;
 use pyo3::exceptions::PyTypeError;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyType};
+use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
@@ -79,6 +79,11 @@ impl PySome {
     #[classmethod]
     pub fn __class_getitem__(cls: &PyType, _args: &PyAny) -> Py<PyType> {
         cls.into_py(cls.py())
+    }
+
+    #[classattr]
+    fn __match_args__(py: Python) -> &PyTuple {
+        PyTuple::new(py, vec![intern!(py, "value")])
     }
 }
 

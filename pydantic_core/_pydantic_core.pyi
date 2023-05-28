@@ -1,6 +1,6 @@
 import decimal
 import sys
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Generic
 
 from typing_extensions import TypeVar
 
@@ -39,7 +39,9 @@ build_profile: str
 
 T = TypeVar('T', default=Any, covariant=True)
 
-class Some(Protocol[T]):
+class Some(Generic[T]):
+    __match_args__ = ('value',)
+
     @property
     def value(self) -> T: ...
 
