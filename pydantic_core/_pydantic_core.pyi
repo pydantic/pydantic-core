@@ -2,6 +2,8 @@ import decimal
 import sys
 from typing import Any, Callable, Protocol
 
+from typing_extensions import TypeVar
+
 from pydantic_core import ErrorDetails, InitErrorDetails
 from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
 
@@ -35,9 +37,11 @@ __all__ = (
 __version__: str
 build_profile: str
 
-class Some(Protocol):
+T = TypeVar('T', default=Any, covariant=True)
+
+class Some(Protocol[T]):
     @property
-    def value(self) -> Any: ...
+    def value(self) -> T: ...
 
 class SchemaValidator:
     @property

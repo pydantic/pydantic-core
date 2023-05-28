@@ -3,7 +3,7 @@ from typing import Dict, List, Union
 
 import pytest
 
-from pydantic_core import ArgsKwargs, SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import ArgsKwargs, SchemaError, SchemaValidator, Some, ValidationError, core_schema
 
 from ..conftest import PyAndJson
 
@@ -474,7 +474,6 @@ def test_default_value() -> None:
     r = v.get_default_value()
     assert r is not None
     assert r.value == [1, 2, 3]
-    assert repr(r) == 'Some([1, 2, 3])'
 
 
 def test_default_value_validate_default() -> None:
@@ -485,7 +484,6 @@ def test_default_value_validate_default() -> None:
     r = v.get_default_value()
     assert r is not None
     assert r.value == [1, 2, 3]
-    assert repr(r) == 'Some([1, 2, 3])'
 
 
 def test_default_value_validate_default_fail() -> None:
@@ -533,3 +531,15 @@ def test_no_default_value(validate_default: bool) -> None:
     v = SchemaValidator(s, core_schema.CoreConfig(validate_default=validate_default))
 
     assert v.get_default_value() is None
+
+
+@pytest.mark.parametrize('validate_default', [True, False])
+def test_some(validate_default: bool) -> None:
+    def get_default() -> Some[int] | None:
+        s = core_schema.with_default_schema(core_schema.int_schema(), default=42)
+        return SchemaValidator(s).get_default_value()
+
+    res = get_default()
+    assert res is not None
+    assert res.value == 42
+    assert repr(res) == 'Some(42)'
