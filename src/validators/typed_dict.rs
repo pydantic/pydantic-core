@@ -46,6 +46,9 @@ impl BuildValidator for TypedDictValidator {
         let py = schema.py();
         let strict = is_strict(schema, config)?;
 
+        // typed dicts ignore the parent config and always use the config from this model
+        let config = schema.get_as(intern!(py, "config"))?;
+
         let total =
             schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
