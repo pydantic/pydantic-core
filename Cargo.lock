@@ -425,8 +425,9 @@ checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 
 [[package]]
 name = "speedate"
-version = "0.7.0"
-source = "git+https://github.com/pydantic/speedate?branch=parse_timestamps#4d92f091cda60516db930c3008d168bb1d99f626"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0efd9b26b4dce26dbcf412831a035647871f8531f46632d8d59e8633351761b0"
 dependencies = [
  "strum",
  "strum_macros",
