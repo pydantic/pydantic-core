@@ -75,6 +75,8 @@ pub struct FunctionPlainSerializer {
     name: String,
     function_name: String,
     return_serializer: Box<CombinedSerializer>,
+    // fallback serializer - used when when_used decides that this serializer should not be used
+    fallback_serializer: Option<Box<CombinedSerializer>>,
     when_used: WhenUsed,
     is_field_serializer: bool,
     info_arg: bool,
@@ -107,8 +109,17 @@ impl BuildSerializer for FunctionPlainSerializer {
         let function_name = function_name(function)?;
 
         let return_serializer = match ser_schema.get_as::<&PyDict>(intern!(py, "return_schema"))? {
-            Some(s) => CombinedSerializer::build(s, config, definitions)?,
-            None => AnySerializer::build(schema, config, definitions)?,
+            Some(s) => Box::new(CombinedSerializer::build(s, config, definitions)?),
+            None => Box::new(AnySerializer::build(schema, config, definitions)?),
+        };
+
+        let when_used = WhenUsed::new(ser_schema, WhenUsed::Always)?;
+        let fallback_serializer = match when_used {
+            WhenUsed::Always => None,
+            _ => {
+                let new_schema = copy_outer_schema(schema)?;
+                Some(Box::new(CombinedSerializer::build(new_schema, config, definitions)?))
+            }
         };
 
         let name = format!("plain_function[{function_name}]");
@@ -116,8 +127,9 @@ impl BuildSerializer for FunctionPlainSerializer {
             func: function.into_py(py),
             function_name,
             name,
-            return_serializer: Box::new(return_serializer),
-            when_used: WhenUsed::new(ser_schema, WhenUsed::Always)?,
+            return_serializer,
+            fallback_serializer,
+            when_used,
             is_field_serializer,
             info_arg,
         }
@@ -132,29 +144,37 @@ impl FunctionPlainSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<(bool, PyObject)> {
         let py = value.py();
         if self.when_used.should_use(value, extra) {
-            if self.is_field_serializer {
+            let v = if self.is_field_serializer {
                 if let Some(model) = extra.model {
                     if self.info_arg {
                         let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
-                        self.func.call1(py, (model, value, info))
+                        self.func.call1(py, (model, value, info))?
                     } else {
-                        self.func.call1(py, (model, value))
+                        self.func.call1(py, (model, value))?
                     }
                 } else {
-                    Err(PyRuntimeError::new_err("Function plain serializer expected to be run inside the context of a model field but no model was found"))
+                    return Err(PyRuntimeError::new_err("Function plain serializer expected to be run inside the context of a model field but no model was found"));
                 }
             } else if self.info_arg {
                 let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
-                self.func.call1(py, (value, info))
+                self.func.call1(py, (value, info))?
             } else {
-                self.func.call1(py, (value,))
-            }
+                self.func.call1(py, (value,))?
+            };
+            Ok((true, v))
         } else {
-            Ok(value.into_py(py))
+            Ok((false, value.into_py(py)))
         }
+    }
+
+    fn get_fallback_serializer(&self) -> &CombinedSerializer {
+        self.fallback_serializer
+            .as_ref()
+            .expect("fallback_serializer unexpectedly none")
+            .as_ref()
     }
 }
 
@@ -191,8 +211,11 @@ macro_rules! function_type_serializer {
                 let py = value.py();
                 match self.call(value, include, exclude, extra) {
                     // None for include/exclude here, as filtering should be done
-                    Ok(v) => self
+                    Ok((true, v)) => self
                         .return_serializer
+                        .to_python(v.into_ref(py), None, None, extra),
+                    Ok((false, v)) => self
+                        .get_fallback_serializer()
                         .to_python(v.into_ref(py), None, None, extra),
                     Err(err) => {
                         on_error(py, err, &self.function_name, extra)?;
@@ -204,7 +227,8 @@ macro_rules! function_type_serializer {
             fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
                 let py = key.py();
                 match self.call(key, None, None, extra) {
-                    Ok(v) => self.return_serializer.json_key(v.into_ref(py), extra),
+                    Ok((true, v)) => self.return_serializer.json_key(v.into_ref(py), extra),
+                    Ok((false, v)) => self.get_fallback_serializer().json_key(v.into_ref(py), extra),
                     Err(err) => {
                         on_error(py, err, &self.function_name, extra)?;
                         infer_json_key(key, extra)
@@ -223,9 +247,14 @@ macro_rules! function_type_serializer {
                 let py = value.py();
                 match self.call(value, include, exclude, extra) {
                     // None for include/exclude here, as filtering should be done
-                    Ok(v) => self
-                        .return_serializer
-                        .serde_serialize(v.into_ref(py), serializer, None, None, extra),
+                    Ok((true, v)) => {
+                        self.return_serializer
+                            .serde_serialize(v.into_ref(py), serializer, None, None, extra)
+                    }
+                    Ok((false, v)) => {
+                        self.get_fallback_serializer()
+                            .serde_serialize(v.into_ref(py), serializer, None, None, extra)
+                    }
                     Err(err) => {
                         on_error(py, err, &self.function_name, extra).map_err(py_err_se_err)?;
                         infer_serialize(value, serializer, include, exclude, extra)
@@ -241,6 +270,19 @@ macro_rules! function_type_serializer {
 }
 
 function_type_serializer!(FunctionPlainSerializer);
+
+fn copy_outer_schema(schema: &PyDict) -> PyResult<&PyDict> {
+    let py = schema.py();
+    // we copy the schema so we can modify it without affecting the original
+    let schema_copy = schema.copy()?;
+    // remove the serialization key from the schema so we don't recurse
+    schema_copy.del_item(intern!(py, "serialization"))?;
+    // remove ref if it exists - the point is that `schema` here has already run through
+    // `CombinedSerializer::build` so "ref" here will have already been added to `Definitions::used_ref`
+    // we don't want to error by "finding" it now
+    schema_copy.del_item(intern!(py, "ref")).ok();
+    Ok(schema_copy)
+}
 
 pub struct FunctionWrapSerializerBuilder;
 
@@ -293,15 +335,7 @@ impl BuildSerializer for FunctionWrapSerializer {
         let inner_schema: &PyDict = if let Some(s) = ser_schema.get_as(intern!(py, "schema"))? {
             s
         } else {
-            // we copy the schema so we can modify it without affecting the original
-            let schema_copy = schema.copy()?;
-            // remove the serialization key from the schema so we don't recurse
-            schema_copy.del_item(intern!(py, "serialization"))?;
-            // remove ref if it exists - the point is that `schema` here has already run through
-            // `CombinedSerializer::build` so "ref" here will have already been added to `Definitions::used_ref`
-            // we don't want to error by "finding" it now
-            schema_copy.del_item(intern!(py, "ref")).ok();
-            schema_copy
+            copy_outer_schema(schema)?
         };
 
         let serializer = CombinedSerializer::build(inner_schema, config, definitions)?;
@@ -333,30 +367,35 @@ impl FunctionWrapSerializer {
         include: Option<&PyAny>,
         exclude: Option<&PyAny>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<(bool, PyObject)> {
         let py = value.py();
         if self.when_used.should_use(value, extra) {
             let serialize = SerializationCallable::new(py, &self.serializer, include, exclude, extra);
-            if self.is_field_serializer {
+            let v = if self.is_field_serializer {
                 if let Some(model) = extra.model {
                     if self.info_arg {
                         let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
-                        self.func.call1(py, (model, value, serialize, info))
+                        self.func.call1(py, (model, value, serialize, info))?
                     } else {
-                        self.func.call1(py, (model, value, serialize))
+                        self.func.call1(py, (model, value, serialize))?
                     }
                 } else {
-                    Err(PyRuntimeError::new_err("Function wrap serializer expected to be run inside the context of a model field but no model was found"))
+                    return Err(PyRuntimeError::new_err("Function wrap serializer expected to be run inside the context of a model field but no model was found"));
                 }
             } else if self.info_arg {
                 let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
-                self.func.call1(py, (value, serialize, info))
+                self.func.call1(py, (value, serialize, info))?
             } else {
-                self.func.call1(py, (value, serialize))
-            }
+                self.func.call1(py, (value, serialize))?
+            };
+            Ok((true, v))
         } else {
-            Ok(value.into_py(py))
+            Ok((false, value.into_py(py)))
         }
+    }
+
+    fn get_fallback_serializer(&self) -> &CombinedSerializer {
+        self.serializer.as_ref()
     }
 }
 

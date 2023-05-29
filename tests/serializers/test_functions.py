@@ -1,7 +1,9 @@
 import json
 import platform
+import re
 import sys
 from collections import deque
+from operator import attrgetter
 from pathlib import Path
 
 import pytest
@@ -629,3 +631,15 @@ def test_recursive_call():
         'PydanticSerializationError: Error calling function `bad_recursive`: '
         'RuntimeError: Already mutably borrowed'
     )
+
+
+def test_serialize_pattern():
+    ser = core_schema.plain_serializer_function_ser_schema(
+        attrgetter('pattern'), when_used='json', return_schema=core_schema.str_schema()
+    )
+    s = SchemaSerializer(core_schema.any_schema(serialization=ser))
+
+    pattern = re.compile('^regex$')
+    assert s.to_python(pattern) == pattern
+    assert s.to_python(pattern, mode='json') == '^regex$'
+    assert s.to_json(pattern) == b'"^regex$"'
