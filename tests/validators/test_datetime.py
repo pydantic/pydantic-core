@@ -403,10 +403,10 @@ def test_aware():
     assert v.validate_python('2022-06-08T12:13:14Z') == datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone.utc)
 
     value = datetime.now()
-    with pytest.raises(ValidationError, match=r'Input should have timezone info'):
+    with pytest.raises(ValidationError, match=r'Input should have timezone info \[type=timezone_aware,'):
         v.validate_python(value)
 
-    with pytest.raises(ValidationError, match=r'Input should have timezone info'):
+    with pytest.raises(ValidationError, match=r'Input should have timezone info \[type=timezone_aware,'):
         v.validate_python('2022-06-08T12:13:14')
 
 
@@ -417,10 +417,10 @@ def test_naive():
     assert v.validate_python('2022-06-08T12:13:14') == datetime(2022, 6, 8, 12, 13, 14)
 
     value = datetime.now(tz=timezone.utc)
-    with pytest.raises(ValidationError, match=r'Input should not have timezone info'):
+    with pytest.raises(ValidationError, match=r'Input should not have timezone info \[type=timezone_naive,'):
         v.validate_python(value)
 
-    with pytest.raises(ValidationError, match=r'Input should not have timezone info'):
+    with pytest.raises(ValidationError, match=r'Input should not have timezone info \[type=timezone_naive,'):
         v.validate_python('2022-06-08T12:13:14Z')
 
 
@@ -441,7 +441,7 @@ def test_aware_specific():
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors(include_url=False) == [
         {
-            'type': 'timezone_offset_differ',
+            'type': 'timezone_offset',
             'loc': (),
             'msg': 'Timezone offset of 0 required, got 3600',
             'input': value,

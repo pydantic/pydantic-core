@@ -240,7 +240,7 @@ pub enum ErrorType {
     // timezone errors
     TimezoneNaive,
     TimezoneAware,
-    TimezoneOffsetDiffer {
+    TimezoneOffset {
         tz_expected: i32,
         tz_actual: i32,
     },
@@ -424,8 +424,8 @@ impl ErrorType {
             Self::TimeParsing { .. } => extract_context!(Cow::Owned, TimeParsing, ctx, error: String),
             Self::DatetimeParsing { .. } => extract_context!(Cow::Owned, DatetimeParsing, ctx, error: String),
             Self::DatetimeObjectInvalid { .. } => extract_context!(DatetimeObjectInvalid, ctx, error: String),
-            Self::TimezoneOffsetDiffer { .. } => {
-                extract_context!(TimezoneOffsetDiffer, ctx, tz_expected: i32, tz_actual: i32)
+            Self::TimezoneOffset { .. } => {
+                extract_context!(TimezoneOffset, ctx, tz_expected: i32, tz_actual: i32)
             }
             Self::TimeDeltaParsing { .. } => extract_context!(Cow::Owned, TimeDeltaParsing, ctx, error: String),
             Self::IsInstanceOf { .. } => extract_context!(IsInstanceOf, ctx, class: String),
@@ -524,7 +524,7 @@ impl ErrorType {
             Self::DatetimeFuture => "Input should be in the future",
             Self::TimezoneNaive => "Input should not have timezone info",
             Self::TimezoneAware => "Input should have timezone info",
-            Self::TimezoneOffsetDiffer {..} => "Timezone offset of {tz_expected} required, got {tz_actual}",
+            Self::TimezoneOffset {..} => "Timezone offset of {tz_expected} required, got {tz_actual}",
             Self::TimeDeltaType => "Input should be a valid timedelta",
             Self::TimeDeltaParsing {..} => "Input should be a valid timedelta, {error}",
             Self::FrozenSetType => "Input should be a valid frozenset",
@@ -636,7 +636,7 @@ impl ErrorType {
             Self::TimeParsing { error } => render!(tmpl, error),
             Self::DatetimeParsing { error } => render!(tmpl, error),
             Self::DatetimeObjectInvalid { error } => render!(tmpl, error),
-            Self::TimezoneOffsetDiffer { tz_expected, tz_actual } => to_string_render!(tmpl, tz_expected, tz_actual),
+            Self::TimezoneOffset { tz_expected, tz_actual } => to_string_render!(tmpl, tz_expected, tz_actual),
             Self::TimeDeltaParsing { error } => render!(tmpl, error),
             Self::IsInstanceOf { class } => render!(tmpl, class),
             Self::IsSubclassOf { class } => render!(tmpl, class),
@@ -694,7 +694,7 @@ impl ErrorType {
             Self::TimeParsing { error } => py_dict!(py, error),
             Self::DatetimeParsing { error } => py_dict!(py, error),
             Self::DatetimeObjectInvalid { error } => py_dict!(py, error),
-            Self::TimezoneOffsetDiffer { tz_expected, tz_actual } => py_dict!(py, tz_expected, tz_actual),
+            Self::TimezoneOffset { tz_expected, tz_actual } => py_dict!(py, tz_expected, tz_actual),
             Self::TimeDeltaParsing { error } => py_dict!(py, error),
             Self::IsInstanceOf { class } => py_dict!(py, class),
             Self::IsSubclassOf { class } => py_dict!(py, class),

@@ -246,7 +246,7 @@ def test_aware_specific():
     # insert_assert(exc_info.value.errors())
     assert exc_info.value.errors(include_url=False) == [
         {
-            'type': 'timezone_offset_differ',
+            'type': 'timezone_offset',
             'loc': (),
             'msg': 'Timezone offset of 0 required, got 3600',
             'input': value,

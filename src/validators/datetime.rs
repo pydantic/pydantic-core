@@ -257,7 +257,7 @@ impl TZConstraint {
                 let tz_expected = *tz_expected;
                 if tz_expected != tz_actual {
                     return Err(ValError::new(
-                        ErrorType::TimezoneOffsetDiffer { tz_expected, tz_actual },
+                        ErrorType::TimezoneOffset { tz_expected, tz_actual },
                         input,
                     ));
                 }

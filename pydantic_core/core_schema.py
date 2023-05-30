@@ -3791,7 +3791,7 @@ ErrorType = Literal[
     'datetime_future',
     'timezone_naive',
     'timezone_aware',
-    'timezone_offset_differ',
+    'timezone_offset',
     'time_delta_type',
     'time_delta_parsing',
     'frozen_set_type',

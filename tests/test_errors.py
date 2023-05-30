@@ -255,7 +255,7 @@ all_errors = [
     ('datetime_future', 'Input should be in the future', None),
     ('timezone_naive', 'Input should not have timezone info', None),
     ('timezone_aware', 'Input should have timezone info', None),
-    ('timezone_offset_differ', 'Timezone offset of 0 required, got 60', {'tz_expected': 0, 'tz_actual': 60}),
+    ('timezone_offset', 'Timezone offset of 0 required, got 60', {'tz_expected': 0, 'tz_actual': 60}),
     ('time_delta_type', 'Input should be a valid timedelta', None),
     ('time_delta_parsing', 'Input should be a valid timedelta, foobar', {'error': 'foobar'}),
     ('frozen_set_type', 'Input should be a valid frozenset', None),
