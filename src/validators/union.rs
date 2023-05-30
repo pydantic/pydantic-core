@@ -18,6 +18,7 @@ use crate::recursion_guard::RecursionGuard;
 use crate::tools::{extract_i64, py_err, SchemaDict};
 
 use super::custom_error::CustomError;
+use super::literal::LiteralValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -265,8 +266,9 @@ impl From<&ChoiceKey> for LocItem {
 
 #[derive(Debug, Clone)]
 pub struct TaggedUnionValidator {
-    choices: AHashMap<ChoiceKey, CombinedValidator>,
-    repeat_choices: Option<AHashMap<ChoiceKey, ChoiceKey>>,
+    discriminator_validator: Box<CombinedValidator>,
+    choices: Py<PyDict>,
+    validators: Vec<CombinedValidator>,
     discriminator: Discriminator,
     from_attributes: bool,
     strict: bool,
@@ -289,22 +291,18 @@ impl BuildValidator for TaggedUnionValidator {
         let discriminator_repr = discriminator.to_string_py(py)?;
 
         let schema_choices: &PyDict = schema.get_as_req(intern!(py, "choices"))?;
-        let mut choices = AHashMap::with_capacity(schema_choices.len());
-        let mut repeat_choices_vec: Vec<(ChoiceKey, ChoiceKey)> = Vec::new();
-        let mut first = true;
+        let choices = PyDict::new(py);
+        let mut validators = Vec::with_capacity(choices.len());
         let mut tags_repr = String::with_capacity(50);
         let mut descr = String::with_capacity(50);
-
-        for (key, value) in schema_choices {
-            let tag = ChoiceKey::from_py(key)?;
-
-            if let Ok(repeat_tag) = ChoiceKey::from_py(value) {
-                repeat_choices_vec.push((tag, repeat_tag));
-                continue;
-            }
-
-            let validator = build_validator(value, config, definitions)?;
-            let tag_repr = tag.repr();
+        let mut first = true;
+        let mut discriminators = Vec::with_capacity(choices.len());
+        for (choice_key, choice_schema) in schema {
+            discriminators.push(choice_key);
+            let validator = build_validator(choice_schema, config, definitions)?;
+            choices.set_item(choice_key, validators.len())?;
+            validators.push(validator);
+            let tag_repr = choice_key.repr()?.to_string();
             if first {
                 first = false;
                 write!(tags_repr, "{tag_repr}").unwrap();
@@ -314,32 +312,12 @@ impl BuildValidator for TaggedUnionValidator {
                 // no spaces in get_name() output to make loc easy to read
                 write!(descr, ",{}", validator.get_name()).unwrap();
             }
-            choices.insert(tag, validator);
         }
-        let repeat_choices = if repeat_choices_vec.is_empty() {
-            None
-        } else {
-            let mut wrong_values = Vec::with_capacity(repeat_choices_vec.len());
-            let mut repeat_choices = AHashMap::with_capacity(repeat_choices_vec.len());
-            for (tag, repeat_tag) in repeat_choices_vec {
-                match choices.get(&repeat_tag) {
-                    Some(validator) => {
-                        let tag_repr = tag.repr();
-                        write!(tags_repr, ", {tag_repr}").unwrap();
-                        write!(descr, ",{}", validator.get_name()).unwrap();
-                        repeat_choices.insert(tag, repeat_tag);
-                    }
-                    None => wrong_values.push(format!("`{repeat_tag}`")),
-                }
-            }
-            if !wrong_values.is_empty() {
-                return py_schema_err!(
-                    "String values in choices don't match any keys: {}",
-                    wrong_values.join(", ")
-                );
-            }
-            Some(repeat_choices)
-        };
+
+        let discriminator_validator_schema = PyDict::new(py);
+        discriminator_validator_schema.set_item(intern!(py, "type"), intern!(py, "literal"))?;
+        discriminator_validator_schema.set_item(intern!(py, "expected"), discriminators.into_py(py))?;
+        let discriminator_validator = build_validator(discriminator_validator_schema, config, definitions)?;
 
         let key = intern!(py, "from_attributes");
         let from_attributes = schema_or_config(schema, config, key, key)?.unwrap_or(true);
@@ -350,8 +328,9 @@ impl BuildValidator for TaggedUnionValidator {
         };
 
         Ok(Self {
-            choices,
-            repeat_choices,
+            choices: choices.into(),
+            validators,
+            discriminator_validator: Box::new(discriminator_validator),
             discriminator,
             from_attributes,
             strict: is_strict(schema, config)?,
@@ -434,8 +413,7 @@ impl Validator for TaggedUnionValidator {
         definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
-        self.choices
-            .values()
+        self.validators.iter()
             .any(|v| v.different_strict_behavior(definitions, ultra_strict))
     }
 
@@ -444,8 +422,7 @@ impl Validator for TaggedUnionValidator {
     }
 
     fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.choices
-            .iter_mut()
+        self.validators.iter()
             .try_for_each(|(_, validator)| validator.complete(definitions))
     }
 }

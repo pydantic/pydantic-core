@@ -3,7 +3,7 @@ from __future__ import annotations as _annotations
 import sys
 from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
-from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
+from typing import Any, Callable, Dict, Hashable, List, Optional, Set, Type, Union
 
 if sys.version_info < (3, 11):
     from typing_extensions import Protocol, Required, TypeAlias
@@ -2376,7 +2376,7 @@ class TaggedUnionSchema(TypedDict, total=False):
 
 
 def tagged_union_schema(
-    choices: Dict[Union[int, str], int | str | CoreSchema],
+    choices: Dict[Hashable, CoreSchema],
     discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], str | int | None],
     *,
     custom_error_type: str | None = None,
