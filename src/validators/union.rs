@@ -1,13 +1,8 @@
-use std::borrow::Cow;
-use std::fmt;
 use std::fmt::Write;
 
-use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
-
-use ahash::AHashMap;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config};
@@ -15,7 +10,7 @@ use crate::errors::{ErrorType, LocItem, ValError, ValLineError, ValResult};
 use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
-use crate::tools::{extract_i64, py_err, SchemaDict};
+use crate::tools::SchemaDict;
 
 use super::custom_error::CustomError;
 use super::literal::LiteralValidator;
@@ -221,55 +216,12 @@ impl Discriminator {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-enum ChoiceKey {
-    Int(i64),
-    Str(String),
-}
-
-impl ChoiceKey {
-    fn from_py(raw: &PyAny) -> PyResult<Self> {
-        if let Ok(py_int) = extract_i64(raw) {
-            Ok(Self::Int(py_int))
-        } else if let Ok(py_str) = raw.downcast::<PyString>() {
-            Ok(Self::Str(py_str.to_str()?.to_string()))
-        } else {
-            py_err!(PyTypeError; "Expected int or str, got {}", raw.get_type().name().unwrap_or("<unknown python object>"))
-        }
-    }
-
-    fn repr(&self) -> String {
-        match self {
-            Self::Int(i) => i.to_string(),
-            Self::Str(s) => format!("'{s}'"),
-        }
-    }
-}
-
-impl fmt::Display for ChoiceKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Int(i) => write!(f, "{i}"),
-            Self::Str(s) => write!(f, "{s}"),
-        }
-    }
-}
-
-impl From<&ChoiceKey> for LocItem {
-    fn from(key: &ChoiceKey) -> Self {
-        match key {
-            ChoiceKey::Str(s) => s.as_str().into(),
-            ChoiceKey::Int(i) => (*i).into(),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct TaggedUnionValidator {
-    discriminator_validator: Box<CombinedValidator>,
     choices: Py<PyDict>,
     validators: Vec<CombinedValidator>,
     discriminator: Discriminator,
+    discriminator_validator: Box<CombinedValidator>,
     from_attributes: bool,
     strict: bool,
     custom_error: Option<CustomError>,
@@ -290,34 +242,42 @@ impl BuildValidator for TaggedUnionValidator {
         let discriminator = Discriminator::new(py, schema.get_as_req(intern!(py, "discriminator"))?)?;
         let discriminator_repr = discriminator.to_string_py(py)?;
 
-        let schema_choices: &PyDict = schema.get_as_req(intern!(py, "choices"))?;
         let choices = PyDict::new(py);
         let mut validators = Vec::with_capacity(choices.len());
         let mut tags_repr = String::with_capacity(50);
         let mut descr = String::with_capacity(50);
         let mut first = true;
         let mut discriminators = Vec::with_capacity(choices.len());
-        for (choice_key, choice_schema) in schema {
+        let schema_choices: &PyDict = schema.get_as_req(intern!(py, "choices"))?;
+        let schema_choice_keys = schema_choices.keys();
+        let discriminator_validator = LiteralValidator::build(
+            PyDict::from_sequence(
+                py,
+                vec![
+                    (intern!(py, "type"), intern!(py, "literal").as_ref()),
+                    (intern!(py, "expected"), schema_choice_keys.as_ref()),
+                ]
+                .into_py(py),
+            )?,
+            config,
+            definitions,
+        )?;
+        for (choice_key, choice_schema) in schema_choices.iter() {
             discriminators.push(choice_key);
             let validator = build_validator(choice_schema, config, definitions)?;
             choices.set_item(choice_key, validators.len())?;
-            validators.push(validator);
             let tag_repr = choice_key.repr()?.to_string();
             if first {
                 first = false;
                 write!(tags_repr, "{tag_repr}").unwrap();
-                descr.push_str(validator.get_name());
+                descr.push_str(validator.get_name().clone());
             } else {
                 write!(tags_repr, ", {tag_repr}").unwrap();
                 // no spaces in get_name() output to make loc easy to read
                 write!(descr, ",{}", validator.get_name()).unwrap();
             }
+            validators.push(validator);
         }
-
-        let discriminator_validator_schema = PyDict::new(py);
-        discriminator_validator_schema.set_item(intern!(py, "type"), intern!(py, "literal"))?;
-        discriminator_validator_schema.set_item(intern!(py, "expected"), discriminators.into_py(py))?;
-        let discriminator_validator = build_validator(discriminator_validator_schema, config, definitions)?;
 
         let key = intern!(py, "from_attributes");
         let from_attributes = schema_or_config(schema, config, key, key)?.unwrap_or(true);
@@ -330,8 +290,8 @@ impl BuildValidator for TaggedUnionValidator {
         Ok(Self {
             choices: choices.into(),
             validators,
-            discriminator_validator: Box::new(discriminator_validator),
             discriminator,
+            discriminator_validator: Box::new(discriminator_validator),
             from_attributes,
             strict: is_strict(schema, config)?,
             custom_error: CustomError::build(schema, config, definitions)?,
@@ -360,12 +320,7 @@ impl Validator for TaggedUnionValidator {
                         // errors when getting attributes which should be "raised"
                         match lookup_key.$get_method($( $dict ),+)? {
                             Some((_, value)) => {
-                                if let Ok(either_int) = value.validate_int(self.strict) {
-                                    let int = either_int.into_i64(py)?;
-                                    Ok(ChoiceKey::Int(int))
-                                } else {
-                                    Ok(ChoiceKey::Str(value.validate_str(self.strict)?.as_cow()?.as_ref().to_string()))
-                                }
+                                Ok(value.to_object(py).into_ref(py))
                             }
                             None => Err(self.tag_not_found(input)),
                         }
@@ -379,27 +334,19 @@ impl Validator for TaggedUnionValidator {
                     GenericMapping::PyMapping(mapping) => find_validator!(py_get_mapping_item, mapping),
                     GenericMapping::JsonObject(mapping) => find_validator!(json_get, mapping),
                 }?;
-                self.find_call_validator(py, &tag, input, extra, definitions, recursion_guard)
+                self.find_call_validator(py, tag, input, extra, definitions, recursion_guard)
             }
             Discriminator::Function(ref func) => {
                 let tag = func.call1(py, (input.to_object(py),))?;
                 if tag.is_none(py) {
                     Err(self.tag_not_found(input))
                 } else {
-                    let tag: &PyAny = tag.downcast(py)?;
-                    self.find_call_validator(
-                        py,
-                        &(ChoiceKey::from_py(tag)?),
-                        input,
-                        extra,
-                        definitions,
-                        recursion_guard,
-                    )
+                    self.find_call_validator(py, tag.into_ref(py), input, extra, definitions, recursion_guard)
                 }
             }
             Discriminator::SelfSchema => self.find_call_validator(
                 py,
-                &ChoiceKey::Str(self.self_schema_tag(py, input)?.into_owned()),
+                &self.self_schema_tag(py, input)?.as_ref(),
                 input,
                 extra,
                 definitions,
@@ -413,7 +360,8 @@ impl Validator for TaggedUnionValidator {
         definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
         ultra_strict: bool,
     ) -> bool {
-        self.validators.iter()
+        self.validators
+            .iter()
             .any(|v| v.different_strict_behavior(definitions, ultra_strict))
     }
 
@@ -422,8 +370,9 @@ impl Validator for TaggedUnionValidator {
     }
 
     fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.validators.iter()
-            .try_for_each(|(_, validator)| validator.complete(definitions))
+        self.validators
+            .iter_mut()
+            .try_for_each(|validator| validator.complete(definitions))
     }
 }
 
@@ -432,7 +381,7 @@ impl TaggedUnionValidator {
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-    ) -> ValResult<'data, Cow<'data, str>> {
+    ) -> ValResult<'data, &'data PyString> {
         let dict = input.strict_dict()?;
         let either_tag = match dict {
             GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "type")) {
@@ -455,44 +404,44 @@ impl TaggedUnionValidator {
             if tag == "function" {
                 let mode = mode.ok_or_else(|| self.tag_not_found(input))?;
                 match mode.as_cow()?.as_ref() {
-                    "plain" => Ok(Cow::Borrowed("function-plain")),
-                    "wrap" => Ok(Cow::Borrowed("function-wrap")),
-                    _ => Ok(Cow::Borrowed("function")),
+                    "plain" => Ok(intern!(py, "function-plain")),
+                    "wrap" => Ok(intern!(py, "function-wrap")),
+                    _ => Ok(intern!(py, "function")),
                 }
             } else {
                 // tag == "tuple"
                 if let Some(mode) = mode {
                     if mode.as_cow()?.as_ref() == "positional" {
-                        return Ok(Cow::Borrowed("tuple-positional"));
+                        return Ok(intern!(py, "tuple-positional"));
                     }
                 }
-                Ok(Cow::Borrowed("tuple-variable"))
+                Ok(intern!(py, "tuple-variable"))
             }
         } else {
-            Ok(Cow::Owned(tag.to_string()))
+            Ok(PyString::new(py, tag))
         }
     }
 
     fn find_call_validator<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        tag: &ChoiceKey,
+        tag: &'data PyAny,
         input: &'data impl Input<'data>,
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        if let Some(validator) = self.choices.get(tag) {
-            return match validator.validate(py, input, extra, definitions, recursion_guard) {
-                Ok(res) => Ok(res),
-                Err(err) => Err(err.with_outer_location(tag.into())),
-            };
-        } else if let Some(ref repeat_choices) = self.repeat_choices {
-            if let Some(choice_tag) = repeat_choices.get(tag) {
-                let validator = &self.choices[choice_tag];
+        if let Ok(tag) = self
+            .discriminator_validator
+            .validate(py, tag, extra, definitions, recursion_guard)
+        {
+            let tag = tag.as_ref(py);
+            if let Some(validator_idx) = self.choices.as_ref(py).get_item(tag) {
+                // We know this will always be a usize because we put it there ourselves
+                let validator = &self.validators[usize::extract(validator_idx).unwrap()];
                 return match validator.validate(py, input, extra, definitions, recursion_guard) {
                     Ok(res) => Ok(res),
-                    Err(err) => Err(err.with_outer_location(tag.into())),
+                    Err(err) => Err(err.with_outer_location(LocItem::try_from(tag)?)),
                 };
             }
         }
