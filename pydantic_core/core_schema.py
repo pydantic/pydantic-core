@@ -3,7 +3,8 @@ from __future__ import annotations as _annotations
 import sys
 from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
-from typing import Any, Callable, Dict, Hashable, List, Optional, Set, Type, Union
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
 
 if sys.version_info < (3, 11):
     from typing_extensions import Protocol, Required, TypeAlias
@@ -995,16 +996,23 @@ def timedelta_schema(
     )
 
 
+LiteralValue = Union[int, str, bool, None, type[Enum], Enum]
+
+
 class LiteralSchema(TypedDict, total=False):
     type: Required[Literal['literal']]
-    expected: Required[List[Any]]
+    expected: Required[List[LiteralValue]]
     ref: str
     metadata: Any
     serialization: SerSchema
 
 
 def literal_schema(
-    expected: list[Any], *, ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
+    expected: list[LiteralValue],
+    *,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
 ) -> LiteralSchema:
     """
     Returns a schema that matches a literal value, e.g.:
@@ -2361,7 +2369,7 @@ def union_schema(
 
 class TaggedUnionSchema(TypedDict, total=False):
     type: Required[Literal['tagged-union']]
-    choices: Required[Dict[Hashable, CoreSchema]]
+    choices: Required[Dict[LiteralValue, CoreSchema]]
     discriminator: Required[
         Union[str, List[Union[str, int]], List[List[Union[str, int]]], Callable[[Any], Optional[Union[str, int]]]]
     ]
@@ -2376,7 +2384,7 @@ class TaggedUnionSchema(TypedDict, total=False):
 
 
 def tagged_union_schema(
-    choices: Dict[Hashable, CoreSchema],
+    choices: Dict[LiteralValue, CoreSchema],
     discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], str | int | None],
     *,
     custom_error_type: str | None = None,

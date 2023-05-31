@@ -114,50 +114,6 @@ def test_literal_py_and_json(py_and_json: PyAndJson, kwarg_expected, input_value
         assert v.validate_test(input_value) == expected
 
 
-@pytest.mark.parametrize(
-    'kwarg_expected,input_value,expected',
-    [
-        ([1, b'whatever'], b'whatever', b'whatever'),
-        ([(1, 2), (3, 4)], (1, 2), (1, 2)),
-        ([(1, 2), (3, 4)], (3, 4), (3, 4)),
-        pytest.param(
-            [1, b'whatever'],
-            3,
-            Err("Input should be 1 or b'whatever' [type=literal_error, input_value=3, input_type=int]"),
-            id='wrong-general',
-        ),
-        ([b'bite'], b'bite', b'bite'),
-        pytest.param(
-            [b'bite'],
-            'spoon',
-            Err(
-                "Input should be b'bite' [type=literal_error, input_value='spoon', input_type=str]",
-                [
-                    {
-                        'type': 'literal_error',
-                        'loc': (),
-                        'msg': "Input should be 1 or '1'",
-                        'input': '2',
-                        'ctx': {'expected': "1 or '1'"},
-                    }
-                ],
-            ),
-            id='single-byte',
-        ),
-    ],
-)
-def test_literal_not_json(kwarg_expected, input_value, expected):
-    v = SchemaValidator({'type': 'literal', 'expected': kwarg_expected})
-    if isinstance(expected, Err):
-        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
-            v.validate_python(input_value)
-            if expected.errors is not None:
-                # debug(exc_info.value.errors(include_url=False))
-                assert exc_info.value.errors(include_url=False) == expected.errors
-    else:
-        assert v.validate_python(input_value) == expected
-
-
 def test_build_error():
     with pytest.raises(SchemaError, match='SchemaError: `expected` should have length > 0'):
         SchemaValidator({'type': 'literal', 'expected': []})
@@ -378,3 +334,46 @@ def test_mix_str_enum_with_str(reverse: Callable[[List[Any]], List[Any]], err: A
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('bar_val')
     assert exc_info.value.errors(include_url=False) == err
+
+
+def test_invalid_value() -> None:
+    with pytest.raises(SchemaError) as exc_info:
+        SchemaValidator(core_schema.literal_schema([1.0]))
+    assert exc_info.value.errors() == [
+        {
+            'type': 'int_type',
+            'loc': ('literal', 'expected', 1, 'int'),
+            'msg': 'Input should be a valid integer',
+            'input': object,
+        },
+        {
+            'type': 'string_type',
+            'loc': ('literal', 'expected', 1, 'str'),
+            'msg': 'Input should be a valid string',
+            'input': object,
+        },
+        {
+            'type': 'bool_type',
+            'loc': ('literal', 'expected', 1, 'bool'),
+            'msg': 'Input should be a valid boolean',
+            'input': object,
+        },
+        {
+            'type': 'none_required',
+            'loc': ('literal', 'expected', 1, 'none'),
+            'msg': 'Input should be None',
+            'input': object,
+        },
+        {
+            'type': 'is_subclass_of',
+            'loc': ('literal', 'expected', 1, 'is-subclass[Enum]'),
+            'msg': 'Input should be a subclass of Enum',
+            'input': object,
+        },
+        {
+            'type': 'is_instance_of',
+            'loc': ('literal', 'expected', 1, 'is-instance[Enum]'),
+            'msg': 'Input should be an instance of Enum',
+            'input': object,
+        },
+    ]
