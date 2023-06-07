@@ -3,7 +3,7 @@ use num_bigint::BigInt;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::EitherInt;
 
-use super::Input;
+use super::{EitherFloat, Input};
 
 pub fn map_json_err<'a>(input: &'a impl Input<'a>, error: serde_json::Error) -> ValError<'a> {
     ValError::new(

@@ -263,6 +263,7 @@ dependencies = [
  "idna",
  "mimalloc",
  "num-bigint",
+ "num-traits",
  "pyo3",
  "pyo3-build-config",
  "regex",
