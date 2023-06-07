@@ -2,12 +2,12 @@ from typing import List
 
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError, core_schema
+from pydantic_core import SchemaValidator, Undefined, ValidationError, core_schema
 
 
 def test_model_root():
     class RootModel:
-        __slots__ = 'root'
+        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
         root: List[int]
 
     v = SchemaValidator(
@@ -18,7 +18,7 @@ def test_model_root():
     m = v.validate_python([1, 2, '3'])
     assert isinstance(m, RootModel)
     assert m.root == [1, 2, 3]
-    assert not hasattr(m, '__dict__')
+    assert m.__dict__ == {'root': [1, 2, 3]}
 
     m = v.validate_json('[1, 2, "3"]')
     assert isinstance(m, RootModel)
@@ -35,7 +35,7 @@ def test_model_root():
 
 def test_revalidate():
     class RootModel:
-        __slots__ = 'root'
+        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
         root: List[int]
 
     v = SchemaValidator(
@@ -55,7 +55,7 @@ def test_revalidate():
 
 def test_init():
     class RootModel:
-        __slots__ = 'root'
+        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
         root: str
 
     v = SchemaValidator(
@@ -70,7 +70,7 @@ def test_init():
 
 def test_assignment():
     class RootModel:
-        __slots__ = 'root'
+        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
         root: str
 
     v = SchemaValidator(core_schema.model_schema(RootModel, core_schema.str_schema(), root_model=True))
@@ -101,7 +101,7 @@ def test_field_function():
     call_infos = []
 
     class RootModel:
-        __slots__ = 'root'
+        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
         root: str
 
     def f(input_value: str, info):
@@ -129,7 +129,7 @@ def test_field_function():
 
 def test_extra():
     class RootModel:
-        __slots__ = 'root'
+        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
         root: int
 
     v = SchemaValidator(core_schema.model_schema(RootModel, core_schema.int_schema(), root_model=True))
@@ -138,3 +138,26 @@ def test_extra():
 
     with pytest.raises(AttributeError):
         m.__pydantic_extra__
+
+
+def test_fields_set():
+    assert core_schema.Omitted is Undefined
+
+    class RootModel:
+        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
+        root: int = 42
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            RootModel, core_schema.with_default_schema(core_schema.int_schema(), default=42), root_model=True
+        )
+    )
+
+    m = RootModel()
+    v.validate_python(1, self_instance=m)
+    assert m.root == 1
+    assert m.__pydantic_fields_set__ == {'root'}
+
+    v.validate_python(Undefined, self_instance=m)
+    assert m.root == 42
+    assert m.__pydantic_fields_set__ == set()

@@ -15,6 +15,11 @@ if sys.version_info < (3, 9):
 else:
     from typing import Literal, TypedDict
 
+try:
+    from pydantic_core import Undefined
+except ImportError:
+    Undefined = object()
+
 
 def dict_not_none(**kwargs: Any) -> Any:
     return {k: v for k, v in kwargs.items() if v is not None}
@@ -2200,7 +2205,7 @@ class WithDefaultSchema(TypedDict, total=False):
     serialization: SerSchema
 
 
-Omitted = object()
+Omitted = Undefined
 
 
 def with_default_schema(
