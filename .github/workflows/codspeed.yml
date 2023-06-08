@@ -46,7 +46,9 @@ jobs:
       - name: cache rust
         uses: Swatinem/rust-cache@v2
 
-      - run: pip install . -v
+      - run: |
+          pip install . -v # For dependencies
+          make build-prod  # Get the release build without MiMalloc
         env:
           CONST_RANDOM_SEED: 0 # Fix the compile time RNG seed
 
