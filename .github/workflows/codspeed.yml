@@ -49,6 +49,7 @@ jobs:
       - name: Install pydantic-core
         # build-prod does not include MiMalloc because it bypasses Maturin
         run: |
+          pip install -e .
           make build-prod
           python -c 'import pydantic_core'
         env:
