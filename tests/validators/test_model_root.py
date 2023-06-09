@@ -43,14 +43,43 @@ def test_revalidate():
             RootModel, core_schema.list_schema(core_schema.int_schema()), root_model=True, revalidate_instances='always'
         )
     )
-    m = v.validate_python([1, '2'])
+    m = RootModel()
+    m = v.validate_python([1, '2'], self_instance=m)
     assert isinstance(m, RootModel)
     assert m.root == [1, 2]
+    assert m.__pydantic_fields_set__ == {'root'}
 
     m2 = v.validate_python(m)
     assert m2 is not m
     assert isinstance(m2, RootModel)
     assert m2.root == [1, 2]
+    assert m.__pydantic_fields_set__ == {'root'}
+
+
+def test_revalidate_with_default():
+    class RootModel:
+        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
+        root: int = 42
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            RootModel,
+            core_schema.with_default_schema(core_schema.int_schema(), default=42),
+            root_model=True,
+            revalidate_instances='always',
+        )
+    )
+    m = RootModel()
+    m = v.validate_python(Undefined, self_instance=m)
+    assert isinstance(m, RootModel)
+    assert m.root == 42
+    assert m.__pydantic_fields_set__ == set()
+
+    m2 = v.validate_python(m)
+    assert m2 is not m
+    assert isinstance(m2, RootModel)
+    assert m2.root == 42
+    assert m.__pydantic_fields_set__ == set()
 
 
 def test_init():

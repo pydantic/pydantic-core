@@ -126,12 +126,11 @@ impl Validator for ModelValidator {
         let class = self.class.as_ref(py);
         if let Some(py_input) = input.input_is_instance(class) {
             if self.revalidate.should_revalidate(py_input, class) {
+                let fields_set = py_input.getattr(intern!(py, DUNDER_FIELDS_SET_KEY))?;
                 if self.root_model {
                     let inner_input = py_input.getattr(intern!(py, ROOT_FIELD))?;
-                    // self.validate_construct(py, inner_input, Some(fields_set), extra, definitions, recursion_guard)
-                    self.validate_construct(py, inner_input, None, extra, definitions, recursion_guard)
+                    self.validate_construct(py, inner_input, Some(fields_set), extra, definitions, recursion_guard)
                 } else {
-                    let fields_set = py_input.getattr(intern!(py, DUNDER_FIELDS_SET_KEY))?;
                     // get dict here so from_attributes logic doesn't apply
                     let dict = py_input.getattr(intern!(py, DUNDER_DICT))?;
                     let model_extra = py_input.getattr(intern!(py, DUNDER_MODEL_EXTRA_KEY))?;
