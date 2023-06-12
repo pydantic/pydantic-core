@@ -420,7 +420,7 @@ impl TaggedUnionValidator {
         if let Ok(Some((tag, validator))) = self.lookup.validate(py, tag) {
             return match validator.validate(py, input, extra, definitions, recursion_guard) {
                 Ok(res) => Ok(res),
-                Err(err) => Err(err.with_outer_location(LocItem::try_from(tag.to_object(py).into_ref(py))?)),
+                Err(err) => Err(err.with_outer_location(&LocItem::try_from(tag.to_object(py).into_ref(py))?)),
             };
         }
         match self.custom_error {

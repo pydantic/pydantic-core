@@ -48,7 +48,7 @@ impl<'a> ValError<'a> {
     }
 
     /// helper function to call with_outer on line items if applicable
-    pub fn with_outer_location(self, loc_item: LocItem) -> Self {
+    pub fn with_outer_location(self, loc_item: &LocItem) -> Self {
         match self {
             Self::LineErrors(mut line_errors) => {
                 for line_error in &mut line_errors {

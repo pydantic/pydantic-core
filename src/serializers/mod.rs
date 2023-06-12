@@ -72,7 +72,7 @@ impl SchemaSerializer {
 impl SchemaSerializer {
     #[new]
     pub fn py_new(py: Python, schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
-        let self_validator = SelfValidator::new(py)?;
+        let self_validator = SelfValidator::new(py);
         let schema = self_validator.validate_schema(py, schema)?;
         let mut definitions_builder = DefinitionsBuilder::new();
 

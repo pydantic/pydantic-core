@@ -107,7 +107,7 @@ pub struct SchemaValidator {
 impl SchemaValidator {
     #[new]
     pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
-        let self_validator = SelfValidator::new(py)?;
+        let self_validator = SelfValidator::new(py);
         let schema = self_validator.validate_schema(py, schema)?;
 
         let mut definitions_builder = DefinitionsBuilder::new();
@@ -332,12 +332,12 @@ pub struct SelfValidator<'py> {
 }
 
 impl<'py> SelfValidator<'py> {
-    pub fn new(py: Python<'py>) -> PyResult<Self> {
+    pub fn new(py: Python<'py>) -> Self {
         let validator = SCHEMA_DEFINITION.get_or_init(py, || match Self::build(py) {
             Ok(schema) => schema,
             Err(e) => panic!("Error building schema validator:\n  {e}"),
         });
-        Ok(Self { validator })
+        Self { validator }
     }
 
     pub fn validate_schema(&self, py: Python<'py>, schema: &'py PyAny) -> PyResult<&'py PyAny> {

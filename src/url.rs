@@ -280,14 +280,14 @@ impl PyMultiHostUrl {
         format!("Url('{}')", self.__str__())
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyResult<bool> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> bool {
         match op {
-            CompareOp::Lt => Ok(self.unicode_string() < other.unicode_string()),
-            CompareOp::Le => Ok(self.unicode_string() <= other.unicode_string()),
-            CompareOp::Eq => Ok(self.unicode_string() == other.unicode_string()),
-            CompareOp::Ne => Ok(self.unicode_string() != other.unicode_string()),
-            CompareOp::Gt => Ok(self.unicode_string() > other.unicode_string()),
-            CompareOp::Ge => Ok(self.unicode_string() >= other.unicode_string()),
+            CompareOp::Lt => self.unicode_string() < other.unicode_string(),
+            CompareOp::Le => self.unicode_string() <= other.unicode_string(),
+            CompareOp::Eq => self.unicode_string() == other.unicode_string(),
+            CompareOp::Ne => self.unicode_string() != other.unicode_string(),
+            CompareOp::Gt => self.unicode_string() > other.unicode_string(),
+            CompareOp::Ge => self.unicode_string() >= other.unicode_string(),
         }
     }
 
