@@ -47,7 +47,7 @@ impl ComputedFields {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<()> {
-        for computed_fields in self.0.iter() {
+        for computed_fields in &self.0 {
             computed_fields.to_python(model, output_dict, filter, include, exclude, extra)?;
         }
         Ok(())
@@ -62,7 +62,7 @@ impl ComputedFields {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<(), S::Error> {
-        for computed_field in self.0.iter() {
+        for computed_field in &self.0 {
             let property_name_py = computed_field.property_name_py.as_ref(model.py());
             if let Some((next_include, next_exclude)) = filter
                 .key_filter(property_name_py, include, exclude)
@@ -75,9 +75,10 @@ impl ComputedFields {
                     exclude: next_exclude,
                     extra,
                 };
-                let key = match extra.by_alias {
-                    true => computed_field.alias.as_str(),
-                    false => computed_field.property_name.as_str(),
+                let key = if extra.by_alias {
+                    computed_field.alias.as_str()
+                } else {
+                    computed_field.property_name.as_str()
                 };
                 map.serialize_entry(key, &cfs)?;
             }
@@ -135,9 +136,10 @@ impl ComputedField {
             let value = self
                 .serializer
                 .to_python(next_value, next_include, next_exclude, extra)?;
-            let key = match extra.by_alias {
-                true => self.alias_py.as_ref(py),
-                false => property_name_py,
+            let key = if extra.by_alias {
+                self.alias_py.as_ref(py)
+            } else {
+                property_name_py
             };
             output_dict.set_item(key, value)?;
         }

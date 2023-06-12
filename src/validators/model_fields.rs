@@ -248,9 +248,7 @@ impl Validator for ModelFieldsValidator {
             GenericMapping::JsonObject(d) => process!(d, json_get, JsonObjectGenericIterator),
         }
 
-        if !errors.is_empty() {
-            Err(ValError::LineErrors(errors))
-        } else {
+        if errors.is_empty() {
             let fields_set = PySet::new(py, &fields_set_vec)?;
 
             // if we have extra=allow, but we didn't create a dict because we were validate attributes, set it now
@@ -260,6 +258,8 @@ impl Validator for ModelFieldsValidator {
             };
 
             Ok((model_dict, model_extra_dict_op, fields_set).to_object(py))
+        } else {
+            Err(ValError::LineErrors(errors))
         }
     }
 

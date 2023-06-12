@@ -323,7 +323,7 @@ fn parse_multihost_url<'url, 'input>(
     loop {
         let peek = chars.peek();
         match peek {
-            Some(&'/') | Some(&'\\') => {
+            Some(&'/' | &'\\') => {
                 chars.next();
             }
             _ => break,

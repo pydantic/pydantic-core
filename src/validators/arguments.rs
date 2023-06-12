@@ -99,8 +99,8 @@ impl BuildValidator for ArgumentsValidator {
             }
             parameters.push(Parameter {
                 positional,
-                kw_lookup_key,
                 name,
+                kw_lookup_key,
                 kwarg_key,
                 validator,
             });
@@ -321,10 +321,10 @@ impl Validator for ArgumentsValidator {
             GenericArguments::Py(a) => process!(a, py_get_dict_item, py_get, py_slice),
             GenericArguments::Json(a) => process!(a, json_get, json_get, json_slice),
         }
-        if !errors.is_empty() {
-            Err(ValError::LineErrors(errors))
-        } else {
+        if errors.is_empty() {
             Ok((PyTuple::new(py, output_args), output_kwargs).to_object(py))
+        } else {
+            Err(ValError::LineErrors(errors))
         }
     }
 

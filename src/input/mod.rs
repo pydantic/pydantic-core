@@ -24,9 +24,9 @@ pub(crate) use return_enums::{
 
 // Defined here as it's not exported by pyo3
 pub fn py_error_on_minusone(py: Python<'_>, result: c_int) -> PyResult<()> {
-    if result != -1 {
-        Ok(())
-    } else {
+    if result == -1 {
         Err(PyErr::fetch(py))
+    } else {
+        Ok(())
     }
 }

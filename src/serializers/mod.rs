@@ -185,7 +185,7 @@ impl SchemaSerializer {
 
     fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
         self.serializer.py_gc_traverse(&visit)?;
-        for slot in self.definitions.iter() {
+        for slot in &self.definitions {
             slot.py_gc_traverse(&visit)?;
         }
         Ok(())
@@ -193,7 +193,7 @@ impl SchemaSerializer {
 
     fn __clear__(&mut self) {
         self.serializer.py_gc_clear();
-        for slot in self.definitions.iter_mut() {
+        for slot in &mut self.definitions {
             slot.py_gc_clear();
         }
     }
@@ -228,7 +228,7 @@ pub fn to_json(
         serialize_unknown,
         fallback,
     );
-    let serializer = type_serializers::any::AnySerializer::default().into();
+    let serializer = type_serializers::any::AnySerializer.into();
     let bytes = to_json_bytes(value, &serializer, include, exclude, &extra, indent, 1024)?;
     state.final_check(py)?;
     let py_bytes = PyBytes::new(py, &bytes);

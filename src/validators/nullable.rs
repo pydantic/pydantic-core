@@ -39,9 +39,10 @@ impl Validator for NullableValidator {
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        match input.is_none() {
-            true => Ok(py.None()),
-            false => self.validator.validate(py, input, extra, definitions, recursion_guard),
+        if input.is_none() {
+            Ok(py.None())
+        } else {
+            self.validator.validate(py, input, extra, definitions, recursion_guard)
         }
     }
 

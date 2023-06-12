@@ -116,11 +116,11 @@ struct ValidatorIterator {
 
 #[pymethods]
 impl ValidatorIterator {
-    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
 
-    fn __next__(mut slf: PyRefMut<'_, Self>, py: Python) -> PyResult<Option<PyObject>> {
+    fn __next__(mut slf: PyRefMut<Self>, py: Python) -> PyResult<Option<PyObject>> {
         let min_length = slf.min_length;
         let max_length = slf.max_length;
         let hide_input_in_errors = slf.hide_input_in_errors;

@@ -270,10 +270,10 @@ impl Validator for TypedDictValidator {
             GenericMapping::JsonObject(d) => process!(d, json_get, JsonObjectGenericIterator),
         }
 
-        if !errors.is_empty() {
-            Err(ValError::LineErrors(errors))
-        } else {
+        if errors.is_empty() {
             Ok(output_dict.to_object(py))
+        } else {
+            Err(ValError::LineErrors(errors))
         }
     }
 

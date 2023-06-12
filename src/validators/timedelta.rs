@@ -40,14 +40,15 @@ impl BuildValidator for TimeDeltaValidator {
 
         Ok(Self {
             strict: is_strict(schema, config)?,
-            constraints: match has_constraints {
-                true => Some(TimedeltaConstraints {
+            constraints: if has_constraints {
+                Some(TimedeltaConstraints {
                     le: py_timedelta_as_timedelta(schema, intern!(py, "le"))?,
                     lt: py_timedelta_as_timedelta(schema, intern!(py, "lt"))?,
                     ge: py_timedelta_as_timedelta(schema, intern!(py, "ge"))?,
                     gt: py_timedelta_as_timedelta(schema, intern!(py, "gt"))?,
-                }),
-                false => None,
+                })
+            } else {
+                None
             },
         }
         .into())

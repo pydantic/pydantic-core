@@ -175,7 +175,7 @@ impl SerializationIterator {
 
 #[pymethods]
 impl SerializationIterator {
-    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
 

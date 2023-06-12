@@ -39,8 +39,8 @@ impl ValidationError {
     pub fn new(line_errors: Vec<PyLineError>, title: PyObject, error_mode: ErrorMode, hide_input: bool) -> Self {
         Self {
             line_errors,
-            title,
             error_mode,
+            title,
             hide_input,
         }
     }

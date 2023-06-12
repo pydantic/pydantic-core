@@ -165,15 +165,7 @@ impl Validator for ModelValidator {
         if self.frozen {
             return Err(ValError::new(ErrorType::FrozenInstance, field_value));
         } else if self.root_model {
-            return if field_name != ROOT_FIELD {
-                Err(ValError::new_with_loc(
-                    ErrorType::NoSuchAttribute {
-                        attribute: field_name.to_string(),
-                    },
-                    field_value,
-                    field_name.to_string(),
-                ))
-            } else {
+            return if field_name == ROOT_FIELD {
                 let field_extra = Extra {
                     field_name: Some(field_name),
                     ..*extra
@@ -184,6 +176,14 @@ impl Validator for ModelValidator {
 
                 force_setattr(py, model, intern!(py, ROOT_FIELD), output)?;
                 Ok(model.into_py(py))
+            } else {
+                Err(ValError::new_with_loc(
+                    ErrorType::NoSuchAttribute {
+                        attribute: field_name.to_string(),
+                    },
+                    field_value,
+                    field_name.to_string(),
+                ))
             };
         }
         let dict: &PyDict = model.getattr(intern!(py, DUNDER_DICT))?.downcast()?;

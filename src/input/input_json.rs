@@ -123,10 +123,13 @@ impl<'a> Input<'a> for JsonInput {
     }
     fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
         match self {
-            JsonInput::Bool(b) => match *b {
-                true => Ok(EitherInt::I64(1)),
-                false => Ok(EitherInt::I64(0)),
-            },
+            JsonInput::Bool(b) => {
+                if *b {
+                    Ok(EitherInt::I64(1))
+                } else {
+                    Ok(EitherInt::I64(0))
+                }
+            }
             JsonInput::Int(i) => Ok(EitherInt::I64(*i)),
             JsonInput::Uint(u) => Ok(EitherInt::U64(*u)),
             JsonInput::Float(f) => float_as_int(self, *f),
@@ -151,10 +154,13 @@ impl<'a> Input<'a> for JsonInput {
     }
     fn lax_float(&self) -> ValResult<f64> {
         match self {
-            JsonInput::Bool(b) => match *b {
-                true => Ok(1.0),
-                false => Ok(0.0),
-            },
+            JsonInput::Bool(b) => {
+                if *b {
+                    Ok(1.0)
+                } else {
+                    Ok(0.0)
+                }
+            }
             JsonInput::Float(f) => Ok(*f),
             JsonInput::Int(i) => Ok(*i as f64),
             JsonInput::Uint(u) => Ok(*u as f64),

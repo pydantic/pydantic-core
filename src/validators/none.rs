@@ -31,9 +31,10 @@ impl Validator for NoneValidator {
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        match input.is_none() {
-            true => Ok(py.None()),
-            false => Err(ValError::new(ErrorType::NoneRequired, input)),
+        if input.is_none() {
+            Ok(py.None())
+        } else {
+            Err(ValError::new(ErrorType::NoneRequired, input))
         }
     }
 
