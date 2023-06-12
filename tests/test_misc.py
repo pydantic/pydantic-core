@@ -5,7 +5,7 @@ import re
 import pytest
 from typing_extensions import get_args
 
-from pydantic_core import CoreSchema, CoreSchemaType, Undefined
+from pydantic_core import CoreSchema, CoreSchemaType, PydanticUndefined
 from pydantic_core._pydantic_core import SchemaError, SchemaValidator, ValidationError, __version__, build_profile
 
 
@@ -166,12 +166,12 @@ def test_core_schema_type_literal():
 
 def test_undefined():
     with pytest.raises(NotImplementedError, match='UndefinedType'):
-        Undefined.__class__()
+        PydanticUndefined.__class__()
 
-    undefined_copy = copy.copy(Undefined)
-    undefined_deepcopy = copy.deepcopy(Undefined)
+    undefined_copy = copy.copy(PydanticUndefined)
+    undefined_deepcopy = copy.deepcopy(PydanticUndefined)
 
-    assert undefined_copy is Undefined
-    assert undefined_deepcopy is Undefined
+    assert undefined_copy is PydanticUndefined
+    assert undefined_deepcopy is PydanticUndefined
 
-    assert pickle.loads(pickle.dumps(Undefined)) is Undefined
+    assert pickle.loads(pickle.dumps(PydanticUndefined)) is PydanticUndefined

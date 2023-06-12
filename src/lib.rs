@@ -46,7 +46,7 @@ pub fn get_version() -> String {
 fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", get_version())?;
     m.add("build_profile", env!("PROFILE"))?;
-    m.add("Undefined", UndefinedType::new(py))?;
+    m.add("PydanticUndefined", UndefinedType::new(py))?;
     m.add_class::<PySome>()?;
     m.add_class::<SchemaValidator>()?;
     m.add_class::<ValidationError>()?;

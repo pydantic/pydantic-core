@@ -2,7 +2,7 @@ from typing import List
 
 import pytest
 
-from pydantic_core import SchemaValidator, Undefined, ValidationError, core_schema
+from pydantic_core import PydanticUndefined, SchemaValidator, ValidationError, core_schema
 
 
 def test_model_root():
@@ -70,7 +70,7 @@ def test_revalidate_with_default():
         )
     )
     m = RootModel()
-    m = v.validate_python(Undefined, self_instance=m)
+    m = v.validate_python(PydanticUndefined, self_instance=m)
     assert isinstance(m, RootModel)
     assert m.root == 42
     assert m.__pydantic_fields_set__ == set()
@@ -170,7 +170,7 @@ def test_extra():
 
 
 def test_fields_set():
-    assert core_schema.Omitted is Undefined
+    assert core_schema.PydanticUndefined is PydanticUndefined
 
     class RootModel:
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
@@ -187,6 +187,6 @@ def test_fields_set():
     assert m.root == 1
     assert m.__pydantic_fields_set__ == {'root'}
 
-    v.validate_python(Undefined, self_instance=m)
+    v.validate_python(PydanticUndefined, self_instance=m)
     assert m.root == 42
     assert m.__pydantic_fields_set__ == set()

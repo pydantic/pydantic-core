@@ -98,7 +98,7 @@ impl UndefinedType {
     }
 
     fn __reduce__(&self) -> &'static str {
-        "Undefined"
+        "PydanticUndefined"
     }
 }
 
