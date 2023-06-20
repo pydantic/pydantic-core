@@ -9,6 +9,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::BoundValidator;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -49,6 +50,17 @@ impl Validator for StrValidator {
         Ok(input.validate_str(extra.strict.unwrap_or(self.strict))?.into_py(py))
     }
 
+    fn bound_validator<'s, 'data, I: Input<'data>>(&'s self, extra: &Extra) -> Box<dyn BoundValidator<'data, I> + 's>
+    where
+        Self: 'static,
+    {
+        if extra.strict.unwrap_or(self.strict) {
+            Box::new(StrictStrValidator)
+        } else {
+            Box::new(LaxStrValidator)
+        }
+    }
+
     fn different_strict_behavior(
         &self,
         _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
@@ -63,6 +75,38 @@ impl Validator for StrValidator {
 
     fn complete(&mut self, _definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct StrictStrValidator;
+
+impl<'data, I: Input<'data>> BoundValidator<'data, I> for StrictStrValidator {
+    fn bound_validate(
+        &self,
+        py: Python<'data>,
+        input: &'data I,
+        _extra: &Extra,
+        _definitions: &'data Definitions<CombinedValidator>,
+        _recursion_guard: &mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        input.strict_str().map(|validated| validated.into_py(py))
+    }
+}
+
+#[derive(Debug)]
+struct LaxStrValidator;
+
+impl<'data, I: Input<'data>> BoundValidator<'data, I> for LaxStrValidator {
+    fn bound_validate(
+        &self,
+        py: Python<'data>,
+        input: &'data I,
+        _extra: &Extra,
+        _definitions: &'data Definitions<CombinedValidator>,
+        _recursion_guard: &mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        input.lax_str().map(|validated| validated.into_py(py))
     }
 }
 

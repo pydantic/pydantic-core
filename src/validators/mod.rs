@@ -662,6 +662,34 @@ pub enum CombinedValidator {
     JsonOrPython(json_or_python::JsonOrPython),
 }
 
+pub trait BoundValidator<'data, I: Input<'data>>: Send + Sync + Debug {
+    /// Do the actual validation for this schema/type
+    fn bound_validate(
+        &self,
+        py: Python<'data>,
+        input: &'data I,
+        extra: &Extra,
+        definitions: &'data Definitions<CombinedValidator>,
+        recursion_guard: &mut RecursionGuard,
+    ) -> ValResult<'data, PyObject>;
+}
+
+impl<'data, I: Input<'data>, T> BoundValidator<'data, I> for T
+where
+    T: Validator,
+{
+    fn bound_validate(
+        &self,
+        py: Python<'data>,
+        input: &'data I,
+        extra: &Extra,
+        definitions: &'data Definitions<CombinedValidator>,
+        recursion_guard: &mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
+        self.validate(py, input, extra, definitions, recursion_guard)
+    }
+}
+
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
 /// validators defined in `build_validator` also need `EXPECTED_TYPE` as a const, but that can't be part of the trait
 #[enum_dispatch(CombinedValidator)]
@@ -707,6 +735,17 @@ pub trait Validator: Send + Sync + Clone + Debug {
     ) -> ValResult<'data, PyObject> {
         let py_err = PyTypeError::new_err(format!("validate_assignment is not supported for {}", self.get_name()));
         Err(py_err.into())
+    }
+
+    /// Binds this validator to a specific strictness. This can allow better-optimized usage for
+    /// collection validators, by avoiding repeated branching on strictness settings.
+    ///
+    /// The default implementation just returns this same validator.
+    fn bound_validator<'s, 'data, I: Input<'data>>(&'s self, _extra: &Extra) -> Box<dyn BoundValidator<'data, I> + 's>
+    where
+        Self: 'static, // TODO relax this 'static bound?
+    {
+        Box::new(self.clone())
     }
 
     /// whether the validator behaves differently in strict mode, and in ultra strict mode

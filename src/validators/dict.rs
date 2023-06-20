@@ -120,11 +120,11 @@ macro_rules! build_validate {
             let output = PyDict::new(py);
             let mut errors: Vec<ValLineError> = Vec::new();
 
-            let key_validator = self.key_validator.as_ref();
-            let value_validator = self.value_validator.as_ref();
+            let key_validator = self.key_validator.bound_validator(extra);
+            let value_validator = self.value_validator.bound_validator(extra);
             for item_result in <$iter>::new(dict)? {
                 let (key, value) = item_result?;
-                let output_key = match key_validator.validate(py, key, extra, definitions, recursion_guard) {
+                let output_key = match key_validator.bound_validate(py, key, extra, definitions, recursion_guard) {
                     Ok(value) => Some(value),
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {
@@ -139,7 +139,8 @@ macro_rules! build_validate {
                     Err(ValError::Omit) => continue,
                     Err(err) => return Err(err),
                 };
-                let output_value = match value_validator.validate(py, value, extra, definitions, recursion_guard) {
+                let output_value = match value_validator.bound_validate(py, value, extra, definitions, recursion_guard)
+                {
                     Ok(value) => Some(value),
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {

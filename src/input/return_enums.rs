@@ -146,9 +146,9 @@ macro_rules! any_next_error {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn validate_iter_to_vec<'a, 's>(
+fn validate_iter_to_vec<'a, 's, I: Input<'a> + 'a>(
     py: Python<'a>,
-    iter: impl Iterator<Item = PyResult<&'a (impl Input<'a> + 'a)>>,
+    iter: impl Iterator<Item = PyResult<&'a I>>,
     capacity: usize,
     mut max_length_check: MaxLengthCheck<'a, impl Input<'a>>,
     validator: &'s CombinedValidator,
@@ -158,9 +158,10 @@ fn validate_iter_to_vec<'a, 's>(
 ) -> ValResult<'a, Vec<PyObject>> {
     let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
+    let bound_validator = validator.bound_validator::<I>(extra);
     for (index, item_result) in iter.enumerate() {
         let item = item_result.map_err(|e| any_next_error!(py, e, max_length_check.input, index))?;
-        match validator.validate(py, item, extra, definitions, recursion_guard) {
+        match bound_validator.bound_validate(py, item, extra, definitions, recursion_guard) {
             Ok(item) => {
                 max_length_check.incr()?;
                 output.push(item);
@@ -302,10 +303,10 @@ impl<'a> GenericIterable<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn validate_to_vec<'s>(
+    pub fn validate_to_vec<'s, I: Input<'a>>(
         &'s self,
         py: Python<'a>,
-        input: &'a impl Input<'a>,
+        input: &'a I,
         max_length: Option<usize>,
         field_type: &'static str,
         validator: &'s CombinedValidator,
@@ -316,7 +317,7 @@ impl<'a> GenericIterable<'a> {
         let capacity = self
             .generic_len()
             .unwrap_or_else(|| max_length.unwrap_or(DEFAULT_CAPACITY));
-        let max_length_check = MaxLengthCheck::new(max_length, field_type, input);
+        let max_length_check = MaxLengthCheck::<I>::new(max_length, field_type, input);
 
         macro_rules! validate {
             ($iter:expr) => {
