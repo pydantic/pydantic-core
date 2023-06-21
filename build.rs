@@ -12,21 +12,24 @@ fn generate_self_schema() {
         return;
     }
 
-    let output = Command::new(
-        env::var("PYTHON")
-            .ok()
-            .or_else(|| pyo3_build_config::get().executable.clone())
-            .unwrap_or_else(|| "python3".to_owned()),
-    )
-    .arg("generate_self_schema.py")
-    .output()
-    .expect("failed to execute process");
+    let python_executable = env::var("PYTHON")
+        .ok()
+        .or_else(|| pyo3_build_config::get().executable.clone())
+        .unwrap_or_else(|| "python3".to_owned());
+
+    let output = Command::new(&python_executable)
+        .arg("generate_self_schema.py")
+        .output()
+        .expect("failed to execute process");
 
     if !output.status.success() {
         let stdout = from_utf8(&output.stdout).unwrap();
         let stderr = from_utf8(&output.stderr).unwrap();
         eprint!("{stdout}{stderr}");
-        panic!("generate_self_schema.py failed with {}", output.status);
+        panic!(
+            "`{python_executable} generate_self_schema.py` failed with {}",
+            output.status
+        );
     }
 }
 
