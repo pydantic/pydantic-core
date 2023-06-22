@@ -59,7 +59,7 @@ jobs:
           RUSTFLAGS: "-Cprofile-generate=${{ github.workspace }}/profdata"
 
       - name: Gather pgo data
-        run: pytest
+        run: pytest tests/benchmarks
 
       - name: Prepare merged pgo data
         run: rustup run stable bash -c '$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-profdata merge -o ${{ github.workspace }}/merged.profdata ${{ github.workspace }}/profdata'
