@@ -1,3 +1,5 @@
+import pickle
+
 import pytest
 
 from pydantic_core import MultiHostUrl, SchemaSerializer, SchemaValidator, Url, core_schema
@@ -86,3 +88,20 @@ def test_custom_serializer():
 
     multi_host_url = MultiHostUrl('https://ex.com,ex.org/path')
     assert s.to_python(multi_host_url) == multi_host_url
+
+
+@pytest.mark.parametrize('base_class', [Url, MultiHostUrl])
+def test_url_subclass(base_class):
+    class MyUrl(base_class):
+        def some_method(self):
+            return self.path + '-success'
+
+    m = MyUrl('http://ex.com/path')
+    assert m.some_method() == '/path-success'
+
+
+@pytest.mark.parametrize('value', (Url('https://example.com'), MultiHostUrl('https://example.com,example.org/path')))
+def test_url_pickle(value):
+    pickled = pickle.dumps(value)
+    unpickled = pickle.loads(pickled)
+    assert value == unpickled

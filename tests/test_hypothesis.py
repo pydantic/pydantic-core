@@ -143,6 +143,10 @@ def url_validator():
     return SchemaValidator({'type': 'url'})
 
 
+# Parsing errors which hypothesis is likely to hit
+_URL_PARSE_ERRORS = {'input is empty', 'relative URL without a base', 'empty host'}
+
+
 @given(strategies.text())
 def test_urls_text(url_validator, text):
     try:
@@ -151,7 +155,23 @@ def test_urls_text(url_validator, text):
         assert exc.error_count() == 1
         error = exc.errors(include_url=False)[0]
         assert error['type'] == 'url_parsing'
-        assert error['ctx']['error'] == 'relative URL without a base'
+        assert error['ctx']['error'] in _URL_PARSE_ERRORS
+
+
+@pytest.fixture(scope='module')
+def multi_host_url_validator():
+    return SchemaValidator({'type': 'multi-host-url'})
+
+
+@given(strategies.text())
+def test_multi_host_urls_text(multi_host_url_validator, text):
+    try:
+        multi_host_url_validator.validate_python(text)
+    except ValidationError as exc:
+        assert exc.error_count() == 1
+        error = exc.errors(include_url=False)[0]
+        assert error['type'] == 'url_parsing'
+        assert error['ctx']['error'] in _URL_PARSE_ERRORS
 
 
 @pytest.fixture(scope='module')

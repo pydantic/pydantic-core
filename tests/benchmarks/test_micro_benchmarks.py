@@ -1360,7 +1360,7 @@ def test_validate_literal(
 @pytest.mark.benchmark(group='root_model')
 def test_core_root_model(benchmark):
     class MyModel:
-        __slots__ = 'root'
+        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
         root: List[int]
 
     v = SchemaValidator(
@@ -1410,3 +1410,43 @@ def test_int_range_json(benchmark):
         v.validate_python('0')
 
     benchmark(v.validate_json, '42')
+
+
+@pytest.mark.benchmark(group='tagged_union_ints')
+def test_tagged_union_int_keys_python(benchmark):
+    inner_schema = core_schema.typed_dict_schema(
+        {
+            'x': core_schema.typed_dict_field(core_schema.int_schema()),
+            'y': core_schema.typed_dict_field(core_schema.int_schema()),
+        }
+    )
+    v = SchemaValidator(core_schema.tagged_union_schema({x: inner_schema for x in range(1000)}, discriminator='x'))
+
+    payload = {'x': 999, 'y': '1'}
+    assert v.validate_python(payload) == {'x': 999, 'y': 1}
+    with pytest.raises(
+        ValidationError, match="Input tag '1001' found using 'x' does not match any of the expected tags"
+    ):
+        v.validate_python({'x': 1001, 'y': '1'})
+
+    benchmark(v.validate_python, payload)
+
+
+@pytest.mark.benchmark(group='tagged_union_ints')
+def test_tagged_union_int_keys_json(benchmark):
+    inner_schema = core_schema.typed_dict_schema(
+        {
+            'x': core_schema.typed_dict_field(core_schema.int_schema()),
+            'y': core_schema.typed_dict_field(core_schema.int_schema()),
+        }
+    )
+    v = SchemaValidator(core_schema.tagged_union_schema({x: inner_schema for x in range(1000)}, discriminator='x'))
+
+    payload = '{"x": 999, "y": "1"}'
+    assert v.validate_json(payload) == {'x': 999, 'y': 1}
+    with pytest.raises(
+        ValidationError, match="Input tag '1001' found using 'x' does not match any of the expected tags"
+    ):
+        v.validate_json('{"x": 1001, "y": "1"}')
+
+    benchmark(v.validate_json, payload)

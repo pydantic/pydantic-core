@@ -12,7 +12,7 @@ use crate::SchemaValidator;
 
 static SCHEMA_DEFINITION_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
 
-#[pyclass(name = "Url", module = "pydantic_core._pydantic_core")]
+#[pyclass(name = "Url", module = "pydantic_core._pydantic_core", subclass)]
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PyUrl {
@@ -145,9 +145,13 @@ impl PyUrl {
     pub fn __deepcopy__(&self, py: Python, _memo: &PyDict) -> Py<PyAny> {
         self.clone().into_py(py)
     }
+
+    fn __getnewargs__(&self) -> (&str,) {
+        (self.__str__(),)
+    }
 }
 
-#[pyclass(name = "MultiHostUrl", module = "pydantic_core._pydantic_core")]
+#[pyclass(name = "MultiHostUrl", module = "pydantic_core._pydantic_core", subclass)]
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PyMultiHostUrl {
@@ -277,7 +281,7 @@ impl PyMultiHostUrl {
     }
 
     pub fn __repr__(&self) -> String {
-        format!("Url('{}')", self.__str__())
+        format!("MultiHostUrl('{}')", self.__str__())
     }
 
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyResult<bool> {
@@ -304,6 +308,10 @@ impl PyMultiHostUrl {
 
     pub fn __deepcopy__(&self, py: Python, _memo: &PyDict) -> Py<PyAny> {
         self.clone().into_py(py)
+    }
+
+    fn __getnewargs__(&self) -> (String,) {
+        (self.__str__(),)
     }
 }
 

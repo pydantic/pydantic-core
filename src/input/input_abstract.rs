@@ -124,6 +124,18 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         self.strict_int()
     }
 
+    /// Extract an EitherInt from the input, only allowing exact
+    /// matches for an Int (no subclasses)
+    fn exact_int(&'a self) -> ValResult<EitherInt<'a>> {
+        self.strict_int()
+    }
+
+    /// Extract a String from the input, only allowing exact
+    /// matches for a String (no subclasses)
+    fn exact_str(&'a self) -> ValResult<EitherString<'a>> {
+        self.strict_str()
+    }
+
     fn validate_float(&'a self, strict: bool, ultra_strict: bool) -> ValResult<EitherFloat<'a>> {
         if ultra_strict {
             self.ultra_strict_float()

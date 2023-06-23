@@ -3,7 +3,7 @@ from __future__ import annotations as _annotations
 import sys
 from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
-from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
+from typing import Any, Callable, Dict, Hashable, List, Optional, Set, Type, Union
 
 if sys.version_info < (3, 11):
     from typing_extensions import Protocol, Required, TypeAlias
@@ -15,6 +15,11 @@ if sys.version_info < (3, 9):
 else:
     from typing import Literal, TypedDict
 
+try:
+    from pydantic_core import PydanticUndefined
+except ImportError:
+    PydanticUndefined = object()
+
 
 def dict_not_none(**kwargs: Any) -> Any:
     return {k: v for k, v in kwargs.items() if v is not None}
@@ -24,6 +29,32 @@ ExtraBehavior = Literal['allow', 'forbid', 'ignore']
 
 
 class CoreConfig(TypedDict, total=False):
+    """
+    Base class for schema configuration options.
+
+    Attributes:
+        title: The name of the configuration.
+        strict: Whether the configuration should strictly adhere to specified rules.
+        extra_fields_behavior: The behavior for handling extra fields.
+        typed_dict_total: Whether the TypedDict should be considered total. Default is `True`.
+        from_attributes: Whether to use attributes for models, dataclasses, and tagged union keys.
+        loc_by_alias: Whether to use the used alias (or first alias for "field required" errors) instead of
+            `field_names` to construct error `loc`s. Default is `True`.
+        revalidate_instances: Whether instances of models and dataclasses should re-validate. Default is 'never'.
+        validate_default: Whether to validate default values during validation. Default is `False`.
+        populate_by_name: Whether an aliased field may be populated by its name as given by the model attribute,
+            as well as the alias. (Replaces 'allow_population_by_field_name' in Pydantic v1.) Default is `False`.
+        str_max_length: The maximum length for string fields.
+        str_min_length: The minimum length for string fields.
+        str_strip_whitespace: Whether to strip whitespace from string fields.
+        str_to_lower: Whether to convert string fields to lowercase.
+        str_to_upper: Whether to convert string fields to uppercase.
+        allow_inf_nan: Whether to allow infinity and NaN values for float fields. Default is `True`.
+        ser_json_timedelta: The serialization option for `timedelta` values. Default is 'iso8601'.
+        ser_json_bytes: The serialization option for `bytes` values. Default is 'utf8'.
+        hide_input_in_errors: Whether to hide input data from `ValidationError` representation.
+    """
+
     title: str
     strict: bool
     # settings related to typed dicts, model fields, dataclass fields
@@ -203,6 +234,7 @@ SerializerFunction = Union[
 WhenUsed = Literal['always', 'unless-none', 'json', 'json-unless-none']
 """
 Values have the following meanings:
+
 * `'always'` means always use
 * `'unless-none'` means use unless the value is `None`
 * `'json'` means use when serializing to JSON
@@ -2200,13 +2232,10 @@ class WithDefaultSchema(TypedDict, total=False):
     serialization: SerSchema
 
 
-Omitted = object()
-
-
 def with_default_schema(
     schema: CoreSchema,
     *,
-    default: Any = Omitted,
+    default: Any = PydanticUndefined,
     default_factory: Callable[[], Any] | None = None,
     on_error: Literal['raise', 'omit', 'default'] | None = None,
     validate_default: bool | None = None,
@@ -2251,7 +2280,7 @@ def with_default_schema(
         metadata=metadata,
         serialization=serialization,
     )
-    if default is not Omitted:
+    if default is not PydanticUndefined:
         s['default'] = default
     return s
 
@@ -2361,7 +2390,7 @@ def union_schema(
 
 class TaggedUnionSchema(TypedDict, total=False):
     type: Required[Literal['tagged-union']]
-    choices: Required[Dict[Union[str, int], Union[str, int, CoreSchema]]]
+    choices: Required[Dict[Hashable, CoreSchema]]
     discriminator: Required[
         Union[str, List[Union[str, int]], List[List[Union[str, int]]], Callable[[Any], Optional[Union[str, int]]]]
     ]
@@ -2376,7 +2405,7 @@ class TaggedUnionSchema(TypedDict, total=False):
 
 
 def tagged_union_schema(
-    choices: Dict[Union[int, str], int | str | CoreSchema],
+    choices: Dict[Hashable, CoreSchema],
     discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], str | int | None],
     *,
     custom_error_type: str | None = None,

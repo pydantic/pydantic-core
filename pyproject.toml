@@ -1,5 +1,5 @@
 [build-system]
-requires = ['maturin>=0.15,<0.16', 'typing_extensions']
+requires = ['maturin>=1,<2', 'typing_extensions']
 build-backend = 'maturin'
 
 [project]
@@ -46,7 +46,7 @@ Source = 'https://github.com/pydantic/pydantic-core'
 [tool.maturin]
 module-name = "pydantic_core._pydantic_core"
 bindings = 'pyo3'
-features = ["pyo3/extension-module"]
+features = ["pyo3/extension-module", "mimalloc-allocator"]
 
 [tool.ruff]
 line-length = 120
@@ -91,7 +91,7 @@ skip-magic-trailing-comma = true
 
 # configuring https://github.com/pydantic/hooky
 [tool.hooky]
-reviewers = ['samuelcolvin', 'adriangb', 'dmontagu']
+reviewers = ['samuelcolvin', 'adriangb', 'dmontagu', 'davidhewitt']
 require_change_file = false
 
 [tool.pyright]

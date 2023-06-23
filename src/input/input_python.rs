@@ -8,7 +8,7 @@ use pyo3::types::{
 };
 #[cfg(not(PyPy))]
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
-use pyo3::{ffi, intern, AsPyPointer, PyTypeInfo};
+use pyo3::{intern, AsPyPointer, PyTypeInfo};
 
 use crate::errors::{ErrorType, InputValue, LocItem, ValError, ValResult};
 use crate::tools::{extract_i64, safe_repr};
@@ -153,8 +153,7 @@ impl<'a> Input<'a> for PyAny {
         } else if let Ok(tuple) = self.downcast::<PyTuple>() {
             Ok(PyArgs::new(Some(tuple), None).into())
         } else if let Ok(list) = self.downcast::<PyList>() {
-            let tuple = list_as_tuple(list);
-            Ok(PyArgs::new(Some(tuple), None).into())
+            Ok(PyArgs::new(Some(list.to_tuple()), None).into())
         } else {
             Err(ValError::new(ErrorType::ArgumentsType, self))
         }
@@ -193,6 +192,14 @@ impl<'a> Input<'a> for PyAny {
             Err(ValError::new(ErrorType::StringSubType, self))
         } else {
             Err(ValError::new(ErrorType::StringType, self))
+        }
+    }
+
+    fn exact_int(&'a self) -> ValResult<EitherInt<'a>> {
+        if PyInt::is_exact_type_of(self) {
+            Ok(EitherInt::Py(self))
+        } else {
+            Err(ValError::new(ErrorType::IntType, self))
         }
     }
 
@@ -296,7 +303,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn ultra_strict_float(&'a self) -> ValResult<EitherFloat<'a>> {
-        if matches!(self.is_instance_of::<PyInt>(), Ok(true)) {
+        if self.is_instance_of::<PyInt>() {
             Err(ValError::new(ErrorType::FloatType, self))
         } else if let Ok(float) = self.extract::<f64>() {
             Ok(EitherFloat::F64(float))
@@ -699,13 +706,4 @@ fn is_dict_items_type(v: &PyAny) -> bool {
         })
         .as_ref(py);
     v.is_instance(items_type).unwrap_or(false)
-}
-
-pub fn list_as_tuple(list: &PyList) -> &PyTuple {
-    let py_tuple: Py<PyTuple> = unsafe {
-        let ptr = list.as_ptr();
-        let tuple_ptr = ffi::PyList_AsTuple(ptr);
-        Py::from_owned_ptr(list.py(), tuple_ptr)
-    };
-    py_tuple.into_ref(list.py())
 }

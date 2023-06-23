@@ -103,6 +103,8 @@ def url_test_case_helper(
 @pytest.mark.parametrize(
     'url,expected',
     [
+        ('', Err('input is empty')),
+        (':,', Err('relative URL without a base')),
         (
             'http://example.com',
             {
@@ -610,7 +612,7 @@ def test_multi_host_url_ok_single(py_and_json: PyAndJson):
     url: MultiHostUrl = v.validate_test('https://example.com/foo/bar?a=b')
     assert isinstance(url, MultiHostUrl)
     assert str(url) == 'https://example.com/foo/bar?a=b'
-    assert repr(url) == "Url('https://example.com/foo/bar?a=b')"
+    assert repr(url) == "MultiHostUrl('https://example.com/foo/bar?a=b')"
     assert url.scheme == 'https'
     assert url.path == '/foo/bar'
     assert url.query == 'a=b'
@@ -649,6 +651,7 @@ def multi_host_url_validator_fixture():
 @pytest.mark.parametrize(
     'url,expected',
     [
+        ('', Err('input is empty')),
         (
             'http://example.com',
             {
