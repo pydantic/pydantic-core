@@ -233,6 +233,7 @@ all_errors = [
     ('less_than_equal', 'Input should be less than or equal to 42.1', {'le': 42.1}),
     ('float_type', 'Input should be a valid number', None),
     ('float_parsing', 'Input should be a valid number, unable to parse string as an number', None),
+    ('float_parsing_size', 'Unable to parse input string as an number, exceeded maximum size', None),
     ('bytes_type', 'Input should be a valid bytes', None),
     ('bytes_too_short', 'Data should have at least 42 bytes', {'min_length': 42}),
     ('bytes_too_long', 'Data should have at most 42 bytes', {'max_length': 42}),
