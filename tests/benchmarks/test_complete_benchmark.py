@@ -4,8 +4,11 @@ General benchmarks that attempt to cover all field types, through by no means al
 import json
 import sys
 from datetime import date, datetime, time
+from pathlib import Path
+from typing import Annotated, List, Literal, Union
 
 import pytest
+from pydantic.networks import EmailStr
 
 from pydantic_core import SchemaValidator, ValidationError
 
@@ -200,3 +203,78 @@ def test_complete_pyd_json(benchmark):
 def test_build_schema(benchmark):
     lax_schema = schema()
     benchmark(SchemaValidator, lax_schema)
+
+
+SAMPLE_DATA = Path(__file__).parent / 'sample_data.json'
+
+
+@pytest.fixture(scope='module')
+def pydantic_v2_type_adapter():
+    from pydantic import BaseModel, Field, TypeAdapter
+    from pydantic.networks import AnyHttpUrl
+
+    class Blog(BaseModel):
+        type: Literal['blog']
+        title: str
+        post_count: int
+        readers: int
+        avg_post_rating: float
+        url: AnyHttpUrl
+
+    class SocialProfileBase(BaseModel):
+        type: Literal['profile']
+        network: Literal['facebook', 'twitter', 'linkedin']
+        username: str
+        join_date: date
+
+    class FacebookProfile(SocialProfileBase):
+        network: Literal['facebook']
+        friends: int
+
+    class TwitterProfile(SocialProfileBase):
+        network: Literal['twitter']
+        followers: int
+
+    class LinkedinProfile(SocialProfileBase):
+        network: Literal['linkedin']
+        connections: Annotated[int, Field(le=500)]
+
+    SocialProfile = Annotated[Union[FacebookProfile, TwitterProfile, LinkedinProfile], Field(discriminator='network')]
+
+    Website = Annotated[Union[Blog, SocialProfile], Field(discriminator='type')]
+
+    class Person(BaseModel):
+        name: str
+        email: EmailStr
+        entry_created_date: date
+        entry_created_time: time
+        entry_updated_at: datetime
+        websites: List[Website] = Field(default_factory=list)
+
+    return TypeAdapter(List[Person])
+
+
+def test_north_star_json(pydantic_v2_type_adapter, benchmark):
+    benchmark(pydantic_v2_type_adapter.validate_json, SAMPLE_DATA.read_bytes())
+
+
+def test_north_star_json_strict(pydantic_v2_type_adapter, benchmark):
+    coerced_sample_data = pydantic_v2_type_adapter.dump_json(
+        pydantic_v2_type_adapter.validate_json(SAMPLE_DATA.read_bytes())
+    )
+    benchmark(pydantic_v2_type_adapter.validate_json, coerced_sample_data, strict=True)
+
+
+def test_north_star_python(pydantic_v2_type_adapter, benchmark):
+    benchmark(pydantic_v2_type_adapter.validate_python, json.loads(SAMPLE_DATA.read_bytes()))
+
+
+def test_north_star_python_strict(pydantic_v2_type_adapter, benchmark):
+    coerced_sample_data = pydantic_v2_type_adapter.dump_python(
+        pydantic_v2_type_adapter.validate_json(SAMPLE_DATA.read_bytes())
+    )
+    benchmark(pydantic_v2_type_adapter.validate_python, coerced_sample_data, strict=True)
+
+
+def test_north_star_json_loads(benchmark):
+    benchmark(json.loads, SAMPLE_DATA.read_bytes())
