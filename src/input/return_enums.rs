@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::slice::Iter as SliceIter;
 
 use num_bigint::BigInt;
-use num_traits::{FromPrimitive, ToPrimitive};
 
 use pyo3::prelude::*;
 use pyo3::types::iter::PyDictIterator;
@@ -897,49 +896,16 @@ impl<'a> IntoPy<PyObject> for EitherInt<'a> {
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub enum EitherFloat<'a> {
     F64(f64),
-    BigInt(BigInt),
     Py(&'a PyAny),
 }
 
-impl<'a> EitherFloat<'a> {
-    pub fn into_f64(self, py: Python<'a>) -> ValResult<'a, f64> {
+impl<'a> TryInto<f64> for EitherFloat<'a> {
+    type Error = ValError<'a>;
+
+    fn try_into(self) -> ValResult<'a, f64> {
         match self {
             EitherFloat::F64(f) => Ok(f),
-            EitherFloat::BigInt(f) => f
-                .to_f64()
-                .ok_or(ValError::new(ErrorType::FloatParsingSize, f.into_py(py).into_ref(py))),
             EitherFloat::Py(i) => i.extract().map_err(|_| ValError::new(ErrorType::FloatParsingSize, i)),
-        }
-    }
-
-    pub fn as_bool(&self) -> Option<bool> {
-        match self {
-            EitherFloat::F64(f) => match *f {
-                x if x == 0.0 => Some(false),
-                x if x == 1.0 => Some(true),
-                _ => None,
-            },
-            EitherFloat::BigInt(f) => match u8::try_from(f) {
-                Ok(0) => Some(false),
-                Ok(1) => Some(true),
-                _ => None,
-            },
-            EitherFloat::Py(f) => match f.extract::<u8>() {
-                Ok(0) => Some(false),
-                Ok(1) => Some(true),
-                _ => None,
-            },
-        }
-    }
-
-    pub fn as_bigint(&self) -> PyResult<Option<BigInt>> {
-        match self {
-            EitherFloat::F64(f) => {
-                let float = BigInt::from_f64(*f);
-                Ok(float)
-            }
-            EitherFloat::BigInt(f) => Ok(Some(f.clone())),
-            EitherFloat::Py(f) =>  f.extract(),
         }
     }
 }
@@ -948,7 +914,6 @@ impl<'a> IntoPy<PyObject> for EitherFloat<'a> {
     fn into_py(self, py: Python<'_>) -> PyObject {
         match self {
             Self::F64(float) => float.into_py(py),
-            Self::BigInt(float) => float.into_py(py),
             Self::Py(float) => float.into_py(py),
         }
     }

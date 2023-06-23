@@ -305,12 +305,14 @@ impl<'a> Input<'a> for PyAny {
         }
     }
     fn strict_float(&'a self) -> ValResult<EitherFloat<'a>> {
-        if let Ok(float) = self.extract::<f64>() {
+        if PyFloat::is_exact_type_of(self) {
+            Ok(EitherFloat::Py(self))
+        } else if let Ok(float) = self.extract::<f64>() {
             // bools are cast to floats as either 0.0 or 1.0, so check for bool type in this specific case
             if (float == 0.0 || float == 1.0) && PyBool::is_exact_type_of(self) {
                 Err(ValError::new(ErrorType::FloatType, self))
             } else {
-                Ok(EitherFloat::F64(float))
+                Ok(EitherFloat::Py(self))
             }
         } else {
             Err(ValError::new(ErrorType::FloatType, self))
@@ -318,15 +320,17 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_float(&'a self) -> ValResult<EitherFloat<'a>> {
-        if let Ok(float) = self.extract::<f64>() {
-            Ok(EitherFloat::F64(float))
-         } else if let Some(cow_str) = maybe_as_string(self, ErrorType::FloatParsing)? {
+        if PyFloat::is_exact_type_of(self) {
+            Ok(EitherFloat::Py(self))
+        } else if let Some(cow_str) = maybe_as_string(self, ErrorType::FloatParsing)? {
             match cow_str.as_ref().parse::<f64>() {
                 Ok(i) => Ok(EitherFloat::F64(i)),
                 Err(_) => Err(ValError::new(ErrorType::FloatParsing, self)),
             }
-        }  else {
-            Err(ValError::new(ErrorType::FloatType, self))  
+        } else if let Ok(float) = self.extract::<f64>() {
+            Ok(EitherFloat::F64(float))
+        } else {
+            Err(ValError::new(ErrorType::FloatType, self))
         }
     }
 

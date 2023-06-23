@@ -18,10 +18,10 @@ install-rust-coverage:
 .PHONY: build-dev
 build-dev:
 	@rm -f pydantic_core/*.so
-	cargo build --target=aarch64-apple-darwin --features extension-module 
-	@rm -f target/aarch64-apple-darwin/debug/lib_pydantic_core.d
-	@rm -f target/aarch64-apple-darwin/debug/lib_pydantic_core.rlib
-	@mv target/aarch64-apple-darwin/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
+	cargo build --features extension-module
+	@rm -f target/debug/lib_pydantic_core.d
+	@rm -f target/debug/lib_pydantic_core.rlib
+	@mv target/debug/lib_pydantic_core.* pydantic_core/_pydantic_core.so
 
 .PHONY: build-prod
 build-prod:

@@ -1,17 +1,12 @@
+use pyo3::intern;
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
+
 use crate::build_tools::{is_strict, schema_or_config_same};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
-use num_bigint::BigInt;
-use num_bigint::ToBigInt;
-use num_traits::FromPrimitive;
-use num_traits::Signed;
-use num_traits::ToPrimitive;
-use num_traits::Zero;
-use pyo3::intern;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
@@ -24,7 +19,6 @@ impl BuildValidator for FloatBuilder {
         config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        dbg!("build validator {:?}", schema);
         let py = schema.py();
         let use_constrained = schema.get_item(intern!(py, "multiple_of")).is_some()
             || schema.get_item(intern!(py, "le")).is_some()
@@ -75,10 +69,9 @@ impl Validator for FloatValidator {
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        dbg!("Hello 1");
         let either_float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
-        let float = either_float.as_bigint()?;
-        if float.is_none()  && !self.allow_inf_nan{
+        let float: f64 = either_float.try_into()?;
+        if !self.allow_inf_nan && !float.is_finite() {
             return Err(ValError::new(ErrorType::FiniteNumber, input));
         } else {
             Ok(float.into_py(py))
@@ -123,17 +116,43 @@ impl Validator for ConstrainedFloatValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let either_float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
-        let float = either_float.as_bigint()?;
-        dbg!("float", &float);
-        if float.is_none()  && !self.allow_inf_nan{
+        let float: f64 = either_float.try_into()?;
+        if !self.allow_inf_nan && !float.is_finite() {
             return Err(ValError::new(ErrorType::FiniteNumber, input));
-        } else if let Some(f) = &float {
-            if let Some(ref lt) = self.lt {
-                dbg!("lt", &lt);
-            }
- 
         }
-        Ok(either_float.into_py(py))
+        if let Some(multiple_of) = self.multiple_of {
+            let rem = float % multiple_of;
+            let threshold = float / 1e9;
+            if rem.abs() > threshold && (rem - multiple_of).abs() > threshold {
+                return Err(ValError::new(
+                    ErrorType::MultipleOf {
+                        multiple_of: multiple_of.into(),
+                    },
+                    input,
+                ));
+            }
+        }
+        if let Some(le) = self.le {
+            if float > le {
+                return Err(ValError::new(ErrorType::LessThanEqual { le: le.into() }, input));
+            }
+        }
+        if let Some(lt) = self.lt {
+            if float >= lt {
+                return Err(ValError::new(ErrorType::LessThan { lt: lt.into() }, input));
+            }
+        }
+        if let Some(ge) = self.ge {
+            if float < ge {
+                return Err(ValError::new(ErrorType::GreaterThanEqual { ge: ge.into() }, input));
+            }
+        }
+        if let Some(gt) = self.gt {
+            if float <= gt {
+                return Err(ValError::new(ErrorType::GreaterThan { gt: gt.into() }, input));
+            }
+        }
+        Ok(float.into_py(py))
     }
 
     fn different_strict_behavior(
@@ -160,7 +179,6 @@ impl BuildValidator for ConstrainedFloatValidator {
         config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        dbg!("schema {:?}", &schema);
         let py = schema.py();
         Ok(Self {
             strict: is_strict(schema, config)?,

@@ -66,6 +66,23 @@ def test_float_strict(py_and_json: PyAndJson, input_value, expected):
 @pytest.mark.parametrize(
     'kwargs,input_value,expected',
     [
+        ({}, 0, 0),
+        ({}, '123.456', 123.456),
+        ({'ge': 0}, 0, 0),
+        (
+            {'ge': 0},
+            -0.1,
+            Err(
+                'Input should be greater than or equal to 0 '
+                '[type=greater_than_equal, input_value=-0.1, input_type=float]'
+            ),
+        ),
+        ({'gt': 0}, 0.1, 0.1),
+        ({'gt': 0}, 0, Err('Input should be greater than 0 [type=greater_than, input_value=0, input_type=int]')),
+        ({'le': 0}, 0, 0),
+        ({'le': 0}, -1, -1),
+        ({'le': 0}, 0.1, Err('Input should be less than or equal to 0')),
+        ({'lt': 0}, 0, Err('Input should be less than 0')),
         ({'lt': 0.123456}, 1, Err('Input should be less than 0.123456')),
     ],
 )

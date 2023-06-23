@@ -142,7 +142,6 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
     fn strict_float(&'a self) -> ValResult<EitherFloat<'a>> {
-        dbg!("strict float python here");
         match self {
             JsonInput::Float(f) => Ok(EitherFloat::F64(*f)),
             JsonInput::Int(i) => Ok(EitherFloat::F64(*i as f64)),
@@ -151,7 +150,6 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
     fn lax_float(&'a self) -> ValResult<EitherFloat<'a>> {
-        dbg!("lax float python here");
         match self {
             JsonInput::Bool(b) => match *b {
                 true => Ok(EitherFloat::F64(1.0)),
@@ -383,7 +381,7 @@ impl<'a> Input<'a> for String {
     }
     fn lax_float(&'a self) -> ValResult<EitherFloat<'a>> {
         match self.parse() {
-            Ok(i) => Ok(EitherFloat::F64(i)),
+            Ok(f) => Ok(EitherFloat::F64(f)),
             Err(_) => Err(ValError::new(ErrorType::FloatParsing, self)),
         }
     }
