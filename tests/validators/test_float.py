@@ -24,7 +24,7 @@ from ..conftest import Err, PyAndJson, plain_repr
         (1e10, 1e10),
         (True, 1),
         (False, 0),
-        ('wrong', Err('Input should be a valid number, unable to parse string as an number [type=float_parsing')),
+        ('wrong', Err('Input should be a valid number, unable to parse string as a number [type=float_parsing')),
         ([1, 2], Err('Input should be a valid number [type=float_type, input_value=[1, 2], input_type=list]')),
     ],
 )
@@ -161,7 +161,7 @@ def test_union_float_simple(py_and_json: PyAndJson):
         {
             'type': 'float_parsing',
             'loc': ('float',),
-            'msg': 'Input should be a valid number, unable to parse string as an number',
+            'msg': 'Input should be a valid number, unable to parse string as a number',
             'input': 'xxx',
         },
         {
@@ -251,7 +251,7 @@ def test_float_key(py_and_json: PyAndJson):
             'pika',
             True,
             Err(
-                'Input should be a valid number, unable to parse string as an number '
+                'Input should be a valid number, unable to parse string as a number '
                 "[type=float_parsing, input_value='pika', input_type=str]"
             ),
         ),
@@ -259,7 +259,7 @@ def test_float_key(py_and_json: PyAndJson):
             'pika',
             False,
             Err(
-                'Input should be a valid number, unable to parse string as an number '
+                'Input should be a valid number, unable to parse string as a number '
                 "[type=float_parsing, input_value='pika', input_type=str]"
             ),
         ),
