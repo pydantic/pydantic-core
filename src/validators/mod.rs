@@ -115,7 +115,7 @@ impl SchemaValidator {
         let mut validator = build_validator(schema, config, &mut definitions_builder)?;
         validator.complete(&definitions_builder)?;
         let mut definitions = definitions_builder.clone().finish()?;
-        for val in definitions.iter_mut() {
+        for val in &mut definitions {
             val.complete(&definitions_builder)?;
         }
         let config_title = match config {
@@ -274,7 +274,7 @@ impl SchemaValidator {
     fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
         self.validator.py_gc_traverse(&visit)?;
         visit.call(&self.schema)?;
-        for slot in self.definitions.iter() {
+        for slot in &self.definitions {
             slot.py_gc_traverse(&visit)?;
         }
         Ok(())
@@ -282,7 +282,7 @@ impl SchemaValidator {
 
     fn __clear__(&mut self) {
         self.validator.py_gc_clear();
-        for slot in self.definitions.iter_mut() {
+        for slot in &mut self.definitions {
             slot.py_gc_clear();
         }
     }
@@ -368,7 +368,7 @@ impl<'py> SelfValidator<'py> {
         };
         validator.complete(&definitions_builder)?;
         let mut definitions = definitions_builder.clone().finish()?;
-        for val in definitions.iter_mut() {
+        for val in &mut definitions {
             val.complete(&definitions_builder)?;
         }
         Ok(SchemaValidator {

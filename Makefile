@@ -73,7 +73,6 @@ lint-rust:
 		-A clippy::cast-precision-loss \
 		-A clippy::cast-sign-loss \
 		-A clippy::doc-markdown \
-		-A clippy::explicit-iter-loop \
 		-A clippy::float-cmp \
 		-A clippy::fn-params-excessive-bools \
 		-A clippy::if-not-else \

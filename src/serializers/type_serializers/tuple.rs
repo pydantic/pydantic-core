@@ -237,7 +237,7 @@ impl TypeSerializer for TuplePositionalSerializer {
                 let mut py_tuple_iter = py_tuple.iter();
 
                 let mut key_builder = KeyBuilder::new();
-                for serializer in self.items_serializers.iter() {
+                for serializer in &self.items_serializers {
                     let element = match py_tuple_iter.next() {
                         Some(value) => value,
                         None => break,
