@@ -88,7 +88,6 @@ lint-rust:
 		-A clippy::single-match-else \
 		-A clippy::struct-excessive-bools \
 		-A clippy::too-many-lines \
-		-A clippy::trivially-copy-pass-by-ref \
 		-A clippy::unnecessary-wraps \
 		-A clippy::unnested-or-patterns \
 		-A clippy::unused-self \

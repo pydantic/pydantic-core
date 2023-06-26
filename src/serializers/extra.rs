@@ -147,8 +147,8 @@ pub(crate) enum SerCheck {
 }
 
 impl SerCheck {
-    pub fn enabled(&self) -> bool {
-        *self != SerCheck::None
+    pub fn enabled(self) -> bool {
+        self != SerCheck::None
     }
 }
 
