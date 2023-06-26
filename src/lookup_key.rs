@@ -84,7 +84,7 @@ impl LookupKey {
             };
 
             if let Some(alt_alias) = alt_alias {
-                locs.push(LookupPath::from_str(py, alt_alias, None))
+                locs.push(LookupPath::from_str(py, alt_alias, None));
             }
             Ok(Self::PathChoices(locs))
         }

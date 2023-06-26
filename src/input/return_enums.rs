@@ -159,7 +159,7 @@ fn validate_iter_to_vec<'a, 's>(
         match validator.validate(py, item, extra, definitions, recursion_guard) {
             Ok(item) => {
                 max_length_check.incr()?;
-                output.push(item)
+                output.push(item);
             }
             Err(ValError::LineErrors(line_errors)) => {
                 max_length_check.incr()?;

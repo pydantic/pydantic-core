@@ -46,7 +46,7 @@ fn map_negative_indices(include_or_exclude: &PyAny, len: Option<usize>) -> PyRes
     } else if let Ok(exclude_set) = include_or_exclude.downcast::<PySet>() {
         let mut values = Vec::with_capacity(exclude_set.len());
         for v in exclude_set {
-            values.push(map_negative_index(v, len)?)
+            values.push(map_negative_index(v, len)?);
         }
         Ok(PySet::new(py, values)?)
     } else {

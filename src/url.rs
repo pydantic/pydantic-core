@@ -339,7 +339,7 @@ fn unicode_url(lib_url: &Url) -> String {
             if let Some(decoded) = decode_punycode(domain) {
                 // replace the range containing the punycode domain with the decoded domain
                 let start = lib_url.scheme().len() + 3;
-                s.replace_range(start..start + domain.len(), &decoded)
+                s.replace_range(start..start + domain.len(), &decoded);
             }
             s
         }

@@ -497,7 +497,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                     .map_err(py_err_se_err)?;
                 if let Some((next_include, next_exclude)) = op_next {
                     let item_serializer = SerializeInfer::new(element, next_include, next_exclude, extra);
-                    seq.serialize_element(&item_serializer)?
+                    seq.serialize_element(&item_serializer)?;
                 }
             }
             seq.end()

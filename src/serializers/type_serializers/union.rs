@@ -186,7 +186,7 @@ impl BuildSerializer for TaggedUnionBuilder {
 
         for (_, value) in schema_choices {
             if let Ok(choice_schema) = value.downcast::<PyDict>() {
-                choices.push(CombinedSerializer::build(choice_schema, config, definitions)?)
+                choices.push(CombinedSerializer::build(choice_schema, config, definitions)?);
             }
         }
         UnionSerializer::from_choices(choices)

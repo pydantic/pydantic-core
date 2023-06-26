@@ -84,7 +84,6 @@ lint-rust:
 		-A clippy::module-name-repetitions \
 		-A clippy::must-use-candidate \
 		-A clippy::needless-pass-by-value \
-		-A clippy::semicolon-if-nothing-returned \
 		-A clippy::similar-names \
 		-A clippy::single-match-else \
 		-A clippy::struct-excessive-bools \
