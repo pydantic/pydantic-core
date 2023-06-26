@@ -859,15 +859,7 @@ impl<'a> EitherInt<'a> {
                 Err(_) => Ok(Int::Big(BigInt::from(*u))),
             },
             EitherInt::BigInt(b) => Ok(Int::Big(b.clone())),
-            EitherInt::Py(i) => {
-                if let Ok(int) = i.extract::<i64>() {
-                    Ok(Int::I64(int))
-                } else if let Ok(big) = i.extract::<BigInt>() {
-                    Ok(Int::Big(big))
-                } else {
-                    Err(ValError::new(ErrorType::IntParsingSize, *i))
-                }
-            }
+            EitherInt::Py(i) => i.extract().map_err(|_| ValError::new(ErrorType::IntParsingSize, *i)),
         }
     }
 
