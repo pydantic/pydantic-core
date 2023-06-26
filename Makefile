@@ -68,7 +68,6 @@ lint-rust:
 		-W clippy::pedantic \
 		-W clippy::dbg_macro \
 		-W clippy::print_stdout \
-		-A clippy::cast-lossless \
 		-A clippy::cast-possible-truncation \
 		-A clippy::cast-possible-wrap \
 		-A clippy::cast-precision-loss \
