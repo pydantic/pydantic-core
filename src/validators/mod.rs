@@ -138,7 +138,7 @@ impl SchemaValidator {
 
     pub fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
         let args = (self.schema.as_ref(py),);
-        let cls = Py::new(py, self.to_owned())?.getattr(py, "__class__")?;
+        let cls = Py::new(py, self.clone())?.getattr(py, "__class__")?;
         Ok((cls, args).into_py(py))
     }
 

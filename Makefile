@@ -76,7 +76,6 @@ lint-rust:
 		-A clippy::float-cmp \
 		-A clippy::fn-params-excessive-bools \
 		-A clippy::if-not-else \
-		-A clippy::implicit-clone \
 		-A clippy::inconsistent-struct-constructor \
 		-A clippy::manual-let-else \
 		-A clippy::map-unwrap-or \
