@@ -63,7 +63,46 @@ lint-rust:
 	cargo fmt --version
 	cargo fmt --all -- --check
 	cargo clippy --version
-	cargo clippy --tests -- -D warnings -A incomplete_features -W clippy::dbg_macro -W clippy::print_stdout
+	cargo clippy --tests -- \
+		-D warnings \
+		-W clippy::pedantic \
+		-W clippy::dbg_macro \
+		-W clippy::print_stdout \
+		-A clippy::cast-lossless \
+		-A clippy::cast-possible-truncation \
+		-A clippy::cast-possible-wrap \
+		-A clippy::cast-precision-loss \
+		-A clippy::cast-sign-loss \
+		-A clippy::doc-markdown \
+		-A clippy::explicit-into-iter-loop \
+		-A clippy::explicit-iter-loop \
+		-A clippy::float-cmp \
+		-A clippy::fn-params-excessive-bools \
+		-A clippy::if-not-else \
+		-A clippy::implicit-clone \
+		-A clippy::inconsistent-struct-constructor \
+		-A clippy::manual-let-else \
+		-A clippy::map-unwrap-or \
+		-A clippy::match-bool \
+		-A clippy::match-same-arms \
+		-A clippy::match-wildcard-for-single-variants \
+		-A clippy::missing-errors-doc \
+		-A clippy::missing-panics-doc \
+		-A clippy::module-name-repetitions \
+		-A clippy::must-use-candidate \
+		-A clippy::needless-pass-by-value \
+		-A clippy::redundant-closure-for-method-calls \
+		-A clippy::redundant-else \
+		-A clippy::semicolon-if-nothing-returned \
+		-A clippy::similar-names \
+		-A clippy::single-match-else \
+		-A clippy::struct-excessive-bools \
+		-A clippy::too-many-lines \
+		-A clippy::trivially-copy-pass-by-ref \
+		-A clippy::unnecessary-wraps \
+		-A clippy::unnested-or-patterns \
+		-A clippy::unused-self \
+		-A clippy::used-underscore-binding
 
 .PHONY: lint
 lint: lint-python lint-rust
