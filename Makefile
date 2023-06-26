@@ -89,7 +89,6 @@ lint-rust:
 		-A clippy::struct-excessive-bools \
 		-A clippy::too-many-lines \
 		-A clippy::unnecessary-wraps \
-		-A clippy::unnested-or-patterns \
 		-A clippy::unused-self \
 		-A clippy::used-underscore-binding
 
