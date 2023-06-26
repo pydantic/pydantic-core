@@ -474,7 +474,7 @@ impl<'py> MappingGenericIterator<'py> {
             .map_err(|e| mapping_err(e, py, input))?
             .iter()
             .map_err(|e| mapping_err(e, py, input))?;
-        Ok(Self { iter, input })
+        Ok(Self { input, iter })
     }
 }
 
