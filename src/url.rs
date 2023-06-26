@@ -72,7 +72,7 @@ impl PyUrl {
     pub fn unicode_host(&self) -> Option<String> {
         match self.lib_url.host() {
             Some(url::Host::Domain(domain)) if is_punnycode_domain(&self.lib_url, domain) => decode_punycode(domain),
-            _ => self.lib_url.host_str().map(|h| h.to_string()),
+            _ => self.lib_url.host_str().map(ToString::to_string),
         }
     }
 

@@ -84,7 +84,6 @@ lint-rust:
 		-A clippy::module-name-repetitions \
 		-A clippy::must-use-candidate \
 		-A clippy::needless-pass-by-value \
-		-A clippy::redundant-closure-for-method-calls \
 		-A clippy::redundant-else \
 		-A clippy::semicolon-if-nothing-returned \
 		-A clippy::similar-names \

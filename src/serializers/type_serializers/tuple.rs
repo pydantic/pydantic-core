@@ -168,7 +168,7 @@ impl BuildSerializer for TuplePositionalSerializer {
 
         let descr = items_serializers
             .iter()
-            .map(|v| v.get_name())
+            .map(TypeSerializer::get_name)
             .collect::<Vec<_>>()
             .join(", ");
         Ok(Self {

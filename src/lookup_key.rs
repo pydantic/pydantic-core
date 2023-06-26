@@ -43,7 +43,7 @@ impl fmt::Display for LookupKey {
             Self::PathChoices(paths) => write!(
                 f,
                 "{}",
-                paths.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(" | ")
+                paths.iter().map(ToString::to_string).collect::<Vec<_>>().join(" | ")
             ),
         }
     }

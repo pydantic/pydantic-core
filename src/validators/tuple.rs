@@ -119,7 +119,11 @@ impl BuildValidator for TuplePositionalValidator {
             .map(|item| build_validator(item, config, definitions))
             .collect::<PyResult<_>>()?;
 
-        let descr = validators.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
+        let descr = validators
+            .iter()
+            .map(Validator::get_name)
+            .collect::<Vec<_>>()
+            .join(", ");
         Ok(Self {
             strict: is_strict(schema, config)?,
             items_validators: validators,

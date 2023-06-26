@@ -44,7 +44,11 @@ impl UnionSerializer {
             0 => py_schema_err!("One or more union choices required"),
             1 => Ok(choices.into_iter().next().unwrap()),
             _ => {
-                let descr = choices.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
+                let descr = choices
+                    .iter()
+                    .map(TypeSerializer::get_name)
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 Ok(Self {
                     choices,
                     name: format!("Union[{descr}]"),
@@ -163,7 +167,7 @@ impl TypeSerializer for UnionSerializer {
     }
 
     fn retry_with_lax_check(&self) -> bool {
-        self.choices.iter().any(|c| c.retry_with_lax_check())
+        self.choices.iter().any(TypeSerializer::retry_with_lax_check)
     }
 }
 
