@@ -10,6 +10,8 @@ from pydantic_core import SchemaValidator, ValidationError
 
 from ..conftest import Err, PyAndJson, plain_repr
 
+f64_max = 1.7976931348623157e308
+
 
 @pytest.mark.parametrize(
     'input_value,expected',

@@ -181,7 +181,6 @@ pub enum ErrorType {
     // float errors
     FloatType,
     FloatParsing,
-    FloatParsingSize,
     // ---------------------
     // bytes errors
     BytesType,
@@ -503,7 +502,6 @@ impl ErrorType {
             Self::IntParsingSize => "Unable to parse input string as an integer, exceeded maximum size",
             Self::FloatType => "Input should be a valid number",
             Self::FloatParsing => "Input should be a valid number, unable to parse string as a number",
-            Self::FloatParsingSize => "Unable to parse input string as a number, exceeded maximum size",
             Self::BytesType => "Input should be a valid bytes",
             Self::BytesTooShort {..} => "Data should have at least {min_length} bytes",
             Self::BytesTooLong {..} => "Data should have at most {max_length} bytes",

@@ -305,8 +305,8 @@ impl<'a> Input<'a> for PyAny {
     fn ultra_strict_float(&'a self) -> ValResult<EitherFloat<'a>> {
         if self.is_instance_of::<PyInt>() {
             Err(ValError::new(ErrorType::FloatType, self))
-        } else if let Ok(float) = self.extract::<f64>() {
-            Ok(EitherFloat::F64(float))
+        } else if self.is_instance_of::<PyFloat>() {
+            Ok(EitherFloat::Py(self))
         } else {
             Err(ValError::new(ErrorType::FloatType, self))
         }

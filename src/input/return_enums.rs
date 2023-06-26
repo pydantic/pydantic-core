@@ -905,7 +905,7 @@ impl<'a> TryInto<f64> for EitherFloat<'a> {
     fn try_into(self) -> ValResult<'a, f64> {
         match self {
             EitherFloat::F64(f) => Ok(f),
-            EitherFloat::Py(i) => i.extract().map_err(|_| ValError::new(ErrorType::FloatParsingSize, i)),
+            EitherFloat::Py(i) => i.extract().map_err(|_| ValError::new(ErrorType::FloatParsing, i)),
         }
     }
 }
