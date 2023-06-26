@@ -205,9 +205,6 @@ def test_build_schema(benchmark):
     benchmark(SchemaValidator, lax_schema)
 
 
-SAMPLE_DATA = Path(__file__).parent / 'sample_data.json'
-
-
 @pytest.fixture(scope='module')
 def pydantic_v2_type_adapter():
     from pydantic import BaseModel, Field, TypeAdapter
@@ -254,27 +251,46 @@ def pydantic_v2_type_adapter():
     return TypeAdapter(List[Person])
 
 
-def test_north_star_json(pydantic_v2_type_adapter, benchmark):
-    benchmark(pydantic_v2_type_adapter.validate_json, SAMPLE_DATA.read_bytes())
+@pytest.fixture(scope='module')
+def sample_data_bytes():
+    sample_data_path = Path(__file__).parent / 'sample_data.json'
+    return sample_data_path.read_bytes()
 
 
-def test_north_star_json_strict(pydantic_v2_type_adapter, benchmark):
-    coerced_sample_data = pydantic_v2_type_adapter.dump_json(
-        pydantic_v2_type_adapter.validate_json(SAMPLE_DATA.read_bytes())
-    )
+def test_north_star_validate_json(pydantic_v2_type_adapter, sample_data_bytes, benchmark):
+    benchmark(pydantic_v2_type_adapter.validate_json, sample_data_bytes)
+
+
+def test_north_star_validate_json_strict(pydantic_v2_type_adapter, sample_data_bytes, benchmark):
+    coerced_sample_data = pydantic_v2_type_adapter.dump_json(pydantic_v2_type_adapter.validate_json(sample_data_bytes))
     benchmark(pydantic_v2_type_adapter.validate_json, coerced_sample_data, strict=True)
 
 
-def test_north_star_python(pydantic_v2_type_adapter, benchmark):
-    benchmark(pydantic_v2_type_adapter.validate_python, json.loads(SAMPLE_DATA.read_bytes()))
+def test_north_star_dump_json(pydantic_v2_type_adapter, sample_data_bytes, benchmark):
+    parsed = pydantic_v2_type_adapter.validate_json(sample_data_bytes)
+    benchmark(pydantic_v2_type_adapter.dump_json, parsed)
 
 
-def test_north_star_python_strict(pydantic_v2_type_adapter, benchmark):
+def test_north_star_validate_python(pydantic_v2_type_adapter, sample_data_bytes, benchmark):
+    benchmark(pydantic_v2_type_adapter.validate_python, json.loads(sample_data_bytes))
+
+
+def test_north_star_validate_python_strict(pydantic_v2_type_adapter, sample_data_bytes, benchmark):
     coerced_sample_data = pydantic_v2_type_adapter.dump_python(
-        pydantic_v2_type_adapter.validate_json(SAMPLE_DATA.read_bytes())
+        pydantic_v2_type_adapter.validate_json(sample_data_bytes)
     )
     benchmark(pydantic_v2_type_adapter.validate_python, coerced_sample_data, strict=True)
 
 
-def test_north_star_json_loads(benchmark):
-    benchmark(json.loads, SAMPLE_DATA.read_bytes())
+def test_north_star_dump_python(pydantic_v2_type_adapter, sample_data_bytes, benchmark):
+    parsed = pydantic_v2_type_adapter.validate_python(json.loads(sample_data_bytes))
+    benchmark(pydantic_v2_type_adapter.dump_python, parsed)
+
+
+def test_north_star_json_loads(sample_data_bytes, benchmark):
+    benchmark(json.loads, sample_data_bytes)
+
+
+def test_north_star_json_dumps(sample_data_bytes, benchmark):
+    parsed = json.loads(sample_data_bytes)
+    benchmark(json.dumps, parsed)
