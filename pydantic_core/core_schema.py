@@ -144,7 +144,7 @@ class ValidationInfo(Protocol):
     """
 
     @property
-    def context(self) -> Dict[str, Any] | None:
+    def context(self) -> Any | None:
         """Current validation context."""
         ...
 
