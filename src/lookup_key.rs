@@ -464,7 +464,7 @@ impl PathItem {
                         None
                     }
                 }
-                _ => None,
+                Self::S(..) => None,
             },
             _ => None,
         }

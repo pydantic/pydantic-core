@@ -79,7 +79,6 @@ lint-rust:
 		-A clippy::manual-let-else \
 		-A clippy::match-bool \
 		-A clippy::match-same-arms \
-		-A clippy::match-wildcard-for-single-variants \
 		-A clippy::missing-errors-doc \
 		-A clippy::missing-panics-doc \
 		-A clippy::module-name-repetitions \
