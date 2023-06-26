@@ -207,6 +207,11 @@ def test_build_schema(benchmark):
 
 @pytest.fixture(scope='module')
 def pydantic_v2_type_adapter():
+    import pydantic
+
+    if not pydantic.__version__.startswith('2.'):
+        raise pytest.skip('pydantic v2 only')
+
     from pydantic import BaseModel, Field, TypeAdapter
     from pydantic.networks import AnyHttpUrl
 
@@ -252,6 +257,60 @@ def pydantic_v2_type_adapter():
 
 
 @pytest.fixture(scope='module')
+def pydantic_v1_model():
+    import pydantic
+
+    if not pydantic.__version__.startswith('1.'):
+        raise pytest.skip('pydantic v1 only')
+
+    from pydantic import BaseModel, Field
+    from pydantic.networks import AnyHttpUrl
+
+    class Blog(BaseModel):
+        type: Literal['blog']
+        title: str
+        post_count: int
+        readers: int
+        avg_post_rating: float
+        url: AnyHttpUrl
+
+    class SocialProfileBase(BaseModel):
+        type: Literal['profile']
+        network: Literal['facebook', 'twitter', 'linkedin']
+        username: str
+        join_date: date
+
+    class FacebookProfile(SocialProfileBase):
+        network: Literal['facebook']
+        friends: int
+
+    class TwitterProfile(SocialProfileBase):
+        network: Literal['twitter']
+        followers: int
+
+    class LinkedinProfile(SocialProfileBase):
+        network: Literal['linkedin']
+        connections: Annotated[int, Field(le=500)]
+
+    SocialProfile = Annotated[Union[FacebookProfile, TwitterProfile, LinkedinProfile], Field(discriminator='network')]
+
+    Website = Annotated[Union[Blog, SocialProfile], Field(discriminator='type')]
+
+    class Person(BaseModel):
+        name: str
+        email: EmailStr
+        entry_created_date: date
+        entry_created_time: time
+        entry_updated_at: datetime
+        websites: List[Website] = Field(default_factory=list)
+
+    class SampleData(BaseModel):
+        __root__: List[Person]
+
+    return SampleData
+
+
+@pytest.fixture(scope='module')
 def sample_data_bytes():
     sample_data_path = Path(__file__).parent / 'sample_data.json'
     return sample_data_path.read_bytes()
@@ -294,3 +353,21 @@ def test_north_star_json_loads(sample_data_bytes, benchmark):
 def test_north_star_json_dumps(sample_data_bytes, benchmark):
     parsed = json.loads(sample_data_bytes)
     benchmark(json.dumps, parsed)
+
+
+def test_north_star_validate_json_v1(pydantic_v1_model, sample_data_bytes, benchmark):
+    benchmark(pydantic_v1_model.parse_raw, sample_data_bytes)
+
+
+def test_north_star_dump_json_v1(pydantic_v1_model, sample_data_bytes, benchmark):
+    parsed = pydantic_v1_model.parse_raw(sample_data_bytes)
+    benchmark(parsed.json)
+
+
+def test_north_star_validate_python_v1(pydantic_v1_model, sample_data_bytes, benchmark):
+    benchmark(pydantic_v1_model.parse_obj, json.loads(sample_data_bytes))
+
+
+def test_north_star_dump_python_v1(pydantic_v1_model, sample_data_bytes, benchmark):
+    parsed = pydantic_v1_model.parse_obj(json.loads(sample_data_bytes))
+    benchmark(parsed.dict)
