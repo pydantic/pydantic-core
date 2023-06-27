@@ -567,6 +567,30 @@ def test_model_class_strict():
     m4 = v.validate_python(m3)
     assert m4 is m3
 
+    # non-instances of subclasses are not allowed in strict mode
+    class MyOtherModel:
+        __pydantic_validator__ = 1  # this ensures pydantic_core thinks it is a model
+
+        def __init__(self):
+            self.field_a = 'init_a'
+            self.field_b = 'init_b'
+            self.field_c = 'init_c'
+
+    other = MyOtherModel()
+    with pytest.raises(ValidationError, match='Input should be an instance of MyModel') as exc_info:
+        v.validate_python(other, strict=True)
+
+    # insert_assert(exc_info.value.errors(include_url=False))
+    assert exc_info.value.errors(include_url=False) == [
+        {
+            'type': 'model_class_type',
+            'loc': (),
+            'msg': 'Input should be an instance of MyModel',
+            'input': other,
+            'ctx': {'class_name': 'MyModel'},
+        }
+    ]
+
 
 def test_model_class_strict_json():
     class MyModel:

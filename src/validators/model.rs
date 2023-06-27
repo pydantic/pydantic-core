@@ -8,8 +8,8 @@ use pyo3::{ffi, intern};
 
 use super::function::convert_err;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
-use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
+use crate::build_tools::{is_strict, py_schema_err};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{py_error_on_minusone, Input};
 use crate::recursion_guard::RecursionGuard;
@@ -51,6 +51,7 @@ impl Revalidate {
 
 #[derive(Debug, Clone)]
 pub struct ModelValidator {
+    strict: bool,
     revalidate: Revalidate,
     validator: Box<CombinedValidator>,
     class: Py<PyType>,
@@ -78,6 +79,7 @@ impl BuildValidator for ModelValidator {
         let validator = build_validator(sub_schema, config, definitions)?;
 
         Ok(Self {
+            strict: is_strict(schema, config)?,
             revalidate: Revalidate::from_str(schema_or_config_same(
                 schema,
                 config,
@@ -148,7 +150,23 @@ impl Validator for ModelValidator {
                 Ok(input.to_object(py))
             }
         } else {
-            self.validate_construct(py, input, None, extra, definitions, recursion_guard)
+            let python_input = input.input_is_python();
+            if extra.strict.unwrap_or(self.strict)
+                && python_input.is_some()
+                && python_input
+                    .unwrap()
+                    .hasattr(intern!(py, "__pydantic_validator__"))
+                    .unwrap_or(false)
+            {
+                Err(ValError::new(
+                    ErrorType::ModelClassType {
+                        class_name: self.get_name().to_string(),
+                    },
+                    input,
+                ))
+            } else {
+                self.validate_construct(py, input, None, extra, definitions, recursion_guard)
+            }
         }
     }
 

@@ -116,6 +116,10 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
+    fn input_is_python(&self) -> Option<&PyAny> {
+        Some(self)
+    }
+
     fn is_python(&self) -> bool {
         true
     }

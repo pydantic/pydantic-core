@@ -44,6 +44,10 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         None
     }
 
+    fn input_is_python(&self) -> Option<&PyAny> {
+        None
+    }
+
     fn is_python(&self) -> bool {
         false
     }
