@@ -1,8 +1,6 @@
 import decimal
 import sys
-from typing import Any, Callable, Generic
-
-from typing_extensions import TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
 from pydantic_core import ErrorDetails, InitErrorDetails
 from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
@@ -54,8 +52,8 @@ class SchemaValidator:
         input: Any,
         *,
         strict: 'bool | None' = None,
-        context: Any = None,
         from_attributes: 'bool | None' = None,
+        context: Any = None,
         self_instance: 'Any | None' = None,
     ) -> Any: ...
     def isinstance_python(
@@ -63,8 +61,8 @@ class SchemaValidator:
         input: Any,
         *,
         strict: 'bool | None' = None,
-        context: Any = None,
         from_attributes: 'bool | None' = None,
+        context: Any = None,
         self_instance: 'Any | None' = None,
     ) -> bool: ...
     def validate_json(
@@ -78,12 +76,12 @@ class SchemaValidator:
     def validate_assignment(
         self,
         obj: Any,
-        field: str,
-        input: Any,
+        field_name: str,
+        field_value: Any,
         *,
         strict: 'bool | None' = None,
-        context: Any = None,
         from_attributes: 'bool | None' = None,
+        context: Any = None,
     ) -> 'dict[str, Any]': ...
     def get_default_value(self, *, strict: 'bool | None' = None, context: Any = None) -> Some | None: ...
 
@@ -175,10 +173,10 @@ class Url(SupportsAllComparisons):
     def __str__(self) -> str: ...
 
 class MultiHostHost(TypedDict):
-    scheme: str
-    path: 'str | None'
-    query: 'str | None'
-    fragment: 'str | None'
+    username: 'str | None'
+    password: 'str | None'
+    host: 'str | None'
+    port: 'int | None'
 
 class MultiHostUrl(SupportsAllComparisons):
     def __init__(self, url: str) -> None: ...
@@ -218,13 +216,14 @@ class ValidationError(ValueError):
     def title(self) -> str: ...
     def error_count(self) -> int: ...
     def errors(self, *, include_url: bool = True, include_context: bool = True) -> 'list[ErrorDetails]': ...
-    def json(self, *, indent: 'int | None' = None, include_url: bool = True, include_context: bool = False) -> str: ...
+    def json(self, *, indent: 'int | None' = None, include_url: bool = True, include_context: bool = True) -> str: ...
 
 class PydanticCustomError(ValueError):
-    context: 'dict[str, Any] | None'
     def __init__(
         self, error_type: LiteralString, message_template: LiteralString, context: 'dict[str, Any] | None' = None
     ) -> None: ...
+    @property
+    def context(self) -> 'dict[str, Any] | None': ...
     @property
     def type(self) -> str: ...
     @property
@@ -232,11 +231,11 @@ class PydanticCustomError(ValueError):
     def message(self) -> str: ...
 
 class PydanticKnownError(ValueError):
-    context: 'dict[str, str | int | float] | None'
-
     def __init__(
         self, error_type: ErrorType, context: 'dict[str, str | int | float | decimal.Decimal] | None' = None
     ) -> None: ...
+    @property
+    def context(self) -> 'dict[str, str | int | float] | None': ...
     @property
     def type(self) -> ErrorType: ...
     @property
