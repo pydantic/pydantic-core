@@ -186,7 +186,7 @@ impl ValidationError {
         include_url: bool,
         include_context: bool,
     ) -> PyResult<&'py PyString> {
-        let state = SerializationState::new(None, None);
+        let state = SerializationState::new("iso8601", "utf8")?;
         let extra = state.extra(py, &SerMode::Json, true, false, false, true, None);
         let serializer = ValidationErrorSerializer {
             py,
