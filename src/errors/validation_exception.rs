@@ -128,12 +128,12 @@ impl<'a> IntoPy<ValError<'a>> for ValidationError {
 #[pymethods]
 impl ValidationError {
     #[staticmethod]
-    #[pyo3(signature = (title, line_errors, error_mode=None, hide_input=false))]
+    #[pyo3(signature = (title, line_errors, error_mode="python", hide_input=false))]
     fn from_exception_data(
         py: Python,
         title: PyObject,
         line_errors: &PyList,
-        error_mode: Option<&str>,
+        error_mode: &str,
         hide_input: bool,
     ) -> PyResult<Py<Self>> {
         Py::new(
