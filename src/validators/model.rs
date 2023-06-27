@@ -152,11 +152,7 @@ impl Validator for ModelValidator {
         } else {
             let python_input = input.input_is_python();
             if extra.strict.unwrap_or(self.strict)
-                && python_input.is_some()
-                && python_input
-                    .unwrap()
-                    .hasattr(intern!(py, "__pydantic_validator__"))
-                    .unwrap_or(false)
+                && python_input.map_or(Ok(false), |input| input.hasattr(intern!(py, "__pydantic_validator__")))?
             {
                 Err(ValError::new(
                     ErrorType::ModelClassType {
