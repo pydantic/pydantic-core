@@ -3772,6 +3772,7 @@ ErrorType = Literal[
     'get_attribute_error',
     'model_class_type',
     'none_required',
+    'bool',
     'greater_than',
     'greater_than_equal',
     'less_than',
