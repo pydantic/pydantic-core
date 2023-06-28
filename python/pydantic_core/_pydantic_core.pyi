@@ -261,6 +261,10 @@ class PydanticOmit(Exception):
     def __init__(self) -> None: ...
 
 @final
+class PydanticUseDefault(Exception):
+    def __init__(self) -> None: ...
+
+@final
 class PydanticSerializationError(ValueError):
     def __init__(self, message: str) -> None: ...
 
