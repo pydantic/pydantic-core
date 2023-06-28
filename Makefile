@@ -26,7 +26,7 @@ build-dev:
 .PHONY: build-prod
 build-prod:
 	@rm -f pydantic_core/*.so
-	cargo build --release --no-default-features --features extension-module --verbose
+	cargo rustc --release --no-default-features --features extension-module --verbose --crate-type=cdylib
 	@rm -f target/release/lib_pydantic_core.d
 	@rm -f target/release/lib_pydantic_core.rlib
 	@mv target/release/lib_pydantic_core.* pydantic_core/_pydantic_core.so
