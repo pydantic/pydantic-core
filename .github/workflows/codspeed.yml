@@ -49,9 +49,9 @@ jobs:
       - name: Install pydantic-core
         # build-prod does not include MiMalloc because it bypasses Maturin
         run: |
-          pip install -e .
+          pip install -e . --config-settings=build-args='--verbose' -v
           make build-prod
-          python -c 'import pydantic_core'
+          python -c 'import pydantic_core; print(pydantic_core._pydantic_core)'
         env:
           CONST_RANDOM_SEED: 0 # Fix the compile time RNG seed
 
