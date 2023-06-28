@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys as _sys
 from typing import Any as _Any
 
@@ -62,17 +64,17 @@ __all__ = [
 
 class ErrorDetails(_TypedDict):
     type: str
-    loc: 'tuple[int | str, ...]'
+    loc: tuple[int | str, ...]
     msg: str
     input: _Any
-    ctx: _NotRequired['dict[str, str | int | float]']
+    ctx: _NotRequired[dict[str, str | int | float]]
 
 
 class InitErrorDetails(_TypedDict):
-    type: 'str | PydanticCustomError'
-    loc: _NotRequired['tuple[int | str, ...]']
+    type: str | PydanticCustomError
+    loc: _NotRequired[tuple[int | str, ...]]
     input: _Any
-    ctx: _NotRequired['dict[str, str | int | float]']
+    ctx: _NotRequired[dict[str, str | int | float]]
 
 
 class ErrorTypeInfo(_TypedDict):
@@ -81,11 +83,11 @@ class ErrorTypeInfo(_TypedDict):
     example_message_python: str
     message_template_json: _NotRequired[str]
     example_message_json: _NotRequired[str]
-    example_context: 'dict[str, str | int | float] | None'
+    example_context: dict[str, str | int | float] | None
 
 
 class MultiHostHost(_TypedDict):
-    username: 'str | None'
-    password: 'str | None'
-    host: 'str | None'
-    port: 'int | None'
+    username: str | None
+    password: str | None
+    host: str | None
+    port: int | None
