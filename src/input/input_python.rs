@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::str::from_utf8;
+use uuid::Uuid;
 
 use pyo3::prelude::*;
 use pyo3::types::{

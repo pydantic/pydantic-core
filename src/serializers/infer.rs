@@ -187,6 +187,10 @@ pub(crate) fn infer_to_python_known(
                 let py_url: PyMultiHostUrl = value.extract()?;
                 py_url.__str__().into_py(py)
             }
+            ObType::Uuid => {
+                let v = value.getattr(intern!(py, "value"))?;
+                infer_to_python(v, include, exclude, extra)?.into_py(py)
+            }
             ObType::PydanticSerializable => serialize_with_serializer()?,
             ObType::Dataclass => serialize_dict(dataclass_to_dict(value)?)?,
             ObType::Enum => {
@@ -503,6 +507,10 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             }
             seq.end()
         }
+        ObType::Uuid => {
+            let s = value.str().map_err(py_err_se_err)?.to_str().map_err(py_err_se_err)?;
+            serializer.serialize_str(s)
+        }
         ObType::Path => {
             let s = value.str().map_err(py_err_se_err)?.to_str().map_err(py_err_se_err)?;
             serializer.serialize_str(s)
@@ -616,7 +624,7 @@ pub(crate) fn infer_json_key_known<'py>(ob_type: &ObType, key: &'py PyAny, extra
             let k = key.getattr(intern!(key.py(), "value"))?;
             infer_json_key(k, extra)
         }
-        ObType::Path => Ok(key.str()?.to_string_lossy()),
+        ObType::Path | ObType::Uuid => Ok(key.str()?.to_string_lossy()),
         ObType::Unknown => {
             if let Some(fallback) = extra.fallback {
                 let next_key = fallback.call1((key,))?;

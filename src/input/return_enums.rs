@@ -5,6 +5,7 @@ use std::slice::Iter as SliceIter;
 use std::str::FromStr;
 
 use num_bigint::BigInt;
+use uuid::Uuid;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;

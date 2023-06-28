@@ -129,6 +129,7 @@ combined_serializer! {
         Dataclass: super::type_serializers::dataclass::DataclassSerializer;
         Url: super::type_serializers::url::UrlSerializer;
         MultiHostUrl: super::type_serializers::url::MultiHostUrlSerializer;
+        Uuid: super::type_serializers::uuid::UuidSerializer;
         Any: super::type_serializers::any::AnySerializer;
         Format: super::type_serializers::format::FormatSerializer;
         ToString: super::type_serializers::format::ToStringSerializer;

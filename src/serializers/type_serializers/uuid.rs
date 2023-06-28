@@ -11,10 +11,10 @@ use super::{
 };
 
 #[derive(Debug, Clone)]
-pub struct StrSerializer;
+pub struct UuidSerializer;
 
-impl BuildSerializer for StrSerializer {
-    const EXPECTED_TYPE: &'static str = "str";
+impl BuildSerializer for UuidSerializer {
+    const EXPECTED_TYPE: &'static str = "uuid";
 
     fn build(
         _schema: &PyDict,
@@ -25,9 +25,7 @@ impl BuildSerializer for StrSerializer {
     }
 }
 
-impl_py_gc_traverse!(StrSerializer {});
-
-impl TypeSerializer for StrSerializer {
+impl TypeSerializer for UuidSerializer {
     fn to_python(
         &self,
         value: &PyAny,
@@ -36,7 +34,6 @@ impl TypeSerializer for StrSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        dbg!("to python");
         match extra.ob_type_lookup.is_type(value, ObType::Str) {
             IsType::Exact => Ok(value.into_py(py)),
             IsType::Subclass => match extra.mode {

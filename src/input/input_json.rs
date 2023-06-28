@@ -258,6 +258,7 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorType::DateType, self)),
         }
     }
+
     // NO custom `lax_date` implementation, if strict_date fails, the validator will fallback to lax_datetime
     // then check there's no remainder
     #[cfg_attr(has_no_coverage, no_coverage)]

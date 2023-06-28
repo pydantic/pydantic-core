@@ -73,6 +73,7 @@ class CoreConfig(TypedDict, total=False):
     # to construct error `loc`s, default True
     loc_by_alias: bool
     # whether instances of models and dataclasses (including subclass instances) should re-validate, default 'never'
+    # whether instances of models and dataclasses (including subclass instances) should re-validate, default 'never'
     revalidate_instances: Literal['always', 'never', 'subclass-instances']
     # whether to validate default values during validation, default False
     validate_default: bool
@@ -206,6 +207,7 @@ ExpectedSerializationTypes = Literal[
     'url',
     'multi-host-url',
     'json',
+    'uuid',
 ]
 
 
@@ -1197,6 +1199,24 @@ def callable_schema(
         serialization: Custom serialization schema
     """
     return _dict_not_none(type='callable', ref=ref, metadata=metadata, serialization=serialization)
+
+
+class UuidSchema(TypedDict, total=False):
+    type: Required[Literal['uuid']]
+    version: Literal[1, 3, 4, 5]
+    ref: str
+    metadata: Any
+    serialization: SerSchema
+
+
+def uuid_schema(
+    *,
+    version: Literal[1, 3, 4, 5] | None = None,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
+) -> UuidSchema:
+    return _dict_not_none(type='uuid', ref=ref, version=version, metadata=metadata, serialization=serialization)
 
 
 class IncExSeqSerSchema(TypedDict, total=False):
@@ -3700,6 +3720,7 @@ if not MYPY:
         IsInstanceSchema,
         IsSubclassSchema,
         CallableSchema,
+        UuidSchema,
         ListSchema,
         TuplePositionalSchema,
         TupleVariableSchema,
@@ -3784,6 +3805,7 @@ CoreSchemaType = Literal[
     'multi-host-url',
     'definitions',
     'definition-ref',
+    'uuid',
 ]
 
 CoreSchemaFieldType = Literal['model-field', 'dataclass-field', 'typed-dict-field', 'computed-field']
@@ -3879,6 +3901,9 @@ ErrorType = Literal[
     'url_syntax_violation',
     'url_too_long',
     'url_scheme',
+    'uuid_type',
+    'uuid_parsing',
+    'uuid_version_mismatch',
 ]
 
 
