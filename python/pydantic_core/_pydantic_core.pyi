@@ -259,11 +259,11 @@ class PydanticKnownError(ValueError):
 
 @final
 class PydanticOmit(Exception):
-    def __init__(self) -> None: ...
+    def __new__(self) -> PydanticOmit: ...
 
 @final
 class PydanticUseDefault(Exception):
-    def __init__(self) -> None: ...
+    def __new__(self) -> PydanticUseDefault: ...
 
 @final
 class PydanticSerializationError(ValueError):
