@@ -69,6 +69,8 @@ filterwarnings = [
     'error',
     # Work around https://github.com/pytest-dev/pytest/issues/10977 for Python 3.12
     'ignore:(ast\.Str|ast\.NameConstant|ast\.Num|Attribute s) is deprecated and will be removed.*:DeprecationWarning:',
+    # issue with pytz - https://github.com/stub42/pytz/issues/105 for Python 3.12
+    'ignore:datetime\.utcfromtimestamp\(\) is deprecated.*:DeprecationWarning:',
 ]
 timeout = 30
 xfail_strict = true
