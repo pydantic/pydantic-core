@@ -32,6 +32,7 @@ __all__ = [
     'PydanticCustomError',
     'PydanticKnownError',
     'PydanticOmit',
+    'PydanticUseDefault',
     'PydanticSerializationError',
     'PydanticSerializationUnexpectedValue',
     'PydanticUndefined',
