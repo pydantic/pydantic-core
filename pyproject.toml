@@ -29,7 +29,8 @@ classifiers = [
     'Typing :: Typed',
 ]
 dependencies = [
-    'typing_extensions; python_version < "3.11.0"'
+    'typing-extensions >=4.6.0; platform_python_implementation != "pypy"',
+    'typing-extensions >=4.6.0,<4.7.0; platform_python_implementation == "pypy"'
 ]
 dynamic = [
     'description',
