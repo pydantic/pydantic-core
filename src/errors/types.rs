@@ -725,18 +725,6 @@ impl Default for Number {
     }
 }
 
-impl From<i64> for Number {
-    fn from(i: i64) -> Self {
-        Self::Int(i)
-    }
-}
-
-impl From<BigInt> for Number {
-    fn from(i: BigInt) -> Self {
-        Self::BigInt(i)
-    }
-}
-
 impl From<f64> for Number {
     fn from(f: f64) -> Self {
         Self::Float(f)
