@@ -11,8 +11,9 @@ import re
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, ForwardRef, List, Set, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, ForwardRef, List, Set, Type, TypeVar, Union
 
+from typing_extensions import TypeVar as TeTypeVar
 from typing_extensions import get_args, get_origin, is_typeddict
 
 TypingUnionType = Type[Union[str, int]]
@@ -43,7 +44,7 @@ else:
 schema_ref_validator = {'type': 'definition-ref', 'schema_ref': 'root-schema'}
 
 
-def get_schema(obj) -> core_schema.CoreSchema:
+def get_schema(obj) -> core_schema.CoreSchema:  # noqa: C901
     if isinstance(obj, str):
         return {'type': obj}
     elif obj in (datetime, timedelta, date, time, bool, int, float, str):
@@ -52,6 +53,8 @@ def get_schema(obj) -> core_schema.CoreSchema:
         return type_dict_schema(obj)
     elif obj == Any or obj == type:
         return {'type': 'any'}
+    elif isinstance(obj, (TypeVar, TeTypeVar)):
+        return {'type': 'any'}
     if isinstance(obj, type) and issubclass(obj, core_schema.Protocol):
         return {'type': 'callable'}
 
@@ -59,6 +62,9 @@ def get_schema(obj) -> core_schema.CoreSchema:
     assert origin is not None, f'origin cannot be None, obj={obj}, you probably need to fix generate_self_schema.py'
     if origin is Union:
         return union_schema(obj)
+    elif is_typeddict(origin):
+        # a generic typeddict
+        return get_schema(origin)
     elif obj is Callable or origin is Callable:
         return {'type': 'callable'}
     elif origin is core_schema.Literal:
