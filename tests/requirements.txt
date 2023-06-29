@@ -9,3 +9,5 @@ pytest-pretty==1.1.1
 pytest-timeout==2.1.0
 pydantic==1.10.4;python_version>="3.8"
 pytz==2022.7.1
+typing-extensions >=4.6.0; platform_python_implementation != "PyPy"
+typing-extensions >=4.6.0,<4.7.0; platform_python_implementation == "PyPy"
