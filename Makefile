@@ -18,6 +18,11 @@ install-rust-coverage:
 
 .PHONY: build-dev
 build-dev:
+#	@rm -f python/pydantic_core/*.so
+#	cargo build --features extension-module
+#	@rm -f target/debug/lib_pydantic_core.d
+#	@rm -f target/debug/lib_pydantic_core.rlib
+#	@mv target/debug/lib_pydantic_core.* python/pydantic_core/_pydantic_core.so
 	@rm -f python/pydantic_core/*.so
 	maturin develop
 

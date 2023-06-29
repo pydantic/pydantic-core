@@ -336,3 +336,13 @@ def test_bad_repr():
         to_json(b)
 
     assert to_json(b, serialize_unknown=True) == b'"<Unserializable BadRepr object>"'
+
+
+def test_error_mode():
+    v = SchemaValidator(core_schema.list_schema())
+    assert v.validate_python((1, 2, 3)) == [1, 2, 3]
+    assert v.validate_python((1, 2, 3), error_mode='json') == [1, 2, 3]
+    with pytest.raises(ValidationError, match=r'  Input should be a valid list \[type=list_type, input_value=123'):
+        v.validate_python(123)
+    with pytest.raises(ValidationError, match=r'  Input should be a valid array \[type=list_type, input_value=123'):
+        v.validate_python(123, error_mode='json')
