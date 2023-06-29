@@ -33,8 +33,6 @@ def dict_not_none(**kwargs: Any) -> Any:
 
 ExtraBehavior = Literal['allow', 'forbid', 'ignore']
 
-assert False, TypedDict
-
 
 class CoreConfig(TypedDict, total=False):
     """
