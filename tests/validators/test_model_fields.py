@@ -994,7 +994,7 @@ def test_from_attributes_type_error():
         {
             'type': 'model_type',
             'loc': (),
-            'msg': 'Input should be a valid dictionary or instance of MyModel',
+            'msg': 'Input should be an object',
             'input': 123,
             'ctx': {'class_name': 'MyModel'},
         }
