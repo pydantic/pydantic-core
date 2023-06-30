@@ -69,6 +69,7 @@ class SchemaValidator:
         from_attributes: bool | None = None,
         context: Any = None,
         self_instance: Any | None = None,
+        input_mode: Literal['python', 'json'] = 'python',
     ) -> Any: ...
     def isinstance_python(
         self,

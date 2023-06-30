@@ -30,3 +30,15 @@ def test_json_or_python():
     ]
 
     assert v.validate_json('"abc"') == Foo('abc')
+
+
+def test_json_or_python_json_mode_for_python_obj() -> None:
+    s = cs.json_or_python_schema(
+        json_schema=cs.no_info_after_validator_function(lambda x: x * 2, cs.int_schema()), python_schema=cs.int_schema()
+    )
+
+    v = SchemaValidator(s)
+
+    assert v.validate_python('1') == 1
+    assert v.validate_python('1', input_mode='python') == 1
+    assert v.validate_python('1', input_mode='json') == 2

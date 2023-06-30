@@ -143,7 +143,8 @@ impl SchemaValidator {
         Ok((cls, args).into_py(py))
     }
 
-    #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None, input_mode="python"))]
     pub fn validate_python(
         &self,
         py: Python,
@@ -152,11 +153,12 @@ impl SchemaValidator {
         from_attributes: Option<bool>,
         context: Option<&PyAny>,
         self_instance: Option<&PyAny>,
+        input_mode: &str,
     ) -> PyResult<PyObject> {
         let r = self._validate(
             py,
             input,
-            InputType::Python,
+            InputType::from_string(input_mode)?,
             strict,
             from_attributes,
             context,

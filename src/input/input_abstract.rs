@@ -1,5 +1,6 @@
 use std::fmt;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*};
 
@@ -14,6 +15,16 @@ use super::{EitherFloat, GenericArguments, GenericIterable, GenericIterator, Gen
 pub enum InputType {
     Python,
     Json,
+}
+
+impl InputType {
+    pub fn from_string(value: &str) -> PyResult<Self> {
+        match value {
+            "python" => Ok(Self::Python),
+            "json" => Ok(Self::Json),
+            other => Err(PyValueError::new_err(format!("Unknown input mode {other}"))),
+        }
+    }
 }
 
 impl IntoPy<PyObject> for InputType {
