@@ -39,6 +39,6 @@ def test_json_or_python_json_mode_for_python_obj() -> None:
 
     v = SchemaValidator(s)
 
-    assert v.validate_python('1') == 1
-    assert v.validate_python('1', input_mode='python') == 1
-    assert v.validate_python('1', input_mode='json') == 2
+    assert v.validate_python(1) == 1
+    assert v.validate_python(1, input_mode='python') == 1
+    assert v.validate_python(1, input_mode='json') == 2
