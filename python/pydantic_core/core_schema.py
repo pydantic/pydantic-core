@@ -2863,7 +2863,7 @@ def model_fields_schema(
 
     Args:
         fields: The fields to use for the typed dict
-        model_name: The name of the model, used for error messages, defaults to `Model`
+        model_name: The name of the model, used for error messages, defaults to "Model"
         computed_fields: Computed fields to use when serializing the model, only applies when directly inside a model
         strict: Whether the typed dict is strict
         extra_validator: The extra validator to use for the typed dict

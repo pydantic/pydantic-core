@@ -557,7 +557,9 @@ impl ErrorType {
             Self::ListType | Self::TupleType | Self::IterableType | Self::SetType | Self::FrozenSetType => {
                 "Input should be a valid array"
             }
-            Self::ModelAttributesType | Self::DictType | Self::DataclassType { .. } => "Input should be an object",
+            Self::ModelType { .. } | Self::ModelAttributesType | Self::DictType | Self::DataclassType { .. } => {
+                "Input should be an object"
+            }
             Self::TimeDeltaType => "Input should be a valid duration",
             Self::TimeDeltaParsing { .. } => "Input should be a valid duration, {error}",
             Self::ArgumentsType => "Arguments must be an array or an object",
