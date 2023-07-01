@@ -1,7 +1,6 @@
 import platform
 import re
 from copy import deepcopy
-from dataclasses import dataclass
 from typing import Any, Dict, Type, Union
 
 import pytest
@@ -379,27 +378,30 @@ def test_function_after_error_hide_input(config, input_str):
 def test_function_after_config():
     f_kwargs = None
 
-    def f(input_value: str, info: core_schema.FieldValidationInfo[FieldInfo]) -> str:
+    def f(input_value, info):
         nonlocal f_kwargs
         f_kwargs = deepcopy_info(info)
         return input_value + ' Changed'
 
     v = SchemaValidator(
-        core_schema.typed_dict_schema(
-            {
-                'test_field': core_schema.typed_dict_field(
-                    core_schema.field_after_validator_function(
-                        f,
-                        core_schema.str_schema(),
-                        field_info=FieldInfo('test_field')
-                    )
-                )
-            }
-        )
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'test_field': {
+                    'type': 'typed-dict-field',
+                    'schema': {
+                        'type': 'function-after',
+                        'function': {'type': 'field', 'function': f, 'field_name': 'test_field'},
+                        'schema': {'type': 'str'},
+                    },
+                }
+            },
+            'config': {'allow_inf_nan': True},
+        }
     )
 
     assert v.validate_python({'test_field': b'321'}) == {'test_field': '321 Changed'}
-    assert f_kwargs == {'data': {}, 'config': {'allow_inf_nan': True}, 'context': None, 'field_info': FieldInfo('test_field')}
+    assert f_kwargs == {'data': {}, 'config': {'allow_inf_nan': True}, 'context': None, 'field_name': 'test_field'}
 
 
 def test_config_no_model():
@@ -605,22 +607,15 @@ def test_raise_type_error():
         v.validate_python('input value')
 
 
-@dataclass
-class FieldInfo:
-    field_name: str
-
-
 def test_model_field_before_validator() -> None:
     class Model:
         x: str
 
-    def f(input_value: Any, info: core_schema.FieldValidationInfo[FieldInfo]) -> Any:
-        assert info.field_info.field_name == 'x'
+    def f(input_value: Any, info: core_schema.FieldValidationInfo) -> Any:
+        assert info.field_name == 'x'
         assert info.data == {}
-        assert (
-            repr(info) == "ValidationInfo(config=None, context=None, data={}, field_info='FieldInfo(field_name='x')')"
-        )
-        assert str(info) == "ValidationInfo(config=None, context=None, data={}, field_info='FieldInfo(field_name='x')')"
+        assert repr(info) == "ValidationInfo(config=None, context=None, data={}, field_name='x')"
+        assert str(info) == "ValidationInfo(config=None, context=None, data={}, field_name='x')"
         assert isinstance(input_value, bytes)
         return f'input: {input_value.decode()}'
 
@@ -630,9 +625,7 @@ def test_model_field_before_validator() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.field_before_validator_function(
-                            f, core_schema.str_schema(), field_info=FieldInfo('x')
-                        )
+                        core_schema.field_before_validator_function(f, 'x', core_schema.str_schema())
                     )
                 }
             ),
@@ -646,8 +639,8 @@ def test_model_field_after_validator() -> None:
     class Model:
         x: str
 
-    def f(input_value: str, info: core_schema.FieldValidationInfo[FieldInfo]) -> Any:
-        assert info.field_info.field_name == 'x'
+    def f(input_value: str, info: core_schema.FieldValidationInfo) -> Any:
+        assert info.field_name == 'x'
         assert info.data == {}
         assert isinstance(input_value, str)
         return f'input: {input_value}'
@@ -658,9 +651,7 @@ def test_model_field_after_validator() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.field_after_validator_function(
-                            f, core_schema.str_schema(), field_info=FieldInfo('x')
-                        )
+                        core_schema.field_after_validator_function(f, 'x', core_schema.str_schema())
                     )
                 }
             ),
@@ -674,8 +665,8 @@ def test_model_field_plain_validator() -> None:
     class Model:
         x: str
 
-    def f(input_value: Any, info: core_schema.FieldValidationInfo[FieldInfo]) -> Any:
-        assert info.field_info.field_name == 'x'
+    def f(input_value: Any, info: core_schema.FieldValidationInfo) -> Any:
+        assert info.field_name == 'x'
         assert info.data == {}
         assert isinstance(input_value, bytes)
         return f'input: {input_value.decode()}'
@@ -684,7 +675,7 @@ def test_model_field_plain_validator() -> None:
         core_schema.model_schema(
             Model,
             core_schema.model_fields_schema(
-                {'x': core_schema.model_field(core_schema.field_plain_validator_function(f, field_info=FieldInfo('x')))}
+                {'x': core_schema.model_field(core_schema.field_plain_validator_function(f, 'x'))}
             ),
         )
     )
@@ -708,7 +699,11 @@ def test_model_field_wrap_validator() -> None:
         core_schema.model_schema(
             Model,
             core_schema.model_fields_schema(
-                {'x': core_schema.model_field(core_schema.field_wrap_validator_function(f, core_schema.str_schema()))}
+                {
+                    'x': core_schema.model_field(
+                        core_schema.field_wrap_validator_function(f, 'x', core_schema.str_schema())
+                    )
+                }
             ),
         )
     )
@@ -816,25 +811,12 @@ def test_non_model_field_wrap_validator_tries_to_access_field_info() -> None:
     assert v.validate_python({'x': b'foo'}).x == 'input: foo'
 
 
-def test_method_function_no_model():
-    def f(*args: Any, **kwargs: Any) -> Any:  # pragma: no cover
-        raise AssertionError('Should not be called')
-
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'field', 'function': f}})
-
-    with pytest.raises(
-        RuntimeError,
-        match='This validator expected to be run inside the context of a model field but no model field was found',
-    ):
-        v.validate_python(123)
-
-
 def test_typed_dict_data() -> None:
     info_stuff = None
 
-    def f(input_value: Any, info: core_schema.FieldValidationInfo[FieldInfo]) -> Any:
+    def f(input_value: Any, info: core_schema.FieldValidationInfo) -> Any:
         nonlocal info_stuff
-        info_stuff = {'field_name': info.field_info.field_name, 'data': info.data.copy()}
+        info_stuff = {'field_name': info.field_name, 'data': info.data.copy()}
         assert isinstance(input_value, str)
         return f'input: {input_value}'
 
@@ -844,7 +826,7 @@ def test_typed_dict_data() -> None:
                 'a': core_schema.typed_dict_field(core_schema.int_schema()),
                 'b': core_schema.typed_dict_field(core_schema.int_schema()),
                 'c': core_schema.typed_dict_field(
-                    core_schema.field_after_validator_function(f, core_schema.str_schema(), field_info=FieldInfo('c'))
+                    core_schema.field_after_validator_function(f, 'c', core_schema.str_schema())
                 ),
             }
         )
