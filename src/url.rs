@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -5,7 +6,7 @@ use idna::punycode::decode_to_string;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::pyclass::CompareOp;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyType};
 use url::Url;
 
 use crate::SchemaValidator;
@@ -313,6 +314,44 @@ impl PyMultiHostUrl {
 
     fn __getnewargs__(&self) -> (String,) {
         (self.__str__(),)
+    }
+
+    #[classmethod]
+    #[pyo3(signature=(*, scheme, host, user=None, password=None, port=None, path=None, query=None, fragment=None))]
+    pub fn build(
+        _cls: &PyType,
+        scheme: String,
+        host: String,
+        user: Option<String>,
+        password: Option<String>,
+        port: Option<String>,
+        path: Option<String>,
+        query: Option<String>,
+        fragment: Option<String>,
+    ) -> String {
+        let user_password = match (user, password) {
+            (Some(user), None) => format!("{}@", user),
+            (None, Some(password)) => format!(":{}@", password),
+            (Some(user), Some(password)) => format!("{}:{}@", user, password),
+            (None, None) => "".to_string(),
+        };
+        let _port = match port {
+            Some(port) => format!(":{}", port),
+            None => "".to_string(),
+        };
+        let _path = match path {
+            Some(path) => path,
+            None => "".to_string(),
+        };
+        let _query = match query {
+            Some(query) => format!("?{}", query),
+            None => "".to_string(),
+        };
+        let _fragment = match fragment {
+            Some(fragment) => format!("#{}", fragment),
+            None => "".to_string(),
+        };
+        return format!("{scheme}://{user_password}{host}{_port}{_path}{_query}{_fragment}");
     }
 }
 
