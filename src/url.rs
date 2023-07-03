@@ -150,7 +150,6 @@ impl PyUrl {
     fn __getnewargs__(&self) -> (&str,) {
         (self.__str__(),)
     }
-
 }
 
 #[pyclass(name = "MultiHostUrl", module = "pydantic_core._pydantic_core", subclass)]
@@ -336,7 +335,7 @@ impl PyMultiHostUrl {
             (Some(user), Some(password)) => format!("{user}:{password}@"),
             (None, None) => String::new(),
         };
-        let mut url =  format!("{scheme}://{user_password}{host}");
+        let mut url = format!("{scheme}://{user_password}{host}");
         if let Some(port) = port {
             url.push(':');
             url.push_str(port);
