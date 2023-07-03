@@ -317,6 +317,7 @@ impl PyMultiHostUrl {
 
     #[classmethod]
     #[pyo3(signature=(*, scheme, host, user=None, password=None, port=None, path=None, query=None, fragment=None))]
+    #[allow(clippy::too_many_arguments)]
     pub fn build(
         _cls: &PyType,
         scheme: String,
