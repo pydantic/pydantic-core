@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -330,26 +329,26 @@ impl PyMultiHostUrl {
         fragment: Option<String>,
     ) -> String {
         let user_password = match (user, password) {
-            (Some(user), None) => format!("{}@", user),
-            (None, Some(password)) => format!(":{}@", password),
-            (Some(user), Some(password)) => format!("{}:{}@", user, password),
-            (None, None) => "".to_string(),
+            (Some(user), None) => format!("{user}@"),
+            (None, Some(password)) => format!(":{password}@"),
+            (Some(user), Some(password)) => format!("{user}:{password}@"),
+            (None, None) => String::new(),
         };
         let _port = match port {
-            Some(port) => format!(":{}", port),
-            None => "".to_string(),
+            Some(port) => format!(":{port}"),
+            None => String::new(),
         };
         let _path = match path {
             Some(path) => path,
-            None => "".to_string(),
+            None => String::new(),
         };
         let _query = match query {
-            Some(query) => format!("?{}", query),
-            None => "".to_string(),
+            Some(query) => format!("?{query}"),
+            None => String::new(),
         };
         let _fragment = match fragment {
-            Some(fragment) => format!("#{}", fragment),
-            None => "".to_string(),
+            Some(fragment) => format!("#{fragment}"),
+            None => String::new(),
         };
         return format!("{scheme}://{user_password}{host}{_port}{_path}{_query}{_fragment}");
     }
