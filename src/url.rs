@@ -150,6 +150,7 @@ impl PyUrl {
     fn __getnewargs__(&self) -> (&str,) {
         (self.__str__(),)
     }
+
 }
 
 #[pyclass(name = "MultiHostUrl", module = "pydantic_core._pydantic_core", subclass)]
@@ -320,14 +321,14 @@ impl PyMultiHostUrl {
     #[allow(clippy::too_many_arguments)]
     pub fn build(
         _cls: &PyType,
-        scheme: String,
-        host: String,
-        user: Option<String>,
-        password: Option<String>,
-        port: Option<String>,
-        path: Option<String>,
-        query: Option<String>,
-        fragment: Option<String>,
+        scheme: &str,
+        host: &str,
+        user: Option<&str>,
+        password: Option<&str>,
+        port: Option<&str>,
+        path: Option<&str>,
+        query: Option<&str>,
+        fragment: Option<&str>,
     ) -> String {
         let user_password = match (user, password) {
             (Some(user), None) => format!("{user}@"),
@@ -335,23 +336,23 @@ impl PyMultiHostUrl {
             (Some(user), Some(password)) => format!("{user}:{password}@"),
             (None, None) => String::new(),
         };
-        let _port = match port {
-            Some(port) => format!(":{port}"),
-            None => String::new(),
-        };
-        let _path = match path {
-            Some(path) => path,
-            None => String::new(),
-        };
-        let _query = match query {
-            Some(query) => format!("?{query}"),
-            None => String::new(),
-        };
-        let _fragment = match fragment {
-            Some(fragment) => format!("#{fragment}"),
-            None => String::new(),
-        };
-        format!("{scheme}://{user_password}{host}{_port}{_path}{_query}{_fragment}")
+        let mut url =  format!("{scheme}://{user_password}{host}");
+        if let Some(port) = port {
+            url.push(':');
+            url.push_str(port);
+        }
+        if let Some(path) = path {
+            url.push_str(path);
+        }
+        if let Some(query) = query {
+            url.push('?');
+            url.push_str(query);
+        }
+        if let Some(fragment) = fragment {
+            url.push('#');
+            url.push_str(fragment);
+        }
+        url
     }
 }
 
