@@ -455,7 +455,7 @@ jobs:
           pip install -U pip
           pip install -r tests/requirements.txt
           pip install pydantic-core --no-index --no-deps --find-links pgo-wheel --force-reinstall
-          pytest
+          pytest tests/benchmarks
           rustup run stable bash -c '$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-profdata merge -o ${{ github.workspace }}/merged.profdata ${{ github.workspace }}/profdata'
 
       - name: build pgo-optimized wheel
