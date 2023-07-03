@@ -350,7 +350,7 @@ impl PyMultiHostUrl {
             Some(fragment) => format!("#{fragment}"),
             None => String::new(),
         };
-        return format!("{scheme}://{user_password}{host}{_port}{_path}{_query}{_fragment}");
+        format!("{scheme}://{user_password}{host}{_port}{_path}{_query}{_fragment}")
     }
 }
 
