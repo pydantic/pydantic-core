@@ -113,6 +113,7 @@ pub(crate) fn infer_to_python_known(
             extra.rec_guard,
             extra.serialize_unknown,
             extra.fallback,
+            extra.duck_typed_serialization,
         );
         serializer.serializer.to_python(value, include, exclude, &extra)
     };
@@ -484,6 +485,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 extra.rec_guard,
                 extra.serialize_unknown,
                 extra.fallback,
+                extra.duck_typed_serialization,
             );
             let pydantic_serializer =
                 PydanticSerializer::new(value, &extracted_serializer.serializer, include, exclude, &extra);

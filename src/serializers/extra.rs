@@ -44,6 +44,7 @@ impl SerializationState {
         round_trip: bool,
         serialize_unknown: bool,
         fallback: Option<&'py PyAny>,
+        duck_typed_serialization: bool,
     ) -> Extra<'py> {
         Extra::new(
             py,
@@ -59,6 +60,7 @@ impl SerializationState {
             &self.rec_guard,
             serialize_unknown,
             fallback,
+            duck_typed_serialization,
         )
     }
 
@@ -72,6 +74,7 @@ impl SerializationState {
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) struct Extra<'a> {
     pub mode: &'a SerMode,
+    pub duck_typed_serialization: bool,
     pub definitions: &'a Definitions<CombinedSerializer>,
     pub ob_type_lookup: &'a ObTypeLookup,
     pub warnings: &'a CollectWarnings,
@@ -109,6 +112,7 @@ impl<'a> Extra<'a> {
         rec_guard: &'a SerRecursionGuard,
         serialize_unknown: bool,
         fallback: Option<&'a PyAny>,
+        duck_typed_serialization: bool,
     ) -> Self {
         Self {
             mode,
@@ -127,6 +131,7 @@ impl<'a> Extra<'a> {
             field_name: None,
             serialize_unknown,
             fallback,
+            duck_typed_serialization,
         }
     }
 
@@ -170,6 +175,7 @@ pub(crate) struct ExtraOwned {
     field_name: Option<String>,
     serialize_unknown: bool,
     fallback: Option<PyObject>,
+    duck_typed_serialization: bool,
 }
 
 impl ExtraOwned {
@@ -190,6 +196,7 @@ impl ExtraOwned {
             field_name: extra.field_name.map(ToString::to_string),
             serialize_unknown: extra.serialize_unknown,
             fallback: extra.fallback.map(Into::into),
+            duck_typed_serialization: extra.duck_typed_serialization,
         }
     }
 
@@ -211,6 +218,7 @@ impl ExtraOwned {
             field_name: self.field_name.as_deref(),
             serialize_unknown: self.serialize_unknown,
             fallback: self.fallback.as_ref().map(|m| m.as_ref(py)),
+            duck_typed_serialization: self.duck_typed_serialization,
         }
     }
 }

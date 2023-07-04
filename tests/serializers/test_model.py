@@ -915,3 +915,55 @@ def test_extra_config_nested_model():
     s_repr = plain_repr(s)
     assert 'has_extra:true,root_model:false,name:"InnerModel"' in s_repr
     assert 'has_extra:false,root_model:false,name:"OuterModel"' in s_repr
+
+
+def test_duck_typed_serialization() -> None:
+    class Parent:
+        x: int = 1
+
+        __pydantic_core_schema__: core_schema.CoreSchema
+        __pydantic_validator__: SchemaValidator
+        __pydantic_serializer__: SchemaSerializer
+
+    Parent.__pydantic_core_schema__ = core_schema.model_schema(
+        Parent, core_schema.model_fields_schema({'x': core_schema.model_field(core_schema.int_schema())})
+    )
+    Parent.__pydantic_validator__ = SchemaValidator(Parent.__pydantic_core_schema__)
+    Parent.__pydantic_serializer__ = SchemaSerializer(Parent.__pydantic_core_schema__)
+
+    class Child(Parent):
+        y: str = 'maybe a secret'
+
+    Child.__pydantic_core_schema__ = core_schema.model_schema(
+        Child,
+        core_schema.model_fields_schema(
+            {
+                'x': core_schema.model_field(core_schema.int_schema()),
+                'y': core_schema.model_field(core_schema.str_schema()),
+            }
+        ),
+    )
+    Child.__pydantic_validator__ = SchemaValidator(Child.__pydantic_core_schema__)
+    Child.__pydantic_serializer__ = SchemaSerializer(Child.__pydantic_core_schema__)
+
+    s = SchemaSerializer(core_schema.list_schema(Parent.__pydantic_core_schema__))
+
+    res = s.to_python(
+        [
+            Child.__pydantic_validator__.validate_python({'x': 1, 'y': 'hopefully not a secret'}),
+            Parent.__pydantic_validator__.validate_python({'x': 2}),
+        ],
+        duck_typed_serialization=True,
+    )
+
+    assert res == [{'x': 1, 'y': 'hopefully not a secret'}, {'x': 2}]
+
+    res = s.to_python(
+        [
+            Child.__pydantic_validator__.validate_python({'x': 1, 'y': 'could be a secret'}),
+            Parent.__pydantic_validator__.validate_python({'x': 2}),
+        ],
+        duck_typed_serialization=False,
+    )
+
+    assert res == [{'x': 1}, {'x': 2}]

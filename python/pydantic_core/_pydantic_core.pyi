@@ -251,6 +251,7 @@ class SchemaSerializer:
         round_trip: bool = False,
         warnings: bool = True,
         fallback: Callable[[Any], Any] | None = None,
+        duck_typed_serialization: bool = False,
     ) -> Any:
         """
         Serialize/marshal a Python object to a Python object including transforming and filtering data.
@@ -291,6 +292,7 @@ class SchemaSerializer:
         round_trip: bool = False,
         warnings: bool = True,
         fallback: Callable[[Any], Any] | None = None,
+        duck_typed_serialization: bool = False,
     ) -> bytes:
         """
         Serialize a Python object to JSON including transforming and filtering data.
