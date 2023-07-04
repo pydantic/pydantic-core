@@ -188,6 +188,20 @@ class Url(SupportsAllComparisons):
     def __str__(self) -> str: ...
     def __deepcopy__(self, memo: dict) -> str: ...
 
+    @classmethod
+    def build(
+        cls,
+        *,
+        scheme: str,
+        user: Optional[str] = None,
+        password: Optional[str] = None,
+        host: str,
+        port: Optional[str] = None,
+        path: Optional[str] = None,
+        query: Optional[str] = None,
+        fragment: Optional[str] = None,
+    ) -> str: ...
+
 class MultiHostUrl(SupportsAllComparisons):
     def __init__(self, url: str) -> None: ...
     @property

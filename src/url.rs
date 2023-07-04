@@ -150,6 +150,45 @@ impl PyUrl {
     fn __getnewargs__(&self) -> (&str,) {
         (self.__str__(),)
     }
+
+    #[classmethod]
+    #[pyo3(signature=(*, scheme, host, user=None, password=None, port=None, path=None, query=None, fragment=None))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn build(
+        _cls: &PyType,
+        scheme: &str,
+        host: &str,
+        user: Option<&str>,
+        password: Option<&str>,
+        port: Option<&str>,
+        path: Option<&str>,
+        query: Option<&str>,
+        fragment: Option<&str>,
+    ) -> String {
+        let user_password = match (user, password) {
+            (Some(user), None) => format!("{user}@"),
+            (None, Some(password)) => format!(":{password}@"),
+            (Some(user), Some(password)) => format!("{user}:{password}@"),
+            (None, None) => String::new(),
+        };
+        let mut url = format!("{scheme}://{user_password}{host}");
+        if let Some(port) = port {
+            url.push(':');
+            url.push_str(port);
+        }
+        if let Some(path) = path {
+            url.push_str(path);
+        }
+        if let Some(query) = query {
+            url.push('?');
+            url.push_str(query);
+        }
+        if let Some(fragment) = fragment {
+            url.push('#');
+            url.push_str(fragment);
+        }
+        url
+    }
 }
 
 #[pyclass(name = "MultiHostUrl", module = "pydantic_core._pydantic_core", subclass)]

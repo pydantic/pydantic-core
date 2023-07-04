@@ -1232,3 +1232,19 @@ def test_multi_url_build() -> None:
         )
         == 'postgresql://testuser:testpassword@127.0.0.1:5432database?sslmode=require#test'
     )
+
+
+def test_url_build() -> None:
+    assert (
+        Url.build(
+            scheme='postgresql',
+            user='testuser',
+            password='testpassword',
+            host='127.0.0.1',
+            port='5432',
+            path='database',
+            query='sslmode=require',
+            fragment='test',
+        )
+        == 'postgresql://testuser:testpassword@127.0.0.1:5432database?sslmode=require#test'
+    )
