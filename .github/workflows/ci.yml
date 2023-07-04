@@ -454,9 +454,10 @@ jobs:
             --release
             --out pgo-wheel
             --interpreter ${{ matrix.maturin-interpreter || matrix.interpreter }}
-            -- -Cprofile-generate=${{ github.workspace }}/profdata
           rust-toolchain: stable
           docker-options: -e CI
+        env:
+          RUSTFLAGS: "-Cprofile-generate=${{ github.workspace }}/profdata"
 
       - name: detect rust host
         run: echo RUST_HOST=$(rustc -Vv | grep host | cut -d ' ' -f 2) >> "$GITHUB_ENV"
@@ -468,10 +469,9 @@ jobs:
           pip install -r tests/requirements.txt
           pip install pydantic-core --no-index --no-deps --find-links pgo-wheel --force-reinstall
           pytest tests/benchmarks
-          rustup run stable bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${{ env.RUST_HOST }}/bin/llvm-profdata >> "$GITHUB_ENV"'
 
       - name: merge pgo data
-        run: ${{ env.LLVM_PROFDATA }} merge -o ${{ github.workspace }}/merged.profdata ${{ github.workspace }}/profdata
+        run: rustup run stable llvm-profdata merge -o ${{ github.workspace }}/merged.profdata ${{ github.workspace }}/profdata
 
       - name: build pgo-optimized wheel
         uses: PyO3/maturin-action@v1
@@ -482,9 +482,10 @@ jobs:
             --release
             --out dist
             --interpreter ${{ matrix.maturin-interpreter || matrix.interpreter }}
-            -- -Cprofile-use=${{ github.workspace }}/merged.profdata
           rust-toolchain: stable
           docker-options: -e CI
+        env:
+          RUSTFLAGS: "-Cprofile-use=${{ github.workspace }}/merged.profdata"
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
 
