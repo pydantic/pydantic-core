@@ -469,9 +469,10 @@ jobs:
           pip install -r tests/requirements.txt
           pip install pydantic-core --no-index --no-deps --find-links pgo-wheel --force-reinstall
           pytest tests/benchmarks
+          rustup run stable bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${{ env.RUST_HOST }}/bin/llvm-profdata >> "$GITHUB_ENV"'
 
       - name: merge pgo data
-        run: rustup run stable llvm-profdata merge -o ${{ github.workspace }}/merged.profdata ${{ github.workspace }}/profdata
+        run: ${{ env.LLVM_PROFDATA }} merge -o ${{ github.workspace }}/merged.profdata ${{ github.workspace }}/profdata
 
       - name: build pgo-optimized wheel
         uses: PyO3/maturin-action@v1
