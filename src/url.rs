@@ -381,13 +381,17 @@ impl PyMultiHostUrl {
             // build multi-host url
             for single_host in hosts.as_deref().unwrap_or_default() {
                 let mut multi_url = format!("{scheme}://");
-                if single_host.username.is_some()
-                    && single_host.host.is_some()
-                    && single_host.password.is_some()
-                    && single_host.port.is_some()
+                if single_host.username.is_some() && single_host.password.is_none()
                 {
-                    todo!()
+                    multi_url.push_str(*single_host.username);
+                    multi_url.push('@');
                 }
+                else if single_host.username.is_none() && single_host.password.is_some()
+                {
+                    multi_url.push_str(*single_host.password);
+                    multi_url.push('@');
+                };
+                if single_host.host
                 else {
                     return Err(PyValueError::new_err("Incomplete object."));
                 };
