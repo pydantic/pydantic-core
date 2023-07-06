@@ -6,6 +6,9 @@ mypy-stubtest = python -m mypy.stubtest pydantic_core._pydantic_core --allowlist
 # using pip install cargo (via maturin via pip) doesn't get the tty handle
 # so doesn't render color without some help
 export CARGO_TERM_COLOR=$(shell (test -t 0 && echo "always") || echo "auto")
+# maturin develop only makes sense inside a virtual env, is otherwise
+# more or less equivalent to pip install -e just a little nicer
+USE_MATURIN = $(shell [ "$$VIRTUAL_ENV" != "" ] && (which maturin))
 
 .PHONY: install
 install:
@@ -26,27 +29,47 @@ install-rust-coverage:
 .PHONY: build-dev
 build-dev:
 	@rm -f python/pydantic_core/*.so
+ifneq ($(USE_MATURIN),)
+	maturin develop
+else
 	pip install -v -e . --config-settings=build-args='--profile dev'
+endif
 
 .PHONY: build-prod
 build-prod:
 	@rm -f python/pydantic_core/*.so
+ifneq ($(USE_MATURIN),)
+	maturin develop --release
+else
 	pip install -v -e .
+endif
 
 .PHONY: build-coverage
 build-coverage:
 	@rm -f python/pydantic_core/*.so
+ifneq ($(USE_MATURIN),)
+	RUSTFLAGS='-C instrument-coverage' maturin develop --release
+else
 	RUSTFLAGS='-C instrument-coverage' pip install -v -e .
+endif
 
 .PHONY: build-pgo
 build-pgo:
 	@rm -f python/pydantic_core/*.so
 	$(eval PROFDATA := $(shell mktemp -d))
+ifneq ($(USE_MATURIN),)
+	RUSTFLAGS='-Cprofile-generate=$(PROFDATA)' maturin develop --release
+else
 	RUSTFLAGS='-Cprofile-generate=$(PROFDATA)' pip install -v -e .
+endif
 	pytest tests/benchmarks
 	$(eval LLVM_PROFDATA := $(shell rustup run stable bash -c 'echo $$RUSTUP_HOME/toolchains/$$RUSTUP_TOOLCHAIN/lib/rustlib/$$(rustc -Vv | grep host | cut -d " " -f 2)/bin/llvm-profdata'))
 	$(LLVM_PROFDATA) merge -o $(PROFDATA)/merged.profdata $(PROFDATA)
+ifneq ($(USE_MATURIN),)
+	RUSTFLAGS='-Cprofile-use=$(PROFDATA)/merged.profdata' maturin develop --release
+else
 	RUSTFLAGS='-Cprofile-use=$(PROFDATA)/merged.profdata' pip install -v -e .
+endif
 	@rm -rf $(PROFDATA)
 
 
