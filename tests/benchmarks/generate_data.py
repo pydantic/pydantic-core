@@ -7,8 +7,8 @@ from faker import Faker
 THIS_DIR = Path(__file__).parent
 
 
-Faker.seed(0)
 f = Faker()
+Faker.seed(0)
 
 
 T = TypeVar('T')
@@ -119,5 +119,8 @@ def person() -> dict:
 
 
 if __name__ == '__main__':
-    with open(THIS_DIR / 'sample_data.json', 'w') as sample_data:
-        sample_data.write(json.dumps([person() for _ in range(1000)]))
+    (THIS_DIR / 'sample_data.json').write_text(
+        json.dumps([person() for _ in range(1000)])
+        # + '\n' to make end-of-file-fixer happy
+        + '\n'
+    )
