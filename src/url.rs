@@ -154,8 +154,8 @@ impl PyUrl {
     #[classmethod]
     #[pyo3(signature=(*, scheme, host, user=None, password=None, port=None, path=None, query=None, fragment=None))]
     #[allow(clippy::too_many_arguments)]
-    pub fn build(
-        _cls: &PyType,
+    pub fn build<'a>(
+        cls: &'a PyType,
         scheme: &str,
         host: &str,
         user: Option<&str>,
@@ -164,7 +164,7 @@ impl PyUrl {
         path: Option<&str>,
         query: Option<&str>,
         fragment: Option<&str>,
-    ) -> String {
+    ) -> PyResult<&'a PyAny> {
         let user_password = match (user, password) {
             (Some(user), None) => format!("{user}@"),
             (None, Some(password)) => format!(":{password}@"),
@@ -177,6 +177,7 @@ impl PyUrl {
             url.push_str(port);
         }
         if let Some(path) = path {
+            url.push('/');
             url.push_str(path);
         }
         if let Some(query) = query {
@@ -187,7 +188,7 @@ impl PyUrl {
             url.push('#');
             url.push_str(fragment);
         }
-        url
+        cls.call1((url,))
     }
 }
 
@@ -357,8 +358,8 @@ impl PyMultiHostUrl {
     #[classmethod]
     #[pyo3(signature=(*, scheme, host, user=None, password=None, port=None, path=None, query=None, fragment=None))]
     #[allow(clippy::too_many_arguments)]
-    pub fn build(
-        _cls: &PyType,
+    pub fn build<'a>(
+        cls: &'a PyType,
         scheme: &str,
         host: &str,
         user: Option<&str>,
@@ -367,7 +368,7 @@ impl PyMultiHostUrl {
         path: Option<&str>,
         query: Option<&str>,
         fragment: Option<&str>,
-    ) -> String {
+    ) -> PyResult<&'a PyAny> {
         let user_password = match (user, password) {
             (Some(user), None) => format!("{user}@"),
             (None, Some(password)) => format!(":{password}@"),
@@ -380,6 +381,7 @@ impl PyMultiHostUrl {
             url.push_str(port);
         }
         if let Some(path) = path {
+            url.push('/');
             url.push_str(path);
         }
         if let Some(query) = query {
@@ -390,7 +392,7 @@ impl PyMultiHostUrl {
             url.push('#');
             url.push_str(fragment);
         }
-        url
+        cls.call1((url,))
     }
 }
 

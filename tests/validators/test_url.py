@@ -1219,8 +1219,7 @@ def test_url_deepcopy() -> None:
 
 
 def test_multi_url_build() -> None:
-    assert (
-        MultiHostUrl.build(
+    url = MultiHostUrl.build(
             scheme='postgresql',
             user='testuser',
             password='testpassword',
@@ -1230,13 +1229,12 @@ def test_multi_url_build() -> None:
             query='sslmode=require',
             fragment='test',
         )
-        == 'postgresql://testuser:testpassword@127.0.0.1:5432database?sslmode=require#test'
-    )
+    assert url == MultiHostUrl('postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test')
+    assert str(url) == 'postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test'
 
 
 def test_url_build() -> None:
-    assert (
-        Url.build(
+    url = Url.build(
             scheme='postgresql',
             user='testuser',
             password='testpassword',
@@ -1246,5 +1244,5 @@ def test_url_build() -> None:
             query='sslmode=require',
             fragment='test',
         )
-        == 'postgresql://testuser:testpassword@127.0.0.1:5432database?sslmode=require#test'
-    )
+    assert url == Url('postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test')
+    assert str(url) == 'postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test'
