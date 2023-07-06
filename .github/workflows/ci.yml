@@ -152,7 +152,7 @@ jobs:
           python-version: '3.11'
 
       - run: pip install -r tests/requirements.txt
-      - run: pip install -e . --config-settings=build-args='--profile dev'
+      - run: make build-dev
 
       - run: pip freeze
       - run: pytest
@@ -194,7 +194,7 @@ jobs:
       - run: pip install -r tests/requirements-linting.txt
         if: steps.cache-py.outputs.cache-hit != 'true'
 
-      - run: pip install .
+      - run: make build-dev
 
       - run: pip freeze
 
