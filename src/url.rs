@@ -373,25 +373,30 @@ impl PyMultiHostUrl {
         password: Option<&str>,
         port: Option<&str>,
     ) -> PyResult<&'a PyAny> {
-        let mut url = if hosts.is_some() {
+        let mut url = if hosts.is_some() && host.is_some() {
+            return Err(PyValueError::new_err("Only one of `host` or `hosts` may be set"));
+        }
+        else if hosts.is_some() {
             // check all of host / user / password / port empty
             // build multi-host url
             todo!()
-        } else if let Some(host) = host {
+        }
+        else if let Some(host) = host {
             let user_password = match (user, password) {
                 (Some(user), None) => format!("{user}@"),
                 (None, Some(password)) => format!(":{password}@"),
                 (Some(user), Some(password)) => format!("{user}:{password}@"),
                 (None, None) => String::new(),
             };
-            format!("{scheme}://{user_password}{host}")
+            let mut single_host_url = format!("{scheme}://{user_password}{host}");
+            if let Some(port) = port {
+                single_host_url.push(':');
+                single_host_url.push_str(port);
+            };
+            single_host_url
         } else {
             return Err(PyValueError::new_err("expected either `host` or `hosts` to be set"));
         };
-        if let Some(port) = port {
-            url.push(':');
-            url.push_str(port);
-        }
         if let Some(path) = path {
             url.push('/');
             url.push_str(path);
