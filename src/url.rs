@@ -2,12 +2,14 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 use idna::punycode::decode_to_string;
+use pyo3::exceptions::PyValueError;
 use pyo3::once_cell::GILOnceCell;
-use pyo3::prelude::*;
 use pyo3::pyclass::CompareOp;
 use pyo3::types::{PyDict, PyType};
+use pyo3::{intern, prelude::*};
 use url::Url;
 
+use crate::tools::SchemaDict;
 use crate::SchemaValidator;
 
 static SCHEMA_DEFINITION_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
@@ -356,26 +358,36 @@ impl PyMultiHostUrl {
     }
 
     #[classmethod]
-    #[pyo3(signature=(*, scheme, host, user=None, password=None, port=None, path=None, query=None, fragment=None))]
+    #[pyo3(signature=(*, scheme, hosts=None, path=None, query=None, fragment=None, host=None, user=None, password=None, port=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn build<'a>(
         cls: &'a PyType,
         scheme: &str,
-        host: &str,
-        user: Option<&str>,
-        password: Option<&str>,
-        port: Option<&str>,
+        hosts: Option<Vec<MultiHostUrlHost>>,
         path: Option<&str>,
         query: Option<&str>,
         fragment: Option<&str>,
+        // convenience parameters to build with a single host
+        host: Option<&str>,
+        user: Option<&str>,
+        password: Option<&str>,
+        port: Option<&str>,
     ) -> PyResult<&'a PyAny> {
-        let user_password = match (user, password) {
-            (Some(user), None) => format!("{user}@"),
-            (None, Some(password)) => format!(":{password}@"),
-            (Some(user), Some(password)) => format!("{user}:{password}@"),
-            (None, None) => String::new(),
+        let mut url = if hosts.is_some() {
+            // check all of host / user / password / port empty
+            // build multi-host url
+            todo!()
+        } else if let Some(host) = host {
+            let user_password = match (user, password) {
+                (Some(user), None) => format!("{user}@"),
+                (None, Some(password)) => format!(":{password}@"),
+                (Some(user), Some(password)) => format!("{user}:{password}@"),
+                (None, None) => String::new(),
+            };
+            format!("{scheme}://{user_password}{host}")
+        } else {
+            return Err(PyValueError::new_err("expected either `host` or `hosts` to be set"));
         };
-        let mut url = format!("{scheme}://{user_password}{host}");
         if let Some(port) = port {
             url.push(':');
             url.push_str(port);
@@ -393,6 +405,26 @@ impl PyMultiHostUrl {
             url.push_str(fragment);
         }
         cls.call1((url,))
+    }
+}
+
+pub struct MultiHostUrlHost {
+    username: Option<String>,
+    password: Option<String>,
+    host: Option<String>,
+    port: Option<String>,
+}
+
+impl FromPyObject<'_> for MultiHostUrlHost {
+    fn extract(ob: &'_ PyAny) -> PyResult<Self> {
+        let py = ob.py();
+        let dict = ob.downcast::<PyDict>()?;
+        Ok(MultiHostUrlHost {
+            username: dict.get_as(intern!(py, "username"))?,
+            password: dict.get_as(intern!(py, "password"))?,
+            host: dict.get_as(intern!(py, "host"))?,
+            port: dict.get_as(intern!(py, "port"))?,
+        })
     }
 }
 
