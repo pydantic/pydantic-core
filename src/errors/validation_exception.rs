@@ -233,11 +233,13 @@ impl ValidationError {
 macro_rules! truncate_input_value {
     ($out:expr, $value:expr) => {
         if $value.len() > 50 {
+            dbg!($value.floor_char_boundary(25));
+            dbg!($value.ceil_char_boundary($value.len() - 24));
             write!(
                 $out,
                 ", input_value={}...{}",
-                &$value[0..25],
-                &$value[$value.len() - 24..]
+                &$value[0..$value.floor_char_boundary(25)],
+                &$value[$value.ceil_char_boundary($value.len() - 24)..]
             )?;
         } else {
             write!($out, ", input_value={}", $value)?;
