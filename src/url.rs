@@ -373,15 +373,27 @@ impl PyMultiHostUrl {
         password: Option<&str>,
         port: Option<&str>,
     ) -> PyResult<&'a PyAny> {
-        let mut url = if hosts.is_some() && host.is_some() {
+        // todo better error message
+        let mut url = if hosts.is_some() && (host.is_some() || user.is_some() || password.is_some() || port.is_some()) {
             return Err(PyValueError::new_err("Only one of `host` or `hosts` may be set"));
-        }
-        else if hosts.is_some() {
+        } else if hosts.is_some() {
             // check all of host / user / password / port empty
             // build multi-host url
+            for single_host in hosts.as_deref().unwrap_or_default() {
+                let mut multi_url = format!("{scheme}://");
+                if single_host.username.is_some()
+                    && single_host.host.is_some()
+                    && single_host.password.is_some()
+                    && single_host.port.is_some()
+                {
+                    todo!()
+                }
+                else {
+                    return Err(PyValueError::new_err("Incomplete object."));
+                };
+            }
             todo!()
-        }
-        else if let Some(host) = host {
+        } else if let Some(host) = host {
             let user_password = match (user, password) {
                 (Some(user), None) => format!("{user}@"),
                 (None, Some(password)) => format!(":{password}@"),

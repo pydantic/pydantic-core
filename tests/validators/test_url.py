@@ -1233,33 +1233,27 @@ def test_multi_url_build() -> None:
     assert str(url) == 'postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test'
 
 
-def test_multi_url_build_host_and_hosts_set() -> None:
+@pytest.mark.parametrize('field', ['host', 'password', 'user', 'port'])
+def test_multi_url_build_hosts_set_with_single_value(field) -> None:
+    """Hosts can't be provided with any single url values."""
     hosts = [
-        {
-            'host': '127.0.0.1:5432',
-            'password': 'testpassword',
-            'username': 'testuser',
-            'port': '5432'
-        },
-        {
-            'host': '127.0.0.1:5432',
-            'password': 'testpassword',
-            'username': 'testuser',
-            'port': '5432'
-        },
+        {'host': '127.0.0.1:5432', 'password': 'testpassword', 'username': 'testuser', 'port': '5432'},
+        {'host': '127.0.0.1:5432', 'password': 'testpassword', 'username': 'testuser', 'port': '5432'},
     ]
+    kwargs = dict(scheme='postgresql', hosts=hosts, path='database', query='sslmode=require', fragment='test')
+    kwargs[field] = 'test'
     with pytest.raises(ValueError):
-        MultiHostUrl.build(
-            scheme='postgresql',
-            user='testuser',
-            password='testpassword',
-            host='127.0.0.1',
-            hosts=hosts,
-            port='5432',
-            path='database',
-            query='sslmode=require',
-            fragment='test',
-        )
+        MultiHostUrl.build(**kwargs)
+
+
+@pytest.mark.parametrize('field', ['host', 'password', 'username', 'port'])
+def test_multi_url_build_hosts_invalid_host(field) -> None:
+    """Hosts can't be provided with any single url values."""
+    host = {'host': '127.0.0.1:5432', 'password': 'testpassword', 'username': 'testuser', 'port': '5432'}
+    del host[field]
+    with pytest.raises(ValueError):
+        MultiHostUrl.build(scheme='postgresql', hosts=[host], path='database', query='sslmode=require', fragment='test')
+
 
 def test_multi_url_build_neither_host_and_hosts_set() -> None:
     with pytest.raises(ValueError):
@@ -1272,6 +1266,7 @@ def test_multi_url_build_neither_host_and_hosts_set() -> None:
             query='sslmode=require',
             fragment='test',
         )
+
 
 def test_url_build() -> None:
     url = Url.build(
