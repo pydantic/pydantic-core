@@ -1,4 +1,3 @@
-#![feature(round_char_boundary)]
 #![cfg_attr(has_no_coverage, feature(no_coverage))]
 
 extern crate core;
