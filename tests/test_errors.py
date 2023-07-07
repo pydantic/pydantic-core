@@ -484,6 +484,10 @@ def test_error_json_python_error():
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('anything')
 
+    exc = exc_info.value.errors()[0]['ctx']['error']  # type: ignore
+    assert isinstance(exc, ValueError)
+    assert isinstance(exc.__context__, AssertionError)
+
     # insert_assert(exc_info.value.errors(include_url=False))
     assert exc_info.value.errors(include_url=False) == [
         {
