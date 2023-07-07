@@ -648,7 +648,7 @@ impl ErrorType {
                     |v| {
                         v.as_ref(py)
                             .str()
-                            .map_or_else(|_| "ValueError", |v| v.to_str().unwrap())
+                            .map_or_else(|_| "AssertionError", |v| v.to_str().unwrap())
                     },
                 );
                 render!(tmpl, error)
