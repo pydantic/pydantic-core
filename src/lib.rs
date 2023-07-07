@@ -44,16 +44,12 @@ pub fn get_version() -> String {
 }
 
 pub fn build_info() -> String {
-    let mut flags = vec![env!("PROFILE")];
-    if let Some(rust_flags) = option_env!("RUSTFLAGS") {
-        if rust_flags.contains("-Cprofile-use=") {
-            flags.push("pgo");
-        }
-    }
-    if cfg!(feature = "mimalloc") {
-        flags.push("mimalloc");
-    }
-    flags.join(" ")
+    format!(
+        "profile={} pgo={} mimalloc={}",
+        env!("PROFILE"),
+        option_env!("RUSTFLAGS").unwrap_or("").contains("-Cprofile-use="),
+        cfg!(feature = "mimalloc")
+    )
 }
 
 #[pymodule]
