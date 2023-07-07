@@ -3787,6 +3787,7 @@ ErrorType = Literal[
     'missing',
     'frozen_field',
     'frozen_instance',
+    'enum',
     'extra_forbidden',
     'invalid_key',
     'get_attribute_error',
