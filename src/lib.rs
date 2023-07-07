@@ -43,10 +43,24 @@ pub fn get_version() -> String {
     version.replace("-alpha", "a").replace("-beta", "b")
 }
 
+pub fn build_info() -> String {
+    let mut flags = vec![env!("PROFILE")];
+    if let Some(rust_flags) = option_env!("RUSTFLAGS") {
+        if rust_flags.contains("-Cprofile-use=") {
+            flags.push("pgo");
+        }
+    }
+    if cfg!(feature = "mimalloc") {
+        flags.push("mimalloc");
+    }
+    flags.join(" ")
+}
+
 #[pymodule]
 fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", get_version())?;
     m.add("build_profile", env!("PROFILE"))?;
+    m.add("build_info", build_info())?;
     m.add("_recursion_limit", recursion_guard::RECURSION_GUARD_LIMIT)?;
     m.add("PydanticUndefined", PydanticUndefinedType::new(py))?;
     m.add_class::<PydanticUndefinedType>()?;
