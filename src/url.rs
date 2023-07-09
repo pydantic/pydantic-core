@@ -1,5 +1,8 @@
 use std::collections::hash_map::DefaultHasher;
+use std::fmt;
+use std::fmt::{format, Formatter};
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 
 use idna::punycode::decode_to_string;
 use pyo3::exceptions::PyValueError;
@@ -7,6 +10,7 @@ use pyo3::once_cell::GILOnceCell;
 use pyo3::pyclass::CompareOp;
 use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*};
+use url::quirks::username;
 use url::Url;
 
 use crate::tools::SchemaDict;
@@ -373,30 +377,26 @@ impl PyMultiHostUrl {
         password: Option<&str>,
         port: Option<&str>,
     ) -> PyResult<&'a PyAny> {
-        // todo better error message
         let mut url = if hosts.is_some() && (host.is_some() || user.is_some() || password.is_some() || port.is_some()) {
-            return Err(PyValueError::new_err("Only one of `host` or `hosts` may be set"));
-        } else if hosts.is_some() {
+            return Err(PyValueError::new_err(
+                "expected one of `hosts` or singular values to be set.",
+            ));
+        } else if let Some(hosts) = hosts {
             // check all of host / user / password / port empty
             // build multi-host url
-            for single_host in hosts.as_deref().unwrap_or_default() {
-                let mut multi_url = format!("{scheme}://");
-                if single_host.username.is_some() && single_host.password.is_none()
-                {
-                    multi_url.push_str(*single_host.username);
-                    multi_url.push('@');
+            let mut multi_url = format!("{scheme}://");
+            for (index, single_host) in hosts.iter().enumerate() {
+                if single_host.is_empty() {
+                    return Err(PyValueError::new_err(
+                        "expected one of 'host', 'username', 'password' or 'port' to be set",
+                    ));
                 }
-                else if single_host.username.is_none() && single_host.password.is_some()
-                {
-                    multi_url.push_str(*single_host.password);
-                    multi_url.push('@');
-                };
-                if single_host.host
-                else {
-                    return Err(PyValueError::new_err("Incomplete object."));
+                multi_url.push_str(&*single_host.to_string());
+                if index != hosts.len() - 1 {
+                    multi_url.push(',')
                 };
             }
-            todo!()
+            multi_url
         } else if let Some(host) = host {
             let user_password = match (user, password) {
                 (Some(user), None) => format!("{user}@"),
@@ -413,6 +413,7 @@ impl PyMultiHostUrl {
         } else {
             return Err(PyValueError::new_err("expected either `host` or `hosts` to be set"));
         };
+
         if let Some(path) = path {
             url.push('/');
             url.push_str(path);
@@ -436,6 +437,12 @@ pub struct MultiHostUrlHost {
     port: Option<String>,
 }
 
+impl MultiHostUrlHost {
+    fn is_empty(&self) -> bool {
+        self.host.is_none() && self.password.is_none() && self.host.is_none() && self.port.is_none()
+    }
+}
+
 impl FromPyObject<'_> for MultiHostUrlHost {
     fn extract(ob: &'_ PyAny) -> PyResult<Self> {
         let py = ob.py();
@@ -446,6 +453,26 @@ impl FromPyObject<'_> for MultiHostUrlHost {
             host: dict.get_as(intern!(py, "host"))?,
             port: dict.get_as(intern!(py, "port"))?,
         })
+    }
+}
+
+impl fmt::Display for MultiHostUrlHost {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut url = String::new();
+        if self.username.is_some() && self.password.is_some() {
+            url.push_str(&*format!(
+                "{}:{}",
+                self.username.as_ref().unwrap(),
+                self.password.as_ref().unwrap()
+            ))
+        }
+        if self.host.is_some() {
+            url.push_str(&*format!("@{}", self.host.as_ref().unwrap()))
+        }
+        if self.port.is_some() {
+            url.push_str(&*format!(":{}", self.port.as_ref().unwrap()))
+        }
+        write!(f, "{}", url)
     }
 }
 
