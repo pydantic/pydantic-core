@@ -389,9 +389,9 @@ impl PyMultiHostUrl {
                         "expected one of 'host', 'username', 'password' or 'port' to be set",
                     ));
                 }
-                multi_url.push_str(&*single_host.to_string());
+                multi_url.push_str(&single_host.to_string());
                 if index != hosts.len() - 1 {
-                    multi_url.push(',')
+                    multi_url.push(',');
                 };
             }
             multi_url
@@ -458,19 +458,19 @@ impl fmt::Display for MultiHostUrlHost {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut url = String::new();
         if self.username.is_some() && self.password.is_some() {
-            url.push_str(&*format!(
+            url.push_str(&format!(
                 "{}:{}",
                 self.username.as_ref().unwrap(),
                 self.password.as_ref().unwrap()
-            ))
+            ));
         }
         if self.host.is_some() {
-            url.push_str(&*format!("@{}", self.host.as_ref().unwrap()))
+            url.push_str(&format!("@{}", self.host.as_ref().unwrap()));
         }
         if self.port.is_some() {
-            url.push_str(&*format!(":{}", self.port.as_ref().unwrap()))
+            url.push_str(&format!(":{}", self.port.as_ref().unwrap()));
         }
-        write!(f, "{}", url)
+        write!(f, "{url}")
     }
 }
 
