@@ -225,7 +225,7 @@ class MultiHostUrl(SupportsAllComparisons):
         user: Optional[str] = None,
         password: Optional[str] = None,
         host: Optional[str] = None,
-        hosts: Optional[dict] = None,
+        hosts: Optional[list[dict]] = None,
         port: Optional[str] = None,
         path: Optional[str] = None,
         query: Optional[str] = None,
