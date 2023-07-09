@@ -161,7 +161,7 @@ pub enum ErrorType {
     // ---------------------
     // enum errors
     Enum {
-        options: String,
+        expected: String,
     },
     // ---------------------
     // dict errors
@@ -420,7 +420,7 @@ impl ErrorType {
             Self::IterationError { .. } => extract_context!(IterationError, ctx, error: String),
             Self::StringTooShort { .. } => extract_context!(StringTooShort, ctx, min_length: usize),
             Self::StringTooLong { .. } => extract_context!(StringTooLong, ctx, max_length: usize),
-            Self::Enum { .. } => extract_context!(Enum, ctx, options: String),
+            Self::Enum { .. } => extract_context!(Enum, ctx, expected: String),
             Self::StringPatternMismatch { .. } => extract_context!(StringPatternMismatch, ctx, pattern: String),
             Self::MappingType { .. } => extract_context!(Cow::Owned, MappingType, ctx, error: String),
             Self::BytesTooShort { .. } => extract_context!(BytesTooShort, ctx, min_length: usize),
@@ -498,7 +498,7 @@ impl ErrorType {
             Self::StringTooShort {..} => "String should have at least {min_length} characters",
             Self::StringTooLong {..} => "String should have at most {max_length} characters",
             Self::StringPatternMismatch {..} => "String should match pattern '{pattern}'",
-            Self::Enum {..} => "Input should be {options}",
+            Self::Enum {..} => "Input should be {expected}",
             Self::DictType => "Input should be a valid dictionary",
             Self::MappingType {..} => "Input should be a valid mapping, error: {error}",
             Self::ListType => "Input should be a valid list",
@@ -635,7 +635,7 @@ impl ErrorType {
             Self::StringTooShort { min_length } => to_string_render!(tmpl, min_length),
             Self::StringTooLong { max_length } => to_string_render!(tmpl, max_length),
             Self::StringPatternMismatch { pattern } => render!(tmpl, pattern),
-            Self::Enum { options } => to_string_render!(tmpl, options),
+            Self::Enum { expected } => to_string_render!(tmpl, expected),
             Self::MappingType { error } => render!(tmpl, error),
             Self::BytesTooShort { min_length } => to_string_render!(tmpl, min_length),
             Self::BytesTooLong { max_length } => to_string_render!(tmpl, max_length),
@@ -695,7 +695,7 @@ impl ErrorType {
             Self::StringTooShort { min_length } => py_dict!(py, min_length),
             Self::StringTooLong { max_length } => py_dict!(py, max_length),
             Self::StringPatternMismatch { pattern } => py_dict!(py, pattern),
-            Self::Enum { options } => py_dict!(py, options),
+            Self::Enum { expected } => py_dict!(py, expected),
             Self::MappingType { error } => py_dict!(py, error),
             Self::BytesTooShort { min_length } => py_dict!(py, min_length),
             Self::BytesTooLong { max_length } => py_dict!(py, max_length),
