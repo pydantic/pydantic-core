@@ -1,6 +1,6 @@
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
-use std::fmt::{Formatter};
+use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
 
 use idna::punycode::decode_to_string;
