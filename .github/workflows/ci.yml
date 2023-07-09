@@ -475,7 +475,7 @@ jobs:
           pip install -U pip
           pip install -r tests/requirements.txt
           pip install pydantic-core --no-index --no-deps --find-links pgo-wheel --force-reinstall
-          pytest tests/benchmarks -v -s
+          pytest tests/benchmarks -v -s -k test_definition_model_core
 
       - name: deduce llvm-profdata location
         run: rustup run stable bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${{ env.RUST_HOST }}/bin/llvm-profdata >> "$GITHUB_ENV"'
