@@ -1,8 +1,7 @@
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
-use std::fmt::{format, Formatter};
+use std::fmt::{Formatter};
 use std::hash::{Hash, Hasher};
-use std::ops::Deref;
 
 use idna::punycode::decode_to_string;
 use pyo3::exceptions::PyValueError;
@@ -10,7 +9,6 @@ use pyo3::once_cell::GILOnceCell;
 use pyo3::pyclass::CompareOp;
 use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*};
-use url::quirks::username;
 use url::Url;
 
 use crate::tools::SchemaDict;
