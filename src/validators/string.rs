@@ -94,10 +94,11 @@ impl Validator for StrConstrainedValidator {
             str = str.trim();
         }
 
-        let mut str_len: Option<usize> = None;
-        if (self.min_length, self.max_length) != (None, None) {
-            str_len = Some(str.chars().count());
-        }
+        let str_len: Option<usize> = if self.min_length.is_some() | self.max_length.is_some() {
+            Some(str.chars().count())
+        } else {
+            None
+        };
         if let Some(min_length) = self.min_length {
             if str_len.unwrap() < min_length {
                 // return py_schema_err!("{} is shorter than {}", str, min_length);
