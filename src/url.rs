@@ -164,7 +164,7 @@ impl PyUrl {
         host: &str,
         user: Option<&str>,
         password: Option<&str>,
-        port: Option<&str>,
+        port: Option<u16>,
         path: Option<&str>,
         query: Option<&str>,
         fragment: Option<&str>,
@@ -178,7 +178,7 @@ impl PyUrl {
         let mut url = format!("{scheme}://{user_password}{host}");
         if let Some(port) = port {
             url.push(':');
-            url.push_str(port);
+            url.push_str(&format!("{port}"));
         }
         if let Some(path) = path {
             url.push('/');
@@ -373,7 +373,7 @@ impl PyMultiHostUrl {
         host: Option<&str>,
         user: Option<&str>,
         password: Option<&str>,
-        port: Option<&str>,
+        port: Option<u16>,
     ) -> PyResult<&'a PyAny> {
         let mut url = if hosts.is_some() && (host.is_some() || user.is_some() || password.is_some() || port.is_some()) {
             return Err(PyValueError::new_err(
@@ -395,19 +395,14 @@ impl PyMultiHostUrl {
                 };
             }
             multi_url
-        } else if let Some(host) = host {
-            let user_password = match (user, password) {
-                (Some(user), None) => format!("{user}@"),
-                (None, Some(password)) => format!(":{password}@"),
-                (Some(user), Some(password)) => format!("{user}:{password}@"),
-                (None, None) => String::new(),
+        } else if host.is_some() {
+            let url_host = MultiHostUrlHost {
+                username: user.map(Into::into),
+                password: password.map(Into::into),
+                host: host.map(Into::into),
+                port: port.map(Into::into),
             };
-            let mut single_host_url = format!("{scheme}://{user_password}{host}");
-            if let Some(port) = port {
-                single_host_url.push(':');
-                single_host_url.push_str(port);
-            };
-            single_host_url
+            format!("{scheme}://{url_host}")
         } else {
             return Err(PyValueError::new_err("expected either `host` or `hosts` to be set"));
         };
@@ -432,7 +427,7 @@ pub struct MultiHostUrlHost {
     username: Option<String>,
     password: Option<String>,
     host: Option<String>,
-    port: Option<String>,
+    port: Option<u16>,
 }
 
 impl MultiHostUrlHost {
@@ -456,21 +451,21 @@ impl FromPyObject<'_> for MultiHostUrlHost {
 
 impl fmt::Display for MultiHostUrlHost {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut url = String::new();
         if self.username.is_some() && self.password.is_some() {
-            url.push_str(&format!(
+            write!(
+                f,
                 "{}:{}",
                 self.username.as_ref().unwrap(),
                 self.password.as_ref().unwrap()
-            ));
+            )?
         }
         if self.host.is_some() {
-            url.push_str(&format!("@{}", self.host.as_ref().unwrap()));
+            write!(f, "@{}", self.host.as_ref().unwrap())?
         }
         if self.port.is_some() {
-            url.push_str(&format!(":{}", self.port.as_ref().unwrap()));
+            write!(f, ":{}", self.port.as_ref().unwrap())?
         }
-        write!(f, "{url}")
+        Ok(())
     }
 }
 

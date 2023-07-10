@@ -1224,7 +1224,7 @@ def test_multi_url_build() -> None:
         user='testuser',
         password='testpassword',
         host='127.0.0.1',
-        port='5432',
+        port=5432,
         path='database',
         query='sslmode=require',
         fragment='test',
@@ -1237,11 +1237,14 @@ def test_multi_url_build() -> None:
 def test_multi_url_build_hosts_set_with_single_value(field) -> None:
     """Hosts can't be provided with any single url values."""
     hosts = [
-        {'host': '127.0.0.1', 'password': 'testpassword', 'username': 'testuser', 'port': '5432'},
-        {'host': '127.0.0.1', 'password': 'testpassword', 'username': 'testuser', 'port': '5432'},
+        {'host': '127.0.0.1', 'password': 'testpassword', 'username': 'testuser', 'port': 5432},
+        {'host': '127.0.0.1', 'password': 'testpassword', 'username': 'testuser', 'port': 5432},
     ]
     kwargs = dict(scheme='postgresql', hosts=hosts, path='database', query='sslmode=require', fragment='test')
-    kwargs[field] = 'test'
+    if field == 'port':
+        kwargs[field] = 5432
+    else:
+        kwargs[field] = 'test'
     with pytest.raises(ValueError):
         MultiHostUrl.build(**kwargs)
 
@@ -1256,8 +1259,8 @@ def test_multi_url_build_hosts_empty_host() -> None:
 def test_multi_url_build_hosts() -> None:
     """Hosts can't be provided with any single url values."""
     hosts = [
-        {'host': '127.0.0.1', 'password': 'testpassword', 'username': 'testuser', 'port': '5431'},
-        {'host': '127.0.0.1', 'password': 'testpassword', 'username': 'testuser', 'port': '5433'},
+        {'host': '127.0.0.1', 'password': 'testpassword', 'username': 'testuser', 'port': 5431},
+        {'host': '127.0.0.1', 'password': 'testpassword', 'username': 'testuser', 'port': 5433},
     ]
     kwargs = dict(scheme='postgresql', hosts=hosts, path='database', query='sslmode=require', fragment='test')
     url = MultiHostUrl.build(**kwargs)
@@ -1276,7 +1279,7 @@ def test_multi_url_build_neither_host_and_hosts_set() -> None:
             scheme='postgresql',
             user='testuser',
             password='testpassword',
-            port='5432',
+            port=5432,
             path='database',
             query='sslmode=require',
             fragment='test',
@@ -1289,7 +1292,7 @@ def test_url_build() -> None:
         user='testuser',
         password='testpassword',
         host='127.0.0.1',
-        port='5432',
+        port=5432,
         path='database',
         query='sslmode=require',
         fragment='test',
