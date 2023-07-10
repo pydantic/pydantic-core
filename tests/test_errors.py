@@ -11,7 +11,6 @@ from pydantic_core import (
     PydanticOmit,
     SchemaValidator,
     ValidationError,
-    __version__,
     core_schema,
 )
 from pydantic_core._pydantic_core import list_all_errors
@@ -414,7 +413,7 @@ class BadRepr:
         raise RuntimeError('bad repr')
 
 
-def test_error_on_repr():
+def test_error_on_repr(pydantic_version):
     s = SchemaValidator({'type': 'int'})
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python(BadRepr())
@@ -423,7 +422,7 @@ def test_error_on_repr():
         '1 validation error for int\n'
         '  Input should be a valid integer '
         '[type=int_type, input_value=<unprintable BadRepr object>, input_type=BadRepr]\n'
-        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/int_type'
+        f'    For further information visit https://errors.pydantic.dev/{pydantic_version}/v/int_type'
     )
     assert exc_info.value.errors(include_url=False) == [
         {'type': 'int_type', 'loc': (), 'msg': 'Input should be a valid integer', 'input': IsInstance(BadRepr)}
@@ -440,7 +439,7 @@ def test_error_on_repr():
     )
 
 
-def test_error_json():
+def test_error_json(pydantic_version):
     s = SchemaValidator({'type': 'str', 'min_length': 3})
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('12')
@@ -463,7 +462,7 @@ def test_error_json():
                 'msg': 'String should have at least 3 characters',
                 'input': '12',
                 'ctx': {'min_length': 3},
-                'url': f'https://errors.pydantic.dev/{__version__}/v/string_too_short',
+                'url': f'https://errors.pydantic.dev/{pydantic_version}/v/string_too_short',
             }
         ]
     )
@@ -665,7 +664,7 @@ def test_raise_validation_error_custom():
     ]
 
 
-def test_loc_with_dots():
+def test_loc_with_dots(pydantic_version):
     v = SchemaValidator(
         core_schema.typed_dict_schema(
             {
@@ -694,5 +693,5 @@ def test_loc_with_dots():
         "`foo.bar`.0\n"
         "  Input should be a valid integer, unable to parse string as an integer "
         "[type=int_parsing, input_value='x', input_type=str]\n"
-        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/int_parsing'
+        f'    For further information visit https://errors.pydantic.dev/{pydantic_version}/v/int_parsing'
     )
