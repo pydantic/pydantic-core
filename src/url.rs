@@ -457,13 +457,13 @@ impl fmt::Display for MultiHostUrlHost {
                 "{}:{}",
                 self.username.as_ref().unwrap(),
                 self.password.as_ref().unwrap()
-            )?
+            )?;
         }
         if self.host.is_some() {
-            write!(f, "@{}", self.host.as_ref().unwrap())?
+            write!(f, "@{}", self.host.as_ref().unwrap())?;
         }
         if self.port.is_some() {
-            write!(f, ":{}", self.port.as_ref().unwrap())?
+            write!(f, ":{}", self.port.as_ref().unwrap())?;
         }
         Ok(())
     }
