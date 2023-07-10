@@ -632,14 +632,9 @@ impl ErrorType {
             Self::BytesTooShort { min_length } => to_string_render!(tmpl, min_length),
             Self::BytesTooLong { max_length } => to_string_render!(tmpl, max_length),
             Self::ValueError { error, .. } => {
-                let error = error.as_ref().map_or_else(
-                    || "None",
-                    |v| {
-                        v.as_ref(py)
-                            .str()
-                            .map_or_else(|_| "ValueError", |v| v.to_str().unwrap())
-                    },
-                );
+                let error = error.as_ref()
+                    .map(|v| Cow::Owned(v.as_ref(py).to_string()))
+                    .unwrap_or_else(Cow::Borrowed("None"));
                 render!(tmpl, error)
             }
             Self::AssertionError { error, .. } => {
