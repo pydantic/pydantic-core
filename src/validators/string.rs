@@ -101,7 +101,6 @@ impl Validator for StrConstrainedValidator {
         };
         if let Some(min_length) = self.min_length {
             if str_len.unwrap() < min_length {
-                // return py_schema_err!("{} is shorter than {}", str, min_length);
                 return Err(ValError::new(ErrorType::StringTooShort { min_length }, input));
             }
         }
