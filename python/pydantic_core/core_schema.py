@@ -8,6 +8,7 @@ from __future__ import annotations as _annotations
 import sys
 from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Callable, Dict, Hashable, List, Set, Type, Union
 
 if sys.version_info < (3, 11):
@@ -652,6 +653,72 @@ def float_schema(
         ge=ge,
         lt=lt,
         gt=gt,
+        strict=strict,
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
+    )
+
+
+class DecimalSchema(TypedDict, total=False):
+    type: Required[Literal['decimal']]
+    gt: Union[int, Decimal]
+    ge: Union[int, Decimal]
+    lt: Union[int, Decimal]
+    le: Union[int, Decimal]
+    max_digits: int
+    decimal_places: int
+    multiple_of: Union[int, Decimal]
+    allow_inf_nan: bool  # whether 'NaN', '+inf', '-inf' should be forbidden. default: False
+    check_digits: bool  # FIXME document. default: False
+    strict: bool
+    ref: str
+    metadata: Any
+    serialization: SerSchema
+
+
+def decimal_schema(
+    *,
+    gt: int | Decimal | None = None,
+    ge: int | Decimal | None = None,
+    lt: int | Decimal | None = None,
+    le: int | Decimal | None = None,
+    max_digits: int | None = None,
+    decimal_places: int | None = None,
+    multiple_of: int | Decimal | None = None,
+    allow_inf_nan: bool = None,
+    check_digits: bool = None,
+    strict: bool | None = None,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
+) -> DecimalSchema:
+    """
+    Returns a schema that matches a decimal value, e.g.:
+
+    ```py
+    from decimal import Decimal
+    from pydantic_core import SchemaValidator, core_schema
+
+    schema = core_schema.decimal_schema(le=0.8, ge=0.2)
+    v = SchemaValidator(schema)
+    assert v.validate_python('0.5') == Decimal('0.5')
+    ```
+
+    Args:
+        FIXME document
+    """
+    return _dict_not_none(
+        type='decimal',
+        gt=gt,
+        ge=ge,
+        lt=lt,
+        le=le,
+        max_digits=max_digits,
+        decimal_places=decimal_places,
+        multiple_of=multiple_of,
+        allow_inf_nan=allow_inf_nan,
+        check_digits=check_digits,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -3711,6 +3778,7 @@ if not MYPY:
         BoolSchema,
         IntSchema,
         FloatSchema,
+        DecimalSchema,
         StringSchema,
         BytesSchema,
         DateSchema,
@@ -3765,6 +3833,7 @@ CoreSchemaType = Literal[
     'bool',
     'int',
     'float',
+    'decimal',
     'str',
     'bytes',
     'date',
@@ -3905,6 +3974,11 @@ ErrorType = Literal[
     'uuid_type',
     'uuid_parsing',
     'uuid_version',
+    'decimal_type',
+    'decimal_parsing',
+    'decimal_max_digits',
+    'decimal_max_places',
+    'decimal_whole_digits',
 ]
 
 
