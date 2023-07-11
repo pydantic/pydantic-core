@@ -473,7 +473,7 @@ def test_error_json(pydantic_version):
     assert exc_info.value.json(indent=2).startswith('[\n  {\n    "type": "string_too_short",')
 
 
-def test_error_json_python_error():
+def test_error_json_python_error(pydantic_version: str):
     def raise_py_error(v: Any) -> Any:
         try:
             assert False
@@ -506,7 +506,7 @@ def test_error_json_python_error():
                 'msg': 'Value error, Oh no!',
                 'input': 'anything',
                 'ctx': {'error': 'Oh no!'},
-                'url': f'https://errors.pydantic.dev/{__version__}/v/value_error',
+                'url': f'https://errors.pydantic.dev/{pydantic_version}/v/value_error',
             }
         ]
     )
