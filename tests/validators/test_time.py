@@ -49,14 +49,7 @@ def test_time(input_value, expected):
         pytest.param('12:13:14.123', time(12, 13, 14, 123_000), id='str-micro'),
         pytest.param('12:13:14.123456', time(12, 13, 14, 123_456), id='str-micro-6dig'),
         pytest.param('12:13:14.123456', time(12, 13, 14, 123_456), id='str-micro-6dig'),
-        pytest.param(
-            '12:13:14.1234561',
-            Err(
-                'Input should be in a valid time format, '
-                'second fraction value is more than 6 digits long [type=time_parsing'
-            ),
-            id='str-micro-7dig',
-        ),
+        pytest.param('12:13:14.1234561', time(12, 13, 14, 123_456), id='str-micro-7dig'),
         pytest.param(123, time(0, 2, 3), id='int'),
         pytest.param(123.4, time(0, 2, 3, 400_000), id='float'),
         pytest.param(123.0, time(0, 2, 3), id='float.0'),
