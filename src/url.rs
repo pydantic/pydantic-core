@@ -452,7 +452,7 @@ impl fmt::Display for UrlHostParts {
             (Some(username), None) => write!(f, "{username}@")?,
             (None, Some(password)) => write!(f, ":{password}@")?,
             (Some(username), Some(password)) => write!(f, "{username}:{password}@")?,
-            (None, None) => {},
+            (None, None) => {}
         };
         if let Some(host) = &self.host {
             write!(f, "{host}")?;
