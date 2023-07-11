@@ -80,6 +80,27 @@ def test_time_json(py_and_json: PyAndJson, input_value, expected):
         assert output == expected
 
 
+def test_time_error_microseconds_overflow(py_and_json: PyAndJson) -> None:
+    v = py_and_json(core_schema.time_schema(microseconds_precision='error'))
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_test('00:00:00.1234567')
+
+    # insert_assert(exc_info.value.errors(include_url=False))
+    assert exc_info.value.errors(include_url=False) == [
+        {
+            'type': 'time_parsing',
+            'loc': (),
+            'msg': 'Input should be in a valid time format, second fraction value is more than 6 digits long',
+            'input': '00:00:00.1234567',
+            'ctx': {'error': 'second fraction value is more than 6 digits long'},
+        }
+    ]
+
+    # insert_assert(v.validate_test('00:00:00.123456'))
+    assert v.validate_test('00:00:00.123456') == time(0, 0, 0, 123456)
+
+
 @pytest.mark.parametrize(
     'input_value,expected',
     [
