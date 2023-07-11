@@ -14,11 +14,21 @@ type RecursionKey = (
 #[derive(Debug, Clone, Default)]
 pub struct RecursionGuard {
     ids: Option<AHashSet<RecursionKey>>,
-    // see validators/definition::BACKUP_GUARD_LIMIT for details
     // depth could be a hashmap {validator_id => depth} but for simplicity and performance it's easier to just
     // use one number for all validators
     depth: u16,
 }
+
+// A hard limit to avoid stack overflows when rampant recursion occurs
+pub const RECURSION_GUARD_LIMIT: u16 = if cfg!(any(target_family = "wasm", all(windows, PyPy))) {
+    // wasm and windows PyPy have very limited stack sizes
+    50
+} else if cfg!(any(PyPy, windows)) {
+    // PyPy and Windows in general have more restricted stack space
+    100
+} else {
+    255
+};
 
 impl RecursionGuard {
     // insert a new id into the set, return whether the set already had the id in it
@@ -37,9 +47,10 @@ impl RecursionGuard {
     }
 
     // see #143 this is used as a backup in case the identity check recursion guard fails
-    pub fn incr_depth(&mut self) -> u16 {
+    #[must_use]
+    pub fn incr_depth(&mut self) -> bool {
         self.depth += 1;
-        self.depth
+        self.depth >= RECURSION_GUARD_LIMIT
     }
 
     pub fn decr_depth(&mut self) {

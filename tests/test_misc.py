@@ -5,8 +5,15 @@ import re
 import pytest
 from typing_extensions import get_args
 
-from pydantic_core import CoreSchema, CoreSchemaType, PydanticUndefined
-from pydantic_core._pydantic_core import SchemaError, SchemaValidator, ValidationError, __version__, build_profile
+from pydantic_core import CoreSchema, CoreSchemaType, PydanticUndefined, core_schema
+from pydantic_core._pydantic_core import (
+    SchemaError,
+    SchemaValidator,
+    ValidationError,
+    __version__,
+    build_info,
+    build_profile,
+)
 
 
 @pytest.mark.parametrize('obj', [ValidationError, SchemaValidator, SchemaError])
@@ -23,6 +30,10 @@ def test_build_profile():
     assert build_profile in ('debug', 'release')
 
 
+def test_build_info():
+    assert isinstance(build_info, str)
+
+
 def test_schema_error():
     err = SchemaError('test')
     assert isinstance(err, Exception)
@@ -30,7 +41,7 @@ def test_schema_error():
     assert repr(err) == 'SchemaError("test")'
 
 
-def test_validation_error():
+def test_validation_error(pydantic_version):
     v = SchemaValidator({'type': 'int'})
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(1.5)
@@ -56,7 +67,7 @@ def test_validation_error():
             'loc': (),
             'msg': 'Input should be a valid integer, got a number with a fractional part',
             'input': 1.5,
-            'url': f'https://errors.pydantic.dev/{__version__}/v/int_from_float',
+            'url': f'https://errors.pydantic.dev/{pydantic_version}/v/int_from_float',
         }
     ]
 
@@ -97,7 +108,7 @@ def test_custom_title():
     assert exc_info.value.title == 'MyInt'
 
 
-def test_validation_error_multiple():
+def test_validation_error_multiple(pydantic_version):
     class MyModel:
         # this is not required, but it avoids `__pydantic_fields_set__` being included in `__dict__`
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
@@ -141,11 +152,11 @@ def test_validation_error_multiple():
         'x\n'
         '  Input should be a valid number, unable to parse string as a number '
         "[type=float_parsing, input_value='xxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxx', input_type=str]\n"
-        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/float_parsing\n'
+        f'    For further information visit https://errors.pydantic.dev/{pydantic_version}/v/float_parsing\n'
         'y\n'
         '  Input should be a valid integer, unable to parse string as an integer '
         "[type=int_parsing, input_value='y', input_type=str]\n"
-        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/int_parsing'
+        f'    For further information visit https://errors.pydantic.dev/{pydantic_version}/v/int_parsing'
     )
 
 
@@ -177,3 +188,19 @@ def test_undefined():
     assert undefined_deepcopy is PydanticUndefined
 
     assert pickle.loads(pickle.dumps(PydanticUndefined)) is PydanticUndefined
+
+
+def test_unicode_error_input_repr() -> None:
+    """https://github.com/pydantic/pydantic/issues/6448"""
+
+    schema = core_schema.int_schema()
+
+    validator = SchemaValidator(schema)
+
+    danger_str = 'ÿ' * 1000
+    expected = "1 validation error for int\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='ÿÿÿÿÿÿÿÿÿÿÿÿ...ÿÿÿÿÿÿÿÿÿÿÿ', input_type=str]"  # noqa: E501
+    with pytest.raises(ValidationError) as exc_info:
+        validator.validate_python(danger_str)
+    actual = repr(exc_info.value).split('For further information visit ')[0].strip()
+
+    assert expected == actual

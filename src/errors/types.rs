@@ -159,6 +159,11 @@ pub enum ErrorType {
         pattern: String,
     },
     // ---------------------
+    // enum errors
+    Enum {
+        expected: String,
+    },
+    // ---------------------
     // dict errors
     DictType,
     MappingType {
@@ -199,10 +204,10 @@ pub enum ErrorType {
     // ---------------------
     // python errors from functions
     ValueError {
-        error: String,
+        error: Option<PyObject>, // Use Option because EnumIter requires Default to be implemented
     },
     AssertionError {
-        error: String,
+        error: Option<PyObject>, // Use Option because EnumIter requires Default to be implemented
     },
     // Note: strum message and serialize are not used here
     CustomError {
@@ -415,12 +420,13 @@ impl ErrorType {
             Self::IterationError { .. } => extract_context!(IterationError, ctx, error: String),
             Self::StringTooShort { .. } => extract_context!(StringTooShort, ctx, min_length: usize),
             Self::StringTooLong { .. } => extract_context!(StringTooLong, ctx, max_length: usize),
+            Self::Enum { .. } => extract_context!(Enum, ctx, expected: String),
             Self::StringPatternMismatch { .. } => extract_context!(StringPatternMismatch, ctx, pattern: String),
             Self::MappingType { .. } => extract_context!(Cow::Owned, MappingType, ctx, error: String),
             Self::BytesTooShort { .. } => extract_context!(BytesTooShort, ctx, min_length: usize),
             Self::BytesTooLong { .. } => extract_context!(BytesTooLong, ctx, max_length: usize),
-            Self::ValueError { .. } => extract_context!(ValueError, ctx, error: String),
-            Self::AssertionError { .. } => extract_context!(AssertionError, ctx, error: String),
+            Self::ValueError { .. } => extract_context!(ValueError, ctx, error: Option<PyObject>),
+            Self::AssertionError { .. } => extract_context!(AssertionError, ctx, error: Option<PyObject>),
             Self::LiteralError { .. } => extract_context!(LiteralError, ctx, expected: String),
             Self::DateParsing { .. } => extract_context!(Cow::Owned, DateParsing, ctx, error: String),
             Self::DateFromDatetimeParsing { .. } => extract_context!(DateFromDatetimeParsing, ctx, error: String),
@@ -492,6 +498,7 @@ impl ErrorType {
             Self::StringTooShort {..} => "String should have at least {min_length} characters",
             Self::StringTooLong {..} => "String should have at most {max_length} characters",
             Self::StringPatternMismatch {..} => "String should match pattern '{pattern}'",
+            Self::Enum {..} => "Input should be {expected}",
             Self::DictType => "Input should be a valid dictionary",
             Self::MappingType {..} => "Input should be a valid mapping, error: {error}",
             Self::ListType => "Input should be a valid list",
@@ -628,11 +635,22 @@ impl ErrorType {
             Self::StringTooShort { min_length } => to_string_render!(tmpl, min_length),
             Self::StringTooLong { max_length } => to_string_render!(tmpl, max_length),
             Self::StringPatternMismatch { pattern } => render!(tmpl, pattern),
+            Self::Enum { expected } => to_string_render!(tmpl, expected),
             Self::MappingType { error } => render!(tmpl, error),
             Self::BytesTooShort { min_length } => to_string_render!(tmpl, min_length),
             Self::BytesTooLong { max_length } => to_string_render!(tmpl, max_length),
-            Self::ValueError { error } => render!(tmpl, error),
-            Self::AssertionError { error } => render!(tmpl, error),
+            Self::ValueError { error, .. } => {
+                let error = &error
+                    .as_ref()
+                    .map_or(Cow::Borrowed("None"), |v| Cow::Owned(v.as_ref(py).to_string()));
+                render!(tmpl, error)
+            }
+            Self::AssertionError { error, .. } => {
+                let error = &error
+                    .as_ref()
+                    .map_or(Cow::Borrowed("None"), |v| Cow::Owned(v.as_ref(py).to_string()));
+                render!(tmpl, error)
+            }
             Self::CustomError {
                 custom_error: value_error,
             } => value_error.message(py),
@@ -687,6 +705,7 @@ impl ErrorType {
             Self::StringTooShort { min_length } => py_dict!(py, min_length),
             Self::StringTooLong { max_length } => py_dict!(py, max_length),
             Self::StringPatternMismatch { pattern } => py_dict!(py, pattern),
+            Self::Enum { expected } => py_dict!(py, expected),
             Self::MappingType { error } => py_dict!(py, error),
             Self::BytesTooShort { min_length } => py_dict!(py, min_length),
             Self::BytesTooLong { max_length } => py_dict!(py, max_length),

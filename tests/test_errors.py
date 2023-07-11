@@ -1,5 +1,6 @@
 import re
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from dirty_equals import HasRepr, IsInstance, IsJson, IsStr
@@ -10,7 +11,6 @@ from pydantic_core import (
     PydanticOmit,
     SchemaValidator,
     ValidationError,
-    __version__,
     core_schema,
 )
 from pydantic_core._pydantic_core import list_all_errors
@@ -191,6 +191,7 @@ all_errors = [
     ('invalid_key', 'Keys should be strings', None),
     ('get_attribute_error', 'Error extracting attribute: foo', {'error': 'foo'}),
     ('none_required', 'Input should be None', None),
+    ('enum', 'Input should be foo', {'expected': 'foo'}),
     ('greater_than', 'Input should be greater than 42.1', {'gt': 42.1}),
     ('greater_than', 'Input should be greater than 42.1', {'gt': '42.1'}),
     ('greater_than', 'Input should be greater than 2020-01-01', {'gt': '2020-01-01'}),
@@ -237,8 +238,8 @@ all_errors = [
     ('bytes_type', 'Input should be a valid bytes', None),
     ('bytes_too_short', 'Data should have at least 42 bytes', {'min_length': 42}),
     ('bytes_too_long', 'Data should have at most 42 bytes', {'max_length': 42}),
-    ('value_error', 'Value error, foobar', {'error': 'foobar'}),
-    ('assertion_error', 'Assertion failed, foobar', {'error': 'foobar'}),
+    ('value_error', 'Value error, foobar', {'error': ValueError('foobar')}),
+    ('assertion_error', 'Assertion failed, foobar', {'error': AssertionError('foobar')}),
     ('literal_error', 'Input should be foo', {'expected': 'foo'}),
     ('literal_error', 'Input should be foo or bar', {'expected': 'foo or bar'}),
     ('date_type', 'Input should be a valid date', None),
@@ -412,7 +413,7 @@ class BadRepr:
         raise RuntimeError('bad repr')
 
 
-def test_error_on_repr():
+def test_error_on_repr(pydantic_version):
     s = SchemaValidator({'type': 'int'})
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python(BadRepr())
@@ -421,7 +422,7 @@ def test_error_on_repr():
         '1 validation error for int\n'
         '  Input should be a valid integer '
         '[type=int_type, input_value=<unprintable BadRepr object>, input_type=BadRepr]\n'
-        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/int_type'
+        f'    For further information visit https://errors.pydantic.dev/{pydantic_version}/v/int_type'
     )
     assert exc_info.value.errors(include_url=False) == [
         {'type': 'int_type', 'loc': (), 'msg': 'Input should be a valid integer', 'input': IsInstance(BadRepr)}
@@ -438,7 +439,7 @@ def test_error_on_repr():
     )
 
 
-def test_error_json():
+def test_error_json(pydantic_version):
     s = SchemaValidator({'type': 'str', 'min_length': 3})
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('12')
@@ -461,7 +462,7 @@ def test_error_json():
                 'msg': 'String should have at least 3 characters',
                 'input': '12',
                 'ctx': {'min_length': 3},
-                'url': f'https://errors.pydantic.dev/{__version__}/v/string_too_short',
+                'url': f'https://errors.pydantic.dev/{pydantic_version}/v/string_too_short',
             }
         ]
     )
@@ -470,6 +471,50 @@ def test_error_json():
     )
     assert exc_info.value.json().startswith('[{"type":"string_too_short",')
     assert exc_info.value.json(indent=2).startswith('[\n  {\n    "type": "string_too_short",')
+
+
+def test_error_json_python_error(pydantic_version: str):
+    def raise_py_error(v: Any) -> Any:
+        try:
+            assert False
+        except AssertionError as e:
+            raise ValueError('Oh no!') from e
+
+    s = SchemaValidator(core_schema.no_info_plain_validator_function(raise_py_error))
+    with pytest.raises(ValidationError) as exc_info:
+        s.validate_python('anything')
+
+    exc = exc_info.value.errors()[0]['ctx']['error']  # type: ignore
+    assert isinstance(exc, ValueError)
+    assert isinstance(exc.__context__, AssertionError)
+
+    # insert_assert(exc_info.value.errors(include_url=False))
+    assert exc_info.value.errors(include_url=False) == [
+        {
+            'type': 'value_error',
+            'loc': (),
+            'msg': 'Value error, Oh no!',
+            'input': 'anything',
+            'ctx': {'error': HasRepr(repr(ValueError('Oh no!')))},
+        }
+    ]
+    assert exc_info.value.json() == IsJson(
+        [
+            {
+                'type': 'value_error',
+                'loc': [],
+                'msg': 'Value error, Oh no!',
+                'input': 'anything',
+                'ctx': {'error': 'Oh no!'},
+                'url': f'https://errors.pydantic.dev/{pydantic_version}/v/value_error',
+            }
+        ]
+    )
+    assert exc_info.value.json(include_url=False, include_context=False) == IsJson(
+        [{'type': 'value_error', 'loc': [], 'msg': 'Value error, Oh no!', 'input': 'anything'}]
+    )
+    assert exc_info.value.json().startswith('[{"type":"value_error",')
+    assert exc_info.value.json(indent=2).startswith('[\n  {\n    "type": "value_error",')
 
 
 def test_error_json_cycle():
@@ -619,7 +664,7 @@ def test_raise_validation_error_custom():
     ]
 
 
-def test_loc_with_dots():
+def test_loc_with_dots(pydantic_version):
     v = SchemaValidator(
         core_schema.typed_dict_schema(
             {
@@ -648,5 +693,5 @@ def test_loc_with_dots():
         "`foo.bar`.0\n"
         "  Input should be a valid integer, unable to parse string as an integer "
         "[type=int_parsing, input_value='x', input_type=str]\n"
-        f'    For further information visit https://errors.pydantic.dev/{__version__}/v/int_parsing'
+        f'    For further information visit https://errors.pydantic.dev/{pydantic_version}/v/int_parsing'
     )

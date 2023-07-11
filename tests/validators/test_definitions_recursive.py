@@ -1,10 +1,12 @@
+import platform
 from dataclasses import dataclass
 from typing import List, Optional
 
 import pytest
 from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict, IsStr, IsTuple
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError, __version__, core_schema
+import pydantic_core
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, plain_repr
 from .test_typed_dict import Cls
@@ -714,6 +716,10 @@ def test_function_name():
     ]
 
 
+@pytest.mark.skipif(
+    platform.python_implementation() == 'PyPy' and pydantic_core._pydantic_core.build_profile == 'debug',
+    reason='PyPy does not have enough stack space for Rust debug builds to recurse very deep',
+)
 @pytest.mark.parametrize('strict', [True, False], ids=lambda s: f'strict={s}')
 def test_function_change_id(strict: bool):
     def f(input_value, info):
@@ -750,7 +756,7 @@ def test_function_change_id(strict: bool):
 
 
 def test_many_uses_of_ref():
-    # check we can safely exceed BACKUP_GUARD_LIMIT without upsetting the backup recursion guard
+    # check we can safely exceed RECURSION_GUARD_LIMIT without upsetting the recursion guard
     v = SchemaValidator(
         {
             'type': 'typed-dict',
@@ -812,7 +818,7 @@ def test_error_inside_definition_wrapper():
     )
 
 
-def test_recursive_definitions_schema() -> None:
+def test_recursive_definitions_schema(pydantic_version) -> None:
     s = core_schema.definitions_schema(
         core_schema.definition_reference_schema(schema_ref='a'),
         [
@@ -848,7 +854,7 @@ def test_recursive_definitions_schema() -> None:
             'loc': ('b', 0, 'a'),
             'msg': 'Input should be a valid list',
             'input': {},
-            'url': f'https://errors.pydantic.dev/{__version__}/v/list_type',
+            'url': f'https://errors.pydantic.dev/{pydantic_version}/v/list_type',
         }
     ]
 
@@ -872,7 +878,7 @@ def test_unsorted_definitions_schema() -> None:
         v.validate_python({'x': 'abc'})
 
 
-def test_validate_assignment() -> None:
+def test_validate_assignment(pydantic_version) -> None:
     @dataclass
     class Model:
         x: List['Model']
@@ -910,6 +916,6 @@ def test_validate_assignment() -> None:
             'msg': 'Input should be a dictionary or an instance of Model',
             'input': 123,
             'ctx': {'class_name': 'Model'},
-            'url': f'https://errors.pydantic.dev/{__version__}/v/dataclass_type',
+            'url': f'https://errors.pydantic.dev/{pydantic_version}/v/dataclass_type',
         }
     ]

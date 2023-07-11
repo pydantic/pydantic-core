@@ -103,7 +103,6 @@ jobs:
 
       - run: pytest
         env:
-          BENCHMARK_VS_PYDANTIC: 1
           HYPOTHESIS_PROFILE: slow
 
   test-os:
@@ -142,17 +141,25 @@ jobs:
 
   # test with a debug build as it picks up errors which optimised release builds do not
   test-debug:
+    name: test-debug ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - '3.11'
+          - 'pypy3.9'
 
     steps:
       - uses: actions/checkout@v3
       - name: set up python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
 
       - run: pip install -r tests/requirements.txt
-      - run: pip install -e . --config-settings=build-args='--profile dev'
+      - run: make build-dev
 
       - run: pip freeze
       - run: pytest
@@ -194,7 +201,7 @@ jobs:
       - run: pip install -r tests/requirements-linting.txt
         if: steps.cache-py.outputs.cache-hit != 'true'
 
-      - run: pip install .
+      - run: make build-dev
 
       - run: pip freeze
 

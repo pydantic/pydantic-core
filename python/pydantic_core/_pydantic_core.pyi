@@ -22,6 +22,8 @@ from _typeshed import SupportsAllComparisons
 __all__ = [
     '__version__',
     'build_profile',
+    'build_info',
+    '_recursion_limit',
     'ArgsKwargs',
     'SchemaValidator',
     'SchemaSerializer',
@@ -44,6 +46,8 @@ __all__ = [
 ]
 __version__: str
 build_profile: str
+build_info: str
+_recursion_limit: int
 
 _T = TypeVar('_T', default=Any, covariant=True)
 
@@ -58,7 +62,7 @@ class Some(Generic[_T]):
 
 @final
 class SchemaValidator:
-    def __init__(self, schema: CoreSchema, config: CoreConfig | None = None) -> None: ...
+    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self: ...
     @property
     def title(self) -> str: ...
     def validate_python(
@@ -103,7 +107,7 @@ _IncEx: TypeAlias = set[int] | set[str] | dict[int, _IncEx] | dict[str, _IncEx] 
 
 @final
 class SchemaSerializer:
-    def __init__(self, schema: CoreSchema, config: CoreConfig | None = None) -> None: ...
+    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self: ...
     def to_python(
         self,
         value: Any,
@@ -164,7 +168,7 @@ def to_jsonable_python(
 ) -> Any: ...
 
 class Url(SupportsAllComparisons):
-    def __init__(self, url: str) -> None: ...
+    def __new__(cls, url: str) -> Self: ...
     @property
     def scheme(self) -> str: ...
     @property
@@ -202,7 +206,7 @@ class Url(SupportsAllComparisons):
     ) -> str: ...
 
 class MultiHostUrl(SupportsAllComparisons):
-    def __init__(self, url: str) -> None: ...
+    def __new__(cls, url: str) -> Self: ...
     @property
     def scheme(self) -> str: ...
     @property
@@ -260,9 +264,9 @@ class ValidationError(ValueError):
 
 @final
 class PydanticCustomError(ValueError):
-    def __init__(
-        self, error_type: LiteralString, message_template: LiteralString, context: dict[str, Any] | None = None
-    ) -> None: ...
+    def __new__(
+        cls, error_type: LiteralString, message_template: LiteralString, context: dict[str, Any] | None = None
+    ) -> Self: ...
     @property
     def context(self) -> dict[str, Any] | None: ...
     @property
@@ -273,9 +277,9 @@ class PydanticCustomError(ValueError):
 
 @final
 class PydanticKnownError(ValueError):
-    def __init__(
-        self, error_type: ErrorType, context: dict[str, str | int | float | decimal.Decimal] | None = None
-    ) -> None: ...
+    def __new__(
+        cls, error_type: ErrorType, context: dict[str, str | int | float | decimal.Decimal] | None = None
+    ) -> Self: ...
     @property
     def context(self) -> dict[str, str | int | float] | None: ...
     @property
@@ -286,23 +290,23 @@ class PydanticKnownError(ValueError):
 
 @final
 class PydanticOmit(Exception):
-    def __new__(self) -> PydanticOmit: ...
+    def __new__(cls) -> Self: ...
 
 @final
 class PydanticUseDefault(Exception):
-    def __new__(self) -> PydanticUseDefault: ...
+    def __new__(cls) -> Self: ...
 
 @final
 class PydanticSerializationError(ValueError):
-    def __init__(self, message: str) -> None: ...
+    def __new__(cls, message: str) -> Self: ...
 
 @final
 class PydanticSerializationUnexpectedValue(ValueError):
-    def __init__(self, message: str | None = None) -> None: ...
+    def __new__(cls, message: str | None = None) -> Self: ...
 
 @final
 class ArgsKwargs:
-    def __init__(self, args: tuple[Any, ...], kwargs: dict[str, Any] | None = None) -> None: ...
+    def __new__(cls, args: tuple[Any, ...], kwargs: dict[str, Any] | None = None) -> Self: ...
     @property
     def args(self) -> tuple[Any, ...]: ...
     @property

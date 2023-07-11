@@ -15,7 +15,7 @@ use serde_json::ser::PrettyFormatter;
 
 use crate::build_tools::py_schema_error_type;
 use crate::errors::LocItem;
-use crate::get_version;
+use crate::get_pydantic_version;
 use crate::serializers::{SerMode, SerializationState};
 use crate::tools::{safe_repr, SchemaDict};
 
@@ -113,7 +113,12 @@ static URL_PREFIX: GILOnceCell<String> = GILOnceCell::new();
 
 fn get_url_prefix(py: Python, include_url: bool) -> Option<&str> {
     if include_url {
-        Some(URL_PREFIX.get_or_init(py, || format!("https://errors.pydantic.dev/{}/v/", get_version())))
+        Some(URL_PREFIX.get_or_init(py, || {
+            format!(
+                "https://errors.pydantic.dev/{}/v/",
+                get_pydantic_version(py).unwrap_or("latest")
+            )
+        }))
     } else {
         None
     }
@@ -230,14 +235,44 @@ impl ValidationError {
     }
 }
 
+// TODO: is_utf8_char_boundary, floor_char_boundary and ceil_char_boundary
+// with builtin methods once https://github.com/rust-lang/rust/issues/93743 is resolved
+// These are just copy pasted from the current implementation
+const fn is_utf8_char_boundary(value: u8) -> bool {
+    // This is bit magic equivalent to: b < 128 || b >= 192
+    (value as i8) >= -0x40
+}
+
+fn floor_char_boundary(value: &str, index: usize) -> usize {
+    if index >= value.len() {
+        value.len()
+    } else {
+        let lower_bound = index.saturating_sub(3);
+        let new_index = value.as_bytes()[lower_bound..=index]
+            .iter()
+            .rposition(|b| is_utf8_char_boundary(*b));
+
+        // SAFETY: we know that the character boundary will be within four bytes
+        unsafe { lower_bound + new_index.unwrap_unchecked() }
+    }
+}
+
+pub fn ceil_char_boundary(value: &str, index: usize) -> usize {
+    let upper_bound = Ord::min(index + 4, value.len());
+    value.as_bytes()[index..upper_bound]
+        .iter()
+        .position(|b| is_utf8_char_boundary(*b))
+        .map_or(upper_bound, |pos| pos + index)
+}
+
 macro_rules! truncate_input_value {
     ($out:expr, $value:expr) => {
         if $value.len() > 50 {
             write!(
                 $out,
                 ", input_value={}...{}",
-                &$value[0..25],
-                &$value[$value.len() - 24..]
+                &$value[0..floor_char_boundary($value, 25)],
+                &$value[ceil_char_boundary($value, $value.len() - 24)..]
             )?;
         } else {
             write!($out, ", input_value={}", $value)?;
@@ -381,7 +416,7 @@ impl PyLineError {
         if !hide_input {
             let input_value = self.input_value.as_ref(py);
             let input_str = safe_repr(input_value);
-            truncate_input_value!(output, input_str);
+            truncate_input_value!(output, &input_str);
 
             if let Ok(type_) = input_value.get_type().name() {
                 write!(output, ", input_type={type_}")?;
