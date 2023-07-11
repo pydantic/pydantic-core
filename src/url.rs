@@ -448,33 +448,17 @@ impl FromPyObject<'_> for UrlHostParts {
 
 impl fmt::Display for UrlHostParts {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let _ = match self {
-            UrlHostParts {
-                username: Some(username),
-                password: None,
-                ..
-            } => write!(f, "{username}"),
-            UrlHostParts {
-                username: None,
-                password: Some(password),
-                ..
-            } => write!(f, ":{password}"),
-            UrlHostParts {
-                username: Some(username),
-                password: Some(password),
-                ..
-            } => write!(f, "{username}:{password}"),
-            UrlHostParts {
-                username: None,
-                password: None,
-                ..
-            } => Ok(()),
+        match (&self.username, &self.password) {
+            (Some(username), None) => write!(f, "{username}@")?,
+            (None, Some(password)) => write!(f, ":{password}@")?,
+            (Some(username), Some(password)) => write!(f, "{username}:{password}@")?,
+            (None, None) => {},
         };
-        if self.host.is_some() {
-            write!(f, "@{}", self.host.as_ref().unwrap())?;
+        if let Some(host) = &self.host {
+            write!(f, "{host}")?;
         }
-        if self.port.is_some() {
-            write!(f, ":{}", self.port.as_ref().unwrap())?;
+        if let Some(port) = self.port {
+            write!(f, ":{port}")?;
         }
         Ok(())
     }
