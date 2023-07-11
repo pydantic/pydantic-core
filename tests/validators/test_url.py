@@ -1221,7 +1221,7 @@ def test_url_deepcopy() -> None:
 def test_multi_url_build() -> None:
     url = MultiHostUrl.build(
         scheme='postgresql',
-        user='testuser',
+        username='testuser',
         password='testpassword',
         host='127.0.0.1',
         port=5432,
@@ -1233,7 +1233,7 @@ def test_multi_url_build() -> None:
     assert str(url) == 'postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test'
 
 
-@pytest.mark.parametrize('field', ['host', 'password', 'user', 'port'])
+@pytest.mark.parametrize('field', ['host', 'password', 'username', 'port'])
 def test_multi_url_build_hosts_set_with_single_value(field) -> None:
     """Hosts can't be provided with any single url values."""
     hosts = [
@@ -1277,7 +1277,7 @@ def test_multi_url_build_neither_host_and_hosts_set() -> None:
     with pytest.raises(ValueError):
         MultiHostUrl.build(
             scheme='postgresql',
-            user='testuser',
+            username='testuser',
             password='testpassword',
             port=5432,
             path='database',
@@ -1289,7 +1289,7 @@ def test_multi_url_build_neither_host_and_hosts_set() -> None:
 def test_url_build() -> None:
     url = Url.build(
         scheme='postgresql',
-        user='testuser',
+        username='testuser',
         password='testpassword',
         host='127.0.0.1',
         port=5432,
