@@ -215,7 +215,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         }
         // this is used to include `__pydantic_extra__` in serialization on models
         if let Some(extra_dict) = extra_dict {
-            for (key, value) in extra_dict.iter() {
+            for (key, value) in extra_dict {
                 if extra.exclude_none && value.is_none() {
                     continue;
                 }
@@ -297,7 +297,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         }
         // this is used to include `__pydantic_extra__` in serialization on models
         if let Some(extra_dict) = extra_dict {
-            for (key, value) in extra_dict.iter() {
+            for (key, value) in extra_dict {
                 if extra.exclude_none && value.is_none() {
                     continue;
                 }
