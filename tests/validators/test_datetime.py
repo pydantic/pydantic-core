@@ -1,5 +1,6 @@
 import copy
 import json
+import pickle
 import platform
 import re
 from datetime import date, datetime, time, timedelta, timezone, tzinfo
@@ -476,3 +477,14 @@ def test_tz_constraint_too_high():
 def test_tz_constraint_wrong():
     with pytest.raises(SchemaError, match="Input should be 'aware' or 'naive"):
         SchemaValidator(core_schema.datetime_schema(tz_constraint='wrong'))
+
+
+def test_tz_pickle() -> None:
+    """
+    https://github.com/pydantic/pydantic-core/issues/589
+    """
+    v = SchemaValidator(core_schema.datetime_schema())
+    original = datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone.utc)
+    validated = v.validate_python(original)
+    assert validated == original
+    assert pickle.loads(pickle.dumps(validated)) == validated == original

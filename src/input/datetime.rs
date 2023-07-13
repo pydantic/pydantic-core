@@ -1,9 +1,12 @@
 use pyo3::intern;
 use pyo3::prelude::*;
+use pyo3::pyclass::CompareOp;
 use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyTzInfo};
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 use speedate::{Date, DateTime, Duration, ParseError, Time, TimeConfig};
 use std::borrow::Cow;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use strum::EnumMessage;
 
 use crate::errors::{ErrorType, ValError, ValResult};
@@ -485,5 +488,21 @@ impl TzInfo {
 
     fn __deepcopy__(&self, py: Python, _memo: &PyDict) -> PyResult<Py<Self>> {
         Py::new(py, self.clone())
+    }
+
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyResult<bool> {
+        Ok(op.matches(self.seconds.cmp(&other.seconds)))
+    }
+
+    fn __hash__(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.seconds.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    pub fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
+        let args = (self.seconds,);
+        let cls = Py::new(py, self.clone())?.getattr(py, "__class__")?;
+        Ok((cls, args).into_py(py))
     }
 }
