@@ -1,4 +1,3 @@
-use crate::errors::{ErrorType, ValError, ValResult};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyTzInfo};
@@ -8,6 +7,7 @@ use std::borrow::Cow;
 use strum::EnumMessage;
 
 use super::Input;
+use crate::errors::{ErrorType, ValError, ValResult};
 
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub enum EitherDate<'a> {
@@ -54,7 +54,6 @@ impl<'a> EitherDate<'a> {
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
-#[derive(Clone)]
 pub enum EitherTime<'a> {
     Raw(Time),
     Py(&'a PyTime),
