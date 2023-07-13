@@ -449,7 +449,7 @@ pub fn float_as_duration<'a>(input: &'a impl Input<'a>, total_seconds: f64) -> V
 #[pyclass(module = "pydantic_core._pydantic_core", extends = PyTzInfo)]
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
-pub(crate) struct TzInfo {
+pub struct TzInfo {
     seconds: i32,
 }
 
