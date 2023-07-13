@@ -5,6 +5,7 @@ import platform
 import re
 from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from decimal import Decimal
+from typing import Dict
 
 import pytest
 import pytz
@@ -488,3 +489,27 @@ def test_tz_pickle() -> None:
     validated = v.validate_python('2022-06-08T12:13:14-12:15')
     assert validated == original
     assert pickle.loads(pickle.dumps(validated)) == validated == original
+
+
+def test_tz_hash() -> None:
+    v = SchemaValidator(core_schema.datetime_schema())
+    lookup: Dict[datetime, str] = {}
+    for day in range(1, 10):
+        input_str = f'2022-06-{day:02}T12:13:14-12:15'
+        validated = v.validate_python(input_str)
+        lookup[validated] = input_str
+
+    assert len(lookup) == 9
+    assert (
+        lookup[datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone(timedelta(hours=-12, minutes=-15)))]
+        == '2022-06-08T12:13:14-12:15'
+    )
+
+
+def test_tz_cmp() -> None:
+    v = SchemaValidator(core_schema.datetime_schema())
+    validated1 = v.validate_python('2022-06-08T12:13:14-12:15')
+    validated2 = v.validate_python('2022-06-08T12:13:14-12:14')
+
+    assert validated1 > validated2
+    assert validated2 < validated1
