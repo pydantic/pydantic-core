@@ -66,7 +66,7 @@ impl BuildValidator for ModelFieldsValidator {
         let fields_dict: &PyDict = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: Vec<Field> = Vec::with_capacity(fields_dict.len());
 
-        for (key, value) in fields_dict {
+        for (key, value) in fields_dict.iter() {
             let field_info: &PyDict = value.downcast()?;
             let field_name: &str = key.extract()?;
 
