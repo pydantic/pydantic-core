@@ -1,3 +1,4 @@
+use crate::errors::{ErrorType, ValError, ValResult};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyTzInfo};
@@ -5,8 +6,6 @@ use speedate::MicrosecondsPrecisionOverflowBehavior;
 use speedate::{Date, DateTime, Duration, ParseError, Time, TimeConfig};
 use std::borrow::Cow;
 use strum::EnumMessage;
-
-use crate::errors::{ErrorType, ValError, ValResult};
 
 use super::Input;
 
@@ -55,6 +54,7 @@ impl<'a> EitherDate<'a> {
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(Clone)]
 pub enum EitherTime<'a> {
     Raw(Time),
     Py(&'a PyTime),
@@ -272,8 +272,9 @@ pub fn bytes_as_time<'a>(
 ) -> ValResult<'a, EitherTime<'a>> {
     match Time::parse_bytes_with_config(
         bytes,
-        TimeConfig {
+        &TimeConfig {
             microseconds_precision_overflow_behavior: microseconds_overflow_behavior,
+            unix_timestamp_offset: Some(0),
         },
     ) {
         Ok(date) => Ok(date.into()),
@@ -293,8 +294,9 @@ pub fn bytes_as_datetime<'a, 'b>(
 ) -> ValResult<'a, EitherDateTime<'a>> {
     match DateTime::parse_bytes_with_config(
         bytes,
-        TimeConfig {
+        &TimeConfig {
             microseconds_precision_overflow_behavior: microseconds_overflow_behavior,
+            unix_timestamp_offset: Some(0),
         },
     ) {
         Ok(dt) => Ok(dt.into()),
@@ -312,7 +314,14 @@ pub fn int_as_datetime<'a>(
     timestamp: i64,
     timestamp_microseconds: u32,
 ) -> ValResult<EitherDateTime> {
-    match DateTime::from_timestamp(timestamp, timestamp_microseconds) {
+    match DateTime::from_timestamp_with_config(
+        timestamp,
+        timestamp_microseconds,
+        &TimeConfig {
+            unix_timestamp_offset: Some(0),
+            ..Default::default()
+        },
+    ) {
         Ok(dt) => Ok(dt.into()),
         Err(err) => Err(ValError::new(
             ErrorType::DatetimeParsing {
@@ -381,7 +390,14 @@ pub fn int_as_time<'a>(
         // ok
         t => t as u32,
     };
-    match Time::from_timestamp(time_timestamp, timestamp_microseconds) {
+    match Time::from_timestamp_with_config(
+        time_timestamp,
+        timestamp_microseconds,
+        &TimeConfig {
+            unix_timestamp_offset: Some(0),
+            ..Default::default()
+        },
+    ) {
         Ok(dt) => Ok(dt.into()),
         Err(err) => Err(ValError::new(
             ErrorType::TimeParsing {
@@ -415,8 +431,9 @@ pub fn bytes_as_timedelta<'a, 'b>(
 ) -> ValResult<'a, EitherTimedelta<'a>> {
     match Duration::parse_bytes_with_config(
         bytes,
-        TimeConfig {
+        &TimeConfig {
             microseconds_precision_overflow_behavior: microseconds_overflow_behavior,
+            unix_timestamp_offset: Some(0),
         },
     ) {
         Ok(dt) => Ok(dt.into()),
