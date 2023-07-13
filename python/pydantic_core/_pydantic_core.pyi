@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import decimal
 import sys
 from typing import Any, Callable, Generic, Optional, Type, TypeVar
@@ -43,6 +44,7 @@ __all__ = [
     'to_json',
     'to_jsonable_python',
     'list_all_errors',
+    'TzInfo',
 ]
 __version__: str
 build_profile: str
@@ -71,7 +73,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: Any = None,
+        context: 'dict[str, Any] | None' = None,
         self_instance: Any | None = None,
     ) -> Any: ...
     def isinstance_python(
@@ -80,7 +82,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: Any = None,
+        context: 'dict[str, Any] | None' = None,
         self_instance: Any | None = None,
     ) -> bool: ...
     def validate_json(
@@ -88,7 +90,7 @@ class SchemaValidator:
         input: str | bytes | bytearray,
         *,
         strict: bool | None = None,
-        context: Any = None,
+        context: 'dict[str, Any] | None' = None,
         self_instance: Any | None = None,
     ) -> Any: ...
     def validate_assignment(
@@ -99,7 +101,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: Any = None,
+        context: 'dict[str, Any] | None' = None,
     ) -> dict[str, Any] | tuple[dict[str, Any], dict[str, Any] | None, set[str]]:
         """
         ModelValidator and ModelFieldsValidator will return a tuple of (fields data, extra data, fields set)
@@ -326,3 +328,10 @@ def list_all_errors() -> list[ErrorTypeInfo]:
     """
     Get information about all built-in errors.
     """
+
+@final
+class TzInfo(datetime.tzinfo):
+    def tzname(self, _dt: datetime.datetime | None) -> str | None: ...
+    def utcoffset(self, _dt: datetime.datetime | None) -> datetime.timedelta: ...
+    def dst(self, _dt: datetime.datetime | None) -> datetime.timedelta: ...
+    def __deepcopy__(self, _memo: dict[Any, Any]) -> 'TzInfo': ...
