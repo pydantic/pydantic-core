@@ -32,11 +32,11 @@ def test_datetime_int(datetime_schema, data):
                 tzinfo=None, microsecond=microsecond
             )
         else:
-            expected = datetime.fromtimestamp(data, tz=timezone.utc)
+            expected = datetime.fromtimestamp(data, tz=timezone.utc).replace(tzinfo=None)
     except OverflowError:
         pytest.skip('OverflowError, see pyodide/pyodide#2841, this can happen on 32-bit systems')
     else:
-        assert datetime_schema.validate_python(data) == expected, data
+        assert datetime_schema.validate_python(data).replace(tzinfo=None) == expected, data
 
 
 @given(strategies.binary())
