@@ -24,7 +24,7 @@ mod url;
 mod validators;
 
 // required for benchmarks
-use self::input::TzInfo;
+pub use self::input::TzInfo;
 pub use self::url::{PyMultiHostUrl, PyUrl};
 pub use argument_markers::{ArgsKwargs, PydanticUndefinedType};
 pub use build_tools::SchemaError;
