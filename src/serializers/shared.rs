@@ -396,3 +396,15 @@ pub(super) fn dataclass_to_dict(dc: &PyAny) -> PyResult<&PyDict> {
     }
     Ok(dict)
 }
+
+pub(super) fn uuid_to_dict(dc: &PyAny) -> PyResult<&PyDict> {
+    let py = dc.py();
+    let dc_slots: &PyDict = dc.getattr(intern!(py, "__slots__"))?.downcast()?;
+    let dict = PyDict::new(py);
+
+    for (field_name, _) in dc_slots.iter() {
+        let field_name: &PyString = field_name.downcast()?;
+        dict.set_item(field_name, dc.getattr(field_name)?)?;
+    }
+    Ok(dict)
+}

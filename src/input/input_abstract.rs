@@ -1,5 +1,4 @@
 use std::fmt;
-use uuid::Uuid;
 
 use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*};

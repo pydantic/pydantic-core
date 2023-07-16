@@ -1,9 +1,8 @@
-use std::str::FromStr;
-
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyType};
+use uuid::Builder;
 use uuid::Uuid;
 
 use crate::build_tools::is_strict;
@@ -77,10 +76,7 @@ impl BuildValidator for UuidValidator {
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let version = match schema.get_as::<u8>(intern!(py, "version"))? {
-            Some(i) => Some(Version::from(i)),
-            None => None,
-        };
+        let version = schema.get_as::<u8>(intern!(py, "version"))?.map(Version::from);
         Ok(Self {
             strict: is_strict(schema, config)?,
             version,
@@ -110,7 +106,7 @@ impl Validator for UuidValidator {
             ))
         } else {
             let dc = create_class(class)?;
-            let uuid = self.validate(input)?;
+            let uuid = self.get_uuid(py, input)?;
             self.set_dict_call(py, dc.as_ref(py), &uuid)?;
             Ok(dc)
         }
@@ -119,9 +115,9 @@ impl Validator for UuidValidator {
     fn different_strict_behavior(
         &self,
         _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        _ultra_strict: bool,
+        ultra_strict: bool,
     ) -> bool {
-        false
+        !ultra_strict
     }
 
     fn get_name(&self) -> &str {
@@ -134,42 +130,53 @@ impl Validator for UuidValidator {
 }
 
 impl UuidValidator {
-    fn validate<'s, 'data>(&'s self, input: &'data impl Input<'data>) -> ValResult<'data, Uuid> {
-        let either_string = input.exact_str()?;
-        let cow = either_string.as_cow()?;
-        let uuid_str = cow.as_ref();
-        match Uuid::parse_str(uuid_str) {
-            Ok(uuid) => {
-                let v1 = uuid.get_version_num();
-                match self.version {
-                    Some(v2) => {
-                        let v2 = usize::from(v2);
-                        if v1 == v2 {
-                            Ok(uuid)
-                        } else {
-                            Err(ValError::new(
-                                ErrorType::UuidVersionMismatch {
-                                    version: v1,
-                                    schema_version: v2,
-                                },
-                                input,
-                            ))
-                        }
-                    }
-                    None => Ok(uuid),
+    fn get_uuid<'s, 'data>(&'s self, py: Python<'data>, input: &'data impl Input<'data>) -> ValResult<'data, Uuid> {
+        let uuid = match input.validate_str(false) {
+            Ok(either_string) => {
+                let cow = either_string.as_cow()?;
+                let uuid_str = cow.as_ref();
+                match Uuid::parse_str(uuid_str) {
+                    Ok(uuid) => uuid,
+                    Err(e) => return Err(ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input)),
                 }
             }
-            Err(e) => Err(ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input)),
+            Err(_) => match input.exact_int() {
+                Ok(either_int) => {
+                    let int = either_int.into_u128(py)?;
+                    Builder::from_u128(int).into_uuid()
+                }
+                Err(_) => return Err(ValError::new(ErrorType::UuidType, input)),
+            },
+        };
+        let v1 = uuid.get_version_num();
+        match self.version {
+            Some(v2) => {
+                let v2 = usize::from(v2);
+                if v1 == v2 {
+                    Ok(uuid)
+                } else {
+                    Err(ValError::new(
+                        ErrorType::UuidVersionMismatch {
+                            version: v1,
+                            schema_version: v2,
+                        },
+                        input,
+                    ))
+                }
+            }
+            None => Ok(uuid),
         }
     }
 
-    fn set_dict_call<'s, 'data>(&'s self, py: Python<'data>, dc: &PyAny, uuid: &Uuid) -> ValResult<'data, ()> {
-        // python convert uuid to integer
+    fn set_dict_call<'data>(&self, py: Python<'data>, dc: &PyAny, uuid: &Uuid) -> ValResult<'data, ()> {
+        // python uuid use integer
         let int = uuid.as_u128();
-        // is_safe wad added in python 3.7, 0 => safe, -1 => unsafe, None => unknown
-        let is_safe = 0;
+        let safe = py
+            .import(intern!(py, "uuid"))?
+            .getattr(intern!(py, "SafeUUID"))?
+            .get_item("safe")?;
         force_setattr(py, dc, intern!(py, UUID_INT), int)?;
-        force_setattr(py, dc, intern!(py, UUID_IS_SAFE), is_safe)?;
+        force_setattr(py, dc, intern!(py, UUID_IS_SAFE), safe)?;
         Ok(())
     }
 }

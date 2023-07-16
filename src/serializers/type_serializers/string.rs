@@ -36,7 +36,6 @@ impl TypeSerializer for StrSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        dbg!("to python");
         match extra.ob_type_lookup.is_type(value, ObType::Str) {
             IsType::Exact => Ok(value.into_py(py)),
             IsType::Subclass => match extra.mode {

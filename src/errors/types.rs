@@ -573,9 +573,9 @@ impl ErrorType {
             Self::UrlTooLong {..} => "URL should have at most {max_length} characters",
             Self::UrlScheme {..} => "URL scheme should be {expected_schemes}",
             Self::UuidExactType { .. } => "Input should be an instance of {class_name}",
-            Self::UuidType => "UUID input should be a string or UUID object",
+            Self::UuidType => "UUID input should be a string, bytes, integer or UUID object",
             Self::UuidParsing { .. } => "Input should be a valid UUID, {error}",
-            Self::UuidVersionMismatch { .. } => "UUID version {version} doest not match expected version: {schema_version}"
+            Self::UuidVersionMismatch { .. } => "UUID version {version} does not match expected version: {schema_version}"
 
         }
     }

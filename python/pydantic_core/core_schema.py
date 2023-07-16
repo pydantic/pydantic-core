@@ -73,7 +73,6 @@ class CoreConfig(TypedDict, total=False):
     # to construct error `loc`s, default True
     loc_by_alias: bool
     # whether instances of models and dataclasses (including subclass instances) should re-validate, default 'never'
-    # whether instances of models and dataclasses (including subclass instances) should re-validate, default 'never'
     revalidate_instances: Literal['always', 'never', 'subclass-instances']
     # whether to validate default values during validation, default False
     validate_default: bool
@@ -1204,6 +1203,7 @@ def callable_schema(
 class UuidSchema(TypedDict, total=False):
     type: Required[Literal['uuid']]
     version: Literal[1, 3, 4, 5]
+    strict: bool
     ref: str
     metadata: Any
     serialization: SerSchema
@@ -1212,11 +1212,14 @@ class UuidSchema(TypedDict, total=False):
 def uuid_schema(
     *,
     version: Literal[1, 3, 4, 5] | None = None,
+    strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
 ) -> UuidSchema:
-    return _dict_not_none(type='uuid', ref=ref, version=version, metadata=metadata, serialization=serialization)
+    return _dict_not_none(
+        type='uuid', version=version, strict=strict, ref=ref, metadata=metadata, serialization=serialization
+    )
 
 
 class IncExSeqSerSchema(TypedDict, total=False):
@@ -3720,7 +3723,6 @@ if not MYPY:
         IsInstanceSchema,
         IsSubclassSchema,
         CallableSchema,
-        UuidSchema,
         ListSchema,
         TuplePositionalSchema,
         TupleVariableSchema,
@@ -3752,6 +3754,7 @@ if not MYPY:
         MultiHostUrlSchema,
         DefinitionsSchema,
         DefinitionReferenceSchema,
+        UuidSchema,
     ]
 elif False:
     CoreSchema: TypeAlias = Mapping[str, Any]
@@ -3902,6 +3905,7 @@ ErrorType = Literal[
     'url_too_long',
     'url_scheme',
     'uuid_type',
+    'uuid_exact_type',
     'uuid_parsing',
     'uuid_version_mismatch',
 ]

@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::str::from_utf8;
-use uuid::Uuid;
 
 use pyo3::prelude::*;
 use pyo3::types::{
@@ -352,7 +351,6 @@ impl<'a> Input<'a> for PyAny {
             Err(ValError::new(ErrorType::FloatType, self))
         }
     }
-
     fn strict_dict(&'a self) -> ValResult<GenericMapping<'a>> {
         if let Ok(dict) = self.downcast::<PyDict>() {
             Ok(dict.into())

@@ -13,6 +13,7 @@ use serde::ser::{Error, Serialize, SerializeMap, SerializeSeq, Serializer};
 use crate::input::Int;
 use crate::serializers::errors::SERIALIZATION_ERR_MARKER;
 use crate::serializers::filter::SchemaFilter;
+use crate::serializers::shared::uuid_to_dict;
 use crate::serializers::shared::{PydanticSerializer, TypeSerializer};
 use crate::serializers::SchemaSerializer;
 use crate::tools::{extract_i64, py_err, safe_repr};
@@ -187,10 +188,7 @@ pub(crate) fn infer_to_python_known(
                 let py_url: PyMultiHostUrl = value.extract()?;
                 py_url.__str__().into_py(py)
             }
-            ObType::Uuid => {
-                let v = value.getattr(intern!(py, "value"))?;
-                infer_to_python(v, include, exclude, extra)?.into_py(py)
-            }
+            ObType::Uuid => serialize_dict(uuid_to_dict(value)?)?,
             ObType::PydanticSerializable => serialize_with_serializer()?,
             ObType::Dataclass => serialize_dict(dataclass_to_dict(value)?)?,
             ObType::Enum => {
@@ -487,6 +485,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             pydantic_serializer.serialize(serializer)
         }
         ObType::Dataclass => serialize_dict!(dataclass_to_dict(value).map_err(py_err_se_err)?),
+        ObType::Uuid => serialize_dict!(uuid_to_dict(value).map_err(py_err_se_err)?),
         ObType::Enum => {
             let v = value.getattr(intern!(value.py(), "value")).map_err(py_err_se_err)?;
             infer_serialize(v, serializer, include, exclude, extra)
@@ -506,10 +505,6 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 }
             }
             seq.end()
-        }
-        ObType::Uuid => {
-            let s = value.str().map_err(py_err_se_err)?.to_str().map_err(py_err_se_err)?;
-            serializer.serialize_str(s)
         }
         ObType::Path => {
             let s = value.str().map_err(py_err_se_err)?.to_str().map_err(py_err_se_err)?;

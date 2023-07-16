@@ -5,7 +5,6 @@ use std::slice::Iter as SliceIter;
 use std::str::FromStr;
 
 use num_bigint::BigInt;
-use uuid::Uuid;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
@@ -844,6 +843,27 @@ impl<'a> EitherInt<'a> {
                 Err(_) => Err(ValError::new(ErrorType::IntParsingSize, u.into_py(py).into_ref(py))),
             },
             EitherInt::BigInt(u) => match i64::try_from(u) {
+                Ok(u) => Ok(u),
+                Err(e) => Err(ValError::new(
+                    ErrorType::IntParsingSize,
+                    e.into_original().into_py(py).into_ref(py),
+                )),
+            },
+            EitherInt::Py(i) => i.extract().map_err(|_| ValError::new(ErrorType::IntParsingSize, i)),
+        }
+    }
+
+    pub fn into_u128(self, py: Python<'a>) -> ValResult<'a, u128> {
+        match self {
+            EitherInt::I64(i) => match u128::try_from(i) {
+                Ok(u) => Ok(u),
+                Err(_) => Err(ValError::new(ErrorType::IntParsingSize, i.into_py(py).into_ref(py))),
+            },
+            EitherInt::U64(u) => match u128::try_from(u) {
+                Ok(u) => Ok(u),
+                Err(_) => Err(ValError::new(ErrorType::IntParsingSize, u.into_py(py).into_ref(py))),
+            },
+            EitherInt::BigInt(u) => match u128::try_from(u) {
                 Ok(u) => Ok(u),
                 Err(e) => Err(ValError::new(
                     ErrorType::IntParsingSize,

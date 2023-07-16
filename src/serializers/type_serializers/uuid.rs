@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::PyDict;
+use pyo3::{intern, prelude::*};
 
 use crate::definitions::DefinitionsBuilder;
 
@@ -9,6 +9,20 @@ use super::{
     infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
     IsType, ObType, SerMode, TypeSerializer,
 };
+
+pub(crate) fn uuid_to_string(py_uuid: &PyAny) -> PyResult<String> {
+    let py = py_uuid.py();
+    let int: i128 = py_uuid.getattr(intern!(py, "int"))?.extract()?;
+    let hex = format!("{int:032x}");
+    Ok(format!(
+        "{}-{}-{}-{}-{}",
+        &hex[0..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    ))
+}
 
 #[derive(Debug, Clone)]
 pub struct UuidSerializer;
@@ -34,10 +48,9 @@ impl TypeSerializer for UuidSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        match extra.ob_type_lookup.is_type(value, ObType::Str) {
-            IsType::Exact => Ok(value.into_py(py)),
-            IsType::Subclass => match extra.mode {
-                SerMode::Json => Ok(value.extract::<&str>()?.into_py(py)),
+        match extra.ob_type_lookup.is_type(value, ObType::Uuid) {
+            IsType::Exact | IsType::Subclass => match extra.mode {
+                SerMode::Json => Ok(uuid_to_string(value)?.into_py(py)),
                 _ => Ok(value.into_py(py)),
             },
             IsType::False => {
@@ -48,11 +61,15 @@ impl TypeSerializer for UuidSerializer {
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
-        if let Ok(py_str) = key.downcast::<PyString>() {
-            Ok(py_str.to_string_lossy())
-        } else {
-            extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
-            infer_json_key(key, extra)
+        match extra.ob_type_lookup.is_type(key, ObType::Uuid) {
+            IsType::Exact | IsType::Subclass => {
+                let str = uuid_to_string(key)?;
+                Ok(Cow::Owned(str))
+            }
+            IsType::False => {
+                extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
+                infer_json_key(key, extra)
+            }
         }
     }
 
@@ -64,9 +81,12 @@ impl TypeSerializer for UuidSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        match value.downcast::<PyString>() {
-            Ok(py_str) => serialize_py_str(py_str, serializer),
-            Err(_) => {
+        match extra.ob_type_lookup.is_type(value, ObType::Uuid) {
+            IsType::Exact | IsType::Subclass => {
+                let s = uuid_to_string(value).map_err(py_err_se_err)?;
+                serializer.serialize_str(&s)
+            }
+            IsType::False => {
                 extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
                 infer_serialize(value, serializer, include, exclude, extra)
             }
@@ -76,9 +96,4 @@ impl TypeSerializer for UuidSerializer {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
-}
-
-pub fn serialize_py_str<S: serde::ser::Serializer>(py_str: &PyString, serializer: S) -> Result<S::Ok, S::Error> {
-    let s = py_str.to_str().map_err(py_err_se_err)?;
-    serializer.serialize_str(s)
 }
