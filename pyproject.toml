@@ -33,7 +33,8 @@ classifiers = [
     'Typing :: Typed',
 ]
 dependencies = [
-    'typing-extensions >=4.6.0,!=4.7.0'
+    'typing-extensions >=4.6.0,!=4.7.0',
+    'exceptiongroup == 1.1.2'
 ]
 dynamic = [
     'description',
