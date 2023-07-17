@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Any, List
+from uuid import UUID
 
 import pytest
 from dirty_equals import IsStr
@@ -667,6 +668,60 @@ class TestBenchmarkUnion:
                 assert True
 
         benchmark(validate_with_expected_error)
+
+
+class TestBenchmarkUUID:
+    @pytest.fixture(scope='class')
+    def core_validator(self):
+        class CoreModel:
+            __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
+
+        return SchemaValidator(
+            {
+                'type': 'model',
+                'cls': CoreModel,
+                'schema': {
+                    'type': 'model-fields',
+                    'fields': {'u': {'type': 'model-field', 'schema': {'type': 'uuid'}}},
+                },
+            }
+        )
+
+    @pytest.fixture(scope='class')
+    def uuid_raw(self):
+        return UUID('12345678-1234-5678-1234-567812345678')
+
+    @pytest.fixture(scope='class')
+    def uuid_str(self, uuid_raw):
+        return str(uuid_raw)
+
+    @pytest.fixture(scope='class')
+    def python_data_dict(self, uuid_raw):
+        return {'u': uuid_raw}
+
+    @pytest.fixture(scope='class')
+    def json_dict_data(self, uuid_str):
+        return json.dumps({'u': uuid_str})
+
+    @pytest.mark.benchmark(group='uuid model - python')
+    def test_core_python(self, core_validator, benchmark, python_data_dict):
+        benchmark(core_validator.validate_python, python_data_dict)
+
+    @pytest.mark.benchmark(group='uuid model - JSON')
+    def test_model_core_json(self, core_validator, benchmark, json_dict_data):
+        benchmark(core_validator.validate_json, json_dict_data)
+
+    @pytest.mark.benchmark(group='uuid uuid')
+    def test_core_raw(self, benchmark, uuid_raw):
+        v = SchemaValidator({'type': 'uuid'})
+
+        benchmark(v.validate_python, uuid_raw)
+
+    @pytest.mark.benchmark(group='uuid str')
+    def test_core_str(self, benchmark, uuid_str):
+        v = SchemaValidator({'type': 'uuid'})
+
+        benchmark(v.validate_python, uuid_str)
 
 
 @pytest.mark.benchmark(group='raise-error')
