@@ -619,8 +619,8 @@ def test_model_field_before_validator() -> None:
     def f(input_value: Any, info: core_schema.FieldValidationInfo) -> Any:
         assert info.field_name == 'x'
         assert info.data == {}
-        assert repr(info) == "ValidationInfo(config=None, context=None, data={}, field_name='x')"
-        assert str(info) == "ValidationInfo(config=None, context=None, data={}, field_name='x')"
+        assert repr(info) == "FieldValidationInfo(config=None, context=None, data={}, field_name='x')"
+        assert str(info) == "FieldValidationInfo(config=None, context=None, data={}, field_name='x')"
         assert isinstance(input_value, bytes)
         return f'input: {input_value.decode()}'
 
