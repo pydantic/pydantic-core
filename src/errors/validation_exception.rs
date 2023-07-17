@@ -62,32 +62,31 @@ impl ValidationError {
                     None => raw_errors.into_iter().map(|e| e.into_py(py)).collect(),
                 };
 
-                let mut user_py_errs = Vec::new();
-                for line_error in &line_errors {
-                    let err = match &line_error.error_type {
-                        ErrorType::AssertionError { error: Some(error) } => Some(error.as_ref(py)),
-                        ErrorType::ValueError { error: Some(error) } => Some(error.as_ref(py)),
-                        _ => None,
-                    };
-                    if let Some(err) = err {
-                        let wrapped =
-                            PyUserWarning::new_err((format!("CAUSE OF: {}", line_error.location).into_py(py),));
-                        wrapped.set_cause(py, Some(PyErr::from_value(err)));
-                        user_py_errs.push(wrapped);
+                // Exception group only supported 3.11 and later:
+                #[cfg(not(Py_3_11))]
+                let cause = None;
+                #[cfg(Py_3_11)]
+                let cause = {
+                    let mut user_py_errs = vec![];
+                    for line_error in &line_errors {
+                        let err = match &line_error.error_type {
+                            ErrorType::AssertionError { error: Some(error) } => Some(error.as_ref(py)),
+                            ErrorType::ValueError { error: Some(error) } => Some(error.as_ref(py)),
+                            _ => None,
+                        };
+                        if let Some(err) = err {
+                            let wrapped =
+                                PyUserWarning::new_err((format!("CAUSE OF: {}", line_error.location).into_py(py),));
+                            wrapped.set_cause(py, Some(PyErr::from_value(err)));
+                            user_py_errs.push(wrapped);
+                        }
                     }
-                }
 
-                let cause = if user_py_errs.is_empty() {
-                    None
-                } else {
-                    Some(PyErr::from_value(
-                        py.import("exceptiongroup")
-                            .unwrap()
-                            .getattr("ExceptionGroup")
-                            .unwrap()
-                            .call1(("CUSTOM VALIDATION CAUSES", user_py_errs))
-                            .unwrap(),
-                    ))
+                    if user_py_errs.is_empty() {
+                        None
+                    } else {
+                        Some(PyBaseExceptionGroup::new_err(("msg", user_py_errs)))
+                    }
                 };
 
                 let validation_error = Self::new(line_errors, title, error_mode, hide_input);
