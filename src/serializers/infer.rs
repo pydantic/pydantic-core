@@ -587,6 +587,11 @@ pub(crate) fn infer_json_key_known<'py>(ob_type: &ObType, key: &'py PyAny, extra
             let iso_time = super::type_serializers::datetime_etc::time_to_string(py_time)?;
             Ok(Cow::Owned(iso_time))
         }
+        ObType::Uuid => {
+            let py_uuid: &PyAny = key.downcast()?;
+            let uuid = super::type_serializers::uuid::uuid_to_string(py_uuid)?;
+            Ok(Cow::Owned(uuid))
+        }
         ObType::Timedelta => {
             let py_timedelta: &PyDelta = key.downcast()?;
             extra.config.timedelta_mode.json_key(py_timedelta)
@@ -619,7 +624,7 @@ pub(crate) fn infer_json_key_known<'py>(ob_type: &ObType, key: &'py PyAny, extra
             let k = key.getattr(intern!(key.py(), "value"))?;
             infer_json_key(k, extra)
         }
-        ObType::Path | ObType::Uuid => Ok(key.str()?.to_string_lossy()),
+        ObType::Path => Ok(key.str()?.to_string_lossy()),
         ObType::Unknown => {
             if let Some(fallback) = extra.fallback {
                 let next_key = fallback.call1((key,))?;
