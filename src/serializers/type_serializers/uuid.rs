@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
+use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pyo3::{intern, prelude::*};
 
 use crate::definitions::DefinitionsBuilder;
 
@@ -11,17 +11,7 @@ use super::{
 };
 
 pub(crate) fn uuid_to_string(py_uuid: &PyAny) -> PyResult<String> {
-    let py = py_uuid.py();
-    let int: i128 = py_uuid.getattr(intern!(py, "int"))?.extract()?;
-    let hex = format!("{int:032x}");
-    Ok(format!(
-        "{}-{}-{}-{}-{}",
-        &hex[0..8],
-        &hex[8..12],
-        &hex[12..16],
-        &hex[16..20],
-        &hex[20..]
-    ))
+    Ok(py_uuid.str()?.to_string())
 }
 
 #[derive(Debug, Clone)]

@@ -148,28 +148,30 @@ impl UuidValidator {
                 Err(_) => return Err(ValError::new(ErrorType::UuidType, input)),
             },
         };
-        let v1 = uuid.get_version_num();
-        match self.version {
-            Some(v2) => {
-                let v2 = usize::from(v2);
-                if v1 == v2 {
-                    Ok(uuid)
-                } else {
-                    Err(ValError::new(
-                        ErrorType::UuidVersionMismatch {
-                            version: v1,
-                            schema_version: v2,
-                        },
-                        input,
-                    ))
-                }
+        if let Some(expected_version) = self.version {
+            let v1 = uuid.get_version_num();
+            let expected_version = usize::from(expected_version);
+            if v1 != expected_version {
+                return Err(ValError::new(
+                    ErrorType::UuidVersionMismatch {
+                        version: v1,
+                        schema_version: expected_version,
+                    },
+                    input,
+                ));
             }
-            None => Ok(uuid),
         }
+
+        Ok(uuid)
     }
 
+    /// Sets the attributes in a Python dictionary object (`dc`) to represent a UUID.
+    /// The function converts the UUID to a u128 integer and sets the corresponding attributes
+    /// in the dictionary object to the converted value and a 'safe' flag.
+    ///
+    /// This implementation does not use the Python `__init__` function to speed up the process,
+    /// as the `__init__` function in the Python `uuid` module performs extensive checks.
     fn set_dict_call<'data>(&self, py: Python<'data>, dc: &PyAny, uuid: &Uuid) -> ValResult<'data, ()> {
-        // python uuid use integer
         let int = uuid.as_u128();
         let safe = py
             .import(intern!(py, "uuid"))?

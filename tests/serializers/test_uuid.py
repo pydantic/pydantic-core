@@ -50,7 +50,7 @@ def test_uuid_json(value, expected):
     assert v.to_json(value).decode() == f'"{expected}"'
 
 
-def test_any_datetime_key():
+def test_any_uuid_key():
     v = SchemaSerializer(core_schema.dict_schema())
     input_value = {UUID('12345678-1234-1234-1234-567812345678'): 1}
 
