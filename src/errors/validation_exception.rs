@@ -62,53 +62,17 @@ impl ValidationError {
                     None => raw_errors.into_iter().map(|e| e.into_py(py)).collect(),
                 };
 
-                // Exception group only supported 3.11 and later:
-                #[cfg(not(Py_3_11))]
-                let cause = None;
-
-                #[cfg(Py_3_11)]
-                let cause = {
-                    use pyo3::exceptions::{PyBaseExceptionGroup, PyUserWarning};
-
-                    let mut user_py_errs: Vec<PyErr> = vec![];
-                    for line_error in &line_errors {
-                        if let ErrorType::AssertionError { error: Some(err) }
-                        | ErrorType::ValueError { error: Some(err) } = &line_error.error_type
-                        {
-                            // Would be better to switch to add_note() instead of the extra exception,
-                            // but not currently implemented by pyo3, seems like it could be done:
-                            // See line 201 https://github.com/python/cpython/blob/main/Objects/exceptions.c
-                            let wrapped = PyUserWarning::new_err(format!(
-                                "Cause of ValidationError loc:  '{}'",
-                                if let Location::Empty = &line_error.location {
-                                    "body".to_string()
-                                } else {
-                                    let loc = line_error.location.to_string();
-                                    loc.trim().to_string()
-                                }
-                            ));
-                            wrapped.set_cause(py, Some(PyErr::from_value(err.as_ref(py))));
-                            user_py_errs.push(wrapped);
-                        }
-                    }
-
-                    if user_py_errs.is_empty() {
-                        None
-                    } else {
-                        Some(PyBaseExceptionGroup::new_err((
-                            "Pydantic User Code Exceptions",
-                            user_py_errs,
-                        )))
-                    }
-                };
-
                 let validation_error = Self::new(line_errors, title, error_mode, hide_input);
                 match Py::new(py, validation_error) {
                     Ok(err) => {
-                        let py_err = PyErr::from_value(err.into_ref(py));
-                        if cause.is_some() {
-                            py_err.set_cause(py, cause);
-                        };
+                        let py_err = PyErr::from_value(err.as_ref(py));
+
+                        #[cfg(any(Py_3_11, Py_3_12))]
+                        {
+                            let borrowed = err.borrow(py);
+                            borrowed.maybe_add_cause(py, &py_err);
+                        }
+
                         py_err
                     }
                     Err(err) => err,
@@ -117,6 +81,45 @@ impl ValidationError {
             ValError::InternalErr(err) => err,
             ValError::Omit => Self::omit_error(),
             ValError::UseDefault => Self::use_default_error(),
+        }
+    }
+
+    // Exception group only supported 3.11 and later:
+    #[cfg(any(Py_3_11, Py_3_12))]
+    fn maybe_add_cause(&self, py: Python, py_err: &PyErr) {
+        use pyo3::exceptions::{PyBaseExceptionGroup, PyUserWarning};
+
+        let mut user_py_errs: Vec<PyErr> = vec![];
+        for line_error in &self.line_errors {
+            if let ErrorType::AssertionError { error: Some(err) } | ErrorType::ValueError { error: Some(err) } =
+                &line_error.error_type
+            {
+                // Would be better to switch to add_note() instead of the extra exception,
+                // but not currently implemented by pyo3, seems like it could be done:
+                // See line 201 https://github.com/python/cpython/blob/main/Objects/exceptions.c
+                let wrapped = PyUserWarning::new_err(format!(
+                    "Cause of ValidationError loc:  '{}'",
+                    if let Location::Empty = &line_error.location {
+                        "body".to_string()
+                    } else {
+                        let loc = line_error.location.to_string();
+                        loc.trim().to_string()
+                    }
+                ));
+                wrapped.set_cause(py, Some(PyErr::from_value(err.as_ref(py))));
+                user_py_errs.push(wrapped);
+            }
+        }
+
+        // Only add the cause if there are actualy python user exceptions to show:
+        if !user_py_errs.is_empty() {
+            py_err.set_cause(
+                py,
+                Some(PyBaseExceptionGroup::new_err((
+                    "Pydantic User Code Exceptions",
+                    user_py_errs,
+                ))),
+            );
         }
     }
 
