@@ -65,19 +65,29 @@ impl ValidationError {
                 // Exception group only supported 3.11 and later:
                 #[cfg(not(Py_3_11))]
                 let cause = None;
+
                 #[cfg(Py_3_11)]
                 let cause = {
-                    let mut user_py_errs = vec![];
+                    use pyo3::exceptions::{PyBaseExceptionGroup, PyUserWarning};
+
+                    let mut user_py_errs: Vec<PyErr> = vec![];
                     for line_error in &line_errors {
-                        let err = match &line_error.error_type {
-                            ErrorType::AssertionError { error: Some(error) } => Some(error.as_ref(py)),
-                            ErrorType::ValueError { error: Some(error) } => Some(error.as_ref(py)),
-                            _ => None,
-                        };
-                        if let Some(err) = err {
-                            let wrapped =
-                                PyUserWarning::new_err((format!("CAUSE OF: {}", line_error.location).into_py(py),));
-                            wrapped.set_cause(py, Some(PyErr::from_value(err)));
+                        if let ErrorType::AssertionError { error: Some(err) }
+                        | ErrorType::ValueError { error: Some(err) } = &line_error.error_type
+                        {
+                            // Would be better to switch to add_note() instead of the extra exception,
+                            // but not currently implemented by pyo3, seems like it could be done:
+                            // See line 201 https://github.com/python/cpython/blob/main/Objects/exceptions.c
+                            let wrapped = PyUserWarning::new_err(format!(
+                                "Cause of ValidationError loc:  '{}'",
+                                if let Location::Empty = &line_error.location {
+                                    "body".to_string()
+                                } else {
+                                    let loc = line_error.location.to_string();
+                                    loc.trim().to_string()
+                                }
+                            ));
+                            wrapped.set_cause(py, Some(PyErr::from_value(err.as_ref(py))));
                             user_py_errs.push(wrapped);
                         }
                     }
@@ -85,7 +95,10 @@ impl ValidationError {
                     if user_py_errs.is_empty() {
                         None
                     } else {
-                        Some(PyBaseExceptionGroup::new_err(("msg", user_py_errs)))
+                        Some(PyBaseExceptionGroup::new_err((
+                            "Pydantic User Code Exceptions",
+                            user_py_errs,
+                        )))
                     }
                 };
 
