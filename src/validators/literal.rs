@@ -96,7 +96,6 @@ impl<T: Clone + Debug> LiteralLookup<T> {
         py: Python<'data>,
         input: &'data I,
     ) -> ValResult<'data, Option<(&'data I, &T)>> {
-        // dbg!(input.to_object(py).as_ref(py).repr().unwrap());
         if let Some(expected_bool) = &self.expected_bool {
             if let Ok(bool_value) = input.strict_bool() {
                 if bool_value {
