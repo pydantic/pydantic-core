@@ -100,10 +100,8 @@ impl Validator for UuidValidator {
                 input,
             ))
         } else {
-            let dc = create_class(class)?;
             let uuid = self.get_uuid(py, input)?;
-            self.create_py_uuid(py, dc.as_ref(py), &uuid)?;
-            Ok(dc)
+            self.create_py_uuid(py, class, &uuid)
         }
     }
 
@@ -157,13 +155,16 @@ impl UuidValidator {
         Ok(uuid)
     }
 
-    /// Sets the attributes in a Python dictionary object (`dc`) to represent a UUID.
-    /// The function converts the UUID to a u128 integer and sets the corresponding attributes
-    /// in the dictionary object to the converted value and a 'safe' flag.
+    /// Sets the attributes in a Python type object (`py_type`) to represent a UUID class.
+    /// The function creates the python class and converts the UUID to a u128 integer and
+    /// sets the corresponding attributes in the dictionary object to the converted value
+    /// and a 'safe' flag.
     ///
     /// This implementation does not use the Python `__init__` function to speed up the process,
     /// as the `__init__` function in the Python `uuid` module performs extensive checks.
-    fn create_py_uuid<'data>(&self, py: Python<'data>, dc: &PyAny, uuid: &Uuid) -> ValResult<'data, ()> {
+    fn create_py_uuid<'py>(&self, py: Python<'py>, py_type: &PyType, uuid: &Uuid) -> ValResult<'py, Py<PyAny>> {
+        let class = create_class(py_type)?;
+        let dc = class.as_ref(py);
         let int = uuid.as_u128();
         let safe = py
             .import(intern!(py, "uuid"))?
@@ -171,6 +172,6 @@ impl UuidValidator {
             .get_item("safe")?;
         force_setattr(py, dc, intern!(py, UUID_INT), int)?;
         force_setattr(py, dc, intern!(py, UUID_IS_SAFE), safe)?;
-        Ok(())
+        Ok(dc.to_object(py))
     }
 }

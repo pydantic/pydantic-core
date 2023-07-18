@@ -25,6 +25,8 @@ from ..conftest import Err, PyAndJson
         ('c0a8f9a8-aa5e-482b-a067-9cb3a51f5c11', UUID('c0a8f9a8-aa5e-482b-a067-9cb3a51f5c11')),
         (b'\x12\x34\x56\x78' * 4, UUID('12345678-1234-5678-1234-567812345678')),
         (b'\x00\x00\x00\x00' * 4, UUID('00000000-0000-0000-0000-000000000000')),
+        (UUID('12345678-1234-5678-1234-567812345678'), UUID('12345678-1234-5678-1234-567812345678')),
+        (UUID('550e8400-e29b-41d4-a716-446655440000'), UUID('550e8400-e29b-41d4-a716-446655440000')),
         # Invalid UUIDs
         (
             'not-a-valid-uuid',
@@ -67,6 +69,8 @@ from ..conftest import Err, PyAndJson
             'c0a8f9a8-aa5e-482b-a067-9cb3a51f5c1',
             Err('Input should be a valid UUID, invalid group length in group 4: expected 12, found 11'),
         ),
+        (0xA1A2A3A4B1B2C1C2D1D2D3D4D5D6D7D8, Err('UUID input should be a string, bytes or UUID object')),
+        (00000000000000000000000000, Err('UUID input should be a string, bytes or UUID object')),
     ],
 )
 def test_uuid(input_value, expected):
@@ -78,6 +82,7 @@ def test_uuid(input_value, expected):
     else:
         output = v.validate_python(input_value)
         assert output == expected
+        assert isinstance(output, UUID)
 
 
 @pytest.mark.parametrize(
@@ -97,6 +102,7 @@ def test_uuid_strict(input_value, expected):
     else:
         output = v.validate_python(input_value)
         assert output == expected
+        assert isinstance(output, UUID)
 
 
 @pytest.mark.parametrize(
@@ -122,6 +128,7 @@ def test_uuid_version(input_value, version, expected):
     else:
         output = v.validate_python(input_value)
         assert output == expected
+        assert isinstance(output, UUID)
 
 
 @pytest.mark.parametrize(
@@ -148,6 +155,7 @@ def test_uuid_json(py_and_json: PyAndJson, input_value, expected):
     else:
         output = v.validate_test(input_value)
         assert output == expected
+        assert isinstance(output, UUID)
 
 
 def test_uuid_deepcopy():
@@ -155,6 +163,7 @@ def test_uuid_deepcopy():
     c = copy.deepcopy(output)
     assert repr(output) == "UUID('a6cc5730-2261-11ee-9c43-2eb5a363657c')"
     assert c == output
+    assert isinstance(output, UUID)
 
 
 def test_uuid_copy():
@@ -162,3 +171,4 @@ def test_uuid_copy():
     c = copy.copy(output)
     assert repr(output) == "UUID('a6cc5730-2261-11ee-9c43-2eb5a363657c')"
     assert c == output
+    assert isinstance(output, UUID)
