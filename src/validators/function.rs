@@ -478,12 +478,12 @@ impl AssignmentValidatorCallable {
 }
 
 macro_rules! py_err_string {
-    ($error_value:expr, $type_member:ident, $input:ident) => {
+    ($py:expr, $py_err:expr, $error_value:expr, $type_member:ident, $input:ident) => {
         match $error_value.str() {
             Ok(py_string) => match py_string.to_str() {
                 Ok(_) => ValError::new(
                     ErrorType::$type_member {
-                        error: Some($error_value.into()),
+                        error: Some(py_err_to_py_object($py, $py_err)),
                         context: None,
                     },
                     $input,
@@ -495,21 +495,34 @@ macro_rules! py_err_string {
     };
 }
 
+// PyErr.into_py(py) seems to drop the traceback of the error, without a seemingly clean solve
+// this func reattaches the traceback to the PyObject during the conversion
+pub fn py_err_to_py_object(py: Python, py_err: PyErr) -> PyObject {
+    let tb = py_err.traceback(py);
+    let err_py_obj: PyObject = py_err.value(py).into_py(py);
+    if let Some(tb) = tb {
+        // Ignore the result to prevent an unwrap if the traceback can't be set for some reason
+        let _ = err_py_obj.setattr(py, "__traceback__", tb);
+    };
+    err_py_obj
+}
+
 /// Only `ValueError` (including `PydanticCustomError` and `ValidationError`) and `AssertionError` are considered
 /// as validation errors, `TypeError` is now considered as a runtime error to catch errors in function signatures
 pub fn convert_err<'a>(py: Python<'a>, err: PyErr, input: &'a impl Input<'a>) -> ValError<'a> {
     if err.is_instance_of::<PyValueError>(py) {
-        if let Ok(pydantic_value_error) = err.value(py).extract::<PydanticCustomError>() {
+        let error_value = err.value(py);
+        if let Ok(pydantic_value_error) = error_value.extract::<PydanticCustomError>() {
             pydantic_value_error.into_val_error(input)
-        } else if let Ok(pydantic_error_type) = err.value(py).extract::<PydanticKnownError>() {
+        } else if let Ok(pydantic_error_type) = error_value.extract::<PydanticKnownError>() {
             pydantic_error_type.into_val_error(input)
         } else if let Ok(validation_error) = err.value(py).extract::<ValidationError>() {
             validation_error.into_val_error(py)
         } else {
-            py_err_string!(err.value(py), ValueError, input)
+            py_err_string!(py, err, error_value, ValueError, input)
         }
     } else if err.is_instance_of::<PyAssertionError>(py) {
-        py_err_string!(err.value(py), AssertionError, input)
+        py_err_string!(py, err, err.value(py), AssertionError, input)
     } else if err.is_instance_of::<PydanticOmit>(py) {
         ValError::Omit
     } else if err.is_instance_of::<PydanticUseDefault>(py) {

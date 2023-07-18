@@ -1,4 +1,5 @@
 import re
+import sys
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -515,6 +516,74 @@ def test_all_errors():
         literal = ''.join(f'\n    {e!r},' for e in error_types)
         print(f'python code (end of python/pydantic_core/core_schema.py):\n\nErrorType = Literal[{literal}\n]')
         pytest.fail('core_schema.ErrorType needs to be updated')
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 11), reason='Exception groups / python error tracebacks supported only 3.11 & higher'
+)
+def test_python_err_cause_tracebacks():
+    # Important to test a singular as well as a multi,
+    # because the singular originally had problems with losing the traceback
+    def singular_raise_py_error(v: Any) -> Any:
+        raise ValueError('Oh no!')
+
+    s1 = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error))
+    with pytest.raises(ValidationError) as exc_info:
+        s1.validate_python('anything')
+
+    assert isinstance(exc_info.value.__cause__, ExceptionGroup)
+    assert len(exc_info.value.__cause__.exceptions) == 1
+    assert repr(exc_info.value.__cause__.exceptions[0]) == repr(ValueError('Oh no!'))
+    assert exc_info.value.__cause__.exceptions[0].__traceback__ is not None
+
+    def multi_raise_py_error(v: Any) -> Any:
+        try:
+            raise AssertionError('Wrong')
+        except AssertionError as e:
+            raise ValueError('Oh no!') from e
+
+    s2 = SchemaValidator(core_schema.no_info_plain_validator_function(multi_raise_py_error))
+    with pytest.raises(ValidationError) as exc_info:
+        s2.validate_python('anything')
+
+    def validate_s2_chain(val_err: ValidationError):
+        cause_group = val_err.__cause__
+        assert isinstance(cause_group, ExceptionGroup)
+        assert len(cause_group.exceptions) == 1
+
+        cause = cause_group.exceptions[0]
+        assert repr(cause) == repr(ValueError('Oh no!'))
+        assert cause.__traceback__ is not None
+        assert cause.__notes__
+        assert cause.__notes__[-1].startswith('\nPydantic: ')
+
+        sub_cause = cause.__cause__
+        assert repr(sub_cause) == repr(AssertionError('Wrong'))
+        assert sub_cause.__cause__ is None
+        assert sub_cause.__traceback__ is not None
+
+    validate_s2_chain(exc_info.value)
+
+    # Edge case: make sure a deep inner ValidationError(s) causing a validator failure doesn't cause any problems:
+    def outer_raise_py_error(v: Any) -> Any:
+        try:
+            s2.validate_python('anything')
+        except ValidationError as e:
+            raise ValueError('Sub val failure') from e
+
+    s3 = SchemaValidator(core_schema.no_info_plain_validator_function(outer_raise_py_error))
+    with pytest.raises(ValidationError) as exc_info:
+        s3.validate_python('anything')
+
+    assert isinstance(exc_info.value.__cause__, ExceptionGroup)
+    assert len(exc_info.value.__cause__.exceptions) == 1
+    cause = exc_info.value.__cause__.exceptions[0]
+    assert cause.__notes__
+    assert cause.__notes__[-1].startswith('\nPydantic: ')
+    assert repr(cause) == repr(ValueError('Sub val failure'))
+    subcause = cause.__cause__
+    assert isinstance(subcause, ValidationError)
+    validate_s2_chain(subcause)
 
 
 class BadRepr:
