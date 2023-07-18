@@ -1,8 +1,8 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
+use pyo3::types::PyBytes;
 use pyo3::types::{PyDict, PyType};
-use uuid::Builder;
 use uuid::Uuid;
 
 use crate::build_tools::is_strict;
@@ -32,20 +32,15 @@ fn get_uuid_type(py: Python) -> PyResult<&PyType> {
 
 #[derive(Debug, Clone, Copy)]
 enum Version {
-    UUIDv1,
-    UUIDv3,
-    UUIDv4,
-    UUIDv5,
+    UUIDv1 = 1,
+    UUIDv3 = 3,
+    UUIDv4 = 4,
+    UUIDv5 = 5,
 }
 
 impl From<Version> for usize {
     fn from(v: Version) -> Self {
-        match v {
-            Version::UUIDv1 => 1,
-            Version::UUIDv3 => 3,
-            Version::UUIDv4 => 4,
-            Version::UUIDv5 => 5,
-        }
+        v as usize
     }
 }
 
@@ -107,7 +102,7 @@ impl Validator for UuidValidator {
         } else {
             let dc = create_class(class)?;
             let uuid = self.get_uuid(py, input)?;
-            self.set_dict_call(py, dc.as_ref(py), &uuid)?;
+            self.create_py_uuid(py, dc.as_ref(py), &uuid)?;
             Ok(dc)
         }
     }
@@ -131,23 +126,20 @@ impl Validator for UuidValidator {
 
 impl UuidValidator {
     fn get_uuid<'s, 'data>(&'s self, py: Python<'data>, input: &'data impl Input<'data>) -> ValResult<'data, Uuid> {
-        let uuid = match input.validate_str(false) {
-            Ok(either_string) => {
-                let cow = either_string.as_cow()?;
-                let uuid_str = cow.as_ref();
-                match Uuid::parse_str(uuid_str) {
-                    Ok(uuid) => uuid,
-                    Err(e) => return Err(ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input)),
-                }
-            }
-            Err(_) => match input.exact_int() {
-                Ok(either_int) => {
-                    let int = either_int.into_u128(py)?;
-                    Builder::from_u128(int).into_uuid()
-                }
-                Err(_) => return Err(ValError::new(ErrorType::UuidType, input)),
-            },
+        let uuid = if let Ok(either_string) = input.exact_str() {
+            let cow = either_string.as_cow()?;
+            let uuid_str = cow.as_ref();
+            Uuid::parse_str(uuid_str)
+                .map_err(|e| ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input))?
+        } else if let Ok(either_bytes) = input.validate_bytes(true) {
+            let py_object = either_bytes.into_py(py);
+            let py_bytes = py_object.downcast::<PyBytes>(py)?;
+            Uuid::from_slice(py_bytes.as_bytes())
+                .map_err(|e| ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input))?
+        } else {
+            return Err(ValError::new(ErrorType::UuidType, input));
         };
+
         if let Some(expected_version) = self.version {
             let v1 = uuid.get_version_num();
             let expected_version = usize::from(expected_version);
@@ -171,7 +163,7 @@ impl UuidValidator {
     ///
     /// This implementation does not use the Python `__init__` function to speed up the process,
     /// as the `__init__` function in the Python `uuid` module performs extensive checks.
-    fn set_dict_call<'data>(&self, py: Python<'data>, dc: &PyAny, uuid: &Uuid) -> ValResult<'data, ()> {
+    fn create_py_uuid<'data>(&self, py: Python<'data>, dc: &PyAny, uuid: &Uuid) -> ValResult<'data, ()> {
         let int = uuid.as_u128();
         let safe = py
             .import(intern!(py, "uuid"))?

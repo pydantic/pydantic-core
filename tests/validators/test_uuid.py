@@ -23,6 +23,8 @@ from ..conftest import Err, PyAndJson
         ('6ba7b810-9dad-11d1-80b4-00c04fd430c8', UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')),
         ('886313e1-3b8a-5372-9b90-0c9aee199e5d', UUID('886313e1-3b8a-5372-9b90-0c9aee199e5d')),
         ('c0a8f9a8-aa5e-482b-a067-9cb3a51f5c11', UUID('c0a8f9a8-aa5e-482b-a067-9cb3a51f5c11')),
+        (b'\x12\x34\x56\x78' * 4, UUID('12345678-1234-5678-1234-567812345678')),
+        (b'\x00\x00\x00\x00' * 4, UUID('00000000-0000-0000-0000-000000000000')),
         # Invalid UUIDs
         (
             'not-a-valid-uuid',
@@ -39,6 +41,7 @@ from ..conftest import Err, PyAndJson
             '12345678-1234-1234-1234-1234567890123',
             Err('Input should be a valid UUID, invalid group length in group 4: expected 12, found 13'),
         ),
+        (b'\x00\x00\x00\x000' * 4, Err('Input should be a valid UUID, invalid length: expected 16 bytes, found 20')),
         ('550e8400-e29b-41d4-a716', Err('Input should be a valid UUID, invalid group count: expected 5, found 4')),
         (
             'f47ac10b-58cc-4372-a567-0e02b2c3d47',
@@ -80,9 +83,9 @@ def test_uuid(input_value, expected):
 @pytest.mark.parametrize(
     'input_value,expected',
     [
-        (UUID('12345678-1234-1234-1234-567812345678'), UUID('12345678-1234-1234-1234-567812345678')),
-        ('12345678-1234-1234-1234-567812345678', Err('Input should be an instance of uuid [type=uuid_exact_type,')),
-        (b'12345678-1234-1234-1234-567812345678', Err('Input should be an instance of uuid [type=uuid_exact_type,')),
+        (UUID('12345678-1234-5678-1234-567812345678'), UUID('12345678-1234-5678-1234-567812345678')),
+        ('12345678-1234-5678-1234-567812345678', Err('Input should be an instance of uuid [type=uuid_exact_type,')),
+        (b'12345678-1234-5678-1234-567812345678', Err('Input should be an instance of uuid [type=uuid_exact_type,')),
         (1654646400, Err('Input should be an instance of uuid [type=uuid_exact_type')),
     ],
 )
@@ -125,16 +128,16 @@ def test_uuid_version(input_value, version, expected):
     'input_value,expected',
     [
         ('a6cc5730-2261-11ee-9c43-2eb5a363657c', UUID('a6cc5730-2261-11ee-9c43-2eb5a363657c')),
-        (0xA1A2A3A4B1B2C1C2D1D2D3D4D5D6D7D8, UUID('a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8')),
-        (0x12345678123456781234567812345678, UUID('12345678-1234-5678-1234-567812345678')),
         ('12345678123456781234567812345678', UUID('12345678-1234-5678-1234-567812345678')),
         (
             'c0a8f9a8-aa5e-482b-a067-9cb3a51f5c1',
             Err('Input should be a valid UUID, invalid group length in group 4: expected 12, found 11'),
         ),
-        (1e1, Err('input should be a string, bytes, integer or UUID object')),
-        (None, Err('input should be a string, bytes, integer or UUID object')),
-        (True, Err('input should be a string, bytes, integer or UUID object')),
+        (1e1, Err('input should be a string, bytes or UUID object')),
+        (None, Err('input should be a string, bytes or UUID object')),
+        (True, Err('input should be a string, bytes or UUID object')),
+        (0xA1A2A3A4B1B2C1C2D1D2D3D4D5D6D7D8, Err('input should be a string, bytes or UUID object')),
+        (0x12345678123456781234567812345678, Err('input should be a string, bytes or UUID object')),
     ],
 )
 def test_uuid_json(py_and_json: PyAndJson, input_value, expected):
