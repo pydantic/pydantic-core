@@ -188,7 +188,7 @@ impl<'a> Input<'a> for PyAny {
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
         if let Ok(py_str) = <PyString as PyTryFrom>::try_from(self) {
-            Ok(py_str.into())
+            Ok(EitherString::Cow(std::borrow::Cow::Borrowed(py_str.to_str()?)))
         } else {
             Err(ValError::new(ErrorType::StringType, self))
         }
