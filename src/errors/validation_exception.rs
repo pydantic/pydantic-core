@@ -64,13 +64,67 @@ impl ValidationError {
 
                 let validation_error = Self::new(line_errors, title, error_mode, hide_input);
                 match Py::new(py, validation_error) {
-                    Ok(err) => PyErr::from_value(err.as_ref(py)),
+                    Ok(err) => {
+                        let py_err = PyErr::from_value(err.as_ref(py));
+
+                        // ExceptionGroup(s) only supported 3.11 and later:
+                        // Attach the user/python exceptions as the __cause__ of the validation error:
+                        #[cfg(Py_3_11)]
+                        {
+                            let borrowed = err.borrow(py);
+                            borrowed.maybe_add_cause(py, &py_err);
+                        }
+
+                        py_err
+                    }
                     Err(err) => err,
                 }
             }
             ValError::InternalErr(err) => err,
             ValError::Omit => Self::omit_error(),
             ValError::UseDefault => Self::use_default_error(),
+        }
+    }
+
+    // ExceptionGroup(s) only supported 3.11 and later:
+    #[cfg(Py_3_11)]
+    fn maybe_add_cause(&self, py: Python, py_err: &PyErr) {
+        use pyo3::exceptions::PyBaseExceptionGroup;
+
+        let mut user_py_errs = vec![];
+        for line_error in &self.line_errors {
+            if let ErrorType::AssertionError { error: Some(err) } | ErrorType::ValueError { error: Some(err) } =
+                &line_error.error_type
+            {
+                let note: PyObject = if let Location::Empty = &line_error.location {
+                    "\nPydantic: cause of loc: root".into_py(py)
+                } else {
+                    format!(
+                        "\nPydantic: cause of loc: {}",
+                        // Location formats with a newline at the end, hence the trim()
+                        line_error.location.to_string().trim()
+                    )
+                    .into_py(py)
+                };
+
+                // Add the location context as a note, no direct c api for this,
+                // fine performance wise, add_note() goes directly to C: "(PyCFunction)BaseException_add_note":
+                // https://github.com/python/cpython/blob/main/Objects/exceptions.c
+                if err.call_method1(py, "add_note", (note,)).is_ok() {
+                    user_py_errs.push(err.clone_ref(py));
+                }
+            }
+        }
+
+        // Only add the cause if there are actualy python user exceptions to show:
+        if !user_py_errs.is_empty() {
+            py_err.set_cause(
+                py,
+                Some(PyBaseExceptionGroup::new_err((
+                    "Pydantic User Code Exceptions",
+                    user_py_errs,
+                ))),
+            );
         }
     }
 
