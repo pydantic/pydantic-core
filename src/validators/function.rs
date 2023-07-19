@@ -1,7 +1,7 @@
 use pyo3::exceptions::{PyAssertionError, PyAttributeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyString};
-use pyo3::{intern, PyTraverseError, PyVisit};
+use pyo3::{intern, AsPyPointer, PyTraverseError, PyVisit};
 
 use crate::errors::{
     ErrorType, LocItem, PydanticCustomError, PydanticKnownError, PydanticOmit, ValError, ValResult, ValidationError,
@@ -495,14 +495,14 @@ macro_rules! py_err_string {
     };
 }
 
-// PyErr.into_py(py) seems to drop the traceback of the error, without a seemingly clean solve
-// this func reattaches the traceback to the PyObject during the conversion
+// Same as upstream PyO3 fix https://github.com/PyO3/pyo3/pull/3328 to prevent loss of traceback,
+// Can be replaced with py_err.into_py(py) once upgraded to PyO3 version 0.2x
 pub fn py_err_to_py_object(py: Python, py_err: PyErr) -> PyObject {
-    let tb = py_err.traceback(py);
     let err_py_obj: PyObject = py_err.value(py).into_py(py);
-    if let Some(tb) = tb {
-        // Ignore the result to prevent an unwrap if the traceback can't be set for some reason
-        let _ = err_py_obj.setattr(py, "__traceback__", tb);
+    if let Some(tb) = py_err.traceback(py) {
+        unsafe {
+            pyo3::ffi::PyException_SetTraceback(err_py_obj.as_ptr(), tb.as_ptr());
+        }
     };
     err_py_obj
 }
