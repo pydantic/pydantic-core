@@ -91,6 +91,19 @@ impl Validator for UuidValidator {
     ) -> ValResult<'data, PyObject> {
         let class = get_uuid_type(py)?;
         if let Some(py_input) = input.input_is_instance(class) {
+            if let Some(expected_version) = self.version {
+                let py_input_version: usize = py_input.getattr(intern!(py, "version"))?.extract()?;
+                let expected_version = usize::from(expected_version);
+                if expected_version != py_input_version {
+                    return Err(ValError::new(
+                        ErrorType::UuidVersionMismatch {
+                            version: py_input_version,
+                            schema_version: expected_version,
+                        },
+                        input,
+                    ));
+                }
+            }
             Ok(py_input.to_object(py))
         } else if extra.strict.unwrap_or(self.strict) && input.is_python() {
             Err(ValError::new(
@@ -150,8 +163,7 @@ impl UuidValidator {
                     input,
                 ));
             }
-        }
-
+        };
         Ok(uuid)
     }
 
