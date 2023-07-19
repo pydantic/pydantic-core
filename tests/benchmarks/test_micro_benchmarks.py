@@ -688,6 +688,48 @@ class TestBenchmarkUUID:
         )
 
     @pytest.fixture(scope='class')
+    def validator(self):
+        return SchemaValidator({'type': 'uuid'})
+
+    @pytest.fixture(scope='class')
+    def pydantic_validator(self):
+        def to_UUID(v: Any) -> UUID:
+            try:
+                return UUID(v)
+            except Exception as e:
+                raise PydanticCustomError('uuid_parsing', 'Input should be a valid uuid') from e
+
+        json_schema = core_schema.no_info_after_validator_function(
+            to_UUID, core_schema.str_schema(strict=True, strip_whitespace=True)
+        )
+        schema = core_schema.json_or_python_schema(
+            json_schema=json_schema,
+            python_schema=core_schema.lax_or_strict_schema(
+                lax_schema=core_schema.union_schema([core_schema.is_instance_schema(UUID), json_schema]),
+                strict_schema=core_schema.is_instance_schema(UUID),
+            ),
+            serialization=core_schema.to_string_ser_schema(when_used='json'),
+        )
+
+        return SchemaValidator(schema)
+
+    @pytest.mark.benchmark(group='uuid from str')
+    def test_uuid_from_string_core(self, benchmark, validator):
+        benchmark(validator.validate_python, '12345678-1234-5678-1234-567812345678')
+
+    @pytest.mark.benchmark(group='uuid from str')
+    def test_uuid_from_string_pyd(self, benchmark, pydantic_validator):
+        benchmark(pydantic_validator.validate_python, '12345678-1234-5678-1234-567812345678')
+
+    @pytest.mark.benchmark(group='uuid from UUID')
+    def test_uuid_from_uuid_core(self, benchmark, validator):
+        benchmark(validator.validate_python, UUID('12345678-1234-5678-1234-567812345678'))
+
+    @pytest.mark.benchmark(group='uuid from UUID')
+    def test_uuid_from_uuid_pyd(self, benchmark, pydantic_validator):
+        benchmark(pydantic_validator.validate_python, UUID('12345678-1234-5678-1234-567812345678'))
+
+    @pytest.fixture(scope='class')
     def uuid_raw(self):
         return UUID('12345678-1234-5678-1234-567812345678')
 

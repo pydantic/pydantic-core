@@ -139,18 +139,22 @@ impl Validator for UuidValidator {
 
 impl UuidValidator {
     fn get_uuid<'s, 'data>(&'s self, py: Python<'data>, input: &'data impl Input<'data>) -> ValResult<'data, Uuid> {
-        let uuid = if let Ok(either_string) = input.exact_str() {
-            let cow = either_string.as_cow()?;
-            let uuid_str = cow.as_ref();
-            Uuid::parse_str(uuid_str)
-                .map_err(|e| ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input))?
-        } else if let Ok(either_bytes) = input.validate_bytes(true) {
-            let py_object = either_bytes.into_py(py);
-            let py_bytes = py_object.downcast::<PyBytes>(py)?;
-            Uuid::from_slice(py_bytes.as_bytes())
-                .map_err(|e| ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input))?
-        } else {
-            return Err(ValError::new(ErrorType::UuidType, input));
+        let uuid = match input.exact_str().ok() {
+            Some(either_string) => {
+                let cow = either_string.as_cow()?;
+                let uuid_str = cow.as_ref();
+                Uuid::parse_str(uuid_str)
+                    .map_err(|e| ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input))?
+            }
+            None => {
+                let either_bytes = input
+                    .validate_bytes(true)
+                    .map_err(|_| ValError::new(ErrorType::UuidType, input))?;
+                let py_object = either_bytes.into_py(py);
+                let py_bytes = py_object.downcast::<PyBytes>(py)?;
+                Uuid::from_slice(py_bytes.as_bytes())
+                    .map_err(|e| ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input))?
+            }
         };
 
         if let Some(expected_version) = self.version {
