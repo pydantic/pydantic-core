@@ -17,6 +17,8 @@ pub(crate) fn uuid_to_string(py_uuid: &PyAny) -> PyResult<String> {
 #[derive(Debug, Clone)]
 pub struct UuidSerializer;
 
+impl_py_gc_traverse!(UuidSerializer {});
+
 impl BuildSerializer for UuidSerializer {
     const EXPECTED_TYPE: &'static str = "uuid";
 

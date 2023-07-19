@@ -310,9 +310,6 @@ pub enum ErrorType {
     },
     // UUID errors,
     UuidType,
-    UuidExactType {
-        class_name: String,
-    },
     UuidParsing {
         error: String,
     },
@@ -463,7 +460,6 @@ impl ErrorType {
             Self::UrlSyntaxViolation { .. } => extract_context!(Cow::Owned, UrlSyntaxViolation, ctx, error: String),
             Self::UrlTooLong { .. } => extract_context!(UrlTooLong, ctx, max_length: usize),
             Self::UrlScheme { .. } => extract_context!(UrlScheme, ctx, expected_schemes: String),
-            Self::UuidExactType { .. } => extract_context!(UuidExactType, ctx, class_name: String),
             Self::UuidParsing { .. } => extract_context!(UuidParsing, ctx, error: String),
             Self::UuidVersionMismatch { .. } => {
                 extract_context!(UuidVersionMismatch, ctx, version: usize, schema_version: usize)
@@ -572,7 +568,6 @@ impl ErrorType {
             Self::UrlSyntaxViolation {..} => "Input violated strict URL syntax rules, {error}",
             Self::UrlTooLong {..} => "URL should have at most {max_length} characters",
             Self::UrlScheme {..} => "URL scheme should be {expected_schemes}",
-            Self::UuidExactType { .. } => "Input should be an instance of {class_name}",
             Self::UuidType => "UUID input should be a string, bytes or UUID object",
             Self::UuidParsing { .. } => "Input should be a valid UUID, {error}",
             Self::UuidVersionMismatch { .. } => "UUID version {version} does not match expected version: {schema_version}"
@@ -696,7 +691,6 @@ impl ErrorType {
             Self::UrlSyntaxViolation { error } => render!(tmpl, error),
             Self::UrlTooLong { max_length } => to_string_render!(tmpl, max_length),
             Self::UrlScheme { expected_schemes } => render!(tmpl, expected_schemes),
-            Self::UuidExactType { class_name } => render!(tmpl, class_name),
             Self::UuidParsing { error } => render!(tmpl, error),
             Self::UuidVersionMismatch {
                 version,
@@ -762,7 +756,6 @@ impl ErrorType {
             Self::UrlSyntaxViolation { error } => py_dict!(py, error),
             Self::UrlTooLong { max_length } => py_dict!(py, max_length),
             Self::UrlScheme { expected_schemes } => py_dict!(py, expected_schemes),
-            Self::UuidExactType { class_name } => py_dict!(py, class_name),
 
             Self::UuidParsing { error } => py_dict!(py, error),
             Self::UuidVersionMismatch {

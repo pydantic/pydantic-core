@@ -89,9 +89,9 @@ def test_uuid(input_value, expected):
     'input_value,expected',
     [
         (UUID('12345678-1234-5678-1234-567812345678'), UUID('12345678-1234-5678-1234-567812345678')),
-        ('12345678-1234-5678-1234-567812345678', Err('Input should be an instance of uuid [type=uuid_exact_type,')),
-        (b'12345678-1234-5678-1234-567812345678', Err('Input should be an instance of uuid [type=uuid_exact_type,')),
-        (1654646400, Err('Input should be an instance of uuid [type=uuid_exact_type')),
+        ('12345678-1234-5678-1234-567812345678', Err('Input should be an instance of UUID [type=is_instance_of,')),
+        (b'12345678-1234-5678-1234-567812345678', Err('Input should be an instance of UUID [type=is_instance_of,')),
+        (1654646400, Err('Input should be an instance of UUID [type=is_instance_of')),
     ],
 )
 def test_uuid_strict(input_value, expected):

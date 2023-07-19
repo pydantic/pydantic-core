@@ -80,6 +80,8 @@ impl BuildValidator for UuidValidator {
     }
 }
 
+impl_py_gc_traverse!(UuidValidator {});
+
 impl Validator for UuidValidator {
     fn validate<'s, 'data>(
         &'s self,
@@ -107,8 +109,8 @@ impl Validator for UuidValidator {
             Ok(py_input.to_object(py))
         } else if extra.strict.unwrap_or(self.strict) && input.is_python() {
             Err(ValError::new(
-                ErrorType::UuidExactType {
-                    class_name: self.get_name().to_string(),
+                ErrorType::IsInstanceOf {
+                    class: class.name().unwrap_or("UUID").to_string(),
                 },
                 input,
             ))

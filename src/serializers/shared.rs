@@ -255,6 +255,7 @@ impl PyGcTraverse for CombinedSerializer {
             CombinedSerializer::Recursive(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::TuplePositional(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::TupleVariable(inner) => inner.py_gc_traverse(visit),
+            CombinedSerializer::Uuid(inner) => inner.py_gc_traverse(visit),
         }
     }
 }
