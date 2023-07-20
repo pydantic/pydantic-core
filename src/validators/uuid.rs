@@ -1,7 +1,8 @@
+use std::str::from_utf8;
+
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::PyBytes;
 use pyo3::types::{PyDict, PyType};
 use uuid::Uuid;
 
@@ -109,7 +110,7 @@ impl Validator for UuidValidator {
                 input,
             ))
         } else {
-            let uuid = self.get_uuid(py, input)?;
+            let uuid = self.get_uuid(input)?;
             self.create_py_uuid(py, class, &uuid)
         }
     }
@@ -132,7 +133,7 @@ impl Validator for UuidValidator {
 }
 
 impl UuidValidator {
-    fn get_uuid<'s, 'data>(&'s self, py: Python<'data>, input: &'data impl Input<'data>) -> ValResult<'data, Uuid> {
+    fn get_uuid<'s, 'data>(&'s self, input: &'data impl Input<'data>) -> ValResult<'data, Uuid> {
         let uuid = match input.exact_str().ok() {
             Some(either_string) => {
                 let cow = either_string.as_cow()?;
@@ -144,10 +145,17 @@ impl UuidValidator {
                 let either_bytes = input
                     .validate_bytes(true)
                     .map_err(|_| ValError::new(ErrorType::UuidType, input))?;
-                let py_object = either_bytes.into_py(py);
-                let py_bytes = py_object.downcast::<PyBytes>(py)?;
-                Uuid::from_slice(py_bytes.as_bytes())
-                    .map_err(|e| ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input))?
+                let bytes_slice = either_bytes.as_slice();
+                'parse: {
+                    // Try parsing as utf8, but don't care if it fails
+                    if let Ok(utf8_str) = from_utf8(bytes_slice) {
+                        if let Ok(uuid) = Uuid::parse_str(utf8_str) {
+                            break 'parse uuid;
+                        }
+                    }
+                    Uuid::from_slice(bytes_slice)
+                        .map_err(|e| ValError::new(ErrorType::UuidParsing { error: e.to_string() }, input))?
+                }
             }
         };
 
