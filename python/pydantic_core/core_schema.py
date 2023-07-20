@@ -3906,7 +3906,7 @@ ErrorType = Literal[
     'url_scheme',
     'uuid_type',
     'uuid_parsing',
-    'uuid_version_mismatch',
+    'uuid_version',
 ]
 
 

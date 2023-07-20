@@ -97,13 +97,7 @@ impl Validator for UuidValidator {
                 let py_input_version: usize = py_input.getattr(intern!(py, "version"))?.extract()?;
                 let expected_version = usize::from(expected_version);
                 if expected_version != py_input_version {
-                    return Err(ValError::new(
-                        ErrorType::UuidVersionMismatch {
-                            version: py_input_version,
-                            schema_version: expected_version,
-                        },
-                        input,
-                    ));
+                    return Err(ValError::new(ErrorType::UuidVersion { expected_version }, input));
                 }
             }
             Ok(py_input.to_object(py))
@@ -161,13 +155,7 @@ impl UuidValidator {
             let v1 = uuid.get_version_num();
             let expected_version = usize::from(expected_version);
             if v1 != expected_version {
-                return Err(ValError::new(
-                    ErrorType::UuidVersionMismatch {
-                        version: v1,
-                        schema_version: expected_version,
-                    },
-                    input,
-                ));
+                return Err(ValError::new(ErrorType::UuidVersion { expected_version }, input));
             }
         };
         Ok(uuid)

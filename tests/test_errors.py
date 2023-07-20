@@ -284,11 +284,7 @@ all_errors = [
     ('url_scheme', 'URL scheme should be "foo", "bar" or "spam"', {'expected_schemes': '"foo", "bar" or "spam"'}),
     ('uuid_type', 'UUID input should be a string, bytes or UUID object', None),
     ('uuid_parsing', 'Input should be a valid UUID, Foobar', {'error': 'Foobar'}),
-    (
-        'uuid_version_mismatch',
-        'UUID version 42 does not match expected version: 41',
-        {'version': 42, 'schema_version': 41},
-    ),
+    ('uuid_version', 'UUID version 42 expected', {'expected_version': 42}),
 ]
 
 

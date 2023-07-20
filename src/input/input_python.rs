@@ -351,6 +351,7 @@ impl<'a> Input<'a> for PyAny {
             Err(ValError::new(ErrorType::FloatType, self))
         }
     }
+
     fn strict_dict(&'a self) -> ValResult<GenericMapping<'a>> {
         if let Ok(dict) = self.downcast::<PyDict>() {
             Ok(dict.into())

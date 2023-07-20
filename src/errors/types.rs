@@ -313,9 +313,8 @@ pub enum ErrorType {
     UuidParsing {
         error: String,
     },
-    UuidVersionMismatch {
-        version: usize,
-        schema_version: usize,
+    UuidVersion {
+        expected_version: usize,
     },
 }
 
@@ -461,8 +460,8 @@ impl ErrorType {
             Self::UrlTooLong { .. } => extract_context!(UrlTooLong, ctx, max_length: usize),
             Self::UrlScheme { .. } => extract_context!(UrlScheme, ctx, expected_schemes: String),
             Self::UuidParsing { .. } => extract_context!(UuidParsing, ctx, error: String),
-            Self::UuidVersionMismatch { .. } => {
-                extract_context!(UuidVersionMismatch, ctx, version: usize, schema_version: usize)
+            Self::UuidVersion { .. } => {
+                extract_context!(UuidVersion, ctx, expected_version: usize)
             }
             _ => {
                 if ctx.is_some() {
@@ -570,7 +569,7 @@ impl ErrorType {
             Self::UrlScheme {..} => "URL scheme should be {expected_schemes}",
             Self::UuidType => "UUID input should be a string, bytes or UUID object",
             Self::UuidParsing { .. } => "Input should be a valid UUID, {error}",
-            Self::UuidVersionMismatch { .. } => "UUID version {version} does not match expected version: {schema_version}"
+            Self::UuidVersion { .. } => "UUID version {expected_version} expected"
 
         }
     }
@@ -692,10 +691,7 @@ impl ErrorType {
             Self::UrlTooLong { max_length } => to_string_render!(tmpl, max_length),
             Self::UrlScheme { expected_schemes } => render!(tmpl, expected_schemes),
             Self::UuidParsing { error } => render!(tmpl, error),
-            Self::UuidVersionMismatch {
-                version,
-                schema_version,
-            } => to_string_render!(tmpl, version, schema_version),
+            Self::UuidVersion { expected_version } => to_string_render!(tmpl, expected_version),
             _ => Ok(tmpl.to_string()),
         }
     }
@@ -758,10 +754,7 @@ impl ErrorType {
             Self::UrlScheme { expected_schemes } => py_dict!(py, expected_schemes),
 
             Self::UuidParsing { error } => py_dict!(py, error),
-            Self::UuidVersionMismatch {
-                version,
-                schema_version,
-            } => py_dict!(py, version, schema_version),
+            Self::UuidVersion { expected_version } => py_dict!(py, expected_version),
             _ => Ok(None),
         }
     }

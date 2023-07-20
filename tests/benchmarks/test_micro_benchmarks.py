@@ -694,10 +694,22 @@ class TestBenchmarkUUID:
     @pytest.fixture(scope='class')
     def pydantic_validator(self):
         def to_UUID(v: Any) -> UUID:
+            if isinstance(v, UUID):
+                return v
             try:
-                return UUID(v)
-            except Exception as e:
-                raise PydanticCustomError('uuid_parsing', 'Input should be a valid uuid') from e
+                if isinstance(v, str):
+                    return UUID(v)
+                else:
+                    try:
+                        return UUID(v.decode())
+                    except ValueError:
+                        # 16 bytes in big-endian order as the bytes argument fail
+                        # the above check
+                        return UUID(bytes=v)
+            except ValueError:
+                raise PydanticCustomError(
+                    'uuid_parsing', 'Input should be a valid UUID, unable to parse string as an UUID'
+                )
 
         json_schema = core_schema.no_info_after_validator_function(
             to_UUID, core_schema.str_schema(strict=True, strip_whitespace=True)

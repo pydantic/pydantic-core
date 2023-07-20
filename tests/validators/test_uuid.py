@@ -118,14 +118,14 @@ def test_uuid_strict(input_value, expected):
         ('0e7ac198-9acd-4c0c-b4b4-761974bf71d7', 4, UUID('0e7ac198-9acd-4c0c-b4b4-761974bf71d7')),
         (UUID('0e7ac198-9acd-4c0c-b4b4-761974bf71d7'), 4, UUID('0e7ac198-9acd-4c0c-b4b4-761974bf71d7')),
         # Invalid UUIDs
-        ('a6cc5730-2261-11ee-9c43-2eb5a363657c', 5, Err('UUID version 1 does not match expected version: 5')),
-        (UUID('a6cc5730-2261-11ee-9c43-2eb5a363657c'), 5, Err('UUID version 1 does not match expected version: 5')),
-        ('04e4aeb3-8f20-30d0-8852-d295e1265eed', 4, Err('UUID version 3 does not match expected version: 4')),
-        (UUID('04e4aeb3-8f20-30d0-8852-d295e1265eed'), 4, Err('UUID version 3 does not match expected version: 4')),
-        ('0e7ac198-9acd-4c0c-b4b4-761974bf71d7', 3, Err('UUID version 4 does not match expected version: 3')),
-        (UUID('0e7ac198-9acd-4c0c-b4b4-761974bf71d7'), 3, Err('UUID version 4 does not match expected version: 3')),
-        ('08ed0736-fb95-5cc5-85ed-37e4f3df9b29', 1, Err('UUID version 5 does not match expected version: 1')),
-        (UUID('08ed0736-fb95-5cc5-85ed-37e4f3df9b29'), 1, Err('UUID version 5 does not match expected version: 1')),
+        ('a6cc5730-2261-11ee-9c43-2eb5a363657c', 5, Err('UUID version 5 expected')),
+        (UUID('a6cc5730-2261-11ee-9c43-2eb5a363657c'), 5, Err('UUID version 5 expected')),
+        ('04e4aeb3-8f20-30d0-8852-d295e1265eed', 4, Err('UUID version 4 expected')),
+        (UUID('04e4aeb3-8f20-30d0-8852-d295e1265eed'), 4, Err('UUID version 4 expected')),
+        ('0e7ac198-9acd-4c0c-b4b4-761974bf71d7', 3, Err('UUID version 3 expected')),
+        (UUID('0e7ac198-9acd-4c0c-b4b4-761974bf71d7'), 3, Err('UUID version 3 expected')),
+        ('08ed0736-fb95-5cc5-85ed-37e4f3df9b29', 1, Err('UUID version 1 expected')),
+        (UUID('08ed0736-fb95-5cc5-85ed-37e4f3df9b29'), 1, Err('UUID version 1 expected')),
     ],
 )
 def test_uuid_version(input_value, version, expected):
