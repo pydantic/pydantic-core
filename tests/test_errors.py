@@ -1,3 +1,4 @@
+import platform
 import re
 import sys
 from decimal import Decimal
@@ -519,9 +520,26 @@ def test_all_errors():
 
 
 @pytest.mark.skipif(
-    sys.version_info < (3, 11), reason='Exception groups / python error tracebacks supported only 3.11 & higher'
+    'pypy' in platform.python_implementation().lower(), reason='Have no idea why its not working with PyPy.'
 )
 def test_python_err_cause_tracebacks():
+    from exceptiongroup import BaseExceptionGroup
+
+    def check_grouped_exception(exc: BaseException) -> BaseException:
+        """
+        Handled the difference pre 3.11 and after,
+        returns the exception to keep testing with:
+        pre 3.11 and extra UserWarning exception gets added, so unwrapping that.
+        """
+        if sys.version_info < (3, 11):
+            assert repr(exc).startswith("UserWarning('Pydantic: ")
+            assert exc.__cause__ is not None
+            return exc.__cause__
+        else:
+            assert exc.__notes__
+            assert exc.__notes__[-1].startswith('\nPydantic: ')
+            return exc
+
     # Important to test a singular as well as a multi,
     # because the singular originally had problems with losing the traceback
     def singular_raise_py_error(v: Any) -> Any:
@@ -531,10 +549,12 @@ def test_python_err_cause_tracebacks():
     with pytest.raises(ValidationError) as exc_info:
         s1.validate_python('anything')
 
-    assert isinstance(exc_info.value.__cause__, ExceptionGroup)
+    assert isinstance(exc_info.value.__cause__, BaseExceptionGroup)
     assert len(exc_info.value.__cause__.exceptions) == 1
-    assert repr(exc_info.value.__cause__.exceptions[0]) == repr(ValueError('Oh no!'))
-    assert exc_info.value.__cause__.exceptions[0].__traceback__ is not None
+    cause = exc_info.value.__cause__.exceptions[0]
+    cause = check_grouped_exception(cause)
+    assert repr(cause) == repr(ValueError('Oh no!'))
+    assert cause.__traceback__ is not None
 
     def multi_raise_py_error(v: Any) -> Any:
         try:
@@ -548,14 +568,13 @@ def test_python_err_cause_tracebacks():
 
     def validate_s2_chain(val_err: ValidationError):
         cause_group = val_err.__cause__
-        assert isinstance(cause_group, ExceptionGroup)
+        assert isinstance(cause_group, BaseExceptionGroup)
         assert len(cause_group.exceptions) == 1
 
         cause = cause_group.exceptions[0]
+        cause = check_grouped_exception(cause)
         assert repr(cause) == repr(ValueError('Oh no!'))
         assert cause.__traceback__ is not None
-        assert cause.__notes__
-        assert cause.__notes__[-1].startswith('\nPydantic: ')
 
         sub_cause = cause.__cause__
         assert repr(sub_cause) == repr(AssertionError('Wrong'))
@@ -575,11 +594,10 @@ def test_python_err_cause_tracebacks():
     with pytest.raises(ValidationError) as exc_info:
         s3.validate_python('anything')
 
-    assert isinstance(exc_info.value.__cause__, ExceptionGroup)
+    assert isinstance(exc_info.value.__cause__, BaseExceptionGroup)
     assert len(exc_info.value.__cause__.exceptions) == 1
     cause = exc_info.value.__cause__.exceptions[0]
-    assert cause.__notes__
-    assert cause.__notes__[-1].startswith('\nPydantic: ')
+    cause = check_grouped_exception(cause)
     assert repr(cause) == repr(ValueError('Sub val failure'))
     subcause = cause.__cause__
     assert isinstance(subcause, ValidationError)
