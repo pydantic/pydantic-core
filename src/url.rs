@@ -7,10 +7,11 @@ use idna::punycode::decode_to_string;
 use pyo3::exceptions::PyValueError;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::pyclass::CompareOp;
-use pyo3::types::{PyDict, PyType};
+use pyo3::types::{PyDict, PyString, PyType};
 use pyo3::{intern, prelude::*};
 use url::Url;
 
+use crate::py_vectorcall::py_vectorcall;
 use crate::tools::SchemaDict;
 use crate::SchemaValidator;
 
@@ -188,7 +189,7 @@ impl PyUrl {
             url.push('#');
             url.push_str(fragment);
         }
-        cls.call1((url,))
+        py_vectorcall(cls, &[PyString::new(cls.py(), &url)])
     }
 }
 
@@ -416,7 +417,7 @@ impl PyMultiHostUrl {
             url.push('#');
             url.push_str(fragment);
         }
-        cls.call1((url,))
+        py_vectorcall(cls, &[PyString::new(cls.py(), &url)])
     }
 }
 

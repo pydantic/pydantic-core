@@ -8,6 +8,7 @@ use serde::ser::Error;
 
 use crate::build_tools::py_schema_err;
 use crate::definitions::DefinitionsBuilder;
+use crate::py_vectorcall::py_vectorcall;
 use crate::tools::SchemaDict;
 
 use super::simple::none_json_key;
@@ -89,8 +90,8 @@ impl BuildSerializer for FormatSerializer {
 impl FormatSerializer {
     fn call(&self, value: &PyAny) -> Result<PyObject, String> {
         let py = value.py();
-        self.format_func
-            .call1(py, (value, self.formatting_string.as_ref(py)))
+        py_vectorcall(self.format_func.as_ref(py), &[value, self.formatting_string.as_ref(py)])
+            .map(Into::into)
             .map_err(|e| {
                 format!(
                     "Error calling `format(value, {})`: {}",

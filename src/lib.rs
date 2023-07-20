@@ -21,6 +21,7 @@ mod errors;
 mod input;
 mod lazy_index_map;
 mod lookup_key;
+mod py_vectorcall;
 mod recursion_guard;
 mod serializers;
 mod tools;

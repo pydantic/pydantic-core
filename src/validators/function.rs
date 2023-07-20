@@ -8,6 +8,7 @@ use crate::errors::{
 };
 use crate::input::Input;
 use crate::py_gc::PyGcTraverse;
+use crate::py_vectorcall::py_vectorcall;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::{function_name, py_err, SchemaDict};
 use crate::PydanticUseDefault;
@@ -168,12 +169,13 @@ impl FunctionBeforeValidator {
     ) -> ValResult<'data, PyObject> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), info))
+            let info = Py::new(py, info)?;
+            py_vectorcall(self.func.to_object(py).into_ref(py), &[input, info.as_ref(py)])
         } else {
-            self.func.call1(py, (input.to_object(py),))
+            py_vectorcall(self.func.to_object(py).into_ref(py), &[input])
         };
         let value = r.map_err(|e| convert_err(py, e, input))?;
-        call(value.into_ref(py), extra)
+        call(value, extra)
     }
 }
 
@@ -202,11 +204,12 @@ impl FunctionAfterValidator {
         let v = call(input, extra)?;
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
-            self.func.call1(py, (v.to_object(py), info))
+            let info = Py::new(py, info)?;
+            py_vectorcall(self.func.to_object(py).into_ref(py), &[v.as_ref(py), info.as_ref(py)])
         } else {
-            self.func.call1(py, (v.to_object(py),))
+            py_vectorcall(self.func.to_object(py).into_ref(py), &[v.as_ref(py)])
         };
-        r.map_err(|e| convert_err(py, e, input))
+        r.map_err(|e| convert_err(py, e, input)).map(Into::into)
     }
 }
 
@@ -261,11 +264,15 @@ impl Validator for FunctionPlainValidator {
     ) -> ValResult<'data, PyObject> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), info))
+            let info = Py::new(py, info)?;
+            py_vectorcall(
+                self.func.to_object(py).into_ref(py),
+                &[input.to_object(py).as_ref(py), info.as_ref(py)],
+            )
         } else {
-            self.func.call1(py, (input.to_object(py),))
+            py_vectorcall(self.func.to_object(py).into_ref(py), &[input.to_object(py).as_ref(py)])
         };
-        r.map_err(|e| convert_err(py, e, input))
+        r.map_err(|e| convert_err(py, e, input)).map(Into::into)
     }
 
     fn different_strict_behavior(
@@ -335,11 +342,12 @@ impl FunctionWrapValidator {
     ) -> ValResult<'data, PyObject> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), handler, info))
+            let info = Py::new(py, info)?;
+            py_vectorcall(self.func.to_object(py).into_ref(py), &[input, handler, info.as_ref(py)])
         } else {
-            self.func.call1(py, (input.to_object(py), handler))
+            py_vectorcall(self.func.to_object(py).into_ref(py), &[input, handler])
         };
-        r.map_err(|e| convert_err(py, e, input))
+        r.map_err(|e| convert_err(py, e, input)).map(Into::into)
     }
 }
 

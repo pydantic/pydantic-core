@@ -10,6 +10,7 @@ use crate::errors::{ErrorType, LocItem, ValError, ValLineError, ValResult};
 use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::py_gc::PyGcTraverse;
+use crate::py_vectorcall::py_vectorcall;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
@@ -336,11 +337,11 @@ impl Validator for TaggedUnionValidator {
                 self.find_call_validator(py, tag, input, extra, definitions, recursion_guard)
             }
             Discriminator::Function(ref func) => {
-                let tag = func.call1(py, (input.to_object(py),))?;
-                if tag.is_none(py) {
+                let tag = py_vectorcall(func.clone().into_ref(py), &[input.to_object(py).as_ref(py)])?;
+                if tag.is_none() {
                     Err(self.tag_not_found(input))
                 } else {
-                    self.find_call_validator(py, tag.into_ref(py), input, extra, definitions, recursion_guard)
+                    self.find_call_validator(py, tag, input, extra, definitions, recursion_guard)
                 }
             }
             Discriminator::SelfSchema => self.find_call_validator(

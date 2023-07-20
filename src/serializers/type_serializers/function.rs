@@ -8,6 +8,7 @@ use pyo3::types::PyDict;
 use pyo3::types::PyString;
 
 use crate::definitions::DefinitionsBuilder;
+use crate::py_vectorcall::py_vectorcall;
 use crate::tools::SchemaDict;
 use crate::tools::{function_name, py_err, py_error_type};
 use crate::{PydanticOmit, PydanticSerializationUnexpectedValue};
@@ -151,20 +152,22 @@ impl FunctionPlainSerializer {
                 if let Some(model) = extra.model {
                     if self.info_arg {
                         let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
-                        self.func.call1(py, (model, value, info))?
+                        let info = Py::new(py, info)?;
+                        py_vectorcall(self.func.as_ref(py), &[model, value, info.as_ref(py)])?
                     } else {
-                        self.func.call1(py, (model, value))?
+                        py_vectorcall(self.func.as_ref(py), &[model, value])?
                     }
                 } else {
                     return Err(PyRuntimeError::new_err("Function plain serializer expected to be run inside the context of a model field but no model was found"));
                 }
             } else if self.info_arg {
                 let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
-                self.func.call1(py, (value, info))?
+                let info = Py::new(py, info)?;
+                py_vectorcall(self.func.as_ref(py), &[value, info.as_ref(py)])?
             } else {
-                self.func.call1(py, (value,))?
+                py_vectorcall(self.func.as_ref(py), &[value])?
             };
-            Ok((true, v))
+            Ok((true, v.into()))
         } else {
             Ok((false, value.into_py(py)))
         }
@@ -377,24 +380,30 @@ impl FunctionWrapSerializer {
         let py = value.py();
         if self.when_used.should_use(value, extra) {
             let serialize = SerializationCallable::new(py, &self.serializer, include, exclude, extra);
+            let serialize = Py::new(py, serialize)?;
             let v = if self.is_field_serializer {
                 if let Some(model) = extra.model {
                     if self.info_arg {
                         let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
-                        self.func.call1(py, (model, value, serialize, info))?
+                        let info = Py::new(py, info)?;
+                        py_vectorcall(
+                            self.func.as_ref(py),
+                            &[model, value, serialize.as_ref(py), info.as_ref(py)],
+                        )?
                     } else {
-                        self.func.call1(py, (model, value, serialize))?
+                        py_vectorcall(self.func.as_ref(py), &[model, value, serialize.as_ref(py)])?
                     }
                 } else {
                     return Err(PyRuntimeError::new_err("Function wrap serializer expected to be run inside the context of a model field but no model was found"));
                 }
             } else if self.info_arg {
                 let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
-                self.func.call1(py, (value, serialize, info))?
+                let info = Py::new(py, info)?;
+                py_vectorcall(self.func.as_ref(py), &[value, serialize.as_ref(py), info.as_ref(py)])?
             } else {
-                self.func.call1(py, (value, serialize))?
+                py_vectorcall(self.func.as_ref(py), &[value, serialize.as_ref(py)])?
             };
-            Ok((true, v))
+            Ok((true, v.into()))
         } else {
             Ok((false, value.into_py(py)))
         }

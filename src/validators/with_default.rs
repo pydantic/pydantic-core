@@ -11,6 +11,7 @@ use crate::build_tools::schema_or_config_same;
 use crate::errors::{LocItem, ValError, ValResult};
 use crate::input::Input;
 use crate::py_gc::PyGcTraverse;
+use crate::py_vectorcall::py_vectorcall;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 use crate::PydanticUndefinedType;
@@ -170,7 +171,7 @@ impl Validator for WithDefaultValidator {
             Some(stored_dft) => {
                 let dft: Py<PyAny> = if self.copy_default {
                     let deepcopy_func = COPY_DEEPCOPY.get_or_init(py, || get_deepcopy(py).unwrap());
-                    deepcopy_func.call1(py, (&stored_dft,))?.into_py(py)
+                    py_vectorcall(deepcopy_func.as_ref(py), &[stored_dft.as_ref(py)])?.into_py(py)
                 } else {
                     stored_dft
                 };

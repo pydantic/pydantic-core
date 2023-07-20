@@ -11,6 +11,7 @@ use pyo3::types::{
 use serde::ser::{Error, Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::input::Int;
+use crate::py_vectorcall::py_vectorcall;
 use crate::serializers::errors::SERIALIZATION_ERR_MARKER;
 use crate::serializers::filter::SchemaFilter;
 use crate::serializers::shared::{PydanticSerializer, TypeSerializer};
@@ -210,7 +211,7 @@ pub(crate) fn infer_to_python_known(
             ObType::Path => value.str()?.into_py(py),
             ObType::Unknown => {
                 if let Some(fallback) = extra.fallback {
-                    let next_value = fallback.call1((value,))?;
+                    let next_value = py_vectorcall(fallback, &[value])?;
                     let next_result = infer_to_python(next_value, include, exclude, extra);
                     extra.rec_guard.pop(value_id, INFER_DEF_REF_ID);
                     return next_result;
@@ -268,7 +269,7 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Unknown => {
                 if let Some(fallback) = extra.fallback {
-                    let next_value = fallback.call1((value,))?;
+                    let next_value = py_vectorcall(fallback, &[value])?;
                     let next_result = infer_to_python(next_value, include, exclude, extra);
                     extra.rec_guard.pop(value_id, INFER_DEF_REF_ID);
                     return next_result;
@@ -509,7 +510,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         }
         ObType::Unknown => {
             if let Some(fallback) = extra.fallback {
-                let next_value = fallback.call1((value,)).map_err(py_err_se_err)?;
+                let next_value = py_vectorcall(fallback, &[value]).map_err(py_err_se_err)?;
                 let next_result = infer_serialize(next_value, serializer, include, exclude, extra);
                 extra.rec_guard.pop(value_id, INFER_DEF_REF_ID);
                 return next_result;
@@ -619,7 +620,7 @@ pub(crate) fn infer_json_key_known<'py>(ob_type: &ObType, key: &'py PyAny, extra
         ObType::Path => Ok(key.str()?.to_string_lossy()),
         ObType::Unknown => {
             if let Some(fallback) = extra.fallback {
-                let next_key = fallback.call1((key,))?;
+                let next_key = py_vectorcall(fallback, &[key])?;
                 // totally unnecessary step to placate rust's lifetime rules
                 let next_key = next_key.to_object(key.py()).into_ref(key.py());
                 infer_json_key(next_key, extra)

@@ -7,6 +7,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PySet};
 
+use crate::py_vectorcall::py_vectorcall;
 use crate::tools::SchemaDict;
 
 #[derive(Debug, Clone, Default)]
@@ -289,9 +290,11 @@ fn check_contains(obj: &PyAny, py_key: impl ToPyObject + Copy) -> PyResult<Optio
     let py = obj.py();
     match obj.getattr(intern!(py, "__contains__")) {
         Ok(contains_method) => {
-            if let Ok(result) = contains_method.call1((py_key.to_object(py),)) {
+            if let Ok(result) = py_vectorcall(contains_method, &[py_key.to_object(py).as_ref(py)]) {
                 Ok(Some(
-                    result.is_true()? || contains_method.call1((intern!(py, "__all__"),))?.is_true()?,
+                    result.is_true()?
+                        || py_vectorcall(contains_method, &[intern!(py, "__all__").to_object(py).as_ref(py)])?
+                            .is_true()?,
                 ))
             } else {
                 Ok(None)
