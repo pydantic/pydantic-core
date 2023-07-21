@@ -67,7 +67,7 @@ class Some(Generic[_T]):
     @property
     def value(self) -> _T:
         """
-        The value.
+        Returns the value wrapped by `Some`.
         """
     @classmethod
     def __class_getitem__(cls, __item: Any) -> Type[Self]: ...
@@ -85,7 +85,7 @@ class SchemaValidator:
 
         Arguments:
             schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for validation.
-            config: The [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to use for validation.
+            config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to configure validation.
         """
     @property
     def title(self) -> str:
@@ -225,7 +225,18 @@ _IncEx: TypeAlias = set[int] | set[str] | dict[int, _IncEx] | dict[str, _IncEx] 
 
 @final
 class SchemaSerializer:
-    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self: ...
+    """
+    `SchemaSerializer` is the Python wrapper for `pydantic-core`'s Rust serialization logic, internally it owns one
+    `CombinedSerializer` which may in turn own more `CombinedSerializer`s which make up the full schema serializer.
+    """
+    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self:
+        """
+        Create a new SchemaSerializer.
+
+        Arguments:
+            schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for serialization.
+            config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to to configure serialization.
+        """
     def to_python(
         self,
         value: Any,
@@ -240,7 +251,32 @@ class SchemaSerializer:
         round_trip: bool = False,
         warnings: bool = True,
         fallback: Callable[[Any], Any] | None = None,
-    ) -> Any: ...
+    ) -> Any:
+        """
+        Serialize a Python object to a Python object including transforming and filtering data.
+
+        Arguments:
+            value: The Python object to serialize.
+            mode: The serialization mode to use, either `'python'` or `'json'`, defaults to `'python'`. In JSON mode,
+                all values are converted to JSON compatible types, e.g. `None`, `int`, `float`, `str`, `list`, `dict`.
+            include: A set of fields to include, if `None` all fields are included.
+            exclude: A set of fields to exclude, if `None` no fields are excluded.
+            by_alias: Whether to use the alias names of fields.
+            exclude_unset: Whether to exclude fields that are not set,
+                e.g. are not included in `__pydantic_fields_set__`.
+            exclude_defaults: Whether to exclude fields that are equal to their default value.
+            exclude_none: Whether to exclude fields that have a value of `None`.
+            round_trip: Whether to enable serialization and validation round-trip support.
+            warnings: Whether to log warnings when invalid fields are encountered.
+            fallback: A function to call when an unknown value is encountered,
+                if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
+
+        Raises:
+            PydanticSerializationError: If serialization fails and no `fallback` function is provided.
+
+        Returns:
+            The serialized Python object.
+        """
     def to_json(
         self,
         value: Any,
@@ -255,7 +291,31 @@ class SchemaSerializer:
         round_trip: bool = False,
         warnings: bool = True,
         fallback: Callable[[Any], Any] | None = None,
-    ) -> bytes: ...
+    ) -> bytes:
+        """
+        Serialize a Python object to JSON including transforming and filtering data.
+
+        Arguments:
+            value: The Python object to serialize.
+            indent: If `None`, the JSON will be compact, otherwise it will be pretty-printed with the indent provided.
+            include: A set of fields to include, if `None` all fields are included.
+            exclude: A set of fields to exclude, if `None` no fields are excluded.
+            by_alias: Whether to use the alias names of fields.
+            exclude_unset: Whether to exclude fields that are not set,
+                e.g. are not included in `__pydantic_fields_set__`.
+            exclude_defaults: Whether to exclude fields that are equal to their default value.
+            exclude_none: Whether to exclude fields that have a value of `None`.
+            round_trip: Whether to enable serialization and validation round-trip support.
+            warnings: Whether to log warnings when invalid fields are encountered.
+            fallback: A function to call when an unknown value is encountered,
+                if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
+
+        Raises:
+            PydanticSerializationError: If serialization fails and no `fallback` function is provided.
+
+        Returns:
+           JSON bytes.
+        """
 
 def to_json(
     value: Any,
