@@ -66,17 +66,35 @@ __all__ = [
 
 class ErrorDetails(_TypedDict):
     type: str
+    """
+    The type of error that occurred, this is an identifier designed for
+    programmatic use that will change rarely or never.
+
+    `type` is unique for each error message, and can hence be used as an identifier to build custom error messages.
+    """
     loc: tuple[int | str, ...]
+    """Tuple of strings and ints identifying where in the schema the error occurred."""
     msg: str
+    """A human readable error message."""
     input: _Any
+    """The input data at this `loc` that caused the error."""
     ctx: _NotRequired[dict[str, str | int | float]]
+    """
+    Values which are required to render the error message, and could hence be useful in rendering custom error messages.
+    """
 
 
 class InitErrorDetails(_TypedDict):
     type: str | PydanticCustomError
+    """The type of error that occurred, this should a "slug" identifier that changes rarely or never."""
     loc: _NotRequired[tuple[int | str, ...]]
+    """Tuple of strings and ints identifying where in the schema the error occurred."""
     input: _Any
+    """The input data at this `loc` that caused the error."""
     ctx: _NotRequired[dict[str, str | int | float]]
+    """
+    Values which are required to render the error message, and could hence be useful in rendering custom error messages.
+    """
 
 
 class ErrorTypeInfo(_TypedDict):

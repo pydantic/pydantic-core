@@ -55,18 +55,43 @@ _T = TypeVar('_T', default=Any, covariant=True)
 
 @final
 class Some(Generic[_T]):
+    """
+    Similar to Rust's [`Option::Some`](https://doc.rust-lang.org/std/option/enum.Option.html) type, this
+    identifies a value as being present, and provides a way to access it.
+
+    Generally used in a union with `None` to different between "some value which could be None" and no value.
+    """
+
     __match_args__ = ('value',)
 
     @property
-    def value(self) -> _T: ...
+    def value(self) -> _T:
+        """
+        The value.
+        """
     @classmethod
     def __class_getitem__(cls, __item: Any) -> Type[Self]: ...
 
 @final
 class SchemaValidator:
-    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self: ...
+    """
+    `SchemaValidator` is the Python wrapper for `pydantic-core`'s Rust validation logic, internally it owns one
+    `CombinedValidator` which may in turn own more `CombinedValidator`s which make up the full schema validator.
+    """
+
+    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self:
+        """
+        Create a new SchemaValidator.
+
+        Arguments:
+            schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for validation.
+            config: The [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to use for validation.
+        """
     @property
-    def title(self) -> str: ...
+    def title(self) -> str:
+        """
+        The title of the schema, as used in the heading of [`ValidationError.__str__()`][pydantic_core.ValidationError].
+        """
     def validate_python(
         self,
         input: Any,
@@ -75,7 +100,28 @@ class SchemaValidator:
         from_attributes: bool | None = None,
         context: 'dict[str, Any] | None' = None,
         self_instance: Any | None = None,
-    ) -> Any: ...
+    ) -> Any:
+        """
+        Validate a Python object against the schema and return the validated object.
+
+        Arguments:
+            input: The Python object to validate.
+            strict: Whether to validate the object in strict mode.
+                If `None`, the value of [`CoreConfig.strict`][pydantic_core.core_schema.CoreConfig] is used.
+            from_attributes: Whether to validate objects as inputs to models by extracting attributes.
+                If `None`, the value of [`CoreConfig.from_attributes`][pydantic_core.core_schema.CoreConfig] is used.
+            context: The context to use for validation, this is passed to functional validators as
+                [`info.context`][pydantic_core.core_schema.ValidationInfo.context].
+            self_instance: An instance of a model set attributes on from validation, this is used when running
+                validation from the `__init__` method of a model.
+
+        Raises:
+            ValidationError: If validation fails.
+            Exception: Other error types maybe raised if internal errors occur.
+
+        Returns:
+            The validated object.
+        """
     def isinstance_python(
         self,
         input: Any,
@@ -84,7 +130,16 @@ class SchemaValidator:
         from_attributes: bool | None = None,
         context: 'dict[str, Any] | None' = None,
         self_instance: Any | None = None,
-    ) -> bool: ...
+    ) -> bool:
+        """
+        Similar to [`validate_python()`][pydantic_core.SchemaValidator.validate_python] but returns a boolean.
+
+        Arguments match `validate_python()`. This method will not raise `ValidationError`s but will raise internal
+        errors.
+
+        Returns:
+            `True` if validation succeeds, `False` if validation fails.
+        """
     def validate_json(
         self,
         input: str | bytes | bytearray,
@@ -92,7 +147,31 @@ class SchemaValidator:
         strict: bool | None = None,
         context: 'dict[str, Any] | None' = None,
         self_instance: Any | None = None,
-    ) -> Any: ...
+    ) -> Any:
+        """
+        Validate JSON data directly against the schema and return the validated Python object.
+
+        This method should be significantly faster than `validate_python(json.loads(json_data))` as it avoids the
+        need to create intermediate Python objects
+
+        It also handles constructing the correct Python type even in strict mode, where
+        `validate_python(json.loads(json_data))` would fail validation.
+
+        Arguments:
+            input: The JSON data to validate.
+            strict: Whether to validate the object in strict mode.
+                If `None`, the value of [`CoreConfig.strict`][pydantic_core.core_schema.CoreConfig] is used.
+            context: The context to use for validation, this is passed to functional validators as
+                [`info.context`][pydantic_core.core_schema.ValidationInfo.context].
+            self_instance: An instance of a model set attributes on from validation.
+
+        Raises:
+            ValidationError: If validation fails or if the JSON data is invalid.
+            Exception: Other error types maybe raised if internal errors occur.
+
+        Returns:
+            The validated Python object.
+        """
     def validate_assignment(
         self,
         obj: Any,
@@ -104,9 +183,43 @@ class SchemaValidator:
         context: 'dict[str, Any] | None' = None,
     ) -> dict[str, Any] | tuple[dict[str, Any], dict[str, Any] | None, set[str]]:
         """
-        ModelValidator and ModelFieldsValidator will return a tuple of (fields data, extra data, fields set)
+        Validate an assignment to a field on a model.
+
+        Arguments:
+            obj: The model instance being assigned to.
+            field_name: The name of the field to validate assignment for.
+            field_value: The value to assign to the field.
+            strict: Whether to validate the object in strict mode.
+                If `None`, the value of [`CoreConfig.strict`][pydantic_core.core_schema.CoreConfig] is used.
+            from_attributes: Whether to validate objects as inputs to models by extracting attributes.
+                If `None`, the value of [`CoreConfig.from_attributes`][pydantic_core.core_schema.CoreConfig] is used.
+            context: The context to use for validation, this is passed to functional validators as
+                [`info.context`][pydantic_core.core_schema.ValidationInfo.context].
+
+        Raises:
+            ValidationError: If validation fails.
+            Exception: Other error types maybe raised if internal errors occur.
+
+        Returns:
+            Either the model dict or a tuple of `(model_data, model_extra, fields_set)`
         """
-    def get_default_value(self, *, strict: bool | None = None, context: Any = None) -> Some | None: ...
+    def get_default_value(self, *, strict: bool | None = None, context: Any = None) -> Some | None:
+        """
+        Get the default value for the schema, including running default value validation.
+
+        Arguments:
+            strict: Whether to validate the default value in strict mode.
+                If `None`, the value of [`CoreConfig.strict`][pydantic_core.core_schema.CoreConfig] is used.
+            context: The context to use for validation, this is passed to functional validators as
+                [`info.context`][pydantic_core.core_schema.ValidationInfo.context].
+
+        Raises:
+            ValidationError: If validation fails.
+            Exception: Other error types maybe raised if internal errors occur.
+
+        Returns:
+            `None` if the schema has no default value, otherwise a [`Some`][pydantic_core.Some] containing the default.
+        """
 
 _IncEx: TypeAlias = set[int] | set[str] | dict[int, _IncEx] | dict[str, _IncEx] | None
 
@@ -248,6 +361,11 @@ class SchemaError(Exception):
 
 @final
 class ValidationError(ValueError):
+    """
+    `ValidationError` is the exception raised by `pydantic-core` when validation fails, it contains a list of errors
+    which detail why validation failed.
+    """
+
     @staticmethod
     def from_exception_data(
         title: str,
@@ -256,10 +374,17 @@ class ValidationError(ValueError):
         hide_input: bool = False,
     ) -> ValidationError:
         """
-        Provisory constructor for a Validation Error.
-        This API will probably change and be deprecated in the the future; we will make it easier and more
-        powerful to construct and use ValidationErrors, but we cannot do that before our initial Pydantic V2 release.
-        So if you use this method please be aware that it may change or be removed before Pydantic V3.
+        Python constructor for a Validation Error.
+
+        The API for constructing validation errors will probably change in future,
+        hence the static method rather than `__init__`.
+
+        Arguments:
+            title: The title of the error, as used in the heading of `str(validation_error`
+            line_errors: A list of [`InitErrorDetails`][pydantic_core.InitErrorDetails] which contain information
+                about errors that occurred during validation.
+            error_mode: Whether the error is for a Python object or JSON.
+            hide_input: Whether to hide the input value in the error message.
         """
     @property
     def title(self) -> str: ...
