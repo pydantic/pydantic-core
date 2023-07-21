@@ -235,15 +235,18 @@ impl ValidationError {
         Ok(PyString::new(py, s))
     }
 
-    // Have no idea what's going wrong with PyPy
-    #[cfg(not(PyPy))]
     #[getter]
     fn __cause__(self_: PyRef<'_, Self>, py: Python) -> Option<PyObject> {
         // Use cached if cause already set:
-        let ptr = unsafe { ffi::PyException_GetCause(self_.as_ptr()) };
-        let cur_cause = unsafe { py.from_owned_ptr_or_opt::<PyAny>(ptr) };
-        if let Some(cur_cause) = cur_cause {
-            return Some(cur_cause.into_py(py));
+        #[cfg(not(PyPy))]
+        // PyPy seems to use __cause__ directly for getting and setting FFI, so can't cache with PyPy (recursion)
+        {
+            use pyo3::AsPyPointer;
+            let ptr = unsafe { ffi::PyException_GetCause(self_.as_ptr()) };
+            let cur_cause = unsafe { py.from_owned_ptr_or_opt::<PyAny>(ptr) };
+            if let Some(cur_cause) = cur_cause {
+                return Some(cur_cause.into_py(py));
+            }
         }
 
         let mut user_py_errs = vec![];
@@ -311,9 +314,14 @@ impl ValidationError {
             };
 
             if let Some(cause) = cause {
-                unsafe {
-                    // PyException_SetCause _steals_ a reference to cause, so must use .into_ptr()
-                    ffi::PyException_SetCause(self_.as_ptr(), cause.clone_ref(py).into_ptr());
+                #[cfg(not(PyPy))]
+                // PyPy seems to use __cause__ directly for getting and setting FFI, so can't cache with PyPy (recursion)
+                {
+                    use pyo3::AsPyPointer;
+                    unsafe {
+                        // PyException_SetCause _steals_ a reference to cause, so must use .into_ptr()
+                        ffi::PyException_SetCause(self_.as_ptr(), cause.clone_ref(py).into_ptr());
+                    }
                 }
                 return Some(cause);
             }

@@ -1,4 +1,3 @@
-import platform
 import re
 import sys
 from decimal import Decimal
@@ -519,9 +518,6 @@ def test_all_errors():
         pytest.fail('core_schema.ErrorType needs to be updated')
 
 
-@pytest.mark.skipif(
-    'pypy' in platform.python_implementation().lower(), reason='Have no idea why its not working with PyPy.'
-)
 def test_python_err_cause_tracebacks():
     from exceptiongroup import BaseExceptionGroup
 
