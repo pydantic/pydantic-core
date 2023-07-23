@@ -63,7 +63,13 @@ def schema(*, strict: bool = False) -> dict:
                 'field_set_int': {'type': 'model-field', 'schema': {'type': 'set', 'items_schema': {'type': 'int'}}},
                 'field_set_int_con': {
                     'type': 'model-field',
-                    'schema': {'type': 'set', 'items_schema': {'type': 'int'}, 'min_length': 3, 'max_length': 42},
+                    'schema': {
+                        'type': 'set',
+                        'items_schema': {'type': 'int'},
+                        'min_length': 3,
+                        'max_length': 42,
+                        'unique': True,
+                    },
                 },
                 'field_frozenset_any': {'type': 'model-field', 'schema': {'type': 'frozenset'}},
                 'field_frozenset_bytes': {
@@ -77,6 +83,7 @@ def schema(*, strict: bool = False) -> dict:
                         'items_schema': {'type': 'bytes'},
                         'min_length': 3,
                         'max_length': 42,
+                        'unique': True,
                     },
                 },
                 'field_tuple_var_len_any': {'type': 'model-field', 'schema': {'type': 'tuple-variable'}},

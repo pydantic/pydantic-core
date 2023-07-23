@@ -1402,6 +1402,7 @@ class SetSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    unique: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1413,6 +1414,7 @@ def set_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    unique: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1435,6 +1437,7 @@ def set_schema(
         items_schema: The value must be a set with items that match this schema
         min_length: The value must be a set with at least this many items
         max_length: The value must be a set with at most this many items
+        unique: The value must be a set without any repeated items
         strict: The value must be a set with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1445,6 +1448,7 @@ def set_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        unique=unique,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -1457,6 +1461,7 @@ class FrozenSetSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    unique: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1468,6 +1473,7 @@ def frozenset_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    unique: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1490,6 +1496,7 @@ def frozenset_schema(
         items_schema: The value must be a frozenset with items that match this schema
         min_length: The value must be a frozenset with at least this many items
         max_length: The value must be a frozenset with at most this many items
+        unique: The value must be a frozenset with no repeated items
         strict: The value must be a frozenset with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1500,6 +1507,7 @@ def frozenset_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        unique=unique,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -3840,6 +3848,7 @@ ErrorType = Literal[
     'finite_number',
     'too_short',
     'too_long',
+    'non_unique',
     'iterable_type',
     'iteration_error',
     'string_type',

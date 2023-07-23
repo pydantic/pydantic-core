@@ -143,6 +143,9 @@ def generate_repeats():
             infinite_generator(),
             Err('Set should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
+        ({'unique': False}, [1, 2, 3, 1], {1, 2, 3}),
+        ({'unique': True}, [1, 2, 3], {1, 2, 3}),
+        ({'unique': True}, [1, 2, 3, 1], Err('Set should be unique, but an item appeared more than once')),
     ],
     ids=repr,
 )

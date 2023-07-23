@@ -163,6 +163,9 @@ def generate_repeats():
             infinite_generator(),
             Err('Frozenset should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
+        ({'unique': False}, [1, 2, 3, 1], {1, 2, 3}),
+        ({'unique': True}, [1, 2, 3], {1, 2, 3}),
+        ({'unique': True}, [1, 2, 3, 1], Err('Frozenset should be unique, but an item appeared more than once')),
     ],
 )
 def test_frozenset_kwargs_python(kwargs: Dict[str, Any], input_value, expected):
@@ -242,12 +245,12 @@ def test_frozenset_as_dict_keys(py_and_json: PyAndJson):
 
 
 def test_repr():
-    v = SchemaValidator({'type': 'frozenset', 'strict': True, 'min_length': 42})
+    v = SchemaValidator({'type': 'frozenset', 'strict': True, 'min_length': 42, 'unique': True})
     assert plain_repr(v) == (
         'SchemaValidator('
         'title="frozenset[any]",'
         'validator=FrozenSet(FrozenSetValidator{'
-        'strict:true,item_validator:Any(AnyValidator),min_length:Some(42),max_length:None,'
+        'strict:true,item_validator:Any(AnyValidator),min_length:Some(42),max_length:None,unique:true,'
         'name:"frozenset[any]"'
         '}),definitions=[])'
     )

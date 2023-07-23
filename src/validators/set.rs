@@ -15,6 +15,7 @@ pub struct SetValidator {
     item_validator: Box<CombinedValidator>,
     min_length: Option<usize>,
     max_length: Option<usize>,
+    unique: bool,
     name: String,
 }
 
@@ -35,13 +36,16 @@ macro_rules! set_build {
                 )?),
             };
             let inner_name = item_validator.get_name();
+            let min_length = schema.get_as(pyo3::intern!(py, "min_length"))?;
             let max_length = schema.get_as(pyo3::intern!(py, "max_length"))?;
+            let unique = schema.get_as(pyo3::intern!(py, "unique"))?.unwrap_or(false);
             let name = format!("{}[{}]", Self::EXPECTED_TYPE, inner_name);
             Ok(Self {
                 strict: crate::build_tools::is_strict(schema, config)?,
                 item_validator,
-                min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
+                min_length,
                 max_length,
+                unique,
                 name,
             }
             .into())
@@ -73,6 +77,7 @@ impl Validator for SetValidator {
             set,
             input,
             self.max_length,
+            self.unique,
             "Set",
             &self.item_validator,
             extra,

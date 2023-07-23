@@ -139,6 +139,11 @@ pub enum ErrorType {
         actual_length: usize,
     },
     // ---------------------
+    // generic collection uniqueness error
+    NonUnique {
+        field_type: String,
+    },
+    // ---------------------
     // generic collection and iteration errors
     IterableType,
     IterationError {
@@ -425,6 +430,7 @@ impl ErrorType {
                 max_length: usize,
                 actual_length: usize
             ),
+            Self::NonUnique { .. } => extract_context!(NonUnique, ctx, field_type: String),
             Self::IterationError { .. } => extract_context!(IterationError, ctx, error: String),
             Self::StringTooShort { .. } => extract_context!(StringTooShort, ctx, min_length: usize),
             Self::StringTooLong { .. } => extract_context!(StringTooLong, ctx, max_length: usize),
@@ -502,6 +508,7 @@ impl ErrorType {
             Self::FiniteNumber => "Input should be a finite number",
             Self::TooShort {..} => "{field_type} should have at least {min_length} item{expected_plural} after validation, not {actual_length}",
             Self::TooLong {..} => "{field_type} should have at most {max_length} item{expected_plural} after validation, not {actual_length}",
+            Self::NonUnique {..} => "{field_type} should be unique, but an item appeared more than once",
             Self::IterableType => "Input should be iterable",
             Self::IterationError {..} => "Error iterating over object, error: {error}",
             Self::StringType => "Input should be a valid string",
@@ -647,6 +654,7 @@ impl ErrorType {
                 let expected_plural = plural_s(*max_length);
                 to_string_render!(tmpl, field_type, max_length, actual_length, expected_plural)
             }
+            Self::NonUnique { field_type } => render!(tmpl, field_type),
             Self::IterationError { error } => render!(tmpl, error),
             Self::StringTooShort { min_length } => to_string_render!(tmpl, min_length),
             Self::StringTooLong { max_length } => to_string_render!(tmpl, max_length),
@@ -719,6 +727,7 @@ impl ErrorType {
                 max_length,
                 actual_length,
             } => py_dict!(py, field_type, max_length, actual_length),
+            Self::NonUnique { field_type } => py_dict!(py, field_type),
             Self::IterationError { error } => py_dict!(py, error),
             Self::StringTooShort { min_length } => py_dict!(py, min_length),
             Self::StringTooLong { max_length } => py_dict!(py, max_length),

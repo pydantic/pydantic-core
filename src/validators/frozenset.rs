@@ -16,6 +16,7 @@ pub struct FrozenSetValidator {
     item_validator: Box<CombinedValidator>,
     min_length: Option<usize>,
     max_length: Option<usize>,
+    unique: bool,
     name: String,
 }
 
@@ -42,6 +43,7 @@ impl Validator for FrozenSetValidator {
             f_set,
             input,
             self.max_length,
+            self.unique,
             "Frozenset",
             &self.item_validator,
             extra,

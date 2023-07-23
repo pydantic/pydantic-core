@@ -222,13 +222,16 @@ fn validate_iter_to_set<'a, 's>(
     input: &'a (impl Input<'a> + 'a),
     field_type: &'static str,
     max_length: Option<usize>,
+    unique: bool,
     validator: &'s CombinedValidator,
     extra: &Extra,
     definitions: &'a [CombinedValidator],
     recursion_guard: &'s mut RecursionGuard,
 ) -> ValResult<'a, ()> {
     let mut errors: Vec<ValLineError> = Vec::new();
+    let mut iter_len = 0;
     for (index, item_result) in iter.enumerate() {
+        iter_len = index;
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
         match validator.validate(py, item, extra, definitions, recursion_guard) {
             Ok(item) => {
@@ -256,7 +259,16 @@ fn validate_iter_to_set<'a, 's>(
     }
 
     if errors.is_empty() {
-        Ok(())
+        if unique && set.build_len() != iter_len + 1 {
+            Err(ValError::new(
+                ErrorType::NonUnique {
+                    field_type: field_type.to_string(),
+                },
+                input,
+            ))
+        } else {
+            Ok(())
+        }
     } else {
         Err(ValError::LineErrors(errors))
     }
@@ -354,6 +366,7 @@ impl<'a> GenericIterable<'a> {
         set: impl BuildSet,
         input: &'a impl Input<'a>,
         max_length: Option<usize>,
+        unique: bool,
         field_type: &'static str,
         validator: &'s CombinedValidator,
         extra: &Extra,
@@ -361,7 +374,7 @@ impl<'a> GenericIterable<'a> {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'a, ()> {
         macro_rules! validate_set {
-            ($iter:expr) => {
+            ($iter:expr, $unique:expr) => {
                 validate_iter_to_set(
                     py,
                     set,
@@ -369,6 +382,7 @@ impl<'a> GenericIterable<'a> {
                     input,
                     field_type,
                     max_length,
+                    $unique,
                     validator,
                     extra,
                     definitions,
@@ -378,14 +392,14 @@ impl<'a> GenericIterable<'a> {
         }
 
         match self {
-            GenericIterable::List(collection) => validate_set!(collection.iter().map(Ok)),
-            GenericIterable::Tuple(collection) => validate_set!(collection.iter().map(Ok)),
-            GenericIterable::Set(collection) => validate_set!(collection.iter().map(Ok)),
-            GenericIterable::FrozenSet(collection) => validate_set!(collection.iter().map(Ok)),
-            GenericIterable::Sequence(collection) => validate_set!(collection.iter()?),
-            GenericIterable::Iterator(collection) => validate_set!(collection.iter()?),
-            GenericIterable::JsonArray(collection) => validate_set!(collection.iter().map(Ok)),
-            other => validate_set!(other.as_sequence_iterator(py)?),
+            GenericIterable::List(collection) => validate_set!(collection.iter().map(Ok), unique),
+            GenericIterable::Tuple(collection) => validate_set!(collection.iter().map(Ok), unique),
+            GenericIterable::Set(collection) => validate_set!(collection.iter().map(Ok), false),
+            GenericIterable::FrozenSet(collection) => validate_set!(collection.iter().map(Ok), false),
+            GenericIterable::Sequence(collection) => validate_set!(collection.iter()?, unique),
+            GenericIterable::Iterator(collection) => validate_set!(collection.iter()?, unique),
+            GenericIterable::JsonArray(collection) => validate_set!(collection.iter().map(Ok), unique),
+            other => validate_set!(other.as_sequence_iterator(py)?, true),
         }
     }
 

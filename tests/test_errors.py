@@ -209,6 +209,7 @@ all_errors = [
         'Foobar should have at most 42 items after validation, not 50',
         {'field_type': 'Foobar', 'max_length': 42, 'actual_length': 50},
     ),
+    ('non_unique', 'Foobar should be unique, but an item appeared more than once', {'field_type': 'Foobar'}),
     ('string_type', 'Input should be a valid string', None),
     ('string_sub_type', 'Input should be a string, not an instance of a subclass of str', None),
     ('string_unicode', 'Input should be a valid string, unable to parse raw data as a unicode string', None),
