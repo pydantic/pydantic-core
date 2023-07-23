@@ -1,3 +1,6 @@
+import string
+
+
 def schema(*, strict: bool = False) -> dict:
     class MyModel:
         # __slots__ is not required, but it avoids __pydantic_fields_set__ falling into __dict__
@@ -57,7 +60,13 @@ def schema(*, strict: bool = False) -> dict:
                 'field_list_str': {'type': 'model-field', 'schema': {'type': 'list', 'items_schema': {'type': 'str'}}},
                 'field_list_str_con': {
                     'type': 'model-field',
-                    'schema': {'type': 'list', 'items_schema': {'type': 'str'}, 'min_length': 3, 'max_length': 42},
+                    'schema': {
+                        'type': 'list',
+                        'items_schema': {'type': 'str'},
+                        'min_length': 3,
+                        'max_length': 42,
+                        'unique': True,
+                    },
                 },
                 'field_set_any': {'type': 'model-field', 'schema': {'type': 'set'}},
                 'field_set_int': {'type': 'model-field', 'schema': {'type': 'set', 'items_schema': {'type': 'int'}}},
@@ -98,6 +107,7 @@ def schema(*, strict: bool = False) -> dict:
                         'items_schema': {'type': 'float'},
                         'min_length': 3,
                         'max_length': 42,
+                        'unique': True,
                     },
                 },
                 'field_tuple_fix_len': {
@@ -105,6 +115,14 @@ def schema(*, strict: bool = False) -> dict:
                     'schema': {
                         'type': 'tuple-positional',
                         'items_schema': [{'type': 'str'}, {'type': 'int'}, {'type': 'float'}, {'type': 'bool'}],
+                    },
+                },
+                'field_tuple_fix_len_con': {
+                    'type': 'model-field',
+                    'schema': {
+                        'type': 'tuple-positional',
+                        'items_schema': [{'type': 'str'}, {'type': 'int'}, {'type': 'float'}, {'type': 'bool'}],
+                        'unique': True,
                     },
                 },
                 'field_dict_any': {'type': 'model-field', 'schema': {'type': 'dict'}},
@@ -237,7 +255,7 @@ def input_data_lax():
         'field_uuid': '12345678-1234-5678-1234-567812345678',
         'field_list_any': ['a', b'b', True, 1.0, None] * 10,
         'field_list_str': ['a', 'b', 'c'] * 10,
-        'field_list_str_con': ['a', 'b', 'c'] * 10,
+        'field_list_str_con': list(string.ascii_lowercase),
         'field_set_any': {'a', b'b', True, 1.0, None},
         'field_set_int': set(range(100)),
         'field_set_int_con': set(range(42)),
@@ -248,6 +266,7 @@ def input_data_lax():
         'field_tuple_var_len_float': tuple((i + 0.5 for i in range(100))),
         'field_tuple_var_len_float_con': tuple((i + 0.5 for i in range(42))),
         'field_tuple_fix_len': ('a', 1, 1.0, True),
+        'field_tuple_fix_len_con': ('a', 1, 1.1, False),
         'field_dict_any': {'a': 'b', 1: True, 1.0: 1.0},
         'field_dict_str_float': {f'{i}': i + 0.5 for i in range(100)},
         'field_literal_1_int': 1,
@@ -318,6 +337,7 @@ def input_data_wrong():
         'field_tuple_var_len_float': tuple(f'x{i}' for i in range(100)),
         'field_tuple_var_len_float_con': (1.0, 2.0),
         'field_tuple_fix_len': ('a', 1, 1.0, True, 'more'),
+        'field_tuple_fix_len_con': ('a', 1, 1.0, False, 'more'),
         'field_dict_any': {'a', 'b', 1, True, 1.0, 2.0},
         'field_dict_str_float': {(i,): f'x{i}' for i in range(100)},
         'field_literal_1_int': 2,

@@ -1,8 +1,9 @@
+use ahash::AHashSet;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::errors::ValResult;
-use crate::input::{GenericIterable, Input};
+use crate::errors::{ErrorType, ValError, ValResult};
+use crate::input::{unique_check, GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
@@ -14,6 +15,7 @@ pub struct ListValidator {
     item_validator: Option<Box<CombinedValidator>>,
     min_length: Option<usize>,
     max_length: Option<usize>,
+    unique: bool,
     name: String,
 }
 
@@ -104,6 +106,7 @@ impl BuildValidator for ListValidator {
             item_validator,
             min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
             max_length: schema.get_as(pyo3::intern!(py, "max_length"))?,
+            unique: schema.get_as(pyo3::intern!(py, "unique"))?.unwrap_or(false),
             name,
         }
         .into())
@@ -128,6 +131,7 @@ impl Validator for ListValidator {
                 py,
                 input,
                 self.max_length,
+                self.unique,
                 "List",
                 v,
                 extra,
@@ -137,10 +141,11 @@ impl Validator for ListValidator {
             None => match seq {
                 GenericIterable::List(list) => {
                     length_check!(input, "List", self.min_length, self.max_length, list);
+                    unique_check!(py, input, "List", self.unique, list, item, item);
                     let list_copy = list.get_slice(0, usize::MAX);
                     return Ok(list_copy.into_py(py));
                 }
-                _ => seq.to_vec(py, input, "List", self.max_length)?,
+                _ => seq.to_vec(py, input, "List", self.max_length, self.unique)?,
             },
         };
         min_length_check!(input, "List", self.min_length, output);

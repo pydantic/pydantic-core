@@ -115,11 +115,40 @@ def test_tuple_strict_fails_without_tuple(wrong_coll_type: Type[Any], mode, item
             infinite_generator(),
             Err('Tuple should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
+        ({'unique': True}, [1, 2, 3], (1, 2, 3)),
+        ({'unique': False}, [1, 2, 3, 1], (1, 2, 3, 1)),
+        ({'unique': True}, (1, 2, 3, 1), Err('Tuple should be unique, but an item appeared more than once')),
     ],
     ids=repr,
 )
 def test_tuple_var_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
     v = SchemaValidator({'type': 'tuple-variable', **kwargs})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'kwargs,input_value,expected',
+    [
+        ({}, ('a', 1, 1.0, True), ('a', 1, 1.0, True)),
+        ({'unique': True}, ('a', 1, 1.1, False), ('a', 1, 1.1, False)),
+        ({'unique': False}, ['a', 1, 1.0, True], ('a', 1, 1.0, True)),
+        ({'unique': True}, ('a', 1, 1.0, False), Err('Tuple should be unique, but an item appeared more than once')),
+        ({'unique': True}, ('a', 1, 1.1, True), Err('Tuple should be unique, but an item appeared more than once')),
+    ],
+    ids=repr,
+)
+def test_tuple_fix_len_kwargs(kwargs: Dict[str, Any], input_value, expected):
+    v = SchemaValidator(
+        {
+            'type': 'tuple-positional',
+            'items_schema': [{'type': 'str'}, {'type': 'int'}, {'type': 'float'}, {'type': 'bool'}],
+            **kwargs,
+        }
+    )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)

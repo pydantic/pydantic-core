@@ -1240,6 +1240,7 @@ class ListSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    unique: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1251,6 +1252,7 @@ def list_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    unique: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1271,6 +1273,7 @@ def list_schema(
         items_schema: The value must be a list of items that match this schema
         min_length: The value must be a list with at least this many items
         max_length: The value must be a list with at most this many items
+        unique: The value must be a list without any repeated items
         strict: The value must be a list with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1281,6 +1284,7 @@ def list_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        unique=unique,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -1292,6 +1296,7 @@ class TuplePositionalSchema(TypedDict, total=False):
     type: Required[Literal['tuple-positional']]
     items_schema: Required[List[CoreSchema]]
     extra_schema: CoreSchema
+    unique: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1301,6 +1306,7 @@ class TuplePositionalSchema(TypedDict, total=False):
 def tuple_positional_schema(
     items_schema: list[CoreSchema],
     *,
+    unique: bool | None = None,
     extra_schema: CoreSchema | None = None,
     strict: bool | None = None,
     ref: str | None = None,
@@ -1322,6 +1328,7 @@ def tuple_positional_schema(
 
     Args:
         items_schema: The value must be a tuple with items that match these schemas
+        unique: The value must be a tuple without any repeated items
         extra_schema: The value must be a tuple with items that match this schema
             This was inspired by JSON schema's `prefixItems` and `items` fields.
             In python's `typing.Tuple`, you can't specify a type for "extra" items -- they must all be the same type
@@ -1334,6 +1341,7 @@ def tuple_positional_schema(
     return _dict_not_none(
         type='tuple-positional',
         items_schema=items_schema,
+        unique=unique,
         extra_schema=extra_schema,
         strict=strict,
         ref=ref,
@@ -1347,6 +1355,7 @@ class TupleVariableSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    unique: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1358,6 +1367,7 @@ def tuple_variable_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    unique: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1380,6 +1390,7 @@ def tuple_variable_schema(
         items_schema: The value must be a tuple with items that match this schema
         min_length: The value must be a tuple with at least this many items
         max_length: The value must be a tuple with at most this many items
+        unique: The value must be a tuple without any repeated items
         strict: The value must be a tuple with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1390,6 +1401,7 @@ def tuple_variable_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        unique=unique,
         strict=strict,
         ref=ref,
         metadata=metadata,

@@ -2,6 +2,7 @@
 General benchmarks that attempt to cover all field types, through by no means all uses of all field types.
 """
 import json
+import string
 from datetime import date, datetime, time
 from uuid import UUID
 
@@ -18,7 +19,7 @@ def test_complete_valid():
     lax_validator = SchemaValidator(lax_schema)
     output = lax_validator.validate_python(input_data_lax())
     assert isinstance(output, cls)
-    assert len(output.__pydantic_fields_set__) == 40
+    assert len(output.__pydantic_fields_set__) == 41
     output_dict = output.__dict__
     assert output_dict == {
         'field_str': 'fo',
@@ -39,7 +40,7 @@ def test_complete_valid():
         'field_uuid': UUID('12345678-1234-5678-1234-567812345678'),
         'field_list_any': ['a', b'b', True, 1.0, None] * 10,
         'field_list_str': ['a', 'b', 'c'] * 10,
-        'field_list_str_con': ['a', 'b', 'c'] * 10,
+        'field_list_str_con': list(string.ascii_lowercase),
         'field_set_any': {'a', b'b', True, 1.0, None},
         'field_set_int': set(range(100)),
         'field_set_int_con': set(range(42)),
@@ -50,6 +51,7 @@ def test_complete_valid():
         'field_tuple_var_len_float': tuple((i + 0.5 for i in range(100))),
         'field_tuple_var_len_float_con': tuple((i + 0.5 for i in range(42))),
         'field_tuple_fix_len': ('a', 1, 1.0, True),
+        'field_tuple_fix_len_con': ('a', 1, 1.1, False),
         'field_dict_any': {'a': 'b', 1: True, 1.0: 1.0},
         'field_dict_str_float': {f'{i}': i + 0.5 for i in range(100)},
         'field_literal_1_int': 1,
@@ -81,7 +83,7 @@ def test_complete_invalid():
     lax_validator = SchemaValidator(lax_schema)
     with pytest.raises(ValidationError) as exc_info:
         lax_validator.validate_python(input_data_wrong())
-    assert len(exc_info.value.errors(include_url=False)) == 738
+    assert len(exc_info.value.errors(include_url=False)) == 739
 
 
 @pytest.mark.benchmark(group='complete')

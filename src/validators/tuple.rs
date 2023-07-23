@@ -1,10 +1,11 @@
+use ahash::AHashSet;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::is_strict;
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
-use crate::input::{GenericIterable, Input};
+use crate::input::{unique_check, GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
@@ -17,6 +18,7 @@ pub struct TupleVariableValidator {
     item_validator: Option<Box<CombinedValidator>>,
     min_length: Option<usize>,
     max_length: Option<usize>,
+    unique: bool,
     name: String,
 }
 
@@ -36,6 +38,7 @@ impl BuildValidator for TupleVariableValidator {
             item_validator,
             min_length: schema.get_as(intern!(py, "min_length"))?,
             max_length: schema.get_as(intern!(py, "max_length"))?,
+            unique: schema.get_as(pyo3::intern!(py, "unique"))?.unwrap_or(false),
             name,
         }
         .into())
@@ -60,13 +63,14 @@ impl Validator for TupleVariableValidator {
                 py,
                 input,
                 self.max_length,
+                self.unique,
                 "Tuple",
                 v,
                 extra,
                 definitions,
                 recursion_guard,
             )?,
-            None => seq.to_vec(py, input, "Tuple", self.max_length)?,
+            None => seq.to_vec(py, input, "Tuple", self.max_length, self.unique)?,
         };
         min_length_check!(input, "Tuple", self.min_length, output);
         Ok(PyTuple::new(py, &output).into_py(py))
@@ -104,6 +108,7 @@ pub struct TuplePositionalValidator {
     strict: bool,
     items_validators: Vec<CombinedValidator>,
     extra_validator: Option<Box<CombinedValidator>>,
+    unique: bool,
     name: String,
 }
 
@@ -133,6 +138,7 @@ impl BuildValidator for TuplePositionalValidator {
                 Some(v) => Some(Box::new(build_validator(v, config, definitions)?)),
                 None => None,
             },
+            unique: schema.get_as(pyo3::intern!(py, "unique"))?.unwrap_or(false),
             name: format!("tuple[{descr}]"),
         }
         .into())
@@ -148,6 +154,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
     recursion_guard: &'s mut RecursionGuard,
     output: &mut Vec<PyObject>,
     errors: &mut Vec<ValLineError<'data>>,
+    unique: bool,
     extra_validator: &Option<Box<CombinedValidator>>,
     items_validators: &[CombinedValidator],
     collection_iter: &mut T,
@@ -203,6 +210,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
             }
         }
     }
+    unique_check!(py, input, "Tuple", unique, output);
     Ok(())
 }
 
@@ -237,6 +245,7 @@ impl Validator for TuplePositionalValidator {
                     recursion_guard,
                     &mut output,
                     &mut errors,
+                    self.unique,
                     &self.extra_validator,
                     &self.items_validators,
                     &mut $collection_iter,

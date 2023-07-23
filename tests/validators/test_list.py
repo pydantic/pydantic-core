@@ -162,6 +162,17 @@ def test_list_error(input_value, index):
             infinite_generator(),
             Err('List should have at most 44 items after validation, not 45 [type=too_long,'),
         ),
+        ({'unique': False}, [1, 2, 3, 1], [1, 2, 3, 1]),
+        ({'unique': True}, [1, 2, 3], [1, 2, 3]),
+        ({'unique': True}, (1, 2, 3), [1, 2, 3]),
+        ({'unique': True, 'items_schema': {'type': 'int'}}, [1, 2, 3], [1, 2, 3]),
+        ({'unique': True}, [1, 2, 3, 1], Err('List should be unique, but an item appeared more than once')),
+        ({'unique': True}, (1, 2, 3, 1), Err('List should be unique, but an item appeared more than once')),
+        (
+            {'unique': True, 'items_schema': {'type': 'int'}},
+            [1, 2, 3, 1],
+            Err('List should be unique, but an item appeared more than once'),
+        ),
     ],
 )
 def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
