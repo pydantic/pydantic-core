@@ -529,7 +529,8 @@ class Url(SupportsAllComparisons):
             query: The query part of the URL, or omit for no query.
             fragment: The fragment part of the URL, or omit for no fragment.
 
-        Returns: An instance of URL
+        Returns:
+            An instance of URL
         """
 
 class MultiHostUrl(SupportsAllComparisons):
@@ -590,7 +591,7 @@ class MultiHostUrl(SupportsAllComparisons):
     def hosts(self) -> list[MultiHostHost]:
         '''
 
-        The hosts of the `MultiHostUrl` as [`MultiHostHost`](pydantic_core.MultiHostHost) typed dicts.
+        The hosts of the `MultiHostUrl` as [`MultiHostHost`][pydantic_core.MultiHostHost] typed dicts.
 
         ```py
         from pydantic_core import MultiHostUrl
@@ -647,7 +648,8 @@ class MultiHostUrl(SupportsAllComparisons):
             query: The query part of the URL, or omit for no query.
             fragment: The fragment part of the URL, or omit for no fragment.
 
-        Returns: An instance of `MultiHostUul`
+        Returns:
+            An instance of `MultiHostUrl`
         """
 
 @final
@@ -725,7 +727,8 @@ class ValidationError(ValueError):
             include_url: Whether to include a URL to documentation on the error each error.
             include_context: Whether to include the context of each error.
 
-        Returns: a JSON string.
+        Returns:
+            a JSON string.
         """
 
 @final
