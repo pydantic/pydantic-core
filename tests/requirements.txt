@@ -1,6 +1,6 @@
 coverage==7.2.7
 dirty-equals==0.6.0
-hypothesis==6.63.0
+hypothesis==6.81.2
 pytest==7.2.1
 pytest-examples==0.0.4
 pytest-speed==0.3.5
