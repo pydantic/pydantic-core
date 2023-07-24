@@ -32,6 +32,19 @@ def test_pydantic_value_error():
     )
 
 
+@pytest.mark.parametrize(
+    'msg,result_msg', [('my custom error', 'my custom error'), ('my custom error {foo}', "my custom error {'bar': []}")]
+)
+def test_pydantic_value_error_nested_ctx(msg: str, result_msg: str):
+    e = PydanticCustomError('my_error', msg, {'foo': {'bar': []}})
+    assert e.message() == result_msg
+    assert e.message_template == msg
+    assert e.type == 'my_error'
+    assert e.context == {'foo': {'bar': []}}
+    assert str(e) == result_msg
+    assert repr(e) == f"{result_msg} [type=my_error, context={'foo': {'bar': []}}]"
+
+
 def test_pydantic_value_error_none():
     e = PydanticCustomError('my_error', 'this is a custom error {missed}')
     assert e.message() == 'this is a custom error {missed}'
@@ -141,6 +154,15 @@ def test_pydantic_error_type():
     assert e.context == {'error': 'Test'}
     assert str(e) == 'Invalid JSON: Test'
     assert repr(e) == "Invalid JSON: Test [type=json_invalid, context={'error': 'Test'}]"
+
+
+def test_pydantic_error_type_nested_ctx():
+    e = PydanticKnownError('json_invalid', {'error': 'Test', 'foo': {'bar': []}})
+    assert e.message() == 'Invalid JSON: Test'
+    assert e.type == 'json_invalid'
+    assert e.context == {'error': 'Test', 'foo': {'bar': []}}
+    assert str(e) == 'Invalid JSON: Test'
+    assert repr(e) == "Invalid JSON: Test [type=json_invalid, context={'error': 'Test', 'foo': {'bar': []}}]"
 
 
 def test_pydantic_error_type_raise_no_ctx():
@@ -664,6 +686,20 @@ def test_raise_validation_error_custom():
             'input': 'x',
             'ctx': {'foo': 'X', 'bar': 42},
         }
+    ]
+
+
+@pytest.mark.parametrize(
+    'msg,result_msg', [('my custom error', 'my custom error'), ('my custom error {foo}', "my custom error {'bar': []}")]
+)
+def test_raise_validation_error_custom_nested_ctx(msg: str, result_msg: str):
+    custom_error = PydanticCustomError('my_error', msg, {'foo': {'bar': []}})
+    with pytest.raises(ValidationError) as exc_info:
+        raise ValidationError.from_exception_data('Foobar', [{'type': custom_error, 'input': 'x'}])
+
+    # insert_assert(exc_info.value.errors(include_url=False))
+    assert exc_info.value.errors(include_url=False) == [
+        {'type': 'my_error', 'loc': (), 'msg': result_msg, 'input': 'x', 'ctx': {'foo': {'bar': []}}}
     ]
 
 
