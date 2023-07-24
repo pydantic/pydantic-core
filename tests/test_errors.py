@@ -697,14 +697,34 @@ def test_raise_validation_error_custom():
     'msg,result_msg', [('my custom error', 'my custom error'), ('my custom error {foo}', "my custom error {'bar': []}")]
 )
 def test_raise_validation_error_custom_nested_ctx(msg: str, result_msg: str):
-    custom_error = PydanticCustomError('my_error', msg, {'foo': {'bar': []}})
+    ctx = {'foo': {'bar': []}}
+    custom_error = PydanticCustomError('my_error', msg, ctx)
     with pytest.raises(ValidationError) as exc_info:
         raise ValidationError.from_exception_data('Foobar', [{'type': custom_error, 'input': 'x'}])
 
+    expected_error_detail = {'type': 'my_error', 'loc': (), 'msg': result_msg, 'input': 'x', 'ctx': ctx}
+
     # insert_assert(exc_info.value.errors(include_url=False))
-    assert exc_info.value.errors(include_url=False) == [
-        {'type': 'my_error', 'loc': (), 'msg': result_msg, 'input': 'x', 'ctx': {'foo': {'bar': []}}}
-    ]
+    assert exc_info.value.errors(include_url=False) == [expected_error_detail]
+    assert exc_info.value.json(include_url=False) == IsJson([{**expected_error_detail, 'loc': []}])
+
+
+def test_raise_validation_error_custom_class_ctx():
+    custom_data = Foobar()
+    ctx = {'foo': {'bar': custom_data}}
+    custom_error = PydanticCustomError('my_error', 'my message', ctx)
+    assert custom_error.context == ctx
+
+    with pytest.raises(ValidationError) as exc_info:
+        raise ValidationError.from_exception_data('MyTitle', [{'type': custom_error, 'input': 'x'}])
+
+    expected_error_detail = {'type': 'my_error', 'loc': (), 'msg': 'my message', 'input': 'x', 'ctx': ctx}
+
+    # insert_assert(exc_info.value.errors(include_url=False))
+    assert exc_info.value.errors(include_url=False) == [expected_error_detail]
+    assert exc_info.value.json(include_url=False) == IsJson(
+        [{**expected_error_detail, 'loc': [], 'ctx': {'foo': {'bar': str(custom_data)}}}]
+    )
 
 
 def test_loc_with_dots(pydantic_version):
