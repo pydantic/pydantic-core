@@ -652,8 +652,21 @@ class MultiHostUrl(SupportsAllComparisons):
 
 @final
 class SchemaError(Exception):
-    def error_count(self) -> int: ...
-    def errors(self) -> list[ErrorDetails]: ...
+    """
+    Information about errors that occur while building a [`SchemaValidator`][pydantic_core.SchemaValidator]
+    or [`SchemaSerializer`][pydantic_core.SchemaSerializer].
+    """
+
+    def error_count(self) -> int:
+        """
+        Returns:
+            The number of errors in the schema.
+        """
+    def errors(self) -> list[ErrorDetails]:
+        """
+        Returns:
+            A list of [`ErrorDetails`][pydantic_core.ErrorDetails] for each error in the schema.
+        """
 
 @final
 class ValidationError(ValueError):
@@ -672,21 +685,48 @@ class ValidationError(ValueError):
         """
         Python constructor for a Validation Error.
 
-        The API for constructing validation errors will probably change in future,
+        The API for constructing validation errors will probably change in the future,
         hence the static method rather than `__init__`.
 
         Arguments:
-            title: The title of the error, as used in the heading of `str(validation_error`
+            title: The title of the error, as used in the heading of `str(validation_error)`
             line_errors: A list of [`InitErrorDetails`][pydantic_core.InitErrorDetails] which contain information
                 about errors that occurred during validation.
             error_mode: Whether the error is for a Python object or JSON.
             hide_input: Whether to hide the input value in the error message.
         """
     @property
-    def title(self) -> str: ...
-    def error_count(self) -> int: ...
-    def errors(self, *, include_url: bool = True, include_context: bool = True) -> list[ErrorDetails]: ...
-    def json(self, *, indent: int | None = None, include_url: bool = True, include_context: bool = True) -> str: ...
+    def title(self) -> str:
+        """
+        The title of the error, as used in the heading of `str(validation_error)`.
+        """
+    def error_count(self) -> int:
+        """
+        Returns:
+            The number of errors in the validation error.
+        """
+    def errors(self, *, include_url: bool = True, include_context: bool = True) -> list[ErrorDetails]:
+        """
+        Details about each error in the validation error.
+
+        Args:
+            include_url: Whether to include a URL to documentation on the error each error.
+            include_context: Whether to include the context of each error.
+
+        Returns:
+            A list of [`ErrorDetails`][pydantic_core.ErrorDetails] for each error in the validation error.
+        """
+    def json(self, *, indent: int | None = None, include_url: bool = True, include_context: bool = True) -> str:
+        """
+        Same as [`errors()`][pydantic_core.ValidationError.errors] but returns a JSON string.
+
+        Args:
+            indent: The number of spaces to indent the JSON by, or `None` for no indentation - compact JSON.
+            include_url: Whether to include a URL to documentation on the error each error.
+            include_context: Whether to include the context of each error.
+
+        Returns: a JSON string.
+        """
 
 @final
 class PydanticCustomError(ValueError):
@@ -748,6 +788,9 @@ PydanticUndefined: PydanticUndefinedType
 def list_all_errors() -> list[ErrorTypeInfo]:
     """
     Get information about all built-in errors.
+
+    Returns:
+        A list of `ErrorTypeInfo` typed dicts.
     """
 
 @final

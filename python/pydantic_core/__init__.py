@@ -98,12 +98,22 @@ class InitErrorDetails(_TypedDict):
 
 
 class ErrorTypeInfo(_TypedDict):
+    """
+    Gives information about errors.
+    """
+
     type: ErrorType
+    """The type of error that occurred, this should a "slug" identifier that changes rarely or never."""
     message_template_python: str
+    """String template to render a human readable error message from using context, when the input is Python."""
     example_message_python: str
+    """Example of a human readable error message, when the input is Python."""
     message_template_json: _NotRequired[str]
+    """String template to render a human readable error message from using context, when the input is JSON data."""
     example_message_json: _NotRequired[str]
+    """Example of a human readable error message, when the input is JSON data."""
     example_context: dict[str, str | int | float] | None
+    """Example of context values."""
 
 
 class MultiHostHost(_TypedDict):
@@ -112,18 +122,10 @@ class MultiHostHost(_TypedDict):
     """
 
     username: str | None
-    """
-    The username part of this host, or `None`.
-    """
+    """The username part of this host, or `None`."""
     password: str | None
-    """
-    The password part of this host, or `None`.
-    """
+    """The password part of this host, or `None`."""
     host: str | None
-    """
-    The host part of this host, or `None`.
-    """
+    """The host part of this host, or `None`."""
     port: int | None
-    """
-    The port part of this host, or `None`.
-    """
+    """The port part of this host, or `None`."""
