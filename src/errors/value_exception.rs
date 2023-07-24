@@ -73,6 +73,10 @@ impl PydanticCustomError {
         }
     }
 
+    pub fn to_object(&self, py: Python<'_>) -> PyObject {
+        self.context(py).into_py(py)
+    }
+
     #[getter(type)]
     pub fn error_type(&self) -> String {
         self.error_type.clone()
@@ -121,7 +125,10 @@ impl PydanticCustomError {
 
 impl PydanticCustomError {
     pub fn into_val_error<'a>(self, input: &'a impl Input<'a>) -> ValError<'a> {
-        let error_type = ErrorType::CustomError { custom_error: self };
+        let error_type = ErrorType::CustomError {
+            custom_error: self,
+            context: None,
+        };
         ValError::new(error_type, input)
     }
 }

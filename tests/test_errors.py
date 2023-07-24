@@ -158,15 +158,13 @@ def test_pydantic_error_type():
 
 
 def test_pydantic_error_type_nested_ctx():
-    e = PydanticKnownError('json_invalid', {'error': 'Test', 'foo': {'bar': []}})
+    ctx = {'error': 'Test', 'foo': {'bar': []}}
+    e = PydanticKnownError('json_invalid', ctx)
     assert e.message() == 'Invalid JSON: Test'
     assert e.type == 'json_invalid'
-    # TODO fix inconsistency here with context. It should include "foo" key
-    # assert e.context == {'error': 'Test', 'foo': {'bar': []}}
-    assert e.context == {'error': 'Test'}
+    assert e.context == ctx
     assert str(e) == 'Invalid JSON: Test'
-    # assert repr(e) == "Invalid JSON: Test [type=json_invalid, context={'error': 'Test', 'foo': {'bar': []}}]"
-    assert repr(e) == "Invalid JSON: Test [type=json_invalid, context={'error': 'Test'}]"
+    assert repr(e) == f"Invalid JSON: Test [type=json_invalid, context={ctx}]"
 
 
 def test_pydantic_error_type_raise_no_ctx():
@@ -332,7 +330,7 @@ def test_error_decimal():
     e = PydanticKnownError('greater_than', {'gt': Decimal('42.1')})
     assert e.message() == 'Input should be greater than 42.1'
     assert e.type == 'greater_than'
-    assert e.context == {'gt': 42.1}
+    assert e.context == {'gt': Decimal("42.1")}
 
 
 def test_custom_error_decimal():
@@ -382,9 +380,9 @@ def test_type_error_error():
         PydanticKnownError('greater_than', {'gt': []})
 
 
-def test_does_not_require_context():
-    with pytest.raises(TypeError, match="^'json_type' errors do not require context$"):
-        PydanticKnownError('json_type', {'gt': 123})
+def test_custom_context_for_simple_error():
+    err = PydanticKnownError('json_type', {'foo': 'bar'})
+    assert err.context == {'foo': 'bar'}
 
 
 def test_all_errors():
@@ -637,7 +635,7 @@ def test_raise_validation_error():
     assert exc_info.value.errors(include_url=False) == [
         {'type': 'greater_than', 'loc': ('a', 2), 'msg': 'Input should be greater than 5', 'input': 4, 'ctx': {'gt': 5}}
     ]
-    with pytest.raises(TypeError, match='GreaterThan requires context: {gt: Number}'):
+    with pytest.raises(TypeError, match="GreaterThan: 'gt' required in context"):
         raise ValidationError.from_exception_data('Foobar', [{'type': 'greater_than', 'loc': ('a', 2), 'input': 4}])
 
 

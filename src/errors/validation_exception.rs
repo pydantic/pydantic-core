@@ -390,7 +390,7 @@ impl PyLineError {
         }
         if let Some(url_prefix) = url_prefix {
             match self.error_type {
-                ErrorType::CustomError { custom_error: _ } => {
+                ErrorType::CustomError { custom_error: _, .. } => {
                     // Don't add URLs for custom errors
                 }
                 _ => {
@@ -428,7 +428,7 @@ impl PyLineError {
         }
         if let Some(url_prefix) = url_prefix {
             match self.error_type {
-                ErrorType::CustomError { custom_error: _ } => {
+                ErrorType::CustomError { custom_error: _, .. } => {
                     // Don't display URLs for custom errors
                     output.push(']');
                 }
