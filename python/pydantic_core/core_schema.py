@@ -93,7 +93,7 @@ class CoreConfig(TypedDict, total=False):
     # used to hide input data from ValidationError repr
     hide_input_in_errors: bool
     # used for plugins to add custom settings
-    plugin_settings: dict[str, Any]
+    plugin_settings: Dict[str, Any]
 
 
 IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
