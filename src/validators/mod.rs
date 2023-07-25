@@ -104,12 +104,13 @@ pub struct SchemaValidator {
     #[pyo3(get)]
     title: PyObject,
     hide_input_in_errors: bool,
+    _ignored: PyObject,
 }
 
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
+    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>, _ignored: Option<&PyAny>) -> PyResult<Self> {
         let self_validator = SelfValidator::new(py)?;
         let schema = self_validator.validate_schema(py, schema)?;
 
@@ -136,6 +137,7 @@ impl SchemaValidator {
             schema: schema.into_py(py),
             title,
             hide_input_in_errors,
+            _ignored: _ignored.into_py(py),
         })
     }
 
@@ -372,6 +374,7 @@ impl<'py> SelfValidator<'py> {
             schema: py.None(),
             title: "Self Schema".into_py(py),
             hide_input_in_errors: false,
+            _ignored: py.None(),
         })
     }
 }

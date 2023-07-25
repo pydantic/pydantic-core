@@ -79,7 +79,7 @@ class SchemaValidator:
     `CombinedValidator` which may in turn own more `CombinedValidator`s which make up the full schema validator.
     """
 
-    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self:
+    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None, _ignored: Any = None) -> Self:
         """
         Create a new SchemaValidator.
 
