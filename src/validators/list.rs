@@ -1,8 +1,7 @@
-use ahash::AHashSet;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::errors::{ErrorType, ValError, ValResult};
+use crate::errors::ValResult;
 use crate::input::{unique_check, GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
@@ -141,7 +140,7 @@ impl Validator for ListValidator {
             None => match seq {
                 GenericIterable::List(list) => {
                     length_check!(input, "List", self.min_length, self.max_length, list);
-                    unique_check!(py, input, "List", self.unique, list, item, item);
+                    unique_check(py, input, "List", self.unique, list, |_, i| i)?;
                     let list_copy = list.get_slice(0, usize::MAX);
                     return Ok(list_copy.into_py(py));
                 }

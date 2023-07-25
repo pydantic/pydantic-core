@@ -1,4 +1,3 @@
-use ahash::AHashSet;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
@@ -210,7 +209,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
             }
         }
     }
-    unique_check!(py, input, "Tuple", unique, output);
+    unique_check(py, input, "Tuple", unique, output, |py, i| i.as_ref(py))?;
     Ok(())
 }
 

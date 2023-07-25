@@ -1,6 +1,6 @@
-use ahash::AHashSet;
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::ops::Index;
 use std::ops::Rem;
 use std::slice::Iter as SliceIter;
 use std::str::FromStr;
@@ -148,41 +148,42 @@ macro_rules! any_next_error {
     };
 }
 
-macro_rules! unique_check {
-    ($py:expr, $input:expr, $field_type:expr, $unique:expr, $data:expr) => {
-        unique_check!($py, $input, $field_type, $unique, $data, item, item.as_ref($py));
-    };
-    ($py:expr, $input:expr, $field_type:expr, $unique:expr, $data:expr, $item:ident, $item_py:expr) => {
-        if $unique {
-            let repeated = if $data.len() <= 30 {
-                let mut hashes = Vec::with_capacity($data.len());
-                for $item in $data.iter() {
-                    hashes.push($item_py.hash()?);
+pub fn unique_check<'data, 'a, T: 'a, I: Index<usize, Output = T> + 'a>(
+    py: Python<'data>,
+    input: &'data impl Input<'data>,
+    field_type: &'static str,
+    unique: bool,
+    data: &'a I,
+    get_item: impl Fn(Python<'data>, &'a T) -> &'a PyAny,
+) -> ValResult<'data, ()>
+where
+    &'a I: IntoIterator<Item = &'a T>,
+    'data: 'a,
+{
+    if unique {
+        let mut vec: Vec<(isize, &PyAny)> = data
+            .into_iter()
+            .map(|item| {
+                let item = get_item(py, item);
+                item.hash().map(|h| (h, item))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        vec.sort_unstable_by_key(|(item_h, _)| *item_h);
+        for (i, (item_h, item)) in vec.iter().enumerate() {
+            for (_, other) in vec[i + 1..].iter().take_while(|(other_h, _)| other_h == item_h) {
+                if item.eq(other)? {
+                    return Err(ValError::new(
+                        ErrorType::NonUnique {
+                            field_type: field_type.to_string(),
+                        },
+                        input,
+                    ));
                 }
-                (1..hashes.len()).any(|i| hashes[i..].contains(&hashes[i - 1]))
-            } else {
-                let mut set = AHashSet::with_capacity($data.len());
-                for $item in $data.iter() {
-                    set.insert($item_py.hash()?);
-                }
-                set.len() != $data.len()
-            };
-            if repeated {
-                return Err(ValError::new(
-                    ErrorType::NonUnique {
-                        field_type: $field_type.to_string(),
-                    },
-                    $input,
-                ));
             }
         }
-    };
+    }
+    Ok(())
 }
-pub(crate) use unique_check;
-
-// pub fn unique_check<'data>(py: Python<'data>, input: &'data impl Input<'data>, field_type: &'static str, unique: bool, data: &Vec<PyObject>) -> ValResult<'data, ()> {
-//     Ok(())
-// }
 
 #[allow(clippy::too_many_arguments)]
 fn validate_iter_to_vec<'a, 's>(
@@ -217,7 +218,7 @@ fn validate_iter_to_vec<'a, 's>(
     }
 
     if errors.is_empty() {
-        unique_check!(py, input, field_type, unique, &output);
+        unique_check(py, input, field_type, unique, &output, |py, i| i.as_ref(py))?;
         Ok(output)
     } else {
         Err(ValError::LineErrors(errors))
@@ -331,7 +332,7 @@ fn no_validator_iter_to_vec<'a, 's>(
         })
         .collect::<ValResult<Vec<PyObject>>>()
         .and_then(|output| {
-            unique_check!(py, input, field_type, unique, &output);
+            unique_check(py, input, field_type, unique, &output, |py, i| i.as_ref(py))?;
             Ok(output)
         })
 }
