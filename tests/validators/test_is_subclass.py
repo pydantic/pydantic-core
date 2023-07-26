@@ -1,6 +1,6 @@
 import pytest
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import SchemaValidator, ValidationError, core_schema
 
 
 class Foo:
@@ -57,9 +57,11 @@ def test_not_parent():
     assert not v.isinstance_python(Foo)
 
 
-def test_invalid_type():
-    with pytest.raises(SchemaError, match="TypeError: 'Foo' object cannot be converted to 'PyType"):
-        SchemaValidator(core_schema.is_subclass_schema(Foo()))
+@pytest.mark.parametrize('input_value', [Foo, Foobar, Bar, type])
+def test_is_subclass_object_of_class(input_value):
+    v = SchemaValidator(core_schema.is_subclass_schema(Foo()))
+    with pytest.raises(TypeError, match='arg 2 must be a class'):
+        v.isinstance_python(input_value)
 
 
 def test_custom_repr():

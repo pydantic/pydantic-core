@@ -11,7 +11,7 @@ use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, 
 
 #[derive(Debug, Clone)]
 pub struct IsSubclassValidator {
-    class: Py<PyType>,
+    class: Py<PyAny>,
     class_repr: String,
     name: String,
 }
@@ -25,11 +25,14 @@ impl BuildValidator for IsSubclassValidator {
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
+        let class: &PyAny = schema.get_as_req(intern!(py, "cls"))?;
 
         let class_repr = match schema.get_as(intern!(py, "cls_repr"))? {
             Some(s) => s,
-            None => class.name()?.to_string(),
+            None => match class.extract::<&PyType>() {
+                Ok(t) => t.name()?.to_string(),
+                Err(_) => class.repr()?.extract()?,
+            },
         };
         let name = format!("{}[{class_repr}]", Self::EXPECTED_TYPE);
         Ok(Self {

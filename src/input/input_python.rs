@@ -125,7 +125,7 @@ impl<'a> Input<'a> for PyAny {
         self.downcast::<PyDict>().ok()
     }
 
-    fn input_is_subclass(&self, class: &PyType) -> PyResult<bool> {
+    fn input_is_subclass(&self, class: &PyAny) -> PyResult<bool> {
         match self.downcast::<PyType>() {
             Ok(py_type) => py_type.is_subclass(class),
             Err(_) => Ok(false),

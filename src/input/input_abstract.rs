@@ -50,7 +50,7 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn as_kwargs(&'a self, py: Python<'a>) -> Option<&'a PyDict>;
 
-    fn input_is_subclass(&self, _class: &PyType) -> PyResult<bool> {
+    fn input_is_subclass(&self, _class: &PyAny) -> PyResult<bool> {
         Ok(false)
     }
 
