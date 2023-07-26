@@ -201,14 +201,10 @@ all_errors = [
     ('finite_number', 'Input should be a finite number', None),
     (
         'too_short',
-        'Foobar should have at least 42 items after validation, not 40',
-        {'field_type': 'Foobar', 'min_length': 42, 'actual_length': 40},
+        'Data should have at least 42 items after validation, not 40',
+        {'min_length': 42, 'actual_length': 40},
     ),
-    (
-        'too_long',
-        'Foobar should have at most 42 items after validation, not 50',
-        {'field_type': 'Foobar', 'max_length': 42, 'actual_length': 50},
-    ),
+    ('too_long', 'Data should have at most 42 items after validation, not 50', {'max_length': 42, 'actual_length': 50}),
     ('string_type', 'Input should be a valid string', None),
     ('string_sub_type', 'Input should be a string, not an instance of a subclass of str', None),
     ('string_unicode', 'Input should be a valid string, unable to parse raw data as a unicode string', None),

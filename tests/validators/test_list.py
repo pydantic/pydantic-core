@@ -143,24 +143,25 @@ def test_list_error(input_value, index):
     [
         ({}, [1, 2, 3, 4], [1, 2, 3, 4]),
         ({'min_length': 3}, [1, 2, 3, 4], [1, 2, 3, 4]),
-        ({'min_length': 3}, [1, 2], Err('List should have at least 3 items after validation, not 2 [type=too_short,')),
-        ({'min_length': 1}, [], Err('List should have at least 1 item after validation, not 0 [type=too_short,')),
+        ({'min_length': 3}, [1, 2], Err('Data should have at least 3 items after validation, not 2 [type=too_short,')),
+        ({'min_length': 1}, [], Err('Data should have at least 1 item after validation, not 0 [type=too_short,')),
         ({'max_length': 4}, [1, 2, 3, 4], [1, 2, 3, 4]),
         (
             {'max_length': 3},
             [1, 2, 3, 4],
-            Err('List should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Data should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
         (
             {'max_length': 3},
             [1, 2, 3, 4, 5, 6, 7],
-            Err('List should have at most 3 items after validation, not 7 [type=too_long,'),
+            Err('Data should have at most 3 items after validation, not 7 [type=too_long,'),
         ),
-        ({'max_length': 1}, [1, 2], Err('List should have at most 1 item after validation, not 2 [type=too_long,')),
-        (
+        ({'max_length': 1}, [1, 2], Err('Data should have at most 1 item after validation, not 2 [type=too_long,')),
+        pytest.param(
             {'max_length': 44},
             infinite_generator(),
-            Err('List should have at most 44 items after validation, not 45 [type=too_long,'),
+            Err('Data should have at most 44 items after validation, not 45 [type=too_long,'),
+            marks=pytest.mark.timeout(5),
         ),
     ],
 )
@@ -177,7 +178,7 @@ def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
     'input_value,expected',
     [
         ([1, 2, 3, 4], [1, 2, 3, 4]),
-        ([1, 2, 3, 4, 5], Err('List should have at most 4 items after validation, not 5 [type=too_long,')),
+        ([1, 2, 3, 4, 5], Err('Data should have at most 4 items after validation, not 5 [type=too_long,')),
         ([1, 2, 3, 'x', 4], [1, 2, 3, 4]),
     ],
 )
@@ -205,9 +206,9 @@ def test_length_ctx():
         {
             'type': 'too_short',
             'loc': (),
-            'msg': 'List should have at least 2 items after validation, not 1',
+            'msg': 'Data should have at least 2 items after validation, not 1',
             'input': [1],
-            'ctx': {'field_type': 'List', 'min_length': 2, 'actual_length': 1},
+            'ctx': {'min_length': 2, 'actual_length': 1},
         }
     ]
 
@@ -219,9 +220,9 @@ def test_length_ctx():
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 3 items after validation, not 4',
+            'msg': 'Data should have at most 3 items after validation, not 4',
             'input': [1, 2, 3, 4],
-            'ctx': {'field_type': 'List', 'max_length': 3, 'actual_length': 4},
+            'ctx': {'max_length': 3, 'actual_length': 4},
         }
     ]
 
@@ -365,6 +366,7 @@ def test_bad_iter(items_schema):
 
 
 @pytest.mark.parametrize('error_in_func', [True, False])
+@pytest.mark.timeout(5)
 def test_max_length_fail_fast(error_in_func: bool) -> None:
     calls: list[int] = []
 
@@ -391,9 +393,9 @@ def test_max_length_fail_fast(error_in_func: bool) -> None:
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 10 items after validation, not 11',
+            'msg': 'Data should have at most 10 items after validation, not 11',
             'input': data,
-            'ctx': {'field_type': 'List', 'max_length': 10, 'actual_length': 11},
+            'ctx': {'max_length': 10, 'actual_length': 11},
         }
     )
 

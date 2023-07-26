@@ -68,9 +68,9 @@ def test_empty_positional_tuple():
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'Tuple should have at most 0 items after validation, not 1',
+            'msg': 'Data should have at most 0 items after validation, not 1',
             'input': (1,),
-            'ctx': {'field_type': 'Tuple', 'max_length': 0, 'actual_length': 1},
+            'ctx': {'max_length': 0, 'actual_length': 1},
         }
     ]
 
@@ -98,22 +98,23 @@ def test_tuple_strict_fails_without_tuple(wrong_coll_type: Type[Any], mode, item
     [
         ({}, (1, 2, 3, 4), (1, 2, 3, 4)),
         ({'min_length': 3}, (1, 2, 3, 4), (1, 2, 3, 4)),
-        ({'min_length': 3}, (1, 2), Err('Tuple should have at least 3 items after validation, not 2 [type=too_short,')),
+        ({'min_length': 3}, (1, 2), Err('Data should have at least 3 items after validation, not 2 [type=too_short,')),
         ({'max_length': 4}, (1, 2, 3, 4), (1, 2, 3, 4)),
         (
             {'max_length': 3},
             (1, 2, 3, 4),
-            Err('Tuple should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Data should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
         (
             {'max_length': 3},
             [1, 2, 3, 4],
-            Err('Tuple should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Data should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
-        (
+        pytest.param(
             {'max_length': 3},
             infinite_generator(),
-            Err('Tuple should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Data should have at most 3 items after validation, not 4 [type=too_long,'),
+            marks=pytest.mark.timeout(5),
         ),
     ],
     ids=repr,
@@ -248,9 +249,9 @@ def test_extra_arguments(py_and_json: PyAndJson):
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'Tuple should have at most 2 items after validation, not 4',
+            'msg': 'Data should have at most 2 items after validation, not 4',
             'input': [1, 2, 3, 4],
-            'ctx': {'field_type': 'Tuple', 'max_length': 2, 'actual_length': 4},
+            'ctx': {'max_length': 2, 'actual_length': 4},
         }
     ]
 
@@ -480,7 +481,7 @@ def test_frozenset_from_dict_items(input_value, items_schema, expected):
     'input_value,expected',
     [
         ([1, 2, 3, 4], (1, 2, 3, 4)),
-        ([1, 2, 3, 4, 5], Err('Tuple should have at most 4 items after validation, not 5 [type=too_long,')),
+        ([1, 2, 3, 4, 5], Err('Data should have at most 4 items after validation, not 5 [type=too_long,')),
         ([1, 2, 3, 'x', 4], (1, 2, 3, 4)),
     ],
 )

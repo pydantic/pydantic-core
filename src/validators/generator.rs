@@ -138,7 +138,6 @@ impl ValidatorIterator {
                                 if index >= max_length {
                                     let val_error = ValError::new(
                                         ErrorType::TooLong {
-                                            field_type: "Generator".to_string(),
                                             max_length,
                                             actual_length: index + 1,
                                         },
@@ -163,7 +162,6 @@ impl ValidatorIterator {
                             if $iter.index() < min_length {
                                 let val_error = ValError::new(
                                     ErrorType::TooShort {
-                                        field_type: "Generator".to_string(),
                                         min_length,
                                         actual_length: $iter.index(),
                                     },

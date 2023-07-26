@@ -122,26 +122,27 @@ def generate_repeats():
         ({'strict': True}, frozenset([1, 2, 3]), Err('Input should be a valid set [type=set_type,')),
         ({'strict': True}, 'abc', Err('Input should be a valid set [type=set_type,')),
         ({'min_length': 3}, {1, 2, 3}, {1, 2, 3}),
-        ({'min_length': 3}, {1, 2}, Err('Set should have at least 3 items after validation, not 2 [type=too_short,')),
+        ({'min_length': 3}, {1, 2}, Err('Data should have at least 3 items after validation, not 2 [type=too_short,')),
         (
             {'max_length': 3},
             {1, 2, 3, 4},
-            Err('Set should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Data should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
         (
             {'max_length': 3},
             [1, 2, 3, 4],
-            Err('Set should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Data should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
         ({'max_length': 3, 'items_schema': {'type': 'int'}}, {1, 2, 3, 4}, Err('type=too_long,')),
         ({'max_length': 3, 'items_schema': {'type': 'int'}}, [1, 2, 3, 4], Err('type=too_long,')),
         # length check after set creation
         ({'max_length': 3}, [1, 1, 2, 2, 3, 3], {1, 2, 3}),
         ({'max_length': 3}, generate_repeats(), {1, 2, 3}),
-        (
+        pytest.param(
             {'max_length': 3},
             infinite_generator(),
-            Err('Set should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Data should have at most 3 items after validation, not 4 [type=too_long,'),
+            marks=pytest.mark.timeout(5),
         ),
     ],
     ids=repr,

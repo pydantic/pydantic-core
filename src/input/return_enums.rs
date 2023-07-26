@@ -99,42 +99,6 @@ macro_rules! derive_from {
     };
 }
 
-#[derive(Debug)]
-struct MaxLengthCheck<'a, INPUT> {
-    current_length: usize,
-    max_length: Option<usize>,
-    field_type: &'a str,
-    input: &'a INPUT,
-}
-
-impl<'a, INPUT: Input<'a>> MaxLengthCheck<'a, INPUT> {
-    fn new(max_length: Option<usize>, field_type: &'a str, input: &'a INPUT) -> Self {
-        Self {
-            current_length: 0,
-            max_length,
-            field_type,
-            input,
-        }
-    }
-
-    fn incr(&mut self) -> ValResult<'a, ()> {
-        if let Some(max_length) = self.max_length {
-            self.current_length += 1;
-            if self.current_length > max_length {
-                return Err(ValError::new(
-                    ErrorType::TooLong {
-                        field_type: self.field_type.to_string(),
-                        max_length,
-                        actual_length: self.current_length,
-                    },
-                    self.input,
-                ));
-            }
-        }
-        Ok(())
-    }
-}
-
 macro_rules! any_next_error {
     ($py:expr, $err:ident, $input:expr, $index:ident) => {
         ValError::new_with_loc(
@@ -150,9 +114,9 @@ macro_rules! any_next_error {
 #[allow(clippy::too_many_arguments)]
 fn validate_iter_to_vec<'a, 's>(
     py: Python<'a>,
+    input: &'a impl Input<'a>,
     iter: impl Iterator<Item = PyResult<&'a (impl Input<'a> + 'a)>>,
     capacity: usize,
-    mut max_length_check: MaxLengthCheck<'a, impl Input<'a>>,
     validator: &'s CombinedValidator,
     extra: &Extra,
     definitions: &'a [CombinedValidator],
@@ -161,14 +125,12 @@ fn validate_iter_to_vec<'a, 's>(
     let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
     for (index, item_result) in iter.enumerate() {
-        let item = item_result.map_err(|e| any_next_error!(py, e, max_length_check.input, index))?;
+        let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
         match validator.validate(py, item, extra, definitions, recursion_guard) {
             Ok(item) => {
-                max_length_check.incr()?;
                 output.push(item);
             }
             Err(ValError::LineErrors(line_errors)) => {
-                max_length_check.incr()?;
                 errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
             }
             Err(ValError::Omit) => (),
@@ -220,8 +182,6 @@ fn validate_iter_to_set<'a, 's>(
     set: impl BuildSet,
     iter: impl Iterator<Item = PyResult<&'a (impl Input<'a> + 'a)>>,
     input: &'a (impl Input<'a> + 'a),
-    field_type: &'static str,
-    max_length: Option<usize>,
     validator: &'s CombinedValidator,
     extra: &Extra,
     definitions: &'a [CombinedValidator],
@@ -233,19 +193,6 @@ fn validate_iter_to_set<'a, 's>(
         match validator.validate(py, item, extra, definitions, recursion_guard) {
             Ok(item) => {
                 set.build_add(item)?;
-                if let Some(max_length) = max_length {
-                    let actual_length = set.build_len();
-                    if actual_length > max_length {
-                        return Err(ValError::new(
-                            ErrorType::TooLong {
-                                field_type: field_type.to_string(),
-                                max_length,
-                                actual_length,
-                            },
-                            input,
-                        ));
-                    }
-                }
             }
             Err(ValError::LineErrors(line_errors)) => {
                 errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
@@ -266,12 +213,10 @@ fn no_validator_iter_to_vec<'a, 's>(
     py: Python<'a>,
     input: &'a (impl Input<'a> + 'a),
     iter: impl Iterator<Item = PyResult<&'a (impl Input<'a> + 'a)>>,
-    mut max_length_check: MaxLengthCheck<'a, impl Input<'a>>,
 ) -> ValResult<'a, Vec<PyObject>> {
     iter.enumerate()
         .map(|(index, result)| {
             let v = result.map_err(|e| any_next_error!(py, e, input, index))?;
-            max_length_check.incr()?;
             Ok(v.to_object(py))
         })
         .collect()
@@ -308,25 +253,20 @@ impl<'a> GenericIterable<'a> {
         &'s self,
         py: Python<'a>,
         input: &'a impl Input<'a>,
-        max_length: Option<usize>,
-        field_type: &'static str,
         validator: &'s CombinedValidator,
         extra: &Extra,
         definitions: &'a [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'a, Vec<PyObject>> {
-        let capacity = self
-            .generic_len()
-            .unwrap_or_else(|| max_length.unwrap_or(DEFAULT_CAPACITY));
-        let max_length_check = MaxLengthCheck::new(max_length, field_type, input);
+        let capacity = self.generic_len().unwrap_or(DEFAULT_CAPACITY);
 
         macro_rules! validate {
             ($iter:expr) => {
                 validate_iter_to_vec(
                     py,
+                    input,
                     $iter,
                     capacity,
-                    max_length_check,
                     validator,
                     extra,
                     definitions,
@@ -353,8 +293,6 @@ impl<'a> GenericIterable<'a> {
         py: Python<'a>,
         set: impl BuildSet,
         input: &'a impl Input<'a>,
-        max_length: Option<usize>,
-        field_type: &'static str,
         validator: &'s CombinedValidator,
         extra: &Extra,
         definitions: &'a [CombinedValidator],
@@ -367,8 +305,6 @@ impl<'a> GenericIterable<'a> {
                     set,
                     $iter,
                     input,
-                    field_type,
-                    max_length,
                     validator,
                     extra,
                     definitions,
@@ -389,38 +325,16 @@ impl<'a> GenericIterable<'a> {
         }
     }
 
-    pub fn to_vec<'s>(
-        &'s self,
-        py: Python<'a>,
-        input: &'a impl Input<'a>,
-        field_type: &'static str,
-        max_length: Option<usize>,
-    ) -> ValResult<'a, Vec<PyObject>> {
-        let max_length_check = MaxLengthCheck::new(max_length, field_type, input);
-
+    pub fn to_vec<'s>(&'s self, py: Python<'a>, input: &'a impl Input<'a>) -> ValResult<'a, Vec<PyObject>> {
         match self {
-            GenericIterable::List(collection) => {
-                no_validator_iter_to_vec(py, input, collection.iter().map(Ok), max_length_check)
-            }
-            GenericIterable::Tuple(collection) => {
-                no_validator_iter_to_vec(py, input, collection.iter().map(Ok), max_length_check)
-            }
-            GenericIterable::Set(collection) => {
-                no_validator_iter_to_vec(py, input, collection.iter().map(Ok), max_length_check)
-            }
-            GenericIterable::FrozenSet(collection) => {
-                no_validator_iter_to_vec(py, input, collection.iter().map(Ok), max_length_check)
-            }
-            GenericIterable::Sequence(collection) => {
-                no_validator_iter_to_vec(py, input, collection.iter()?, max_length_check)
-            }
-            GenericIterable::Iterator(collection) => {
-                no_validator_iter_to_vec(py, input, collection.iter()?, max_length_check)
-            }
-            GenericIterable::JsonArray(collection) => {
-                no_validator_iter_to_vec(py, input, collection.iter().map(Ok), max_length_check)
-            }
-            other => no_validator_iter_to_vec(py, input, other.as_sequence_iterator(py)?, max_length_check),
+            GenericIterable::List(collection) => no_validator_iter_to_vec(py, input, collection.iter().map(Ok)),
+            GenericIterable::Tuple(collection) => no_validator_iter_to_vec(py, input, collection.iter().map(Ok)),
+            GenericIterable::Set(collection) => no_validator_iter_to_vec(py, input, collection.iter().map(Ok)),
+            GenericIterable::FrozenSet(collection) => no_validator_iter_to_vec(py, input, collection.iter().map(Ok)),
+            GenericIterable::Sequence(collection) => no_validator_iter_to_vec(py, input, collection.iter()?),
+            GenericIterable::Iterator(collection) => no_validator_iter_to_vec(py, input, collection.iter()?),
+            GenericIterable::JsonArray(collection) => no_validator_iter_to_vec(py, input, collection.iter().map(Ok)),
+            other => no_validator_iter_to_vec(py, input, other.as_sequence_iterator(py)?),
         }
     }
 }

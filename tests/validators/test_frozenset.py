@@ -139,29 +139,26 @@ def generate_repeats():
         ({'strict': True}, {1, 2, 3}, Err('Input should be a valid frozenset [type=frozen_set_type,')),
         ({'strict': True}, 'abc', Err('Input should be a valid frozenset [type=frozen_set_type,')),
         ({'min_length': 3}, {1, 2, 3}, {1, 2, 3}),
-        (
-            {'min_length': 3},
-            {1, 2},
-            Err('Frozenset should have at least 3 items after validation, not 2 [type=too_short,'),
-        ),
+        ({'min_length': 3}, {1, 2}, Err('Data should have at least 3 items after validation, not 2 [type=too_short,')),
         ({'max_length': 3}, {1, 2, 3}, {1, 2, 3}),
         (
             {'max_length': 3},
             {1, 2, 3, 4},
-            Err('Frozenset should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Data should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
         (
             {'items_schema': {'type': 'int'}, 'max_length': 3},
             {1, 2, 3, 4},
-            Err('Frozenset should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Data should have at most 3 items after validation, not 4 [type=too_long,'),
         ),
         # length check after set creation
         ({'max_length': 3}, [1, 1, 2, 2, 3, 3], {1, 2, 3}),
         ({'max_length': 3}, generate_repeats(), {1, 2, 3}),
-        (
+        pytest.param(
             {'max_length': 3},
             infinite_generator(),
-            Err('Frozenset should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('Data should have at most 3 items after validation, not 4 [type=too_long,'),
+            marks=pytest.mark.timeout(5),
         ),
     ],
 )
@@ -243,13 +240,10 @@ def test_frozenset_as_dict_keys(py_and_json: PyAndJson):
 
 def test_repr():
     v = SchemaValidator({'type': 'frozenset', 'strict': True, 'min_length': 42})
-    assert plain_repr(v) == (
-        'SchemaValidator('
-        'title="frozenset[any]",'
-        'validator=FrozenSet(FrozenSetValidator{'
-        'strict:true,item_validator:Any(AnyValidator),min_length:Some(42),max_length:None,'
-        'name:"frozenset[any]"'
-        '}),definitions=[])'
+    # insert_assert(plain_repr(v))
+    assert (
+        plain_repr(v)
+        == 'SchemaValidator(title="length_constraint",validator=Chain(ChainValidator{steps:[FrozenSet(FrozenSetValidator{strict:true,item_validator:Any(AnyValidator),name:"frozenset[any]"}),LengthConstraint(LengthConstraint{min_length:Some(42),max_length:None}),],name:"length_constraint"}),definitions=[])'
     )
 
 

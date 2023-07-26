@@ -23,6 +23,7 @@ mod bytes;
 mod call;
 mod callable;
 mod chain;
+mod constraints;
 mod custom_error;
 mod dataclass;
 mod date;
@@ -621,7 +622,6 @@ pub enum CombinedValidator {
     Any(any::AnyValidator),
     // bytes
     Bytes(bytes::BytesValidator),
-    ConstrainedBytes(bytes::BytesConstrainedValidator),
     // dates
     Date(date::DateValidator),
     // times
@@ -659,6 +659,8 @@ pub enum CombinedValidator {
     DefinitionRef(definitions::DefinitionRefValidator),
     // input dependent
     JsonOrPython(json_or_python::JsonOrPython),
+    // constraints
+    LengthConstraint(constraints::LengthConstraint),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
