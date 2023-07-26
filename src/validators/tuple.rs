@@ -8,15 +8,14 @@ use crate::input::{GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
-use super::list::{get_items_schema, min_length_check};
+use super::constraints::LengthConstraint;
+use super::list::get_items_schema;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct TupleVariableValidator {
     strict: bool,
     item_validator: Option<Box<CombinedValidator>>,
-    min_length: Option<usize>,
-    max_length: Option<usize>,
     name: String,
 }
 
@@ -27,18 +26,15 @@ impl BuildValidator for TupleVariableValidator {
         config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        let py = schema.py();
         let item_validator = get_items_schema(schema, config, definitions)?;
         let inner_name = item_validator.as_ref().map_or("any", |v| v.get_name());
         let name = format!("tuple[{inner_name}, ...]");
-        Ok(Self {
+        let validator = Self {
             strict: is_strict(schema, config)?,
             item_validator,
-            min_length: schema.get_as(intern!(py, "min_length"))?,
-            max_length: schema.get_as(intern!(py, "max_length"))?,
             name,
-        }
-        .into())
+        };
+        LengthConstraint::maybe_wrap(schema, validator.into())
     }
 }
 
@@ -56,19 +52,9 @@ impl Validator for TupleVariableValidator {
         let seq = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
 
         let output = match self.item_validator {
-            Some(ref v) => seq.validate_to_vec(
-                py,
-                input,
-                self.max_length,
-                "Tuple",
-                v,
-                extra,
-                definitions,
-                recursion_guard,
-            )?,
-            None => seq.to_vec(py, input, "Tuple", self.max_length)?,
+            Some(ref v) => seq.validate_to_vec(py, input, v, extra, definitions, recursion_guard)?,
+            None => seq.to_vec(py, input)?,
         };
-        min_length_check!(input, "Tuple", self.min_length, output);
         Ok(PyTuple::new(py, &output).into_py(py))
     }
 
@@ -126,7 +112,7 @@ impl BuildValidator for TuplePositionalValidator {
             .map(Validator::get_name)
             .collect::<Vec<_>>()
             .join(", ");
-        Ok(Self {
+        let validator = Self {
             strict: is_strict(schema, config)?,
             items_validators: validators,
             extra_validator: match schema.get_item(intern!(py, "extra_schema")) {
@@ -134,8 +120,8 @@ impl BuildValidator for TuplePositionalValidator {
                 None => None,
             },
             name: format!("tuple[{descr}]"),
-        }
-        .into())
+        };
+        LengthConstraint::maybe_wrap(schema, validator.into())
     }
 }
 
@@ -192,7 +178,6 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
             None => {
                 errors.push(ValLineError::new(
                     ErrorType::TooLong {
-                        field_type: "Tuple".to_string(),
                         max_length: expected_length,
                         actual_length: collection_len.unwrap_or(index),
                     },

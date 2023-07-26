@@ -49,9 +49,9 @@ def test_lax_bytes_validator():
     [
         ({}, b'foo', b'foo'),
         ({'max_length': 5}, b'foo', b'foo'),
-        ({'max_length': 5}, b'foobar', Err('Data should have at most 5 bytes')),
+        ({'max_length': 5}, b'foobar', Err('Data should have at most 5 items after validation, not 6')),
         ({'min_length': 2}, b'foo', b'foo'),
-        ({'min_length': 2}, b'f', Err('Data should have at least 2 bytes')),
+        ({'min_length': 2}, b'f', Err('Data should have at least 2 items after validation, not 1')),
         ({'min_length': 1, 'max_length': 6, 'strict': True}, b'bytes?', b'bytes?'),
     ],
 )
@@ -69,9 +69,9 @@ def test_constrained_bytes_python_bytes(opts: Dict[str, Any], input, expected):
     [
         ({}, 'foo', b'foo'),
         ({'max_length': 5}, 'foo', b'foo'),
-        ({'max_length': 5}, 'foobar', Err('Data should have at most 5 bytes')),
+        ({'max_length': 5}, 'foobar', Err('Data should have at most 5 items after validation, not 6')),
         ({'min_length': 2}, 'foo', b'foo'),
-        ({'min_length': 2}, 'f', Err('Data should have at least 2 bytes')),
+        ({'min_length': 2}, 'f', Err('Data should have at least 2 items after validation, not 1')),
         ({}, 1, Err('Input should be a valid bytes')),
         ({}, 1.0, Err('Input should be a valid bytes')),
         ({}, [], Err('Input should be a valid bytes')),
@@ -101,9 +101,9 @@ def test_length_ctx():
         v.validate_python(b'1')
     assert exc_info.value.errors(include_url=False) == [
         {
-            'type': 'bytes_too_short',
+            'type': 'too_short',
             'loc': (),
-            'msg': 'Data should have at least 2 bytes',
+            'msg': 'Bytes should have at least 2 items after validation, not 1',
             'input': b'1',
             'ctx': {'min_length': 2},
         }

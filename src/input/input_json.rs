@@ -334,6 +334,13 @@ impl<'a> Input<'a> for JsonInput {
             _ => Err(ValError::new(ErrorType::TimeDeltaType, self)),
         }
     }
+
+    fn len(&self, py: Python<'_>) -> PyResult<usize> {
+        match self.len() {
+            Some(len) => Ok(len),
+            None => self.to_object(py).as_ref(py).len(),
+        }
+    }
 }
 
 /// Required for Dict keys so the string can behave like an Input
@@ -521,6 +528,10 @@ impl<'a> Input<'a> for String {
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
     ) -> ValResult<EitherTimedelta> {
         self.validate_timedelta(false, microseconds_overflow_behavior)
+    }
+
+    fn len(&self, _py: Python<'_>) -> PyResult<usize> {
+        Ok(self.len())
     }
 }
 

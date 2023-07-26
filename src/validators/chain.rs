@@ -16,6 +16,12 @@ pub struct ChainValidator {
     name: String,
 }
 
+impl ChainValidator {
+    pub fn new(steps: Vec<CombinedValidator>, name: String) -> Self {
+        Self { steps, name }
+    }
+}
+
 impl BuildValidator for ChainValidator {
     const EXPECTED_TYPE: &'static str = "chain";
 

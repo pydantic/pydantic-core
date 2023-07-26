@@ -218,3 +218,14 @@ impl<'de> Visitor<'de> for KeyDeserializer {
         unreachable!()
     }
 }
+
+impl JsonInput {
+    pub fn len(&self) -> Option<usize> {
+        match self {
+            Self::Array(v) => Some(v.len()),
+            Self::Object(o) => Some(o.len()),
+            Self::String(s) => Some(s.len()),
+            _ => None,
+        }
+    }
+}

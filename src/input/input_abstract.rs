@@ -306,4 +306,5 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
     ) -> ValResult<EitherTimedelta> {
         self.strict_timedelta(microseconds_overflow_behavior)
     }
+    fn len(&self, py: Python<'_>) -> PyResult<usize>;
 }

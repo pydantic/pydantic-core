@@ -77,16 +77,16 @@ def test_validation_error_include_context():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1, 2, 3])
 
-    assert exc_info.value.title == 'list[any]'
+    assert exc_info.value.title == 'length_constraint'
     assert exc_info.value.error_count() == 1
     # insert_assert(exc_info.value.errors(include_url=False))
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 2 items after validation, not 3',
+            'msg': 'Data should have at most 2 items after validation, not 3',
             'input': [1, 2, 3],
-            'ctx': {'field_type': 'List', 'max_length': 2, 'actual_length': 3},
+            'ctx': {'max_length': 2, 'actual_length': 3},
         }
     ]
     # insert_assert(exc_info.value.errors(include_url=False, include_context=False))
@@ -94,7 +94,7 @@ def test_validation_error_include_context():
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 2 items after validation, not 3',
+            'msg': 'Data should have at most 2 items after validation, not 3',
             'input': [1, 2, 3],
         }
     ]
@@ -198,7 +198,7 @@ def test_unicode_error_input_repr() -> None:
     validator = SchemaValidator(schema)
 
     danger_str = 'ÿ' * 1000
-    expected = "1 validation error for int\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='ÿÿÿÿÿÿÿÿÿÿÿÿ...ÿÿÿÿÿÿÿÿÿÿÿ', input_type=str]"  # noqa: E501
+    expected = "1 validation error for int\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='ÿÿÿÿÿÿÿÿÿÿÿÿ...ÿÿÿÿÿÿÿÿÿÿÿ', input_type=str]"
     with pytest.raises(ValidationError) as exc_info:
         validator.validate_python(danger_str)
     actual = repr(exc_info.value).split('For further information visit ')[0].strip()

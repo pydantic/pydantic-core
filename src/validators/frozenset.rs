@@ -4,9 +4,8 @@ use pyo3::types::{PyDict, PyFrozenSet};
 use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
-use crate::tools::SchemaDict;
+use crate::validators::constraints::LengthConstraint;
 
-use super::list::min_length_check;
 use super::set::set_build;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
@@ -14,8 +13,6 @@ use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, 
 pub struct FrozenSetValidator {
     strict: bool,
     item_validator: Box<CombinedValidator>,
-    min_length: Option<usize>,
-    max_length: Option<usize>,
     name: String,
 }
 
@@ -41,14 +38,11 @@ impl Validator for FrozenSetValidator {
             py,
             f_set,
             input,
-            self.max_length,
-            "Frozenset",
             &self.item_validator,
             extra,
             definitions,
             recursion_guard,
         )?;
-        min_length_check!(input, "Frozenset", self.min_length, f_set);
         Ok(f_set.into_py(py))
     }
 

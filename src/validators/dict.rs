@@ -9,10 +9,10 @@ use crate::input::{
 };
 
 use crate::recursion_guard::RecursionGuard;
-use crate::tools::SchemaDict;
 
 use super::any::AnyValidator;
-use super::list::length_check;
+use super::constraints::LengthConstraint;
+
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -20,8 +20,6 @@ pub struct DictValidator {
     strict: bool,
     key_validator: Box<CombinedValidator>,
     value_validator: Box<CombinedValidator>,
-    min_length: Option<usize>,
-    max_length: Option<usize>,
     name: String,
 }
 
@@ -48,15 +46,14 @@ impl BuildValidator for DictValidator {
             key_validator.get_name(),
             value_validator.get_name()
         );
-        Ok(Self {
+        let validator = Self {
             strict: is_strict(schema, config)?,
             key_validator,
             value_validator,
-            min_length: schema.get_as(intern!(py, "min_length"))?,
-            max_length: schema.get_as(intern!(py, "max_length"))?,
             name,
         }
-        .into())
+        .into();
+        LengthConstraint::maybe_wrap(schema, validator)
     }
 }
 
@@ -117,7 +114,7 @@ macro_rules! build_validate {
         fn $name<'s, 'data>(
             &'s self,
             py: Python<'data>,
-            input: &'data impl Input<'data>,
+            _input: &'data impl Input<'data>,
             dict: &'data $dict_type,
             extra: &Extra,
             definitions: &'data Definitions<CombinedValidator>,
@@ -162,7 +159,6 @@ macro_rules! build_validate {
             }
 
             if errors.is_empty() {
-                length_check!(input, "Dictionary", self.min_length, self.max_length, output);
                 Ok(output.into())
             } else {
                 Err(ValError::LineErrors(errors))

@@ -646,6 +646,10 @@ impl<'a> Input<'a> for PyAny {
             Err(ValError::new(ErrorType::TimeDeltaType, self))
         }
     }
+
+    fn len(&self, _py: Python) -> PyResult<usize> {
+        self.len()
+    }
 }
 
 /// Best effort check of whether it's likely to make sense to inspect obj for attributes and iterate over it
