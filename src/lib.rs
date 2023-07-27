@@ -16,6 +16,7 @@ mod py_gc;
 
 mod argument_markers;
 mod build_tools;
+mod data_value;
 mod definitions;
 mod errors;
 mod input;
