@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -56,7 +56,7 @@ def test_lax_bytes_validator():
     ],
 )
 def test_constrained_bytes_python_bytes(opts: Dict[str, Any], input, expected):
-    v = SchemaValidator({'type': 'bytes', **opts})
+    v = SchemaValidator(core_schema.bytes_schema(**opts))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input)

@@ -134,6 +134,8 @@ def type_dict_schema(typed_dict) -> dict[str, Any]:  # noqa: C901
                 else:
                     raise ValueError(f'Unknown Schema forward ref: {fr_arg}')
             else:
+                if field_type.__forward_arg__ == 'SupportsRichComparison':
+                    return {'type': 'any'}
                 field_type = eval_forward_ref(field_type)
 
         if schema is None:

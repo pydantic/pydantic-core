@@ -6,7 +6,7 @@ from typing import Any, Dict
 import pytest
 from dirty_equals import FunctionCheck, IsStr
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson, plain_repr
 
@@ -89,7 +89,7 @@ def test_float_strict(py_and_json: PyAndJson, input_value, expected):
     ],
 )
 def test_float_kwargs(py_and_json: PyAndJson, kwargs: Dict[str, Any], input_value, expected):
-    v = py_and_json({'type': 'float', **kwargs})
+    v = py_and_json(core_schema.float_schema(**kwargs))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
@@ -123,7 +123,7 @@ def test_float_kwargs(py_and_json: PyAndJson, kwargs: Dict[str, Any], input_valu
     ids=repr,
 )
 def test_float_multiple_of(py_and_json: PyAndJson, multiple_of, input_value, error):
-    v = py_and_json({'type': 'float', 'multiple_of': multiple_of})
+    v = py_and_json(core_schema.float_schema(multiple_of=multiple_of))
     if error:
         with pytest.raises(ValidationError, match=re.escape(error.message)):
             v.validate_test(input_value)
@@ -135,7 +135,7 @@ def test_float_multiple_of(py_and_json: PyAndJson, multiple_of, input_value, err
 
 def test_union_float(py_and_json: PyAndJson):
     v = py_and_json(
-        {'type': 'union', 'choices': [{'type': 'float', 'strict': True}, {'type': 'float', 'multiple_of': 7}]}
+        {'type': 'union', 'choices': [{'type': 'float', 'strict': True}, core_schema.float_schema(multiple_of=7)]}
     )
     assert v.validate_test('14') == 14
     assert v.validate_test(5) == 5
@@ -186,7 +186,7 @@ def test_float_repr():
         plain_repr(v)
         == 'SchemaValidator(title="float",validator=Float(FloatValidator{strict:true,allow_inf_nan:true}),definitions=[])'
     )
-    v = SchemaValidator({'type': 'float', 'multiple_of': 7})
+    v = SchemaValidator(core_schema.float_schema(multiple_of=7))
     assert plain_repr(v).startswith('SchemaValidator(title="constrained-float",validator=ConstrainedFloat(')
 
 
@@ -319,7 +319,9 @@ def test_non_finite_float_values(strict, input_value, allow_inf_nan, expected):
     ],
 )
 def test_non_finite_constrained_float_values(input_value, allow_inf_nan, expected):
-    v = SchemaValidator({'type': 'float', 'allow_inf_nan': allow_inf_nan, 'gt': 0})
+    v = SchemaValidator(
+        core_schema.float_schema(allow_inf_nan=allow_inf_nan, gt=0)
+    )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)

@@ -4,23 +4,23 @@ import re
 import pytest
 from dirty_equals import FunctionCheck, HasAttributes, IsInstance
 
-from pydantic_core import CoreConfig, SchemaValidator, ValidationError
+from pydantic_core import CoreConfig, SchemaValidator, ValidationError, core_schema
 
 from .conftest import Err, plain_repr
 
 
 def test_on_field():
-    v = SchemaValidator({'type': 'str', 'min_length': 2, 'max_length': 5})
+    v = SchemaValidator(core_schema.str_schema(min_length=2, max_length=5))
     r = plain_repr(v)
-    assert 'min_length:Some(2)' in r
-    assert 'max_length:Some(5)' in r
+    assert 'MinLength' in r
+    assert 'MaxLength' in r
     assert v.isinstance_python('test') is True
     assert v.isinstance_python('test long') is False
 
 
 def test_on_config():
     v = SchemaValidator({'type': 'str'}, {'str_max_length': 5})
-    assert 'max_length:Some(5)' in plain_repr(v)
+    assert 'MinLength' in plain_repr(v)
     assert v.isinstance_python('test') is True
     assert v.isinstance_python('test long') is False
 

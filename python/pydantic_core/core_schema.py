@@ -4,6 +4,7 @@ validate and serialize.
 """
 
 from __future__ import annotations as _annotations
+import re
 
 import sys
 from collections.abc import Mapping
@@ -22,6 +23,7 @@ else:
 
 if TYPE_CHECKING:
     from pydantic_core import PydanticUndefined
+    from _typeshed import SupportsRichComparison
 else:
     # The initial build of pydantic_core requires PydanticUndefined to generate
     # the core schema; so we need to conditionally skip it. mypy doesn't like
@@ -557,7 +559,7 @@ def int_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> IntSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a int value, e.g.:
 
@@ -580,18 +582,25 @@ def int_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='int',
-        multiple_of=multiple_of,
-        le=le,
-        ge=ge,
-        lt=lt,
-        gt=gt,
         strict=strict,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
     )
+    constraints: list[CoreSchema] = []
+    if gt is not None:
+        constraints.append(numeric_constraint_schema('gt', gt))
+    if le is not None:
+        constraints.append(numeric_constraint_schema('le', le))
+    if ge is not None:
+        constraints.append(numeric_constraint_schema('ge', ge))
+    if lt is not None:
+        constraints.append(numeric_constraint_schema('lt', lt))
+    if multiple_of is not None:
+        constraints.append(numeric_constraint_schema('multiple-of', multiple_of))
+    return chain_schema([schema, *constraints])
 
 
 class FloatSchema(TypedDict, total=False):
@@ -620,7 +629,7 @@ def float_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> FloatSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a float value, e.g.:
 
@@ -644,29 +653,30 @@ def float_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='float',
         allow_inf_nan=allow_inf_nan,
-        multiple_of=multiple_of,
-        le=le,
-        ge=ge,
-        lt=lt,
-        gt=gt,
         strict=strict,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
     )
+    constraints: list[CoreSchema] = []
+    if gt is not None:
+        constraints.append(numeric_constraint_schema('gt', gt))
+    if le is not None:
+        constraints.append(numeric_constraint_schema('le', le))
+    if ge is not None:
+        constraints.append(numeric_constraint_schema('ge', ge))
+    if lt is not None:
+        constraints.append(numeric_constraint_schema('lt', lt))
+    if multiple_of is not None:
+        constraints.append(numeric_constraint_schema('multiple-of', multiple_of))
+    return chain_schema([schema, *constraints])
 
 
 class StringSchema(TypedDict, total=False):
     type: Required[Literal['str']]
-    pattern: str
-    max_length: int
-    min_length: int
-    strip_whitespace: bool
-    to_lower: bool
-    to_upper: bool
     strict: bool
     ref: str
     metadata: Any
@@ -685,7 +695,7 @@ def str_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> StringSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a string value, e.g.:
 
@@ -709,25 +719,33 @@ def str_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='str',
-        pattern=pattern,
-        max_length=max_length,
-        min_length=min_length,
-        strip_whitespace=strip_whitespace,
-        to_lower=to_lower,
-        to_upper=to_upper,
         strict=strict,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
     )
 
+    constraints: List[CoreSchema] = []
+
+    if pattern:
+        constraints.append(pattern_constraint_schema(pattern))
+    if min_length is not None:
+        constraints.append(length_constraint_schema('min-length', min_length))
+    if max_length is not None:
+        constraints.append(length_constraint_schema('max-length', max_length))
+    if strip_whitespace:
+        constraints.append(no_info_plain_validator_function(str.strip))
+    if to_lower:
+        constraints.append(no_info_plain_validator_function(str.lower))
+    if to_upper:
+        constraints.append(no_info_plain_validator_function(str.upper))
+    return chain_schema([schema, *constraints])
+
 
 class BytesSchema(TypedDict, total=False):
     type: Required[Literal['bytes']]
-    max_length: int
-    min_length: int
     strict: bool
     ref: str
     metadata: Any
@@ -742,7 +760,7 @@ def bytes_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> BytesSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a bytes value, e.g.:
 
@@ -762,24 +780,24 @@ def bytes_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    constraints: list[CoreSchema] = []
+    schema = _dict_not_none(
         type='bytes',
-        max_length=max_length,
-        min_length=min_length,
         strict=strict,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
     )
+    if min_length is not None:
+        constraints.append(length_constraint_schema('min-length', min_length))
+    if max_length is not None:
+        constraints.append(length_constraint_schema('max-length', max_length))
+    return chain_schema([schema, *constraints])
 
 
 class DateSchema(TypedDict, total=False):
     type: Required[Literal['date']]
     strict: bool
-    le: date
-    ge: date
-    lt: date
-    gt: date
     now_op: Literal['past', 'future']
     # defaults to current local utc offset from `time.localtime().tm_gmtoff`
     # value is restricted to -86_400 < offset < 86_400 by bounds in generate_self_schema.py
@@ -801,7 +819,7 @@ def date_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> DateSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a date value, e.g.:
 
@@ -826,28 +844,30 @@ def date_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='date',
         strict=strict,
-        le=le,
-        ge=ge,
-        lt=lt,
-        gt=gt,
         now_op=now_op,
         now_utc_offset=now_utc_offset,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
     )
+    constraints: list[CoreSchema] = []
+    if gt is not None:
+        constraints.append(numeric_constraint_schema('gt', gt))
+    if le is not None:
+        constraints.append(numeric_constraint_schema('le', le))
+    if ge is not None:
+        constraints.append(numeric_constraint_schema('ge', ge))
+    if lt is not None:
+        constraints.append(numeric_constraint_schema('lt', lt))
+    return chain_schema([schema, *constraints])
 
 
 class TimeSchema(TypedDict, total=False):
     type: Required[Literal['time']]
     strict: bool
-    le: time
-    ge: time
-    lt: time
-    gt: time
     tz_constraint: Union[Literal['aware', 'naive'], int]
     microseconds_precision: Literal['truncate', 'error']
     ref: str
@@ -867,7 +887,7 @@ def time_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> TimeSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a time value, e.g.:
 
@@ -892,7 +912,7 @@ def time_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='time',
         strict=strict,
         le=le,
@@ -905,15 +925,21 @@ def time_schema(
         metadata=metadata,
         serialization=serialization,
     )
+    constraints: list[CoreSchema] = []
+    if gt is not None:
+        constraints.append(numeric_constraint_schema('gt', gt))
+    if le is not None:
+        constraints.append(numeric_constraint_schema('le', le))
+    if ge is not None:
+        constraints.append(numeric_constraint_schema('ge', ge))
+    if lt is not None:
+        constraints.append(numeric_constraint_schema('lt', lt))
+    return chain_schema([schema, *constraints])
 
 
 class DatetimeSchema(TypedDict, total=False):
     type: Required[Literal['datetime']]
     strict: bool
-    le: datetime
-    ge: datetime
-    lt: datetime
-    gt: datetime
     now_op: Literal['past', 'future']
     tz_constraint: Union[Literal['aware', 'naive'], int]
     # defaults to current local utc offset from `time.localtime().tm_gmtoff`
@@ -939,7 +965,7 @@ def datetime_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> DatetimeSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a datetime value, e.g.:
 
@@ -968,7 +994,7 @@ def datetime_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='datetime',
         strict=strict,
         le=le,
@@ -983,15 +1009,21 @@ def datetime_schema(
         metadata=metadata,
         serialization=serialization,
     )
+    constraints: list[CoreSchema] = []
+    if gt is not None:
+        constraints.append(numeric_constraint_schema('gt', gt))
+    if le is not None:
+        constraints.append(numeric_constraint_schema('le', le))
+    if ge is not None:
+        constraints.append(numeric_constraint_schema('ge', ge))
+    if lt is not None:
+        constraints.append(numeric_constraint_schema('lt', lt))
+    return chain_schema([schema, *constraints])
 
 
 class TimedeltaSchema(TypedDict, total=False):
     type: Required[Literal['timedelta']]
     strict: bool
-    le: timedelta
-    ge: timedelta
-    lt: timedelta
-    gt: timedelta
     microseconds_precision: Literal['truncate', 'error']
     ref: str
     metadata: Any
@@ -1009,7 +1041,7 @@ def timedelta_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> TimedeltaSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a timedelta value, e.g.:
 
@@ -1033,7 +1065,7 @@ def timedelta_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='timedelta',
         strict=strict,
         le=le,
@@ -1045,6 +1077,16 @@ def timedelta_schema(
         metadata=metadata,
         serialization=serialization,
     )
+    constraints: list[CoreSchema] = []
+    if gt is not None:
+        constraints.append(numeric_constraint_schema('gt', gt))
+    if le is not None:
+        constraints.append(numeric_constraint_schema('le', le))
+    if ge is not None:
+        constraints.append(numeric_constraint_schema('ge', ge))
+    if lt is not None:
+        constraints.append(numeric_constraint_schema('lt', lt))
+    return chain_schema([schema, *constraints])
 
 
 class LiteralSchema(TypedDict, total=False):
@@ -1238,8 +1280,6 @@ IncExSeqOrElseSerSchema = Union[IncExSeqSerSchema, SerSchema]
 class ListSchema(TypedDict, total=False):
     type: Required[Literal['list']]
     items_schema: CoreSchema
-    min_length: int
-    max_length: int
     strict: bool
     ref: str
     metadata: Any
@@ -1255,7 +1295,7 @@ def list_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: IncExSeqOrElseSerSchema | None = None,
-) -> ListSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a list value, e.g.:
 
@@ -1276,16 +1316,21 @@ def list_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='list',
         items_schema=items_schema,
-        min_length=min_length,
-        max_length=max_length,
         strict=strict,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
     )
+
+    constraints: List[CoreSchema] = []
+    if min_length:
+        constraints.append(length_constraint_schema('min-length', min_length))
+    if max_length:
+        constraints.append(length_constraint_schema('max-length', max_length))
+    return chain_schema([schema, *constraints])
 
 
 class TuplePositionalSchema(TypedDict, total=False):
@@ -1345,8 +1390,6 @@ def tuple_positional_schema(
 class TupleVariableSchema(TypedDict, total=False):
     type: Required[Literal['tuple-variable']]
     items_schema: CoreSchema
-    min_length: int
-    max_length: int
     strict: bool
     ref: str
     metadata: Any
@@ -1362,7 +1405,7 @@ def tuple_variable_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: IncExSeqOrElseSerSchema | None = None,
-) -> TupleVariableSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a tuple of a given schema, e.g.:
 
@@ -1385,23 +1428,25 @@ def tuple_variable_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='tuple-variable',
         items_schema=items_schema,
-        min_length=min_length,
-        max_length=max_length,
         strict=strict,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
     )
+    constraints: list[CoreSchema] = []
+    if min_length is not None:
+        constraints.append(length_constraint_schema('min-length', min_length))
+    if max_length is not None:
+        constraints.append(length_constraint_schema('max-length', max_length))
+    return chain_schema([schema, *constraints])
 
 
 class SetSchema(TypedDict, total=False):
     type: Required[Literal['set']]
     items_schema: CoreSchema
-    min_length: int
-    max_length: int
     strict: bool
     ref: str
     metadata: Any
@@ -1417,7 +1462,7 @@ def set_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> SetSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a set of a given schema, e.g.:
 
@@ -1440,7 +1485,7 @@ def set_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='set',
         items_schema=items_schema,
         min_length=min_length,
@@ -1450,13 +1495,17 @@ def set_schema(
         metadata=metadata,
         serialization=serialization,
     )
+    constraints: list[CoreSchema] = []
+    if min_length is not None:
+        constraints.append(length_constraint_schema('min-length', min_length))
+    if max_length is not None:
+        constraints.append(length_constraint_schema('max-length', max_length))
+    return chain_schema([schema, *constraints])
 
 
 class FrozenSetSchema(TypedDict, total=False):
     type: Required[Literal['frozenset']]
     items_schema: CoreSchema
-    min_length: int
-    max_length: int
     strict: bool
     ref: str
     metadata: Any
@@ -1472,7 +1521,7 @@ def frozenset_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> FrozenSetSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a frozenset of a given schema, e.g.:
 
@@ -1495,7 +1544,7 @@ def frozenset_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='frozenset',
         items_schema=items_schema,
         min_length=min_length,
@@ -1505,6 +1554,12 @@ def frozenset_schema(
         metadata=metadata,
         serialization=serialization,
     )
+    constraints: list[CoreSchema] = []
+    if min_length is not None:
+        constraints.append(length_constraint_schema('min-length', min_length))
+    if max_length is not None:
+        constraints.append(length_constraint_schema('max-length', max_length))
+    return chain_schema([schema, *constraints])
 
 
 class GeneratorSchema(TypedDict, total=False):
@@ -1584,8 +1639,6 @@ class DictSchema(TypedDict, total=False):
     type: Required[Literal['dict']]
     keys_schema: CoreSchema  # default: AnySchema
     values_schema: CoreSchema  # default: AnySchema
-    min_length: int
-    max_length: int
     strict: bool
     ref: str
     metadata: Any
@@ -1602,7 +1655,7 @@ def dict_schema(
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
-) -> DictSchema:
+) -> CoreSchema:
     """
     Returns a schema that matches a dict value, e.g.:
 
@@ -1626,17 +1679,21 @@ def dict_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(
+    schema = _dict_not_none(
         type='dict',
         keys_schema=keys_schema,
         values_schema=values_schema,
-        min_length=min_length,
-        max_length=max_length,
         strict=strict,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
     )
+    constraints: list[CoreSchema] = []
+    if min_length is not None:
+        constraints.append(length_constraint_schema('min-length', min_length))
+    if max_length is not None:
+        constraints.append(length_constraint_schema('max-length', max_length))
+    return chain_schema([schema, *constraints])
 
 
 # (__input_value: Any) -> Any
@@ -2549,7 +2606,7 @@ class ChainSchema(TypedDict, total=False):
 
 def chain_schema(
     steps: list[CoreSchema], *, ref: str | None = None, metadata: Any = None, serialization: SerSchema | None = None
-) -> ChainSchema:
+) -> CoreSchema:
     """
     Returns a schema that chains the provided validation schemas, e.g.:
 
@@ -2574,6 +2631,8 @@ def chain_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
+    if len(steps) == 1:
+        return steps[0]
     return _dict_not_none(type='chain', steps=steps, ref=ref, metadata=metadata, serialization=serialization)
 
 
@@ -3703,6 +3762,110 @@ def definition_reference_schema(
     return _dict_not_none(type='definition-ref', schema_ref=schema_ref, metadata=metadata, serialization=serialization)
 
 
+class LengthConstraint(TypedDict):
+    type: Literal['min-length', 'max-length']
+    value: int
+
+
+class NumericConstraintSchema(TypedDict):
+    type: Literal['ge', 'gt', 'le', 'lt', 'multiple-of']
+    value: SupportsRichComparison
+
+
+class PatternConstraintSchema(TypedDict):
+    type: Literal['pattern']
+    value: str
+
+
+
+class ConstraintSchema(TypedDict):
+    type: Literal['constraint']
+    constraint: Union[
+        LengthConstraint,
+        NumericConstraintSchema,
+        PatternConstraintSchema,
+    ]
+
+
+def length_constraint_schema(type: Literal['min-length', 'max-length'], value: int) -> CoreSchema:
+    """
+    Returns a schema that matches a length constraint, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    schema = core_schema.chain_schema([core_schema.str_schema(), core_schema.length_constraint_schema('min-length', 1)])
+    v = SchemaValidator(schema)
+    assert v.validate_python('hello') == 'hello'
+    ```
+
+    Args:
+        type: The type of length constraint
+        value: The value of the length constraint
+    """
+    return ConstraintSchema(
+        type='constraint',
+        constraint=LengthConstraint(
+            type=type,
+            value=value,
+        )
+    )
+
+
+def numeric_constraint_schema(
+    type: Literal['ge', 'gt', 'le', 'lt', 'multiple-of'], value: SupportsRichComparison
+) -> CoreSchema:
+    """
+    Returns a schema that matches a numeric constraint, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    schema = core_schema.chain_schema([core_schema.int_schema(), core_schema.numeric_constraint_schema('ge', 0)])
+    v = SchemaValidator(schema)
+    assert v.validate_python(1) == 1
+    ```
+
+    Args:
+        type: The type of numeric constraint
+        value: The value of the numeric constraint
+    """
+    return ConstraintSchema(
+        type='constraint',
+        constraint=NumericConstraintSchema(
+            type=type,
+            value=value,
+        )
+    )
+
+
+def pattern_constraint_schema(pattern: str) -> CoreSchema:
+    """
+    Returns a schema that matches a pattern constraint, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    schema = core_schema.chain_schema([core_schema.str_schema(), core_schema.pattern_constraint_schema('[a-z]+')])
+    v = SchemaValidator(schema)
+    assert v.validate_python('hello') == 'hello'
+    ```
+
+    Args:
+        pattern: The value of the pattern constraint
+    """
+    # make sure it's a valid pattern
+    # we're using a str for now instead of Pattern[str]
+    # to preserve flexibility of implementation
+    re.compile(pattern)
+    return ConstraintSchema(
+        type='pattern',
+        constraint=PatternConstraintSchema(
+            pattern=pattern,
+        )
+    )
+
+
 MYPY = False
 # See https://github.com/python/mypy/issues/14034 for details, in summary mypy is extremely slow to process this
 # union which kills performance not just for pydantic, but even for code using pydantic
@@ -3755,6 +3918,7 @@ if not MYPY:
         DefinitionsSchema,
         DefinitionReferenceSchema,
         UuidSchema,
+        ConstraintSchema,
     ]
 elif False:
     CoreSchema: TypeAlias = Mapping[str, Any]
@@ -3809,6 +3973,7 @@ CoreSchemaType = Literal[
     'definitions',
     'definition-ref',
     'uuid',
+    'constraint',
 ]
 
 CoreSchemaFieldType = Literal['model-field', 'dataclass-field', 'typed-dict-field', 'computed-field']

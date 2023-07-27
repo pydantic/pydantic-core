@@ -7,7 +7,6 @@ use crate::input::Input;
 
 use crate::recursion_guard::RecursionGuard;
 
-use super::constraints::LengthConstraint;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -23,10 +22,10 @@ impl BuildValidator for BytesValidator {
         config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        let validator = Self {
+        Ok(Self {
             strict: is_strict(schema, config)?,
-        };
-        LengthConstraint::maybe_wrap(schema, validator.into())
+        }
+        .into())
     }
 }
 

@@ -6,7 +6,7 @@ from typing import Any, Dict
 import pytest
 from dirty_equals import IsStr
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson, plain_repr
 
@@ -124,7 +124,7 @@ def test_int(input_value, expected):
     ],
 )
 def test_positive_int(input_value, expected):
-    v = SchemaValidator({'type': 'int', 'gt': 0})
+    v = SchemaValidator(core_schema.int_schema(gt=0))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -145,7 +145,9 @@ def test_positive_int(input_value, expected):
     ],
 )
 def test_negative_int(input_value, expected):
-    v = SchemaValidator({'type': 'int', 'lt': 0})
+    v = SchemaValidator(
+        core_schema.int_schema(lt=0)
+    )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -173,7 +175,9 @@ def test_negative_int(input_value, expected):
     ],
 )
 def test_positive_json(input_value, expected):
-    v = SchemaValidator({'type': 'int', 'gt': 0})
+    v = SchemaValidator(
+        core_schema.int_schema(gt=0)
+    )
     json_input = json.dumps(input_value)
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -195,7 +199,9 @@ def test_positive_json(input_value, expected):
     ],
 )
 def test_negative_json(input_value, expected):
-    v = SchemaValidator({'type': 'int', 'lt': 0})
+    v = SchemaValidator(
+        core_schema.int_schema(lt=0)
+    )
     json_input = json.dumps(input_value)
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -266,7 +272,7 @@ def test_int_strict(py_and_json: PyAndJson, input_value, expected):
     ids=repr,
 )
 def test_int_kwargs(py_and_json: PyAndJson, kwargs: Dict[str, Any], input_value, expected):
-    v = py_and_json({'type': 'int', **kwargs})
+    v = py_and_json(core_schema.int_schema(**kwargs))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_test(input_value)
@@ -282,19 +288,20 @@ def test_int_kwargs(py_and_json: PyAndJson, kwargs: Dict[str, Any], input_value,
 
 
 def test_union_int(py_and_json: PyAndJson):
-    v = py_and_json({'type': 'union', 'choices': [{'type': 'int', 'strict': True}, {'type': 'int', 'multiple_of': 7}]})
+    v = py_and_json({'type': 'union', 'choices': [{'type': 'int', 'strict': True}, core_schema.int_schema(multiple_of=7)]})
     assert v.validate_test('14') == 14
     assert v.validate_test(5) == 5
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test('5')
 
+    # insert_assert(exc_info.value.errors(include_url=False))
     assert exc_info.value.errors(include_url=False) == [
         {'type': 'int_type', 'loc': ('int',), 'msg': 'Input should be a valid integer', 'input': '5'},
         {
             'type': 'multiple_of',
-            'loc': ('constrained-int',),
+            'loc': ('chain[int,multiple_of]',),
             'msg': 'Input should be a multiple of 7',
-            'input': '5',
+            'input': 5,
             'ctx': {'multiple_of': 7},
         },
     ]
@@ -327,8 +334,13 @@ def test_int_repr():
     assert plain_repr(v) == 'SchemaValidator(title="int",validator=Int(IntValidator{strict:false}),definitions=[])'
     v = SchemaValidator({'type': 'int', 'strict': True})
     assert plain_repr(v) == 'SchemaValidator(title="int",validator=Int(IntValidator{strict:true}),definitions=[])'
-    v = SchemaValidator({'type': 'int', 'multiple_of': 7})
-    assert plain_repr(v).startswith('SchemaValidator(title="constrained-int",validator=ConstrainedInt(')
+    v = SchemaValidator(core_schema.int_schema(multiple_of=7))
+    # insert_assert(plain_repr(v))
+    assert (
+        plain_repr(v)
+        == 'SchemaValidator(title="chain[int,multiple_of]",validator=Chain(ChainValidator{steps:[Int(IntValidator{strict:false}),Constraint(MultipleOf(Py(0x0000000102ec41b0))),],name:"chain[int,multiple_of]"}),definitions=[])'
+    )
+
 
 
 def test_too_long(pydantic_version):
@@ -368,7 +380,7 @@ def test_long_python():
 
 
 def test_long_python_inequality():
-    v = SchemaValidator({'type': 'int', 'gt': 0, 'lt': int('1' * 4_300) - 5})
+    v = SchemaValidator(core_schema.int_schema(**{'gt': 0, 'lt': int('1' * 4_300) - 5}))
 
     s = str(int('1' * 4_300) - 6)
     s = v.validate_python(s)

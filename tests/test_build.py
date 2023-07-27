@@ -12,17 +12,17 @@ def test_build_error_type():
 
 
 def test_build_error_internal():
-    with pytest.raises(SchemaError, match='Input should be a valid integer, unable to parse string as an integer'):
-        SchemaValidator({'type': 'str', 'min_length': 'xxx', 'title': 'TestModel'})
+    with pytest.raises(SchemaError, match='Input should be a valid boolean, unable to interpret input'):
+        SchemaValidator({'type': 'str', 'strict': 'xyz'})
 
 
 def test_build_error_deep():
-    with pytest.raises(SchemaError, match='Input should be a valid integer, unable to parse string as an integer'):
+    with pytest.raises(SchemaError, match='Input should be a valid boolean, unable to interpret input'):
         SchemaValidator(
             {
                 'title': 'MyTestModel',
                 'type': 'typed-dict',
-                'fields': {'age': {'schema': {'type': 'int', 'ge': 'not-int'}}},
+                'fields': {'age': {'schema': {'type': 'int', 'strict': 'xyz'}}},
             }
         )
 

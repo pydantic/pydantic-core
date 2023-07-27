@@ -4,7 +4,6 @@ use pyo3::types::{PyDict, PySet};
 use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
-use crate::validators::constraints::LengthConstraint;
 
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
@@ -32,13 +31,12 @@ macro_rules! set_build {
             };
             let inner_name = item_validator.get_name();
             let name = format!("{}[{}]", Self::EXPECTED_TYPE, inner_name);
-            let validator = Self {
+            Ok(Self {
                 strict: crate::build_tools::is_strict(schema, config)?,
                 item_validator,
                 name,
             }
-            .into();
-            LengthConstraint::maybe_wrap(schema, validator)
+            .into())
         }
     };
 }

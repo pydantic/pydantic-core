@@ -6,7 +6,7 @@ from typing import Any, Dict
 import pytest
 from dirty_equals import HasRepr, IsStr
 
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -219,7 +219,7 @@ def test_mapping_error_yield_1(mapping_items):
     ],
 )
 def test_dict_length_constraints(kwargs: Dict[str, Any], input_value, expected):
-    v = SchemaValidator({'type': 'dict', **kwargs})
+    v = SchemaValidator(core_schema.dict_schema(**kwargs))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)

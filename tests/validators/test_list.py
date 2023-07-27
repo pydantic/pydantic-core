@@ -166,7 +166,7 @@ def test_list_error(input_value, index):
     ],
 )
 def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
-    v = SchemaValidator({'type': 'list', **kwargs})
+    v = SchemaValidator(core_schema.list_schema(**kwargs))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -184,11 +184,9 @@ def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
 )
 def test_list_length_constraints_omit(input_value, expected):
     v = SchemaValidator(
-        {
-            'type': 'list',
-            'items_schema': {'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'omit'},
-            'max_length': 4,
-        }
+        core_schema.list_schema(
+            items_schema=core_schema.with_default_schema(core_schema.int_schema(), on_error='omit'), max_length=4
+        )
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -198,7 +196,9 @@ def test_list_length_constraints_omit(input_value, expected):
 
 
 def test_length_ctx():
-    v = SchemaValidator({'type': 'list', 'min_length': 2, 'max_length': 3})
+    v = SchemaValidator(
+        core_schema.list_schema(min_length=2, max_length=3)
+    )
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1])
     # insert_assert(exc_info.value.errors(include_url=False))
@@ -228,22 +228,26 @@ def test_length_ctx():
 
 
 def test_list_function():
-    def f(input_value, info):
+    def f(input_value: Any) -> Any:
         return input_value * 2
 
     v = SchemaValidator(
-        {'type': 'list', 'items_schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f}}}
+        core_schema.list_schema(
+            core_schema.no_info_plain_validator_function(f)
+        )
     )
 
     assert v.validate_python([1, 2, 3]) == [2, 4, 6]
 
 
 def test_list_function_val_error():
-    def f(input_value, info):
+    def f(input_value: Any) -> Any:
         raise ValueError(f'error {input_value}')
 
     v = SchemaValidator(
-        {'type': 'list', 'items_schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f}}}
+        core_schema.list_schema(
+            core_schema.no_info_plain_validator_function(f)
+        )
     )
 
     with pytest.raises(ValidationError) as exc_info:
@@ -267,11 +271,15 @@ def test_list_function_val_error():
 
 
 def test_list_function_internal_error():
-    def f(input_value, info):
+    def f(input_value: Any) -> Any:
         raise RuntimeError(f'error {input_value}')
 
     v = SchemaValidator(
-        {'type': 'list', 'items_schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f}}}
+        core_schema.list_schema(
+            core_schema.no_info_plain_validator_function(
+                f
+            )
+        )
     )
 
     with pytest.raises(RuntimeError, match='^error 1$') as exc_info:

@@ -8,7 +8,6 @@ use crate::input::{GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
-use super::constraints::LengthConstraint;
 use super::list::get_items_schema;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
@@ -29,12 +28,12 @@ impl BuildValidator for TupleVariableValidator {
         let item_validator = get_items_schema(schema, config, definitions)?;
         let inner_name = item_validator.as_ref().map_or("any", |v| v.get_name());
         let name = format!("tuple[{inner_name}, ...]");
-        let validator = Self {
+        Ok(Self {
             strict: is_strict(schema, config)?,
             item_validator,
             name,
-        };
-        LengthConstraint::maybe_wrap(schema, validator.into())
+        }
+        .into())
     }
 }
 
@@ -112,7 +111,7 @@ impl BuildValidator for TuplePositionalValidator {
             .map(Validator::get_name)
             .collect::<Vec<_>>()
             .join(", ");
-        let validator = Self {
+        Ok(Self {
             strict: is_strict(schema, config)?,
             items_validators: validators,
             extra_validator: match schema.get_item(intern!(py, "extra_schema")) {
@@ -120,8 +119,8 @@ impl BuildValidator for TuplePositionalValidator {
                 None => None,
             },
             name: format!("tuple[{descr}]"),
-        };
-        LengthConstraint::maybe_wrap(schema, validator.into())
+        }
+        .into())
     }
 }
 

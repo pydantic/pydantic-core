@@ -11,7 +11,6 @@ use crate::input::{
 use crate::recursion_guard::RecursionGuard;
 
 use super::any::AnyValidator;
-use super::constraints::LengthConstraint;
 
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
@@ -46,14 +45,13 @@ impl BuildValidator for DictValidator {
             key_validator.get_name(),
             value_validator.get_name()
         );
-        let validator = Self {
+        Ok(Self {
             strict: is_strict(schema, config)?,
             key_validator,
             value_validator,
             name,
         }
-        .into();
-        LengthConstraint::maybe_wrap(schema, validator)
+        .into())
     }
 }
 

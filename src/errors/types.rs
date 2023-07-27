@@ -1,15 +1,13 @@
 use std::borrow::Cow;
-use std::fmt;
 
 use ahash::AHashMap;
-use num_bigint::BigInt;
+
 use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use crate::input::Int;
-use crate::tools::{extract_i64, py_err, py_error_type};
+use crate::tools::{py_err, py_error_type};
 use strum::{Display, EnumMessage, IntoEnumIterator};
 use strum_macros::EnumIter;
 
@@ -111,19 +109,19 @@ pub enum ErrorType {
     // generic comparison errors - used for all inequality comparisons except int and float which have their
     // own type, bounds arguments are Strings so they can be created from any type
     GreaterThan {
-        gt: Number,
+        gt: Option<PyObject>,
     },
     GreaterThanEqual {
-        ge: Number,
+        ge: Option<PyObject>,
     },
     LessThan {
-        lt: Number,
+        lt: Option<PyObject>,
     },
     LessThanEqual {
-        le: Number,
+        le: Option<PyObject>,
     },
     MultipleOf {
-        multiple_of: Number,
+        multiple_of: Option<PyObject>,
     },
     FiniteNumber,
     // ---------------------
@@ -404,11 +402,11 @@ impl ErrorType {
             Self::ModelType { .. } => extract_context!(ModelType, ctx, class_name: String),
             Self::DataclassType { .. } => extract_context!(DataclassType, ctx, class_name: String),
             Self::DataclassExactType { .. } => extract_context!(DataclassExactType, ctx, class_name: String),
-            Self::GreaterThan { .. } => extract_context!(GreaterThan, ctx, gt: Number),
-            Self::GreaterThanEqual { .. } => extract_context!(GreaterThanEqual, ctx, ge: Number),
-            Self::LessThan { .. } => extract_context!(LessThan, ctx, lt: Number),
-            Self::LessThanEqual { .. } => extract_context!(LessThanEqual, ctx, le: Number),
-            Self::MultipleOf { .. } => extract_context!(MultipleOf, ctx, multiple_of: Number),
+            Self::GreaterThan { .. } => extract_context!(GreaterThan, ctx, gt: Option<PyObject>),
+            Self::GreaterThanEqual { .. } => extract_context!(GreaterThanEqual, ctx, ge: Option<PyObject>),
+            Self::LessThan { .. } => extract_context!(LessThan, ctx, lt: Option<PyObject>),
+            Self::LessThanEqual { .. } => extract_context!(LessThanEqual, ctx, le: Option<PyObject>),
+            Self::MultipleOf { .. } => extract_context!(MultipleOf, ctx, multiple_of: Option<PyObject>),
             Self::TooShort { .. } => extract_context!(
                 TooShort,
                 ctx,
@@ -627,11 +625,26 @@ impl ErrorType {
             Self::ModelType { class_name } => render!(tmpl, class_name),
             Self::DataclassType { class_name } => render!(tmpl, class_name),
             Self::DataclassExactType { class_name } => render!(tmpl, class_name),
-            Self::GreaterThan { gt } => to_string_render!(tmpl, gt),
-            Self::GreaterThanEqual { ge } => to_string_render!(tmpl, ge),
-            Self::LessThan { lt } => to_string_render!(tmpl, lt),
-            Self::LessThanEqual { le } => to_string_render!(tmpl, le),
-            Self::MultipleOf { multiple_of } => to_string_render!(tmpl, multiple_of),
+            Self::GreaterThan { gt } => {
+                let gt = gt.clone().unwrap();
+                to_string_render!(tmpl, gt)
+            }
+            Self::GreaterThanEqual { ge } => {
+                let ge = ge.clone().unwrap();
+                to_string_render!(tmpl, ge)
+            }
+            Self::LessThan { lt } => {
+                let lt = lt.clone().unwrap();
+                to_string_render!(tmpl, lt)
+            }
+            Self::LessThanEqual { le } => {
+                let le = le.clone().unwrap();
+                to_string_render!(tmpl, le)
+            }
+            Self::MultipleOf { multiple_of } => {
+                let multiple_of = multiple_of.clone().unwrap();
+                to_string_render!(tmpl, multiple_of)
+            }
             Self::TooShort {
                 min_length,
                 actual_length,
@@ -753,75 +766,6 @@ impl ErrorType {
             Self::UuidParsing { error } => py_dict!(py, error),
             Self::UuidVersion { expected_version } => py_dict!(py, expected_version),
             _ => Ok(None),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum Number {
-    Int(i64),
-    BigInt(BigInt),
-    Float(f64),
-    String(String),
-}
-
-impl Default for Number {
-    fn default() -> Self {
-        Self::Int(0)
-    }
-}
-
-impl From<f64> for Number {
-    fn from(f: f64) -> Self {
-        Self::Float(f)
-    }
-}
-
-impl From<String> for Number {
-    fn from(s: String) -> Self {
-        Self::String(s)
-    }
-}
-impl From<Int> for Number {
-    fn from(i: Int) -> Self {
-        match i {
-            Int::I64(i) => Number::Int(i),
-            Int::Big(b) => Number::BigInt(b),
-        }
-    }
-}
-
-impl FromPyObject<'_> for Number {
-    fn extract(obj: &PyAny) -> PyResult<Self> {
-        if let Ok(int) = extract_i64(obj) {
-            Ok(Number::Int(int))
-        } else if let Ok(float) = obj.extract::<f64>() {
-            Ok(Number::Float(float))
-        } else if let Ok(string) = obj.extract::<String>() {
-            Ok(Number::String(string))
-        } else {
-            py_err!(PyTypeError; "Expected int or float or String, got {}", obj.get_type())
-        }
-    }
-}
-
-impl fmt::Display for Number {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Float(s) => write!(f, "{s}"),
-            Self::Int(i) => write!(f, "{i}"),
-            Self::BigInt(i) => write!(f, "{i}"),
-            Self::String(s) => write!(f, "{s}"),
-        }
-    }
-}
-impl ToPyObject for Number {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::Int(i) => i.into_py(py),
-            Self::BigInt(i) => i.clone().into_py(py),
-            Self::Float(f) => f.into_py(py),
-            Self::String(s) => s.into_py(py),
         }
     }
 }

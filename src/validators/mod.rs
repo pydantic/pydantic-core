@@ -514,6 +514,8 @@ pub fn build_validator<'a>(
         // recursive (self-referencing) models
         definitions::DefinitionRefValidator,
         definitions::DefinitionsValidatorBuilder,
+        // constraints
+        constraints::Constraint,
     )
 }
 
@@ -592,12 +594,10 @@ pub enum CombinedValidator {
     StrConstrained(string::StrConstrainedValidator),
     // integers
     Int(int::IntValidator),
-    ConstrainedInt(int::ConstrainedIntValidator),
     // booleans
     Bool(bool::BoolValidator),
     // floats
     Float(float::FloatValidator),
-    ConstrainedFloat(float::ConstrainedFloatValidator),
     // lists
     List(list::ListValidator),
     // sets - unique lists
@@ -660,7 +660,7 @@ pub enum CombinedValidator {
     // input dependent
     JsonOrPython(json_or_python::JsonOrPython),
     // constraints
-    LengthConstraint(constraints::LengthConstraint),
+    Constraint(constraints::Constraint),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

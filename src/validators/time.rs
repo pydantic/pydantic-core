@@ -5,7 +5,7 @@ use pyo3::types::{PyDict, PyString, PyTime};
 use speedate::Time;
 
 use crate::build_tools::is_strict;
-use crate::errors::{ErrorType, ValError, ValResult};
+use crate::errors::ValResult;
 use crate::input::{EitherTime, Input};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
@@ -52,26 +52,6 @@ impl Validator for TimeValidator {
         let time = input.validate_time(extra.strict.unwrap_or(self.strict), self.microseconds_precision)?;
         if let Some(constraints) = &self.constraints {
             let raw_time = time.as_raw()?;
-
-            macro_rules! check_constraint {
-                ($constraint:ident, $error:ident) => {
-                    if let Some(constraint) = &constraints.$constraint {
-                        if !raw_time.$constraint(constraint) {
-                            return Err(ValError::new(
-                                ErrorType::$error {
-                                    $constraint: constraint.to_string().into(),
-                                },
-                                input,
-                            ));
-                        }
-                    }
-                };
-            }
-
-            check_constraint!(le, LessThanEqual);
-            check_constraint!(lt, LessThan);
-            check_constraint!(ge, GreaterThanEqual);
-            check_constraint!(gt, GreaterThan);
 
             if let Some(ref tz_constraint) = constraints.tz {
                 tz_constraint.tz_check(raw_time.tz_offset, input)?;

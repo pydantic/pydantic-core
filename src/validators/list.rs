@@ -5,7 +5,6 @@ use crate::errors::ValResult;
 use crate::input::{GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 
-use super::constraints::LengthConstraint;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -43,12 +42,12 @@ impl BuildValidator for ListValidator {
         let item_validator = get_items_schema(schema, config, definitions)?;
         let inner_name = item_validator.as_ref().map_or("any", |v| v.get_name());
         let name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
-        let list_validator = Self {
+        Ok(Self {
             strict: crate::build_tools::is_strict(schema, config)?,
             item_validator,
             name,
-        };
-        LengthConstraint::maybe_wrap(schema, list_validator.into())
+        }
+        .into())
     }
 }
 

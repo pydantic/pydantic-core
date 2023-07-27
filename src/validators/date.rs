@@ -1,6 +1,5 @@
-use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDate, PyDict, PyString};
+use pyo3::types::PyDict;
 use speedate::{Date, Time};
 use strum::EnumMessage;
 
@@ -9,7 +8,7 @@ use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{EitherDate, Input};
 
 use crate::recursion_guard::RecursionGuard;
-use crate::tools::SchemaDict;
+
 use crate::validators::datetime::{NowConstraint, NowOp};
 
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
@@ -60,26 +59,6 @@ impl Validator for DateValidator {
         };
         if let Some(constraints) = &self.constraints {
             let raw_date = date.as_raw()?;
-
-            macro_rules! check_constraint {
-                ($constraint:ident, $error:ident) => {
-                    if let Some(constraint) = &constraints.$constraint {
-                        if !raw_date.$constraint(constraint) {
-                            return Err(ValError::new(
-                                ErrorType::$error {
-                                    $constraint: constraint.to_string().into(),
-                                },
-                                input,
-                            ));
-                        }
-                    }
-                };
-            }
-
-            check_constraint!(le, LessThanEqual);
-            check_constraint!(lt, LessThan);
-            check_constraint!(ge, GreaterThanEqual);
-            check_constraint!(gt, GreaterThan);
 
             if let Some(ref today_constraint) = constraints.today {
                 let offset = today_constraint.utc_offset(py)?;
@@ -167,34 +146,18 @@ fn date_from_datetime<'data>(
 
 #[derive(Debug, Clone)]
 struct DateConstraints {
-    le: Option<Date>,
-    lt: Option<Date>,
-    ge: Option<Date>,
-    gt: Option<Date>,
     today: Option<NowConstraint>,
 }
 
 impl DateConstraints {
     fn from_py(schema: &PyDict) -> PyResult<Option<Self>> {
-        let py = schema.py();
         let c = Self {
-            le: convert_pydate(schema, intern!(py, "le"))?,
-            lt: convert_pydate(schema, intern!(py, "lt"))?,
-            ge: convert_pydate(schema, intern!(py, "ge"))?,
-            gt: convert_pydate(schema, intern!(py, "gt"))?,
             today: NowConstraint::from_py(schema)?,
         };
-        if c.le.is_some() || c.lt.is_some() || c.ge.is_some() || c.gt.is_some() || c.today.is_some() {
+        if c.today.is_some() {
             Ok(Some(c))
         } else {
             Ok(None)
         }
-    }
-}
-
-fn convert_pydate(schema: &PyDict, field: &PyString) -> PyResult<Option<Date>> {
-    match schema.get_as::<&PyDate>(field)? {
-        Some(date) => Ok(Some(EitherDate::Py(date).as_raw()?)),
-        None => Ok(None),
     }
 }

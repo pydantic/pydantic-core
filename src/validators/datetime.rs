@@ -78,25 +78,6 @@ impl Validator for DateTimeValidator {
                     return Err(ValError::new(ErrorType::DatetimeObjectInvalid { error }, input));
                 }
             };
-            macro_rules! check_constraint {
-                ($constraint:ident, $error:ident) => {
-                    if let Some(constraint) = &constraints.$constraint {
-                        if !speedate_dt.$constraint(constraint) {
-                            return Err(ValError::new(
-                                ErrorType::$error {
-                                    $constraint: constraint.to_string().into(),
-                                },
-                                input,
-                            ));
-                        }
-                    }
-                };
-            }
-
-            check_constraint!(le, LessThanEqual);
-            check_constraint!(lt, LessThan);
-            check_constraint!(ge, GreaterThanEqual);
-            check_constraint!(gt, GreaterThan);
 
             if let Some(ref now_constraint) = constraints.now {
                 let offset = now_constraint.utc_offset(py)?;

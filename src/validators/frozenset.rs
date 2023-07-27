@@ -4,7 +4,6 @@ use pyo3::types::{PyDict, PyFrozenSet};
 use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
-use crate::validators::constraints::LengthConstraint;
 
 use super::set::set_build;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
