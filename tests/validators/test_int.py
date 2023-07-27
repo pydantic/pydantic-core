@@ -338,8 +338,9 @@ def test_int_repr():
     # insert_assert(plain_repr(v))
     assert (
         plain_repr(v)
-        == 'SchemaValidator(title="chain[int,multiple_of]",validator=Chain(ChainValidator{steps:[Int(IntValidator{strict:false}),Constraint(MultipleOf(Py(0x0000000102ec41b0))),],name:"chain[int,multiple_of]"}),definitions=[])'
+        == 'SchemaValidator(title="chain[int,multiple_of]",validator=Chain(ChainValidator{steps:[Int(IntValidator{strict:false}),Constraint(MultipleOf(Py(0x0000000104a081b0))),],name:"chain[int,multiple_of]"}),definitions=[])'
     )
+
 
 
 
