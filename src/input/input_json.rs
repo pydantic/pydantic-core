@@ -196,7 +196,7 @@ impl<'a> Input<'a> for DataValue {
 
     fn validate_dict(&'a self, _strict: bool) -> ValResult<GenericMapping<'a>> {
         match self {
-            DataValue::Object(dict) => Ok(dict.into()),
+            DataValue::Object(dict) => Ok(dict.as_ref().into()),
             DataValue::Py(obj) => obj
                 .as_ref(unsafe { Python::assume_gil_acquired() })
                 .validate_dict(_strict),
@@ -281,7 +281,7 @@ impl<'a> Input<'a> for DataValue {
 
     fn validate_iter(&self) -> ValResult<GenericIterator> {
         match self {
-            DataValue::Array(a) => Ok(a.clone().into()),
+            DataValue::Array(a) => Ok(a.clone().into()), // FIXME this clone copies the whole iterator, potentially awful for performance
             DataValue::String(s) => Ok(string_to_vec(s).into()),
             DataValue::Object(object) => {
                 // return keys iterator to match python's behavior
