@@ -236,7 +236,7 @@ impl Validator for ArgumentsValidator {
                                 if let Some(ref kwarg_key) = parameter.kwarg_key {
                                     output_kwargs.set_item(kwarg_key, value)?;
                                 } else {
-                                    output_args.push(DataValue::Py(value));
+                                    output_args.push(value);
                                 }
                             } else if let Some(ref lookup_key) = parameter.kw_lookup_key {
                                 let error_type = if parameter.positional {

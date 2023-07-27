@@ -166,7 +166,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
             },
             None => {
                 if let Some(value) = validator.default_value(py, Some(index), extra, definitions, recursion_guard)? {
-                    output.push(value);
+                    output.push(value.to_object(py));
                 } else {
                     errors.push(ValLineError::new_with_loc(ErrorType::Missing, input, index));
                 }

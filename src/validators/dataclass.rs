@@ -234,7 +234,7 @@ impl Validator for DataclassArgsValidator {
                                 definitions,
                                 recursion_guard,
                             )? {
-                                set_item!(field, DataValue::Py(value));
+                                set_item!(field, value);
                             } else {
                                 errors.push(field.lookup_key.error(
                                     ErrorType::Missing,

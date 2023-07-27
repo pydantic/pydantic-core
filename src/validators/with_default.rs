@@ -137,24 +137,21 @@ impl Validator for WithDefaultValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, DataValue> {
         if input.to_object(py).is(&PydanticUndefinedType::py_undefined()) {
-            Ok(DataValue::Py(
-                self.default_value(py, None::<usize>, extra, definitions, recursion_guard)?
-                    .unwrap(),
-            ))
+            Ok(self
+                .default_value(py, None::<usize>, extra, definitions, recursion_guard)?
+                .unwrap())
         } else {
             match self.validator.validate(py, input, extra, definitions, recursion_guard) {
                 Ok(v) => Ok(v),
                 Err(e) => match e {
-                    ValError::UseDefault => Ok(DataValue::Py(
-                        self.default_value(py, None::<usize>, extra, definitions, recursion_guard)?
-                            .ok_or(e)?,
-                    )),
+                    ValError::UseDefault => self
+                        .default_value(py, None::<usize>, extra, definitions, recursion_guard)?
+                        .ok_or(e),
                     e => match self.on_error {
                         OnError::Raise => Err(e),
-                        OnError::Default => Ok(DataValue::Py(
-                            self.default_value(py, None::<usize>, extra, definitions, recursion_guard)?
-                                .ok_or(e)?,
-                        )),
+                        OnError::Default => self
+                            .default_value(py, None::<usize>, extra, definitions, recursion_guard)?
+                            .ok_or(e),
                         OnError::Omit => Err(ValError::Omit),
                     },
                 },
@@ -169,7 +166,7 @@ impl Validator for WithDefaultValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, Option<PyObject>> {
+    ) -> ValResult<'data, Option<DataValue>> {
         match self.default.default_value(py)? {
             Some(stored_dft) => {
                 let dft: Py<PyAny> = if self.copy_default {
@@ -180,7 +177,7 @@ impl Validator for WithDefaultValidator {
                 };
                 if self.validate_default {
                     match self.validate(py, dft.into_ref(py), extra, definitions, recursion_guard) {
-                        Ok(v) => Ok(Some(v.to_object(py))),
+                        Ok(v) => Ok(Some(v)),
                         Err(e) => {
                             if let Some(outer_loc) = outer_loc {
                                 Err(e.with_outer_location(outer_loc.into()))
@@ -190,7 +187,7 @@ impl Validator for WithDefaultValidator {
                         }
                     }
                 } else {
-                    Ok(Some(dft))
+                    Ok(Some(DataValue::Py(dft)))
                 }
             }
             None => Ok(None),
