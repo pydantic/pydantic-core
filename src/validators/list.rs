@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::data_value::DataValue;
 use crate::errors::ValResult;
 use crate::input::{GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
@@ -120,7 +121,7 @@ impl Validator for ListValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let seq = input.validate_list(extra.strict.unwrap_or(self.strict))?;
 
         let output = match self.item_validator {
@@ -138,13 +139,13 @@ impl Validator for ListValidator {
                 GenericIterable::List(list) => {
                     length_check!(input, "List", self.min_length, self.max_length, list);
                     let list_copy = list.get_slice(0, usize::MAX);
-                    return Ok(list_copy.into_py(py));
+                    return Ok(DataValue::Py(list_copy.into_py(py)));
                 }
                 _ => seq.to_vec(py, input, "List", self.max_length)?,
             },
         };
         min_length_check!(input, "List", self.min_length, output);
-        Ok(output.into_py(py))
+        Ok(DataValue::Py(output.into_py(py)))
     }
 
     fn different_strict_behavior(

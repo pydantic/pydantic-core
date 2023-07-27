@@ -10,6 +10,7 @@ use ahash::AHashSet;
 use url::{ParseError, SyntaxViolation, Url};
 
 use crate::build_tools::{is_strict, py_schema_err};
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -67,7 +68,7 @@ impl Validator for UrlValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let mut lib_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
@@ -84,7 +85,7 @@ impl Validator for UrlValidator {
             self.default_port,
             &self.default_path,
         ) {
-            Ok(()) => Ok(PyUrl::new(lib_url).into_py(py)),
+            Ok(()) => Ok(DataValue::Py(PyUrl::new(lib_url).into_py(py))),
             Err(error_type) => return Err(ValError::new(error_type, input)),
         }
     }
@@ -198,7 +199,7 @@ impl Validator for MultiHostUrlValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let mut multi_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
@@ -214,7 +215,7 @@ impl Validator for MultiHostUrlValidator {
             self.default_port,
             &self.default_path,
         ) {
-            Ok(()) => Ok(multi_url.into_py(py)),
+            Ok(()) => Ok(DataValue::Py(multi_url.into_py(py))),
             Err(error_type) => return Err(ValError::new(error_type, input)),
         }
     }

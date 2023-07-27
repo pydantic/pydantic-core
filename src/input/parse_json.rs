@@ -35,6 +35,29 @@ impl ToPyObject for DataValue {
     }
 }
 
+impl IntoPy<PyObject> for DataValue {
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        match self {
+            Self::Null => py.None(),
+            Self::Bool(b) => b.into_py(py),
+            Self::Int(i) => i.into_py(py),
+            Self::BigInt(b) => b.to_object(py),
+            Self::Uint(i) => i.into_py(py),
+            Self::Float(f) => f.into_py(py),
+            Self::String(s) => s.into_py(py),
+            Self::Array(v) => PyList::new(py, v.into_iter().map(|v| v.into_py(py))).into_py(py),
+            Self::Object(o) => {
+                let dict = PyDict::new(py);
+                for (k, v) in o {
+                    dict.set_item(k, v.into_py(py)).unwrap();
+                }
+                dict.into_py(py)
+            }
+            Self::Py(o) => o.clone_ref(py),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for DataValue {
     fn deserialize<D>(deserializer: D) -> Result<DataValue, D::Error>
     where

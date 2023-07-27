@@ -3,6 +3,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 
+use crate::data_value::DataValue;
 use crate::errors::ValResult;
 use crate::input::Input;
 
@@ -79,10 +80,11 @@ impl Validator for CallValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let args = self
             .arguments_validator
-            .validate(py, input, extra, definitions, recursion_guard)?;
+            .validate(py, input, extra, definitions, recursion_guard)?
+            .to_object(py);
 
         let return_value = if let Ok((args, kwargs)) = args.extract::<(&PyTuple, &PyDict)>(py) {
             self.function.call(py, args, Some(kwargs))?
@@ -98,7 +100,7 @@ impl Validator for CallValidator {
                 .validate(py, return_value.into_ref(py), extra, definitions, recursion_guard)
                 .map_err(|e| e.with_outer_location("return".into()))
         } else {
-            Ok(return_value.to_object(py))
+            Ok(DataValue::Py(return_value.to_object(py)))
         }
     }
 

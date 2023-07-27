@@ -6,6 +6,7 @@ use ahash::AHashSet;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{GenericArguments, Input};
 use crate::lookup_key::LookupKey;
@@ -168,10 +169,10 @@ impl Validator for ArgumentsValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let args = input.validate_args()?;
 
-        let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_params_count);
+        let mut output_args: Vec<DataValue> = Vec::with_capacity(self.positional_params_count);
         let output_kwargs = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let mut used_kwargs: AHashSet<&str> = AHashSet::with_capacity(self.parameters.len());
@@ -235,7 +236,7 @@ impl Validator for ArgumentsValidator {
                                 if let Some(ref kwarg_key) = parameter.kwarg_key {
                                     output_kwargs.set_item(kwarg_key, value)?;
                                 } else {
-                                    output_args.push(value);
+                                    output_args.push(DataValue::Py(value));
                                 }
                             } else if let Some(ref lookup_key) = parameter.kw_lookup_key {
                                 let error_type = if parameter.positional {
@@ -333,7 +334,9 @@ impl Validator for ArgumentsValidator {
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
         } else {
-            Ok((PyTuple::new(py, output_args), output_kwargs).to_object(py))
+            Ok(DataValue::Py(
+                (PyTuple::new(py, output_args), output_kwargs).to_object(py),
+            ))
         }
     }
 

@@ -4,6 +4,7 @@ use pyo3::types::{PyDict, PyString};
 use regex::Regex;
 
 use crate::build_tools::{is_strict, py_schema_error_type, schema_or_config};
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -47,8 +48,10 @@ impl Validator for StrValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        Ok(input.validate_str(extra.strict.unwrap_or(self.strict))?.into_py(py))
+    ) -> ValResult<'data, DataValue> {
+        Ok(DataValue::Py(
+            input.validate_str(extra.strict.unwrap_or(self.strict))?.into_py(py),
+        ))
     }
 
     fn different_strict_behavior(
@@ -90,7 +93,7 @@ impl Validator for StrConstrainedValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let either_str = input.validate_str(extra.strict.unwrap_or(self.strict))?;
         let cow = either_str.as_cow()?;
         let mut str = cow.as_ref();
@@ -135,7 +138,7 @@ impl Validator for StrConstrainedValidator {
             // we haven't modified the string, return the original as it might be a PyString
             either_str.as_py_string(py)
         };
-        Ok(py_string.into_py(py))
+        Ok(DataValue::Py(py_string.into_py(py)))
     }
 
     fn different_strict_behavior(

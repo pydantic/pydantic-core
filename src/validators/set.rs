@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet};
 
+use crate::data_value::DataValue;
 use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -65,7 +66,7 @@ impl Validator for SetValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let collection = input.validate_set(extra.strict.unwrap_or(self.strict))?;
         let set = PySet::empty(py)?;
         collection.validate_to_set(
@@ -80,7 +81,7 @@ impl Validator for SetValidator {
             recursion_guard,
         )?;
         min_length_check!(input, "Set", self.min_length, set);
-        Ok(set.into_py(py))
+        Ok(DataValue::Py(set.into_py(py)))
     }
 
     fn different_strict_behavior(

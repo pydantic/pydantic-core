@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::py_schema_err;
+use crate::data_value::DataValue;
 use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -77,14 +78,18 @@ impl Validator for ChainValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let mut steps_iter = self.steps.iter();
         let first_step = steps_iter.next().unwrap();
-        let value = first_step.validate(py, input, extra, definitions, recursion_guard)?;
+        let mut value = first_step.validate(py, input, extra, definitions, recursion_guard)?;
 
-        steps_iter.try_fold(value, |v, step| {
-            step.validate(py, v.into_ref(py), extra, definitions, recursion_guard)
-        })
+        for step in steps_iter {
+            value = step
+                .validate(py, &value, extra, definitions, recursion_guard)
+                .map_err(|e| e.duplicate(py))?;
+        }
+
+        Ok(value)
     }
 
     fn different_strict_behavior(

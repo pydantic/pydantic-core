@@ -2,6 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::data_value::DataValue;
 use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -40,9 +41,9 @@ impl Validator for NullableValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         match input.is_none() {
-            true => Ok(py.None()),
+            true => Ok(DataValue::Py(py.None())),
             false => self.validator.validate(py, input, extra, definitions, recursion_guard),
         }
     }

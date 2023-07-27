@@ -5,6 +5,7 @@ use pyo3::types::{PyDict, PyString, PyTime};
 use speedate::Time;
 
 use crate::build_tools::is_strict;
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{EitherTime, Input};
 use crate::recursion_guard::RecursionGuard;
@@ -48,7 +49,7 @@ impl Validator for TimeValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let time = input.validate_time(extra.strict.unwrap_or(self.strict), self.microseconds_precision)?;
         if let Some(constraints) = &self.constraints {
             let raw_time = time.as_raw()?;
@@ -77,7 +78,7 @@ impl Validator for TimeValidator {
                 tz_constraint.tz_check(raw_time.tz_offset, input)?;
             }
         }
-        Ok(time.try_into_py(py)?)
+        Ok(DataValue::Py(time.try_into_py(py)?))
     }
 
     fn different_strict_behavior(

@@ -4,6 +4,7 @@ use pyo3::types::{PyDelta, PyDict};
 use speedate::Duration;
 
 use crate::build_tools::is_strict;
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{duration_as_pytimedelta, pytimedelta_as_duration, Input};
 use crate::recursion_guard::RecursionGuard;
@@ -74,7 +75,7 @@ impl Validator for TimeDeltaValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let timedelta = input.validate_timedelta(extra.strict.unwrap_or(self.strict), self.microseconds_precision)?;
         let py_timedelta = timedelta.try_into_py(py)?;
         if let Some(constraints) = &self.constraints {
@@ -103,7 +104,7 @@ impl Validator for TimeDeltaValidator {
             check_constraint!(ge, GreaterThanEqual);
             check_constraint!(gt, GreaterThan);
         }
-        Ok(py_timedelta.into())
+        Ok(DataValue::Py(py_timedelta.into()))
     }
 
     fn different_strict_behavior(

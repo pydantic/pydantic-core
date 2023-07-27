@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::py_schema_err;
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, PydanticCustomError, PydanticKnownError, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -95,7 +96,7 @@ impl Validator for CustomErrorValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         self.validator
             .validate(py, input, extra, definitions, recursion_guard)
             .map_err(|_| self.custom_error.as_val_error(input))

@@ -26,6 +26,7 @@ impl<'a> Input<'a> for DataValue {
         match self {
             DataValue::Int(i) => (*i).into(),
             DataValue::String(s) => s.as_str().into(),
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).as_loc_item(),
             v => format!("{v:?}").into(),
         }
     }
@@ -47,6 +48,7 @@ impl<'a> Input<'a> for DataValue {
                 }
                 Some(dict)
             }
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).as_kwargs(py),
             _ => None,
         }
     }
@@ -55,6 +57,7 @@ impl<'a> Input<'a> for DataValue {
         match self {
             DataValue::Object(object) => Ok(JsonArgs::new(None, Some(object)).into()),
             DataValue::Array(array) => Ok(JsonArgs::new(Some(array), None).into()),
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).validate_args(),
             _ => Err(ValError::new(ErrorType::ArgumentsType, self)),
         }
     }
@@ -62,6 +65,9 @@ impl<'a> Input<'a> for DataValue {
     fn validate_dataclass_args(&'a self, class_name: &str) -> ValResult<'a, GenericArguments<'a>> {
         match self {
             DataValue::Object(object) => Ok(JsonArgs::new(None, Some(object)).into()),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .validate_dataclass_args(class_name),
             _ => {
                 let class_name = class_name.to_string();
                 Err(ValError::new(ErrorType::DataclassType { class_name }, self))
@@ -72,6 +78,7 @@ impl<'a> Input<'a> for DataValue {
     fn parse_json(&'a self) -> ValResult<'a, DataValue> {
         match self {
             DataValue::String(s) => serde_json::from_str(s.as_str()).map_err(|e| map_json_err(self, e)),
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).parse_json(),
             _ => Err(ValError::new(ErrorType::JsonType, self)),
         }
     }
@@ -79,19 +86,24 @@ impl<'a> Input<'a> for DataValue {
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
         match self {
             DataValue::String(s) => Ok(s.as_str().into()),
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).strict_str(),
             _ => Err(ValError::new(ErrorType::StringType, self)),
         }
     }
     fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
         match self {
             DataValue::String(s) => Ok(s.as_str().into()),
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).lax_str(),
             _ => Err(ValError::new(ErrorType::StringType, self)),
         }
     }
 
-    fn validate_bytes(&'a self, _strict: bool) -> ValResult<EitherBytes<'a>> {
+    fn validate_bytes(&'a self, strict: bool) -> ValResult<EitherBytes<'a>> {
         match self {
             DataValue::String(s) => Ok(s.as_bytes().into()),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .validate_bytes(strict),
             _ => Err(ValError::new(ErrorType::BytesType, self)),
         }
     }
@@ -103,6 +115,7 @@ impl<'a> Input<'a> for DataValue {
     fn strict_bool(&self) -> ValResult<bool> {
         match self {
             DataValue::Bool(b) => Ok(*b),
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).strict_bool(),
             _ => Err(ValError::new(ErrorType::BoolType, self)),
         }
     }
@@ -115,6 +128,7 @@ impl<'a> Input<'a> for DataValue {
                 Ok(int) => int.as_bool().ok_or_else(|| ValError::new(ErrorType::BoolParsing, self)),
                 _ => Err(ValError::new(ErrorType::BoolType, self)),
             },
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).lax_bool(),
             _ => Err(ValError::new(ErrorType::BoolType, self)),
         }
     }
@@ -124,6 +138,7 @@ impl<'a> Input<'a> for DataValue {
             DataValue::Int(i) => Ok(EitherInt::I64(*i)),
             DataValue::Uint(u) => Ok(EitherInt::U64(*u)),
             DataValue::BigInt(b) => Ok(EitherInt::BigInt(b.clone())),
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).strict_int(),
             _ => Err(ValError::new(ErrorType::IntType, self)),
         }
     }
@@ -138,6 +153,7 @@ impl<'a> Input<'a> for DataValue {
             DataValue::BigInt(b) => Ok(EitherInt::BigInt(b.clone())),
             DataValue::Float(f) => float_as_int(self, *f),
             DataValue::String(str) => str_as_int(self, str),
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).lax_int(),
             _ => Err(ValError::new(ErrorType::IntType, self)),
         }
     }
@@ -145,6 +161,9 @@ impl<'a> Input<'a> for DataValue {
     fn ultra_strict_float(&'a self) -> ValResult<EitherFloat<'a>> {
         match self {
             DataValue::Float(f) => Ok(EitherFloat::F64(*f)),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .ultra_strict_float(),
             _ => Err(ValError::new(ErrorType::FloatType, self)),
         }
     }
@@ -153,6 +172,7 @@ impl<'a> Input<'a> for DataValue {
             DataValue::Float(f) => Ok(EitherFloat::F64(*f)),
             DataValue::Int(i) => Ok(EitherFloat::F64(*i as f64)),
             DataValue::Uint(u) => Ok(EitherFloat::F64(*u as f64)),
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).strict_float(),
             _ => Err(ValError::new(ErrorType::FloatType, self)),
         }
     }
@@ -169,6 +189,7 @@ impl<'a> Input<'a> for DataValue {
                 Ok(i) => Ok(EitherFloat::F64(i)),
                 Err(_) => Err(ValError::new(ErrorType::FloatParsing, self)),
             },
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).lax_float(),
             _ => Err(ValError::new(ErrorType::FloatType, self)),
         }
     }
@@ -176,6 +197,9 @@ impl<'a> Input<'a> for DataValue {
     fn validate_dict(&'a self, _strict: bool) -> ValResult<GenericMapping<'a>> {
         match self {
             DataValue::Object(dict) => Ok(dict.into()),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .validate_dict(_strict),
             _ => Err(ValError::new(ErrorType::DictType, self)),
         }
     }
@@ -187,6 +211,9 @@ impl<'a> Input<'a> for DataValue {
     fn validate_list(&'a self, _strict: bool) -> ValResult<GenericIterable<'a>> {
         match self {
             DataValue::Array(a) => Ok(GenericIterable::JsonArray(a)),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .validate_list(_strict),
             _ => Err(ValError::new(ErrorType::ListType, self)),
         }
     }
@@ -199,6 +226,9 @@ impl<'a> Input<'a> for DataValue {
         // just as in set's case, List has to be allowed
         match self {
             DataValue::Array(a) => Ok(GenericIterable::JsonArray(a)),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .validate_tuple(_strict),
             _ => Err(ValError::new(ErrorType::TupleType, self)),
         }
     }
@@ -211,6 +241,9 @@ impl<'a> Input<'a> for DataValue {
         // we allow a list here since otherwise it would be impossible to create a set from JSON
         match self {
             DataValue::Array(a) => Ok(GenericIterable::JsonArray(a)),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .validate_set(_strict),
             _ => Err(ValError::new(ErrorType::SetType, self)),
         }
     }
@@ -223,6 +256,9 @@ impl<'a> Input<'a> for DataValue {
         // we allow a list here since otherwise it would be impossible to create a frozenset from JSON
         match self {
             DataValue::Array(a) => Ok(GenericIterable::JsonArray(a)),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .validate_frozenset(_strict),
             _ => Err(ValError::new(ErrorType::FrozenSetType, self)),
         }
     }
@@ -236,6 +272,9 @@ impl<'a> Input<'a> for DataValue {
             DataValue::Array(a) => Ok(GenericIterable::JsonArray(a)),
             DataValue::String(s) => Ok(GenericIterable::JsonString(s)),
             DataValue::Object(object) => Ok(GenericIterable::JsonObject(object)),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .extract_generic_iterable(),
             _ => Err(ValError::new(ErrorType::IterableType, self)),
         }
     }
@@ -249,6 +288,7 @@ impl<'a> Input<'a> for DataValue {
                 let keys: Vec<DataValue> = object.keys().map(|k| DataValue::String(k.clone())).collect();
                 Ok(keys.into())
             }
+            DataValue::Py(obj) => obj.as_ref(unsafe { Python::assume_gil_acquired() }).validate_iter(),
             _ => Err(ValError::new(ErrorType::IterableType, self)),
         }
     }
@@ -256,6 +296,9 @@ impl<'a> Input<'a> for DataValue {
     fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
         match self {
             DataValue::String(v) => bytes_as_date(self, v.as_bytes()),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .validate_date(_strict),
             _ => Err(ValError::new(ErrorType::DateType, self)),
         }
     }
@@ -272,6 +315,9 @@ impl<'a> Input<'a> for DataValue {
     ) -> ValResult<EitherTime> {
         match self {
             DataValue::String(v) => bytes_as_time(self, v.as_bytes(), microseconds_overflow_behavior),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .strict_time(microseconds_overflow_behavior),
             _ => Err(ValError::new(ErrorType::TimeType, self)),
         }
     }
@@ -290,6 +336,9 @@ impl<'a> Input<'a> for DataValue {
                 },
                 self,
             )),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .lax_time(microseconds_overflow_behavior),
             _ => Err(ValError::new(ErrorType::TimeType, self)),
         }
     }
@@ -300,6 +349,9 @@ impl<'a> Input<'a> for DataValue {
     ) -> ValResult<EitherDateTime> {
         match self {
             DataValue::String(v) => bytes_as_datetime(self, v.as_bytes(), microseconds_overflow_behavior),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .strict_datetime(microseconds_overflow_behavior),
             _ => Err(ValError::new(ErrorType::DatetimeType, self)),
         }
     }
@@ -311,6 +363,9 @@ impl<'a> Input<'a> for DataValue {
             DataValue::String(v) => bytes_as_datetime(self, v.as_bytes(), microseconds_overflow_behavior),
             DataValue::Int(v) => int_as_datetime(self, *v, 0),
             DataValue::Float(v) => float_as_datetime(self, *v),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .lax_datetime(microseconds_overflow_behavior),
             _ => Err(ValError::new(ErrorType::DatetimeType, self)),
         }
     }
@@ -321,6 +376,9 @@ impl<'a> Input<'a> for DataValue {
     ) -> ValResult<EitherTimedelta> {
         match self {
             DataValue::String(v) => bytes_as_timedelta(self, v.as_bytes(), microseconds_overflow_behavior),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .strict_timedelta(microseconds_overflow_behavior),
             _ => Err(ValError::new(ErrorType::TimeDeltaType, self)),
         }
     }
@@ -332,6 +390,9 @@ impl<'a> Input<'a> for DataValue {
             DataValue::String(v) => bytes_as_timedelta(self, v.as_bytes(), microseconds_overflow_behavior),
             DataValue::Int(v) => Ok(int_as_duration(self, *v)?.into()),
             DataValue::Float(v) => Ok(float_as_duration(self, *v)?.into()),
+            DataValue::Py(obj) => obj
+                .as_ref(unsafe { Python::assume_gil_acquired() })
+                .lax_timedelta(microseconds_overflow_behavior),
             _ => Err(ValError::new(ErrorType::TimeDeltaType, self)),
         }
     }

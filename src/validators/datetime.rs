@@ -8,6 +8,7 @@ use strum::EnumMessage;
 
 use crate::build_tools::{is_strict, py_schema_error_type};
 use crate::build_tools::{py_schema_err, schema_or_config_same};
+use crate::data_value::DataValue;
 use crate::errors::{py_err_string, ErrorType, ValError, ValResult};
 use crate::input::{EitherDateTime, Input};
 
@@ -66,7 +67,7 @@ impl Validator for DateTimeValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let datetime = input.validate_datetime(extra.strict.unwrap_or(self.strict), self.microseconds_precision)?;
         if let Some(constraints) = &self.constraints {
             // if we get an error from as_speedate, it's probably because the input datetime was invalid
@@ -120,7 +121,7 @@ impl Validator for DateTimeValidator {
                 tz_constraint.tz_check(speedate_dt.time.tz_offset, input)?;
             }
         }
-        Ok(datetime.try_into_py(py)?)
+        Ok(DataValue::Py(datetime.try_into_py(py)?))
     }
 
     fn different_strict_behavior(

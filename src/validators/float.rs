@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::{is_strict, schema_or_config_same};
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -70,13 +71,13 @@ impl Validator for FloatValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let either_float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
         let float: f64 = either_float.try_into()?;
         if !self.allow_inf_nan && !float.is_finite() {
             return Err(ValError::new(ErrorType::FiniteNumber, input));
         }
-        Ok(float.into_py(py))
+        Ok(DataValue::Py(float.into_py(py)))
     }
 
     fn different_strict_behavior(
@@ -117,7 +118,7 @@ impl Validator for ConstrainedFloatValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let either_float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
         let float: f64 = either_float.try_into()?;
         if !self.allow_inf_nan && !float.is_finite() {
@@ -155,7 +156,7 @@ impl Validator for ConstrainedFloatValidator {
                 return Err(ValError::new(ErrorType::GreaterThan { gt: gt.into() }, input));
             }
         }
-        Ok(float.into_py(py))
+        Ok(DataValue::Py(float.into_py(py)))
     }
 
     fn different_strict_behavior(

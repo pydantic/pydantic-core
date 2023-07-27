@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::errors::ValResult;
 use crate::input::Input;
+use crate::{data_value::DataValue, errors::ValResult};
 
 use crate::recursion_guard::RecursionGuard;
 
@@ -34,9 +34,9 @@ impl Validator for AnyValidator {
         _extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         // Ok(input.clone().into_py(py))
-        Ok(input.to_object(py))
+        Ok(DataValue::Py(input.to_object(py)))
     }
 
     fn different_strict_behavior(

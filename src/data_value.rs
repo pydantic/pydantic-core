@@ -4,6 +4,7 @@ use pyo3::PyObject;
 use crate::lazy_index_map::LazyIndexMap;
 
 /// similar to serde `Value` but with int and float split
+// FIXME remove clone, don't want to accidentally duplicate Vecs
 #[derive(Clone, Debug)]
 pub enum DataValue {
     Null,

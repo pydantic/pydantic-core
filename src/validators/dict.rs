@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyMapping};
 
 use crate::build_tools::is_strict;
+use crate::data_value::DataValue;
 use crate::errors::{ValError, ValLineError, ValResult};
 use crate::input::{
     DictGenericIterator, GenericMapping, Input, JsonObject, JsonObjectGenericIterator, MappingGenericIterator,
@@ -73,7 +74,7 @@ impl Validator for DictValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let dict = input.validate_dict(extra.strict.unwrap_or(self.strict))?;
         match dict {
             GenericMapping::PyDict(py_dict) => {
@@ -122,7 +123,7 @@ macro_rules! build_validate {
             extra: &Extra,
             definitions: &'data Definitions<CombinedValidator>,
             recursion_guard: &'s mut RecursionGuard,
-        ) -> ValResult<'data, PyObject> {
+        ) -> ValResult<'data, DataValue> {
             let output = PyDict::new(py);
             let mut errors: Vec<ValLineError> = Vec::new();
 
@@ -163,7 +164,7 @@ macro_rules! build_validate {
 
             if errors.is_empty() {
                 length_check!(input, "Dictionary", self.min_length, self.max_length, output);
-                Ok(output.into())
+                Ok(DataValue::Py(output.into()))
             } else {
                 Err(ValError::LineErrors(errors))
             }

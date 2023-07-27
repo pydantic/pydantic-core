@@ -65,3 +65,12 @@ where
         self.vec.iter()
     }
 }
+
+impl<K, V> IntoIterator for LazyIndexMap<K, V> {
+    type Item = (K, V);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.vec.into_iter()
+    }
+}

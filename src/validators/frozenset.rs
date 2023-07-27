@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFrozenSet};
 
+use crate::data_value::DataValue;
 use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -34,7 +35,7 @@ impl Validator for FrozenSetValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let collection = input.validate_frozenset(extra.strict.unwrap_or(self.strict))?;
         let f_set = PyFrozenSet::empty(py)?;
         collection.validate_to_set(
@@ -49,7 +50,7 @@ impl Validator for FrozenSetValidator {
             recursion_guard,
         )?;
         min_length_check!(input, "Frozenset", self.min_length, f_set);
-        Ok(f_set.into_py(py))
+        Ok(DataValue::Py(f_set.into_py(py)))
     }
 
     fn different_strict_behavior(

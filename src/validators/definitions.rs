@@ -2,6 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 
@@ -81,7 +82,7 @@ impl Validator for DefinitionRefValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         if let Some(id) = input.identity() {
             if recursion_guard.contains_or_insert(id, self.validator_id) {
                 // we don't remove id here, we leave that to the validator which originally added id to `recursion_guard`
@@ -109,7 +110,7 @@ impl Validator for DefinitionRefValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         if let Some(id) = obj.identity() {
             if recursion_guard.contains_or_insert(id, self.validator_id) {
                 // we don't remove id here, we leave that to the validator which originally added id to `recursion_guard`
@@ -179,7 +180,7 @@ fn validate<'s, 'data>(
     extra: &Extra,
     definitions: &'data Definitions<CombinedValidator>,
     recursion_guard: &'s mut RecursionGuard,
-) -> ValResult<'data, PyObject> {
+) -> ValResult<'data, DataValue> {
     let validator = definitions.get(validator_id).unwrap();
     validator.validate(py, input, extra, definitions, recursion_guard)
 }
@@ -194,7 +195,7 @@ fn validate_assignment<'data>(
     extra: &Extra,
     definitions: &'data Definitions<CombinedValidator>,
     recursion_guard: &mut RecursionGuard,
-) -> ValResult<'data, PyObject> {
+) -> ValResult<'data, DataValue> {
     let validator = definitions.get(validator_id).unwrap();
     validator.validate_assignment(py, obj, field_name, field_value, extra, definitions, recursion_guard)
 }

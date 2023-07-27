@@ -5,6 +5,7 @@ use speedate::{Date, Time};
 use strum::EnumMessage;
 
 use crate::build_tools::{is_strict, py_schema_error_type};
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{EitherDate, Input};
 
@@ -46,7 +47,7 @@ impl Validator for DateValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let date = match input.validate_date(extra.strict.unwrap_or(self.strict)) {
             Ok(date) => date,
             // if the date error was an internal error, return that immediately
@@ -99,7 +100,7 @@ impl Validator for DateValidator {
                 }
             }
         }
-        Ok(date.try_into_py(py)?)
+        Ok(DataValue::Py(date.try_into_py(py)?))
     }
 
     fn different_strict_behavior(

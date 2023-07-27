@@ -6,6 +6,7 @@ use ahash::AHashSet;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config, schema_or_config_same, ExtraBehavior};
+use crate::data_value::DataValue;
 use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{
     AttributesGenericIterator, DictGenericIterator, GenericMapping, Input, JsonObjectGenericIterator,
@@ -147,7 +148,7 @@ impl Validator for TypedDictValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let strict = extra.strict.unwrap_or(self.strict);
         let dict = input.validate_dict(strict)?;
 
@@ -279,7 +280,7 @@ impl Validator for TypedDictValidator {
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
         } else {
-            Ok(output_dict.to_object(py))
+            Ok(DataValue::Py(output_dict.to_object(py)))
         }
     }
 
