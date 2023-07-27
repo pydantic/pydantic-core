@@ -3,6 +3,7 @@ use std::fmt;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::data_value::DataValue;
 use crate::errors::{ErrorMode, ErrorType, LocItem, ValError, ValResult};
 use crate::input::{GenericIterator, Input};
 use crate::recursion_guard::RecursionGuard;
@@ -58,7 +59,7 @@ impl Validator for GeneratorValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let iterator = input.validate_iter()?;
         let validator = self.item_validator.as_ref().map(|v| {
             InternalValidator::new(
@@ -79,7 +80,7 @@ impl Validator for GeneratorValidator {
             max_length: self.max_length,
             hide_input_in_errors: self.hide_input_in_errors,
         };
-        Ok(v_iterator.into_py(py))
+        Ok(DataValue::Py(v_iterator.into_py(py)))
     }
 
     fn different_strict_behavior(
@@ -294,6 +295,7 @@ impl InternalValidator {
                     self.hide_input_in_errors,
                 )
             })
+            .map(|v| v.to_object(py))
     }
 
     pub fn validate<'s, 'data>(
@@ -326,6 +328,7 @@ impl InternalValidator {
                     self.hide_input_in_errors,
                 )
             })
+            .map(|v| v.to_object(py))
     }
 }
 

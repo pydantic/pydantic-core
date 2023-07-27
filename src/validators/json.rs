@@ -2,6 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::data_value::DataValue;
 use crate::errors::ValResult;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -52,14 +53,14 @@ impl Validator for JsonValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let json_value = input.parse_json()?;
         match self.validator {
             Some(ref validator) => match validator.validate(py, &json_value, extra, definitions, recursion_guard) {
                 Ok(v) => Ok(v),
                 Err(err) => Err(err.duplicate(py)),
             },
-            None => Ok(json_value.to_object(py)),
+            None => Ok(DataValue::Py(json_value.to_object(py))),
         }
     }
 

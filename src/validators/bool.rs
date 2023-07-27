@@ -1,9 +1,9 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_tools::is_strict;
 use crate::errors::ValResult;
 use crate::input::Input;
+use crate::{build_tools::is_strict, data_value::DataValue};
 
 use crate::recursion_guard::RecursionGuard;
 
@@ -39,10 +39,12 @@ impl Validator for BoolValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool
         // and back again, might be worth profiling?
-        Ok(input.validate_bool(extra.strict.unwrap_or(self.strict))?.into_py(py))
+        Ok(DataValue::Py(
+            input.validate_bool(extra.strict.unwrap_or(self.strict))?.into_py(py),
+        ))
     }
 
     fn different_strict_behavior(

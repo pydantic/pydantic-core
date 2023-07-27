@@ -9,6 +9,7 @@ use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
+use crate::data_value::DataValue;
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::errors::{ErrorMode, LocItem, ValError, ValResult, ValidationError};
 use crate::input::{Input, InputType};
@@ -155,7 +156,7 @@ impl SchemaValidator {
         context: Option<&PyAny>,
         self_instance: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        let r = self._validate(
+        match self._validate(
             py,
             input,
             InputType::Python,
@@ -163,8 +164,10 @@ impl SchemaValidator {
             from_attributes,
             context,
             self_instance,
-        );
-        r.map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Python))
+        ) {
+            Ok(value) => Ok(value.to_object(py)),
+            Err(err) => Err(self.prepare_validation_err(py, err, ErrorMode::Python)),
+        }
     }
 
     #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]
@@ -204,10 +207,10 @@ impl SchemaValidator {
         self_instance: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         match input.parse_json() {
-            Ok(input) => {
-                let r = self._validate(py, &input, InputType::Json, strict, None, context, self_instance);
-                r.map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Json))
-            }
+            Ok(json) => match self._validate(py, &json, InputType::Json, strict, None, context, self_instance) {
+                Ok(value) => Ok(value.to_object(py)),
+                Err(err) => Err(self.prepare_validation_err(py, err, ErrorMode::Json)),
+            },
             Err(err) => Err(self.prepare_validation_err(py, err, ErrorMode::Json)),
         }
     }
@@ -235,9 +238,13 @@ impl SchemaValidator {
         };
 
         let guard = &mut RecursionGuard::default();
-        self.validator
+        match self
+            .validator
             .validate_assignment(py, obj, field_name, field_value, &extra, &self.definitions, guard)
-            .map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Python))
+        {
+            Ok(value) => Ok(value.to_object(py)),
+            Err(e) => Err(self.prepare_validation_err(py, e, ErrorMode::Python)),
+        }
     }
 
     #[pyo3(signature = (*, strict=None, context=None))]
@@ -294,7 +301,7 @@ impl SchemaValidator {
         from_attributes: Option<bool>,
         context: Option<&'data PyAny>,
         self_instance: Option<&PyAny>,
-    ) -> ValResult<'data, PyObject>
+    ) -> ValResult<'data, DataValue>
     where
         's: 'data,
     {
@@ -344,7 +351,7 @@ impl<'py> SelfValidator<'py> {
             &self.validator.definitions,
             &mut RecursionGuard::default(),
         ) {
-            Ok(schema_obj) => Ok(schema_obj.into_ref(py)),
+            Ok(schema_obj) => Ok(schema_obj.to_object(py).into_ref(py)),
             Err(e) => Err(SchemaError::from_val_error(py, e)),
         }
     }
@@ -673,7 +680,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject>;
+    ) -> ValResult<'data, DataValue>;
 
     /// Get a default value, currently only used by `WithDefaultValidator`
     fn default_value<'s, 'data>(
@@ -698,7 +705,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         _extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let py_err = PyTypeError::new_err(format!("validate_assignment is not supported for {}", self.get_name()));
         Err(py_err.into())
     }

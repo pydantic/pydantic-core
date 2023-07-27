@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::is_strict;
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 
@@ -48,9 +49,9 @@ impl Validator for BytesValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let either_bytes = input.validate_bytes(extra.strict.unwrap_or(self.strict))?;
-        Ok(either_bytes.into_py(py))
+        Ok(DataValue::Py(either_bytes.into_py(py)))
     }
 
     fn different_strict_behavior(
@@ -87,7 +88,7 @@ impl Validator for BytesConstrainedValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let either_bytes = input.validate_bytes(extra.strict.unwrap_or(self.strict))?;
         let len = either_bytes.len()?;
 
@@ -102,7 +103,7 @@ impl Validator for BytesConstrainedValidator {
             }
         }
 
-        Ok(either_bytes.into_py(py))
+        Ok(DataValue::Py(either_bytes.into_py(py)))
     }
 
     fn different_strict_behavior(

@@ -20,6 +20,7 @@ use pyo3::types::PyFunction;
 use pyo3::PyTypeInfo;
 use serde::{ser::Error, Serialize, Serializer};
 
+use crate::data_value::DataValue;
 use crate::errors::{py_err_string, ErrorType, InputValue, ValError, ValLineError, ValResult};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::py_err;
@@ -157,8 +158,8 @@ fn validate_iter_to_vec<'a, 's>(
     extra: &Extra,
     definitions: &'a [CombinedValidator],
     recursion_guard: &'s mut RecursionGuard,
-) -> ValResult<'a, Vec<PyObject>> {
-    let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
+) -> ValResult<'a, Vec<DataValue>> {
+    let mut output = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
     for (index, item_result) in iter.enumerate() {
         let item = item_result.map_err(|e| any_next_error!(py, e, max_length_check.input, index))?;
@@ -232,7 +233,7 @@ fn validate_iter_to_set<'a, 's>(
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
         match validator.validate(py, item, extra, definitions, recursion_guard) {
             Ok(item) => {
-                set.build_add(item)?;
+                set.build_add(item.to_object(py))?;
                 if let Some(max_length) = max_length {
                     let actual_length = set.build_len();
                     if actual_length > max_length {
@@ -267,12 +268,12 @@ fn no_validator_iter_to_vec<'a, 's>(
     input: &'a (impl Input<'a> + 'a),
     iter: impl Iterator<Item = PyResult<&'a (impl Input<'a> + 'a)>>,
     mut max_length_check: MaxLengthCheck<'a, impl Input<'a>>,
-) -> ValResult<'a, Vec<PyObject>> {
+) -> ValResult<'a, Vec<DataValue>> {
     iter.enumerate()
         .map(|(index, result)| {
             let v = result.map_err(|e| any_next_error!(py, e, input, index))?;
             max_length_check.incr()?;
-            Ok(v.to_object(py))
+            Ok(DataValue::Py(v.to_object(py)))
         })
         .collect()
 }
@@ -314,7 +315,7 @@ impl<'a> GenericIterable<'a> {
         extra: &Extra,
         definitions: &'a [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'a, Vec<PyObject>> {
+    ) -> ValResult<'a, Vec<DataValue>> {
         let capacity = self
             .generic_len()
             .unwrap_or_else(|| max_length.unwrap_or(DEFAULT_CAPACITY));
@@ -395,7 +396,7 @@ impl<'a> GenericIterable<'a> {
         input: &'a impl Input<'a>,
         field_type: &'static str,
         max_length: Option<usize>,
-    ) -> ValResult<'a, Vec<PyObject>> {
+    ) -> ValResult<'a, Vec<DataValue>> {
         let max_length_check = MaxLengthCheck::new(max_length, field_type, input);
 
         match self {

@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::is_strict;
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
@@ -52,7 +53,7 @@ impl Validator for TupleVariableValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let seq = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
 
         let output = match self.item_validator {
@@ -69,7 +70,7 @@ impl Validator for TupleVariableValidator {
             None => seq.to_vec(py, input, "Tuple", self.max_length)?,
         };
         min_length_check!(input, "Tuple", self.min_length, output);
-        Ok(PyTuple::new(py, &output).into_py(py))
+        Ok(DataValue::Py(PyTuple::new(py, &output).into_py(py)))
     }
 
     fn different_strict_behavior(
@@ -157,7 +158,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
     for (index, validator) in items_validators.iter().enumerate() {
         match collection_iter.next() {
             Some(result) => match validator.validate(py, result?, extra, definitions, recursion_guard) {
-                Ok(item) => output.push(item),
+                Ok(item) => output.push(item.to_object(py)),
                 Err(ValError::LineErrors(line_errors)) => {
                     errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
                 }
@@ -177,7 +178,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
         match extra_validator {
             Some(ref extra_validator) => {
                 match extra_validator.validate(py, item, extra, definitions, recursion_guard) {
-                    Ok(item) => output.push(item),
+                    Ok(item) => output.push(item.to_object(py)),
                     Err(ValError::LineErrors(line_errors)) => {
                         errors.extend(
                             line_errors
@@ -219,7 +220,7 @@ impl Validator for TuplePositionalValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let collection = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
         let expected_length = self.items_validators.len();
         let collection_len = collection.generic_len();
@@ -253,7 +254,7 @@ impl Validator for TuplePositionalValidator {
             other => iter!(other.as_sequence_iterator(py)?),
         }
         if errors.is_empty() {
-            Ok(PyTuple::new(py, &output).into_py(py))
+            Ok(DataValue::Py(PyTuple::new(py, &output).into_py(py)))
         } else {
             Err(ValError::LineErrors(errors))
         }

@@ -2,6 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::data_value::DataValue;
 use crate::definitions::DefinitionsBuilder;
 use crate::errors::ValResult;
 use crate::input::Input;
@@ -58,7 +59,7 @@ impl Validator for JsonOrPython {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         match extra.mode {
             InputType::Python => self.python.validate(py, input, extra, definitions, recursion_guard),
             InputType::Json => self.json.validate(py, input, extra, definitions, recursion_guard),

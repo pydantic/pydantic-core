@@ -7,6 +7,7 @@ use pyo3::types::{PyDict, PyType};
 use uuid::Uuid;
 
 use crate::build_tools::is_strict;
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -91,7 +92,7 @@ impl Validator for UuidValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let class = get_uuid_type(py)?;
         if let Some(py_input) = input.input_is_instance(class) {
             if let Some(expected_version) = self.version {
@@ -101,7 +102,7 @@ impl Validator for UuidValidator {
                     return Err(ValError::new(ErrorType::UuidVersion { expected_version }, input));
                 }
             }
-            Ok(py_input.to_object(py))
+            Ok(DataValue::Py(py_input.to_object(py)))
         } else if extra.strict.unwrap_or(self.strict) && input.is_python() {
             Err(ValError::new(
                 ErrorType::IsInstanceOf {
@@ -111,7 +112,7 @@ impl Validator for UuidValidator {
             ))
         } else {
             let uuid = self.get_uuid(input)?;
-            self.create_py_uuid(py, class, &uuid)
+            self.create_py_uuid(py, class, &uuid).map(DataValue::Py)
         }
     }
 

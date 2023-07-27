@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
+use crate::data_value::DataValue;
 use crate::errors::{
     ErrorType, LocItem, PydanticCustomError, PydanticKnownError, PydanticOmit, ValError, ValResult, ValidationError,
 };
@@ -100,7 +101,7 @@ macro_rules! impl_validator {
                 extra: &Extra,
                 definitions: &'data Definitions<CombinedValidator>,
                 recursion_guard: &'s mut RecursionGuard,
-            ) -> ValResult<'data, PyObject> {
+            ) -> ValResult<'data, DataValue> {
                 let validate =
                     move |v: &'data PyAny, e: &Extra| self.validator.validate(py, v, e, definitions, recursion_guard);
                 self._validate(validate, py, input.to_object(py).into_ref(py), extra)
@@ -114,7 +115,7 @@ macro_rules! impl_validator {
                 extra: &Extra,
                 definitions: &'data Definitions<CombinedValidator>,
                 recursion_guard: &'s mut RecursionGuard,
-            ) -> ValResult<'data, PyObject> {
+            ) -> ValResult<'data, DataValue> {
                 let validate = move |v: &'data PyAny, e: &Extra| {
                     self.validator
                         .validate_assignment(py, v, field_name, field_value, e, definitions, recursion_guard)
@@ -161,11 +162,11 @@ impl_build!(FunctionBeforeValidator, "function-before");
 impl FunctionBeforeValidator {
     fn _validate<'s, 'data>(
         &'s self,
-        mut call: impl FnMut(&'data PyAny, &Extra) -> ValResult<'data, PyObject>,
+        mut call: impl FnMut(&'data PyAny, &Extra) -> ValResult<'data, DataValue>,
         py: Python<'data>,
         input: &'data PyAny,
         extra: &Extra,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
             self.func.call1(py, (input.to_object(py), info))
@@ -194,11 +195,11 @@ impl_build!(FunctionAfterValidator, "function-after");
 impl FunctionAfterValidator {
     fn _validate<'s, 'data>(
         &'s self,
-        mut call: impl FnMut(&'data PyAny, &Extra) -> ValResult<'data, PyObject>,
+        mut call: impl FnMut(&'data PyAny, &Extra) -> ValResult<'data, DataValue>,
         py: Python<'data>,
         input: &'data PyAny,
         extra: &Extra,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let v = call(input, extra)?;
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
@@ -206,7 +207,7 @@ impl FunctionAfterValidator {
         } else {
             self.func.call1(py, (v.to_object(py),))
         };
-        r.map_err(|e| convert_err(py, e, input))
+        r.map_err(|e| convert_err(py, e, input)).map(DataValue::Py)
     }
 }
 
@@ -258,14 +259,14 @@ impl Validator for FunctionPlainValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
             self.func.call1(py, (input.to_object(py), info))
         } else {
             self.func.call1(py, (input.to_object(py),))
         };
-        r.map_err(|e| convert_err(py, e, input))
+        r.map_err(|e| convert_err(py, e, input)).map(DataValue::Py)
     }
 
     fn different_strict_behavior(
@@ -332,14 +333,14 @@ impl FunctionWrapValidator {
         py: Python<'data>,
         input: &'data PyAny,
         extra: &Extra,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
             self.func.call1(py, (input.to_object(py), handler, info))
         } else {
             self.func.call1(py, (input.to_object(py), handler))
         };
-        r.map_err(|e| convert_err(py, e, input))
+        r.map_err(|e| convert_err(py, e, input)).map(DataValue::Py)
     }
 }
 
@@ -357,7 +358,7 @@ impl Validator for FunctionWrapValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let handler = ValidatorCallable {
             validator: InternalValidator::new(
                 py,
@@ -386,7 +387,7 @@ impl Validator for FunctionWrapValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let handler = AssignmentValidatorCallable {
             validator: InternalValidator::new(
                 py,

@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 
 use crate::build_tools::py_schema_err;
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
@@ -64,7 +65,7 @@ impl Validator for IsInstanceValidator {
         _extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         if !input.is_python() {
             return Err(ValError::InternalErr(PyNotImplementedError::new_err(
                 "Cannot check isinstance when validating from json, \
@@ -74,7 +75,7 @@ impl Validator for IsInstanceValidator {
 
         let ob = input.to_object(py);
         match ob.as_ref(py).is_instance(self.class.as_ref(py))? {
-            true => Ok(ob),
+            true => Ok(DataValue::Py(ob)),
             false => Err(ValError::new(
                 ErrorType::IsInstanceOf {
                     class: self.class_repr.clone(),

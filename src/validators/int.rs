@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::is_strict;
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{Input, Int};
 use crate::recursion_guard::RecursionGuard;
@@ -51,8 +52,10 @@ impl Validator for IntValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        Ok(input.validate_int(extra.strict.unwrap_or(self.strict))?.into_py(py))
+    ) -> ValResult<'data, DataValue> {
+        Ok(DataValue::Py(
+            input.validate_int(extra.strict.unwrap_or(self.strict))?.into_py(py),
+        ))
     }
 
     fn different_strict_behavior(
@@ -92,7 +95,7 @@ impl Validator for ConstrainedIntValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let either_int = input.validate_int(extra.strict.unwrap_or(self.strict))?;
         let int_value = either_int.as_int()?;
 
@@ -129,7 +132,7 @@ impl Validator for ConstrainedIntValidator {
                 return Err(ValError::new(ErrorType::GreaterThan { gt: gt.clone().into() }, input));
             }
         }
-        Ok(either_int.into_py(py))
+        Ok(DataValue::Py(either_int.into_py(py)))
     }
 
     fn different_strict_behavior(

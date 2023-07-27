@@ -7,6 +7,7 @@ use ahash::AHashSet;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config_same, ExtraBehavior};
+use crate::data_value::DataValue;
 use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
 use crate::input::{
     AttributesGenericIterator, DictGenericIterator, GenericMapping, Input, JsonObjectGenericIterator,
@@ -122,7 +123,7 @@ impl Validator for ModelFieldsValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let strict = extra.strict.unwrap_or(self.strict);
         let from_attributes = extra.from_attributes.unwrap_or(self.from_attributes);
 
@@ -293,7 +294,9 @@ impl Validator for ModelFieldsValidator {
                 model_extra_dict_op = Some(PyDict::new(py));
             };
 
-            Ok((model_dict, model_extra_dict_op, fields_set).to_object(py))
+            Ok(DataValue::Py(
+                (model_dict, model_extra_dict_op, fields_set).to_object(py),
+            ))
         }
     }
 
@@ -306,7 +309,7 @@ impl Validator for ModelFieldsValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         let dict: &PyDict = obj.downcast()?;
 
         let get_updated_dict = |output: PyObject| {
@@ -314,8 +317,8 @@ impl Validator for ModelFieldsValidator {
             Ok(dict)
         };
 
-        let prepare_result = |result: ValResult<'data, PyObject>| match result {
-            Ok(output) => get_updated_dict(output),
+        let prepare_result = |result: ValResult<'data, DataValue>| match result {
+            Ok(output) => get_updated_dict(output.to_object(py)),
             Err(ValError::LineErrors(line_errors)) => {
                 let errors = line_errors
                     .into_iter()
@@ -396,7 +399,9 @@ impl Validator for ModelFieldsValidator {
         };
 
         let fields_set: &PySet = PySet::new(py, &[field_name.to_string()])?;
-        Ok((new_data.to_object(py), new_extra, fields_set.to_object(py)).to_object(py))
+        Ok(DataValue::Py(
+            (new_data.to_object(py), new_extra, fields_set.to_object(py)).to_object(py),
+        ))
     }
 
     fn different_strict_behavior(

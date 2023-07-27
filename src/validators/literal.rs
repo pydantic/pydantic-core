@@ -8,6 +8,7 @@ use pyo3::types::{PyDict, PyList};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type};
+use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::py_gc::PyGcTraverse;
@@ -188,9 +189,9 @@ impl Validator for LiteralValidator {
         _extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, DataValue> {
         match self.lookup.validate(py, input)? {
-            Some((_, v)) => Ok(v.clone()),
+            Some((_, v)) => Ok(DataValue::Py(v.clone_ref(py))),
             None => Err(ValError::new(
                 ErrorType::LiteralError {
                     expected: self.expected_repr.clone(),
