@@ -86,6 +86,7 @@ impl Validator for ChainValidator {
         for step in steps_iter {
             value = step
                 .validate(py, &value, extra, definitions, recursion_guard)
+                // FIXME this avoids a lifetime issue but costs cloning the erroneous input
                 .map_err(|e| e.duplicate(py))?;
         }
 
