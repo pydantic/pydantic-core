@@ -264,7 +264,7 @@ impl SchemaValidator {
             .default_value(py, None::<i64>, &extra, &self.definitions, recursion_guard);
         match r {
             Ok(maybe_default) => match maybe_default {
-                Some(v) => Ok(PySome::new(v).into_py(py)),
+                Some(v) => Ok(PySome::new(v.to_object(py)).into_py(py)),
                 None => Ok(py.None().into_py(py)),
             },
             Err(e) => Err(self.prepare_validation_err(py, e, ErrorMode::Python)),
@@ -690,7 +690,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         _extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, Option<PyObject>> {
+    ) -> ValResult<'data, Option<DataValue>> {
         Ok(None)
     }
 

@@ -43,7 +43,7 @@ impl Validator for NullableValidator {
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, DataValue> {
         match input.is_none() {
-            true => Ok(DataValue::Py(py.None())),
+            true => Ok(DataValue::Null),
             false => self.validator.validate(py, input, extra, definitions, recursion_guard),
         }
     }
