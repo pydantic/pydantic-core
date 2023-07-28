@@ -35,7 +35,6 @@ impl Validator for AnyValidator {
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, DataValue> {
-        // Ok(input.clone().into_py(py))
         Ok(DataValue::Py(input.to_object(py)))
     }
 

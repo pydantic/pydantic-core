@@ -66,18 +66,31 @@ impl_py_gc_traverse!(FloatValidator {});
 impl Validator for FloatValidator {
     fn validate<'s, 'data>(
         &'s self,
-        py: Python<'data>,
+        _py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, DataValue> {
         let either_float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
-        let float: f64 = either_float.try_into()?;
-        if !self.allow_inf_nan && !float.is_finite() {
-            return Err(ValError::new(ErrorType::FiniteNumber, input));
-        }
-        Ok(DataValue::Py(float.into_py(py)))
+        Ok(match either_float {
+            crate::input::EitherFloat::F64(float) => {
+                if !self.allow_inf_nan && !float.is_finite() {
+                    return Err(ValError::new(ErrorType::FiniteNumber, input));
+                }
+                DataValue::Float(float)
+            }
+            crate::input::EitherFloat::Py(float) => {
+                if !self.allow_inf_nan {
+                    let float: f64 = float.extract()?;
+                    if !float.is_finite() {
+                        return Err(ValError::new(ErrorType::FiniteNumber, input));
+                    }
+                    return Ok(DataValue::Float(float));
+                }
+                DataValue::Py(float.into())
+            }
+        })
     }
 
     fn different_strict_behavior(

@@ -53,9 +53,12 @@ impl Validator for IntValidator {
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, DataValue> {
-        Ok(DataValue::Py(
-            input.validate_int(extra.strict.unwrap_or(self.strict))?.into_py(py),
-        ))
+        Ok(match input.validate_int(extra.strict.unwrap_or(self.strict))? {
+            crate::input::EitherInt::I64(int) => DataValue::Int(int),
+            crate::input::EitherInt::U64(int) => DataValue::BigInt(BigInt::from(int)),
+            crate::input::EitherInt::BigInt(int) => DataValue::BigInt(int),
+            crate::input::EitherInt::Py(int) => DataValue::Py(int.into_py(py)),
+        })
     }
 
     fn different_strict_behavior(

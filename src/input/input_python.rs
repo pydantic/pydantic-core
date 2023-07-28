@@ -330,7 +330,7 @@ impl<'a> Input<'a> for PyAny {
             if (float == 0.0 || float == 1.0) && PyBool::is_exact_type_of(self) {
                 Err(ValError::new(ErrorType::FloatType, self))
             } else {
-                Ok(EitherFloat::Py(self))
+                Ok(EitherFloat::F64(float))
             }
         } else {
             Err(ValError::new(ErrorType::FloatType, self))

@@ -6,6 +6,7 @@ use regex::Regex;
 use crate::build_tools::{is_strict, py_schema_error_type, schema_or_config};
 use crate::data_value::DataValue;
 use crate::errors::{ErrorType, ValError, ValResult};
+use crate::input::EitherString;
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
@@ -95,6 +96,19 @@ impl Validator for StrConstrainedValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, DataValue> {
         let either_str = input.validate_str(extra.strict.unwrap_or(self.strict))?;
+
+        if !(self.strip_whitespace
+            || self.to_lower
+            || self.to_upper
+            || self.pattern.is_some()
+            || self.min_length.is_some() | self.max_length.is_some())
+        {
+            return Ok(match either_str {
+                EitherString::Cow(s) => DataValue::String(s.into_owned()),
+                EitherString::Py(s) => DataValue::Py(s.into_py(py)),
+            });
+        }
+
         let cow = either_str.as_cow()?;
         let mut str = cow.as_ref();
         if self.strip_whitespace {
