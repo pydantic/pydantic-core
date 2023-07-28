@@ -119,7 +119,7 @@ macro_rules! error_types {
                 }
             }
 
-            fn py_dict_merge_ctx(&self, py: Python, dict: &PyDict) -> PyResult<()> {
+            fn py_dict_update_ctx(&self, py: Python, dict: &PyDict) -> PyResult<()> {
                 match self {
                     $(
                         Self::$item { context, $($key,)* } => {
@@ -299,7 +299,9 @@ error_types! {
     },
     // Note: strum message and serialize are not used here
     CustomError {
-        custom_error: {ctx_type: PydanticCustomError, ctx_fn: do_nothing, extract_type: PydanticCustomError},
+        // context is a common field in all enums
+        error_type: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        message_template: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
     },
     // ---------------------
     // literals
@@ -439,10 +441,11 @@ fn plural_s(value: usize) -> &'static str {
 static ERROR_TYPE_LOOKUP: GILOnceCell<AHashMap<String, ErrorType>> = GILOnceCell::new();
 
 impl ErrorType {
-    pub fn new_custom_error(custom_error: PydanticCustomError) -> Self {
+    pub fn new_custom_error(py: Python, custom_error: PydanticCustomError) -> Self {
         Self::CustomError {
-            custom_error,
-            context: None,
+            error_type: custom_error.error_type(),
+            message_template: custom_error.message_template(),
+            context: custom_error.context(py),
         }
     }
 
@@ -545,19 +548,19 @@ impl ErrorType {
 
     pub fn message_template_json(&self) -> &'static str {
         match self {
-            Self::NoneRequired {..} => "Input should be null",
-            Self::ListType {..}
-            | Self::TupleType {..}
-            | Self::IterableType {..}
-            | Self::SetType {..}
-            | Self::FrozenSetType {..} => "Input should be a valid array",
-            Self::ModelType {..}
-            | Self::ModelAttributesType {..}
-            | Self::DictType {..}
-            | Self::DataclassType {..} => "Input should be an object",
-            Self::TimeDeltaType {..} => "Input should be a valid duration",
-            Self::TimeDeltaParsing {..} => "Input should be a valid duration, {error}",
-            Self::ArgumentsType {..} => "Arguments must be an array or an object",
+            Self::NoneRequired { .. } => "Input should be null",
+            Self::ListType { .. }
+            | Self::TupleType { .. }
+            | Self::IterableType { .. }
+            | Self::SetType { .. }
+            | Self::FrozenSetType { .. } => "Input should be a valid array",
+            Self::ModelType { .. }
+            | Self::ModelAttributesType { .. }
+            | Self::DictType { .. }
+            | Self::DataclassType { .. } => "Input should be an object",
+            Self::TimeDeltaType { .. } => "Input should be a valid duration",
+            Self::TimeDeltaParsing { .. } => "Input should be a valid duration, {error}",
+            Self::ArgumentsType { .. } => "Arguments must be an array or an object",
             _ => self.message_template_python(),
         }
     }
@@ -579,10 +582,7 @@ impl ErrorType {
 
     pub fn type_string(&self) -> String {
         match self {
-            Self::CustomError {
-                custom_error: value_error,
-                ..
-            } => value_error.error_type(),
+            Self::CustomError { error_type, .. } => error_type.clone(),
             _ => self.to_string(),
         }
     }
@@ -643,9 +643,10 @@ impl ErrorType {
                 render!(tmpl, error)
             }
             Self::CustomError {
-                custom_error: value_error,
+                message_template,
+                context,
                 ..
-            } => value_error.message(py),
+            } => PydanticCustomError::format_message(message_template, context.as_ref().map(|c| c.as_ref(py))),
             Self::LiteralError { expected, .. } => render!(tmpl, expected),
             Self::DateParsing { error, .. } => render!(tmpl, error),
             Self::DateFromDatetimeParsing { error, .. } => render!(tmpl, error),
@@ -677,16 +678,15 @@ impl ErrorType {
 
     pub fn py_dict(&self, py: Python) -> PyResult<Option<Py<PyDict>>> {
         let dict = PyDict::new(py);
-        self.py_dict_merge_ctx(py, dict)?;
-        match self {
-            Self::CustomError { custom_error, .. } => {
-                dict.del_item("custom_error")?; // Custom error data is merged to the root of ctx
-                if let Some(custom_ctx) = custom_error.context(py) {
-                    dict.update(custom_ctx.as_ref(py).downcast()?)?
-                }
-            }
-            _ => {}
-        };
+        self.py_dict_update_ctx(py, dict)?;
+
+        if let Self::CustomError { .. } = self {
+            // Custom error type and message are handled separately by the caller.
+            // They are added to the root of the ErrorDetails.
+            dict.del_item("error_type")?;
+            dict.del_item("message_template")?;
+        }
+
         if dict.is_empty() {
             return Ok(None);
         }

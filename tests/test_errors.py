@@ -164,7 +164,7 @@ def test_pydantic_error_type_nested_ctx():
     assert e.type == 'json_invalid'
     assert e.context == ctx
     assert str(e) == 'Invalid JSON: Test'
-    assert repr(e) == f"Invalid JSON: Test [type=json_invalid, context={ctx}]"
+    assert repr(e) == f'Invalid JSON: Test [type=json_invalid, context={ctx}]'
 
 
 def test_pydantic_error_type_raise_no_ctx():
@@ -183,9 +183,14 @@ def test_pydantic_error_type_raise_no_ctx():
     ]
 
 
-def test_pydantic_error_type_raise_ctx():
+@pytest.mark.parametrize(
+    'extra', [{}, {'foo': 1}, {'foo': {'bar': []}}, {'foo': {'bar': object()}}, {'foo': Decimal('42.1')}]
+)
+def test_pydantic_error_type_raise_ctx(extra: dict):
+    ctx = {'gt': 42, **extra}
+
     def f(input_value, info):
-        raise PydanticKnownError('greater_than', {'gt': 42})
+        raise PydanticKnownError('greater_than', ctx)
 
     v = SchemaValidator(
         {'type': 'function-before', 'function': {'type': 'general', 'function': f}, 'schema': {'type': 'int'}}
@@ -195,7 +200,28 @@ def test_pydantic_error_type_raise_ctx():
         v.validate_python(4)
     # insert_assert(exc_info.value.errors(include_url=False))
     assert exc_info.value.errors(include_url=False) == [
-        {'type': 'greater_than', 'loc': (), 'msg': 'Input should be greater than 42', 'input': 4, 'ctx': {'gt': 42.0}}
+        {'type': 'greater_than', 'loc': (), 'msg': 'Input should be greater than 42', 'input': 4, 'ctx': ctx}
+    ]
+
+
+@pytest.mark.parametrize(
+    'extra', [{}, {'foo': 1}, {'foo': {'bar': []}}, {'foo': {'bar': object()}}, {'foo': Decimal('42.1')}]
+)
+def test_pydantic_custom_error_type_raise_custom_ctx(extra: dict):
+    ctx = {'val': 42, **extra}
+
+    def f(input_value, info):
+        raise PydanticCustomError('my_error', 'my message with {val}', ctx)
+
+    v = SchemaValidator(
+        {'type': 'function-before', 'function': {'type': 'general', 'function': f}, 'schema': {'type': 'int'}}
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(4)
+    # insert_assert(exc_info.value.errors(include_url=False))
+    assert exc_info.value.errors(include_url=False) == [
+        {'type': 'my_error', 'loc': (), 'msg': 'my message with 42', 'input': 4, 'ctx': ctx}
     ]
 
 
@@ -330,7 +356,7 @@ def test_error_decimal():
     e = PydanticKnownError('greater_than', {'gt': Decimal('42.1')})
     assert e.message() == 'Input should be greater than 42.1'
     assert e.type == 'greater_than'
-    assert e.context == {'gt': Decimal("42.1")}
+    assert e.context == {'gt': Decimal('42.1')}
 
 
 def test_custom_error_decimal():
@@ -705,6 +731,28 @@ def test_raise_validation_error_custom_nested_ctx(msg: str, result_msg: str):
     # insert_assert(exc_info.value.errors(include_url=False))
     assert exc_info.value.errors(include_url=False) == [expected_error_detail]
     assert exc_info.value.json(include_url=False) == IsJson([{**expected_error_detail, 'loc': []}])
+
+
+def test_raise_validation_error_known_class_ctx():
+    custom_data = Foobar()
+    ctx = {'gt': 10, 'foo': {'bar': custom_data}}
+
+    with pytest.raises(ValidationError) as exc_info:
+        raise ValidationError.from_exception_data('MyTitle', [{'type': 'greater_than', 'input': 9, 'ctx': ctx}])
+
+    expected_error_detail = {
+        'type': 'greater_than',
+        'loc': (),
+        'msg': 'Input should be greater than 10',
+        'input': 9,
+        'ctx': ctx,
+    }
+
+    # insert_assert(exc_info.value.errors(include_url=False))
+    assert exc_info.value.errors(include_url=False) == [expected_error_detail]
+    assert exc_info.value.json(include_url=False) == IsJson(
+        [{**expected_error_detail, 'loc': [], 'ctx': {'gt': 10, 'foo': {'bar': str(custom_data)}}}]
+    )
 
 
 def test_raise_validation_error_custom_class_ctx():
