@@ -103,7 +103,7 @@ def test_repr():
     assert v.isinstance_python(Bar()) is True
     assert v.isinstance_python('foo') is False
 
-    with pytest.raises(ValidationError, match=r'is-instance\[Foo\]\s+Input should be an instance of Foo'):
+    with pytest.raises(ValidationError, match=r'\[case:is-instance\[Foo\]]\s+Input should be an instance of Foo'):
         v.validate_python('foo')
 
 

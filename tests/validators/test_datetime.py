@@ -283,7 +283,7 @@ def test_union():
 
 
 def test_invalid_constraint():
-    with pytest.raises(SchemaError, match=r'datetime\.gt\n  Input should be a valid datetime'):
+    with pytest.raises(SchemaError, match=r"\[tag:'datetime']\.gt\n  Input should be a valid datetime"):
         SchemaValidator({'type': 'datetime', 'gt': 'foobar'})
 
 

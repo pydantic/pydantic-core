@@ -126,13 +126,13 @@ def test_nullable_error():
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'none_required',
-            'loc': ('sub_branch', 'none'),
+            'loc': ('sub_branch', '[case:none]'),
             'msg': 'Input should be None',
             'input': {'width': 'wrong'},
         },
         {
             'type': 'int_parsing',
-            'loc': ('sub_branch', 'typed-dict', 'width'),
+            'loc': ('sub_branch', '[case:typed-dict]', 'width'),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'wrong',
         },
@@ -606,8 +606,8 @@ def test_union_ref_strictness():
         v.validate_python({'a': 1, 'b': []})
 
     assert exc_info.value.errors(include_url=False) == [
-        {'type': 'int_type', 'loc': ('b', 'int'), 'msg': 'Input should be a valid integer', 'input': []},
-        {'type': 'string_type', 'loc': ('b', 'str'), 'msg': 'Input should be a valid string', 'input': []},
+        {'type': 'int_type', 'loc': ('b', '[case:int]'), 'msg': 'Input should be a valid integer', 'input': []},
+        {'type': 'string_type', 'loc': ('b', '[case:str]'), 'msg': 'Input should be a valid string', 'input': []},
     ]
 
 
@@ -631,8 +631,8 @@ def test_union_container_strictness():
         v.validate_python({'a': 1, 'b': []})
 
     assert exc_info.value.errors(include_url=False) == [
-        {'type': 'int_type', 'loc': ('b', 'int'), 'msg': 'Input should be a valid integer', 'input': []},
-        {'type': 'string_type', 'loc': ('b', 'str'), 'msg': 'Input should be a valid string', 'input': []},
+        {'type': 'int_type', 'loc': ('b', '[case:int]'), 'msg': 'Input should be a valid integer', 'input': []},
+        {'type': 'string_type', 'loc': ('b', '[case:str]'), 'msg': 'Input should be a valid string', 'input': []},
     ]
 
 
@@ -669,7 +669,7 @@ def test_union_cycle(strict: bool):
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'recursion_loop',
-            'loc': ('typed-dict', 'foobar', 0),
+            'loc': ('[case:typed-dict]', 'foobar', 0),
             'msg': 'Recursion error - cyclic reference detected',
             'input': {'foobar': [{'foobar': IsList(length=1)}]},
         }
@@ -703,13 +703,13 @@ def test_function_name():
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'recursion_loop',
-            'loc': ('function-after[f(), ...]',),
+            'loc': ('[case:function-after[f(), ...]]',),
             'msg': 'Recursion error - cyclic reference detected',
             'input': 'input value',
         },
         {
             'type': 'int_parsing',
-            'loc': ('int',),
+            'loc': ('[case:int]',),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'input value',
         },

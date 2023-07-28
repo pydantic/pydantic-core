@@ -142,10 +142,10 @@ def test_union_float(py_and_json: PyAndJson):
     with pytest.raises(ValidationError) as exc_info:
         v.validate_test('5')
     assert exc_info.value.errors(include_url=False) == [
-        {'type': 'float_type', 'loc': ('float',), 'msg': 'Input should be a valid number', 'input': '5'},
+        {'type': 'float_type', 'loc': ('[case:float]',), 'msg': 'Input should be a valid number', 'input': '5'},
         {
             'type': 'multiple_of',
-            'loc': ('constrained-float',),
+            'loc': ('[case:constrained-float]',),
             'msg': 'Input should be a multiple of 7',
             'input': '5',
             'ctx': {'multiple_of': 7.0},
@@ -162,13 +162,13 @@ def test_union_float_simple(py_and_json: PyAndJson):
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'float_parsing',
-            'loc': ('float',),
+            'loc': ('[case:float]',),
             'msg': 'Input should be a valid number, unable to parse string as a number',
             'input': 'xxx',
         },
         {
             'type': 'list_type',
-            'loc': ('list[any]',),
+            'loc': ('[case:list[any]]',),
             'msg': IsStr(regex='Input should be a valid (list|array)'),
             'input': 'xxx',
         },

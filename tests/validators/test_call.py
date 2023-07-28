@@ -116,11 +116,11 @@ def test_in_union():
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'unexpected_positional_argument',
-            'loc': ('call[my_function]', 1),
+            'loc': ('[case:call[my_function]]', 1),
             'msg': 'Unexpected positional argument',
             'input': 2,
         },
-        {'type': 'int_type', 'loc': ('int',), 'msg': 'Input should be a valid integer', 'input': (1, 2)},
+        {'type': 'int_type', 'loc': ('[case:int]',), 'msg': 'Input should be a valid integer', 'input': (1, 2)},
     ]
 
 

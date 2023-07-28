@@ -33,7 +33,7 @@ def test_def_error():
         )
 
     assert str(exc_info.value).startswith(
-        "Invalid Schema:\ndefinitions.definitions.1\n  Input tag 'wrong' found using 'type'"
+        "Invalid Schema:\n[tag:'definitions'].definitions.1\n  Input tag 'wrong' found using 'type'"
     )
 
 
