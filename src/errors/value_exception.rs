@@ -115,8 +115,8 @@ impl PydanticCustomError {
         ValError::new(error_type, input)
     }
 
-    pub fn format_message(message_template: &String, context: Option<&PyDict>) -> PyResult<String> {
-        let mut message = message_template.clone();
+    pub fn format_message(message_template: &str, context: Option<&PyDict>) -> PyResult<String> {
+        let mut message = message_template.to_string();
         if let Some(ctx) = context {
             for (key, value) in ctx {
                 let key: &PyString = key.downcast()?;

@@ -119,7 +119,7 @@ macro_rules! error_types {
                 }
             }
 
-            fn py_dict_update_ctx(&self, py: Python, dict: &PyDict) -> PyResult<()> {
+            fn py_dict_update_ctx(&self, py: Python, dict: &PyDict) -> PyResult<bool> {
                 match self {
                     $(
                         Self::$item { context, $($key,)* } => {
@@ -127,9 +127,11 @@ macro_rules! error_types {
                                 dict.set_item::<&str, Py<PyAny>>(stringify!($key), $key.to_object(py))?;
                             )*
                             if let Some(ctx) = context {
-                                dict.update(ctx.as_ref(py).downcast()?)?
+                                dict.update(ctx.as_ref(py).downcast()?)?;
+                                Ok(true)
+                            } else {
+                                Ok(false)
                             }
-                            Ok(())
                         },
                     )+
                 }
@@ -678,19 +680,23 @@ impl ErrorType {
 
     pub fn py_dict(&self, py: Python) -> PyResult<Option<Py<PyDict>>> {
         let dict = PyDict::new(py);
-        self.py_dict_update_ctx(py, dict)?;
+        let custom_ctx_used = self.py_dict_update_ctx(py, dict)?;
 
         if let Self::CustomError { .. } = self {
-            // Custom error type and message are handled separately by the caller.
-            // They are added to the root of the ErrorDetails.
-            dict.del_item("error_type")?;
-            dict.del_item("message_template")?;
+            if custom_ctx_used {
+                // Custom error type and message are handled separately by the caller.
+                // They are added to the root of the ErrorDetails.
+                dict.del_item("error_type")?;
+                dict.del_item("message_template")?;
+                Ok(Some(dict.into()))
+            } else {
+                Ok(None)
+            }
+        } else if custom_ctx_used || !dict.is_empty() {
+            Ok(Some(dict.into()))
+        } else {
+            Ok(None)
         }
-
-        if dict.is_empty() {
-            return Ok(None);
-        }
-        return Ok(Some(dict.into()));
     }
 }
 

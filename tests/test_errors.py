@@ -1,6 +1,6 @@
 import re
 from decimal import Decimal
-from typing import Any
+from typing import Any, Optional
 
 import pytest
 from dirty_equals import HasRepr, IsInstance, IsJson, IsStr
@@ -204,6 +204,25 @@ def test_pydantic_error_type_raise_ctx(extra: dict):
     ]
 
 
+@pytest.mark.parametrize('ctx', [None, {}])
+def test_pydantic_error_type_raise_custom_no_ctx(ctx: Optional[dict]):
+    def f(input_value, info):
+        raise PydanticKnownError('int_type', ctx)
+
+    v = SchemaValidator(
+        {'type': 'function-before', 'function': {'type': 'general', 'function': f}, 'schema': {'type': 'int'}}
+    )
+
+    expect_ctx = {'ctx': {}} if ctx is not None else {}
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(4)
+    # insert_assert(exc_info.value.errors(include_url=False))
+    assert exc_info.value.errors(include_url=False) == [
+        {'type': 'int_type', 'loc': (), 'msg': 'Input should be a valid integer', 'input': 4, **expect_ctx}
+    ]
+
+
 @pytest.mark.parametrize(
     'extra', [{}, {'foo': 1}, {'foo': {'bar': []}}, {'foo': {'bar': object()}}, {'foo': Decimal('42.1')}]
 )
@@ -222,6 +241,25 @@ def test_pydantic_custom_error_type_raise_custom_ctx(extra: dict):
     # insert_assert(exc_info.value.errors(include_url=False))
     assert exc_info.value.errors(include_url=False) == [
         {'type': 'my_error', 'loc': (), 'msg': 'my message with 42', 'input': 4, 'ctx': ctx}
+    ]
+
+
+@pytest.mark.parametrize('ctx', [None, {}])
+def test_pydantic_custom_error_type_raise_custom_no_ctx(ctx: Optional[dict]):
+    def f(input_value, info):
+        raise PydanticCustomError('my_error', 'my message', ctx)
+
+    v = SchemaValidator(
+        {'type': 'function-before', 'function': {'type': 'general', 'function': f}, 'schema': {'type': 'int'}}
+    )
+
+    expect_ctx = {'ctx': {}} if ctx is not None else {}
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python(4)
+    # insert_assert(exc_info.value.errors(include_url=False))
+    assert exc_info.value.errors(include_url=False) == [
+        {'type': 'my_error', 'loc': (), 'msg': 'my message', 'input': 4, **expect_ctx}
     ]
 
 
