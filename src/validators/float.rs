@@ -73,16 +73,25 @@ impl Validator for FloatValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, DataValue> {
         let either_float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
-        let float: f64 = either_float.try_into()?;
-        if !self.allow_inf_nan && !float.is_finite() {
-            return Err(ValError::new(ErrorType::FiniteNumber, input));
-        }
-        Ok(
-            match input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)? {
-                crate::input::EitherFloat::F64(float) => DataValue::Float(float),
-                crate::input::EitherFloat::Py(float) => DataValue::Py(float.into()),
-            },
-        )
+        // Change the above code to avoid borrowing either_float after it is moved
+        Ok(match either_float {
+            crate::input::EitherFloat::F64(float) => {
+                if !self.allow_inf_nan && !float.is_finite() {
+                    return Err(ValError::new(ErrorType::FiniteNumber, input));
+                }
+                DataValue::Float(float)
+            }
+            crate::input::EitherFloat::Py(float) => {
+                if !self.allow_inf_nan {
+                    let float: f64 = float.extract()?;
+                    if !float.is_finite() {
+                        return Err(ValError::new(ErrorType::FiniteNumber, input));
+                    }
+                    return Ok(DataValue::Float(float));
+                }
+                DataValue::Py(float.into())
+            }
+        })
     }
 
     fn different_strict_behavior(

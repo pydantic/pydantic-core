@@ -97,7 +97,12 @@ impl Validator for StrConstrainedValidator {
     ) -> ValResult<'data, DataValue> {
         let either_str = input.validate_str(extra.strict.unwrap_or(self.strict))?;
 
-        if !self.strip_whitespace || self.to_lower || self.to_upper {
+        if !(self.strip_whitespace
+            || self.to_lower
+            || self.to_upper
+            || self.pattern.is_some()
+            || self.min_length.is_some() | self.max_length.is_some())
+        {
             return Ok(match either_str {
                 EitherString::Cow(s) => DataValue::String(s.into_owned()),
                 EitherString::Py(s) => DataValue::Py(s.into_py(py)),
