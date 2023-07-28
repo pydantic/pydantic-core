@@ -73,7 +73,6 @@ impl Validator for FloatValidator {
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, DataValue> {
         let either_float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
-        // Change the above code to avoid borrowing either_float after it is moved
         Ok(match either_float {
             crate::input::EitherFloat::F64(float) => {
                 if !self.allow_inf_nan && !float.is_finite() {
