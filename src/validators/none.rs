@@ -28,14 +28,14 @@ impl_py_gc_traverse!(NoneValidator {});
 impl Validator for NoneValidator {
     fn validate<'s, 'data>(
         &'s self,
-        py: Python<'data>,
+        _py: Python<'data>,
         input: &'data impl Input<'data>,
         _extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, DataValue> {
         match input.is_none() {
-            true => Ok(DataValue::Py(py.None())),
+            true => Ok(DataValue::Null),
             false => Err(ValError::new(ErrorType::NoneRequired, input)),
         }
     }

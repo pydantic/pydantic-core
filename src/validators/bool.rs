@@ -34,7 +34,7 @@ impl_py_gc_traverse!(BoolValidator {});
 impl Validator for BoolValidator {
     fn validate<'s, 'data>(
         &'s self,
-        py: Python<'data>,
+        _py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
@@ -42,8 +42,8 @@ impl Validator for BoolValidator {
     ) -> ValResult<'data, DataValue> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool
         // and back again, might be worth profiling?
-        Ok(DataValue::Py(
-            input.validate_bool(extra.strict.unwrap_or(self.strict))?.into_py(py),
+        Ok(DataValue::Bool(
+            input.validate_bool(extra.strict.unwrap_or(self.strict))?,
         ))
     }
 
