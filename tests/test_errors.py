@@ -439,9 +439,18 @@ def test_omit_exc_repr():
     assert str(PydanticOmit()) == 'PydanticOmit()'
 
 
-def test_type_error_error():
-    with pytest.raises(TypeError, match="^GreaterThan: 'gt' context value must be a Number$"):
-        PydanticKnownError('greater_than', {'gt': []})
+@pytest.mark.parametrize(
+    'error,ctx,expect',
+    [
+        ('greater_than', {'gt': []}, "GreaterThan: 'gt' context value must be a Number"),
+        ('model_type', {'class_name': []}, "ModelType: 'class_name' context value must be a String"),
+        ('date_parsing', {'error': []}, "DateParsing: 'error' context value must be a String"),
+        ('string_too_short', {'min_length': []}, "StringTooShort: 'min_length' context value must be a usize"),
+    ],
+)
+def test_type_error_error(error: str, ctx: dict, expect: str):
+    with pytest.raises(TypeError, match=f'^{expect}$'):
+        PydanticKnownError(error, ctx)
 
 
 def test_custom_context_for_simple_error():

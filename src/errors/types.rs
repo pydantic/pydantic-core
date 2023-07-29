@@ -1,3 +1,4 @@
+use std::any::type_name;
 use std::borrow::Cow;
 use std::fmt;
 
@@ -58,8 +59,29 @@ pub fn list_all_errors(py: Python) -> PyResult<&PyList> {
     Ok(PyList::new(py, errors))
 }
 
-fn do_nothing<T>(v: T) -> T {
-    v
+fn field_from_context<'py, T: FromPyObject<'py>>(
+    context: Option<&'py PyDict>,
+    field_name: &str,
+    enum_name: &str,
+) -> PyResult<T> {
+    context
+        .ok_or(py_error_type!(PyTypeError; "{}: '{}' required in context", enum_name, field_name))?
+        .get_item(field_name)
+        .ok_or(py_error_type!(PyTypeError; "{}: '{}' required in context", enum_name, field_name))?
+        .extract::<T>()
+        .map_err(|_| {
+            let type_name = type_name::<T>().split("::").last().unwrap();
+            py_error_type!(PyTypeError; "{}: '{}' context value must be a {}", enum_name, field_name, type_name)
+        })
+}
+
+fn str_cow_field_from_context(
+    context: Option<&PyDict>,
+    field_name: &str,
+    enum_name: &str,
+) -> PyResult<Cow<'static, str>> {
+    let res: String = field_from_context(context, field_name, enum_name)?;
+    Ok(Cow::Owned(res))
 }
 
 macro_rules! basic_error_default {
@@ -77,7 +99,7 @@ macro_rules! error_types {
     (
         $(
             $item:ident {
-                $($key:ident: {ctx_type: $ctx_type:ty, ctx_fn: $ctx_fn:path, extract_type: $extract_type:ty}),* $(,)?
+                $($key:ident: {ctx_type: $ctx_type:ty, ctx_fn: $ctx_fn:path}),* $(,)?
             },
         )+
     ) => {
@@ -104,14 +126,7 @@ macro_rules! error_types {
                             Ok(Self::$item {
                                 context: context.map(|c| c.into_py(py)),
                                 $(
-                                    $key: $ctx_fn(
-                                        context
-                                        .ok_or(py_error_type!(PyTypeError; "{}: '{}' required in context", stringify!($item), stringify!($key)))?
-                                        .get_item(stringify!($key))
-                                        .ok_or(py_error_type!(PyTypeError; "{}: '{}' required in context", stringify!($item), stringify!($key)))?
-                                        .extract::<$extract_type>()
-                                        .map_err(|_| py_error_type!(PyTypeError; "{}: '{}' context value must be a {}", stringify!($item), stringify!($key), stringify!($extract_type)))?
-                                    ),
+                                    $key: $ctx_fn(context, stringify!($key), stringify!($item))?,
                                 )*
                             })
                         },
@@ -159,12 +174,12 @@ error_types! {
     // ---------------------
     // Assignment errors
     NoSuchAttribute {
-        attribute: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        attribute: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
     // JSON errors
     JsonInvalid {
-        error: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        error: {ctx_type: String, ctx_fn: field_from_context},
     },
     JsonType {},
     // ---------------------
@@ -178,21 +193,21 @@ error_types! {
     ExtraForbidden {},
     InvalidKey {},
     GetAttributeError {
-        error: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        error: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
     // model class specific errors
     ModelType {
-        class_name: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        class_name: {ctx_type: String, ctx_fn: field_from_context},
     },
     ModelAttributesType {},
     // ---------------------
     // dataclass errors (we don't talk about ArgsKwargs here for simplicity)
     DataclassType {
-        class_name: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        class_name: {ctx_type: String, ctx_fn: field_from_context},
     },
     DataclassExactType {
-        class_name: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        class_name: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
     // None errors
@@ -201,38 +216,38 @@ error_types! {
     // generic comparison errors - used for all inequality comparisons except int and float which have their
     // own type, bounds arguments are Strings so they can be created from any type
     GreaterThan {
-        gt: {ctx_type: Number, ctx_fn: do_nothing, extract_type: Number},
+        gt: {ctx_type: Number, ctx_fn: field_from_context},
     },
     GreaterThanEqual {
-        ge: {ctx_type: Number, ctx_fn: do_nothing, extract_type: Number},
+        ge: {ctx_type: Number, ctx_fn: field_from_context},
     },
     LessThan {
-        lt: {ctx_type: Number, ctx_fn: do_nothing, extract_type: Number},
+        lt: {ctx_type: Number, ctx_fn: field_from_context},
     },
     LessThanEqual {
-        le: {ctx_type: Number, ctx_fn: do_nothing, extract_type: Number},
+        le: {ctx_type: Number, ctx_fn: field_from_context},
     },
     MultipleOf {
-        multiple_of: {ctx_type: Number, ctx_fn: do_nothing, extract_type: Number},
+        multiple_of: {ctx_type: Number, ctx_fn: field_from_context},
     },
     FiniteNumber {},
     // ---------------------
     // generic length errors - used for everything with a length except strings and bytes which need custom messages
     TooShort {
-        field_type: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
-        min_length: {ctx_type: usize, ctx_fn: do_nothing, extract_type: usize},
-        actual_length: {ctx_type: usize, ctx_fn: do_nothing, extract_type: usize},
+        field_type: {ctx_type: String, ctx_fn: field_from_context},
+        min_length: {ctx_type: usize, ctx_fn: field_from_context},
+        actual_length: {ctx_type: usize, ctx_fn: field_from_context},
     },
     TooLong {
-        field_type: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
-        max_length: {ctx_type: usize, ctx_fn: do_nothing, extract_type: usize},
-        actual_length: {ctx_type: usize, ctx_fn: do_nothing, extract_type: usize},
+        field_type: {ctx_type: String, ctx_fn: field_from_context},
+        max_length: {ctx_type: usize, ctx_fn: field_from_context},
+        actual_length: {ctx_type: usize, ctx_fn: field_from_context},
     },
     // ---------------------
     // generic collection and iteration errors
     IterableType {},
     IterationError {
-        error: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        error: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
     // string errors
@@ -240,24 +255,24 @@ error_types! {
     StringSubType {},
     StringUnicode {},
     StringTooShort {
-        min_length: {ctx_type: usize, ctx_fn: do_nothing, extract_type: usize},
+        min_length: {ctx_type: usize, ctx_fn: field_from_context},
     },
     StringTooLong {
-        max_length: {ctx_type: usize, ctx_fn: do_nothing, extract_type: usize},
+        max_length: {ctx_type: usize, ctx_fn: field_from_context},
     },
     StringPatternMismatch {
-        pattern: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        pattern: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
     // enum errors
     Enum {
-        expected: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        expected: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
     // dict errors
     DictType {},
     MappingType {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: Cow::Owned, extract_type: String},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
     },
     // ---------------------
     // list errors
@@ -286,38 +301,38 @@ error_types! {
     // bytes errors
     BytesType {},
     BytesTooShort {
-        min_length: {ctx_type: usize, ctx_fn: do_nothing, extract_type: usize},
+        min_length: {ctx_type: usize, ctx_fn: field_from_context},
     },
     BytesTooLong {
-        max_length: {ctx_type: usize, ctx_fn: do_nothing, extract_type: usize},
+        max_length: {ctx_type: usize, ctx_fn: field_from_context},
     },
     // ---------------------
     // python errors from functions
     ValueError {
-        error: {ctx_type: Option<PyObject>, ctx_fn: do_nothing, extract_type: Option<PyObject>}, // Use Option because EnumIter requires Default to be implemented
+        error: {ctx_type: Option<PyObject>, ctx_fn: field_from_context}, // Use Option because EnumIter requires Default to be implemented
     },
     AssertionError {
-        error: {ctx_type: Option<PyObject>, ctx_fn: do_nothing, extract_type: Option<PyObject>}, // Use Option because EnumIter requires Default to be implemented
+        error: {ctx_type: Option<PyObject>, ctx_fn: field_from_context}, // Use Option because EnumIter requires Default to be implemented
     },
     // Note: strum message and serialize are not used here
     CustomError {
         // context is a common field in all enums
-        error_type: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
-        message_template: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        error_type: {ctx_type: String, ctx_fn: field_from_context},
+        message_template: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
     // literals
     LiteralError {
-        expected: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        expected: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
     // date errors
     DateType {},
     DateParsing {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: Cow::Owned, extract_type: String},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
     },
     DateFromDatetimeParsing {
-        error: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        error: {ctx_type: String, ctx_fn: field_from_context},
     },
     DateFromDatetimeInexact {},
     DatePast {},
@@ -326,16 +341,16 @@ error_types! {
     // date errors
     TimeType {},
     TimeParsing {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: Cow::Owned, extract_type: String},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
     },
     // ---------------------
     // datetime errors
     DatetimeType {},
     DatetimeParsing {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: Cow::Owned, extract_type: String},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
     },
     DatetimeObjectInvalid {
-        error: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        error: {ctx_type: String, ctx_fn: field_from_context},
     },
     DatetimePast {},
     DatetimeFuture {},
@@ -344,14 +359,14 @@ error_types! {
     TimezoneNaive {},
     TimezoneAware {},
     TimezoneOffset {
-        tz_expected: {ctx_type: i32, ctx_fn: do_nothing, extract_type: i32},
-        tz_actual: {ctx_type: i32, ctx_fn: do_nothing, extract_type: i32},
+        tz_expected: {ctx_type: i32, ctx_fn: field_from_context},
+        tz_actual: {ctx_type: i32, ctx_fn: field_from_context},
     },
     // ---------------------
     // timedelta errors
     TimeDeltaType {},
     TimeDeltaParsing {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: Cow::Owned, extract_type: String},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
     },
     // ---------------------
     // frozenset errors
@@ -359,21 +374,21 @@ error_types! {
     // ---------------------
     // introspection types - e.g. isinstance, callable
     IsInstanceOf {
-        class: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        class: {ctx_type: String, ctx_fn: field_from_context},
     },
     IsSubclassOf {
-        class: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        class: {ctx_type: String, ctx_fn: field_from_context},
     },
     CallableType {},
     // ---------------------
     // union errors
     UnionTagInvalid {
-        discriminator: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
-        tag: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
-        expected_tags: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        discriminator: {ctx_type: String, ctx_fn: field_from_context},
+        tag: {ctx_type: String, ctx_fn: field_from_context},
+        expected_tags: {ctx_type: String, ctx_fn: field_from_context},
     },
     UnionTagNotFound {
-        discriminator: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        discriminator: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
     // argument errors
@@ -389,24 +404,24 @@ error_types! {
     UrlType {},
     UrlParsing {
         // would be great if this could be a static cow, waiting for https://github.com/servo/rust-url/issues/801
-        error: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        error: {ctx_type: String, ctx_fn: field_from_context},
     },
     UrlSyntaxViolation {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: Cow::Owned, extract_type: String},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
     },
     UrlTooLong {
-        max_length: {ctx_type: usize, ctx_fn: do_nothing, extract_type: usize},
+        max_length: {ctx_type: usize, ctx_fn: field_from_context},
     },
     UrlScheme {
-        expected_schemes: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        expected_schemes: {ctx_type: String, ctx_fn: field_from_context},
     },
     // UUID errors,
     UuidType {},
     UuidParsing {
-        error: {ctx_type: String, ctx_fn: do_nothing, extract_type: String},
+        error: {ctx_type: String, ctx_fn: field_from_context},
     },
     UuidVersion {
-        expected_version: {ctx_type: usize, ctx_fn: do_nothing, extract_type: usize},
+        expected_version: {ctx_type: usize, ctx_fn: field_from_context},
     },
 }
 
@@ -544,7 +559,6 @@ impl ErrorType {
             Self::UuidType{..} => "UUID input should be a string, bytes or UUID object",
             Self::UuidParsing {..} => "Input should be a valid UUID, {error}",
             Self::UuidVersion {..} => "UUID version {expected_version} expected"
-
         }
     }
 
