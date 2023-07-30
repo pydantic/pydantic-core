@@ -63,24 +63,28 @@ fn field_from_context<'py, T: FromPyObject<'py>>(
     context: Option<&'py PyDict>,
     field_name: &str,
     enum_name: &str,
+    type_name_fn: fn() -> &'static str,
 ) -> PyResult<T> {
     context
-        .ok_or(py_error_type!(PyTypeError; "{}: '{}' required in context", enum_name, field_name))?
+        .ok_or_else(|| py_error_type!(PyTypeError; "{}: '{}' required in context", enum_name, field_name))?
         .get_item(field_name)
-        .ok_or(py_error_type!(PyTypeError; "{}: '{}' required in context", enum_name, field_name))?
+        .ok_or_else(|| py_error_type!(PyTypeError; "{}: '{}' required in context", enum_name, field_name))?
         .extract::<T>()
-        .map_err(|_| {
-            let type_name = type_name::<T>().split("::").last().unwrap();
-            py_error_type!(PyTypeError; "{}: '{}' context value must be a {}", enum_name, field_name, type_name)
-        })
+        .map_err(|_| py_error_type!(PyTypeError; "{}: '{}' context value must be a {}", enum_name, field_name, type_name_fn()))
 }
 
-fn str_cow_field_from_context(
-    context: Option<&PyDict>,
+fn cow_field_from_context<'py, T: FromPyObject<'py>, B: ?Sized + 'static>(
+    context: Option<&'py PyDict>,
     field_name: &str,
     enum_name: &str,
-) -> PyResult<Cow<'static, str>> {
-    let res: String = field_from_context(context, field_name, enum_name)?;
+    _type_name_fn: fn() -> &'static str,
+) -> PyResult<Cow<'static, B>>
+where
+    B: ToOwned<Owned = T>,
+{
+    let res: T = field_from_context(context, field_name, enum_name, || {
+        type_name::<T>().split("::").last().unwrap()
+    })?;
     Ok(Cow::Owned(res))
 }
 
@@ -126,7 +130,7 @@ macro_rules! error_types {
                             Ok(Self::$item {
                                 context: context.map(|c| c.into_py(py)),
                                 $(
-                                    $key: $ctx_fn(context, stringify!($key), stringify!($item))?,
+                                    $key: $ctx_fn(context, stringify!($key), stringify!($item), || stringify!($ctx_type))?,
                                 )*
                             })
                         },
@@ -272,7 +276,7 @@ error_types! {
     // dict errors
     DictType {},
     MappingType {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: cow_field_from_context<String, _>},
     },
     // ---------------------
     // list errors
@@ -329,7 +333,7 @@ error_types! {
     // date errors
     DateType {},
     DateParsing {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: cow_field_from_context<String, _>},
     },
     DateFromDatetimeParsing {
         error: {ctx_type: String, ctx_fn: field_from_context},
@@ -341,13 +345,13 @@ error_types! {
     // date errors
     TimeType {},
     TimeParsing {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: cow_field_from_context<String, _>},
     },
     // ---------------------
     // datetime errors
     DatetimeType {},
     DatetimeParsing {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: cow_field_from_context<String, _>},
     },
     DatetimeObjectInvalid {
         error: {ctx_type: String, ctx_fn: field_from_context},
@@ -366,7 +370,7 @@ error_types! {
     // timedelta errors
     TimeDeltaType {},
     TimeDeltaParsing {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: cow_field_from_context<String, _>},
     },
     // ---------------------
     // frozenset errors
@@ -407,7 +411,7 @@ error_types! {
         error: {ctx_type: String, ctx_fn: field_from_context},
     },
     UrlSyntaxViolation {
-        error: {ctx_type: Cow<'static, str>, ctx_fn: str_cow_field_from_context},
+        error: {ctx_type: Cow<'static, str>, ctx_fn: cow_field_from_context<String, _>},
     },
     UrlTooLong {
         max_length: {ctx_type: usize, ctx_fn: field_from_context},
