@@ -332,6 +332,7 @@ def to_json(
     bytes_mode: Literal['utf8', 'base64'] = 'utf8',
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
+    duck_typed_serialization: bool = False,
 ) -> bytes:
     """
     Serialize a Python object to JSON including transforming and filtering data.
@@ -372,6 +373,7 @@ def to_jsonable_python(
     bytes_mode: Literal['utf8', 'base64'] = 'utf8',
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
+    duck_typed_serialization: bool = False,
 ) -> Any:
     """
     Serialize/marshal a Python object to a JSON-serializable Python object including transforming and filtering data.

@@ -159,7 +159,9 @@ impl TypeSerializer for ModelSerializer {
             field_name: None,
             ..*extra
         };
-        if self.root_model {
+        if extra.duck_typed_serialization {
+            infer_to_python(value, include, exclude, &extra)
+        } else if self.root_model {
             extra.field_name = Some(ROOT_FIELD);
             let py = value.py();
             let root = value.getattr(intern!(py, ROOT_FIELD)).map_err(|original_err| {

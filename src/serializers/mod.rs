@@ -126,10 +126,7 @@ impl SchemaSerializer {
             fallback,
             duck_typed_serialization,
         );
-        let v = match duck_typed_serialization {
-            false => self.serializer.to_python(value, include, exclude, &extra)?,
-            true => infer::infer_to_python(value, include, exclude, &extra)?,
-        };
+        let v = self.serializer.to_python(value, include, exclude, &extra)?;
         warnings.final_check(py)?;
         Ok(v)
     }
