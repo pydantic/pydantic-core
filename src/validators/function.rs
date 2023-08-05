@@ -13,9 +13,7 @@ use crate::tools::{function_name, py_err, SchemaDict};
 use crate::PydanticUseDefault;
 
 use super::generator::InternalValidator;
-use super::{
-    build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, InputType, Validator,
-};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, InputType, Validator};
 
 struct FunctionInfo {
     /// The actual function object that will get called
@@ -98,11 +96,9 @@ macro_rules! impl_validator {
                 py: Python<'data>,
                 input: &'data impl Input<'data>,
                 extra: &Extra,
-                definitions: &'data Definitions<CombinedValidator>,
                 recursion_guard: &'s mut RecursionGuard,
             ) -> ValResult<'data, PyObject> {
-                let validate =
-                    move |v: &'data PyAny, e: &Extra| self.validator.validate(py, v, e, definitions, recursion_guard);
+                let validate = move |v: &'data PyAny, e: &Extra| self.validator.validate(py, v, e, recursion_guard);
                 self._validate(validate, py, input.to_object(py).into_ref(py), extra)
             }
             fn validate_assignment<'s, 'data: 's>(
@@ -112,24 +108,18 @@ macro_rules! impl_validator {
                 field_name: &'data str,
                 field_value: &'data PyAny,
                 extra: &Extra,
-                definitions: &'data Definitions<CombinedValidator>,
                 recursion_guard: &'s mut RecursionGuard,
             ) -> ValResult<'data, PyObject> {
                 let validate = move |v: &'data PyAny, e: &Extra| {
                     self.validator
-                        .validate_assignment(py, v, field_name, field_value, e, definitions, recursion_guard)
+                        .validate_assignment(py, v, field_name, field_value, e, recursion_guard)
                 };
                 self._validate(validate, py, obj, extra)
             }
 
-            fn different_strict_behavior(
-                &self,
-                definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-                ultra_strict: bool,
-            ) -> bool {
+            fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
                 if ultra_strict {
-                    self.validator
-                        .different_strict_behavior(definitions, ultra_strict)
+                    self.validator.different_strict_behavior(ultra_strict)
                 } else {
                     true
                 }
@@ -137,10 +127,6 @@ macro_rules! impl_validator {
 
             fn get_name(&self) -> &str {
                 &self.name
-            }
-
-            fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-                self.validator.complete(definitions)
             }
         }
     };
@@ -256,7 +242,6 @@ impl Validator for FunctionPlainValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let r = if self.info_arg {
@@ -268,21 +253,13 @@ impl Validator for FunctionPlainValidator {
         r.map_err(|e| convert_err(py, e, input))
     }
 
-    fn different_strict_behavior(
-        &self,
-        _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         // best guess, should we change this?
         !ultra_strict
     }
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, _definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        Ok(())
     }
 }
 
@@ -355,7 +332,6 @@ impl Validator for FunctionWrapValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let handler = ValidatorCallable {
@@ -363,7 +339,6 @@ impl Validator for FunctionWrapValidator {
                 py,
                 "ValidatorCallable",
                 &self.validator,
-                definitions,
                 extra,
                 recursion_guard,
                 self.hide_input_in_errors,
@@ -384,7 +359,6 @@ impl Validator for FunctionWrapValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let handler = AssignmentValidatorCallable {
@@ -392,7 +366,6 @@ impl Validator for FunctionWrapValidator {
                 py,
                 "AssignmentValidatorCallable",
                 &self.validator,
-                definitions,
                 extra,
                 recursion_guard,
                 self.hide_input_in_errors,
@@ -403,13 +376,9 @@ impl Validator for FunctionWrapValidator {
         self._validate(Py::new(py, handler)?.into_ref(py), py, obj, extra)
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         if ultra_strict {
-            self.validator.different_strict_behavior(definitions, ultra_strict)
+            self.validator.different_strict_behavior(ultra_strict)
         } else {
             true
         }
@@ -417,10 +386,6 @@ impl Validator for FunctionWrapValidator {
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.validator.complete(definitions)
     }
 }
 

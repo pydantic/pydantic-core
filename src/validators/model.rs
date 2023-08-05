@@ -7,7 +7,7 @@ use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
 use pyo3::{ffi, intern};
 
 use super::function::convert_err;
-use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
 use crate::errors::{ErrorType, ValError, ValResult};
@@ -107,12 +107,11 @@ impl Validator for ModelValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if let Some(self_instance) = extra.self_instance {
             // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
-            return self.validate_init(py, self_instance, input, extra, definitions, recursion_guard);
+            return self.validate_init(py, self_instance, input, extra, recursion_guard);
         }
 
         // if we're in strict mode, we require an exact instance of the class (from python, with JSON an object is ok)
@@ -125,7 +124,7 @@ impl Validator for ModelValidator {
                 let fields_set = py_input.getattr(intern!(py, DUNDER_FIELDS_SET_KEY))?;
                 if self.root_model {
                     let inner_input = py_input.getattr(intern!(py, ROOT_FIELD))?;
-                    self.validate_construct(py, inner_input, Some(fields_set), extra, definitions, recursion_guard)
+                    self.validate_construct(py, inner_input, Some(fields_set), extra, recursion_guard)
                 } else {
                     // get dict here so from_attributes logic doesn't apply
                     let dict = py_input.getattr(intern!(py, DUNDER_DICT))?;
@@ -138,13 +137,13 @@ impl Validator for ModelValidator {
                         full_model_dict.update(model_extra.downcast()?)?;
                         full_model_dict
                     };
-                    self.validate_construct(py, inner_input, Some(fields_set), extra, definitions, recursion_guard)
+                    self.validate_construct(py, inner_input, Some(fields_set), extra, recursion_guard)
                 }
             } else {
                 Ok(input.to_object(py))
             }
         } else {
-            self.validate_construct(py, input, None, extra, definitions, recursion_guard)
+            self.validate_construct(py, input, None, extra, recursion_guard)
         }
     }
 
@@ -155,7 +154,6 @@ impl Validator for ModelValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if self.frozen {
@@ -173,7 +171,7 @@ impl Validator for ModelValidator {
                 let field_extra = Extra { ..*extra };
                 let output = self
                     .validator
-                    .validate(py, field_value, &field_extra, definitions, recursion_guard)?;
+                    .validate(py, field_value, &field_extra, recursion_guard)?;
 
                 force_setattr(py, model, intern!(py, ROOT_FIELD), output)?;
                 Ok(model.into_py(py))
@@ -188,15 +186,9 @@ impl Validator for ModelValidator {
         }
         input_dict.set_item(field_name, field_value)?;
 
-        let output = self.validator.validate_assignment(
-            py,
-            input_dict,
-            field_name,
-            field_value,
-            extra,
-            definitions,
-            recursion_guard,
-        )?;
+        let output =
+            self.validator
+                .validate_assignment(py, input_dict, field_name, field_value, extra, recursion_guard)?;
 
         let (validated_dict, validated_extra, validated_fields_set): (&PyDict, &PyAny, &PySet) = output.extract(py)?;
 
@@ -217,13 +209,9 @@ impl Validator for ModelValidator {
         Ok(model.into_py(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         if ultra_strict {
-            self.validator.different_strict_behavior(definitions, ultra_strict)
+            self.validator.different_strict_behavior(ultra_strict)
         } else {
             true
         }
@@ -231,10 +219,6 @@ impl Validator for ModelValidator {
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.validator.complete(definitions)
     }
 }
 
@@ -246,7 +230,6 @@ impl ModelValidator {
         self_instance: &'s PyAny,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         // we need to set `self_instance` to None for nested validators as we don't want to operate on self_instance
@@ -256,9 +239,7 @@ impl ModelValidator {
             ..*extra
         };
 
-        let output = self
-            .validator
-            .validate(py, input, &new_extra, definitions, recursion_guard)?;
+        let output = self.validator.validate(py, input, &new_extra, recursion_guard)?;
 
         if self.root_model {
             let fields_set = if input.to_object(py).is(&PydanticUndefinedType::py_undefined()) {
@@ -281,7 +262,6 @@ impl ModelValidator {
         input: &'data impl Input<'data>,
         existing_fields_set: Option<&'data PyAny>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         if self.custom_init {
@@ -297,11 +277,9 @@ impl ModelValidator {
 
         let output = if self.root_model {
             let field_extra = Extra { ..*extra };
-            self.validator
-                .validate(py, input, &field_extra, definitions, recursion_guard)?
+            self.validator.validate(py, input, &field_extra, recursion_guard)?
         } else {
-            self.validator
-                .validate(py, input, extra, definitions, recursion_guard)?
+            self.validator.validate(py, input, extra, recursion_guard)?
         };
 
         let instance = create_class(self.class.as_ref(py))?;

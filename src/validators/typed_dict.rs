@@ -15,7 +15,7 @@ use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
-use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 struct TypedDictField {
@@ -145,7 +145,6 @@ impl Validator for TypedDictValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let strict = extra.strict.unwrap_or(self.strict);
@@ -190,7 +189,7 @@ impl Validator for TypedDictValidator {
                         }
                         match field
                             .validator
-                            .validate(py, value, &extra, definitions, recursion_guard)
+                            .validate(py, value, &extra, recursion_guard)
                         {
                             Ok(value) => {
                                 output_dict.set_item(&field.name_py, value)?;
@@ -204,7 +203,7 @@ impl Validator for TypedDictValidator {
                             Err(err) => return Err(err),
                         }
                         continue;
-                    } else if let Some(value) = field.validator.default_value(py, Some(field.name.as_str()), &extra, definitions, recursion_guard)? {
+                    } else if let Some(value) = field.validator.default_value(py, Some(field.name.as_str()), &extra, recursion_guard)? {
                         output_dict.set_item(&field.name_py, value)?;
                     } else if field.required {
                         errors.push(field.lookup_key.error(
@@ -249,7 +248,7 @@ impl Validator for TypedDictValidator {
                             ExtraBehavior::Allow => {
                             let py_key = either_str.as_py_string(py);
                                 if let Some(ref validator) = self.extra_validator {
-                                    match validator.validate(py, value, &extra, definitions, recursion_guard) {
+                                    match validator.validate(py, value, &extra, recursion_guard) {
                                         Ok(value) => {
                                             output_dict.set_item(py_key, value)?;
                                         }
@@ -283,27 +282,13 @@ impl Validator for TypedDictValidator {
         }
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         self.fields
             .iter()
-            .any(|f| f.validator.different_strict_behavior(definitions, ultra_strict))
+            .any(|f| f.validator.different_strict_behavior(ultra_strict))
     }
 
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
-    }
-
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.fields
-            .iter_mut()
-            .try_for_each(|f| f.validator.complete(definitions))?;
-        match &mut self.extra_validator {
-            Some(v) => v.complete(definitions),
-            None => Ok(()),
-        }
     }
 }

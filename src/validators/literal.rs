@@ -14,7 +14,7 @@ use crate::py_gc::PyGcTraverse;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 struct BoolLiteral {
@@ -186,7 +186,6 @@ impl Validator for LiteralValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         _extra: &Extra,
-        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         match self.lookup.validate(py, input)? {
@@ -200,20 +199,12 @@ impl Validator for LiteralValidator {
         }
     }
 
-    fn different_strict_behavior(
-        &self,
-        _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         !ultra_strict
     }
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, _definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        Ok(())
     }
 }
 

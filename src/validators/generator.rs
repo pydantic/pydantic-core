@@ -10,7 +10,7 @@ use crate::tools::SchemaDict;
 use crate::ValidationError;
 
 use super::list::get_items_schema;
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, InputType, Validator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, InputType, Validator};
 
 #[derive(Debug, Clone)]
 pub struct GeneratorValidator {
@@ -56,7 +56,6 @@ impl Validator for GeneratorValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let iterator = input.validate_iter()?;
@@ -65,7 +64,6 @@ impl Validator for GeneratorValidator {
                 py,
                 "ValidatorIterator",
                 v,
-                definitions,
                 extra,
                 recursion_guard,
                 self.hide_input_in_errors,
@@ -82,13 +80,9 @@ impl Validator for GeneratorValidator {
         Ok(v_iterator.into_py(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         if let Some(ref v) = self.item_validator {
-            v.different_strict_behavior(definitions, ultra_strict)
+            v.different_strict_behavior(ultra_strict)
         } else {
             false
         }
@@ -96,13 +90,6 @@ impl Validator for GeneratorValidator {
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        match self.item_validator {
-            Some(ref mut v) => v.complete(definitions),
-            None => Ok(()),
-        }
     }
 }
 
@@ -214,7 +201,6 @@ impl ValidatorIterator {
 pub struct InternalValidator {
     name: String,
     validator: CombinedValidator,
-    definitions: Vec<CombinedValidator>,
     // TODO, do we need data?
     data: Option<Py<PyDict>>,
     strict: Option<bool>,
@@ -237,7 +223,6 @@ impl InternalValidator {
         py: Python,
         name: &str,
         validator: &CombinedValidator,
-        definitions: &[CombinedValidator],
         extra: &Extra,
         recursion_guard: &RecursionGuard,
         hide_input_in_errors: bool,
@@ -245,7 +230,6 @@ impl InternalValidator {
         Self {
             name: name.to_string(),
             validator: validator.clone(),
-            definitions: definitions.to_vec(),
             data: extra.data.map(|d| d.into_py(py)),
             strict: extra.strict,
             from_attributes: extra.from_attributes,
@@ -275,15 +259,7 @@ impl InternalValidator {
             self_instance: self.self_instance.as_ref().map(|data| data.as_ref(py)),
         };
         self.validator
-            .validate_assignment(
-                py,
-                model,
-                field_name,
-                field_value,
-                &extra,
-                &self.definitions,
-                &mut self.recursion_guard,
-            )
+            .validate_assignment(py, model, field_name, field_value, &extra, &mut self.recursion_guard)
             .map_err(|e| {
                 ValidationError::from_val_error(
                     py,
@@ -315,7 +291,7 @@ impl InternalValidator {
             self_instance: self.self_instance.as_ref().map(|data| data.as_ref(py)),
         };
         self.validator
-            .validate(py, input, &extra, &self.definitions, &mut self.recursion_guard)
+            .validate(py, input, &extra, &mut self.recursion_guard)
             .map_err(|e| {
                 ValidationError::from_val_error(
                     py,
@@ -331,7 +307,6 @@ impl InternalValidator {
 
 impl_py_gc_traverse!(InternalValidator {
     validator,
-    definitions,
     data,
     context,
     self_instance

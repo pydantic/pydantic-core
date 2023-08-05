@@ -9,7 +9,7 @@ use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
 use super::InputType;
-use super::{build_validator, BuildValidator, CombinedValidator, Definitions, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct JsonOrPython {
@@ -56,30 +56,19 @@ impl Validator for JsonOrPython {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         match extra.mode {
-            InputType::Python => self.python.validate(py, input, extra, definitions, recursion_guard),
-            InputType::Json => self.json.validate(py, input, extra, definitions, recursion_guard),
+            InputType::Python => self.python.validate(py, input, extra, recursion_guard),
+            InputType::Json => self.json.validate(py, input, extra, recursion_guard),
         }
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
-        self.json.different_strict_behavior(definitions, ultra_strict)
-            || self.python.different_strict_behavior(definitions, ultra_strict)
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        self.json.different_strict_behavior(ultra_strict) || self.python.different_strict_behavior(ultra_strict)
     }
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.json.complete(definitions)?;
-        self.python.complete(definitions)
     }
 }

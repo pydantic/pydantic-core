@@ -8,7 +8,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 pub struct FloatBuilder;
 
@@ -68,7 +68,6 @@ impl Validator for FloatValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let either_float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
@@ -78,20 +77,12 @@ impl Validator for FloatValidator {
         Ok(either_float.into_py(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        _ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, _ultra_strict: bool) -> bool {
         true
     }
 
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
-    }
-
-    fn complete(&mut self, _definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        Ok(())
     }
 }
 
@@ -114,7 +105,6 @@ impl Validator for ConstrainedFloatValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let either_float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
@@ -157,20 +147,12 @@ impl Validator for ConstrainedFloatValidator {
         Ok(either_float.into_py(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        _ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, _ultra_strict: bool) -> bool {
         true
     }
 
     fn get_name(&self) -> &str {
         "constrained-float"
-    }
-
-    fn complete(&mut self, _definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        Ok(())
     }
 }
 

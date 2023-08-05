@@ -8,7 +8,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
-use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub enum CustomError {
@@ -93,27 +93,18 @@ impl Validator for CustomErrorValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         self.validator
-            .validate(py, input, extra, definitions, recursion_guard)
+            .validate(py, input, extra, recursion_guard)
             .map_err(|_| self.custom_error.as_val_error(input))
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
-        self.validator.different_strict_behavior(definitions, ultra_strict)
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        self.validator.different_strict_behavior(ultra_strict)
     }
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.validator.complete(definitions)
     }
 }

@@ -8,7 +8,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
-use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ChainValidator {
@@ -75,33 +75,22 @@ impl Validator for ChainValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let mut steps_iter = self.steps.iter();
         let first_step = steps_iter.next().unwrap();
-        let value = first_step.validate(py, input, extra, definitions, recursion_guard)?;
+        let value = first_step.validate(py, input, extra, recursion_guard)?;
 
         steps_iter.try_fold(value, |v, step| {
-            step.validate(py, v.into_ref(py), extra, definitions, recursion_guard)
+            step.validate(py, v.into_ref(py), extra, recursion_guard)
         })
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
-        self.steps
-            .iter()
-            .any(|v| v.different_strict_behavior(definitions, ultra_strict))
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        self.steps.iter().any(|v| v.different_strict_behavior(ultra_strict))
     }
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.steps.iter_mut().try_for_each(|v| v.complete(definitions))
     }
 }

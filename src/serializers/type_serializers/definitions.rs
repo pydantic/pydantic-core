@@ -1,10 +1,11 @@
 use std::borrow::Cow;
+use std::fmt::Debug;
 
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use crate::definitions::DefinitionsBuilder;
+use crate::definitions::{DefinitionRef, DefinitionsBuilder};
 
 use crate::tools::SchemaDict;
 
@@ -37,12 +38,12 @@ impl BuildSerializer for DefinitionsSerializerBuilder {
 
 #[derive(Debug, Clone)]
 pub struct DefinitionRefSerializer {
-    serializer_id: usize,
+    definition: DefinitionRef<CombinedSerializer>,
 }
 
 impl DefinitionRefSerializer {
-    pub fn from_id(serializer_id: usize) -> CombinedSerializer {
-        Self { serializer_id }.into()
+    pub fn new(definition: DefinitionRef<CombinedSerializer>) -> DefinitionRefSerializer {
+        Self { definition }
     }
 }
 
@@ -55,11 +56,13 @@ impl BuildSerializer for DefinitionRefSerializer {
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let schema_ref: String = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
-        let serializer_id = definitions.get_reference_id(&schema_ref);
-        Ok(Self { serializer_id }.into())
+        let definition = definitions.get_definition(&schema_ref).clone();
+        Ok(Self { definition }.into())
     }
 }
 
+// NB it is NOT correct to traverse the definition here; doing so may lead to circular references.
+// Instead leave the traversal to the definitions in the top-level schema validator.
 impl_py_gc_traverse!(DefinitionRefSerializer {});
 
 impl TypeSerializer for DefinitionRefSerializer {
@@ -70,10 +73,10 @@ impl TypeSerializer for DefinitionRefSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let value_id = extra.rec_guard.add(value, self.serializer_id)?;
-        let comb_serializer = extra.definitions.get(self.serializer_id).unwrap();
+        let value_id = extra.rec_guard.add(value, self.definition.id())?;
+        let comb_serializer = self.definition.get().unwrap();
         let r = comb_serializer.to_python(value, include, exclude, extra);
-        extra.rec_guard.pop(value_id, self.serializer_id);
+        extra.rec_guard.pop(value_id, self.definition.id());
         r
     }
 
@@ -89,10 +92,13 @@ impl TypeSerializer for DefinitionRefSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let value_id = extra.rec_guard.add(value, self.serializer_id).map_err(py_err_se_err)?;
-        let comb_serializer = extra.definitions.get(self.serializer_id).unwrap();
+        let value_id = extra
+            .rec_guard
+            .add(value, self.definition.id())
+            .map_err(py_err_se_err)?;
+        let comb_serializer = self.definition.get().unwrap();
         let r = comb_serializer.serde_serialize(value, serializer, include, exclude, extra);
-        extra.rec_guard.pop(value_id, self.serializer_id);
+        extra.rec_guard.pop(value_id, self.definition.id());
         r
     }
 

@@ -3,16 +3,17 @@
 /// Unlike json schema we let you put definitions inline, not just in a single '#/$defs/' block or similar.
 /// We use DefinitionsBuilder to collect the references / definitions into a single vector
 /// and then get a definition from a reference using an integer id (just for performance of not using a HashMap)
-use std::collections::hash_map::Entry;
+use std::{
+    collections::hash_map::Entry,
+    fmt::Debug,
+    sync::{Arc, OnceLock},
+};
 
-use pyo3::prelude::*;
+use pyo3::{prelude::*, PyTraverseError, PyVisit};
 
 use ahash::AHashMap;
 
-use crate::build_tools::py_schema_err;
-
-// An integer id for the reference
-pub type ReferenceId = usize;
+use crate::{build_tools::py_schema_err, py_gc::PyGcTraverse};
 
 /// Definitions are validators and serializers that are
 /// shared by reference.
@@ -24,90 +25,136 @@ pub type ReferenceId = usize;
 /// They get indexed by a ReferenceId, which are integer identifiers
 /// that are handed out and managed by DefinitionsBuilder when the Schema{Validator,Serializer}
 /// gets build.
-pub type Definitions<T> = [T];
+#[derive(Clone)]
+pub struct Definitions<T>(AHashMap<Arc<String>, Definition<T>>);
 
-#[derive(Clone, Debug)]
-struct Definition<T> {
-    pub id: ReferenceId,
-    pub value: Option<T>,
+/// Internal type which contains a definition to be filled
+struct Definition<T>(Arc<OnceLock<T>>);
+
+/// Reference to a definition.
+#[derive(Clone)]
+pub struct DefinitionRef<T> {
+    name: Arc<String>,
+    value: Definition<T>,
+}
+
+impl<T> DefinitionRef<T> {
+    pub fn id(&self) -> usize {
+        Arc::as_ptr(&self.value.0) as usize
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn get(&self) -> Option<&T> {
+        self.value.0.get()
+    }
+}
+
+impl<T: Debug> Debug for DefinitionRef<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // To avoid possible infinite recursion from recursive definitions,
+        // a DefinitionRef just displays debug as its name
+        self.name.fmt(f)
+    }
+}
+
+impl<T: Debug> Debug for Definitions<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl<T> Clone for Definition<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: Debug> Debug for Definition<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0.get() {
+            Some(value) => value.fmt(f),
+            None => "...".fmt(f),
+        }
+    }
+}
+
+impl<T: PyGcTraverse> PyGcTraverse for DefinitionRef<T> {
+    fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
+        if let Some(value) = self.value.0.get() {
+            value.py_gc_traverse(visit)?;
+        }
+        Ok(())
+    }
+}
+
+impl<T: PyGcTraverse> PyGcTraverse for Definitions<T> {
+    fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
+        for value in self.0.values() {
+            if let Some(value) = value.0.get() {
+                value.py_gc_traverse(visit)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct DefinitionsBuilder<T> {
-    definitions: AHashMap<String, Definition<T>>,
+    definitions: Definitions<T>,
 }
 
 impl<T: Clone + std::fmt::Debug> DefinitionsBuilder<T> {
     pub fn new() -> Self {
         Self {
-            definitions: AHashMap::new(),
+            definitions: Definitions(AHashMap::new()),
         }
     }
 
     /// Get a ReferenceId for the given reference string.
-    // This ReferenceId can later be used to retrieve a definition
-    pub fn get_reference_id(&mut self, reference: &str) -> ReferenceId {
-        let next_id = self.definitions.len();
+    pub fn get_definition(&mut self, reference: &str) -> DefinitionRef<T> {
         // We either need a String copy or two hashmap lookups
         // Neither is better than the other
         // We opted for the easier outward facing API
-        match self.definitions.entry(reference.to_string()) {
-            Entry::Occupied(entry) => entry.get().id,
-            Entry::Vacant(entry) => {
-                entry.insert(Definition {
-                    id: next_id,
-                    value: None,
-                });
-                next_id
-            }
+        let name = Arc::new(reference.to_string());
+        let value = match self.definitions.0.entry(name.clone()) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => entry.insert(Definition(Arc::new(OnceLock::new()))),
+        };
+        DefinitionRef {
+            name,
+            value: value.clone(),
         }
     }
 
     /// Add a definition, returning the ReferenceId that maps to it
-    pub fn add_definition(&mut self, reference: String, value: T) -> PyResult<ReferenceId> {
-        let next_id = self.definitions.len();
-        match self.definitions.entry(reference.clone()) {
-            Entry::Occupied(mut entry) => match entry.get_mut().value.replace(value) {
-                Some(_) => py_schema_err!("Duplicate ref: `{}`", reference),
-                None => Ok(entry.get().id),
-            },
-            Entry::Vacant(entry) => {
-                entry.insert(Definition {
-                    id: next_id,
-                    value: Some(value),
-                });
-                Ok(next_id)
+    pub fn add_definition(&mut self, reference: String, value: T) -> PyResult<DefinitionRef<T>> {
+        let name = Arc::new(reference.to_string());
+        let value = match self.definitions.0.entry(name.clone()) {
+            Entry::Occupied(entry) => {
+                let definition = entry.into_mut();
+                match definition.0.set(value) {
+                    Ok(()) => definition,
+                    Err(_) => return py_schema_err!("Duplicate ref: `{}`", reference),
+                }
             }
-        }
-    }
-
-    /// Retrieve an item definition using a ReferenceId
-    /// Will raise an error if the definition for that reference does not yet exist
-    pub fn get_definition(&self, reference_id: ReferenceId) -> PyResult<&T> {
-        let (reference, def) = match self.definitions.iter().find(|(_, def)| def.id == reference_id) {
-            Some(v) => v,
-            None => return py_schema_err!("Definitions error: no definition for ReferenceId `{}`", reference_id),
+            Entry::Vacant(entry) => entry.insert(Definition(Arc::new(OnceLock::from(value)))),
         };
-        match def.value.as_ref() {
-            Some(v) => Ok(v),
-            None => py_schema_err!(
-                "Definitions error: attempted to use `{}` before it was filled",
-                reference
-            ),
-        }
+        Ok(DefinitionRef {
+            name,
+            value: value.clone(),
+        })
     }
 
     /// Consume this Definitions into a vector of items, indexed by each items ReferenceId
-    pub fn finish(self) -> PyResult<Vec<T>> {
-        // We need to create a vec of defs according to the order in their ids
-        let mut defs: Vec<(usize, T)> = Vec::new();
-        for (reference, def) in self.definitions {
-            match def.value {
-                None => return py_schema_err!("Definitions error: definition {} was never filled", reference),
-                Some(v) => defs.push((def.id, v)),
+    pub fn finish(self) -> PyResult<Definitions<T>> {
+        for (reference, def) in &self.definitions.0 {
+            if def.0.get().is_none() {
+                return py_schema_err!("Definitions error: definition `{}` was never filled", reference);
             }
         }
-        defs.sort_by_key(|(id, _)| *id);
-        Ok(defs.into_iter().map(|(_, v)| v).collect())
+        Ok(self.definitions)
     }
 }

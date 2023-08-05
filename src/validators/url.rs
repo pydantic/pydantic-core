@@ -17,7 +17,7 @@ use crate::tools::SchemaDict;
 use crate::url::{schema_is_special, PyMultiHostUrl, PyUrl};
 
 use super::literal::expected_repr_name;
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 type AllowedSchemas = Option<(AHashSet<String>, String)>;
 
@@ -65,7 +65,6 @@ impl Validator for UrlValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let mut lib_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
@@ -89,20 +88,12 @@ impl Validator for UrlValidator {
         }
     }
 
-    fn different_strict_behavior(
-        &self,
-        _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         !ultra_strict
     }
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, _definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        Ok(())
     }
 }
 
@@ -196,7 +187,6 @@ impl Validator for MultiHostUrlValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let mut multi_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
@@ -219,20 +209,12 @@ impl Validator for MultiHostUrlValidator {
         }
     }
 
-    fn different_strict_behavior(
-        &self,
-        _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         !ultra_strict
     }
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, _definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        Ok(())
     }
 }
 

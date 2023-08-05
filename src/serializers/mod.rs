@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::{PyTraverseError, PyVisit};
 
-use crate::definitions::DefinitionsBuilder;
+use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::py_gc::PyGcTraverse;
 use crate::validators::SelfValidator;
 
@@ -31,7 +31,7 @@ mod type_serializers;
 #[derive(Debug)]
 pub struct SchemaSerializer {
     serializer: CombinedSerializer,
-    definitions: Vec<CombinedSerializer>,
+    definitions: Definitions<CombinedSerializer>,
     expected_json_size: AtomicUsize,
     config: SerializationConfig,
 }
@@ -55,7 +55,6 @@ impl SchemaSerializer {
         Extra::new(
             py,
             mode,
-            &self.definitions,
             by_alias,
             warnings,
             exclude_unset,
@@ -187,9 +186,7 @@ impl SchemaSerializer {
 
     fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
         self.serializer.py_gc_traverse(&visit)?;
-        for slot in &self.definitions {
-            slot.py_gc_traverse(&visit)?;
-        }
+        self.definitions.py_gc_traverse(&visit)?;
         Ok(())
     }
 }

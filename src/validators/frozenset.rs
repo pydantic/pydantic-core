@@ -8,7 +8,7 @@ use crate::tools::SchemaDict;
 
 use super::list::min_length_check;
 use super::set::set_build;
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct FrozenSetValidator {
@@ -32,7 +32,6 @@ impl Validator for FrozenSetValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let collection = input.validate_frozenset(extra.strict.unwrap_or(self.strict))?;
@@ -45,20 +44,15 @@ impl Validator for FrozenSetValidator {
             "Frozenset",
             &self.item_validator,
             extra,
-            definitions,
             recursion_guard,
         )?;
         min_length_check!(input, "Frozenset", self.min_length, f_set);
         Ok(f_set.into_py(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         if ultra_strict {
-            self.item_validator.different_strict_behavior(definitions, true)
+            self.item_validator.different_strict_behavior(true)
         } else {
             true
         }
@@ -66,9 +60,5 @@ impl Validator for FrozenSetValidator {
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.item_validator.complete(definitions)
     }
 }

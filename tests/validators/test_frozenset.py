@@ -249,7 +249,7 @@ def test_repr():
         'validator=FrozenSet(FrozenSetValidator{'
         'strict:true,item_validator:Any(AnyValidator),min_length:Some(42),max_length:None,'
         'name:"frozenset[any]"'
-        '}),definitions=[])'
+        '}),definitions={})'
     )
 
 

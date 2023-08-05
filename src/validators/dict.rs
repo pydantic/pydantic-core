@@ -13,7 +13,7 @@ use crate::tools::SchemaDict;
 
 use super::any::AnyValidator;
 use super::list::length_check;
-use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DictValidator {
@@ -71,32 +71,22 @@ impl Validator for DictValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let dict = input.validate_dict(extra.strict.unwrap_or(self.strict))?;
         match dict {
-            GenericMapping::PyDict(py_dict) => {
-                self.validate_dict(py, input, py_dict, extra, definitions, recursion_guard)
-            }
-            GenericMapping::PyMapping(mapping) => {
-                self.validate_mapping(py, input, mapping, extra, definitions, recursion_guard)
-            }
+            GenericMapping::PyDict(py_dict) => self.validate_dict(py, input, py_dict, extra, recursion_guard),
+            GenericMapping::PyMapping(mapping) => self.validate_mapping(py, input, mapping, extra, recursion_guard),
             GenericMapping::PyGetAttr(_, _) => unreachable!(),
             GenericMapping::JsonObject(json_object) => {
-                self.validate_json_object(py, input, json_object, extra, definitions, recursion_guard)
+                self.validate_json_object(py, input, json_object, extra, recursion_guard)
             }
         }
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         if ultra_strict {
-            self.key_validator.different_strict_behavior(definitions, true)
-                || self.value_validator.different_strict_behavior(definitions, true)
+            self.key_validator.different_strict_behavior(true) || self.value_validator.different_strict_behavior(true)
         } else {
             true
         }
@@ -104,11 +94,6 @@ impl Validator for DictValidator {
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.key_validator.complete(definitions)?;
-        self.value_validator.complete(definitions)
     }
 }
 
@@ -120,7 +105,6 @@ macro_rules! build_validate {
             input: &'data impl Input<'data>,
             dict: &'data $dict_type,
             extra: &Extra,
-            definitions: &'data Definitions<CombinedValidator>,
             recursion_guard: &'s mut RecursionGuard,
         ) -> ValResult<'data, PyObject> {
             let output = PyDict::new(py);
@@ -130,7 +114,7 @@ macro_rules! build_validate {
             let value_validator = self.value_validator.as_ref();
             for item_result in <$iter>::new(dict)? {
                 let (key, value) = item_result?;
-                let output_key = match key_validator.validate(py, key, extra, definitions, recursion_guard) {
+                let output_key = match key_validator.validate(py, key, extra, recursion_guard) {
                     Ok(value) => Some(value),
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {
@@ -145,7 +129,7 @@ macro_rules! build_validate {
                     Err(ValError::Omit) => continue,
                     Err(err) => return Err(err),
                 };
-                let output_value = match value_validator.validate(py, value, extra, definitions, recursion_guard) {
+                let output_value = match value_validator.validate(py, value, extra, recursion_guard) {
                     Ok(value) => Some(value),
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {

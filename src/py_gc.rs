@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ahash::AHashMap;
 use enum_dispatch::enum_dispatch;
 use pyo3::{AsPyPointer, Py, PyTraverseError, PyVisit};
@@ -36,6 +38,12 @@ impl<T: PyGcTraverse> PyGcTraverse for AHashMap<String, T> {
 }
 
 impl<T: PyGcTraverse> PyGcTraverse for Box<T> {
+    fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
+        T::py_gc_traverse(self, visit)
+    }
+}
+
+impl<T: PyGcTraverse> PyGcTraverse for Arc<T> {
     fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
         T::py_gc_traverse(self, visit)
     }

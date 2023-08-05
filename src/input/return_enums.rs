@@ -156,14 +156,13 @@ fn validate_iter_to_vec<'a, 's>(
     mut max_length_check: MaxLengthCheck<'a, impl Input<'a>>,
     validator: &'s CombinedValidator,
     extra: &Extra,
-    definitions: &'a [CombinedValidator],
     recursion_guard: &'s mut RecursionGuard,
 ) -> ValResult<'a, Vec<PyObject>> {
     let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
     for (index, item_result) in iter.enumerate() {
         let item = item_result.map_err(|e| any_next_error!(py, e, max_length_check.input, index))?;
-        match validator.validate(py, item, extra, definitions, recursion_guard) {
+        match validator.validate(py, item, extra, recursion_guard) {
             Ok(item) => {
                 max_length_check.incr()?;
                 output.push(item);
@@ -225,13 +224,12 @@ fn validate_iter_to_set<'a, 's>(
     max_length: Option<usize>,
     validator: &'s CombinedValidator,
     extra: &Extra,
-    definitions: &'a [CombinedValidator],
     recursion_guard: &'s mut RecursionGuard,
 ) -> ValResult<'a, ()> {
     let mut errors: Vec<ValLineError> = Vec::new();
     for (index, item_result) in iter.enumerate() {
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
-        match validator.validate(py, item, extra, definitions, recursion_guard) {
+        match validator.validate(py, item, extra, recursion_guard) {
             Ok(item) => {
                 set.build_add(item)?;
                 if let Some(max_length) = max_length {
@@ -313,7 +311,6 @@ impl<'a> GenericIterable<'a> {
         field_type: &'static str,
         validator: &'s CombinedValidator,
         extra: &Extra,
-        definitions: &'a [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'a, Vec<PyObject>> {
         let capacity = self
@@ -330,7 +327,6 @@ impl<'a> GenericIterable<'a> {
                     max_length_check,
                     validator,
                     extra,
-                    definitions,
                     recursion_guard,
                 )
             };
@@ -358,7 +354,6 @@ impl<'a> GenericIterable<'a> {
         field_type: &'static str,
         validator: &'s CombinedValidator,
         extra: &Extra,
-        definitions: &'a [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'a, ()> {
         macro_rules! validate_set {
@@ -372,7 +367,6 @@ impl<'a> GenericIterable<'a> {
                     max_length,
                     validator,
                     extra,
-                    definitions,
                     recursion_guard,
                 )
             };

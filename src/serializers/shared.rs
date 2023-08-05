@@ -207,13 +207,14 @@ impl BuildSerializer for CombinedSerializer {
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py: Python = schema.py();
+        let ser = Self::_build(schema, config, definitions)?;
         if let Some(schema_ref) = schema.get_as::<String>(intern!(py, "ref"))? {
-            let inner_ser = Self::_build(schema, config, definitions)?;
-            let ser_id = definitions.add_definition(schema_ref, inner_ser)?;
-            return Ok(DefinitionRefSerializer::from_id(ser_id));
+            definitions
+                .add_definition(schema_ref, ser)
+                .map(|def| DefinitionRefSerializer::new(def.clone()).into())
+        } else {
+            Ok(ser)
         }
-
-        Self::_build(schema, config, definitions)
     }
 }
 

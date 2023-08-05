@@ -35,7 +35,7 @@ def test_branch_nullable():
     assert plain_repr(v).startswith(
         'SchemaValidator(title="typed-dict",validator=DefinitionRef(DefinitionRefValidator{'
     )
-    assert ',definitions=[TypedDict(TypedDictValidator{' in plain_repr(v)
+    assert ',definitions={"Branch":TypedDict(TypedDictValidator{' in plain_repr(v)
 
     assert v.validate_python({'name': 'root', 'sub_branch': {'name': 'b1'}}) == (
         {'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': None}}
@@ -80,7 +80,7 @@ def test_branch_nullable_definitions():
     assert v.validate_python({'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': {'name': 'b2'}}}) == (
         {'name': 'root', 'sub_branch': {'name': 'b1', 'sub_branch': {'name': 'b2', 'sub_branch': None}}}
     )
-    assert ',definitions=[TypedDict(TypedDictValidator{' in plain_repr(v)
+    assert ',definitions={"Branch":TypedDict(TypedDictValidator{' in plain_repr(v)
 
 
 def test_unused_ref():
@@ -166,7 +166,7 @@ def test_list():
             'branches': [{'width': 2, 'branches': None}, {'width': 3, 'branches': [{'width': 4, 'branches': None}]}],
         }
     )
-    assert ',definitions=[TypedDict(TypedDictValidator{' in plain_repr(v)
+    assert ',definitions={"BranchList":TypedDict(TypedDictValidator{' in plain_repr(v)
 
 
 def test_multiple_intertwined():
@@ -284,7 +284,7 @@ def test_model_class():
 
 
 def test_invalid_schema():
-    with pytest.raises(SchemaError, match='Definitions error: attempted to use `Branch` before it was filled'):
+    with pytest.raises(SchemaError, match='Definitions error: definition `Branch` was never filled'):
         SchemaValidator(
             {
                 'type': 'list',
@@ -352,7 +352,7 @@ def test_recursion_branch():
         },
         {'from_attributes': True},
     )
-    assert ',definitions=[TypedDict(TypedDictValidator{' in plain_repr(v)
+    assert ',definitions={"Branch":TypedDict(TypedDictValidator{' in plain_repr(v)
 
     assert v.validate_python({'name': 'root'}) == {'name': 'root', 'branch': None}
     assert v.validate_python({'name': 'root', 'branch': {'name': 'b1', 'branch': None}}) == {
@@ -426,7 +426,7 @@ def test_definition_list():
     v = SchemaValidator(
         {'type': 'list', 'ref': 'the-list', 'items_schema': {'type': 'definition-ref', 'schema_ref': 'the-list'}}
     )
-    assert ',definitions=[List(ListValidator{' in plain_repr(v)
+    assert ',definitions={"the-list":List(ListValidator{' in plain_repr(v)
     assert v.validate_python([]) == []
     assert v.validate_python([[]]) == [[]]
 
@@ -812,7 +812,8 @@ def test_error_inside_definition_wrapper():
             }
         )
     assert str(exc_info.value) == (
-        'Field "sub_branch":\n'
+        'Error building "typed-dict" validator:\n'
+        '  SchemaError: Field "sub_branch":\n'
         '  SchemaError: Error building "default" validator:\n'
         "  SchemaError: 'default' and 'default_factory' cannot be used together"
     )

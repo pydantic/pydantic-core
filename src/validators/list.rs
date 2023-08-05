@@ -6,7 +6,7 @@ use crate::input::{GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
-use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 pub struct ListValidator {
@@ -118,22 +118,12 @@ impl Validator for ListValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_list(extra.strict.unwrap_or(self.strict))?;
 
         let output = match self.item_validator {
-            Some(ref v) => seq.validate_to_vec(
-                py,
-                input,
-                self.max_length,
-                "List",
-                v,
-                extra,
-                definitions,
-                recursion_guard,
-            )?,
+            Some(ref v) => seq.validate_to_vec(py, input, self.max_length, "List", v, extra, recursion_guard)?,
             None => match seq {
                 GenericIterable::List(list) => {
                     length_check!(input, "List", self.min_length, self.max_length, list);
@@ -147,14 +137,10 @@ impl Validator for ListValidator {
         Ok(output.into_py(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         if ultra_strict {
             match self.item_validator {
-                Some(ref v) => v.different_strict_behavior(definitions, true),
+                Some(ref v) => v.different_strict_behavior(true),
                 None => false,
             }
         } else {
@@ -164,14 +150,5 @@ impl Validator for ListValidator {
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        if let Some(ref mut v) = self.item_validator {
-            v.complete(definitions)?;
-            let inner_name = v.get_name();
-            self.name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
-        }
-        Ok(())
     }
 }

@@ -16,7 +16,7 @@ use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
-use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
 struct Field {
@@ -120,7 +120,6 @@ impl Validator for ModelFieldsValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let strict = extra.strict.unwrap_or(self.strict);
@@ -189,7 +188,7 @@ impl Validator for ModelFieldsValidator {
                         }
                         match field
                             .validator
-                            .validate(py, value, &extra, definitions, recursion_guard)
+                            .validate(py, value, &extra, recursion_guard)
                         {
                             Ok(value) => {
                                 model_dict.set_item(&field.name_py, value)?;
@@ -204,7 +203,7 @@ impl Validator for ModelFieldsValidator {
                             Err(err) => return Err(err),
                         }
                         continue;
-                    } else if let Some(value) = field.validator.default_value(py, Some(field.name.as_str()), &extra, definitions, recursion_guard)? {
+                    } else if let Some(value) = field.validator.default_value(py, Some(field.name.as_str()), &extra, recursion_guard)? {
                         model_dict.set_item(&field.name_py, value)?;
                     } else {
                         errors.push(field.lookup_key.error(
@@ -250,7 +249,7 @@ impl Validator for ModelFieldsValidator {
                             ExtraBehavior::Allow => {
                             let py_key = either_str.as_py_string(py);
                                 if let Some(ref validator) = self.extra_validator {
-                                    match validator.validate(py, value, &extra, definitions, recursion_guard) {
+                                    match validator.validate(py, value, &extra, recursion_guard) {
                                         Ok(value) => {
                                             model_extra_dict.set_item(py_key, value)?;
                                             fields_set_vec.push(py_key.into_py(py));
@@ -304,7 +303,6 @@ impl Validator for ModelFieldsValidator {
         field_name: &'data str,
         field_value: &'data PyAny,
         extra: &Extra,
-        definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
         let dict: &PyDict = obj.downcast()?;
@@ -348,11 +346,7 @@ impl Validator for ModelFieldsValidator {
                     field.name.to_string(),
                 ))
             } else {
-                prepare_result(
-                    field
-                        .validator
-                        .validate(py, field_value, &extra, definitions, recursion_guard),
-                )
+                prepare_result(field.validator.validate(py, field_value, &extra, recursion_guard))
             }
         } else {
             // Handle extra (unknown) field
@@ -362,9 +356,7 @@ impl Validator for ModelFieldsValidator {
             // unless the user explicitly set extra_behavior to 'allow'
             match self.extra_behavior {
                 ExtraBehavior::Allow => match self.extra_validator {
-                    Some(ref validator) => {
-                        prepare_result(validator.validate(py, field_value, &extra, definitions, recursion_guard))
-                    }
+                    Some(ref validator) => prepare_result(validator.validate(py, field_value, &extra, recursion_guard)),
                     None => get_updated_dict(field_value.to_object(py)),
                 },
                 ExtraBehavior::Forbid | ExtraBehavior::Ignore => {
@@ -399,27 +391,13 @@ impl Validator for ModelFieldsValidator {
         Ok((new_data.to_object(py), new_extra, fields_set.to_object(py)).to_object(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         self.fields
             .iter()
-            .any(|f| f.validator.different_strict_behavior(definitions, ultra_strict))
+            .any(|f| f.validator.different_strict_behavior(ultra_strict))
     }
 
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
-    }
-
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.fields
-            .iter_mut()
-            .try_for_each(|f| f.validator.complete(definitions))?;
-        match &mut self.extra_validator {
-            Some(v) => v.complete(definitions),
-            None => Ok(()),
-        }
     }
 }
