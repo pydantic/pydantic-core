@@ -9,7 +9,7 @@ use crate::tools::SchemaDict;
 use super::list::min_length_check;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SetValidator {
     strict: bool,
     item_validator: Box<CombinedValidator>,

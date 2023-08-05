@@ -67,7 +67,7 @@ enum OnError {
     Default,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct WithDefaultValidator {
     default: DefaultType,
     on_error: OnError,

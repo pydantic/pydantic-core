@@ -57,7 +57,7 @@ impl CustomError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct CustomErrorValidator {
     validator: Box<CombinedValidator>,
     custom_error: CustomError,

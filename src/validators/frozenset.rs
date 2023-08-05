@@ -10,7 +10,7 @@ use super::list::min_length_check;
 use super::set::set_build;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FrozenSetValidator {
     strict: bool,
     item_validator: Box<CombinedValidator>,

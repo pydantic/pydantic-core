@@ -18,7 +18,7 @@ use crate::tools::SchemaDict;
 
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Field {
     name: String,
     lookup_key: LookupKey,
@@ -29,7 +29,7 @@ struct Field {
 
 impl_py_gc_traverse!(Field { validator });
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ModelFieldsValidator {
     fields: Vec<Field>,
     model_name: String,

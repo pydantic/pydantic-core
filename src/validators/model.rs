@@ -49,7 +49,7 @@ impl Revalidate {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ModelValidator {
     revalidate: Revalidate,
     validator: Box<CombinedValidator>,

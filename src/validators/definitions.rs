@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::sync::OnceLock;
 
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -38,14 +39,18 @@ impl BuildValidator for DefinitionsValidatorBuilder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DefinitionRefValidator {
     definition: DefinitionRef<CombinedValidator>,
 }
 
 impl DefinitionRefValidator {
     pub fn new(definition: DefinitionRef<CombinedValidator>) -> Self {
-        Self { definition }
+        Self {
+            definition,
+            different_strict_behaviour: OnceLock::new(),
+            different_ultra_strict_behaviour: OnceLock::new(),
+        }
     }
 }
 

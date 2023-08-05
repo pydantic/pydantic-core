@@ -11,7 +11,7 @@ use crate::tools::SchemaDict;
 use super::InputType;
 use super::{build_validator, BuildValidator, CombinedValidator, Extra, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct JsonOrPython {
     json: Box<CombinedValidator>,
     python: Box<CombinedValidator>,

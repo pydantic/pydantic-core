@@ -11,7 +11,7 @@ use crate::tools::SchemaDict;
 use super::list::{get_items_schema, min_length_check};
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TupleVariableValidator {
     strict: bool,
     item_validator: Option<Box<CombinedValidator>>,
@@ -78,7 +78,7 @@ impl Validator for TupleVariableValidator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TuplePositionalValidator {
     strict: bool,
     items_validators: Vec<CombinedValidator>,

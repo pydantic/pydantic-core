@@ -17,7 +17,7 @@ use crate::tools::SchemaDict;
 
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct TypedDictField {
     name: String,
     lookup_key: LookupKey,
@@ -28,7 +28,7 @@ struct TypedDictField {
 
 impl_py_gc_traverse!(TypedDictField { validator });
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TypedDictValidator {
     fields: Vec<TypedDictField>,
     extra_behavior: ExtraBehavior,

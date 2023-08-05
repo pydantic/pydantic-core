@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use pyo3::exceptions::{PyAssertionError, PyAttributeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyString};
@@ -132,7 +134,7 @@ macro_rules! impl_validator {
     };
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FunctionBeforeValidator {
     validator: Box<CombinedValidator>,
     func: PyObject,
@@ -165,7 +167,7 @@ impl FunctionBeforeValidator {
 
 impl_validator!(FunctionBeforeValidator);
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FunctionAfterValidator {
     validator: Box<CombinedValidator>,
     func: PyObject,
@@ -263,9 +265,9 @@ impl Validator for FunctionPlainValidator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FunctionWrapValidator {
-    validator: Box<CombinedValidator>,
+    validator: Arc<CombinedValidator>,
     func: PyObject,
     config: PyObject,
     name: String,
@@ -287,7 +289,7 @@ impl BuildValidator for FunctionWrapValidator {
         let function_info = destructure_function_schema(schema)?;
         let hide_input_in_errors: bool = config.get_as(intern!(py, "hide_input_in_errors"))?.unwrap_or(false);
         Ok(Self {
-            validator: Box::new(validator),
+            validator: Arc::new(validator),
             func: function_info.function.clone(),
             config: match config {
                 Some(c) => c.into(),
@@ -338,7 +340,7 @@ impl Validator for FunctionWrapValidator {
             validator: InternalValidator::new(
                 py,
                 "ValidatorCallable",
-                &self.validator,
+                self.validator.clone(),
                 extra,
                 recursion_guard,
                 self.hide_input_in_errors,
@@ -365,7 +367,7 @@ impl Validator for FunctionWrapValidator {
             validator: InternalValidator::new(
                 py,
                 "AssignmentValidatorCallable",
-                &self.validator,
+                self.validator.clone(),
                 extra,
                 recursion_guard,
                 self.hide_input_in_errors,

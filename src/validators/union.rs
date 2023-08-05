@@ -1,5 +1,6 @@
 use std::fmt::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
@@ -18,7 +19,7 @@ use super::custom_error::CustomError;
 use super::literal::LiteralLookup;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct UnionValidator {
     choices: Vec<CombinedValidator>,
     custom_error: Option<CustomError>,
@@ -79,7 +80,7 @@ impl UnionValidator {
         }
     }
 
-    fn complete(&mut self) {
+    fn complete(&self) {
         if !self.complete.load(Ordering::Acquire) {
             self.strict_required
                 .store(self.different_strict_behavior(false), Ordering::Release);
@@ -232,7 +233,7 @@ impl PyGcTraverse for Discriminator {
 #[derive(Debug, Clone)]
 pub struct TaggedUnionValidator {
     discriminator: Discriminator,
-    lookup: LiteralLookup<CombinedValidator>,
+    lookup: LiteralLookup<Arc<CombinedValidator>>,
     from_attributes: bool,
     strict: bool,
     custom_error: Option<CustomError>,
@@ -273,7 +274,7 @@ impl BuildValidator for TaggedUnionValidator {
                 // no spaces in get_name() output to make loc easy to read
                 write!(descr, ",{}", validator.get_name()).unwrap();
             }
-            lookup_map.push((choice_key, validator));
+            lookup_map.push((choice_key, Arc::new(validator)));
         }
 
         let lookup = LiteralLookup::new(py, lookup_map.into_iter())?;

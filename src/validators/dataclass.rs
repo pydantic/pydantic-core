@@ -18,7 +18,7 @@ use super::arguments::{json_get, json_slice, py_get, py_slice};
 use super::model::{create_class, force_setattr, Revalidate};
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Field {
     kw_only: bool,
     name: String,
@@ -29,7 +29,7 @@ struct Field {
     frozen: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DataclassArgsValidator {
     fields: Vec<Field>,
     positional_count: usize,
@@ -383,7 +383,7 @@ impl Validator for DataclassArgsValidator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DataclassValidator {
     strict: bool,
     validator: Box<CombinedValidator>,

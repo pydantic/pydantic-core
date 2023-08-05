@@ -15,7 +15,7 @@ use super::any::AnyValidator;
 use super::list::length_check;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DictValidator {
     strict: bool,
     key_validator: Box<CombinedValidator>,

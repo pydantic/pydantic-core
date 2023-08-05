@@ -32,10 +32,19 @@ pub struct Definitions<T>(AHashMap<Arc<String>, Definition<T>>);
 struct Definition<T>(Arc<OnceLock<T>>);
 
 /// Reference to a definition.
-#[derive(Clone)]
 pub struct DefinitionRef<T> {
     name: Arc<String>,
     value: Definition<T>,
+}
+
+// DefinitionRef can always be cloned (#[derive(Clone)] would require T: Clone)
+impl<T> Clone for DefinitionRef<T> {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            value: self.value.clone(),
+        }
+    }
 }
 
 impl<T> DefinitionRef<T> {
@@ -106,7 +115,7 @@ pub struct DefinitionsBuilder<T> {
     definitions: Definitions<T>,
 }
 
-impl<T: Clone + std::fmt::Debug> DefinitionsBuilder<T> {
+impl<T: std::fmt::Debug> DefinitionsBuilder<T> {
     pub fn new() -> Self {
         Self {
             definitions: Definitions(AHashMap::new()),

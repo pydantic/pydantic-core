@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::Arc;
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -12,9 +13,9 @@ use crate::ValidationError;
 use super::list::get_items_schema;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, InputType, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct GeneratorValidator {
-    item_validator: Option<Box<CombinedValidator>>,
+    item_validator: Option<Arc<CombinedValidator>>,
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: String,
@@ -38,7 +39,7 @@ impl BuildValidator for GeneratorValidator {
             .get_as(pyo3::intern!(schema.py(), "hide_input_in_errors"))?
             .unwrap_or(false);
         Ok(Self {
-            item_validator,
+            item_validator: item_validator.map(Arc::from),
             name,
             min_length: schema.get_as(pyo3::intern!(schema.py(), "min_length"))?,
             max_length: schema.get_as(pyo3::intern!(schema.py(), "max_length"))?,
@@ -63,7 +64,7 @@ impl Validator for GeneratorValidator {
             InternalValidator::new(
                 py,
                 "ValidatorIterator",
-                v,
+                v.clone(),
                 extra,
                 recursion_guard,
                 self.hide_input_in_errors,
@@ -199,8 +200,8 @@ impl ValidatorIterator {
 /// mid-validation
 #[derive(Clone)]
 pub struct InternalValidator {
-    name: String,
-    validator: CombinedValidator,
+    name: &'static str,
+    validator: Arc<CombinedValidator>,
     // TODO, do we need data?
     data: Option<Py<PyDict>>,
     strict: Option<bool>,
@@ -221,15 +222,15 @@ impl fmt::Debug for InternalValidator {
 impl InternalValidator {
     pub fn new(
         py: Python,
-        name: &str,
-        validator: &CombinedValidator,
+        name: &'static str,
+        validator: Arc<CombinedValidator>,
         extra: &Extra,
         recursion_guard: &RecursionGuard,
         hide_input_in_errors: bool,
     ) -> Self {
         Self {
-            name: name.to_string(),
-            validator: validator.clone(),
+            name,
+            validator,
             data: extra.data.map(|d| d.into_py(py)),
             strict: extra.strict,
             from_attributes: extra.from_attributes,
