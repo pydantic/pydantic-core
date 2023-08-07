@@ -22,7 +22,7 @@ use super::datetime::{
 };
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
-    py_string_str, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments,
+    py_string_str, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, Exactness, GenericArguments,
     GenericIterable, GenericIterator, GenericMapping, Input, JsonInput, PyArgs,
 };
 
@@ -206,14 +206,6 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn exact_int(&'a self) -> ValResult<EitherInt<'a>> {
-        if PyInt::is_exact_type_of(self) {
-            Ok(EitherInt::Py(self))
-        } else {
-            Err(ValError::new(ErrorType::IntType, self))
-        }
-    }
-
     fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
         if let Ok(py_str) = <PyString as PyTryFrom>::try_from_exact(self) {
             Ok(py_str.into())
@@ -286,30 +278,23 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_int(&'a self) -> ValResult<EitherInt<'a>> {
+    fn validate_int(&'a self) -> Option<(ValResult<EitherInt<'a>>, Exactness)> {
         if PyInt::is_exact_type_of(self) {
-            Ok(EitherInt::Py(self))
+            Some((Ok(EitherInt::Py(self)), Exactness::Exact))
         } else if PyInt::is_type_of(self) {
             // bools are a subclass of int, so check for bool type in this specific case
-            if PyBool::is_exact_type_of(self) {
-                Err(ValError::new(ErrorType::IntType, self))
+            let exactness = if PyBool::is_exact_type_of(self) {
+                Exactness::Lax
             } else {
-                Ok(EitherInt::Py(self))
-            }
-        } else {
-            Err(ValError::new(ErrorType::IntType, self))
-        }
-    }
-
-    fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
-        if PyInt::is_exact_type_of(self) {
-            Ok(EitherInt::Py(self))
-        } else if let Some(cow_str) = maybe_as_string(self, ErrorType::IntParsing)? {
-            str_as_int(self, &cow_str)
+                Exactness::Strict
+            };
+            Some((Ok(EitherInt::Py(self)), exactness))
+        } else if let Some(maybe_cow_str) = maybe_as_string_2(self, ErrorType::IntParsing) {
+            Some((maybe_cow_str.and_then(|s| str_as_int(self, &s)), Exactness::Lax))
         } else if let Ok(float) = self.extract::<f64>() {
-            float_as_int(self, float)
+            Some((float_as_int(self, float), Exactness::Lax))
         } else {
-            Err(ValError::new(ErrorType::IntType, self))
+            None
         }
     }
 
@@ -679,6 +664,20 @@ fn maybe_as_string(v: &PyAny, unicode_error: ErrorType) -> ValResult<Option<Cow<
         }
     } else {
         Ok(None)
+    }
+}
+
+/// Utility for extracting a string from a PyAny, if possible.
+fn maybe_as_string_2(v: &PyAny, unicode_error: ErrorType) -> Option<ValResult<Cow<str>>> {
+    if let Ok(py_string) = v.downcast::<PyString>() {
+        Some(py_string_str(py_string).map(Cow::Borrowed))
+    } else if let Ok(bytes) = v.downcast::<PyBytes>() {
+        match from_utf8(bytes.as_bytes()) {
+            Ok(s) => Some(Ok(Cow::Owned(s.to_string()))),
+            Err(_) => Some(Err(ValError::new(unicode_error, v))),
+        }
+    } else {
+        None
     }
 }
 

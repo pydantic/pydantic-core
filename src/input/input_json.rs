@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use num_bigint::BigInt;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use speedate::MicrosecondsPrecisionOverflowBehavior;
@@ -14,7 +15,7 @@ use super::datetime::{
 use super::parse_json::JsonArray;
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_int};
 use super::{
-    EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable,
+    EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, Exactness, GenericArguments, GenericIterable,
     GenericIterator, GenericMapping, Input, JsonArgs, JsonInput,
 };
 
@@ -118,26 +119,15 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
-    fn strict_int(&'a self) -> ValResult<EitherInt<'a>> {
+    fn validate_int(&'a self) -> Option<(ValResult<EitherInt<'a>>, Exactness)> {
         match self {
-            JsonInput::Int(i) => Ok(EitherInt::I64(*i)),
-            JsonInput::Uint(u) => Ok(EitherInt::U64(*u)),
-            JsonInput::BigInt(b) => Ok(EitherInt::BigInt(b.clone())),
-            _ => Err(ValError::new(ErrorType::IntType, self)),
-        }
-    }
-    fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
-        match self {
-            JsonInput::Bool(b) => match *b {
-                true => Ok(EitherInt::I64(1)),
-                false => Ok(EitherInt::I64(0)),
-            },
-            JsonInput::Int(i) => Ok(EitherInt::I64(*i)),
-            JsonInput::Uint(u) => Ok(EitherInt::U64(*u)),
-            JsonInput::BigInt(b) => Ok(EitherInt::BigInt(b.clone())),
-            JsonInput::Float(f) => float_as_int(self, *f),
-            JsonInput::String(str) => str_as_int(self, str),
-            _ => Err(ValError::new(ErrorType::IntType, self)),
+            JsonInput::Bool(b) => Some((Ok(EitherInt::I64((*b).into())), Exactness::Lax)),
+            JsonInput::Int(i) => Some((Ok(EitherInt::I64(*i)), Exactness::Exact)),
+            JsonInput::Uint(u) => Some((Ok(EitherInt::U64(*u)), Exactness::Exact)),
+            JsonInput::BigInt(b) => Some((Ok(EitherInt::BigInt(b.clone())), Exactness::Exact)),
+            JsonInput::Float(f) => Some((float_as_int(self, *f), Exactness::Lax)),
+            JsonInput::String(str) => Some((str_as_int(self, str), Exactness::Lax)),
+            _ => None,
         }
     }
 
@@ -392,13 +382,13 @@ impl<'a> Input<'a> for String {
         str_as_bool(self, self)
     }
 
-    fn strict_int(&'a self) -> ValResult<EitherInt<'a>> {
-        Err(ValError::new(ErrorType::IntType, self))
-    }
-    fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
-        match self.parse() {
-            Ok(i) => Ok(EitherInt::I64(i)),
-            Err(_) => Err(ValError::new(ErrorType::IntParsing, self)),
+    fn validate_int(&'a self) -> Option<(ValResult<EitherInt<'a>>, Exactness)> {
+        if let Ok(i) = self.parse::<i64>() {
+            Some((Ok(EitherInt::I64(i)), Exactness::Lax))
+        } else if let Ok(big_int) = self.parse::<BigInt>() {
+            Some((Ok(EitherInt::BigInt(big_int)), Exactness::Lax))
+        } else {
+            None
         }
     }
 

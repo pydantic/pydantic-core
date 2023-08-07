@@ -8,7 +8,7 @@ use crate::{PyMultiHostUrl, PyUrl};
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
 use super::return_enums::{EitherBytes, EitherInt, EitherString};
-use super::{EitherFloat, GenericArguments, GenericIterable, GenericIterator, GenericMapping, JsonInput};
+use super::{EitherFloat, Exactness, GenericArguments, GenericIterable, GenericIterator, GenericMapping, JsonInput};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InputType {
@@ -111,24 +111,7 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         self.strict_bool()
     }
 
-    fn validate_int(&'a self, strict: bool) -> ValResult<EitherInt<'a>> {
-        if strict {
-            self.strict_int()
-        } else {
-            self.lax_int()
-        }
-    }
-    fn strict_int(&'a self) -> ValResult<EitherInt<'a>>;
-    #[cfg_attr(has_no_coverage, no_coverage)]
-    fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
-        self.strict_int()
-    }
-
-    /// Extract an EitherInt from the input, only allowing exact
-    /// matches for an Int (no subclasses)
-    fn exact_int(&'a self) -> ValResult<EitherInt<'a>> {
-        self.strict_int()
-    }
+    fn validate_int(&'a self) -> Option<(ValResult<EitherInt<'a>>, Exactness)>;
 
     /// Extract a String from the input, only allowing exact
     /// matches for a String (no subclasses)

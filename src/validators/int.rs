@@ -5,6 +5,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::is_strict;
 use crate::errors::{ErrorType, ValError, ValResult};
+use crate::input::Exactness;
 use crate::input::{Input, Int};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
@@ -52,7 +53,12 @@ impl Validator for IntValidator {
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        Ok(input.validate_int(extra.strict.unwrap_or(self.strict))?.into_py(py))
+        let strict = extra.strict.unwrap_or(self.strict);
+        let Some((parse_result, exactness)) = input.validate_int() else { return Err(ValError::new(ErrorType::IntType, input)) };
+        if strict && matches!(exactness, Exactness::Lax) {
+            return Err(ValError::new(ErrorType::IntType, input));
+        }
+        Ok(parse_result?.into_py(py))
     }
 
     fn different_strict_behavior(
@@ -93,7 +99,12 @@ impl Validator for ConstrainedIntValidator {
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let either_int = input.validate_int(extra.strict.unwrap_or(self.strict))?;
+        let strict = extra.strict.unwrap_or(self.strict);
+        let Some((parse_result, exactness)) = input.validate_int() else { return Err(ValError::new(ErrorType::IntType, input)) };
+        if strict && matches!(exactness, Exactness::Lax) {
+            return Err(ValError::new(ErrorType::IntType, input));
+        }
+        let either_int = parse_result?;
         let int_value = either_int.as_int()?;
 
         if let Some(ref multiple_of) = self.multiple_of {

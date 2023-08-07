@@ -739,6 +739,13 @@ impl<'a> From<JsonArgs<'a>> for GenericArguments<'a> {
     }
 }
 
+#[derive(Copy, Clone)]
+pub enum Exactness {
+    Lax,
+    Strict,
+    Exact,
+}
+
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub enum EitherString<'a> {
     Cow(Cow<'a, str>),

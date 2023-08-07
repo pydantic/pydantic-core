@@ -9,7 +9,7 @@ use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type};
 use crate::errors::{ErrorType, ValError, ValResult};
-use crate::input::Input;
+use crate::input::{Exactness, Input};
 use crate::py_gc::PyGcTraverse;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
@@ -56,7 +56,7 @@ impl<T: Clone + Debug> LiteralLookup<T> {
                     expected_bool.false_id = Some(id);
                 }
             }
-            if let Ok(either_int) = k.exact_int() {
+            if let Some((Ok(either_int), Exactness::Exact)) = k.validate_int() {
                 let int = either_int
                     .into_i64(py)
                     .map_err(|_| py_schema_error_type!("error extracting int {:?}", k))?;
@@ -109,7 +109,7 @@ impl<T: Clone + Debug> LiteralLookup<T> {
             }
         }
         if let Some(expected_ints) = &self.expected_int {
-            if let Ok(either_int) = input.exact_int() {
+            if let Some((Ok(either_int), Exactness::Exact)) = input.validate_int() {
                 let int = either_int.into_i64(py)?;
                 if let Some(id) = expected_ints.get(&int) {
                     return Ok(Some((input, &self.values[*id])));
