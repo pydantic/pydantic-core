@@ -524,6 +524,11 @@ impl TzInfo {
         None
     }
 
+    fn fromutc<'p>(&self, py: Python<'p>, dt: &'p PyDateTime) -> PyResult<&'p PyDateTime> {
+        dt.call_method1("__add__", (self.utcoffset(py, py.None().as_ref(py))?,))?
+            .extract()
+    }
+
     fn __repr__(&self) -> String {
         format!("TzInfo({})", self.__str__())
     }

@@ -1,6 +1,7 @@
 import copy
 import pickle
 import re
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from typing_extensions import get_args
@@ -204,3 +205,22 @@ def test_unicode_error_input_repr() -> None:
     actual = repr(exc_info.value).split('For further information visit ')[0].strip()
 
     assert expected == actual
+
+
+def test_tzinfo_could_be_reused():
+    class Model:
+        value: datetime
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model, core_schema.model_fields_schema({'value': core_schema.model_field(core_schema.datetime_schema())})
+        )
+    )
+
+    m = v.validate_python({'value': '2015-10-21T15:28:00.000000+01:00'})
+
+    target = datetime(1955, 11, 12, 14, 38, tzinfo=m.value.tzinfo)
+    assert target == datetime(1955, 11, 12, 14, 38, tzinfo=timezone(timedelta(hours=1)))
+
+    now = datetime.now(tz=m.value.tzinfo)
+    assert isinstance(now, datetime)
