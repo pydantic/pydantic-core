@@ -1,6 +1,7 @@
 import json
 from enum import IntEnum
 
+import numpy
 import pytest
 
 from pydantic_core import SchemaSerializer, core_schema
@@ -37,6 +38,7 @@ _BIG_NUMBER_BYTES = b'1' + (b'0' * 40)
         ('int', IntSubClass(42), IntSubClass(42), b'42'),
         ('int', MyIntEnum.one, MyIntEnum.one, b'1'),
         ('float', FloatSubClass(42), FloatSubClass(42), b'42.0'),
+        ('float', numpy.float64(1.0), numpy.float64(1.0), b'1.0'),
     ],
 )
 def test_simple_serializers(schema_type, value, expected_python, expected_json, custom_type_schema):

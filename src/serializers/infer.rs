@@ -531,7 +531,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 let msg = format!(
                     "{}Unable to serialize unknown type: {}",
                     SERIALIZATION_ERR_MARKER,
-                    safe_repr(value)
+                    safe_repr(value.get_type()),
                 );
                 return Err(S::Error::custom(msg));
             }
@@ -542,7 +542,10 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
 }
 
 fn unknown_type_error(value: &PyAny) -> PyErr {
-    PydanticSerializationError::new_err(format!("Unable to serialize unknown type: {}", safe_repr(value)))
+    PydanticSerializationError::new_err(format!(
+        "Unable to serialize unknown type: {}",
+        safe_repr(value.get_type())
+    ))
 }
 
 fn serialize_unknown(value: &PyAny) -> Cow<str> {

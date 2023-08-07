@@ -9,6 +9,7 @@ from enum import Enum
 from pathlib import Path
 from typing import ClassVar
 
+import numpy
 import pytest
 from dirty_equals import HasRepr, IsList
 
@@ -301,10 +302,10 @@ def test_unknown_type(any_serializer: SchemaSerializer):
     f = Foobar()
     assert any_serializer.to_python(f) == f
 
-    with pytest.raises(PydanticSerializationError, match='Unable to serialize unknown type: <Foobar repr>'):
+    with pytest.raises(PydanticSerializationError, match="Unable to serialize unknown type: <class '.+Foobar'>"):
         any_serializer.to_python(f, mode='json')
 
-    with pytest.raises(PydanticSerializationError, match='Unable to serialize unknown type: <Foobar repr>'):
+    with pytest.raises(PydanticSerializationError, match="Unable to serialize unknown type: <class '.+Foobar'>"):
         any_serializer.to_json(f)
 
 
@@ -574,3 +575,17 @@ def test_slots_mixed(any_serializer):
 
     assert any_serializer.to_python(dc) == {'x': 1, 'x2': 2}
     assert any_serializer.to_json(dc) == b'{"x":1,"x2":2}'
+
+
+def test_numpy_float(any_serializer):
+    assert any_serializer.to_python(numpy.float64(1.0)) == 1.0
+    assert any_serializer.to_python(numpy.float64(1.0), mode='json') == 1.0
+    assert any_serializer.to_json(numpy.float64(1.0)) == b'1.0'
+
+    # float16 is not a subclass of float
+    assert not isinstance(numpy.float16(1.0), float)
+    assert any_serializer.to_python(numpy.float16(1.0)) == 1.0
+    with pytest.raises(PydanticSerializationError, match=r"Unable to serialize unknown type: <class 'numpy\.float16'>"):
+        any_serializer.to_python(numpy.float16(1.0), mode='json')
+    with pytest.raises(PydanticSerializationError, match=r"Unable to serialize unknown type: <class 'numpy\.float16'>"):
+        any_serializer.to_json(numpy.float16(1.0))
