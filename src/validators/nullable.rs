@@ -7,6 +7,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -40,9 +41,9 @@ impl Validator for NullableValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         match input.is_none() {
-            true => Ok(py.None()),
+            true => Ok(Validation::exact(py.None())),
             false => self.validator.validate(py, input, extra, definitions, recursion_guard),
         }
     }

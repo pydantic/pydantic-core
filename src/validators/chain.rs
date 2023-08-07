@@ -8,6 +8,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -77,14 +78,18 @@ impl Validator for ChainValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let mut steps_iter = self.steps.iter();
         let first_step = steps_iter.next().unwrap();
-        let value = first_step.validate(py, input, extra, definitions, recursion_guard)?;
+        let Validation { value, mut exactness } =
+            first_step.validate(py, input, extra, definitions, recursion_guard)?;
 
-        steps_iter.try_fold(value, |v, step| {
-            step.validate(py, v.into_ref(py), extra, definitions, recursion_guard)
-        })
+        steps_iter
+            .try_fold(value, |v, step| {
+                step.validate(py, v.into_ref(py), extra, definitions, recursion_guard)
+                    .map(|v| v.unpack(&mut exactness))
+            })
+            .map(|v| Validation::new(v, exactness))
     }
 
     fn different_strict_behavior(

@@ -8,6 +8,7 @@ use ahash::AHashSet;
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config_same, ExtraBehavior};
 use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
+use crate::input::Exactness;
 use crate::input::{
     AttributesGenericIterator, DictGenericIterator, GenericMapping, Input, JsonObjectGenericIterator,
     MappingGenericIterator,
@@ -16,6 +17,7 @@ use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -122,7 +124,8 @@ impl Validator for ModelFieldsValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let mut exactness = Exactness::Exact;
         let strict = extra.strict.unwrap_or(self.strict);
         let from_attributes = extra.from_attributes.unwrap_or(self.from_attributes);
 
@@ -192,7 +195,7 @@ impl Validator for ModelFieldsValidator {
                             .validate(py, value, &extra, definitions, recursion_guard)
                         {
                             Ok(value) => {
-                                model_dict.set_item(&field.name_py, value)?;
+                                model_dict.set_item(&field.name_py, value.unpack(&mut exactness))?;
                                 fields_set_vec.push(field.name_py.clone_ref(py));
                             }
                             Err(ValError::Omit) => continue,
@@ -252,7 +255,7 @@ impl Validator for ModelFieldsValidator {
                                 if let Some(ref validator) = self.extra_validator {
                                     match validator.validate(py, value, &extra, definitions, recursion_guard) {
                                         Ok(value) => {
-                                            model_extra_dict.set_item(py_key, value)?;
+                                            model_extra_dict.set_item(py_key, value.unpack(&mut exactness))?;
                                             fields_set_vec.push(py_key.into_py(py));
                                         }
                                         Err(ValError::LineErrors(line_errors)) => {
@@ -293,7 +296,10 @@ impl Validator for ModelFieldsValidator {
                 model_extra_dict_op = Some(PyDict::new(py));
             };
 
-            Ok((model_dict, model_extra_dict_op, fields_set).to_object(py))
+            Ok(Validation::new(
+                (model_dict, model_extra_dict_op, fields_set).to_object(py),
+                exactness,
+            ))
         }
     }
 
@@ -314,8 +320,8 @@ impl Validator for ModelFieldsValidator {
             Ok(dict)
         };
 
-        let prepare_result = |result: ValResult<'data, PyObject>| match result {
-            Ok(output) => get_updated_dict(output),
+        let prepare_result = |result: ValResult<'data, Validation<PyObject>>| match result {
+            Ok(output) => get_updated_dict(output.value),
             Err(ValError::LineErrors(line_errors)) => {
                 let errors = line_errors
                     .into_iter()

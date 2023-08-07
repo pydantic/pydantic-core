@@ -8,7 +8,7 @@ use crate::tools::SchemaDict;
 
 use super::list::min_length_check;
 use super::set::set_build;
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validation, Validator};
 
 #[derive(Debug, Clone)]
 pub struct FrozenSetValidator {
@@ -34,8 +34,9 @@ impl Validator for FrozenSetValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let collection = input.validate_frozenset(extra.strict.unwrap_or(self.strict))?;
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let collection = input.validate_frozenset(strict)?;
         let f_set = PyFrozenSet::empty(py)?;
         collection.validate_to_set(
             py,
@@ -49,7 +50,7 @@ impl Validator for FrozenSetValidator {
             recursion_guard,
         )?;
         min_length_check!(input, "Frozenset", self.min_length, f_set);
-        Ok(f_set.into_py(py))
+        Ok(Validation::maybe_strict(f_set.into_py(py), strict))
     }
 
     fn different_strict_behavior(

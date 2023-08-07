@@ -11,7 +11,7 @@ use pyo3::{intern, PyTraverseError, PyVisit};
 use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::errors::{ErrorMode, LocItem, ValError, ValResult, ValidationError};
-use crate::input::{Input, InputType};
+use crate::input::{Exactness, Input, InputType};
 use crate::py_gc::PyGcTraverse;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
@@ -298,13 +298,15 @@ impl SchemaValidator {
     where
         's: 'data,
     {
-        self.validator.validate(
-            py,
-            input,
-            &Extra::new(strict, from_attributes, context, self_instance, mode),
-            &self.definitions,
-            &mut RecursionGuard::default(),
-        )
+        self.validator
+            .validate(
+                py,
+                input,
+                &Extra::new(strict, from_attributes, context, self_instance, mode),
+                &self.definitions,
+                &mut RecursionGuard::default(),
+            )
+            .map(|validation| validation.value)
     }
 
     fn prepare_validation_err(&self, py: Python, error: ValError, error_mode: ErrorMode) -> PyErr {
@@ -344,7 +346,7 @@ impl<'py> SelfValidator<'py> {
             &self.validator.definitions,
             &mut RecursionGuard::default(),
         ) {
-            Ok(schema_obj) => Ok(schema_obj.into_ref(py)),
+            Ok(schema_obj) => Ok(schema_obj.value.into_ref(py)),
             Err(e) => Err(SchemaError::from_val_error(py, e)),
         }
     }
@@ -570,6 +572,58 @@ impl<'a> Extra<'a> {
     }
 }
 
+pub struct Validation<T> {
+    pub value: T,
+    pub exactness: Exactness,
+}
+
+impl<T> Validation<T> {
+    pub const fn new(value: T, exactness: Exactness) -> Self {
+        Self { value, exactness }
+    }
+
+    pub const fn exact(value: T) -> Self {
+        Self {
+            value,
+            exactness: Exactness::Exact,
+        }
+    }
+
+    pub const fn strict(value: T) -> Self {
+        Self {
+            value,
+            exactness: Exactness::Strict,
+        }
+    }
+
+    pub const fn lax(value: T) -> Self {
+        Self {
+            value,
+            exactness: Exactness::Lax,
+        }
+    }
+
+    pub const fn maybe_strict(value: T, strict: bool) -> Self {
+        Self {
+            value,
+            exactness: if strict { Exactness::Strict } else { Exactness::Lax },
+        }
+    }
+
+    /// Merges the exactness of this validation with some external strictness
+    pub fn merge_least_strict(mut self, exactness: Exactness) -> Self {
+        self.exactness = self.exactness.merge_least_strict(exactness);
+        self
+    }
+
+    /// Unpacks this validation into the inner value, updating an Exactness with the
+    /// least strict of the two Exactness values.
+    pub fn unpack(self, exactness: &mut Exactness) -> T {
+        *exactness = exactness.merge_least_strict(self.exactness);
+        self.value
+    }
+}
+
 #[derive(Debug, Clone)]
 #[enum_dispatch(PyGcTraverse)]
 pub enum CombinedValidator {
@@ -673,7 +727,7 @@ pub trait Validator: Send + Sync + Clone + Debug {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject>;
+    ) -> ValResult<'data, Validation<PyObject>>;
 
     /// Get a default value, currently only used by `WithDefaultValidator`
     fn default_value<'s, 'data>(

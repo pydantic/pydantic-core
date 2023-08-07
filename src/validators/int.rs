@@ -10,6 +10,7 @@ use crate::input::{Input, Int};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -52,13 +53,13 @@ impl Validator for IntValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let strict = extra.strict.unwrap_or(self.strict);
         let Some((parse_result, exactness)) = input.validate_int() else { return Err(ValError::new(ErrorType::IntType, input)) };
         if strict && matches!(exactness, Exactness::Lax) {
             return Err(ValError::new(ErrorType::IntType, input));
         }
-        Ok(parse_result?.into_py(py))
+        Ok(Validation::new(parse_result?.into_py(py), exactness))
     }
 
     fn different_strict_behavior(
@@ -98,7 +99,7 @@ impl Validator for ConstrainedIntValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let strict = extra.strict.unwrap_or(self.strict);
         let Some((parse_result, exactness)) = input.validate_int() else { return Err(ValError::new(ErrorType::IntType, input)) };
         if strict && matches!(exactness, Exactness::Lax) {
@@ -140,7 +141,7 @@ impl Validator for ConstrainedIntValidator {
                 return Err(ValError::new(ErrorType::GreaterThan { gt: gt.clone().into() }, input));
             }
         }
-        Ok(either_int.into_py(py))
+        Ok(Validation::new(either_int.into_py(py), exactness))
     }
 
     fn different_strict_behavior(

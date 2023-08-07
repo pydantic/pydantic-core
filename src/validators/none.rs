@@ -5,7 +5,7 @@ use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validation, Validator};
 
 #[derive(Debug, Clone)]
 pub struct NoneValidator;
@@ -32,9 +32,9 @@ impl Validator for NoneValidator {
         _extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         match input.is_none() {
-            true => Ok(py.None()),
+            true => Ok(Validation::exact(py.None())),
             false => Err(ValError::new(ErrorType::NoneRequired, input)),
         }
     }

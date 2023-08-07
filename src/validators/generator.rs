@@ -10,7 +10,9 @@ use crate::tools::SchemaDict;
 use crate::ValidationError;
 
 use super::list::get_items_schema;
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, InputType, Validator};
+use super::{
+    BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, InputType, Validation, Validator,
+};
 
 #[derive(Debug, Clone)]
 pub struct GeneratorValidator {
@@ -58,7 +60,7 @@ impl Validator for GeneratorValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let iterator = input.validate_iter()?;
         let validator = self.item_validator.as_ref().map(|v| {
             InternalValidator::new(
@@ -79,7 +81,10 @@ impl Validator for GeneratorValidator {
             max_length: self.max_length,
             hide_input_in_errors: self.hide_input_in_errors,
         };
-        Ok(v_iterator.into_py(py))
+        Ok(Validation::maybe_strict(
+            v_iterator.into_py(py),
+            extra.strict.unwrap_or(false),
+        ))
     }
 
     fn different_strict_behavior(
@@ -154,7 +159,9 @@ impl ValidatorIterator {
                                     ));
                                 }
                             }
-                            validator.validate(py, next, Some(index.into())).map(Some)
+                            validator
+                                .validate(py, next, Some(index.into()))
+                                .map(|validation| Some(validation.value))
                         }
                         None => Ok(Some(next.to_object(py))),
                     },
@@ -301,7 +308,7 @@ impl InternalValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         outer_location: Option<LocItem>,
-    ) -> PyResult<PyObject>
+    ) -> PyResult<Validation<PyObject>>
     where
         's: 'data,
     {

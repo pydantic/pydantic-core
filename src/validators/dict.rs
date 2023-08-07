@@ -4,6 +4,7 @@ use pyo3::types::{PyDict, PyMapping};
 
 use crate::build_tools::is_strict;
 use crate::errors::{ValError, ValLineError, ValResult};
+use crate::input::Exactness;
 use crate::input::{
     DictGenericIterator, GenericMapping, Input, JsonObject, JsonObjectGenericIterator, MappingGenericIterator,
 };
@@ -13,6 +14,7 @@ use crate::tools::SchemaDict;
 
 use super::any::AnyValidator;
 use super::list::length_check;
+use super::Validation;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -73,8 +75,10 @@ impl Validator for DictValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let dict = input.validate_dict(extra.strict.unwrap_or(self.strict))?;
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let exactness = Exactness::from_strictness(strict);
+        let dict = input.validate_dict(strict)?;
         match dict {
             GenericMapping::PyDict(py_dict) => {
                 self.validate_dict(py, input, py_dict, extra, definitions, recursion_guard)
@@ -87,6 +91,7 @@ impl Validator for DictValidator {
                 self.validate_json_object(py, input, json_object, extra, definitions, recursion_guard)
             }
         }
+        .map(|v| v.merge_least_strict(exactness))
     }
 
     fn different_strict_behavior(
@@ -122,7 +127,8 @@ macro_rules! build_validate {
             extra: &Extra,
             definitions: &'data Definitions<CombinedValidator>,
             recursion_guard: &'s mut RecursionGuard,
-        ) -> ValResult<'data, PyObject> {
+        ) -> ValResult<'data, Validation<PyObject>> {
+            let mut exactness = Exactness::Exact;
             let output = PyDict::new(py);
             let mut errors: Vec<ValLineError> = Vec::new();
 
@@ -131,7 +137,7 @@ macro_rules! build_validate {
             for item_result in <$iter>::new(dict)? {
                 let (key, value) = item_result?;
                 let output_key = match key_validator.validate(py, key, extra, definitions, recursion_guard) {
-                    Ok(value) => Some(value),
+                    Ok(value) => Some(value.unpack(&mut exactness)),
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {
                             // these are added in reverse order so [key] is shunted along by the second call
@@ -146,7 +152,7 @@ macro_rules! build_validate {
                     Err(err) => return Err(err),
                 };
                 let output_value = match value_validator.validate(py, value, extra, definitions, recursion_guard) {
-                    Ok(value) => Some(value),
+                    Ok(value) => Some(value.unpack(&mut exactness)),
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {
                             errors.push(err.with_outer_location(key.as_loc_item()));
@@ -163,7 +169,7 @@ macro_rules! build_validate {
 
             if errors.is_empty() {
                 length_check!(input, "Dictionary", self.min_length, self.max_length, output);
-                Ok(output.into())
+                Ok(Validation::new(output.into(), exactness))
             } else {
                 Err(ValError::LineErrors(errors))
             }

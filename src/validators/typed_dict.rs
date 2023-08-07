@@ -7,6 +7,7 @@ use ahash::AHashSet;
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config, schema_or_config_same, ExtraBehavior};
 use crate::errors::{py_err_string, ErrorType, ValError, ValLineError, ValResult};
+use crate::input::Exactness;
 use crate::input::{
     AttributesGenericIterator, DictGenericIterator, GenericMapping, Input, JsonObjectGenericIterator,
     MappingGenericIterator,
@@ -15,6 +16,7 @@ use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -147,7 +149,8 @@ impl Validator for TypedDictValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let mut exactness = Exactness::Exact;
         let strict = extra.strict.unwrap_or(self.strict);
         let dict = input.validate_dict(strict)?;
 
@@ -193,7 +196,7 @@ impl Validator for TypedDictValidator {
                             .validate(py, value, &extra, definitions, recursion_guard)
                         {
                             Ok(value) => {
-                                output_dict.set_item(&field.name_py, value)?;
+                                output_dict.set_item(&field.name_py, value.unpack(&mut exactness))?;
                             }
                             Err(ValError::Omit) => continue,
                             Err(ValError::LineErrors(line_errors)) => {
@@ -236,6 +239,8 @@ impl Validator for TypedDictValidator {
                             continue;
                         }
 
+                        exactness = exactness.at_most_strict();
+
                         // Unknown / extra field
                         match self.extra_behavior {
                             ExtraBehavior::Forbid => {
@@ -251,7 +256,7 @@ impl Validator for TypedDictValidator {
                                 if let Some(ref validator) = self.extra_validator {
                                     match validator.validate(py, value, &extra, definitions, recursion_guard) {
                                         Ok(value) => {
-                                            output_dict.set_item(py_key, value)?;
+                                            output_dict.set_item(py_key, value.unpack(&mut exactness))?;
                                         }
                                         Err(ValError::LineErrors(line_errors)) => {
                                             for err in line_errors {
@@ -279,7 +284,7 @@ impl Validator for TypedDictValidator {
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
         } else {
-            Ok(output_dict.to_object(py))
+            Ok(Validation::new(output_dict.to_object(py), exactness))
         }
     }
 

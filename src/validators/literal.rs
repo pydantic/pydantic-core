@@ -14,7 +14,7 @@ use crate::py_gc::PyGcTraverse;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validation, Validator};
 
 #[derive(Debug, Clone)]
 struct BoolLiteral {
@@ -188,9 +188,9 @@ impl Validator for LiteralValidator {
         _extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         match self.lookup.validate(py, input)? {
-            Some((_, v)) => Ok(v.clone()),
+            Some((_, v)) => Ok(Validation::strict(v.clone())),
             None => Err(ValError::new(
                 ErrorType::LiteralError {
                     expected: self.expected_repr.clone(),

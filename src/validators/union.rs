@@ -15,7 +15,9 @@ use crate::tools::SchemaDict;
 
 use super::custom_error::CustomError;
 use super::literal::LiteralLookup;
-use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{
+    build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validation, Validator,
+};
 
 #[derive(Debug, Clone)]
 pub struct UnionValidator {
@@ -87,7 +89,7 @@ impl Validator for UnionValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         if self.ultra_strict_required {
             // do an ultra strict check first
             let ultra_strict_extra = extra.as_strict(true);
@@ -310,7 +312,7 @@ impl Validator for TaggedUnionValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         match self.discriminator {
             Discriminator::LookupKey(ref lookup_key) => {
                 macro_rules! find_validator {
@@ -431,7 +433,7 @@ impl TaggedUnionValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         if let Ok(Some((tag, validator))) = self.lookup.validate(py, tag) {
             return match validator.validate(py, input, extra, definitions, recursion_guard) {
                 Ok(res) => Ok(res),

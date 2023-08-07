@@ -12,6 +12,7 @@ use crate::tools::SchemaDict;
 
 use super::datetime::extract_microseconds_precision;
 use super::datetime::TZConstraint;
+use super::Validation;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -48,8 +49,9 @@ impl Validator for TimeValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let time = input.validate_time(extra.strict.unwrap_or(self.strict), self.microseconds_precision)?;
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let time = input.validate_time(strict, self.microseconds_precision)?;
         if let Some(constraints) = &self.constraints {
             let raw_time = time.as_raw()?;
 
@@ -77,7 +79,7 @@ impl Validator for TimeValidator {
                 tz_constraint.tz_check(raw_time.tz_offset, input)?;
             }
         }
-        Ok(time.try_into_py(py)?)
+        Ok(Validation::maybe_strict(time.try_into_py(py)?, strict))
     }
 
     fn different_strict_behavior(

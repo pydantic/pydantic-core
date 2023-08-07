@@ -9,6 +9,7 @@ use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
 use super::InputType;
+use super::Validation;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -58,7 +59,7 @@ impl Validator for JsonOrPython {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         match extra.mode {
             InputType::Python => self.python.validate(py, input, extra, definitions, recursion_guard),
             InputType::Json => self.json.validate(py, input, extra, definitions, recursion_guard),

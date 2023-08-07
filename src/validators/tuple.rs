@@ -4,11 +4,13 @@ use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::is_strict;
 use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
+use crate::input::Exactness;
 use crate::input::{GenericIterable, Input};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
 use super::list::{get_items_schema, min_length_check};
+use super::Validation;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -52,10 +54,10 @@ impl Validator for TupleVariableValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let seq = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
 
-        let output = match self.item_validator {
+        let Validation { value, exactness } = match self.item_validator {
             Some(ref v) => seq.validate_to_vec(
                 py,
                 input,
@@ -66,10 +68,10 @@ impl Validator for TupleVariableValidator {
                 definitions,
                 recursion_guard,
             )?,
-            None => seq.to_vec(py, input, "Tuple", self.max_length)?,
+            None => Validation::lax(seq.to_vec(py, input, "Tuple", self.max_length)?),
         };
-        min_length_check!(input, "Tuple", self.min_length, output);
-        Ok(PyTuple::new(py, &output).into_py(py))
+        min_length_check!(input, "Tuple", self.min_length, value);
+        Ok(Validation::new(PyTuple::new(py, &value).into_py(py), exactness))
     }
 
     fn different_strict_behavior(
@@ -153,11 +155,12 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
     collection_iter: &mut T,
     collection_len: Option<usize>,
     expected_length: usize,
-) -> ValResult<'data, ()> {
+) -> ValResult<'data, Exactness> {
+    let mut exactness = Exactness::Exact;
     for (index, validator) in items_validators.iter().enumerate() {
         match collection_iter.next() {
             Some(result) => match validator.validate(py, result?, extra, definitions, recursion_guard) {
-                Ok(item) => output.push(item),
+                Ok(item) => output.push(item.unpack(&mut exactness)),
                 Err(ValError::LineErrors(line_errors)) => {
                     errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
                 }
@@ -177,7 +180,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
         match extra_validator {
             Some(ref extra_validator) => {
                 match extra_validator.validate(py, item, extra, definitions, recursion_guard) {
-                    Ok(item) => output.push(item),
+                    Ok(item) => output.push(item.unpack(&mut exactness)),
                     Err(ValError::LineErrors(line_errors)) => {
                         errors.extend(
                             line_errors
@@ -203,7 +206,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
             }
         }
     }
-    Ok(())
+    Ok(exactness)
 }
 
 impl_py_gc_traverse!(TuplePositionalValidator {
@@ -219,7 +222,7 @@ impl Validator for TuplePositionalValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let collection = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
         let expected_length = self.items_validators.len();
         let collection_len = collection.generic_len();
@@ -246,14 +249,14 @@ impl Validator for TuplePositionalValidator {
             }};
         }
 
-        match collection {
+        let exactness = match collection {
             GenericIterable::List(collection_iter) => iter!(collection_iter.iter().map(Ok)),
             GenericIterable::Tuple(collection_iter) => iter!(collection_iter.iter().map(Ok)),
             GenericIterable::JsonArray(collection_iter) => iter!(collection_iter.iter().map(Ok)),
             other => iter!(other.as_sequence_iterator(py)?),
-        }
+        };
         if errors.is_empty() {
-            Ok(PyTuple::new(py, &output).into_py(py))
+            Ok(Validation::new(PyTuple::new(py, &output).into_py(py), exactness))
         } else {
             Err(ValError::LineErrors(errors))
         }

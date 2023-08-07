@@ -14,7 +14,8 @@ use crate::PydanticUseDefault;
 
 use super::generator::InternalValidator;
 use super::{
-    build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, InputType, Validator,
+    build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, InputType, Validation,
+    Validator,
 };
 
 struct FunctionInfo {
@@ -100,9 +101,12 @@ macro_rules! impl_validator {
                 extra: &Extra,
                 definitions: &'data Definitions<CombinedValidator>,
                 recursion_guard: &'s mut RecursionGuard,
-            ) -> ValResult<'data, PyObject> {
-                let validate =
-                    move |v: &'data PyAny, e: &Extra| self.validator.validate(py, v, e, definitions, recursion_guard);
+            ) -> ValResult<'data, Validation<PyObject>> {
+                let validate = move |v: &'data PyAny, e: &Extra| {
+                    self.validator
+                        .validate(py, v, e, definitions, recursion_guard)
+                        .map(|v| v.value)
+                };
                 self._validate(validate, py, input.to_object(py).into_ref(py), extra)
             }
             fn validate_assignment<'s, 'data: 's>(
@@ -119,7 +123,7 @@ macro_rules! impl_validator {
                     self.validator
                         .validate_assignment(py, v, field_name, field_value, e, definitions, recursion_guard)
                 };
-                self._validate(validate, py, obj, extra)
+                self._validate(validate, py, obj, extra).map(|v| v.value)
             }
 
             fn different_strict_behavior(
@@ -165,7 +169,7 @@ impl FunctionBeforeValidator {
         py: Python<'data>,
         input: &'data PyAny,
         extra: &Extra,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
             self.func.call1(py, (input.to_object(py), info))
@@ -173,7 +177,7 @@ impl FunctionBeforeValidator {
             self.func.call1(py, (input.to_object(py),))
         };
         let value = r.map_err(|e| convert_err(py, e, input))?;
-        call(value.into_ref(py), extra)
+        call(value.into_ref(py), extra).map(|value| Validation::maybe_strict(value, extra.strict.unwrap_or(false)))
     }
 }
 
@@ -198,7 +202,7 @@ impl FunctionAfterValidator {
         py: Python<'data>,
         input: &'data PyAny,
         extra: &Extra,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let v = call(input, extra)?;
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
@@ -207,6 +211,7 @@ impl FunctionAfterValidator {
             self.func.call1(py, (v.to_object(py),))
         };
         r.map_err(|e| convert_err(py, e, input))
+            .map(|value| Validation::maybe_strict(value, extra.strict.unwrap_or(false)))
     }
 }
 
@@ -258,14 +263,17 @@ impl Validator for FunctionPlainValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
             self.func.call1(py, (input.to_object(py), info))
         } else {
             self.func.call1(py, (input.to_object(py),))
         };
-        r.map_err(|e| convert_err(py, e, input))
+        match r {
+            Ok(value) => Ok(Validation::maybe_strict(value, extra.strict.unwrap_or(false))),
+            Err(e) => Err(convert_err(py, e, input)),
+        }
     }
 
     fn different_strict_behavior(
@@ -332,14 +340,17 @@ impl FunctionWrapValidator {
         py: Python<'data>,
         input: &'data PyAny,
         extra: &Extra,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, extra, &self.config, self.field_name.clone());
             self.func.call1(py, (input.to_object(py), handler, info))
         } else {
             self.func.call1(py, (input.to_object(py), handler))
         };
-        r.map_err(|e| convert_err(py, e, input))
+        match r {
+            Ok(value) => Ok(Validation::maybe_strict(value, extra.strict.unwrap_or(false))),
+            Err(e) => Err(convert_err(py, e, input)),
+        }
     }
 }
 
@@ -357,7 +368,7 @@ impl Validator for FunctionWrapValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let handler = ValidatorCallable {
             validator: InternalValidator::new(
                 py,
@@ -401,6 +412,7 @@ impl Validator for FunctionWrapValidator {
             updated_field_value: field_value.to_object(py),
         };
         self._validate(Py::new(py, handler)?.into_ref(py), py, obj, extra)
+            .map(|v| v.value)
     }
 
     fn different_strict_behavior(
@@ -440,7 +452,9 @@ impl ValidatorCallable {
             },
             None => None,
         };
-        self.validator.validate(py, input_value, outer_location)
+        self.validator
+            .validate(py, input_value, outer_location)
+            .map(|v| v.value)
     }
 
     fn __repr__(&self) -> String {

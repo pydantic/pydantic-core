@@ -7,7 +7,7 @@ use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
 use super::list::min_length_check;
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validation, Validator};
 
 #[derive(Debug, Clone)]
 pub struct SetValidator {
@@ -65,8 +65,9 @@ impl Validator for SetValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let collection = input.validate_set(extra.strict.unwrap_or(self.strict))?;
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let collection = input.validate_set(strict)?;
         let set = PySet::empty(py)?;
         collection.validate_to_set(
             py,
@@ -80,7 +81,7 @@ impl Validator for SetValidator {
             recursion_guard,
         )?;
         min_length_check!(input, "Set", self.min_length, set);
-        Ok(set.into_py(py))
+        Ok(Validation::maybe_strict(set.into_py(py), strict))
     }
 
     fn different_strict_behavior(

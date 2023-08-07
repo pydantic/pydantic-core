@@ -10,6 +10,7 @@ use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
 use super::datetime::extract_microseconds_precision;
+use super::Validation;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -74,8 +75,9 @@ impl Validator for TimeDeltaValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let timedelta = input.validate_timedelta(extra.strict.unwrap_or(self.strict), self.microseconds_precision)?;
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let timedelta = input.validate_timedelta(strict, self.microseconds_precision)?;
         let py_timedelta = timedelta.try_into_py(py)?;
         if let Some(constraints) = &self.constraints {
             let raw_timedelta = timedelta.as_raw();
@@ -103,7 +105,7 @@ impl Validator for TimeDeltaValidator {
             check_constraint!(ge, GreaterThanEqual);
             check_constraint!(gt, GreaterThan);
         }
-        Ok(py_timedelta.into())
+        Ok(Validation::maybe_strict(py_timedelta.into(), strict))
     }
 
     fn different_strict_behavior(

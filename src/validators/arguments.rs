@@ -13,6 +13,7 @@ use crate::lookup_key::LookupKey;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -168,7 +169,7 @@ impl Validator for ArgumentsValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let args = input.validate_args()?;
 
         let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_params_count);
@@ -209,7 +210,7 @@ impl Validator for ArgumentsValidator {
                                 .validator
                                 .validate(py, pos_value, extra, definitions, recursion_guard)
                             {
-                                Ok(value) => output_args.push(value),
+                                Ok(value) => output_args.push(value.value),
                                 Err(ValError::LineErrors(line_errors)) => {
                                     errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
                                 }
@@ -221,7 +222,7 @@ impl Validator for ArgumentsValidator {
                                 .validator
                                 .validate(py, kw_value, extra, definitions, recursion_guard)
                             {
-                                Ok(value) => output_kwargs.set_item(parameter.kwarg_key.as_ref().unwrap(), value)?,
+                                Ok(value) => output_kwargs.set_item(parameter.kwarg_key.as_ref().unwrap(), value.value)?,
                                 Err(ValError::LineErrors(line_errors)) => {
                                     errors.extend(line_errors.into_iter().map(|err| {
                                         lookup_path.apply_error_loc(err, self.loc_by_alias, &parameter.name)
@@ -262,7 +263,7 @@ impl Validator for ArgumentsValidator {
                         if let Some(ref validator) = self.var_args_validator {
                             for (index, item) in $slice_macro!(args, self.positional_params_count, len).iter().enumerate() {
                                 match validator.validate(py, item, extra, definitions, recursion_guard) {
-                                    Ok(value) => output_args.push(value),
+                                    Ok(value) => output_args.push(value.value),
                                     Err(ValError::LineErrors(line_errors)) => {
                                         errors.extend(
                                             line_errors
@@ -304,7 +305,7 @@ impl Validator for ArgumentsValidator {
                             if !used_kwargs.contains(either_str.as_cow()?.as_ref()) {
                                 match self.var_kwargs_validator {
                                     Some(ref validator) => match validator.validate(py, value, extra, definitions, recursion_guard) {
-                                        Ok(value) => output_kwargs.set_item(either_str.as_py_string(py), value)?,
+                                        Ok(value) => output_kwargs.set_item(either_str.as_py_string(py), value.value)?,
                                         Err(ValError::LineErrors(line_errors)) => {
                                             for err in line_errors {
                                                 errors.push(err.with_outer_location(raw_key.as_loc_item()));
@@ -333,7 +334,9 @@ impl Validator for ArgumentsValidator {
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
         } else {
-            Ok((PyTuple::new(py, output_args), output_kwargs).to_object(py))
+            Ok(Validation::lax(
+                (PyTuple::new(py, output_args), output_kwargs).to_object(py),
+            ))
         }
     }
 

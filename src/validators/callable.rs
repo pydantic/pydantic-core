@@ -6,7 +6,7 @@ use crate::input::Input;
 
 use crate::recursion_guard::RecursionGuard;
 
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validation, Validator};
 
 #[derive(Debug, Clone)]
 pub struct CallableValidator;
@@ -33,9 +33,9 @@ impl Validator for CallableValidator {
         _extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         match input.callable() {
-            true => Ok(input.to_object(py)),
+            true => Ok(Validation::lax(input.to_object(py))),
             false => Err(ValError::new(ErrorType::CallableType, input)),
         }
     }

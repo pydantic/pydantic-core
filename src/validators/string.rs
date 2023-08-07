@@ -9,6 +9,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -47,8 +48,12 @@ impl Validator for StrValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        Ok(input.validate_str(extra.strict.unwrap_or(self.strict))?.into_py(py))
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        Ok(Validation::maybe_strict(
+            input.validate_str(strict)?.into_py(py),
+            strict,
+        ))
     }
 
     fn different_strict_behavior(
@@ -90,8 +95,9 @@ impl Validator for StrConstrainedValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let either_str = input.validate_str(extra.strict.unwrap_or(self.strict))?;
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let either_str = input.validate_str(strict)?;
         let cow = either_str.as_cow()?;
         let mut str = cow.as_ref();
         if self.strip_whitespace {
@@ -135,7 +141,7 @@ impl Validator for StrConstrainedValidator {
             // we haven't modified the string, return the original as it might be a PyString
             either_str.as_py_string(py)
         };
-        Ok(py_string.into_py(py))
+        Ok(Validation::maybe_strict(py_string.into_py(py), strict))
     }
 
     fn different_strict_behavior(

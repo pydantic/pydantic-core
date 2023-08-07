@@ -14,7 +14,7 @@ use crate::input::{EitherDateTime, Input};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
-use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
+use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validation, Validator};
 
 #[derive(Debug, Clone)]
 pub struct DateTimeValidator {
@@ -66,8 +66,9 @@ impl Validator for DateTimeValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let datetime = input.validate_datetime(extra.strict.unwrap_or(self.strict), self.microseconds_precision)?;
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let datetime = input.validate_datetime(strict, self.microseconds_precision)?;
         if let Some(constraints) = &self.constraints {
             // if we get an error from as_speedate, it's probably because the input datetime was invalid
             // specifically had an invalid tzinfo, hence here we return a validation error
@@ -120,7 +121,7 @@ impl Validator for DateTimeValidator {
                 tz_constraint.tz_check(speedate_dt.time.tz_offset, input)?;
             }
         }
-        Ok(datetime.try_into_py(py)?)
+        Ok(Validation::maybe_strict(datetime.try_into_py(py)?, strict))
     }
 
     fn different_strict_behavior(

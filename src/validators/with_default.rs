@@ -5,6 +5,7 @@ use pyo3::types::PyDict;
 use pyo3::PyTraverseError;
 use pyo3::PyVisit;
 
+use super::Validation;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
@@ -134,23 +135,26 @@ impl Validator for WithDefaultValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         if input.to_object(py).is(&PydanticUndefinedType::py_undefined()) {
-            Ok(self
-                .default_value(py, None::<usize>, extra, definitions, recursion_guard)?
-                .unwrap())
+            Ok(Validation::lax(
+                self.default_value(py, None::<usize>, extra, definitions, recursion_guard)?
+                    .unwrap(),
+            ))
         } else {
             match self.validator.validate(py, input, extra, definitions, recursion_guard) {
                 Ok(v) => Ok(v),
                 Err(e) => match e {
-                    ValError::UseDefault => Ok(self
-                        .default_value(py, None::<usize>, extra, definitions, recursion_guard)?
-                        .ok_or(e)?),
+                    ValError::UseDefault => Ok(Validation::lax(
+                        self.default_value(py, None::<usize>, extra, definitions, recursion_guard)?
+                            .ok_or(e)?,
+                    )),
                     e => match self.on_error {
                         OnError::Raise => Err(e),
-                        OnError::Default => Ok(self
-                            .default_value(py, None::<usize>, extra, definitions, recursion_guard)?
-                            .ok_or(e)?),
+                        OnError::Default => Ok(Validation::lax(
+                            self.default_value(py, None::<usize>, extra, definitions, recursion_guard)?
+                                .ok_or(e)?,
+                        )),
                         OnError::Omit => Err(ValError::Omit),
                     },
                 },
@@ -176,7 +180,7 @@ impl Validator for WithDefaultValidator {
                 };
                 if self.validate_default {
                     match self.validate(py, dft.into_ref(py), extra, definitions, recursion_guard) {
-                        Ok(v) => Ok(Some(v)),
+                        Ok(v) => Ok(Some(v.value)),
                         Err(e) => {
                             if let Some(outer_loc) = outer_loc {
                                 Err(e.with_outer_location(outer_loc.into()))

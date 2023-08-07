@@ -9,6 +9,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -79,10 +80,10 @@ impl Validator for CallValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let args = self
-            .arguments_validator
-            .validate(py, input, extra, definitions, recursion_guard)?;
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let Validation { value: args, exactness } =
+            self.arguments_validator
+                .validate(py, input, extra, definitions, recursion_guard)?;
 
         let return_value = if let Ok((args, kwargs)) = args.extract::<(&PyTuple, &PyDict)>(py) {
             self.function.call(py, args, Some(kwargs))?
@@ -98,7 +99,7 @@ impl Validator for CallValidator {
                 .validate(py, return_value.into_ref(py), extra, definitions, recursion_guard)
                 .map_err(|e| e.with_outer_location("return".into()))
         } else {
-            Ok(return_value.to_object(py))
+            Ok(Validation::new(return_value.to_object(py), exactness))
         }
     }
 

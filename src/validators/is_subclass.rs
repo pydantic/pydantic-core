@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyNotImplementedError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
@@ -7,6 +8,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -51,16 +53,30 @@ impl Validator for IsSubclassValidator {
         _extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        match input.input_is_subclass(self.class.as_ref(py))? {
-            true => Ok(input.to_object(py)),
-            false => Err(ValError::new(
-                ErrorType::IsSubclassOf {
-                    class: self.class_repr.clone(),
-                },
-                input,
-            )),
+    ) -> ValResult<'data, Validation<PyObject>> {
+        if !input.is_python() {
+            return Err(ValError::InternalErr(PyNotImplementedError::new_err(
+                "Cannot check issubclass when validating from json, \
+                            use a JsonOrPython validator instead.",
+            )));
         }
+
+        let ob = input.to_object(py);
+        let ty = self.class.as_ref(py);
+        if ob.as_ref(py).is(ty) {
+            return Ok(Validation::exact(ob));
+        } else if let Ok(ob) = ob.as_ref(py).downcast::<PyType>() {
+            if ob.is_subclass(ty)? {
+                return Ok(Validation::lax(ob.to_object(py)));
+            }
+        }
+
+        Err(ValError::new(
+            ErrorType::IsSubclassOf {
+                class: self.class_repr.clone(),
+            },
+            input,
+        ))
     }
 
     fn different_strict_behavior(

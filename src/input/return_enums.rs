@@ -24,7 +24,7 @@ use serde::{ser::Error, Serialize, Serializer};
 use crate::errors::{py_err_string, ErrorType, InputValue, ValError, ValLineError, ValResult};
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::py_err;
-use crate::validators::{CombinedValidator, Extra, Validator};
+use crate::validators::{CombinedValidator, Extra, Validation, Validator};
 
 use super::parse_json::{JsonArray, JsonInput, JsonObject};
 use super::{py_error_on_minusone, Input};
@@ -158,7 +158,8 @@ fn validate_iter_to_vec<'a, 's>(
     extra: &Extra,
     definitions: &'a [CombinedValidator],
     recursion_guard: &'s mut RecursionGuard,
-) -> ValResult<'a, Vec<PyObject>> {
+) -> ValResult<'a, Validation<Vec<PyObject>>> {
+    let mut exactness = Exactness::Exact;
     let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
     for (index, item_result) in iter.enumerate() {
@@ -166,7 +167,7 @@ fn validate_iter_to_vec<'a, 's>(
         match validator.validate(py, item, extra, definitions, recursion_guard) {
             Ok(item) => {
                 max_length_check.incr()?;
-                output.push(item);
+                output.push(item.unpack(&mut exactness));
             }
             Err(ValError::LineErrors(line_errors)) => {
                 max_length_check.incr()?;
@@ -178,7 +179,7 @@ fn validate_iter_to_vec<'a, 's>(
     }
 
     if errors.is_empty() {
-        Ok(output)
+        Ok(Validation::new(output, exactness))
     } else {
         Err(ValError::LineErrors(errors))
     }
@@ -227,13 +228,14 @@ fn validate_iter_to_set<'a, 's>(
     extra: &Extra,
     definitions: &'a [CombinedValidator],
     recursion_guard: &'s mut RecursionGuard,
-) -> ValResult<'a, ()> {
+) -> ValResult<'a, Exactness> {
+    let mut exactness = Exactness::Exact;
     let mut errors: Vec<ValLineError> = Vec::new();
     for (index, item_result) in iter.enumerate() {
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
         match validator.validate(py, item, extra, definitions, recursion_guard) {
             Ok(item) => {
-                set.build_add(item)?;
+                set.build_add(item.unpack(&mut exactness))?;
                 if let Some(max_length) = max_length {
                     let actual_length = set.build_len();
                     if actual_length > max_length {
@@ -257,7 +259,7 @@ fn validate_iter_to_set<'a, 's>(
     }
 
     if errors.is_empty() {
-        Ok(())
+        Ok(exactness)
     } else {
         Err(ValError::LineErrors(errors))
     }
@@ -315,7 +317,7 @@ impl<'a> GenericIterable<'a> {
         extra: &Extra,
         definitions: &'a [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'a, Vec<PyObject>> {
+    ) -> ValResult<'a, Validation<Vec<PyObject>>> {
         let capacity = self
             .generic_len()
             .unwrap_or_else(|| max_length.unwrap_or(DEFAULT_CAPACITY));
@@ -360,7 +362,7 @@ impl<'a> GenericIterable<'a> {
         extra: &Extra,
         definitions: &'a [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'a, ()> {
+    ) -> ValResult<'a, Exactness> {
         macro_rules! validate_set {
             ($iter:expr) => {
                 validate_iter_to_set(
@@ -744,6 +746,32 @@ pub enum Exactness {
     Lax,
     Strict,
     Exact,
+}
+
+impl Exactness {
+    pub const fn from_strictness(strict: bool) -> Self {
+        if strict {
+            Self::Strict
+        } else {
+            Self::Lax
+        }
+    }
+
+    /// Returns self unless self is Exact, in which case Strict is returned
+    pub fn at_most_strict(self) -> Self {
+        match self {
+            Self::Exact => Self::Strict,
+            other => other,
+        }
+    }
+
+    pub fn merge_least_strict(self, other: Exactness) -> Self {
+        if (other as u8) < (self as u8) {
+            other
+        } else {
+            self
+        }
+    }
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]

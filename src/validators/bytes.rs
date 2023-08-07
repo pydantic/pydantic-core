@@ -9,6 +9,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -48,9 +49,10 @@ impl Validator for BytesValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let either_bytes = input.validate_bytes(extra.strict.unwrap_or(self.strict))?;
-        Ok(either_bytes.into_py(py))
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let either_bytes = input.validate_bytes(strict)?;
+        Ok(Validation::maybe_strict(either_bytes.into_py(py), strict))
     }
 
     fn different_strict_behavior(
@@ -87,8 +89,9 @@ impl Validator for BytesConstrainedValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let either_bytes = input.validate_bytes(extra.strict.unwrap_or(self.strict))?;
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let either_bytes = input.validate_bytes(strict)?;
         let len = either_bytes.len()?;
 
         if let Some(min_length) = self.min_length {
@@ -102,7 +105,7 @@ impl Validator for BytesConstrainedValidator {
             }
         }
 
-        Ok(either_bytes.into_py(py))
+        Ok(Validation::maybe_strict(either_bytes.into_py(py), strict))
     }
 
     fn different_strict_behavior(

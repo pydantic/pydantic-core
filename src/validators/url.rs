@@ -17,6 +17,7 @@ use crate::tools::SchemaDict;
 use crate::url::{schema_is_special, PyMultiHostUrl, PyUrl};
 
 use super::literal::expected_repr_name;
+use super::Validation;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 type AllowedSchemas = Option<(AHashSet<String>, String)>;
@@ -67,8 +68,9 @@ impl Validator for UrlValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let mut lib_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let mut lib_url = self.get_url(input, strict)?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(lib_url.scheme()) {
@@ -84,7 +86,7 @@ impl Validator for UrlValidator {
             self.default_port,
             &self.default_path,
         ) {
-            Ok(()) => Ok(PyUrl::new(lib_url).into_py(py)),
+            Ok(()) => Ok(Validation::maybe_strict(PyUrl::new(lib_url).into_py(py), strict)),
             Err(error_type) => return Err(ValError::new(error_type, input)),
         }
     }
@@ -198,8 +200,9 @@ impl Validator for MultiHostUrlValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let mut multi_url = self.get_url(input, extra.strict.unwrap_or(self.strict))?;
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let mut multi_url = self.get_url(input, strict)?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(multi_url.scheme()) {
@@ -214,7 +217,7 @@ impl Validator for MultiHostUrlValidator {
             self.default_port,
             &self.default_path,
         ) {
-            Ok(()) => Ok(multi_url.into_py(py)),
+            Ok(()) => Ok(Validation::maybe_strict(multi_url.into_py(py), strict)),
             Err(error_type) => return Err(ValError::new(error_type, input)),
         }
     }

@@ -12,6 +12,7 @@ use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 use crate::validators::datetime::{NowConstraint, NowOp};
 
+use super::Validation;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -46,8 +47,9 @@ impl Validator for DateValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
-        let date = match input.validate_date(extra.strict.unwrap_or(self.strict)) {
+    ) -> ValResult<'data, Validation<PyObject>> {
+        let strict = extra.strict.unwrap_or(self.strict);
+        let date = match input.validate_date(strict) {
             Ok(date) => date,
             // if the date error was an internal error, return that immediately
             Err(ValError::InternalErr(internal_err)) => return Err(ValError::InternalErr(internal_err)),
@@ -99,7 +101,7 @@ impl Validator for DateValidator {
                 }
             }
         }
-        Ok(date.try_into_py(py)?)
+        Ok(Validation::maybe_strict(date.try_into_py(py)?, strict))
     }
 
     fn different_strict_behavior(

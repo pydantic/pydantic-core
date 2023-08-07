@@ -8,6 +8,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{build_validator, BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 #[derive(Debug, Clone)]
@@ -81,7 +82,7 @@ impl Validator for DefinitionRefValidator {
         extra: &Extra,
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         if let Some(id) = input.identity() {
             if recursion_guard.contains_or_insert(id, self.validator_id) {
                 // we don't remove id here, we leave that to the validator which originally added id to `recursion_guard`
@@ -179,7 +180,7 @@ fn validate<'s, 'data>(
     extra: &Extra,
     definitions: &'data Definitions<CombinedValidator>,
     recursion_guard: &'s mut RecursionGuard,
-) -> ValResult<'data, PyObject> {
+) -> ValResult<'data, Validation<PyObject>> {
     let validator = definitions.get(validator_id).unwrap();
     validator.validate(py, input, extra, definitions, recursion_guard)
 }

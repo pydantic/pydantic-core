@@ -8,6 +8,7 @@ use crate::input::Input;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
+use super::Validation;
 use super::{BuildValidator, CombinedValidator, Definitions, DefinitionsBuilder, Extra, Validator};
 
 pub struct FloatBuilder;
@@ -70,12 +71,13 @@ impl Validator for FloatValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let either_float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
         if !self.allow_inf_nan && !either_float.as_f64().is_finite() {
             return Err(ValError::new(ErrorType::FiniteNumber, input));
         }
-        Ok(either_float.into_py(py))
+        // FIXME
+        Ok(Validation::lax(either_float.into_py(py)))
     }
 
     fn different_strict_behavior(
@@ -116,7 +118,7 @@ impl Validator for ConstrainedFloatValidator {
         extra: &Extra,
         _definitions: &'data Definitions<CombinedValidator>,
         _recursion_guard: &'s mut RecursionGuard,
-    ) -> ValResult<'data, PyObject> {
+    ) -> ValResult<'data, Validation<PyObject>> {
         let either_float = input.validate_float(extra.strict.unwrap_or(self.strict), extra.ultra_strict)?;
         let float: f64 = either_float.as_f64();
         if !self.allow_inf_nan && !float.is_finite() {
@@ -154,7 +156,8 @@ impl Validator for ConstrainedFloatValidator {
                 return Err(ValError::new(ErrorType::GreaterThan { gt: gt.into() }, input));
             }
         }
-        Ok(either_float.into_py(py))
+        // FIXME
+        Ok(Validation::lax(either_float.into_py(py)))
     }
 
     fn different_strict_behavior(
