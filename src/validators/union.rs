@@ -3,11 +3,12 @@ use std::fmt::Write;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
+use smallvec::SmallVec;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config};
 use crate::errors::{ErrorType, LocItem, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input};
+use crate::input::{Exactness, GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::py_gc::PyGcTraverse;
 use crate::recursion_guard::RecursionGuard;
@@ -65,20 +66,6 @@ impl BuildValidator for UnionValidator {
     }
 }
 
-impl UnionValidator {
-    fn or_custom_error<'s, 'data>(
-        &'s self,
-        errors: Option<Vec<ValLineError<'data>>>,
-        input: &'data impl Input<'data>,
-    ) -> ValError<'data> {
-        if let Some(errors) = errors {
-            ValError::LineErrors(errors)
-        } else {
-            self.custom_error.as_ref().unwrap().as_val_error(input)
-        }
-    }
-}
-
 impl_py_gc_traverse!(UnionValidator { choices });
 
 impl Validator for UnionValidator {
@@ -90,80 +77,60 @@ impl Validator for UnionValidator {
         definitions: &'data Definitions<CombinedValidator>,
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, Validation<PyObject>> {
-        if self.ultra_strict_required {
-            // do an ultra strict check first
-            let ultra_strict_extra = extra.as_strict(true);
-            if let Some(res) = self
-                .choices
-                .iter()
-                .map(|validator| validator.validate(py, input, &ultra_strict_extra, definitions, recursion_guard))
-                .find(ValResult::is_ok)
+        let mut results: SmallVec<[ValResult<'data, Validation<PyObject>>; 4]> = SmallVec::new();
+
+        // Try to run all validators; if it's an exact match stop early
+        for validator in &self.choices {
+            match validator.validate(py, input, extra, definitions, recursion_guard) {
+                Ok(
+                    res @ Validation {
+                        exactness: Exactness::Exact,
+                        ..
+                    },
+                ) => return Ok(res),
+                other => results.push(other),
+            }
+        }
+
+        // Try to get a strict match
+        for v in results.iter().flatten() {
+            if let Validation {
+                value,
+                exactness: Exactness::Strict,
+            } = v
             {
-                return res;
+                return Ok(Validation::strict(value.clone_ref(py)));
             }
         }
 
-        if extra.strict.unwrap_or(self.strict) {
-            let mut errors: Option<Vec<ValLineError>> = match self.custom_error {
-                None => Some(Vec::with_capacity(self.choices.len())),
-                _ => None,
-            };
-            let strict_extra = extra.as_strict(false);
-
-            for validator in &self.choices {
-                let line_errors = match validator.validate(py, input, &strict_extra, definitions, recursion_guard) {
-                    Err(ValError::LineErrors(line_errors)) => line_errors,
-                    otherwise => return otherwise,
-                };
-
-                if let Some(ref mut errors) = errors {
-                    errors.extend(
-                        line_errors
-                            .into_iter()
-                            .map(|err| err.with_outer_location(validator.get_name().into())),
-                    );
-                }
+        // Try to get a lax match; just return any
+        if !extra.strict.unwrap_or(self.strict) {
+            if let Some(v) = results.iter().flatten().next() {
+                debug_assert_eq!(v.exactness, Exactness::Lax);
+                return Ok(Validation::lax(v.value.clone_ref(py)));
             }
-
-            Err(self.or_custom_error(errors, input))
-        } else {
-            if self.strict_required {
-                // 1st pass: check if the value is an exact instance of one of the Union types,
-                // e.g. use validate in strict mode
-                let strict_extra = extra.as_strict(false);
-                if let Some(res) = self
-                    .choices
-                    .iter()
-                    .map(|validator| validator.validate(py, input, &strict_extra, definitions, recursion_guard))
-                    .find(ValResult::is_ok)
-                {
-                    return res;
-                }
-            }
-
-            let mut errors: Option<Vec<ValLineError>> = match self.custom_error {
-                None => Some(Vec::with_capacity(self.choices.len())),
-                _ => None,
-            };
-
-            // 2nd pass: check if the value can be coerced into one of the Union types, e.g. use validate
-            for validator in &self.choices {
-                let line_errors = match validator.validate(py, input, extra, definitions, recursion_guard) {
-                    Err(ValError::LineErrors(line_errors)) => line_errors,
-                    success => return success,
-                };
-
-                if let Some(ref mut errors) = errors {
-                    errors.extend(
-                        line_errors
-                            .into_iter()
-                            .map(|err| err.with_outer_location(validator.get_name().into())),
-                    );
-                }
-            }
-
-            Err(self.or_custom_error(errors, input))
         }
+
+        // Build errors
+        if let Some(custom_error) = &self.custom_error {
+            return Err(custom_error.as_val_error(input));
+        }
+
+        let mut errors: Vec<ValLineError> = Vec::with_capacity(self.choices.len());
+        for (result, validator) in std::iter::zip(results, &self.choices) {
+            let line_errors = match result {
+                Err(ValError::LineErrors(line_errors)) => line_errors,
+                otherwise => return otherwise,
+            };
+
+            errors.extend(
+                line_errors
+                    .into_iter()
+                    .map(|err| err.with_outer_location(validator.get_name().into())),
+            );
+        }
+
+        Err(ValError::LineErrors(errors))
     }
 
     fn different_strict_behavior(
