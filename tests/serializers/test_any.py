@@ -9,7 +9,6 @@ from enum import Enum
 from pathlib import Path
 from typing import ClassVar
 
-import numpy
 import pytest
 from dirty_equals import HasRepr, IsList
 
@@ -19,6 +18,11 @@ from pydantic_core import PydanticSerializationError, SchemaSerializer, SchemaVa
 from ..conftest import plain_repr
 from .test_dataclasses import IsStrictDict, on_pypy
 from .test_list_tuple import as_list, as_tuple
+
+try:
+    import numpy
+except ImportError:
+    numpy = None
 
 
 @pytest.fixture(scope='module')
@@ -577,6 +581,7 @@ def test_slots_mixed(any_serializer):
     assert any_serializer.to_json(dc) == b'{"x":1,"x2":2}'
 
 
+@pytest.mark.skipif(numpy is None, reason='numpy is not installed')
 def test_numpy_float(any_serializer):
     assert any_serializer.to_python(numpy.float64(1.0)) == 1.0
     assert any_serializer.to_python(numpy.float64(1.0), mode='json') == 1.0

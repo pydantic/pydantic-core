@@ -10,5 +10,4 @@ pytest-mock==3.11.1
 pytest-pretty==1.2.0
 pytest-timeout==2.1.0
 pytz==2023.3
-# later version of numpy do not support 3.7 or even 3.8
-numpy==1.21.6
+numpy==1.25.2; python_version >= "3.9" and python_version < "3.12"

@@ -1,10 +1,14 @@
 import json
 from enum import IntEnum
 
-import numpy
 import pytest
 
 from pydantic_core import SchemaSerializer, core_schema
+
+try:
+    import numpy
+except ImportError:
+    numpy = None
 
 
 class IntSubClass(int):
@@ -38,7 +42,6 @@ _BIG_NUMBER_BYTES = b'1' + (b'0' * 40)
         ('int', IntSubClass(42), IntSubClass(42), b'42'),
         ('int', MyIntEnum.one, MyIntEnum.one, b'1'),
         ('float', FloatSubClass(42), FloatSubClass(42), b'42.0'),
-        ('float', numpy.float64(1.0), numpy.float64(1.0), b'1.0'),
     ],
 )
 def test_simple_serializers(schema_type, value, expected_python, expected_json, custom_type_schema):
@@ -119,3 +122,17 @@ def test_simple_serializers_fallback(schema_type):
         UserWarning, match=f'Expected `{schema_type}` but got `list` - serialized value may not be as expected'
     ):
         assert s.to_json([1, 2, 3]) == b'[1,2,3]'
+
+
+@pytest.mark.skipif(numpy is None, reason='numpy is not installed')
+def test_numpy():
+    s = SchemaSerializer(core_schema.float_schema())
+    v = s.to_python(numpy.float64(1.0))
+    assert v == 1.0
+    assert type(v) == numpy.float64
+
+    v = s.to_python(numpy.float64(1.0), mode='json')
+    assert v == 1.0
+    assert type(v) == float
+
+    assert s.to_json(numpy.float64(1.0)) == b'1.0'

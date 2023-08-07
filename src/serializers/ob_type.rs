@@ -110,9 +110,8 @@ impl ObTypeLookup {
     }
 
     pub fn is_type(&self, value: &PyAny, expected_ob_type: ObType) -> IsType {
-        match self.ob_type_is_expected(Some(value), value.get_type_ptr(), expected_ob_type) {
+        match self.ob_type_is_expected(Some(value), value.get_type_ptr(), &expected_ob_type) {
             IsType::False => {
-                dbg!(expected_ob_type, self.fallback_isinstance(value));
                 if expected_ob_type == self.fallback_isinstance(value) {
                     IsType::Subclass
                 } else {
@@ -127,7 +126,7 @@ impl ObTypeLookup {
         &self,
         op_value: Option<&PyAny>,
         type_ptr: *mut PyTypeObject,
-        expected_ob_type: ObType,
+        expected_ob_type: &ObType,
     ) -> IsType {
         let ob_type = type_ptr as usize;
         let ans = match expected_ob_type {
@@ -376,7 +375,7 @@ fn is_generator(op_value: Option<&PyAny>) -> bool {
     }
 }
 
-#[derive(Debug, Clone, Copy, EnumString, Display)]
+#[derive(Debug, Clone, EnumString, Display)]
 #[strum(serialize_all = "snake_case")]
 pub enum ObType {
     None,
