@@ -24,7 +24,7 @@ try:
     UnionType = Union[TypingUnionType, TypesUnionType]
 
 except ImportError:
-    TypesUnionType = None
+    TypesUnionType = TypingUnionType
     UnionType = TypingUnionType
 
 
@@ -81,7 +81,6 @@ def get_schema(obj) -> core_schema.CoreSchema:
         # can't really use 'is-instance' since this is used for the class_ parameter of 'is-instance' validators
         return {'type': 'any'}
     else:
-        print(origin)
         # debug(obj)
         raise TypeError(f'Unknown type: {obj!r}')
 

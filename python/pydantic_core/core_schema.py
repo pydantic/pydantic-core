@@ -662,15 +662,14 @@ def float_schema(
 
 class DecimalSchema(TypedDict, total=False):
     type: Required[Literal['decimal']]
-    gt: Union[int, Decimal]
-    ge: Union[int, Decimal]
-    lt: Union[int, Decimal]
-    le: Union[int, Decimal]
+    allow_inf_nan: bool  # whether 'NaN', '+inf', '-inf' should be forbidden. default: False
+    multiple_of: Decimal
+    le: Decimal
+    ge: Decimal
+    lt: Decimal
+    gt: Decimal
     max_digits: int
     decimal_places: int
-    multiple_of: Union[int, Decimal]
-    allow_inf_nan: bool  # whether 'NaN', '+inf', '-inf' should be forbidden. default: False
-    check_digits: bool  # FIXME document. default: False
     strict: bool
     ref: str
     metadata: Any
@@ -679,15 +678,14 @@ class DecimalSchema(TypedDict, total=False):
 
 def decimal_schema(
     *,
-    gt: int | Decimal | None = None,
-    ge: int | Decimal | None = None,
-    lt: int | Decimal | None = None,
-    le: int | Decimal | None = None,
+    allow_inf_nan: bool = None,
+    multiple_of: Decimal | None = None,
+    le: Decimal | None = None,
+    ge: Decimal | None = None,
+    lt: Decimal | None = None,
+    gt: Decimal | None = None,
     max_digits: int | None = None,
     decimal_places: int | None = None,
-    multiple_of: int | Decimal | None = None,
-    allow_inf_nan: bool = None,
-    check_digits: bool = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -706,7 +704,18 @@ def decimal_schema(
     ```
 
     Args:
-        FIXME document
+        allow_inf_nan: Whether to allow inf and nan values
+        multiple_of: The value must be a multiple of this number
+        le: The value must be less than or equal to this number
+        ge: The value must be greater than or equal to this number
+        lt: The value must be strictly less than this number
+        gt: The value must be strictly greater than this number
+        max_digits: The maximum number of decimal digits allowed
+        decimal_places: The maximum number of decimal places allowed
+        strict: Whether the value should be a float or a value that can be converted to a float
+        ref: optional unique identifier of the schema, used to reference the schema in other places
+        metadata: Any other information you want to include with the schema, not used by pydantic-core
+        serialization: Custom serialization schema
     """
     return _dict_not_none(
         type='decimal',
@@ -718,7 +727,6 @@ def decimal_schema(
         decimal_places=decimal_places,
         multiple_of=multiple_of,
         allow_inf_nan=allow_inf_nan,
-        check_digits=check_digits,
         strict=strict,
         ref=ref,
         metadata=metadata,

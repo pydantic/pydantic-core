@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::str::from_utf8;
 
-use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFloat, PyFrozenSet, PyInt, PyIterator, PyList,
@@ -365,8 +364,6 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn strict_decimal(&'a self, decimal_type: &'a PyType) -> ValResult<&'a PyAny> {
-        let py = decimal_type.py();
-
         // Fast path for existing decimal objects
         if self.is_exact_instance(decimal_type) {
             return Ok(self);
@@ -374,21 +371,7 @@ impl<'a> Input<'a> for PyAny {
 
         // Try subclasses of decimals, they will be upcast to Decimal
         if self.is_instance(decimal_type)? {
-            match decimal_type.call1((self,)) {
-                Ok(decimal) => return Ok(decimal),
-                Err(e)
-                    if e.matches(
-                        py,
-                        PyTuple::new(
-                            py,
-                            [
-                                py.import("decimal")?.getattr("DecimalException")?,
-                                PyTypeError::type_object(py),
-                            ],
-                        ),
-                    ) => {}
-                Err(e) => return Err(ValError::InternalErr(e)),
-            }
+            return create_decimal(self, self, decimal_type);
         }
 
         Err(ValError::new(
@@ -407,7 +390,11 @@ impl<'a> Input<'a> for PyAny {
         }
 
         if self.is_instance_of::<PyString>() || (self.is_instance_of::<PyInt>() && !self.is_instance_of::<PyBool>()) {
+            // checking isinstance for str / int / bool is fast compared to decimal / float
             create_decimal(self, self, decimal_type)
+        } else if self.is_instance(decimal_type)? {
+            // upcast subclasses to decimal
+            return create_decimal(self, self, decimal_type);
         } else if self.is_instance_of::<PyFloat>() {
             create_decimal(self.str()?, self, decimal_type)
         } else {

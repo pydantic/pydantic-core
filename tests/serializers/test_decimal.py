@@ -12,6 +12,14 @@ def test_decimal():
     assert v.to_python(Decimal('123.456'), mode='json') == '123.456'
     assert v.to_json(Decimal('123.456')) == b'"123.456"'
 
+    assert v.to_python(Decimal('123456789123456789123456789.123456789123456789123456789')) == Decimal(
+        '123456789123456789123456789.123456789123456789123456789'
+    )
+    assert (
+        v.to_json(Decimal('123456789123456789123456789.123456789123456789123456789'))
+        == b'"123456789123456789123456789.123456789123456789123456789"'
+    )
+
     with pytest.warns(UserWarning, match='Expected `decimal` but got `int` - serialized value may not be as expected'):
         assert v.to_python(123, mode='json') == 123
 

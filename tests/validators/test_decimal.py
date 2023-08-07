@@ -12,6 +12,10 @@ from pydantic_core import SchemaValidator, ValidationError
 from ..conftest import Err, PyAndJson, plain_repr
 
 
+class DecimalSubclass(Decimal):
+    pass
+
+
 @pytest.mark.parametrize(
     'input_value,expected',
     [
@@ -23,6 +27,16 @@ from ..conftest import Err, PyAndJson, plain_repr
         (42.0, Decimal(42)),
         (42.5, Decimal('42.5')),
         (1e10, Decimal('1E10')),
+        (Decimal('42.0'), Decimal(42)),
+        (Decimal('42.5'), Decimal('42.5')),
+        (Decimal('1e10'), Decimal('1E10')),
+        (
+            Decimal('123456789123456789123456789.123456789123456789123456789'),
+            Decimal('123456789123456789123456789.123456789123456789123456789'),
+        ),
+        (DecimalSubclass('42.0'), Decimal(42)),
+        (DecimalSubclass('42.5'), Decimal('42.5')),
+        (DecimalSubclass('1e10'), Decimal('1E10')),
         (
             True,
             Err(
@@ -46,6 +60,9 @@ from ..conftest import Err, PyAndJson, plain_repr
 )
 def test_decimal(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json({'type': 'decimal'})
+    # Decimal types are not JSON serializable
+    if v.validator_type == 'json' and isinstance(input_value, Decimal):
+        input_value = str(input_value)
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
