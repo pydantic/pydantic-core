@@ -115,7 +115,7 @@ impl ObTypeLookup {
                     true
                 } else if self.int == ob_type {
                     // special case for int as the input to float serializer,
-                    // https://github.com/pydantic/pydantic/issues/7041
+                    // https://github.com/pydantic/pydantic-core/pull/866
                     return IsType::Subclass;
                 } else {
                     false

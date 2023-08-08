@@ -60,7 +60,7 @@ def test_simple_serializers(schema_type, value, expected_python, expected_json, 
 
 def test_int_to_float():
     """
-    See https://github.com/pydantic/pydantic/issues/7041
+    See https://github.com/pydantic/pydantic-core/pull/866
     """
     s = SchemaSerializer(core_schema.float_schema())
     v_plain = s.to_python(1)
@@ -85,7 +85,7 @@ def test_int_to_float():
 
 def test_int_to_float_key():
     """
-    See https://github.com/pydantic/pydantic/issues/7041
+    See https://github.com/pydantic/pydantic-core/pull/866
     """
     s = SchemaSerializer(core_schema.dict_schema(core_schema.float_schema(), core_schema.float_schema()))
     v_plain = s.to_python({1: 1})
