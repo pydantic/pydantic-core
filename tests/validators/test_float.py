@@ -359,3 +359,9 @@ def test_non_finite_constrained_float_values(input_value, allow_inf_nan, expecte
 def test_validate_scientific_notation_from_json(input_value, expected):
     v = SchemaValidator({'type': 'float'})
     assert v.validate_json(input_value) == expected
+
+
+def test_string_with_underscores() -> None:
+    v = SchemaValidator({'type': 'float'})
+    assert v.validate_python('1_000_000.0') == 1_000_000.0
+    assert v.validate_json('"1_000_000.0"') == 1_000_000.0

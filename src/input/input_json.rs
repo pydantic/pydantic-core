@@ -144,7 +144,10 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::Uint(u) => Ok(EitherInt::U64(*u)),
             JsonInput::BigInt(b) => Ok(EitherInt::BigInt(b.clone())),
             JsonInput::Float(f) => float_as_int(self, *f),
-            JsonInput::String(str) => str_as_int(self, str),
+            JsonInput::String(str) => match str_as_int(self, str) {
+                Ok(i) => Ok(i),
+                Err(_) => str_as_int(self, &str.replace('_', "")),
+            },
             _ => Err(ValError::new(ErrorTypeDefaults::IntType, self)),
         }
     }
@@ -174,7 +177,10 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::Uint(u) => Ok(EitherFloat::F64(*u as f64)),
             JsonInput::String(str) => match str.parse::<f64>() {
                 Ok(i) => Ok(EitherFloat::F64(i)),
-                Err(_) => Err(ValError::new(ErrorTypeDefaults::FloatParsing, self)),
+                Err(_) => match str.replace('_', "").parse::<f64>() {
+                    Ok(i) => Ok(EitherFloat::F64(i)),
+                    Err(_) => Err(ValError::new(ErrorTypeDefaults::FloatParsing, self)),
+                },
             },
             _ => Err(ValError::new(ErrorTypeDefaults::FloatType, self)),
         }
@@ -413,7 +419,10 @@ impl<'a> Input<'a> for String {
     fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
         match self.parse() {
             Ok(i) => Ok(EitherInt::I64(i)),
-            Err(_) => Err(ValError::new(ErrorTypeDefaults::IntParsing, self)),
+            Err(_) => match self.replace('_', "").parse() {
+                Ok(i) => Ok(EitherInt::I64(i)),
+                Err(_) => Err(ValError::new(ErrorTypeDefaults::IntParsing, self)),
+            },
         }
     }
 
@@ -428,7 +437,10 @@ impl<'a> Input<'a> for String {
     fn lax_float(&'a self) -> ValResult<EitherFloat<'a>> {
         match self.parse() {
             Ok(f) => Ok(EitherFloat::F64(f)),
-            Err(_) => Err(ValError::new(ErrorTypeDefaults::FloatParsing, self)),
+            Err(_) => match self.replace('_', "").parse() {
+                Ok(f) => Ok(EitherFloat::F64(f)),
+                Err(_) => Err(ValError::new(ErrorTypeDefaults::FloatParsing, self)),
+            },
         }
     }
 

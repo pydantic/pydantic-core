@@ -313,7 +313,10 @@ impl<'a> Input<'a> for PyAny {
         if PyInt::is_exact_type_of(self) {
             Ok(EitherInt::Py(self))
         } else if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::IntParsing)? {
-            str_as_int(self, &cow_str)
+            match str_as_int(self, &cow_str) {
+                Ok(int) => Ok(int),
+                Err(_) => str_as_int(self, &cow_str.replace('_', "")),
+            }
         } else if let Ok(float) = self.extract::<f64>() {
             float_as_int(self, float)
         } else {
@@ -353,7 +356,10 @@ impl<'a> Input<'a> for PyAny {
         } else if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::FloatParsing)? {
             match cow_str.as_ref().parse::<f64>() {
                 Ok(i) => Ok(EitherFloat::F64(i)),
-                Err(_) => Err(ValError::new(ErrorTypeDefaults::FloatParsing, self)),
+                Err(_) => match cow_str.replace('_', "").parse::<f64>() {
+                    Ok(i) => Ok(EitherFloat::F64(i)),
+                    Err(_) => Err(ValError::new(ErrorTypeDefaults::FloatParsing, self)),
+                },
             }
         } else if let Ok(float) = self.extract::<f64>() {
             Ok(EitherFloat::F64(float))
