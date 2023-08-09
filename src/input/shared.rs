@@ -3,7 +3,7 @@ use num_bigint::BigInt;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::EitherInt;
 
-use super::Input;
+use super::{EitherFloat, Input};
 
 pub fn map_json_err<'a>(input: &'a impl Input<'a>, error: serde_json::Error) -> ValError<'a> {
     ValError::new(
@@ -47,6 +47,17 @@ pub fn int_as_bool<'a>(input: &'a impl Input<'a>, int: i64) -> ValResult<'a, boo
     }
 }
 
+/// Strip underscores from strings so that 1_000 can be parsed to 1000
+/// Ignore any unicode stuff since this has to be digits and underscores
+/// and if it's not subsequent parsing will just fail
+fn strip_underscores(s: &str) -> Option<String> {
+    if s.starts_with('_') || s.ends_with('_') || s.contains("__") || !s.contains('_') {
+        // no underscores to strip
+        return None;
+    }
+    Some(s.replace('_', ""))
+}
+
 /// parse a string as an int
 ///
 /// max length of the input is 4300, see
@@ -64,8 +75,25 @@ pub fn str_as_int<'s, 'l>(input: &'s impl Input<'s>, str: &'l str) -> ValResult<
         } else {
             Err(ValError::new(ErrorTypeDefaults::IntParsing, input))
         }
+    } else if let Some(str_stripped) = strip_underscores(str) {
+        if let Some(int) = _parse_str(input, &str_stripped, len) {
+            Ok(int)
+        } else {
+            Err(ValError::new(ErrorTypeDefaults::IntParsing, input))
+        }
     } else {
         Err(ValError::new(ErrorTypeDefaults::IntParsing, input))
+    }
+}
+
+/// parse a float as a float
+pub fn str_as_float<'s, 'l>(input: &'s impl Input<'s>, str: &'l str) -> ValResult<'s, EitherFloat<'s>> {
+    match str.parse::<f64>() {
+        Ok(float) => Ok(EitherFloat::F64(float)),
+        Err(_) => match strip_underscores(str).as_deref().unwrap_or(str).parse::<f64>() {
+            Ok(float) => Ok(EitherFloat::F64(float)),
+            Err(_) => Err(ValError::new(ErrorTypeDefaults::FloatParsing, input)),
+        },
     }
 }
 

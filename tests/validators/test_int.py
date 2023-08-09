@@ -395,7 +395,13 @@ def test_int_key(py_and_json: PyAndJson):
         v.validate_test({'1': 1, '2': 2}, strict=True)
 
 
-def test_string_with_underscores() -> None:
+def test_string_as_int_with_underscores() -> None:
     v = SchemaValidator({'type': 'int'})
     assert v.validate_python('1_000_000') == 1_000_000
     assert v.validate_json('"1_000_000"') == 1_000_000
+
+    for edge_case in ('_1', '1__0', '1_0_', '1_0__0'):
+        with pytest.raises(ValidationError):
+            v.validate_python(edge_case)
+        with pytest.raises(ValidationError):
+            v.validate_json(f'"{edge_case}"')

@@ -365,3 +365,9 @@ def test_string_with_underscores() -> None:
     v = SchemaValidator({'type': 'float'})
     assert v.validate_python('1_000_000.0') == 1_000_000.0
     assert v.validate_json('"1_000_000.0"') == 1_000_000.0
+
+    for edge_case in ('_1', '_1.0', '1__0', '1.1__1', '1_0.0_', '1._', '1_0__0.0'):
+        with pytest.raises(ValidationError):
+            v.validate_python(edge_case)
+        with pytest.raises(ValidationError):
+            v.validate_json(f'"{edge_case}"')
