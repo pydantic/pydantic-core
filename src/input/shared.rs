@@ -51,7 +51,7 @@ pub fn int_as_bool<'a>(input: &'a impl Input<'a>, int: i64) -> ValResult<'a, boo
 /// Ignore any unicode stuff since this has to be digits and underscores
 /// and if it's not subsequent parsing will just fail
 fn strip_underscores(s: &str) -> Option<String> {
-    if s.starts_with('_') || s.ends_with('_') || s.contains("__") || !s.contains('_') {
+    if s.starts_with('_') || s.ends_with('_') || !s.contains('_') || s.contains("__") {
         // no underscores to strip
         return None;
     }
