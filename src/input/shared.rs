@@ -88,13 +88,10 @@ pub fn str_as_int<'s, 'l>(input: &'s impl Input<'s>, str: &'l str) -> ValResult<
 
 /// parse a float as a float
 pub fn str_as_float<'s, 'l>(input: &'s impl Input<'s>, str: &'l str) -> ValResult<'s, EitherFloat<'s>> {
-    match str.parse::<f64>() {
-        Ok(float) => Ok(EitherFloat::F64(float)),
-        Err(_) => match strip_underscores(str).as_deref().unwrap_or(str).parse::<f64>() {
-            Ok(float) => Ok(EitherFloat::F64(float)),
-            Err(_) => Err(ValError::new(ErrorTypeDefaults::FloatParsing, input)),
-        },
-    }
+    str.parse::<f64>()
+        .ok()
+        .or_else(|_| strip_underscores(str).and_then(|stripped| stripped.parse().ok()))
+        .ok_or_else(|| Err(ValError::new(ErrorTypeDefaults::FloatParsing, input)))
 }
 
 /// parse a string as an int, `input` is required here to get lifetimes to match up
