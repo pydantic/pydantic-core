@@ -51,6 +51,10 @@ pub fn int_as_bool<'a>(input: &'a impl Input<'a>, int: i64) -> ValResult<'a, boo
 /// Ignore any unicode stuff since this has to be digits and underscores
 /// and if it's not subsequent parsing will just fail
 fn strip_underscores(s: &str) -> Option<String> {
+    // Leading and trailing underscores are not valid in Python (e.g. `int('__1__')` fails)
+    // so we match that behavior here.
+    // Double consecutive underscores are also not valid
+    // If there are no underscores at all, no need to replace anything
     if s.starts_with('_') || s.ends_with('_') || !s.contains('_') || s.contains("__") {
         // no underscores to strip
         return None;
@@ -88,10 +92,13 @@ pub fn str_as_int<'s, 'l>(input: &'s impl Input<'s>, str: &'l str) -> ValResult<
 
 /// parse a float as a float
 pub fn str_as_float<'s, 'l>(input: &'s impl Input<'s>, str: &'l str) -> ValResult<'s, EitherFloat<'s>> {
-    str.parse::<f64>()
-        .ok()
-        .or_else(|_| strip_underscores(str).and_then(|stripped| stripped.parse().ok()))
-        .ok_or_else(|| Err(ValError::new(ErrorTypeDefaults::FloatParsing, input)))
+    match str.parse() {
+        Ok(float) => Ok(EitherFloat::F64(float)),
+        Err(_) => match strip_underscores(str).and_then(|stripped| stripped.parse().ok()) {
+            Some(float) => Ok(EitherFloat::F64(float)),
+            None => Err(ValError::new(ErrorTypeDefaults::FloatParsing, input)),
+        },
+    }
 }
 
 /// parse a string as an int, `input` is required here to get lifetimes to match up
