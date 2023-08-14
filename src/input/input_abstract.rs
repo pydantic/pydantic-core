@@ -1,9 +1,11 @@
 use std::fmt;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*};
 
 use crate::errors::{InputValue, LocItem, ValResult};
+use crate::tools::py_err;
 use crate::{PyMultiHostUrl, PyUrl};
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
@@ -14,6 +16,7 @@ use super::{EitherFloat, GenericArguments, GenericIterable, GenericIterator, Gen
 pub enum InputType {
     Python,
     Json,
+    String,
 }
 
 impl IntoPy<PyObject> for InputType {
@@ -21,6 +24,20 @@ impl IntoPy<PyObject> for InputType {
         match self {
             Self::Json => intern!(py, "json").into(),
             Self::Python => intern!(py, "python").into(),
+            Self::String => intern!(py, "string").into(),
+        }
+    }
+}
+
+impl TryFrom<&str> for InputType {
+    type Error = PyErr;
+
+    fn try_from(error_mode: &str) -> PyResult<Self> {
+        match error_mode {
+            "python" => Ok(Self::Python),
+            "json" => Ok(Self::Json),
+            "string" => Ok(Self::String),
+            s => py_err!(PyValueError; "Invalid error mode: {}", s),
         }
     }
 }
@@ -38,7 +55,9 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         None
     }
 
-    fn is_none(&self) -> bool;
+    fn is_none(&self) -> bool {
+        false
+    }
 
     fn input_is_instance(&self, _class: &PyType) -> Option<&PyAny> {
         None

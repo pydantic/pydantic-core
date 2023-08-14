@@ -7,14 +7,15 @@ use ahash::AHashSet;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config_same, ExtraBehavior};
-use crate::errors::{py_err_string, ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
+use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{
     AttributesGenericIterator, DictGenericIterator, GenericMapping, Input, JsonObjectGenericIterator,
-    MappingGenericIterator,
+    MappingGenericIterator, StringMappingGenericIterator,
 };
 use crate::lookup_key::LookupKey;
 use crate::tools::SchemaDict;
 
+use super::dict::BorrowInput;
 use super::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
@@ -180,17 +181,13 @@ impl Validator for ModelFieldsValidator {
                     for field in &self.fields {
                         let op_key_value = match field.lookup_key.$get_method($dict $(, $kwargs )? ) {
                             Ok(v) => v,
-                            Err(err) => {
-                                errors.push(ValLineError::new_with_loc(
-                                    ErrorType::GetAttributeError {
-                                        error: py_err_string(py, err),
-                                        context: None,
-                                    },
-                                    input,
-                                    field.name.clone(),
-                                ));
+                            Err(ValError::LineErrors(line_errors)) => {
+                                for err in line_errors {
+                                    errors.push(err.with_outer_location(field.name.as_loc_item()));
+                                }
                                 continue;
                             }
+                            Err(err) => return ControlFlow::Break(err),
                         };
                         if let Some((lookup_path, value)) = op_key_value {
                             if let Some(ref mut used_keys) = used_keys {
@@ -198,10 +195,7 @@ impl Validator for ModelFieldsValidator {
                                 // extra logic either way
                                 used_keys.insert(lookup_path.first_key());
                             }
-                            match field
-                                .validator
-                                .validate(py, value, state)
-                            {
+                            match field.validator.validate(py, value.borrow_input(), state) {
                                 Ok(value) => {
                                     control_flow!(model_dict.set_item(&field.name_py, value))?;
                                     fields_set_vec.push(field.name_py.clone_ref(py));
@@ -209,10 +203,13 @@ impl Validator for ModelFieldsValidator {
                                 Err(ValError::Omit) => continue,
                                 Err(ValError::LineErrors(line_errors)) => {
                                     for err in line_errors {
-                                        errors.push(lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name));
+                                        errors.push(
+                                            lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name)
+                                            .into_owned(py)
+                                        );
                                     }
                                 }
-                                Err(err) => return ControlFlow::Break(err),
+                                Err(err) => return ControlFlow::Break(err.into_owned(py)),
                             }
                             continue;
                         } else if let Some(value) = control_flow!(field.validator.default_value(py, Some(field.name.as_str()), state))? {
@@ -242,25 +239,31 @@ impl Validator for ModelFieldsValidator {
                                 for err in line_errors {
                                     errors.push(
                                         err.with_outer_location(raw_key.as_loc_item())
-                                            .with_type(ErrorTypeDefaults::InvalidKey),
+                                            .with_type(ErrorTypeDefaults::InvalidKey)
+                                            .into_owned(py)
                                     );
                                 }
                                 continue;
                             }
-                            Err(err) => return Err(err),
+                            Err(err) => return Err(err.into_owned(py)),
                         };
-                        if used_keys.contains(either_str.as_cow()?.as_ref()) {
+                        let cow = either_str.as_cow().map_err(|err| err.into_owned(py))?;
+                        if used_keys.contains(cow.as_ref()) {
                             continue;
                         }
 
+                        let value = value.borrow_input();
                         // Unknown / extra field
                         match self.extra_behavior {
                             ExtraBehavior::Forbid => {
-                                errors.push(ValLineError::new_with_loc(
-                                    ErrorTypeDefaults::ExtraForbidden,
-                                    value,
-                                    raw_key.as_loc_item(),
-                                ));
+                                errors.push(
+                                    ValLineError::new_with_loc(
+                                        ErrorTypeDefaults::ExtraForbidden,
+                                        value,
+                                        raw_key.as_loc_item(),
+                                    )
+                                    .into_owned(py)
+                                );
                             }
                             ExtraBehavior::Ignore => {}
                             ExtraBehavior::Allow => {
@@ -273,10 +276,10 @@ impl Validator for ModelFieldsValidator {
                                         }
                                         Err(ValError::LineErrors(line_errors)) => {
                                             for err in line_errors {
-                                                errors.push(err.with_outer_location(raw_key.as_loc_item()));
+                                                errors.push(err.with_outer_location(raw_key.as_loc_item()).into_owned(py));
                                             }
                                         }
-                                        Err(err) => return Err(err),
+                                        Err(err) => return Err(err.into_owned(py)),
                                     }
                                 } else {
                                     model_extra_dict.set_item(py_key, value.to_object(py))?;
@@ -293,8 +296,9 @@ impl Validator for ModelFieldsValidator {
         }
         match dict {
             GenericMapping::PyDict(d) => process!(d, py_get_dict_item, DictGenericIterator),
-            GenericMapping::PyGetAttr(d, kwargs) => process!(d, py_get_attr, AttributesGenericIterator, kwargs),
             GenericMapping::PyMapping(d) => process!(d, py_get_mapping_item, MappingGenericIterator),
+            GenericMapping::StringMapping(d) => process!(d, py_get_string_mapping_item, StringMappingGenericIterator),
+            GenericMapping::PyGetAttr(d, kwargs) => process!(d, py_get_attr, AttributesGenericIterator, kwargs),
             GenericMapping::JsonObject(d) => process!(d, json_get, JsonObjectGenericIterator),
         }
 
