@@ -76,7 +76,7 @@ impl TimedeltaMode {
     pub fn either_delta_to_json(&self, py: Python, either_delta: &EitherTimedelta) -> PyResult<PyObject> {
         match self {
             Self::Iso8601 => {
-                let d = either_delta.as_raw()?;
+                let d = either_delta.as_duration()?;
                 Ok(d.to_string().into_py(py))
             }
             Self::Float => {
@@ -92,7 +92,7 @@ impl TimedeltaMode {
     pub fn json_key<'py>(&self, py: Python, either_delta: &EitherTimedelta) -> PyResult<Cow<'py, str>> {
         match self {
             Self::Iso8601 => {
-                let d = either_delta.as_raw()?;
+                let d = either_delta.as_duration()?;
                 Ok(d.to_string().into())
             }
             Self::Float => {
@@ -111,7 +111,7 @@ impl TimedeltaMode {
     ) -> Result<S::Ok, S::Error> {
         match self {
             Self::Iso8601 => {
-                let d = either_delta.as_raw().map_err(py_err_se_err)?;
+                let d = either_delta.as_duration().map_err(py_err_se_err)?;
                 serializer.serialize_str(&d.to_string())
             }
             Self::Float => {

@@ -89,7 +89,7 @@ impl<'a> From<Duration> for EitherTimedelta<'a> {
 }
 
 impl<'a> EitherTimedelta<'a> {
-    pub fn as_raw(&self) -> PyResult<Duration> {
+    pub fn as_duration(&self) -> PyResult<Duration> {
         match self {
             Self::Raw(timedelta) => Ok(timedelta.clone()),
             Self::PyExact(py_timedelta) => Ok(pytimedelta_exact_as_duration(py_timedelta)),
