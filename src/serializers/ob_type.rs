@@ -368,7 +368,7 @@ fn is_generator(op_value: Option<&PyAny>) -> bool {
     }
 }
 
-#[derive(Debug, Clone, EnumString, Display)]
+#[derive(Debug, Clone, Copy, EnumString, Display)]
 #[strum(serialize_all = "snake_case")]
 pub enum ObType {
     None,
@@ -417,44 +417,20 @@ pub enum ObType {
 
 impl PartialEq for ObType {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::None, Self::None) => true,
-            (Self::Int, Self::Int) => true,
-            (Self::IntSubclass, Self::IntSubclass) => true,
-            (Self::Bool, Self::Bool) => true,
-            (Self::Float, Self::Float) => true,
-            (Self::FloatSubclass, Self::FloatSubclass) => true,
-            (Self::Decimal, Self::Decimal) => true,
-            (Self::Str, Self::Str) => true,
-            (Self::StrSubclass, Self::StrSubclass) => true,
-            (Self::Bytes, Self::Bytes) => true,
-            (Self::Bytearray, Self::Bytearray) => true,
-            (Self::List, Self::List) => true,
-            (Self::Tuple, Self::Tuple) => true,
-            (Self::Set, Self::Set) => true,
-            (Self::Frozenset, Self::Frozenset) => true,
-            (Self::Dict, Self::Dict) => true,
-            (Self::Datetime, Self::Datetime) => true,
-            (Self::Date, Self::Date) => true,
-            (Self::Time, Self::Time) => true,
-            (Self::Timedelta, Self::Timedelta) => true,
-            (Self::Url, Self::Url) => true,
-            (Self::MultiHostUrl, Self::MultiHostUrl) => true,
-            (Self::PydanticSerializable, Self::PydanticSerializable) => true,
-            (Self::Dataclass, Self::Dataclass) => true,
-            (Self::Enum, Self::Enum) => true,
-            (Self::Generator, Self::Generator) => true,
-            (Self::Path, Self::Path) => true,
-            (Self::Uuid, Self::Uuid) => true,
-            // not Unknown here - unknowns are never equal
-            // special cases for subclasses
-            (Self::IntSubclass, Self::Int) => true,
-            (Self::Int, Self::IntSubclass) => true,
-            (Self::FloatSubclass, Self::Float) => true,
-            (Self::Float, Self::FloatSubclass) => true,
-            (Self::StrSubclass, Self::Str) => true,
-            (Self::Str, Self::StrSubclass) => true,
-            _ => false,
+        if ((*self) as u8) == ((*other) as u8) {
+            // everything is equal to itself except for Unknown, which is never equal to anything
+            !matches!(self, Self::Unknown)
+        } else {
+            match (self, other) {
+                // special cases for subclasses
+                (Self::IntSubclass, Self::Int) => true,
+                (Self::Int, Self::IntSubclass) => true,
+                (Self::FloatSubclass, Self::Float) => true,
+                (Self::Float, Self::FloatSubclass) => true,
+                (Self::StrSubclass, Self::Str) => true,
+                (Self::Str, Self::StrSubclass) => true,
+                _ => false,
+            }
         }
     }
 }
