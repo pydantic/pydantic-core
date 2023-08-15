@@ -29,7 +29,7 @@ fn get_constraint(schema: &PyDict, key: &str) -> PyResult<Option<Duration>> {
     match schema.get_item(key) {
         Some(value) => {
             let either_timedelta = EitherTimedelta::try_from(value)?;
-            Ok(Some(either_timedelta.as_duration()?))
+            Ok(Some(either_timedelta.to_duration()?))
         }
         None => Ok(None),
     }
@@ -77,7 +77,7 @@ impl Validator for TimeDeltaValidator {
         let timedelta = input.validate_timedelta(extra.strict.unwrap_or(self.strict), self.microseconds_precision)?;
         let py_timedelta = timedelta.try_into_py(py)?;
         if let Some(constraints) = &self.constraints {
-            let raw_timedelta = timedelta.as_duration()?;
+            let raw_timedelta = timedelta.to_duration()?;
 
             macro_rules! check_constraint {
                 ($constraint:ident, $error:ident) => {
