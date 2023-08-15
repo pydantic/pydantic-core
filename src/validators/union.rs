@@ -6,7 +6,7 @@ use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config};
-use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
+use crate::errors::{ErrorType, LocItem, ValError, ValLineError, ValResult};
 use crate::input::{GenericMapping, Input};
 use crate::lookup_key::LookupKey;
 use crate::py_gc::PyGcTraverse;
@@ -139,7 +139,7 @@ impl Validator for UnionValidator {
                 if let Some(ref mut errors) = errors {
                     errors.extend(line_errors.into_iter().map(|err| {
                         let case_label = label.as_deref().unwrap_or(validator.get_name());
-                        err.with_outer_location(format!("[case:{case_label}]").into())
+                        err.with_outer_location(case_label.into())
                     }));
                 }
             }
@@ -177,7 +177,7 @@ impl Validator for UnionValidator {
                 if let Some(ref mut errors) = errors {
                     errors.extend(line_errors.into_iter().map(|err| {
                         let case_label = label.as_deref().unwrap_or(validator.get_name());
-                        err.with_outer_location(format!("[case:{case_label}]").into())
+                        err.with_outer_location(case_label.into())
                     }));
                 }
             }
@@ -457,7 +457,7 @@ impl TaggedUnionValidator {
         if let Ok(Some((tag, validator))) = self.lookup.validate(py, tag) {
             return match validator.validate(py, input, extra, definitions, recursion_guard) {
                 Ok(res) => Ok(res),
-                Err(err) => Err(err.with_outer_location(format!("[tag:{}]", tag.repr()?).into())),
+                Err(err) => Err(err.with_outer_location(LocItem::try_from(tag.to_object(py).into_ref(py))?)),
             };
         }
         match self.custom_error {

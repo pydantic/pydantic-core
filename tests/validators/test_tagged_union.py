@@ -21,7 +21,7 @@ from .test_typed_dict import Cls
                 [
                     {
                         'type': 'int_parsing',
-                        'loc': ("[tag:'apple']", 'bar'),
+                        'loc': ('apple', 'bar'),
                         'msg': 'Input should be a valid integer, unable to parse string as an integer',
                         'input': 'wrong',
                     }
@@ -32,14 +32,7 @@ from .test_typed_dict import Cls
             {'foo': 'banana'},
             Err(
                 'Field required',
-                [
-                    {
-                        'type': 'missing',
-                        'loc': ("[tag:'banana']", 'spam'),
-                        'msg': 'Field required',
-                        'input': {'foo': 'banana'},
-                    }
-                ],
+                [{'type': 'missing', 'loc': ('banana', 'spam'), 'msg': 'Field required', 'input': {'foo': 'banana'}}],
             ),
         ),
         (
@@ -141,7 +134,7 @@ def test_simple_tagged_union(py_and_json: PyAndJson, input_value, expected):
                 [
                     {
                         'type': 'int_parsing',
-                        'loc': ('[tag:123]', 'bar'),
+                        'loc': (123, 'bar'),
                         'msg': 'Input should be a valid integer, unable to parse string as an integer',
                         'input': 'wrong',
                     }
@@ -321,7 +314,7 @@ def test_discriminator_path(py_and_json: PyAndJson):
                 [
                     {
                         'type': 'literal_error',
-                        'loc': ("[tag:'str']",),
+                        'loc': ('str',),
                         'msg': "Input should be 'foo' or 'bar'",
                         'input': 'baz',
                         'ctx': {'expected': "'foo' or 'bar'"},

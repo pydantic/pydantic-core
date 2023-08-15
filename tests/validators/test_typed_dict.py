@@ -234,7 +234,7 @@ def test_json_error():
 
 
 def test_missing_schema_key():
-    with pytest.raises(SchemaError, match=r"\[tag:'typed-dict'].fields.x.schema\n  Field required"):
+    with pytest.raises(SchemaError, match='typed-dict.fields.x.schema\n  Field required'):
         SchemaValidator({'type': 'typed-dict', 'fields': {'x': {'type': 'str'}}})
 
 

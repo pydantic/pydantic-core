@@ -181,14 +181,14 @@ def test_union():
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'literal_error',
-            'loc': ("[case:literal['a','b']]",),
+            'loc': ("literal['a','b']",),
             'msg': "Input should be 'a' or 'b'",
             'input': 'c',
             'ctx': {'expected': "'a' or 'b'"},
         },
         {
             'type': 'int_parsing',
-            'loc': ('[case:int]',),
+            'loc': ('int',),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'c',
         },

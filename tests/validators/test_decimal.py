@@ -206,14 +206,14 @@ def test_union_decimal_py():
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'is_instance_of',
-            'loc': ('[case:decimal]',),
+            'loc': ('decimal',),
             'msg': 'Input should be an instance of Decimal',
             'input': '5',
             'ctx': {'class': 'Decimal'},
         },
         {
             'type': 'multiple_of',
-            'loc': ('[case:decimal]',),
+            'loc': ('decimal',),
             'msg': 'Input should be a multiple of 7',
             'input': '5',
             'ctx': {'multiple_of': 7},
@@ -236,15 +236,10 @@ def test_union_decimal_simple(py_and_json: PyAndJson):
         v.validate_test('xxx')
 
     assert exc_info.value.errors(include_url=False) == [
-        {
-            'type': 'decimal_parsing',
-            'loc': ('[case:decimal]',),
-            'msg': 'Input should be a valid decimal',
-            'input': 'xxx',
-        },
+        {'type': 'decimal_parsing', 'loc': ('decimal',), 'msg': 'Input should be a valid decimal', 'input': 'xxx'},
         {
             'type': 'list_type',
-            'loc': ('[case:list[any]]',),
+            'loc': ('list[any]',),
             'msg': IsStr(regex='Input should be a valid (list|array)'),
             'input': 'xxx',
         },

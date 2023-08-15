@@ -289,10 +289,10 @@ def test_union_int(py_and_json: PyAndJson):
         v.validate_test('5')
 
     assert exc_info.value.errors(include_url=False) == [
-        {'type': 'int_type', 'loc': ('[case:int]',), 'msg': 'Input should be a valid integer', 'input': '5'},
+        {'type': 'int_type', 'loc': ('int',), 'msg': 'Input should be a valid integer', 'input': '5'},
         {
             'type': 'multiple_of',
-            'loc': ('[case:constrained-int]',),
+            'loc': ('constrained-int',),
             'msg': 'Input should be a multiple of 7',
             'input': '5',
             'ctx': {'multiple_of': 7},
@@ -309,13 +309,13 @@ def test_union_int_simple(py_and_json: PyAndJson):
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'int_parsing',
-            'loc': ('[case:int]',),
+            'loc': ('int',),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'xxx',
         },
         {
             'type': 'list_type',
-            'loc': ('[case:list[any]]',),
+            'loc': ('list[any]',),
             'msg': IsStr(regex='Input should be a valid (list|array)'),
             'input': 'xxx',
         },

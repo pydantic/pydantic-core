@@ -57,5 +57,5 @@ def test_repr():
     assert v.isinstance_python(func) is True
     assert v.isinstance_python('foo') is False
 
-    with pytest.raises(ValidationError, match=r'\[case:callable]\s+Input should be callable'):
+    with pytest.raises(ValidationError, match=r'callable\s+Input should be callable'):
         v.validate_python('foo')

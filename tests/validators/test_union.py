@@ -108,9 +108,9 @@ class TestModelClass:
         with pytest.raises(ValidationError) as exc_info:
             schema_validator.validate_python({'a': 2})
         assert exc_info.value.errors(include_url=False) == [
-            {'type': 'missing', 'loc': ('[case:ModelA]', 'b'), 'msg': 'Field required', 'input': {'a': 2}},
-            {'type': 'missing', 'loc': ('[case:ModelB]', 'c'), 'msg': 'Field required', 'input': {'a': 2}},
-            {'type': 'missing', 'loc': ('[case:ModelB]', 'd'), 'msg': 'Field required', 'input': {'a': 2}},
+            {'type': 'missing', 'loc': ('ModelA', 'b'), 'msg': 'Field required', 'input': {'a': 2}},
+            {'type': 'missing', 'loc': ('ModelB', 'c'), 'msg': 'Field required', 'input': {'a': 2}},
+            {'type': 'missing', 'loc': ('ModelB', 'd'), 'msg': 'Field required', 'input': {'a': 2}},
         ]
 
 
@@ -191,10 +191,10 @@ def test_nullable_via_union():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('hello')
     assert exc_info.value.errors(include_url=False) == [
-        {'type': 'none_required', 'loc': ('[case:none]',), 'msg': 'Input should be None', 'input': 'hello'},
+        {'type': 'none_required', 'loc': ('none',), 'msg': 'Input should be None', 'input': 'hello'},
         {
             'type': 'int_parsing',
-            'loc': ('[case:int]',),
+            'loc': ('int',),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'hello',
         },
@@ -219,13 +219,13 @@ def test_union_list_bool_int():
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'bool_parsing',
-            'loc': ('[case:list[bool]]', 0),
+            'loc': ('list[bool]', 0),
             'msg': 'Input should be a valid boolean, unable to interpret input',
             'input': 3,
         },
         {
             'type': 'int_parsing',
-            'loc': ('[case:list[int]]', 1),
+            'loc': ('list[int]', 1),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'true',
         },
@@ -238,13 +238,13 @@ def test_no_choices(pydantic_version):
 
     assert str(exc_info.value) == (
         'Invalid Schema:\n'
-        "[tag:'union'].choices\n"
+        'union.choices\n'
         "  Field required [type=missing, input_value={'type': 'union'}, input_type=dict]\n"
         f'    For further information visit https://errors.pydantic.dev/{pydantic_version}/v/missing'
     )
     assert exc_info.value.error_count() == 1
     assert exc_info.value.errors() == [
-        {'input': {'type': 'union'}, 'loc': ("[tag:'union']", 'choices'), 'msg': 'Field required', 'type': 'missing'}
+        {'input': {'type': 'union'}, 'loc': ('union', 'choices'), 'msg': 'Field required', 'type': 'missing'}
     ]
 
 
@@ -269,8 +269,8 @@ def test_strict_union():
         v.validate_python('123')
 
     assert exc_info.value.errors(include_url=False) == [
-        {'type': 'bool_type', 'loc': ('[case:bool]',), 'msg': 'Input should be a valid boolean', 'input': '123'},
-        {'type': 'int_type', 'loc': ('[case:int]',), 'msg': 'Input should be a valid integer', 'input': '123'},
+        {'type': 'bool_type', 'loc': ('bool',), 'msg': 'Input should be a valid boolean', 'input': '123'},
+        {'type': 'int_type', 'loc': ('int',), 'msg': 'Input should be a valid integer', 'input': '123'},
     ]
 
 
@@ -422,12 +422,12 @@ def test_case_labels():
     with pytest.raises(ValidationError, match=r'3 validation errors for union\[none,my_label,str]') as exc_info:
         v.validate_python(1.5)
     assert exc_info.value.errors(include_url=False) == [
-        {'input': 1.5, 'loc': ('[case:none]',), 'msg': 'Input should be None', 'type': 'none_required'},
+        {'input': 1.5, 'loc': ('none',), 'msg': 'Input should be None', 'type': 'none_required'},
         {
             'input': 1.5,
-            'loc': ('[case:my_label]',),
+            'loc': ('my_label',),
             'msg': 'Input should be a valid integer, got a number with a fractional part',
             'type': 'int_from_float',
         },
-        {'input': 1.5, 'loc': ('[case:str]',), 'msg': 'Input should be a valid string', 'type': 'string_type'},
+        {'input': 1.5, 'loc': ('str',), 'msg': 'Input should be a valid string', 'type': 'string_type'},
     ]

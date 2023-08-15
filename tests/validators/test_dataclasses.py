@@ -1224,11 +1224,11 @@ def test_custom_dataclass_names():
         {
             'ctx': {'class_name': 'FooDataclass[dataclass_args_schema]'},
             'input': 123,
-            'loc': ('foo', '[case:FooDataclass[cls_name]]'),
+            'loc': ('foo', 'FooDataclass[cls_name]'),
             'msg': 'Input should be a dictionary or an instance of FooDataclass[dataclass_args_schema]',
             'type': 'dataclass_type',
         },
-        {'input': 123, 'loc': ('foo', '[case:none]'), 'msg': 'Input should be None', 'type': 'none_required'},
+        {'input': 123, 'loc': ('foo', 'none'), 'msg': 'Input should be None', 'type': 'none_required'},
     ]
 
 
