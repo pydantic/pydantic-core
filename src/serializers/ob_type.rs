@@ -24,7 +24,6 @@ pub struct ObTypeLookup {
     dict: usize,
     // other numeric types
     decimal_object: PyObject,
-    decimal: usize,
     // other string types
     bytes: usize,
     bytearray: usize,
@@ -42,16 +41,12 @@ pub struct ObTypeLookup {
     multi_host_url: usize,
     // enum type
     enum_object: PyObject,
-    enum_: usize,
     // generator
     generator_object: PyObject,
-    generator: usize,
     // path
     path_object: PyObject,
-    path: usize,
     // uuid type
     uuid_object: PyObject,
-    uuid: usize,
 }
 
 static TYPE_LOOKUP: GILOnceCell<ObTypeLookup> = GILOnceCell::new();
@@ -66,11 +61,6 @@ pub enum IsType {
 impl ObTypeLookup {
     fn new(py: Python) -> Self {
         let lib_url = url::Url::parse("https://example.com").unwrap();
-        let decimal_type = py.import("decimal").unwrap().getattr("Decimal").unwrap();
-        let enum_object = py.import("enum").unwrap().getattr("Enum").unwrap();
-        let generator_object = py.import("types").unwrap().getattr("GeneratorType").unwrap();
-        let path_object = py.import("pathlib").unwrap().getattr("Path").unwrap();
-        let uuid_object = py.import("uuid").unwrap().getattr("UUID").unwrap();
         Self {
             none: py.None().as_ref(py).get_type_ptr() as usize,
             int: 0i32.into_py(py).as_ref(py).get_type_ptr() as usize,
@@ -78,8 +68,7 @@ impl ObTypeLookup {
             float: 0f32.into_py(py).as_ref(py).get_type_ptr() as usize,
             list: PyList::empty(py).get_type_ptr() as usize,
             dict: PyDict::new(py).get_type_ptr() as usize,
-            decimal_object: decimal_type.to_object(py),
-            decimal: decimal_type.as_ptr() as usize,
+            decimal_object: py.import("decimal").unwrap().getattr("Decimal").unwrap().to_object(py),
             string: PyString::new(py, "s").get_type_ptr() as usize,
             bytes: PyBytes::new(py, b"s").get_type_ptr() as usize,
             bytearray: PyByteArray::new(py, b"s").get_type_ptr() as usize,
@@ -94,14 +83,15 @@ impl ObTypeLookup {
             timedelta: PyDelta::new(py, 0, 0, 0, false).unwrap().get_type_ptr() as usize,
             url: PyUrl::new(lib_url.clone()).into_py(py).as_ref(py).get_type_ptr() as usize,
             multi_host_url: PyMultiHostUrl::new(lib_url, None).into_py(py).as_ref(py).get_type_ptr() as usize,
-            enum_object: enum_object.to_object(py),
-            enum_: enum_object.get_type_ptr() as usize,
-            generator_object: generator_object.to_object(py),
-            generator: generator_object.as_ptr() as usize,
-            path_object: path_object.to_object(py),
-            path: path_object.as_ptr() as usize,
-            uuid_object: uuid_object.to_object(py),
-            uuid: uuid_object.as_ptr() as usize,
+            enum_object: py.import("enum").unwrap().getattr("Enum").unwrap().to_object(py),
+            generator_object: py
+                .import("types")
+                .unwrap()
+                .getattr("GeneratorType")
+                .unwrap()
+                .to_object(py),
+            path_object: py.import("pathlib").unwrap().getattr("Path").unwrap().to_object(py),
+            uuid_object: py.import("uuid").unwrap().getattr("UUID").unwrap().to_object(py),
         }
     }
 
@@ -150,7 +140,7 @@ impl ObTypeLookup {
             ObType::Str => self.string == ob_type,
             ObType::List => self.list == ob_type,
             ObType::Dict => self.dict == ob_type,
-            ObType::Decimal => self.decimal == ob_type,
+            ObType::Decimal => self.decimal_object.as_ptr() as usize == ob_type,
             ObType::StrSubclass => self.string == ob_type && op_value.is_none(),
             ObType::Tuple => self.tuple == ob_type,
             ObType::Set => self.set == ob_type,
@@ -165,10 +155,10 @@ impl ObTypeLookup {
             ObType::MultiHostUrl => self.multi_host_url == ob_type,
             ObType::Dataclass => is_dataclass(op_value),
             ObType::PydanticSerializable => is_pydantic_serializable(op_value),
-            ObType::Enum => self.enum_ == ob_type,
-            ObType::Generator => self.generator == ob_type,
-            ObType::Path => self.path == ob_type,
-            ObType::Uuid => self.uuid == ob_type,
+            ObType::Enum => self.enum_object.as_ptr() as usize == ob_type,
+            ObType::Generator => self.generator_object.as_ptr() as usize == ob_type,
+            ObType::Path => self.path_object.as_ptr() as usize == ob_type,
+            ObType::Uuid => self.uuid_object.as_ptr() as usize == ob_type,
             ObType::Unknown => false,
         };
 
@@ -226,7 +216,7 @@ impl ObTypeLookup {
             ObType::List
         } else if ob_type == self.dict {
             ObType::Dict
-        } else if ob_type == self.decimal {
+        } else if ob_type == self.decimal_object.as_ptr() as usize {
             ObType::Decimal
         } else if ob_type == self.bytes {
             ObType::Bytes
@@ -250,7 +240,7 @@ impl ObTypeLookup {
             ObType::Url
         } else if ob_type == self.multi_host_url {
             ObType::MultiHostUrl
-        } else if ob_type == self.uuid {
+        } else if ob_type == self.uuid_object.as_ptr() as usize {
             ObType::Uuid
         } else if is_pydantic_serializable(op_value) {
             ObType::PydanticSerializable
@@ -258,9 +248,9 @@ impl ObTypeLookup {
             ObType::Dataclass
         } else if self.is_enum(op_value, type_ptr) {
             ObType::Enum
-        } else if ob_type == self.generator || is_generator(op_value) {
+        } else if ob_type == self.generator_object.as_ptr() as usize || is_generator(op_value) {
             ObType::Generator
-        } else if ob_type == self.path {
+        } else if ob_type == self.path_object.as_ptr() as usize {
             ObType::Path
         } else {
             // this allows for subtypes of the supported class types,
@@ -283,7 +273,7 @@ impl ObTypeLookup {
             let meta_type = unsafe { (*type_ptr).ob_type };
             #[cfg(any(not(PyPy), Py_3_9))]
             let meta_type = unsafe { (*type_ptr).ob_base.ob_base.ob_type };
-            meta_type as usize == self.enum_
+            meta_type as usize == self.enum_object.as_ptr() as usize
         } else {
             false
         }
@@ -295,26 +285,29 @@ impl ObTypeLookup {
     /// 1. we pay a price for each `isinstance` call
     /// 2. some types are subclasses of others, e.g. `bool` is a subclass of `int`
     /// hence we put common types first
+    /// In addition, some types have inheritance set as a bitflag on the type object:
+    /// https://github.com/python/cpython/blob/v3.12.0rc1/Include/object.h#L546-L553
+    /// Hence they come first
     fn fallback_isinstance(&self, value: &PyAny) -> ObType {
         let py = value.py();
-        if PyBool::is_type_of(value) {
-            ObType::Bool
-        } else if PyInt::is_type_of(value) {
+        if PyInt::is_type_of(value) {
             ObType::IntSubclass
-        } else if PyFloat::is_type_of(value) {
-            ObType::FloatSubclass
         } else if PyString::is_type_of(value) {
             ObType::StrSubclass
         } else if PyBytes::is_type_of(value) {
             ObType::Bytes
-        } else if PyByteArray::is_type_of(value) {
-            ObType::Bytearray
         } else if PyList::is_type_of(value) {
             ObType::List
         } else if PyTuple::is_type_of(value) {
             ObType::Tuple
         } else if PyDict::is_type_of(value) {
             ObType::Dict
+        } else if PyBool::is_type_of(value) {
+            ObType::Bool
+        } else if PyFloat::is_type_of(value) {
+            ObType::FloatSubclass
+        } else if PyByteArray::is_type_of(value) {
+            ObType::Bytearray
         } else if PySet::is_type_of(value) {
             ObType::Set
         } else if PyFrozenSet::is_type_of(value) {
