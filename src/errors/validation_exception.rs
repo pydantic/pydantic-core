@@ -51,7 +51,7 @@ impl ValidationError {
         error_mode: ErrorMode,
         error: ValError,
         outer_location: Option<LocItem>,
-        hide_input: bool,
+        user_config: &crate::user_config::UserConfig,
     ) -> PyErr {
         match error {
             ValError::LineErrors(raw_errors) => {
@@ -62,7 +62,15 @@ impl ValidationError {
                         .collect(),
                     None => raw_errors.into_iter().map(|e| e.into_py(py)).collect(),
                 };
-                let validation_error = Self::new(line_errors, title, error_mode, hide_input);
+                let validation_error = Self::new(
+                    line_errors,
+                    title,
+                    error_mode,
+                    user_config
+                        .get_conf::<bool>(intern!(py, "hide_input_in_errors"))
+                        .unwrap_or(false),
+                );
+
                 match Py::new(py, validation_error) {
                     Ok(err) => PyErr::from_value(err.into_ref(py)),
                     Err(err) => err,

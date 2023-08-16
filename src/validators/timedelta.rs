@@ -39,7 +39,7 @@ impl BuildValidator for TimeDeltaValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let constraints = TimedeltaConstraints {
@@ -50,13 +50,13 @@ impl BuildValidator for TimeDeltaValidator {
         };
 
         Ok(Self {
-            strict: is_strict(schema, config)?,
+            strict: is_strict(schema, user_config)?,
             constraints: (constraints.le.is_some()
                 || constraints.lt.is_some()
                 || constraints.ge.is_some()
                 || constraints.gt.is_some())
             .then_some(constraints),
-            microseconds_precision: extract_microseconds_precision(schema, config)?,
+            microseconds_precision: extract_microseconds_precision(schema, user_config)?,
         }
         .into())
     }

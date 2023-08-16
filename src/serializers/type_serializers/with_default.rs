@@ -21,14 +21,14 @@ impl BuildSerializer for WithDefaultSerializer {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let default = DefaultType::new(schema)?;
 
         let sub_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
-        let serializer = Box::new(CombinedSerializer::build(sub_schema, config, definitions)?);
+        let serializer = Box::new(CombinedSerializer::build(sub_schema, user_config, definitions)?);
 
         Ok(Self { default, serializer }.into())
     }

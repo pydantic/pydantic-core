@@ -63,7 +63,7 @@ impl BuildValidator for UnionValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
@@ -80,7 +80,7 @@ impl BuildValidator for UnionValidator {
                     }
                     Err(_) => choice,
                 };
-                Ok((build_validator(choice, config, definitions)?, label))
+                Ok((build_validator(choice, user_config, definitions)?, label))
             })
             .collect::<PyResult<Vec<(CombinedValidator, Option<String>)>>>()?;
 
@@ -101,8 +101,8 @@ impl BuildValidator for UnionValidator {
                 Ok(Self {
                     mode,
                     choices,
-                    custom_error: CustomError::build(schema, config, definitions)?,
-                    strict: is_strict(schema, config)?,
+                    custom_error: CustomError::build(schema, user_config, definitions)?,
+                    strict: is_strict(schema, user_config)?,
                     name: format!("{}[{descr}]", Self::EXPECTED_TYPE),
                 }
                 .into())
@@ -374,7 +374,7 @@ impl BuildValidator for TaggedUnionValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
@@ -390,7 +390,7 @@ impl BuildValidator for TaggedUnionValidator {
         let mut lookup_map = Vec::with_capacity(choices.len());
         for (choice_key, choice_schema) in schema_choices {
             discriminators.push(choice_key);
-            let validator = build_validator(choice_schema, config, definitions)?;
+            let validator = build_validator(choice_schema, user_config, definitions)?;
             let tag_repr = choice_key.repr()?.to_string();
             if first {
                 first = false;
@@ -407,7 +407,7 @@ impl BuildValidator for TaggedUnionValidator {
         let lookup = LiteralLookup::new(py, lookup_map.into_iter())?;
 
         let key = intern!(py, "from_attributes");
-        let from_attributes = schema_or_config(schema, config, key, key)?.unwrap_or(true);
+        let from_attributes = schema_or_config(schema, user_config, key, key)?.unwrap_or(true);
 
         let descr = match discriminator {
             Discriminator::SelfSchema => "self-schema".to_string(),
@@ -418,8 +418,8 @@ impl BuildValidator for TaggedUnionValidator {
             discriminator,
             lookup,
             from_attributes,
-            strict: is_strict(schema, config)?,
-            custom_error: CustomError::build(schema, config, definitions)?,
+            strict: is_strict(schema, user_config)?,
+            custom_error: CustomError::build(schema, user_config, definitions)?,
             tags_repr,
             discriminator_repr,
             name: format!("{}[{descr}]", Self::EXPECTED_TYPE),

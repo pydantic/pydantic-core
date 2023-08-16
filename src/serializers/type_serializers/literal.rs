@@ -29,7 +29,7 @@ impl BuildSerializer for LiteralSerializer {
 
     fn build(
         schema: &PyDict,
-        _config: Option<&PyDict>,
+        _user_config: &crate::user_config::UserConfig,
         _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let expected: &PyList = schema.get_as_req(intern!(schema.py(), "expected"))?;

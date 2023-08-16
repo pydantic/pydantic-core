@@ -26,16 +26,16 @@ impl BuildSerializer for TupleVariableSerializer {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         if let Some("positional") = schema.get_as::<&str>(intern!(py, "mode"))? {
-            return TuplePositionalSerializer::build(schema, config, definitions);
+            return TuplePositionalSerializer::build(schema, user_config, definitions);
         }
         let item_serializer = match schema.get_as::<&PyDict>(intern!(py, "items_schema"))? {
-            Some(items_schema) => CombinedSerializer::build(items_schema, config, definitions)?,
-            None => AnySerializer::build(schema, config, definitions)?,
+            Some(items_schema) => CombinedSerializer::build(items_schema, user_config, definitions)?,
+            None => AnySerializer::build(schema, user_config, definitions)?,
         };
         let name = format!("tuple[{}, ...]", item_serializer.get_name());
         Ok(Self {
@@ -153,19 +153,19 @@ impl BuildSerializer for TuplePositionalSerializer {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let items: &PyList = schema.get_as_req(intern!(py, "items_schema"))?;
 
         let extra_serializer = match schema.get_as::<&PyDict>(intern!(py, "extra_schema"))? {
-            Some(extra_schema) => CombinedSerializer::build(extra_schema, config, definitions)?,
-            None => AnySerializer::build(schema, config, definitions)?,
+            Some(extra_schema) => CombinedSerializer::build(extra_schema, user_config, definitions)?,
+            None => AnySerializer::build(schema, user_config, definitions)?,
         };
         let items_serializers: Vec<CombinedSerializer> = items
             .iter()
-            .map(|item| CombinedSerializer::build(item.downcast()?, config, definitions))
+            .map(|item| CombinedSerializer::build(item.downcast()?, user_config, definitions))
             .collect::<PyResult<_>>()?;
 
         let descr = items_serializers

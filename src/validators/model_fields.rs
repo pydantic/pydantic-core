@@ -47,19 +47,21 @@ impl BuildValidator for ModelFieldsValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let strict = is_strict(schema, config)?;
+        let strict = is_strict(schema, user_config)?;
 
-        let from_attributes = schema_or_config_same(schema, config, intern!(py, "from_attributes"))?.unwrap_or(false);
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
+        let from_attributes =
+            schema_or_config_same(schema, user_config, intern!(py, "from_attributes"))?.unwrap_or(false);
+        let populate_by_name =
+            schema_or_config_same(schema, user_config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
-        let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
+        let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, user_config, ExtraBehavior::Ignore)?;
 
         let extra_validator = match (schema.get_item(intern!(py, "extra_validator")), &extra_behavior) {
-            (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(v, config, definitions)?)),
+            (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(v, user_config, definitions)?)),
             (Some(_), _) => return py_schema_err!("extra_validator can only be used if extra_behavior=allow"),
             (_, _) => None,
         };
@@ -76,7 +78,7 @@ impl BuildValidator for ModelFieldsValidator {
 
             let schema = field_info.get_as_req(intern!(py, "schema"))?;
 
-            let validator = match build_validator(schema, config, definitions) {
+            let validator = match build_validator(schema, user_config, definitions) {
                 Ok(v) => v,
                 Err(err) => return py_schema_err!("Field \"{}\":\n  {}", field_name, err),
             };
@@ -105,7 +107,7 @@ impl BuildValidator for ModelFieldsValidator {
             extra_validator,
             strict,
             from_attributes,
-            loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
+            loc_by_alias: user_config.get_conf(intern!(py, "loc_by_alias")).unwrap_or(true),
         }
         .into())
     }

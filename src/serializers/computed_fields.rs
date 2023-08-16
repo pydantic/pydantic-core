@@ -20,14 +20,14 @@ pub(super) struct ComputedFields(Vec<ComputedField>);
 impl ComputedFields {
     pub fn new(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<Option<Self>> {
         let py = schema.py();
         if let Some(computed_fields) = schema.get_as::<&PyList>(intern!(py, "computed_fields"))? {
             let computed_fields = computed_fields
                 .iter()
-                .map(|field| ComputedField::new(field, config, definitions))
+                .map(|field| ComputedField::new(field, user_config, definitions))
                 .collect::<PyResult<Vec<_>>>()?;
             Ok(Some(Self(computed_fields)))
         } else {
@@ -99,14 +99,14 @@ struct ComputedField {
 impl ComputedField {
     pub fn new(
         schema: &PyAny,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<Self> {
         let py = schema.py();
         let schema: &PyDict = schema.downcast()?;
         let property_name: &PyString = schema.get_as_req(intern!(py, "property_name"))?;
         let return_schema = schema.get_as_req(intern!(py, "return_schema"))?;
-        let serializer = CombinedSerializer::build(return_schema, config, definitions)
+        let serializer = CombinedSerializer::build(return_schema, user_config, definitions)
             .map_err(|e| py_schema_error_type!("Computed field `{}`:\n  {}", property_name, e))?;
         let alias_py: &PyString = schema.get_as(intern!(py, "alias"))?.unwrap_or(property_name);
         Ok(Self {

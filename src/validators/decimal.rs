@@ -32,11 +32,11 @@ impl BuildValidator for DecimalValidator {
     const EXPECTED_TYPE: &'static str = "decimal";
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let allow_inf_nan = schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(false);
+        let allow_inf_nan = schema_or_config_same(schema, user_config, intern!(py, "allow_inf_nan"))?.unwrap_or(false);
         let decimal_places = schema.get_as(intern!(py, "decimal_places"))?;
         let max_digits = schema.get_as(intern!(py, "max_digits"))?;
         if allow_inf_nan && (decimal_places.is_some() || max_digits.is_some()) {
@@ -45,7 +45,7 @@ impl BuildValidator for DecimalValidator {
             ));
         }
         Ok(Self {
-            strict: is_strict(schema, config)?,
+            strict: is_strict(schema, user_config)?,
             allow_inf_nan,
             check_digits: decimal_places.is_some() || max_digits.is_some(),
             decimal_places,

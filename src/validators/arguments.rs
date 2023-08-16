@@ -38,12 +38,13 @@ impl BuildValidator for ArgumentsValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
+        let populate_by_name =
+            schema_or_config_same(schema, user_config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
         let arguments_schema: &PyList = schema.get_as_req(intern!(py, "arguments_schema"))?;
         let mut parameters: Vec<Parameter> = Vec::with_capacity(arguments_schema.len());
@@ -78,7 +79,7 @@ impl BuildValidator for ArgumentsValidator {
 
             let schema: &PyAny = arg.get_as_req(intern!(py, "schema"))?;
 
-            let validator = match build_validator(schema, config, definitions) {
+            let validator = match build_validator(schema, user_config, definitions) {
                 Ok(v) => v,
                 Err(err) => return py_schema_err!("Parameter '{}':\n  {}", name, err),
             };
@@ -111,14 +112,14 @@ impl BuildValidator for ArgumentsValidator {
             parameters,
             positional_params_count,
             var_args_validator: match schema.get_item(intern!(py, "var_args_schema")) {
-                Some(v) => Some(Box::new(build_validator(v, config, definitions)?)),
+                Some(v) => Some(Box::new(build_validator(v, user_config, definitions)?)),
                 None => None,
             },
             var_kwargs_validator: match schema.get_item(intern!(py, "var_kwargs_schema")) {
-                Some(v) => Some(Box::new(build_validator(v, config, definitions)?)),
+                Some(v) => Some(Box::new(build_validator(v, user_config, definitions)?)),
                 None => None,
             },
-            loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
+            loc_by_alias: user_config.get_conf(intern!(py, "loc_by_alias")).unwrap_or(true),
         }
         .into())
     }

@@ -78,13 +78,14 @@ class SchemaValidator:
     `CombinedValidator` which may in turn own more `CombinedValidator`s which make up the full schema validator.
     """
 
-    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self:
+    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None, flags: CoreConfig | None = None) -> Self:
         """
         Create a new SchemaValidator.
 
         Arguments:
             schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for validation.
             config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to configure validation.
+            flags: Global flags to apply to the schema, same as `config` but is overriden by `config` if the same key is provided in both.
         """
     @property
     def title(self) -> str:
@@ -229,7 +230,7 @@ class SchemaSerializer:
     `CombinedSerializer` which may in turn own more `CombinedSerializer`s which make up the full schema serializer.
     """
 
-    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self:
+    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None, flags: CoreConfig | None = None) -> Self:
         """
         Create a new SchemaSerializer.
 

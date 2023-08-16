@@ -24,9 +24,9 @@ pub struct DateTimeValidator {
 
 pub(crate) fn extract_microseconds_precision(
     schema: &PyDict,
-    config: Option<&PyDict>,
+    user_config: &crate::user_config::UserConfig,
 ) -> PyResult<speedate::MicrosecondsPrecisionOverflowBehavior> {
-    schema_or_config_same(schema, config, intern!(schema.py(), "microseconds_precision"))?
+    schema_or_config_same(schema, user_config, intern!(schema.py(), "microseconds_precision"))?
         .map_or(
             Ok(speedate::MicrosecondsPrecisionOverflowBehavior::Truncate),
             |v: &PyString| {
@@ -43,13 +43,13 @@ impl BuildValidator for DateTimeValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         Ok(Self {
-            strict: is_strict(schema, config)?,
+            strict: is_strict(schema, user_config)?,
             constraints: DateTimeConstraints::from_py(schema)?,
-            microseconds_precision: extract_microseconds_precision(schema, config)?,
+            microseconds_precision: extract_microseconds_precision(schema, user_config)?,
         }
         .into())
     }

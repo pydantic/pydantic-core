@@ -18,12 +18,12 @@ pub struct ListValidator {
 
 pub fn get_items_schema(
     schema: &PyDict,
-    config: Option<&PyDict>,
+    user_config: &crate::user_config::UserConfig,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<Option<Box<CombinedValidator>>> {
     match schema.get_item(pyo3::intern!(schema.py(), "items_schema")) {
         Some(d) => {
-            let validator = build_validator(d, config, definitions)?;
+            let validator = build_validator(d, user_config, definitions)?;
             match validator {
                 CombinedValidator::Any(_) => Ok(None),
                 _ => Ok(Some(Box::new(validator))),
@@ -94,15 +94,15 @@ impl BuildValidator for ListValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let item_validator = get_items_schema(schema, config, definitions)?;
+        let item_validator = get_items_schema(schema, user_config, definitions)?;
         let inner_name = item_validator.as_ref().map_or("any", |v| v.get_name());
         let name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
         Ok(Self {
-            strict: crate::build_tools::is_strict(schema, config)?,
+            strict: crate::build_tools::is_strict(schema, user_config)?,
             item_validator,
             min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
             max_length: schema.get_as(pyo3::intern!(py, "max_length"))?,

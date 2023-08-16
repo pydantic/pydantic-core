@@ -17,7 +17,7 @@ impl BuildValidator for DefinitionsValidatorBuilder {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
@@ -25,12 +25,12 @@ impl BuildValidator for DefinitionsValidatorBuilder {
         let schema_definitions: &PyList = schema.get_as_req(intern!(py, "definitions"))?;
 
         for schema_definition in schema_definitions {
-            build_validator(schema_definition, config, definitions)?;
+            build_validator(schema_definition, user_config, definitions)?;
             // no need to store the validator here, it has already been stored in definitions if necessary
         }
 
         let inner_schema: &PyAny = schema.get_as_req(intern!(py, "schema"))?;
-        build_validator(inner_schema, config, definitions)
+        build_validator(inner_schema, user_config, definitions)
     }
 }
 
@@ -55,7 +55,7 @@ impl BuildValidator for DefinitionRefValidator {
 
     fn build(
         schema: &PyDict,
-        _config: Option<&PyDict>,
+        _user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let schema_ref: String = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
