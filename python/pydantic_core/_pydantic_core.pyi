@@ -5,7 +5,7 @@ import sys
 from typing import Any, Callable, Generic, Optional, Type, TypeVar
 
 from pydantic_core import ErrorDetails, ErrorTypeInfo, InitErrorDetails, MultiHostHost
-from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
+from pydantic_core.core_schema import CoreConfig, CoreFlags, CoreSchema, ErrorType
 
 if sys.version_info < (3, 8):
     from typing_extensions import final
@@ -78,7 +78,7 @@ class SchemaValidator:
     `CombinedValidator` which may in turn own more `CombinedValidator`s which make up the full schema validator.
     """
 
-    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self:
+    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None, flags: CoreFlags | None = None) -> Self:
         """
         Create a new SchemaValidator.
 
@@ -229,7 +229,7 @@ class SchemaSerializer:
     `CombinedSerializer` which may in turn own more `CombinedSerializer`s which make up the full schema serializer.
     """
 
-    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self:
+    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None, flags: CoreFlags | None = None) -> Self:
         """
         Create a new SchemaSerializer.
 

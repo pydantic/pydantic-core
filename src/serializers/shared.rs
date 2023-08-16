@@ -28,7 +28,7 @@ pub(crate) trait BuildSerializer: Sized {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer>;
 }
@@ -51,18 +51,18 @@ macro_rules! combined_serializer {
             fn find_serializer(
                 lookup_type: &str,
                 schema: &PyDict,
-                config: Option<&PyDict>,
+                user_config: &crate::user_config::UserConfig,
                 definitions: &mut DefinitionsBuilder<CombinedSerializer>
             ) -> PyResult<CombinedSerializer> {
                 match lookup_type {
                     $(
-                        <$b_serializer>::EXPECTED_TYPE => match <$b_serializer>::build(schema, config, definitions) {
+                        <$b_serializer>::EXPECTED_TYPE => match <$b_serializer>::build(schema, user_config, definitions) {
                             Ok(serializer) => Ok(serializer),
                             Err(err) => py_schema_err!("Error building `{}` serializer:\n  {}", lookup_type, err),
                         },
                     )*
                     $(
-                        <$builder>::EXPECTED_TYPE => match <$builder>::build(schema, config, definitions) {
+                        <$builder>::EXPECTED_TYPE => match <$builder>::build(schema, user_config, definitions) {
                             Ok(serializer) => Ok(serializer),
                             Err(err) => py_schema_err!("Error building `{}` serializer:\n  {}", lookup_type, err),
                         },
@@ -148,7 +148,7 @@ combined_serializer! {
 impl CombinedSerializer {
     fn _build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
@@ -163,7 +163,7 @@ impl CombinedSerializer {
                     // NOTE! we use the `schema` here, not `ser_schema`
                     return super::type_serializers::function::FunctionPlainSerializer::build(
                         schema,
-                        config,
+                        user_config,
                         definitions,
                     )
                     .map_err(|err| py_schema_error_type!("Error building `function-plain` serializer:\n  {}", err));
@@ -174,7 +174,7 @@ impl CombinedSerializer {
                     // NOTE! we use the `schema` here, not `ser_schema`
                     return super::type_serializers::function::FunctionWrapSerializer::build(
                         schema,
-                        config,
+                        user_config,
                         definitions,
                     )
                     .map_err(|err| py_schema_error_type!("Error building `function-wrap` serializer:\n  {}", err));
@@ -186,7 +186,7 @@ impl CombinedSerializer {
                 Some(ser_type) => {
                     // otherwise if `schema.serialization.type` is defined, use that with `find_serializer`
                     // instead of `schema.type`. In this case it's an error if a serializer isn't found.
-                    return Self::find_serializer(ser_type, ser_schema, config, definitions);
+                    return Self::find_serializer(ser_type, ser_schema, user_config, definitions);
                 }
                 // if `schema.serialization.type` is None, fall back to `schema.type`
                 None => (),
@@ -194,7 +194,7 @@ impl CombinedSerializer {
         }
 
         let type_: &str = schema.get_as_req(type_key)?;
-        Self::find_serializer(type_, schema, config, definitions)
+        Self::find_serializer(type_, schema, user_config, definitions)
     }
 }
 
@@ -204,17 +204,17 @@ impl BuildSerializer for CombinedSerializer {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py: Python = schema.py();
         if let Some(schema_ref) = schema.get_as::<String>(intern!(py, "ref"))? {
-            let inner_ser = Self::_build(schema, config, definitions)?;
+            let inner_ser = Self::_build(schema, user_config, definitions)?;
             let ser_id = definitions.add_definition(schema_ref, inner_ser)?;
             return Ok(DefinitionRefSerializer::from_id(ser_id));
         }
 
-        Self::_build(schema, config, definitions)
+        Self::_build(schema, user_config, definitions)
     }
 }
 

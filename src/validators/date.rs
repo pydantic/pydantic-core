@@ -24,11 +24,11 @@ impl BuildValidator for DateValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         Ok(Self {
-            strict: is_strict(schema, config)?,
+            strict: is_strict(schema, user_config)?,
             constraints: DateConstraints::from_py(schema)?,
         }
         .into())

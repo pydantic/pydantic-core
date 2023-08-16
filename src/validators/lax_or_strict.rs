@@ -23,15 +23,15 @@ impl BuildValidator for LaxOrStrictValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let lax_schema = schema.get_as_req(intern!(py, "lax_schema"))?;
-        let lax_validator = Box::new(build_validator(lax_schema, config, definitions)?);
+        let lax_validator = Box::new(build_validator(lax_schema, user_config, definitions)?);
 
         let strict_schema = schema.get_as_req(intern!(py, "strict_schema"))?;
-        let strict_validator = Box::new(build_validator(strict_schema, config, definitions)?);
+        let strict_validator = Box::new(build_validator(strict_schema, user_config, definitions)?);
 
         let name = format!(
             "{}[lax={},strict={}]",
@@ -40,7 +40,7 @@ impl BuildValidator for LaxOrStrictValidator {
             strict_validator.get_name()
         );
         Ok(Self {
-            strict: is_strict(schema, config)?,
+            strict: is_strict(schema, user_config)?,
             lax_validator,
             strict_validator,
             name,

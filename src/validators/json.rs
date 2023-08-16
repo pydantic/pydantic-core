@@ -20,12 +20,12 @@ impl BuildValidator for JsonValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let validator = match schema.get_as(intern!(schema.py(), "schema"))? {
             Some(schema) => {
-                let validator = build_validator(schema, config, definitions)?;
+                let validator = build_validator(schema, user_config, definitions)?;
                 match validator {
                     CombinedValidator::Any(_) => None,
                     _ => Some(Box::new(validator)),

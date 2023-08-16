@@ -155,7 +155,7 @@ impl BuildValidator for LiteralValidator {
 
     fn build(
         schema: &PyDict,
-        _config: Option<&PyDict>,
+        _user_config: &crate::user_config::UserConfig,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let expected: &PyList = schema.get_as_req(intern!(schema.py(), "expected"))?;

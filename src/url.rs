@@ -36,7 +36,7 @@ impl PyUrl {
 fn build_schema_validator(py: Python, schema_type: &str) -> SchemaValidator {
     let schema: &PyDict = PyDict::new(py);
     schema.set_item("type", schema_type).unwrap();
-    SchemaValidator::py_new(py, schema, None).unwrap()
+    SchemaValidator::py_new(py, schema, None, None).unwrap()
 }
 
 #[pymethods]

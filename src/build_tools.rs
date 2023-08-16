@@ -12,7 +12,7 @@ use crate::ValidationError;
 
 pub fn schema_or_config<'py, T>(
     schema: &'py PyDict,
-    config: Option<&'py PyDict>,
+    user_config: &'py crate::user_config::UserConfig,
     schema_key: &PyString,
     config_key: &PyString,
 ) -> PyResult<Option<T>>
@@ -21,27 +21,24 @@ where
 {
     match schema.get_as(schema_key)? {
         Some(v) => Ok(Some(v)),
-        None => match config {
-            Some(config) => config.get_as(config_key),
-            None => Ok(None),
-        },
+        None => Ok(user_config.get_conf(config_key)),
     }
 }
 
 pub fn schema_or_config_same<'py, T>(
     schema: &'py PyDict,
-    config: Option<&'py PyDict>,
+    user_config: &'py crate::user_config::UserConfig,
     key: &PyString,
 ) -> PyResult<Option<T>>
 where
     T: FromPyObject<'py>,
 {
-    schema_or_config(schema, config, key, key)
+    schema_or_config(schema, user_config, key, key)
 }
 
-pub fn is_strict(schema: &PyDict, config: Option<&PyDict>) -> PyResult<bool> {
+pub fn is_strict(schema: &PyDict, user_config: &crate::user_config::UserConfig) -> PyResult<bool> {
     let py = schema.py();
-    Ok(schema_or_config_same(schema, config, intern!(py, "strict"))?.unwrap_or(false))
+    Ok(schema_or_config_same(schema, user_config, intern!(py, "strict"))?.unwrap_or(false))
 }
 
 enum SchemaErrorEnum {
@@ -174,12 +171,12 @@ impl ExtraBehavior {
     pub fn from_schema_or_config(
         py: Python,
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         default: Self,
     ) -> PyResult<Self> {
         let extra_behavior = schema_or_config::<Option<&str>>(
             schema,
-            config,
+            user_config,
             intern!(py, "extra_behavior"),
             intern!(py, "extra_fields_behavior"),
         )?

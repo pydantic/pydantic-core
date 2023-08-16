@@ -22,7 +22,7 @@ impl BuildSerializer for DataclassArgsBuilder {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
@@ -30,7 +30,7 @@ impl BuildSerializer for DataclassArgsBuilder {
         let fields_list: &PyList = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: AHashMap<String, SerField> = AHashMap::with_capacity(fields_list.len());
 
-        let fields_mode = match ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)? {
+        let fields_mode = match ExtraBehavior::from_schema_or_config(py, schema, user_config, ExtraBehavior::Ignore)? {
             ExtraBehavior::Allow => FieldsMode::TypedDictAllow,
             _ => FieldsMode::SimpleDict,
         };
@@ -45,7 +45,7 @@ impl BuildSerializer for DataclassArgsBuilder {
                 fields.insert(name, SerField::new(py, key_py, None, None, true));
             } else {
                 let schema = field_info.get_as_req(intern!(py, "schema"))?;
-                let serializer = CombinedSerializer::build(schema, config, definitions)
+                let serializer = CombinedSerializer::build(schema, user_config, definitions)
                     .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", index, e))?;
 
                 let alias = field_info.get_as(intern!(py, "serialization_alias"))?;
@@ -53,7 +53,7 @@ impl BuildSerializer for DataclassArgsBuilder {
             }
         }
 
-        let computed_fields = ComputedFields::new(schema, config, definitions)?;
+        let computed_fields = ComputedFields::new(schema, user_config, definitions)?;
 
         Ok(GeneralFieldsSerializer::new(fields, fields_mode, None, computed_fields).into())
     }
@@ -72,17 +72,17 @@ impl BuildSerializer for DataclassSerializer {
 
     fn build(
         schema: &PyDict,
-        _config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
         // models ignore the parent config and always use the config from this model
-        let config = schema.get_as(intern!(py, "config"))?;
+        let user_config = &user_config.with_new_target(schema.get_as(intern!(py, "config"))?);
 
         let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
         let sub_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
-        let serializer = Box::new(CombinedSerializer::build(sub_schema, config, definitions)?);
+        let serializer = Box::new(CombinedSerializer::build(sub_schema, user_config, definitions)?);
 
         let fields = schema
             .get_as_req::<&PyList>(intern!(py, "fields"))?

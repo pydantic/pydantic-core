@@ -50,7 +50,7 @@ impl ValidationError {
         error_mode: ErrorMode,
         error: ValError,
         outer_location: Option<LocItem>,
-        hide_input: bool,
+        user_config: &crate::user_config::UserConfig,
     ) -> PyErr {
         match error {
             ValError::LineErrors(raw_errors) => {
@@ -62,20 +62,27 @@ impl ValidationError {
                     None => raw_errors.into_iter().map(|e| e.into_py(py)).collect(),
                 };
 
-                let validation_error = Self::new(line_errors, title, error_mode, hide_input);
+                let set_cause = user_config
+                    .get_conf::<bool>(intern!(py, "validation_error_cause"))
+                    .unwrap_or(false);
+                let validation_error = Self::new(
+                    line_errors,
+                    title,
+                    error_mode,
+                    user_config
+                        .get_conf::<bool>(intern!(py, "hide_input_in_errors"))
+                        .unwrap_or(false),
+                );
+
                 match Py::new(py, validation_error) {
                     Ok(err) => {
-                        let py_err = PyErr::from_value(err.as_ref(py));
-
-                        // ExceptionGroup(s) only supported 3.11 and later:
-                        // Attach the user/python exceptions as the __cause__ of the validation error:
-                        #[cfg(Py_3_11)]
-                        {
-                            let borrowed = err.borrow(py);
-                            borrowed.maybe_add_cause(py, &py_err);
+                        if set_cause {
+                            // Will return an import error if the backport was needed and not installed:
+                            if let Some(cause_problem) = ValidationError::maybe_add_cause(err.borrow(py), py) {
+                                return cause_problem;
+                            }
                         }
-
-                        py_err
+                        PyErr::from_value(err.as_ref(py))
                     }
                     Err(err) => err,
                 }
@@ -147,6 +154,91 @@ impl ValidationError {
 
     pub fn use_default_error() -> PyErr {
         py_schema_error_type!("Uncaught UseDefault error, please check your usage of `default` validators.")
+    }
+
+    fn maybe_add_cause(self_: PyRef<'_, Self>, py: Python) -> Option<PyErr> {
+        let mut user_py_errs = vec![];
+        for line_error in &self_.line_errors {
+            if let ErrorType::AssertionError {
+                error: Some(err),
+                context: _,
+            }
+            | ErrorType::ValueError {
+                error: Some(err),
+                context: _,
+            } = &line_error.error_type
+            {
+                let note: PyObject = if let Location::Empty = &line_error.location {
+                    "Pydantic: cause of loc: root".into_py(py)
+                } else {
+                    format!(
+                        "Pydantic: cause of loc: {}",
+                        // Location formats with a newline at the end, hence the trim()
+                        line_error.location.to_string().trim()
+                    )
+                    .into_py(py)
+                };
+
+                // Notes only support 3.11 upwards:
+                #[cfg(Py_3_11)]
+                {
+                    // Add the location context as a note, no direct c api for this,
+                    // fine performance wise, add_note() goes directly to C: "(PyCFunction)BaseException_add_note":
+                    // https://github.com/python/cpython/blob/main/Objects/exceptions.c
+                    if err.call_method1(py, "add_note", (format!("\n{note}"),)).is_ok() {
+                        user_py_errs.push(err.clone_ref(py));
+                    }
+                }
+
+                // Pre 3.11 notes support, use a UserWarning exception instead:
+                #[cfg(not(Py_3_11))]
+                {
+                    use pyo3::exceptions::PyUserWarning;
+
+                    let wrapped = PyUserWarning::new_err((note,));
+                    wrapped.set_cause(py, Some(PyErr::from_value(err.as_ref(py))));
+                    user_py_errs.push(wrapped);
+                }
+            }
+        }
+
+        // Only add the cause if there are actually python user exceptions to show:
+        if !user_py_errs.is_empty() {
+            let title = "Pydantic User Code Exceptions";
+
+            // Native ExceptionGroup(s) only supported 3.11 and later:
+            #[cfg(Py_3_11)]
+            let cause = {
+                use pyo3::exceptions::PyBaseExceptionGroup;
+                Some(PyBaseExceptionGroup::new_err((title, user_py_errs)).into_py(py))
+            };
+
+            // Pre 3.11 ExceptionGroup support, use the python backport instead:
+            // If something's gone wrong with the backport, just don't add the cause:
+            #[cfg(not(Py_3_11))]
+            let cause = {
+                use pyo3::exceptions::PyImportError;
+                match py.import("exceptiongroup") {
+                Ok(py_mod) => match py_mod.getattr("ExceptionGroup") {
+                    Ok(group_cls) => match group_cls.call1((title, user_py_errs)) {
+                        Ok(group_instance) => Some(group_instance.into_py(py)),
+                        Err(_) => None,
+                    },
+                    Err(_) => None,
+                },
+                Err(_) => return Some(PyImportError::new_err("validation_error_cause flag requires the exceptiongroup module backport to be installed when used on Python <3.11.")),
+            }
+            };
+
+            // Set the cause to the ValidationError:
+            if let Some(cause) = cause {
+                unsafe {
+                    // PyException_SetCause _steals_ a reference to cause, so must use .into_ptr()
+                    ffi::PyException_SetCause(self_.as_ptr(), cause.into_ptr());
+                }
+            }
+        }
+        None
     }
 }
 
@@ -287,107 +379,6 @@ impl ValidationError {
         };
         let s = from_utf8(&bytes).map_err(json_py_err)?;
         Ok(PyString::new(py, s))
-    }
-
-    #[getter]
-    fn __cause__(self_: PyRef<'_, Self>, py: Python) -> Option<PyObject> {
-        // Use cached if cause already set:
-        #[cfg(not(PyPy))]
-        // PyPy seems to use __cause__ directly for getting and setting FFI, so can't cache with PyPy (recursion)
-        {
-            use pyo3::AsPyPointer;
-            let ptr = unsafe { ffi::PyException_GetCause(self_.as_ptr()) };
-            let cur_cause = unsafe { py.from_owned_ptr_or_opt::<PyAny>(ptr) };
-            if let Some(cur_cause) = cur_cause {
-                return Some(cur_cause.into_py(py));
-            }
-        }
-
-        let mut user_py_errs = vec![];
-        for line_error in &self_.line_errors {
-            if let ErrorType::AssertionError {
-                error: Some(err),
-                context: _,
-            }
-            | ErrorType::ValueError {
-                error: Some(err),
-                context: _,
-            } = &line_error.error_type
-            {
-                let note: PyObject = if let Location::Empty = &line_error.location {
-                    "Pydantic: cause of loc: root".into_py(py)
-                } else {
-                    format!(
-                        "Pydantic: cause of loc: {}",
-                        // Location formats with a newline at the end, hence the trim()
-                        line_error.location.to_string().trim()
-                    )
-                    .into_py(py)
-                };
-
-                // Notes only support 3.11 upwards:
-                #[cfg(Py_3_11)]
-                {
-                    // Add the location context as a note, no direct c api for this,
-                    // fine performance wise, add_note() goes directly to C: "(PyCFunction)BaseException_add_note":
-                    // https://github.com/python/cpython/blob/main/Objects/exceptions.c
-                    if err.call_method1(py, "add_note", (format!("\n{note}"),)).is_ok() {
-                        user_py_errs.push(err.clone_ref(py));
-                    }
-                }
-
-                // Pre 3.11 notes support, use a UserWarning exception instead:
-                #[cfg(not(Py_3_11))]
-                {
-                    use pyo3::exceptions::PyUserWarning;
-
-                    let wrapped = PyUserWarning::new_err((note,));
-                    wrapped.set_cause(py, Some(PyErr::from_value(err.as_ref(py))));
-                    user_py_errs.push(wrapped);
-                }
-            }
-        }
-
-        // Only add the cause if there are actually python user exceptions to show:
-        if !user_py_errs.is_empty() {
-            let title = "Pydantic User Code Exceptions";
-
-            // Native ExceptionGroup(s) only supported 3.11 and later:
-            #[cfg(Py_3_11)]
-            let cause = {
-                use pyo3::exceptions::PyBaseExceptionGroup;
-                Some(PyBaseExceptionGroup::new_err((title, user_py_errs)).into_py(py))
-            };
-
-            // Pre 3.11 ExceptionGroup support, use the python backport instead:
-            // If something's gone wrong with the backport, just don't add the cause:
-            #[cfg(not(Py_3_11))]
-            let cause = match py.import("exceptiongroup") {
-                Ok(py_mod) => match py_mod.getattr("ExceptionGroup") {
-                    Ok(group_cls) => match group_cls.call1((title, user_py_errs)) {
-                        Ok(group_instance) => Some(group_instance.into_py(py)),
-                        Err(_) => None,
-                    },
-                    Err(_) => None,
-                },
-                Err(_) => None,
-            };
-
-            if let Some(cause) = cause {
-                #[cfg(not(PyPy))]
-                // PyPy seems to use __cause__ directly for getting and setting FFI, so can't cache with PyPy (recursion)
-                {
-                    use pyo3::AsPyPointer;
-                    unsafe {
-                        // PyException_SetCause _steals_ a reference to cause, so must use .into_ptr()
-                        ffi::PyException_SetCause(self_.as_ptr(), cause.clone_ref(py).into_ptr());
-                    }
-                }
-                return Some(cause);
-            }
-        }
-
-        None
     }
 
     fn __repr__(&self, py: Python) -> String {

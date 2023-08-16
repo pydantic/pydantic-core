@@ -73,12 +73,14 @@ impl SchemaSerializer {
 #[pymethods]
 impl SchemaSerializer {
     #[new]
-    pub fn py_new(py: Python, schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
+    pub fn py_new(py: Python, schema: &PyDict, config: Option<&PyDict>, flags: Option<&PyDict>) -> PyResult<Self> {
+        let user_conf = crate::user_config::UserConfig::new(config, flags);
+
         let self_validator = SelfValidator::new(py)?;
         let schema = self_validator.validate_schema(py, schema)?;
         let mut definitions_builder = DefinitionsBuilder::new();
 
-        let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut definitions_builder)?;
+        let serializer = CombinedSerializer::build(schema.downcast()?, &user_conf, &mut definitions_builder)?;
         Ok(Self {
             serializer,
             definitions: definitions_builder.finish()?,

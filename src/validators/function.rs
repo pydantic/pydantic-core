@@ -55,11 +55,15 @@ macro_rules! impl_build {
             const EXPECTED_TYPE: &'static str = $name;
             fn build(
                 schema: &PyDict,
-                config: Option<&PyDict>,
+                user_config: &crate::user_config::UserConfig,
                 definitions: &mut DefinitionsBuilder<CombinedValidator>,
             ) -> PyResult<CombinedValidator> {
                 let py = schema.py();
-                let validator = build_validator(schema.get_as_req(intern!(py, "schema"))?, config, definitions)?;
+                let validator = build_validator(
+                    schema.get_as_req(intern!(py, "schema"))?,
+                    user_config,
+                    definitions,
+                )?;
                 let func_info = destructure_function_schema(schema)?;
                 let name = format!(
                     "{}[{}(), {}]",
@@ -70,10 +74,7 @@ macro_rules! impl_build {
                 Ok(Self {
                     validator: Box::new(validator),
                     func: func_info.function,
-                    config: match config {
-                        Some(c) => c.into(),
-                        None => py.None(),
-                    },
+                    user_config: user_config.to_owned(py),
                     name,
                     field_name: func_info.field_name,
                     info_arg: func_info.info_arg,
@@ -89,7 +90,7 @@ macro_rules! impl_validator {
         impl_py_gc_traverse!($name {
             validator,
             func,
-            config
+            user_config
         });
 
         impl Validator for $name {
@@ -145,7 +146,7 @@ macro_rules! impl_validator {
 pub struct FunctionBeforeValidator {
     validator: Box<CombinedValidator>,
     func: PyObject,
-    config: PyObject,
+    user_config: crate::user_config::OwnedUserConfig,
     name: String,
     field_name: Option<Py<PyString>>,
     info_arg: bool,
@@ -162,7 +163,7 @@ impl FunctionBeforeValidator {
         state: &'s mut ValidationState<'_>,
     ) -> ValResult<'data, PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.user_config.target, self.field_name.clone());
             self.func.call1(py, (input.to_object(py), info))
         } else {
             self.func.call1(py, (input.to_object(py),))
@@ -178,7 +179,7 @@ impl_validator!(FunctionBeforeValidator);
 pub struct FunctionAfterValidator {
     validator: Box<CombinedValidator>,
     func: PyObject,
-    config: PyObject,
+    user_config: crate::user_config::OwnedUserConfig,
     name: String,
     field_name: Option<Py<PyString>>,
     info_arg: bool,
@@ -196,7 +197,7 @@ impl FunctionAfterValidator {
     ) -> ValResult<'data, PyObject> {
         let v = call(input, state)?;
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.user_config.target, self.field_name.clone());
             self.func.call1(py, (v.to_object(py), info))
         } else {
             self.func.call1(py, (v.to_object(py),))
@@ -210,7 +211,7 @@ impl_validator!(FunctionAfterValidator);
 #[derive(Debug, Clone)]
 pub struct FunctionPlainValidator {
     func: PyObject,
-    config: PyObject,
+    user_config: crate::user_config::OwnedUserConfig,
     name: String,
     field_name: Option<Py<PyString>>,
     info_arg: bool,
@@ -221,17 +222,14 @@ impl BuildValidator for FunctionPlainValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let function_info = destructure_function_schema(schema)?;
         Ok(Self {
             func: function_info.function.clone(),
-            config: match config {
-                Some(c) => c.into(),
-                None => py.None(),
-            },
+            user_config: user_config.to_owned(py),
             name: format!(
                 "function-plain[{}()]",
                 function_name(function_info.function.as_ref(py))?
@@ -243,7 +241,7 @@ impl BuildValidator for FunctionPlainValidator {
     }
 }
 
-impl_py_gc_traverse!(FunctionPlainValidator { func, config });
+impl_py_gc_traverse!(FunctionPlainValidator { func, user_config });
 
 impl Validator for FunctionPlainValidator {
     fn validate<'data>(
@@ -253,7 +251,7 @@ impl Validator for FunctionPlainValidator {
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.user_config.target, self.field_name.clone());
             self.func.call1(py, (input.to_object(py), info))
         } else {
             self.func.call1(py, (input.to_object(py),))
@@ -283,11 +281,10 @@ impl Validator for FunctionPlainValidator {
 pub struct FunctionWrapValidator {
     validator: Box<CombinedValidator>,
     func: PyObject,
-    config: PyObject,
+    user_config: crate::user_config::OwnedUserConfig,
     name: String,
     field_name: Option<Py<PyString>>,
     info_arg: bool,
-    hide_input_in_errors: bool,
 }
 
 impl BuildValidator for FunctionWrapValidator {
@@ -295,24 +292,20 @@ impl BuildValidator for FunctionWrapValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let validator = build_validator(schema.get_as_req(intern!(py, "schema"))?, config, definitions)?;
+        let validator = build_validator(schema.get_as_req(intern!(py, "schema"))?, user_config, definitions)?;
         let function_info = destructure_function_schema(schema)?;
-        let hide_input_in_errors: bool = config.get_as(intern!(py, "hide_input_in_errors"))?.unwrap_or(false);
+
         Ok(Self {
             validator: Box::new(validator),
             func: function_info.function.clone(),
-            config: match config {
-                Some(c) => c.into(),
-                None => py.None(),
-            },
+            user_config: user_config.to_owned(py),
             name: format!("function-wrap[{}()]", function_name(function_info.function.as_ref(py))?),
             field_name: function_info.field_name.clone(),
             info_arg: function_info.info_arg,
-            hide_input_in_errors,
         }
         .into())
     }
@@ -327,7 +320,7 @@ impl FunctionWrapValidator {
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.user_config.target, self.field_name.clone());
             self.func.call1(py, (input.to_object(py), handler, info))
         } else {
             self.func.call1(py, (input.to_object(py), handler))
@@ -339,7 +332,7 @@ impl FunctionWrapValidator {
 impl_py_gc_traverse!(FunctionWrapValidator {
     validator,
     func,
-    config
+    user_config
 });
 
 impl Validator for FunctionWrapValidator {
@@ -355,7 +348,7 @@ impl Validator for FunctionWrapValidator {
                 "ValidatorCallable",
                 &self.validator,
                 state,
-                self.hide_input_in_errors,
+                self.user_config.clone(),
             ),
         };
         self._validate(
@@ -380,7 +373,7 @@ impl Validator for FunctionWrapValidator {
                 "AssignmentValidatorCallable",
                 &self.validator,
                 state,
-                self.hide_input_in_errors,
+                self.user_config.clone(),
             ),
             updated_field_name: field_name.to_string(),
             updated_field_value: field_value.to_object(py),

@@ -27,13 +27,13 @@ impl BuildSerializer for FunctionBeforeSerializerBuilder {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         // `before` schemas will obviously have type from `schema` since the validator is called second
         let schema = schema.get_as_req(intern!(py, "schema"))?;
-        CombinedSerializer::build(schema, config, definitions)
+        CombinedSerializer::build(schema, user_config, definitions)
     }
 }
 
@@ -43,7 +43,7 @@ impl BuildSerializer for FunctionAfterSerializerBuilder {
     const EXPECTED_TYPE: &'static str = "function-after";
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
@@ -52,7 +52,7 @@ impl BuildSerializer for FunctionAfterSerializerBuilder {
         // be used for serialization. For convenience, the default is to assume the wrapped schema
         // should be used; the user/lib can override the serializer if necessary.
         let schema = schema.get_as_req(intern!(py, "schema"))?;
-        CombinedSerializer::build(schema, config, definitions)
+        CombinedSerializer::build(schema, user_config, definitions)
     }
 }
 
@@ -62,10 +62,10 @@ impl BuildSerializer for FunctionPlainSerializerBuilder {
     const EXPECTED_TYPE: &'static str = "function-plain";
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        super::any::AnySerializer::build(schema, config, definitions)
+        super::any::AnySerializer::build(schema, user_config, definitions)
     }
 }
 
@@ -98,7 +98,7 @@ impl BuildSerializer for FunctionPlainSerializer {
     /// (done this way to match `FunctionWrapSerializer` which requires the full schema)
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
@@ -109,8 +109,8 @@ impl BuildSerializer for FunctionPlainSerializer {
         let function_name = function_name(function)?;
 
         let return_serializer = match ser_schema.get_as::<&PyDict>(intern!(py, "return_schema"))? {
-            Some(s) => Box::new(CombinedSerializer::build(s, config, definitions)?),
-            None => Box::new(AnySerializer::build(schema, config, definitions)?),
+            Some(s) => Box::new(CombinedSerializer::build(s, user_config, definitions)?),
+            None => Box::new(AnySerializer::build(schema, user_config, definitions)?),
         };
 
         let when_used = WhenUsed::new(ser_schema, WhenUsed::Always)?;
@@ -118,7 +118,11 @@ impl BuildSerializer for FunctionPlainSerializer {
             WhenUsed::Always => None,
             _ => {
                 let new_schema = copy_outer_schema(schema)?;
-                Some(Box::new(CombinedSerializer::build(new_schema, config, definitions)?))
+                Some(Box::new(CombinedSerializer::build(
+                    new_schema,
+                    user_config,
+                    definitions,
+                )?))
             }
         };
 
@@ -296,7 +300,7 @@ impl BuildSerializer for FunctionWrapSerializerBuilder {
     const EXPECTED_TYPE: &'static str = "function-wrap";
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
@@ -305,7 +309,7 @@ impl BuildSerializer for FunctionWrapSerializerBuilder {
         // schema should be used for serialization. For convenience, the default is to assume the
         // wrapped schema should be used; the user/lib can override the serializer if necessary.
         let schema = schema.get_as_req(intern!(py, "schema"))?;
-        CombinedSerializer::build(schema, config, definitions)
+        CombinedSerializer::build(schema, user_config, definitions)
     }
 }
 
@@ -328,7 +332,7 @@ impl BuildSerializer for FunctionWrapSerializer {
     /// (done this way since we need the `CoreSchema`)
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
@@ -344,11 +348,11 @@ impl BuildSerializer for FunctionWrapSerializer {
             copy_outer_schema(schema)?
         };
 
-        let serializer = CombinedSerializer::build(inner_schema, config, definitions)?;
+        let serializer = CombinedSerializer::build(inner_schema, user_config, definitions)?;
 
         let return_serializer = match ser_schema.get_as::<&PyDict>(intern!(py, "return_schema"))? {
-            Some(s) => CombinedSerializer::build(s, config, definitions)?,
-            None => AnySerializer::build(schema, config, definitions)?,
+            Some(s) => CombinedSerializer::build(s, user_config, definitions)?,
+            None => AnySerializer::build(schema, user_config, definitions)?,
         };
 
         let name = format!("wrap_function[{function_name}, {}]", serializer.get_name());

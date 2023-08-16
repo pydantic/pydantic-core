@@ -20,7 +20,7 @@ impl BuildSerializer for NoneSerializer {
 
     fn build(
         _schema: &PyDict,
-        _config: Option<&PyDict>,
+        _user_config: &crate::user_config::UserConfig,
         _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         Ok(Self {}.into())
@@ -94,7 +94,7 @@ macro_rules! build_simple_serializer {
 
             fn build(
                 _schema: &PyDict,
-                _config: Option<&PyDict>,
+                _user_config: &crate::user_config::UserConfig,
                 _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
             ) -> PyResult<CombinedSerializer> {
                 Ok(Self {}.into())

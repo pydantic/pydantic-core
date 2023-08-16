@@ -24,7 +24,7 @@ impl BuildSerializer for UnionSerializer {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
@@ -36,7 +36,7 @@ impl BuildSerializer for UnionSerializer {
                     Ok(py_tuple) => py_tuple.get_item(0)?,
                     Err(_) => choice,
                 };
-                CombinedSerializer::build(choice.downcast()?, config, definitions)
+                CombinedSerializer::build(choice.downcast()?, user_config, definitions)
             })
             .collect::<PyResult<Vec<CombinedSerializer>>>()?;
 
@@ -186,7 +186,7 @@ impl BuildSerializer for TaggedUnionBuilder {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let schema_choices: &PyDict = schema.get_as_req(intern!(schema.py(), "choices"))?;
@@ -194,7 +194,7 @@ impl BuildSerializer for TaggedUnionBuilder {
 
         for (_, value) in schema_choices {
             if let Ok(choice_schema) = value.downcast::<PyDict>() {
-                choices.push(CombinedSerializer::build(choice_schema, config, definitions)?);
+                choices.push(CombinedSerializer::build(choice_schema, user_config, definitions)?);
             }
         }
         UnionSerializer::from_choices(choices)

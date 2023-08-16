@@ -23,15 +23,15 @@ impl BuildValidator for TupleVariableValidator {
     const EXPECTED_TYPE: &'static str = "tuple-variable";
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let item_validator = get_items_schema(schema, config, definitions)?;
+        let item_validator = get_items_schema(schema, user_config, definitions)?;
         let inner_name = item_validator.as_ref().map_or("any", |v| v.get_name());
         let name = format!("tuple[{inner_name}, ...]");
         Ok(Self {
-            strict: is_strict(schema, config)?,
+            strict: is_strict(schema, user_config)?,
             item_validator,
             min_length: schema.get_as(intern!(py, "min_length"))?,
             max_length: schema.get_as(intern!(py, "max_length"))?,
@@ -99,14 +99,14 @@ impl BuildValidator for TuplePositionalValidator {
     const EXPECTED_TYPE: &'static str = "tuple-positional";
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let items: &PyList = schema.get_as_req(intern!(py, "items_schema"))?;
         let validators: Vec<CombinedValidator> = items
             .iter()
-            .map(|item| build_validator(item, config, definitions))
+            .map(|item| build_validator(item, user_config, definitions))
             .collect::<PyResult<_>>()?;
 
         let descr = validators
@@ -115,7 +115,7 @@ impl BuildValidator for TuplePositionalValidator {
             .collect::<Vec<_>>()
             .join(", ");
         Ok(Self {
-            strict: is_strict(schema, config)?,
+            strict: is_strict(schema, user_config)?,
             items_validators: validators,
             extras_validator: match schema.get_item(intern!(py, "extras_schema")) {
                 Some(v) => Some(Box::new(build_validator(v, config, definitions)?)),

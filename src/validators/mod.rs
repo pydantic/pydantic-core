@@ -106,39 +106,37 @@ pub struct SchemaValidator {
     schema: PyObject,
     #[pyo3(get)]
     title: PyObject,
-    hide_input_in_errors: bool,
+    user_config: crate::user_config::OwnedUserConfig,
 }
 
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
+    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>, flags: Option<&PyDict>) -> PyResult<Self> {
         let self_validator = SelfValidator::new(py)?;
         let schema = self_validator.validate_schema(py, schema)?;
 
+        let user_conf = crate::user_config::UserConfig::new(config, flags);
+
         let mut definitions_builder = DefinitionsBuilder::new();
 
-        let mut validator = build_validator(schema, config, &mut definitions_builder)?;
+        let mut validator = build_validator(schema, &user_conf, &mut definitions_builder)?;
         validator.complete(&definitions_builder)?;
         let mut definitions = definitions_builder.clone().finish()?;
         for val in &mut definitions {
             val.complete(&definitions_builder)?;
         }
-        let config_title = match config {
-            Some(c) => c.get_item("title"),
-            None => None,
-        };
-        let title = match config_title {
-            Some(t) => t.into_py(py),
-            None => validator.get_name().into_py(py),
-        };
-        let hide_input_in_errors: bool = config.get_as(intern!(py, "hide_input_in_errors"))?.unwrap_or(false);
+
+        let title = user_conf
+            .get_conf::<PyObject>(intern!(py, "title"))
+            .unwrap_or_else(|| validator.get_name().into_py(py));
+
         Ok(Self {
             validator,
             definitions,
             schema: schema.into_py(py),
             title,
-            hide_input_in_errors,
+            user_config: user_conf.to_owned(py),
         })
     }
 
@@ -328,7 +326,7 @@ impl SchemaValidator {
             error_mode,
             error,
             None,
-            self.hide_input_in_errors,
+            &self.user_config.to_reffed(py),
         )
     }
 }
@@ -370,7 +368,11 @@ impl<'py> SelfValidator<'py> {
 
         let mut definitions_builder = DefinitionsBuilder::new();
 
-        let mut validator = match build_validator(self_schema, None, &mut definitions_builder) {
+        let mut validator = match build_validator(
+            self_schema,
+            &crate::user_config::UserConfig::default(),
+            &mut definitions_builder,
+        ) {
             Ok(v) => v,
             Err(err) => return py_schema_err!("Error building self-schema:\n  {}", err),
         };
@@ -384,7 +386,7 @@ impl<'py> SelfValidator<'py> {
             definitions,
             schema: py.None(),
             title: "Self Schema".into_py(py),
-            hide_input_in_errors: false,
+            user_config: crate::user_config::UserConfig::default().to_owned(py),
         })
     }
 }
@@ -396,44 +398,44 @@ pub trait BuildValidator: Sized {
     /// to return other validators, see `string.rs`, `int.rs`, `float.rs` and `function.rs` for examples
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator>;
 }
 
 /// Logic to create a particular validator, called in the `validator_match` macro, then in turn by `build_validator`
-fn build_specific_validator<'a, T: BuildValidator>(
+fn build_specific_validator<T: BuildValidator>(
     val_type: &str,
-    schema_dict: &'a PyDict,
-    config: Option<&'a PyDict>,
+    schema_dict: &PyDict,
+    user_config: &crate::user_config::UserConfig,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<CombinedValidator> {
     let py = schema_dict.py();
     if let Some(schema_ref) = schema_dict.get_as::<String>(intern!(py, "ref"))? {
-        let inner_val = T::build(schema_dict, config, definitions)?;
+        let inner_val = T::build(schema_dict, user_config, definitions)?;
         let validator_id = definitions.add_definition(schema_ref, inner_val)?;
         return Ok(DefinitionRefValidator::new(validator_id).into());
     }
 
-    T::build(schema_dict, config, definitions)
+    T::build(schema_dict, user_config, definitions)
         .map_err(|err| py_schema_error_type!("Error building \"{}\" validator:\n  {}", val_type, err))
 }
 
 // macro to build the match statement for validator selection
 macro_rules! validator_match {
-    ($type:ident, $dict:ident, $config:ident, $definitions:ident, $($validator:path,)+) => {
+    ($type:ident, $dict:ident, $user_config:ident, $definitions:ident, $($validator:path,)+) => {
         match $type {
             $(
-                <$validator>::EXPECTED_TYPE => build_specific_validator::<$validator>($type, $dict, $config, $definitions),
+                <$validator>::EXPECTED_TYPE => build_specific_validator::<$validator>($type, $dict, $user_config, $definitions),
             )+
             _ => return py_schema_err!(r#"Unknown schema type: "{}""#, $type),
         }
     };
 }
 
-pub fn build_validator<'a>(
-    schema: &'a PyAny,
-    config: Option<&'a PyDict>,
+pub fn build_validator(
+    schema: &PyAny,
+    user_config: &crate::user_config::UserConfig,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<CombinedValidator> {
     let dict: &PyDict = schema.downcast()?;
@@ -441,7 +443,7 @@ pub fn build_validator<'a>(
     validator_match!(
         type_,
         dict,
-        config,
+        user_config,
         definitions,
         // typed dict e.g. heterogeneous dicts or simply a model
         typed_dict::TypedDictValidator,

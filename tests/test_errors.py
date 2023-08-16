@@ -1,12 +1,15 @@
+import enum
 import re
 import sys
 from decimal import Decimal
 from typing import Any, Optional
+from unittest.mock import patch
 
 import pytest
 from dirty_equals import HasRepr, IsInstance, IsJson, IsStr
 
 from pydantic_core import (
+    CoreFlags,
     PydanticCustomError,
     PydanticKnownError,
     PydanticOmit,
@@ -518,8 +521,10 @@ def test_all_errors():
         pytest.fail('core_schema.ErrorType needs to be updated')
 
 
-def test_python_err_cause_tracebacks():
+def test_validation_error_cause_usage():
     from exceptiongroup import BaseExceptionGroup
+
+    enabled_flags: CoreFlags = {'validation_error_cause': True}
 
     def check_grouped_exception(exc: BaseException) -> BaseException:
         """
@@ -541,7 +546,7 @@ def test_python_err_cause_tracebacks():
     def singular_raise_py_error(v: Any) -> Any:
         raise ValueError('Oh no!')
 
-    s1 = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error))
+    s1 = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), flags=enabled_flags)
     with pytest.raises(ValidationError) as exc_info:
         s1.validate_python('anything')
 
@@ -558,7 +563,7 @@ def test_python_err_cause_tracebacks():
         except AssertionError as e:
             raise ValueError('Oh no!') from e
 
-    s2 = SchemaValidator(core_schema.no_info_plain_validator_function(multi_raise_py_error))
+    s2 = SchemaValidator(core_schema.no_info_plain_validator_function(multi_raise_py_error), flags=enabled_flags)
     with pytest.raises(ValidationError) as exc_info:
         s2.validate_python('anything')
 
@@ -586,7 +591,7 @@ def test_python_err_cause_tracebacks():
         except ValidationError as e:
             raise ValueError('Sub val failure') from e
 
-    s3 = SchemaValidator(core_schema.no_info_plain_validator_function(outer_raise_py_error))
+    s3 = SchemaValidator(core_schema.no_info_plain_validator_function(outer_raise_py_error), flags=enabled_flags)
     with pytest.raises(ValidationError) as exc_info:
         s3.validate_python('anything')
 
@@ -598,6 +603,50 @@ def test_python_err_cause_tracebacks():
     subcause = cause.__cause__
     assert isinstance(subcause, ValidationError)
     validate_s2_chain(subcause)
+
+
+def test_validation_error_cause_backport_missing():
+    class Result(enum.Enum):
+        CAUSE = enum.auto()
+        NO_CAUSE = enum.auto()
+        IMPORT_ERROR = enum.auto()
+
+    config: list[tuple[str, CoreFlags, Result]] = [
+        # Without the backport should still work after 3.10 as not needed:
+        (
+            'Enabled',
+            {'validation_error_cause': True},
+            Result.CAUSE if sys.version_info >= (3, 11) else Result.IMPORT_ERROR,
+        ),
+        ('Disabled specifically', {'validation_error_cause': False}, Result.NO_CAUSE),
+        ('Disabled implicitly', {}, Result.NO_CAUSE),
+    ]
+
+    # Simulate the package being missing:
+    with patch.dict('sys.modules', {'exceptiongroup': None}):
+
+        def singular_raise_py_error(v: Any) -> Any:
+            raise ValueError('Oh no!')
+
+        for _, flags, expected in config:
+            s = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), flags=flags)
+
+            if expected is Result.IMPORT_ERROR:
+                # Confirm error message contains "requires the exceptiongroup module" in the middle of the string:
+                with pytest.raises(ImportError, match='requires the exceptiongroup module'):
+                    s.validate_python('anything')
+            elif expected is Result.CAUSE:
+                with pytest.raises(ValidationError) as exc_info:
+                    s.validate_python('anything')
+                assert isinstance(exc_info.value.__cause__, BaseExceptionGroup)
+                assert len(exc_info.value.__cause__.exceptions) == 1
+                assert repr(exc_info.value.__cause__.exceptions[0]) == repr(ValueError('Oh no!'))
+            elif expected is Result.NO_CAUSE:
+                with pytest.raises(ValidationError) as exc_info:
+                    s.validate_python('anything')
+                assert exc_info.value.__cause__ is None
+            else:
+                raise AssertionError('Unhandled result: {}'.format(expected))
 
 
 class BadRepr:

@@ -25,7 +25,7 @@ from ._pydantic_core import (
     to_json,
     to_jsonable_python,
 )
-from .core_schema import CoreConfig, CoreSchema, CoreSchemaType, ErrorType
+from .core_schema import CoreConfig, CoreFlags, CoreSchema, CoreSchemaType, ErrorType
 from .exception_groups import enable_validation_cause_tracebacks
 
 enable_validation_cause_tracebacks()
@@ -43,6 +43,7 @@ else:
 __all__ = [
     '__version__',
     'CoreConfig',
+    'CoreFlags',
     'CoreSchema',
     'CoreSchemaType',
     'SchemaValidator',

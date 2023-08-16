@@ -94,6 +94,18 @@ class CoreConfig(TypedDict, total=False):
     hide_input_in_errors: bool
 
 
+class CoreFlags(TypedDict, total=False):
+    """
+    Base class for global configuration options.
+
+    Attributes:
+        validation_error_cause: Whether to add user-python excs to the __cause__ of a ValidationError.
+            Requires exceptiongroup backport pre Python 3.11.
+    """
+
+    validation_error_cause: bool
+
+
 IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
 
 

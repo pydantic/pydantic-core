@@ -15,7 +15,7 @@ impl BuildValidator for FloatBuilder {
     const EXPECTED_TYPE: &'static str = "float";
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
@@ -25,11 +25,12 @@ impl BuildValidator for FloatBuilder {
             || schema.get_item(intern!(py, "ge")).is_some()
             || schema.get_item(intern!(py, "gt")).is_some();
         if use_constrained {
-            ConstrainedFloatValidator::build(schema, config, definitions)
+            ConstrainedFloatValidator::build(schema, user_config, definitions)
         } else {
             Ok(FloatValidator {
-                strict: is_strict(schema, config)?,
-                allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
+                strict: is_strict(schema, user_config)?,
+                allow_inf_nan: schema_or_config_same(schema, user_config, intern!(py, "allow_inf_nan"))?
+                    .unwrap_or(true),
             }
             .into())
         }
@@ -47,13 +48,13 @@ impl BuildValidator for FloatValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         Ok(Self {
-            strict: is_strict(schema, config)?,
-            allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
+            strict: is_strict(schema, user_config)?,
+            allow_inf_nan: schema_or_config_same(schema, user_config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
         }
         .into())
     }
@@ -200,13 +201,13 @@ impl BuildValidator for ConstrainedFloatValidator {
     const EXPECTED_TYPE: &'static str = "float";
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         Ok(Self {
-            strict: is_strict(schema, config)?,
-            allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
+            strict: is_strict(schema, user_config)?,
+            allow_inf_nan: schema_or_config_same(schema, user_config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
             multiple_of: schema.get_as(intern!(py, "multiple_of"))?,
             le: schema.get_as(intern!(py, "le"))?,
             lt: schema.get_as(intern!(py, "lt"))?,

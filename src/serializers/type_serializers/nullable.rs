@@ -19,12 +19,12 @@ impl BuildSerializer for NullableSerializer {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let sub_schema = schema.get_as_req::<&PyDict>(intern!(schema.py(), "schema"))?;
         Ok(Self {
-            serializer: Box::new(CombinedSerializer::build(sub_schema, config, definitions)?),
+            serializer: Box::new(CombinedSerializer::build(sub_schema, user_config, definitions)?),
         }
         .into())
     }

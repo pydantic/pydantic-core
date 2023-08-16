@@ -27,17 +27,17 @@ impl BuildValidator for DictValidator {
 
     fn build(
         schema: &PyDict,
-        config: Option<&PyDict>,
+        user_config: &crate::user_config::UserConfig,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let key_validator = match schema.get_item(intern!(py, "keys_schema")) {
-            Some(schema) => Box::new(build_validator(schema, config, definitions)?),
-            None => Box::new(AnyValidator::build(schema, config, definitions)?),
+            Some(schema) => Box::new(build_validator(schema, user_config, definitions)?),
+            None => Box::new(AnyValidator::build(schema, user_config, definitions)?),
         };
         let value_validator = match schema.get_item(intern!(py, "values_schema")) {
-            Some(d) => Box::new(build_validator(d, config, definitions)?),
-            None => Box::new(AnyValidator::build(schema, config, definitions)?),
+            Some(d) => Box::new(build_validator(d, user_config, definitions)?),
+            None => Box::new(AnyValidator::build(schema, user_config, definitions)?),
         };
         let name = format!(
             "{}[{},{}]",
@@ -46,7 +46,7 @@ impl BuildValidator for DictValidator {
             value_validator.get_name()
         );
         Ok(Self {
-            strict: is_strict(schema, config)?,
+            strict: is_strict(schema, user_config)?,
             key_validator,
             value_validator,
             min_length: schema.get_as(intern!(py, "min_length"))?,
