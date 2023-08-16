@@ -522,7 +522,10 @@ def test_all_errors():
 
 
 def test_validation_error_cause_usage():
-    from exceptiongroup import BaseExceptionGroup
+    if sys.version_info < (3, 11):
+        from exceptiongroup import BaseExceptionGroup
+    else:
+        from builtins import BaseExceptionGroup
 
     enabled_config: CoreConfig = {'validation_error_cause': True}
 
