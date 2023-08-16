@@ -136,3 +136,38 @@ def test_numpy():
     assert type(v) == float  # noqa: E721
 
     assert s.to_json(numpy.float64(1.0)) == b'1.0'
+
+
+@pytest.mark.parametrize(
+    'schema_type,value,expected,allow_inf_nan',
+    [
+        ('float', float('inf'), float('inf'), True),
+        ('float', float('+inf'), float('+inf'), True),
+        ('float', float('-inf'), float('-inf'), True),
+        ('float', float('inf'), None, False),
+        ('float', float('+inf'), None, False),
+        ('float', float('-inf'), None, False),
+        ('float', float('NaN'), float('NaN'), True),
+        ('float', float('NAN'), float('NAN'), True),
+        ('float', float('NaN'), None, False),
+        ('float', float('NAN'), None, False),
+    ],
+)
+def test_float_inf_and_nan_serializers(schema_type, value, expected, allow_inf_nan):
+    schema = {'type': schema_type, 'allow_inf_nan': allow_inf_nan}
+
+    s = SchemaSerializer(schema)
+    v = s.to_python(value)
+
+    if allow_inf_nan:
+        assert type(v) == type(expected)
+    else:
+        assert expected is None
+
+    assert s.to_json(value) == json.dumps(expected).encode('utf-8')
+
+    v_json = s.to_python(value, mode='json')
+    if allow_inf_nan:
+        assert type(v_json) == type(expected)
+    else:
+        assert expected is None
