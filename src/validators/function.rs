@@ -1,7 +1,7 @@
 use pyo3::exceptions::{PyAssertionError, PyAttributeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyString};
-use pyo3::{intern, AsPyPointer, PyTraverseError, PyVisit};
+use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::errors::{
     ErrorType, LocItem, PydanticCustomError, PydanticKnownError, PydanticOmit, ValError, ValResult, ValidationError,
@@ -476,7 +476,7 @@ macro_rules! py_err_string {
             Ok(py_string) => match py_string.to_str() {
                 Ok(_) => ValError::new(
                     ErrorType::$type_member {
-                        error: Some(py_err_to_py_object($py, $py_err)),
+                        error: Some($py_err.into_py($py)),
                         context: None,
                     },
                     $input,
@@ -486,18 +486,6 @@ macro_rules! py_err_string {
             Err(e) => ValError::InternalErr(e),
         }
     };
-}
-
-// Same as upstream PyO3 fix https://github.com/PyO3/pyo3/pull/3328 to prevent loss of traceback,
-// Can be replaced with py_err.into_py(py) once upgraded to PyO3 version 0.2x
-pub fn py_err_to_py_object(py: Python, py_err: PyErr) -> PyObject {
-    let err_py_obj: PyObject = py_err.value(py).into_py(py);
-    if let Some(tb) = py_err.traceback(py) {
-        unsafe {
-            pyo3::ffi::PyException_SetTraceback(err_py_obj.as_ptr(), tb.as_ptr());
-        }
-    };
-    err_py_obj
 }
 
 /// Only `ValueError` (including `PydanticCustomError` and `ValidationError`) and `AssertionError` are considered

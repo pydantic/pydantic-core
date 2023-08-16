@@ -93,48 +93,6 @@ impl ValidationError {
         }
     }
 
-    // ExceptionGroup(s) only supported 3.11 and later:
-    #[cfg(Py_3_11)]
-    fn maybe_add_cause(&self, py: Python, py_err: &PyErr) {
-        use pyo3::exceptions::PyBaseExceptionGroup;
-
-        let mut user_py_errs = vec![];
-        for line_error in &self.line_errors {
-            if let ErrorType::AssertionError { error: Some(err) } | ErrorType::ValueError { error: Some(err) } =
-                &line_error.error_type
-            {
-                let note: PyObject = if let Location::Empty = &line_error.location {
-                    "\nPydantic: cause of loc: root".into_py(py)
-                } else {
-                    format!(
-                        "\nPydantic: cause of loc: {}",
-                        // Location formats with a newline at the end, hence the trim()
-                        line_error.location.to_string().trim()
-                    )
-                    .into_py(py)
-                };
-
-                // Add the location context as a note, no direct c api for this,
-                // fine performance wise, add_note() goes directly to C: "(PyCFunction)BaseException_add_note":
-                // https://github.com/python/cpython/blob/main/Objects/exceptions.c
-                if err.call_method1(py, "add_note", (note,)).is_ok() {
-                    user_py_errs.push(err.clone_ref(py));
-                }
-            }
-        }
-
-        // Only add the cause if there are actualy python user exceptions to show:
-        if !user_py_errs.is_empty() {
-            py_err.set_cause(
-                py,
-                Some(PyBaseExceptionGroup::new_err((
-                    "Pydantic User Code Exceptions",
-                    user_py_errs,
-                ))),
-            );
-        }
-    }
-
     pub fn display(&self, py: Python, prefix_override: Option<&'static str>, hide_input: bool) -> String {
         let url_prefix = get_url_prefix(py, include_url_env(py));
         let line_errors = pretty_py_line_errors(py, &self.error_mode, self.line_errors.iter(), url_prefix, hide_input);

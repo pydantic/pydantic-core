@@ -26,9 +26,6 @@ from ._pydantic_core import (
     to_jsonable_python,
 )
 from .core_schema import CoreConfig, CoreFlags, CoreSchema, CoreSchemaType, ErrorType
-from .exception_groups import enable_validation_cause_tracebacks
-
-enable_validation_cause_tracebacks()
 
 if _sys.version_info < (3, 11):
     from typing_extensions import NotRequired as _NotRequired
