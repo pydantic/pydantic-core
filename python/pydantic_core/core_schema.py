@@ -2499,7 +2499,7 @@ def union_schema(
         custom_error_message: The custom error message to use if the validation fails
         custom_error_context: The custom error context to use if the validation fails
         mode: How to select which choice to return
-            * `smart` (default) will try to return the choice which is the closest match the input value
+            * `smart` (default) will try to return the choice which is the closest match to the input value
             * `left_to_right` will return the first choice in `choices` which succeeds validation
         strict: Whether the underlying schemas should be validated with strict mode
         ref: optional unique identifier of the schema, used to reference the schema in other places
