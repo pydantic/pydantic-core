@@ -251,8 +251,14 @@ impl ValidationError {
 
         let mut user_py_errs = vec![];
         for line_error in &self_.line_errors {
-            if let ErrorType::AssertionError { error: Some(err) } | ErrorType::ValueError { error: Some(err) } =
-                &line_error.error_type
+            if let ErrorType::AssertionError {
+                error: Some(err),
+                context: _,
+            }
+            | ErrorType::ValueError {
+                error: Some(err),
+                context: _,
+            } = &line_error.error_type
             {
                 let note: PyObject = if let Location::Empty = &line_error.location {
                     "Pydantic: cause of loc: root".into_py(py)
