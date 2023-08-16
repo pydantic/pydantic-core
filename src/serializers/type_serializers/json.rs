@@ -26,14 +26,14 @@ impl BuildSerializer for JsonSerializer {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
         let serializer = match schema.get_as::<&PyDict>(intern!(py, "schema"))? {
-            Some(items_schema) => CombinedSerializer::build(items_schema, user_config, definitions)?,
-            None => AnySerializer::build(schema, user_config, definitions)?,
+            Some(items_schema) => CombinedSerializer::build(items_schema, config, definitions)?,
+            None => AnySerializer::build(schema, config, definitions)?,
         };
         Ok(Self {
             serializer: Box::new(serializer),

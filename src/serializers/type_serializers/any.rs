@@ -19,7 +19,7 @@ impl BuildSerializer for AnySerializer {
 
     fn build(
         _schema: &PyDict,
-        _user_config: &crate::user_config::UserConfig,
+        _config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         Ok(Self {}.into())

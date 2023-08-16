@@ -19,20 +19,15 @@ impl BuildSerializer for TypedDictBuilder {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
-        let total = schema_or_config(
-            schema,
-            user_config,
-            intern!(py, "total"),
-            intern!(py, "typed_dict_total"),
-        )?
-        .unwrap_or(true);
+        let total =
+            schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
 
-        let fields_mode = match ExtraBehavior::from_schema_or_config(py, schema, user_config, ExtraBehavior::Ignore)? {
+        let fields_mode = match ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)? {
             ExtraBehavior::Allow => FieldsMode::TypedDictAllow,
             _ => FieldsMode::SimpleDict,
         };
@@ -62,13 +57,13 @@ impl BuildSerializer for TypedDictBuilder {
                 let alias: Option<String> = field_info.get_as(intern!(py, "serialization_alias"))?;
 
                 let schema = field_info.get_as_req(intern!(py, "schema"))?;
-                let serializer = CombinedSerializer::build(schema, user_config, definitions)
+                let serializer = CombinedSerializer::build(schema, config, definitions)
                     .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", key, e))?;
                 fields.insert(key, SerField::new(py, key_py, alias, Some(serializer), required));
             }
         }
 
-        let computed_fields = ComputedFields::new(schema, user_config, definitions)?;
+        let computed_fields = ComputedFields::new(schema, config, definitions)?;
 
         Ok(GeneralFieldsSerializer::new(fields, fields_mode, extra_serializer, computed_fields).into())
     }

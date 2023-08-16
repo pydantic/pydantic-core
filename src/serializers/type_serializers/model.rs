@@ -26,12 +26,12 @@ impl BuildSerializer for ModelFieldsBuilder {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
-        let fields_mode = match has_extra(schema, user_config)? {
+        let fields_mode = match has_extra(schema, config)? {
             true => FieldsMode::ModelExtra,
             false => FieldsMode::SimpleDict,
         };
@@ -58,14 +58,14 @@ impl BuildSerializer for ModelFieldsBuilder {
                 let alias: Option<String> = field_info.get_as(intern!(py, "serialization_alias"))?;
 
                 let schema = field_info.get_as_req(intern!(py, "schema"))?;
-                let serializer = CombinedSerializer::build(schema, user_config, definitions)
+                let serializer = CombinedSerializer::build(schema, config, definitions)
                     .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", key, e))?;
 
                 fields.insert(key, SerField::new(py, key_py, alias, Some(serializer), true));
             }
         }
 
-        let computed_fields = ComputedFields::new(schema, user_config, definitions)?;
+        let computed_fields = ComputedFields::new(schema, config, definitions)?;
 
         Ok(GeneralFieldsSerializer::new(fields, fields_mode, extra_serializer, computed_fields).into())
     }
@@ -85,23 +85,23 @@ impl BuildSerializer for ModelSerializer {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        _config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
         // models ignore the parent config and always use the config from this model
-        let user_config = &user_config.with_new_target(schema.get_as(intern!(py, "config"))?);
+        let config = schema.get_as(intern!(py, "config"))?;
 
         let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
         let sub_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
-        let serializer = Box::new(CombinedSerializer::build(sub_schema, user_config, definitions)?);
+        let serializer = Box::new(CombinedSerializer::build(sub_schema, config, definitions)?);
         let root_model = schema.get_as(intern!(py, "root_model"))?.unwrap_or(false);
 
         Ok(Self {
             class: class.into(),
             serializer,
-            has_extra: has_extra(schema, user_config)?,
+            has_extra: has_extra(schema, config)?,
             root_model,
             name: class.getattr(intern!(py, "__name__"))?.extract()?,
         }
@@ -109,9 +109,9 @@ impl BuildSerializer for ModelSerializer {
     }
 }
 
-fn has_extra(schema: &PyDict, user_config: &crate::user_config::UserConfig) -> PyResult<bool> {
+fn has_extra(schema: &PyDict, config: Option<&PyDict>) -> PyResult<bool> {
     let py = schema.py();
-    let extra_behaviour = ExtraBehavior::from_schema_or_config(py, schema, user_config, ExtraBehavior::Ignore)?;
+    let extra_behaviour = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
     Ok(matches!(extra_behaviour, ExtraBehavior::Allow))
 }
 

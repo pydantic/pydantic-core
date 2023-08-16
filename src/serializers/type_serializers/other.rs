@@ -16,7 +16,7 @@ impl BuildSerializer for ChainBuilder {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let last_schema = schema
@@ -25,7 +25,7 @@ impl BuildSerializer for ChainBuilder {
             .last()
             .unwrap()
             .downcast()?;
-        CombinedSerializer::build(last_schema, user_config, definitions)
+        CombinedSerializer::build(last_schema, config, definitions)
     }
 }
 
@@ -36,11 +36,11 @@ impl BuildSerializer for CustomErrorBuilder {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let sub_schema: &PyDict = schema.get_as_req(intern!(schema.py(), "schema"))?;
-        CombinedSerializer::build(sub_schema, user_config, definitions)
+        CombinedSerializer::build(sub_schema, config, definitions)
     }
 }
 
@@ -51,13 +51,13 @@ impl BuildSerializer for CallBuilder {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let return_schema = schema.get_as::<&PyDict>(intern!(schema.py(), "return_schema"))?;
         match return_schema {
-            Some(return_schema) => CombinedSerializer::build(return_schema, user_config, definitions),
-            None => AnySerializer::build(schema, user_config, definitions),
+            Some(return_schema) => CombinedSerializer::build(return_schema, config, definitions),
+            None => AnySerializer::build(schema, config, definitions),
         }
     }
 }
@@ -69,11 +69,11 @@ impl BuildSerializer for LaxOrStrictBuilder {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let strict_schema: &PyDict = schema.get_as_req(intern!(schema.py(), "strict_schema"))?;
-        CombinedSerializer::build(strict_schema, user_config, definitions)
+        CombinedSerializer::build(strict_schema, config, definitions)
     }
 }
 
@@ -84,7 +84,7 @@ impl BuildSerializer for ArgumentsBuilder {
 
     fn build(
         _schema: &PyDict,
-        _user_config: &crate::user_config::UserConfig,
+        _config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         py_schema_err!("`arguments` validators require a custom serializer")
@@ -100,10 +100,10 @@ macro_rules! any_build_serializer {
 
             fn build(
                 schema: &PyDict,
-                user_config: &crate::user_config::UserConfig,
+                config: Option<&PyDict>,
                 definitions: &mut DefinitionsBuilder<CombinedSerializer>,
             ) -> PyResult<CombinedSerializer> {
-                AnySerializer::build(schema, user_config, definitions)
+                AnySerializer::build(schema, config, definitions)
             }
         }
     };

@@ -37,13 +37,13 @@ impl BuildValidator for UrlValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let (allowed_schemes, name) = get_allowed_schemas(schema, Self::EXPECTED_TYPE)?;
 
         Ok(Self {
-            strict: is_strict(schema, user_config)?,
+            strict: is_strict(schema, config)?,
             max_length: schema.get_as(intern!(schema.py(), "max_length"))?,
             host_required: schema.get_as(intern!(schema.py(), "host_required"))?.unwrap_or(false),
             default_host: schema.get_as(intern!(schema.py(), "default_host"))?,
@@ -172,7 +172,7 @@ impl BuildValidator for MultiHostUrlValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let (allowed_schemes, name) = get_allowed_schemas(schema, Self::EXPECTED_TYPE)?;
@@ -184,7 +184,7 @@ impl BuildValidator for MultiHostUrlValidator {
             }
         }
         Ok(Self {
-            strict: is_strict(schema, user_config)?,
+            strict: is_strict(schema, config)?,
             max_length: schema.get_as(intern!(schema.py(), "max_length"))?,
             allowed_schemes,
             host_required: schema.get_as(intern!(schema.py(), "host_required"))?.unwrap_or(false),

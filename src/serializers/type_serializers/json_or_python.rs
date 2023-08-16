@@ -20,15 +20,15 @@ impl BuildSerializer for JsonOrPythonSerializer {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let json_schema: &PyDict = schema.get_as_req(intern!(py, "json_schema"))?;
         let python_schema: &PyDict = schema.get_as_req(intern!(py, "python_schema"))?;
 
-        let json = CombinedSerializer::build(json_schema, user_config, definitions)?;
-        let python = CombinedSerializer::build(python_schema, user_config, definitions)?;
+        let json = CombinedSerializer::build(json_schema, config, definitions)?;
+        let python = CombinedSerializer::build(python_schema, config, definitions)?;
 
         let name = format!(
             "{}[json={}, python={}]",

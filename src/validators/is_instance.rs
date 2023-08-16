@@ -23,7 +23,7 @@ impl BuildValidator for IsInstanceValidator {
 
     fn build(
         schema: &PyDict,
-        _user_config: &crate::user_config::UserConfig,
+        _config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();

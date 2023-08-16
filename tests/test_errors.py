@@ -9,7 +9,7 @@ import pytest
 from dirty_equals import HasRepr, IsInstance, IsJson, IsStr
 
 from pydantic_core import (
-    CoreFlags,
+    CoreConfig,
     PydanticCustomError,
     PydanticKnownError,
     PydanticOmit,
@@ -524,7 +524,7 @@ def test_all_errors():
 def test_validation_error_cause_usage():
     from exceptiongroup import BaseExceptionGroup
 
-    enabled_flags: CoreFlags = {'validation_error_cause': True}
+    enabled_config: CoreConfig = {'validation_error_cause': True}
 
     def check_grouped_exception(exc: BaseException) -> BaseException:
         """
@@ -546,7 +546,7 @@ def test_validation_error_cause_usage():
     def singular_raise_py_error(v: Any) -> Any:
         raise ValueError('Oh no!')
 
-    s1 = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), flags=enabled_flags)
+    s1 = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), config=enabled_config)
     with pytest.raises(ValidationError) as exc_info:
         s1.validate_python('anything')
 
@@ -563,7 +563,7 @@ def test_validation_error_cause_usage():
         except AssertionError as e:
             raise ValueError('Oh no!') from e
 
-    s2 = SchemaValidator(core_schema.no_info_plain_validator_function(multi_raise_py_error), flags=enabled_flags)
+    s2 = SchemaValidator(core_schema.no_info_plain_validator_function(multi_raise_py_error), config=enabled_config)
     with pytest.raises(ValidationError) as exc_info:
         s2.validate_python('anything')
 
@@ -591,7 +591,7 @@ def test_validation_error_cause_usage():
         except ValidationError as e:
             raise ValueError('Sub val failure') from e
 
-    s3 = SchemaValidator(core_schema.no_info_plain_validator_function(outer_raise_py_error), flags=enabled_flags)
+    s3 = SchemaValidator(core_schema.no_info_plain_validator_function(outer_raise_py_error), config=enabled_config)
     with pytest.raises(ValidationError) as exc_info:
         s3.validate_python('anything')
 
@@ -605,13 +605,13 @@ def test_validation_error_cause_usage():
     validate_s2_chain(subcause)
 
 
-def test_validation_error_cause_backport_missing():
+def test_validation_error_cause_version_variants():
     class Result(enum.Enum):
         CAUSE = enum.auto()
         NO_CAUSE = enum.auto()
         IMPORT_ERROR = enum.auto()
 
-    config: list[tuple[str, CoreFlags, Result]] = [
+    config: list[tuple[str, CoreConfig, Result]] = [
         # Without the backport should still work after 3.10 as not needed:
         (
             'Enabled',
@@ -628,8 +628,8 @@ def test_validation_error_cause_backport_missing():
         def singular_raise_py_error(v: Any) -> Any:
             raise ValueError('Oh no!')
 
-        for _, flags, expected in config:
-            s = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), flags=flags)
+        for _, config, expected in config:
+            s = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), config=config)
 
             if expected is Result.IMPORT_ERROR:
                 # Confirm error message contains "requires the exceptiongroup module" in the middle of the string:

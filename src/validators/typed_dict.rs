@@ -45,27 +45,21 @@ impl BuildValidator for TypedDictValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        _config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
         // typed dicts ignore the parent config and always use the config from this TypedDict
-        let user_config = &user_config.with_new_target(schema.get_as(intern!(py, "config"))?);
+        let config = schema.get_as(intern!(py, "config"))?;
 
-        let strict = is_strict(schema, user_config)?;
+        let strict = is_strict(schema, config)?;
 
-        let total = schema_or_config(
-            schema,
-            user_config,
-            intern!(py, "total"),
-            intern!(py, "typed_dict_total"),
-        )?
-        .unwrap_or(true);
-        let populate_by_name =
-            schema_or_config_same(schema, user_config, intern!(py, "populate_by_name"))?.unwrap_or(false);
+        let total =
+            schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
+        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
-        let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, user_config, ExtraBehavior::Ignore)?;
+        let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
         let extras_validator = match (schema.get_item(intern!(py, "extras_schema")), &extra_behavior) {
             (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(v, config, definitions)?)),
@@ -82,7 +76,7 @@ impl BuildValidator for TypedDictValidator {
 
             let schema = field_info.get_as_req(intern!(py, "schema"))?;
 
-            let validator = match build_validator(schema, user_config, definitions) {
+            let validator = match build_validator(schema, config, definitions) {
                 Ok(v) => v,
                 Err(err) => return py_schema_err!("Field \"{}\":\n  {}", field_name, err),
             };
@@ -137,7 +131,7 @@ impl BuildValidator for TypedDictValidator {
             extra_behavior,
             extras_validator,
             strict,
-            loc_by_alias: user_config.get_conf(intern!(py, "loc_by_alias")).unwrap_or(true),
+            loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
         }
         .into())
     }

@@ -67,22 +67,21 @@ impl BuildValidator for ModelValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        _config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-
         // models ignore the parent config and always use the config from this model
-        let user_config = &user_config.with_new_target(schema.get_as(intern!(py, "config"))?);
+        let config = schema.get_as(intern!(py, "config"))?;
 
         let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
         let sub_schema: &PyAny = schema.get_as_req(intern!(py, "schema"))?;
-        let validator = build_validator(sub_schema, user_config, definitions)?;
+        let validator = build_validator(sub_schema, config, definitions)?;
 
         Ok(Self {
             revalidate: Revalidate::from_str(schema_or_config_same(
                 schema,
-                user_config,
+                config,
                 intern!(py, "revalidate_instances"),
             )?)?,
             validator: Box::new(validator),

@@ -65,13 +65,13 @@ impl BuildSerializer for FormatSerializer {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let formatting_string: &str = schema.get_as_req(intern!(py, "formatting_string"))?;
         if formatting_string.is_empty() {
-            ToStringSerializer::build(schema, user_config, definitions)
+            ToStringSerializer::build(schema, config, definitions)
         } else {
             Ok(Self {
                 format_func: py
@@ -167,7 +167,7 @@ impl BuildSerializer for ToStringSerializer {
 
     fn build(
         schema: &PyDict,
-        _user_config: &crate::user_config::UserConfig,
+        _config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         Ok(Self {

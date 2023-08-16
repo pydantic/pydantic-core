@@ -25,7 +25,7 @@ from ._pydantic_core import (
     to_json,
     to_jsonable_python,
 )
-from .core_schema import CoreConfig, CoreFlags, CoreSchema, CoreSchemaType, ErrorType
+from .core_schema import CoreConfig, CoreSchema, CoreSchemaType, ErrorType
 
 if _sys.version_info < (3, 11):
     from typing_extensions import NotRequired as _NotRequired
@@ -40,7 +40,6 @@ else:
 __all__ = [
     '__version__',
     'CoreConfig',
-    'CoreFlags',
     'CoreSchema',
     'CoreSchemaType',
     'SchemaValidator',

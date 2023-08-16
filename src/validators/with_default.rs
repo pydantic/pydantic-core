@@ -81,7 +81,7 @@ impl BuildValidator for WithDefaultValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
@@ -101,7 +101,7 @@ impl BuildValidator for WithDefaultValidator {
         };
 
         let sub_schema: &PyAny = schema.get_as_req(intern!(schema.py(), "schema"))?;
-        let validator = Box::new(build_validator(sub_schema, user_config, definitions)?);
+        let validator = Box::new(build_validator(sub_schema, config, definitions)?);
 
         let copy_default = if let DefaultType::Default(default_obj) = &default {
             default_obj.as_ref(py).hash().is_err()
@@ -115,8 +115,7 @@ impl BuildValidator for WithDefaultValidator {
             default,
             on_error,
             validator,
-            validate_default: schema_or_config_same(schema, user_config, intern!(py, "validate_default"))?
-                .unwrap_or(false),
+            validate_default: schema_or_config_same(schema, config, intern!(py, "validate_default"))?.unwrap_or(false),
             copy_default,
             name,
         }

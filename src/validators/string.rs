@@ -20,10 +20,10 @@ impl BuildValidator for StrValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        let con_str_validator = StrConstrainedValidator::build(schema, user_config)?;
+        let con_str_validator = StrConstrainedValidator::build(schema, config)?;
 
         if con_str_validator.has_constraints_set() {
             Ok(con_str_validator.into())
@@ -165,49 +165,31 @@ impl Validator for StrConstrainedValidator {
 }
 
 impl StrConstrainedValidator {
-    fn build(schema: &PyDict, user_config: &crate::user_config::UserConfig) -> PyResult<Self> {
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
         let py = schema.py();
         let pattern = match schema.get_as(intern!(py, "pattern"))? {
             Some(s) => Some(Regex::new(s).map_err(|e| py_schema_error_type!("{}", e))?),
             None => None,
         };
-        let min_length: Option<usize> = schema_or_config(
-            schema,
-            user_config,
-            intern!(py, "min_length"),
-            intern!(py, "str_min_length"),
-        )?;
-        let max_length: Option<usize> = schema_or_config(
-            schema,
-            user_config,
-            intern!(py, "max_length"),
-            intern!(py, "str_max_length"),
-        )?;
+        let min_length: Option<usize> =
+            schema_or_config(schema, config, intern!(py, "min_length"), intern!(py, "str_min_length"))?;
+        let max_length: Option<usize> =
+            schema_or_config(schema, config, intern!(py, "max_length"), intern!(py, "str_max_length"))?;
 
         let strip_whitespace: bool = schema_or_config(
             schema,
-            user_config,
+            config,
             intern!(py, "strip_whitespace"),
             intern!(py, "str_strip_whitespace"),
         )?
         .unwrap_or(false);
-        let to_lower: bool = schema_or_config(
-            schema,
-            user_config,
-            intern!(py, "to_lower"),
-            intern!(py, "str_to_lower"),
-        )?
-        .unwrap_or(false);
-        let to_upper: bool = schema_or_config(
-            schema,
-            user_config,
-            intern!(py, "to_upper"),
-            intern!(py, "str_to_upper"),
-        )?
-        .unwrap_or(false);
+        let to_lower: bool =
+            schema_or_config(schema, config, intern!(py, "to_lower"), intern!(py, "str_to_lower"))?.unwrap_or(false);
+        let to_upper: bool =
+            schema_or_config(schema, config, intern!(py, "to_upper"), intern!(py, "str_to_upper"))?.unwrap_or(false);
 
         Ok(Self {
-            strict: is_strict(schema, user_config)?,
+            strict: is_strict(schema, config)?,
             pattern,
             min_length,
             max_length,

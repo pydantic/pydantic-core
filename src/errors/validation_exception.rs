@@ -50,7 +50,8 @@ impl ValidationError {
         error_mode: ErrorMode,
         error: ValError,
         outer_location: Option<LocItem>,
-        user_config: &crate::user_config::UserConfig,
+        hide_input_in_errors: bool,
+        validation_error_cause: bool,
     ) -> PyErr {
         match error {
             ValError::LineErrors(raw_errors) => {
@@ -62,21 +63,11 @@ impl ValidationError {
                     None => raw_errors.into_iter().map(|e| e.into_py(py)).collect(),
                 };
 
-                let set_cause = user_config
-                    .get_conf::<bool>(intern!(py, "validation_error_cause"))
-                    .unwrap_or(false);
-                let validation_error = Self::new(
-                    line_errors,
-                    title,
-                    error_mode,
-                    user_config
-                        .get_conf::<bool>(intern!(py, "hide_input_in_errors"))
-                        .unwrap_or(false),
-                );
+                let validation_error = Self::new(line_errors, title, error_mode, hide_input_in_errors);
 
                 match Py::new(py, validation_error) {
                     Ok(err) => {
-                        if set_cause {
+                        if validation_error_cause {
                             // Will return an import error if the backport was needed and not installed:
                             if let Some(cause_problem) = ValidationError::maybe_add_cause(err.borrow(py), py) {
                                 return cause_problem;

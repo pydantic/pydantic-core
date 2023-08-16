@@ -18,7 +18,7 @@ impl BuildSerializer for DefinitionsSerializerBuilder {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
@@ -26,12 +26,12 @@ impl BuildSerializer for DefinitionsSerializerBuilder {
         let schema_definitions: &PyList = schema.get_as_req(intern!(py, "definitions"))?;
 
         for schema_def in schema_definitions {
-            CombinedSerializer::build(schema_def.downcast()?, user_config, definitions)?;
+            CombinedSerializer::build(schema_def.downcast()?, config, definitions)?;
             // no need to store the serializer here, it has already been stored in definitions if necessary
         }
 
         let inner_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
-        CombinedSerializer::build(inner_schema, user_config, definitions)
+        CombinedSerializer::build(inner_schema, config, definitions)
     }
 }
 
@@ -51,7 +51,7 @@ impl BuildSerializer for DefinitionRefSerializer {
 
     fn build(
         schema: &PyDict,
-        _user_config: &crate::user_config::UserConfig,
+        _config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let schema_ref: String = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;

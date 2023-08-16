@@ -21,15 +21,15 @@ macro_rules! set_build {
     () => {
         fn build(
             schema: &PyDict,
-            user_config: &crate::user_config::UserConfig,
+            config: Option<&PyDict>,
             definitions: &mut DefinitionsBuilder<CombinedValidator>,
         ) -> PyResult<CombinedValidator> {
             let py = schema.py();
             let item_validator = match schema.get_item(pyo3::intern!(schema.py(), "items_schema")) {
-                Some(d) => Box::new(crate::validators::build_validator(d, user_config, definitions)?),
+                Some(d) => Box::new(crate::validators::build_validator(d, config, definitions)?),
                 None => Box::new(crate::validators::any::AnyValidator::build(
                     schema,
-                    user_config,
+                    config,
                     definitions,
                 )?),
             };
@@ -37,7 +37,7 @@ macro_rules! set_build {
             let max_length = schema.get_as(pyo3::intern!(py, "max_length"))?;
             let name = format!("{}[{}]", Self::EXPECTED_TYPE, inner_name);
             Ok(Self {
-                strict: crate::build_tools::is_strict(schema, user_config)?,
+                strict: crate::build_tools::is_strict(schema, config)?,
                 item_validator,
                 min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
                 max_length,

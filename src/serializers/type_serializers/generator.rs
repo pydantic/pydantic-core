@@ -26,13 +26,13 @@ impl BuildSerializer for GeneratorSerializer {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let item_serializer = match schema.get_as::<&PyDict>(intern!(py, "items_schema"))? {
-            Some(items_schema) => CombinedSerializer::build(items_schema, user_config, definitions)?,
-            None => AnySerializer::build(schema, user_config, definitions)?,
+            Some(items_schema) => CombinedSerializer::build(items_schema, config, definitions)?,
+            None => AnySerializer::build(schema, config, definitions)?,
         };
         Ok(Self {
             item_serializer: Box::new(item_serializer),

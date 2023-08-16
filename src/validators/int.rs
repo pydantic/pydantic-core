@@ -21,7 +21,7 @@ impl BuildValidator for IntValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
@@ -31,10 +31,10 @@ impl BuildValidator for IntValidator {
             || schema.get_item(intern!(py, "ge")).is_some()
             || schema.get_item(intern!(py, "gt")).is_some();
         if use_constrained {
-            ConstrainedIntValidator::build(schema, user_config)
+            ConstrainedIntValidator::build(schema, config)
         } else {
             Ok(Self {
-                strict: is_strict(schema, user_config)?,
+                strict: is_strict(schema, config)?,
             }
             .into())
         }
@@ -169,10 +169,10 @@ impl Validator for ConstrainedIntValidator {
 }
 
 impl ConstrainedIntValidator {
-    fn build(schema: &PyDict, user_config: &crate::user_config::UserConfig) -> PyResult<CombinedValidator> {
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedValidator> {
         let py = schema.py();
         Ok(Self {
-            strict: is_strict(schema, user_config)?,
+            strict: is_strict(schema, config)?,
             multiple_of: schema.get_as(intern!(py, "multiple_of"))?,
             le: schema.get_as(intern!(py, "le"))?,
             lt: schema.get_as(intern!(py, "lt"))?,

@@ -20,17 +20,17 @@ impl BuildValidator for BytesValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let use_constrained = schema.get_item(intern!(py, "max_length")).is_some()
             || schema.get_item(intern!(py, "min_length")).is_some();
         if use_constrained {
-            BytesConstrainedValidator::build(schema, user_config)
+            BytesConstrainedValidator::build(schema, config)
         } else {
             Ok(Self {
-                strict: is_strict(schema, user_config)?,
+                strict: is_strict(schema, config)?,
             }
             .into())
         }
@@ -130,10 +130,10 @@ impl Validator for BytesConstrainedValidator {
 }
 
 impl BytesConstrainedValidator {
-    fn build(schema: &PyDict, user_config: &crate::user_config::UserConfig) -> PyResult<CombinedValidator> {
+    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedValidator> {
         let py = schema.py();
         Ok(Self {
-            strict: is_strict(schema, user_config)?,
+            strict: is_strict(schema, config)?,
             min_length: schema.get_as(intern!(py, "min_length"))?,
             max_length: schema.get_as(intern!(py, "max_length"))?,
         }

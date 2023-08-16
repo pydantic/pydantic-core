@@ -21,7 +21,6 @@ mod recursion_guard;
 mod serializers;
 mod tools;
 mod url;
-mod user_config;
 mod validators;
 
 // required for benchmarks

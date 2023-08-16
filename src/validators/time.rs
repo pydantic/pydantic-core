@@ -25,13 +25,13 @@ impl BuildValidator for TimeValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let s = Self {
-            strict: is_strict(schema, user_config)?,
+            strict: is_strict(schema, config)?,
             constraints: TimeConstraints::from_py(schema)?,
-            microseconds_precision: extract_microseconds_precision(schema, user_config)?,
+            microseconds_precision: extract_microseconds_precision(schema, config)?,
         };
         Ok(s.into())
     }

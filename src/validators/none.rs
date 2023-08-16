@@ -14,7 +14,7 @@ impl BuildValidator for NoneValidator {
 
     fn build(
         _schema: &PyDict,
-        _user_config: &crate::user_config::UserConfig,
+        _config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         Ok(Self.into())

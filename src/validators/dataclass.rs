@@ -47,15 +47,14 @@ impl BuildValidator for DataclassArgsValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
-        let populate_by_name =
-            schema_or_config_same(schema, user_config, intern!(py, "populate_by_name"))?.unwrap_or(false);
+        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
-        let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, user_config, ExtraBehavior::Ignore)?;
+        let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
         let extras_validator = match (schema.get_item(intern!(py, "extras_schema")), &extra_behavior) {
             (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(v, config, definitions)?)),
@@ -84,7 +83,7 @@ impl BuildValidator for DataclassArgsValidator {
 
             let schema: &PyAny = field.get_as_req(intern!(py, "schema"))?;
 
-            let validator = match build_validator(schema, user_config, definitions) {
+            let validator = match build_validator(schema, config, definitions) {
                 Ok(v) => v,
                 Err(err) => return py_schema_err!("Field '{}':\n  {}", name, err),
             };
@@ -440,13 +439,13 @@ impl BuildValidator for DataclassValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        _config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
         // dataclasses ignore the parent config and always use the config from this dataclasses
-        let user_config = &user_config.with_new_target(schema.get_as(intern!(py, "config"))?);
+        let config = schema.get_as(intern!(py, "config"))?;
 
         let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
         let name = match schema.get_as_req::<String>(intern!(py, "cls_name")) {
@@ -454,7 +453,7 @@ impl BuildValidator for DataclassValidator {
             Err(_) => class.getattr(intern!(py, "__name__"))?.extract()?,
         };
         let sub_schema: &PyAny = schema.get_as_req(intern!(py, "schema"))?;
-        let validator = build_validator(sub_schema, user_config, definitions)?;
+        let validator = build_validator(sub_schema, config, definitions)?;
 
         let post_init = if schema.get_as::<bool>(intern!(py, "post_init"))?.unwrap_or(false) {
             Some(PyString::intern(py, "__post_init__").into_py(py))
@@ -469,14 +468,14 @@ impl BuildValidator for DataclassValidator {
             .collect::<PyResult<Vec<_>>>()?;
 
         Ok(Self {
-            strict: is_strict(schema, user_config)?,
+            strict: is_strict(schema, config)?,
             validator: Box::new(validator),
             class: class.into(),
             fields,
             post_init,
             revalidate: Revalidate::from_str(schema_or_config_same(
                 schema,
-                user_config,
+                config,
                 intern!(py, "revalidate_instances"),
             )?)?,
             name,

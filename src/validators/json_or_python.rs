@@ -23,15 +23,15 @@ impl BuildValidator for JsonOrPython {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let json_schema: &PyDict = schema.get_as_req(intern!(py, "json_schema"))?;
         let python_schema: &PyDict = schema.get_as_req(intern!(py, "python_schema"))?;
 
-        let json = build_validator(json_schema, user_config, definitions)?;
-        let python = build_validator(python_schema, user_config, definitions)?;
+        let json = build_validator(json_schema, config, definitions)?;
+        let python = build_validator(python_schema, config, definitions)?;
 
         let name = format!(
             "{}[json={},python={}]",

@@ -18,7 +18,8 @@ pub struct GeneratorValidator {
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: String,
-    user_config: crate::user_config::OwnedUserConfig,
+    hide_input_in_errors: bool,
+    validation_error_cause: bool,
 }
 
 impl BuildValidator for GeneratorValidator {
@@ -26,22 +27,27 @@ impl BuildValidator for GeneratorValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        let py = schema.py();
-        let item_validator = get_items_schema(schema, user_config, definitions)?;
+        let item_validator = get_items_schema(schema, config, definitions)?;
         let name = match item_validator {
             Some(ref v) => format!("{}[{}]", Self::EXPECTED_TYPE, v.get_name()),
             None => format!("{}[any]", Self::EXPECTED_TYPE),
         };
-
+        let hide_input_in_errors: bool = config
+            .get_as(pyo3::intern!(schema.py(), "hide_input_in_errors"))?
+            .unwrap_or(false);
+        let validation_error_cause: bool = config
+            .get_as(pyo3::intern!(schema.py(), "validation_error_cause"))?
+            .unwrap_or(false);
         Ok(Self {
             item_validator,
             name,
-            min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
-            max_length: schema.get_as(pyo3::intern!(py, "max_length"))?,
-            user_config: user_config.to_owned(py),
+            min_length: schema.get_as(pyo3::intern!(schema.py(), "min_length"))?,
+            max_length: schema.get_as(pyo3::intern!(schema.py(), "max_length"))?,
+            hide_input_in_errors,
+            validation_error_cause,
         }
         .into())
     }
@@ -57,17 +63,24 @@ impl Validator for GeneratorValidator {
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
         let iterator = input.validate_iter()?;
-        let validator = self
-            .item_validator
-            .as_ref()
-            .map(|v| InternalValidator::new(py, "ValidatorIterator", v, state, self.user_config.clone()));
+        let validator = self.item_validator.as_ref().map(|v| {
+            InternalValidator::new(
+                py,
+                "ValidatorIterator",
+                v,
+                state,
+                self.hide_input_in_errors,
+                self.validation_error_cause,
+            )
+        });
 
         let v_iterator = ValidatorIterator {
             iterator,
             validator,
             min_length: self.min_length,
             max_length: self.max_length,
-            user_config: self.user_config.clone(),
+            hide_input_in_errors: self.hide_input_in_errors,
+            validation_error_cause: self.validation_error_cause,
         };
         Ok(v_iterator.into_py(py))
     }
@@ -103,7 +116,8 @@ struct ValidatorIterator {
     validator: Option<InternalValidator>,
     min_length: Option<usize>,
     max_length: Option<usize>,
-    user_config: crate::user_config::OwnedUserConfig,
+    hide_input_in_errors: bool,
+    validation_error_cause: bool,
 }
 
 #[pymethods]
@@ -115,11 +129,10 @@ impl ValidatorIterator {
     fn __next__(mut slf: PyRefMut<'_, Self>, py: Python) -> PyResult<Option<PyObject>> {
         let min_length = slf.min_length;
         let max_length = slf.max_length;
+        let hide_input_in_errors = slf.hide_input_in_errors;
+        let validation_error_cause = slf.validation_error_cause;
         let Self {
-            validator,
-            iterator,
-            user_config,
-            ..
+            validator, iterator, ..
         } = &mut *slf;
         macro_rules! next {
             ($iter:ident) => {
@@ -143,7 +156,8 @@ impl ValidatorIterator {
                                         ErrorMode::Python,
                                         val_error,
                                         None,
-                                        &user_config.clone().to_reffed(py),
+                                        hide_input_in_errors,
+                                        validation_error_cause,
                                     ));
                                 }
                             }
@@ -169,7 +183,8 @@ impl ValidatorIterator {
                                     ErrorMode::Python,
                                     val_error,
                                     None,
-                                    &user_config.clone().to_reffed(py),
+                                    hide_input_in_errors,
+                                    validation_error_cause,
                                 ));
                             }
                         }
@@ -217,7 +232,8 @@ pub struct InternalValidator {
     self_instance: Option<PyObject>,
     recursion_guard: RecursionGuard,
     validation_mode: InputType,
-    user_config: crate::user_config::OwnedUserConfig,
+    hide_input_in_errors: bool,
+    validation_error_cause: bool,
 }
 
 impl fmt::Debug for InternalValidator {
@@ -232,7 +248,8 @@ impl InternalValidator {
         name: &str,
         validator: &CombinedValidator,
         state: &ValidationState,
-        user_config: crate::user_config::OwnedUserConfig,
+        hide_input_in_errors: bool,
+        validation_error_cause: bool,
     ) -> Self {
         let extra = state.extra();
         Self {
@@ -246,7 +263,8 @@ impl InternalValidator {
             self_instance: extra.self_instance.map(|d| d.into_py(py)),
             recursion_guard: state.recursion_guard.clone(),
             validation_mode: extra.mode,
-            user_config,
+            hide_input_in_errors,
+            validation_error_cause,
         }
     }
 
@@ -277,7 +295,8 @@ impl InternalValidator {
                     ErrorMode::Python,
                     e,
                     outer_location,
-                    &self.user_config.to_reffed(py),
+                    self.hide_input_in_errors,
+                    self.validation_error_cause,
                 )
             })
     }
@@ -305,7 +324,8 @@ impl InternalValidator {
                 ErrorMode::Python,
                 e,
                 outer_location,
-                &self.user_config.to_reffed(py),
+                self.hide_input_in_errors,
+                self.validation_error_cause,
             )
         })
     }

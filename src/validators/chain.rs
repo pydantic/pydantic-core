@@ -9,7 +9,6 @@ use crate::tools::SchemaDict;
 
 use super::validation_state::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
-use crate::user_config::UserConfig;
 
 #[derive(Debug, Clone)]
 pub struct ChainValidator {
@@ -22,13 +21,13 @@ impl BuildValidator for ChainValidator {
 
     fn build(
         schema: &PyDict,
-        user_config: &crate::user_config::UserConfig,
+        config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let steps: Vec<CombinedValidator> = schema
             .get_as_req::<&PyList>(intern!(schema.py(), "steps"))?
             .iter()
-            .map(|step| build_validator_steps(step, user_config, definitions))
+            .map(|step| build_validator_steps(step, config, definitions))
             .collect::<PyResult<Vec<Vec<CombinedValidator>>>>()?
             .into_iter()
             .flatten()
@@ -55,12 +54,12 @@ impl BuildValidator for ChainValidator {
 
 // either a vec of the steps from a nested `ChainValidator`, or a length-1 vec containing the validator
 // to be flattened into `steps` above
-fn build_validator_steps(
-    step: &PyAny,
-    user_config: &UserConfig,
+fn build_validator_steps<'a>(
+    step: &'a PyAny,
+    config: Option<&'a PyDict>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<Vec<CombinedValidator>> {
-    let validator = build_validator(step, user_config, definitions)?;
+    let validator = build_validator(step, config, definitions)?;
     if let CombinedValidator::Chain(chain_validator) = validator {
         Ok(chain_validator.steps)
     } else {
