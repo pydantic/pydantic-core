@@ -36,6 +36,28 @@ pub struct SchemaSerializer {
     config: SerializationConfig,
 }
 
+#[pyclass(module = "pydantic_core._pydantic_core")]
+#[derive(Clone)]
+pub struct _NoOpCallableContainer {}
+
+#[pymethods]
+impl _NoOpCallableContainer {
+    #[new]
+    pub fn py_new(_hack: Option<i32>) -> PyResult<Self> {
+        Ok(Self{})
+    }
+
+    fn no_op(&self) -> () {}
+
+    fn __call__(&self, _hack: Option<i32>) -> PyResult<()> {Ok(self.no_op())}
+
+    pub fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
+        let args = (1,);
+        let cls = Py::new(py, self.clone())?.getattr(py, "__class__")?;
+        Ok((cls, args).into_py(py))
+    }
+}
+
 impl SchemaSerializer {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn build_extra<'b, 'a: 'b>(
@@ -176,6 +198,10 @@ impl SchemaSerializer {
         self.expected_json_size.store(bytes.len(), Ordering::Relaxed);
         let py_bytes = PyBytes::new(py, &bytes);
         Ok(py_bytes.into())
+    }
+
+    pub fn __reduce__(&self) -> (_NoOpCallableContainer, (i32, )) {
+        (_NoOpCallableContainer{}, (1, ))
     }
 
     pub fn __repr__(&self) -> String {
