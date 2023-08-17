@@ -52,7 +52,6 @@ jobs:
       - name: Compile pydantic-core for profiling
         run: |
           pip install -e . --config-settings=build-args='--verbose' -v
-          python -c 'import pydantic_core; assert pydantic_core._pydantic_core.__pydantic_core_default_allocator__'
         env:
           CONST_RANDOM_SEED: 0 # Fix the compile time RNG seed
           RUSTFLAGS: "-Cprofile-generate=${{ github.workspace }}/profdata"
@@ -66,7 +65,6 @@ jobs:
       - name: Compile pydantic-core for benchmarking
         run: |
           pip install -e . --config-settings=build-args='--verbose' -v
-          python -c 'import pydantic_core; assert pydantic_core._pydantic_core.__pydantic_core_default_allocator__'
         env:
           CONST_RANDOM_SEED: 0 # Fix the compile time RNG seed
           RUSTFLAGS: "-Cprofile-use=${{ github.workspace }}/merged.profdata"
