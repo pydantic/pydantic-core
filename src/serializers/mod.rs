@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::{PyBytes, PyDict, PyTuple};
 use pyo3::{PyTraverseError, PyVisit};
 
 use crate::definitions::DefinitionsBuilder;
@@ -43,16 +43,19 @@ pub struct _NoOpCallableContainer {}
 #[pymethods]
 impl _NoOpCallableContainer {
     #[new]
-    pub fn py_new(_hack: Option<i32>) -> PyResult<Self> {
-        Ok(Self{})
+    pub fn py_new() -> PyResult<Self> {
+        Ok(Self {})
     }
 
-    fn no_op(&self) -> () {}
+    fn no_op(&self) {}
 
-    fn __call__(&self, _hack: Option<i32>) -> PyResult<()> {Ok(self.no_op())}
+    #[pyo3(signature = (*_args))]
+    fn __call__(&self, _args: &PyTuple) {
+        self.no_op();
+    }
 
     pub fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
-        let args = (1,);
+        let args = PyTuple::empty(py);
         let cls = Py::new(py, self.clone())?.getattr(py, "__class__")?;
         Ok((cls, args).into_py(py))
     }
@@ -200,8 +203,8 @@ impl SchemaSerializer {
         Ok(py_bytes.into())
     }
 
-    pub fn __reduce__(&self) -> (_NoOpCallableContainer, (i32, )) {
-        (_NoOpCallableContainer{}, (1, ))
+    pub fn __reduce__(&self, _py: Python) -> (_NoOpCallableContainer, ((),)) {
+        (_NoOpCallableContainer {}, ((),))
     }
 
     pub fn __repr__(&self) -> String {
