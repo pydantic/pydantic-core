@@ -512,7 +512,7 @@ impl TzInfo {
         Self { seconds }
     }
 
-    fn utcoffset<'p>(&self, py: Python<'p>, _dt: &PyAny) -> PyResult<&'p PyDelta> {
+    fn utcoffset<'py>(&self, py: Python<'py>, _dt: &PyAny) -> PyResult<&'py PyDelta> {
         PyDelta::new(py, 0, self.seconds, 0, true)
     }
 
@@ -524,7 +524,7 @@ impl TzInfo {
         None
     }
 
-    fn fromutc<'p>(&self, py: Python<'p>, dt: &'p PyDateTime) -> PyResult<&'p PyDateTime> {
+    fn fromutc<'py>(&self, py: Python<'py>, dt: &'py PyDateTime) -> PyResult<&'py PyDateTime> {
         dt.call_method1("__add__", (self.utcoffset(py, py.None().as_ref(py))?,))?
             .extract()
     }
