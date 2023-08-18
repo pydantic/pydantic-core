@@ -3,19 +3,12 @@ use std::{io, num::FpCategory};
 use serde::{ser::Impossible, serde_if_integer128, Serialize, Serializer};
 use serde_json::ser::{CompactFormatter, Formatter, PrettyFormatter, State};
 
-use super::errors::PythonSerializerError;
+use crate::serde::shared::tri;
 
-macro_rules! tri {
-    ($e:expr $(,)?) => {
-        match $e {
-            core::result::Result::Ok(val) => val,
-            core::result::Result::Err(err) => return core::result::Result::Err(err),
-        }
-    };
-}
+use super::{error::PydanticSerdeError, shared::TOKEN};
 
-type Result<T> = std::result::Result<T, PythonSerializerError>;
-const TOKEN: &str = "$serde_json::private::Number";
+type Result<T> = std::result::Result<T, PydanticSerdeError>;
+
 pub struct PythonSerializer<W, F = CompactFormatter> {
     writer: W,
     formatter: F,
@@ -68,7 +61,7 @@ where
     F: Formatter,
 {
     type Ok = ();
-    type Error = PythonSerializerError;
+    type Error = PydanticSerdeError;
 
     type SerializeSeq = Compound<'a, W, F>;
     type SerializeTuple = Compound<'a, W, F>;
@@ -82,62 +75,62 @@ where
     fn serialize_bool(self, value: bool) -> Result<()> {
         self.formatter
             .write_bool(&mut self.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     #[inline]
     fn serialize_i8(self, value: i8) -> Result<()> {
         self.formatter
             .write_i8(&mut self.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_i16(self, value: i16) -> Result<Self::Ok> {
         self.formatter
             .write_i16(&mut self.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_i32(self, value: i32) -> Result<Self::Ok> {
         self.formatter
             .write_i32(&mut self.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_i64(self, value: i64) -> Result<Self::Ok> {
         self.formatter
             .write_i64(&mut self.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_u8(self, value: u8) -> Result<Self::Ok> {
         self.formatter
             .write_u8(&mut self.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_u16(self, value: u16) -> Result<Self::Ok> {
         self.formatter
             .write_u16(&mut self.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_u32(self, value: u32) -> Result<Self::Ok> {
         self.formatter
             .write_u32(&mut self.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_u64(self, value: u64) -> Result<Self::Ok> {
         self.formatter
             .write_u64(&mut self.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_u128(self, value: u128) -> Result<()> {
         self.formatter
             .write_u128(&mut self.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     #[inline]
@@ -146,7 +139,7 @@ where
             FpCategory::Nan => self
                 .formatter
                 .write_number_str(&mut self.writer, "NaN")
-                .map_err(|e| PythonSerializerError { message: e.to_string() }),
+                .map_err(PydanticSerdeError::io),
             FpCategory::Infinite => {
                 let infinity = if value.is_sign_negative() {
                     "-Infinity"
@@ -155,12 +148,12 @@ where
                 };
                 self.formatter
                     .write_number_str(&mut self.writer, infinity)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() })
+                    .map_err(PydanticSerdeError::io)
             }
             _ => self
                 .formatter
                 .write_f32(&mut self.writer, value)
-                .map_err(|e| PythonSerializerError { message: e.to_string() }),
+                .map_err(PydanticSerdeError::io),
         }
     }
 
@@ -169,7 +162,7 @@ where
             FpCategory::Nan => self
                 .formatter
                 .write_number_str(&mut self.writer, "NaN")
-                .map_err(|e| PythonSerializerError { message: e.to_string() }),
+                .map_err(PydanticSerdeError::io),
             FpCategory::Infinite => {
                 let infinity = if value.is_sign_negative() {
                     "-Infinity"
@@ -178,12 +171,12 @@ where
                 };
                 self.formatter
                     .write_number_str(&mut self.writer, infinity)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() })
+                    .map_err(PydanticSerdeError::io)
             }
             _ => self
                 .formatter
                 .write_f64(&mut self.writer, value)
-                .map_err(|e| PythonSerializerError { message: e.to_string() }),
+                .map_err(PydanticSerdeError::io),
         }
     }
 
@@ -194,20 +187,19 @@ where
     }
 
     fn serialize_str(self, value: &str) -> Result<Self::Ok> {
-        format_escaped_str(&mut self.writer, &mut self.formatter, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+        format_escaped_str(&mut self.writer, &mut self.formatter, value).map_err(PydanticSerdeError::io)
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<()> {
         self.formatter
             .write_byte_array(&mut self.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_none(self) -> Result<Self::Ok> {
         self.formatter
             .write_null(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_some<T>(self, value: &T) -> Result<Self::Ok>
@@ -220,7 +212,7 @@ where
     fn serialize_unit(self) -> Result<Self::Ok> {
         self.formatter
             .write_null(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok> {
@@ -256,40 +248,40 @@ where
         tri!(self
             .formatter
             .begin_object(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .formatter
             .begin_object_key(&mut self.writer, true)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self.serialize_str(variant));
         tri!(self
             .formatter
             .end_object_key(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .formatter
             .begin_object_value(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(value.serialize(&mut *self));
         tri!(self
             .formatter
             .end_object_value(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         self.formatter
             .end_object(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {
         tri!(self
             .formatter
             .begin_array(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         if len == Some(0) {
             tri!(self
                 .formatter
                 .end_array(&mut self.writer)
-                .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                .map_err(PydanticSerdeError::io));
             Ok(Compound::Map {
                 ser: self,
                 state: State::Empty,
@@ -320,20 +312,20 @@ where
         tri!(self
             .formatter
             .begin_object(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .formatter
             .begin_object_key(&mut self.writer, true)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self.serialize_str(variant));
         tri!(self
             .formatter
             .end_object_key(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .formatter
             .begin_object_value(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         self.serialize_seq(Some(len))
     }
 
@@ -341,12 +333,12 @@ where
         tri!(self
             .formatter
             .begin_object(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         if len == Some(0) {
             tri!(self
                 .formatter
                 .end_object(&mut self.writer)
-                .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                .map_err(PydanticSerdeError::io));
             Ok(Compound::Map {
                 ser: self,
                 state: State::Empty,
@@ -376,20 +368,20 @@ where
         tri!(self
             .formatter
             .begin_object(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .formatter
             .begin_object_key(&mut self.writer, true)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self.serialize_str(variant));
         tri!(self
             .formatter
             .end_object_key(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .formatter
             .begin_object_value(&mut self.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         self.serialize_map(Some(len))
     }
 }
@@ -400,7 +392,7 @@ where
     F: Formatter,
 {
     type Ok = ();
-    type Error = PythonSerializerError;
+    type Error = PydanticSerdeError;
 
     #[inline]
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
@@ -412,13 +404,13 @@ where
                 tri!(ser
                     .formatter
                     .begin_array_value(&mut ser.writer, *state == State::First)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                    .map_err(PydanticSerdeError::io));
                 *state = State::Rest;
                 tri!(value.serialize(&mut **ser));
                 tri!(ser
                     .formatter
                     .end_array_value(&mut ser.writer)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                    .map_err(PydanticSerdeError::io));
                 Ok(())
             }
             Compound::Number { .. } => unreachable!(),
@@ -430,10 +422,7 @@ where
             Compound::Map { ser, state } => {
                 match state {
                     State::Empty => {}
-                    _ => tri!(ser
-                        .formatter
-                        .end_array(&mut ser.writer)
-                        .map_err(|e| PythonSerializerError { message: e.to_string() })),
+                    _ => tri!(ser.formatter.end_array(&mut ser.writer).map_err(PydanticSerdeError::io)),
                 }
                 Ok(())
             }
@@ -448,7 +437,7 @@ where
     F: Formatter,
 {
     type Ok = ();
-    type Error = PythonSerializerError;
+    type Error = PydanticSerdeError;
 
     #[inline]
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
@@ -470,7 +459,7 @@ where
     F: Formatter,
 {
     type Ok = ();
-    type Error = PythonSerializerError;
+    type Error = PydanticSerdeError;
 
     #[inline]
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
@@ -492,7 +481,7 @@ where
     F: Formatter,
 {
     type Ok = ();
-    type Error = PythonSerializerError;
+    type Error = PydanticSerdeError;
 
     #[inline]
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
@@ -508,19 +497,16 @@ where
             Compound::Map { ser, state } => {
                 match state {
                     State::Empty => {}
-                    _ => tri!(ser
-                        .formatter
-                        .end_array(&mut ser.writer)
-                        .map_err(|e| PythonSerializerError { message: e.to_string() })),
+                    _ => tri!(ser.formatter.end_array(&mut ser.writer).map_err(PydanticSerdeError::io)),
                 }
                 tri!(ser
                     .formatter
                     .end_object_value(&mut ser.writer)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                    .map_err(PydanticSerdeError::io));
                 tri!(ser
                     .formatter
                     .end_object(&mut ser.writer)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                    .map_err(PydanticSerdeError::io));
                 Ok(())
             }
             Compound::Number { .. } => unreachable!(),
@@ -534,7 +520,7 @@ where
     F: Formatter,
 {
     type Ok = ();
-    type Error = PythonSerializerError;
+    type Error = PydanticSerdeError;
 
     #[inline]
     fn serialize_key<T>(&mut self, key: &T) -> Result<()>
@@ -546,7 +532,7 @@ where
                 tri!(ser
                     .formatter
                     .begin_object_key(&mut ser.writer, *state == State::First)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                    .map_err(PydanticSerdeError::io));
                 *state = State::Rest;
 
                 tri!(key.serialize(MapKeySerializer { ser: *ser }));
@@ -554,7 +540,7 @@ where
                 tri!(ser
                     .formatter
                     .end_object_key(&mut ser.writer)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                    .map_err(PydanticSerdeError::io));
                 Ok(())
             }
             Compound::Number { .. } => unreachable!(),
@@ -571,12 +557,12 @@ where
                 tri!(ser
                     .formatter
                     .begin_object_value(&mut ser.writer)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                    .map_err(PydanticSerdeError::io));
                 tri!(value.serialize(&mut **ser));
                 tri!(ser
                     .formatter
                     .end_object_value(&mut ser.writer)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                    .map_err(PydanticSerdeError::io));
                 Ok(())
             }
             Compound::Number { .. } => unreachable!(),
@@ -592,7 +578,7 @@ where
                     _ => tri!(ser
                         .formatter
                         .end_object(&mut ser.writer)
-                        .map_err(|e| PythonSerializerError { message: e.to_string() })),
+                        .map_err(PydanticSerdeError::io)),
                 }
                 Ok(())
             }
@@ -607,7 +593,7 @@ where
     F: Formatter,
 {
     type Ok = ();
-    type Error = PythonSerializerError;
+    type Error = PydanticSerdeError;
 
     #[inline]
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
@@ -642,7 +628,7 @@ where
     F: Formatter,
 {
     type Ok = ();
-    type Error = PythonSerializerError;
+    type Error = PydanticSerdeError;
 
     #[inline]
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
@@ -664,16 +650,16 @@ where
                     _ => tri!(ser
                         .formatter
                         .end_object(&mut ser.writer)
-                        .map_err(|e| PythonSerializerError { message: e.to_string() })),
+                        .map_err(PydanticSerdeError::io)),
                 }
                 tri!(ser
                     .formatter
                     .end_object_value(&mut ser.writer)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                    .map_err(PydanticSerdeError::io));
                 tri!(ser
                     .formatter
                     .end_object(&mut ser.writer)
-                    .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                    .map_err(PydanticSerdeError::io));
                 Ok(())
             }
             Compound::Number { .. } => unreachable!(),
@@ -789,15 +775,12 @@ struct MapKeySerializer<'a, W: 'a, F: 'a> {
     ser: &'a mut PythonSerializer<W, F>,
 }
 
-fn key_must_be_a_string() -> PythonSerializerError {
-    PythonSerializerError {
-        message: "Key must be a string".to_string(),
-    }
+fn invalid_number() -> PydanticSerdeError {
+    PydanticSerdeError::syntax(super::error::ErrorCode::InvalidNumber, 0, 0)
 }
-fn invalid_number() -> PythonSerializerError {
-    PythonSerializerError {
-        message: "Invalid Number".to_string(),
-    }
+
+fn key_must_be_a_string() -> PydanticSerdeError {
+    PydanticSerdeError::syntax(super::error::ErrorCode::KeyMustBeAString, 0, 0)
 }
 
 impl<'a, W, F> serde::ser::Serializer for MapKeySerializer<'a, W, F>
@@ -806,7 +789,7 @@ where
     F: Formatter,
 {
     type Ok = ();
-    type Error = PythonSerializerError;
+    type Error = PydanticSerdeError;
 
     #[inline]
     fn serialize_str(self, value: &str) -> Result<()> {
@@ -826,13 +809,13 @@ where
         value.serialize(self)
     }
 
-    type SerializeSeq = Impossible<(), PythonSerializerError>;
-    type SerializeTuple = Impossible<(), PythonSerializerError>;
-    type SerializeTupleStruct = Impossible<(), PythonSerializerError>;
-    type SerializeTupleVariant = Impossible<(), PythonSerializerError>;
-    type SerializeMap = Impossible<(), PythonSerializerError>;
-    type SerializeStruct = Impossible<(), PythonSerializerError>;
-    type SerializeStructVariant = Impossible<(), PythonSerializerError>;
+    type SerializeSeq = Impossible<(), PydanticSerdeError>;
+    type SerializeTuple = Impossible<(), PydanticSerdeError>;
+    type SerializeTupleStruct = Impossible<(), PydanticSerdeError>;
+    type SerializeTupleVariant = Impossible<(), PydanticSerdeError>;
+    type SerializeMap = Impossible<(), PydanticSerdeError>;
+    type SerializeStruct = Impossible<(), PydanticSerdeError>;
+    type SerializeStructVariant = Impossible<(), PydanticSerdeError>;
 
     fn serialize_bool(self, _value: bool) -> Result<()> {
         Err(key_must_be_a_string())
@@ -843,17 +826,17 @@ where
             .ser
             .formatter
             .begin_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .write_i8(&mut self.ser.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .end_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         Ok(())
     }
 
@@ -862,17 +845,17 @@ where
             .ser
             .formatter
             .begin_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .write_i16(&mut self.ser.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .end_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         Ok(())
     }
 
@@ -881,17 +864,17 @@ where
             .ser
             .formatter
             .begin_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .write_i32(&mut self.ser.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .end_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         Ok(())
     }
 
@@ -900,17 +883,17 @@ where
             .ser
             .formatter
             .begin_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .write_i64(&mut self.ser.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .end_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         Ok(())
     }
 
@@ -920,17 +903,17 @@ where
                 .ser
                 .formatter
                 .begin_string(&mut self.ser.writer)
-                .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                .map_err(PydanticSerdeError::io));
             tri!(self
                 .ser
                 .formatter
                 .write_number_str(&mut self.ser.writer, &value.to_string())
-                .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                .map_err(PydanticSerdeError::io));
             tri!(self
                 .ser
                 .formatter
                 .end_string(&mut self.ser.writer)
-                .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                .map_err(PydanticSerdeError::io));
             Ok(())
         }
     }
@@ -940,17 +923,17 @@ where
             .ser
             .formatter
             .begin_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .write_u8(&mut self.ser.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .end_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         Ok(())
     }
 
@@ -959,17 +942,17 @@ where
             .ser
             .formatter
             .begin_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .write_u16(&mut self.ser.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .end_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         Ok(())
     }
 
@@ -978,17 +961,17 @@ where
             .ser
             .formatter
             .begin_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .write_u32(&mut self.ser.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .end_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         Ok(())
     }
 
@@ -997,17 +980,17 @@ where
             .ser
             .formatter
             .begin_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .write_u64(&mut self.ser.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         tri!(self
             .ser
             .formatter
             .end_string(&mut self.ser.writer)
-            .map_err(|e| PythonSerializerError { message: e.to_string() }));
+            .map_err(PydanticSerdeError::io));
         Ok(())
     }
 
@@ -1017,17 +1000,17 @@ where
                 .ser
                 .formatter
                 .begin_string(&mut self.ser.writer)
-                .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                .map_err(PydanticSerdeError::io));
             tri!(self
                 .ser
                 .formatter
                 .write_number_str(&mut self.ser.writer, &value.to_string())
-                .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                .map_err(PydanticSerdeError::io));
             tri!(self
                 .ser
                 .formatter
                 .end_string(&mut self.ser.writer)
-                .map_err(|e| PythonSerializerError { message: e.to_string() }));
+                .map_err(PydanticSerdeError::io));
             Ok(())
         }
     }
@@ -1132,15 +1115,15 @@ struct NumberStrEmitter<'a, W: 'a + io::Write, F: 'a + Formatter>(&'a mut Python
 
 impl<'a, W: io::Write, F: Formatter> serde::ser::Serializer for NumberStrEmitter<'a, W, F> {
     type Ok = ();
-    type Error = PythonSerializerError;
+    type Error = PydanticSerdeError;
 
-    type SerializeSeq = Impossible<(), PythonSerializerError>;
-    type SerializeTuple = Impossible<(), PythonSerializerError>;
-    type SerializeTupleStruct = Impossible<(), PythonSerializerError>;
-    type SerializeTupleVariant = Impossible<(), PythonSerializerError>;
-    type SerializeMap = Impossible<(), PythonSerializerError>;
-    type SerializeStruct = Impossible<(), PythonSerializerError>;
-    type SerializeStructVariant = Impossible<(), PythonSerializerError>;
+    type SerializeSeq = Impossible<(), PydanticSerdeError>;
+    type SerializeTuple = Impossible<(), PydanticSerdeError>;
+    type SerializeTupleStruct = Impossible<(), PydanticSerdeError>;
+    type SerializeTupleVariant = Impossible<(), PydanticSerdeError>;
+    type SerializeMap = Impossible<(), PydanticSerdeError>;
+    type SerializeStruct = Impossible<(), PydanticSerdeError>;
+    type SerializeStructVariant = Impossible<(), PydanticSerdeError>;
 
     fn serialize_bool(self, _v: bool) -> Result<()> {
         Err(invalid_number())
@@ -1207,7 +1190,7 @@ impl<'a, W: io::Write, F: Formatter> serde::ser::Serializer for NumberStrEmitter
         serializer
             .formatter
             .write_number_str(&mut serializer.writer, value)
-            .map_err(|e| PythonSerializerError { message: e.to_string() })
+            .map_err(PydanticSerdeError::io)
     }
 
     fn serialize_bytes(self, _value: &[u8]) -> Result<()> {

@@ -182,12 +182,12 @@ impl<'a> Input<'a> for PyAny {
 
     fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
         if let Ok(py_bytes) = self.downcast::<PyBytes>() {
-            serde_json::from_slice(py_bytes.as_bytes()).map_err(|e| map_json_err(self, e))
+            crate::serde::from_slice(py_bytes.as_bytes()).map_err(|e| map_json_err(self, e))
         } else if let Ok(py_str) = self.downcast::<PyString>() {
             let str = py_str.to_str()?;
-            serde_json::from_str(str).map_err(|e| map_json_err(self, e))
+            crate::serde::from_str(str).map_err(|e| map_json_err(self, e))
         } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
-            serde_json::from_slice(unsafe { py_byte_array.as_bytes() }).map_err(|e| map_json_err(self, e))
+            crate::serde::from_slice(unsafe { py_byte_array.as_bytes() }).map_err(|e| map_json_err(self, e))
         } else {
             Err(ValError::new(ErrorTypeDefaults::JsonType, self))
         }

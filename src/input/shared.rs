@@ -1,11 +1,13 @@
 use num_bigint::BigInt;
+use pyo3::exceptions::PyValueError;
+use pyo3::pyclass;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::EitherInt;
 
 use super::{EitherFloat, Input};
 
-pub fn map_json_err<'a>(input: &'a impl Input<'a>, error: serde_json::Error) -> ValError<'a> {
+pub fn map_json_err<'a>(input: &'a impl Input<'a>, error: crate::serde::PydanticSerdeError) -> ValError<'a> {
     ValError::new(
         ErrorType::JsonInvalid {
             error: error.to_string(),
@@ -134,5 +136,30 @@ pub fn float_as_int<'a>(input: &'a impl Input<'a>, float: f64) -> ValResult<'a, 
         Ok(EitherInt::I64(float as i64))
     } else {
         Err(ValError::new(ErrorTypeDefaults::IntParsingSize, input))
+    }
+}
+
+#[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
+#[derive(Debug, Clone)]
+pub struct PythonDeserializerError {
+    pub message: String,
+}
+
+impl std::fmt::Display for PythonDeserializerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for PythonDeserializerError {}
+
+impl serde::ser::Error for PythonDeserializerError {
+    fn custom<T>(msg: T) -> Self
+    where
+        T: std::fmt::Display,
+    {
+        PythonDeserializerError {
+            message: format!("{msg}"),
+        }
     }
 }

@@ -384,7 +384,7 @@ def test_long_json():
 
     assert v.validate_json('-' + '1' * 400) == int('-' + '1' * 400)
 
-    with pytest.raises(ValidationError, match=r'expected ident at line 1 column 2 \[type=json_invalid,'):
+    with pytest.raises(ValidationError, match=r'expected value at line 1 column 2 \[type=json_invalid,'):
         v.validate_json('nan')
 
 

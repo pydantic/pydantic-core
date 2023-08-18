@@ -22,6 +22,7 @@ mod input;
 mod lazy_index_map;
 mod lookup_key;
 mod recursion_guard;
+mod serde;
 mod serializers;
 mod tools;
 mod url;

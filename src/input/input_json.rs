@@ -77,7 +77,7 @@ impl<'a> Input<'a> for JsonInput {
 
     fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
         match self {
-            JsonInput::String(s) => serde_json::from_str(s.as_str()).map_err(|e| map_json_err(self, e)),
+            JsonInput::String(s) => crate::serde::from_str(s.as_str()).map_err(|e| map_json_err(self, e)),
             _ => Err(ValError::new(ErrorTypeDefaults::JsonType, self)),
         }
     }
@@ -392,7 +392,7 @@ impl<'a> Input<'a> for String {
     }
 
     fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
-        serde_json::from_str(self.as_str()).map_err(|e| map_json_err(self, e))
+        crate::serde::from_str(self.as_str()).map_err(|e| map_json_err(self, e))
     }
 
     fn validate_str(&'a self, _strict: bool) -> ValResult<EitherString<'a>> {

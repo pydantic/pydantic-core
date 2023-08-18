@@ -216,12 +216,12 @@ impl ValidationError {
             Some(indent) => {
                 let indent = vec![b' '; indent];
                 let formatter = PrettyFormatter::with_indent(&indent);
-                let mut ser = crate::serializers::ser::PythonSerializer::with_formatter(writer, formatter);
+                let mut ser = crate::serde::PythonSerializer::with_formatter(writer, formatter);
                 serializer.serialize(&mut ser).map_err(json_py_err)?;
                 ser.into_inner()
             }
             None => {
-                let mut ser = crate::serializers::ser::PythonSerializer::new(writer);
+                let mut ser = crate::serde::PythonSerializer::new(writer);
                 serializer.serialize(&mut ser).map_err(json_py_err)?;
                 ser.into_inner()
             }

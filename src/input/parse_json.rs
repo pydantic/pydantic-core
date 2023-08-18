@@ -129,7 +129,6 @@ impl<'de> Deserialize<'de> for JsonInput {
                     Some(first_key) => {
                         let mut values = LazyIndexMap::new();
                         let first_value = visitor.next_value()?;
-
                         // serde_json will parse arbitrary precision numbers into a map
                         // structure with a "number" key and a String value
                         'try_number: {

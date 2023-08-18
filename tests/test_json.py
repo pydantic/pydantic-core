@@ -1,4 +1,5 @@
 import json
+import math
 import platform
 import re
 from typing import List
@@ -159,6 +160,24 @@ def test_error_loc():
             'input': 'wrong',
         }
     ]
+
+
+def test_nan_inf_float():
+    v = SchemaValidator(
+        {'type': 'typed-dict', 'fields': {'field_a': {'type': 'typed-dict-field', 'schema': {'type': 'float'}}}}
+    )
+    # language=json
+    input_neg_infinity_str = '{"field_a": -Infinity}'
+    assert json.loads(input_neg_infinity_str) == {'field_a': float('-inf')}
+    assert v.validate_json(input_neg_infinity_str) == {'field_a': float('-inf')}
+
+    input_infinity_str = '{"field_a": Infinity}'
+    assert json.loads(input_infinity_str) == {'field_a': float('+inf')}
+    assert v.validate_json(input_infinity_str) == {'field_a': float('+inf')}
+
+    input_nan_str = '{"field_a": NaN}'
+    assert math.isnan(json.loads(input_nan_str)['field_a'])
+    assert math.isnan(v.validate_json(input_nan_str)['field_a'])
 
 
 def test_dict():

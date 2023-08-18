@@ -15,7 +15,7 @@ use crate::build_tools::py_schema_err;
 use crate::build_tools::py_schema_error_type;
 use crate::definitions::DefinitionsBuilder;
 use crate::py_gc::PyGcTraverse;
-use crate::serializers::ser::PythonSerializer;
+use crate::serde::PythonSerializer;
 use crate::tools::{py_err, SchemaDict};
 
 use super::errors::se_err_py_err;
