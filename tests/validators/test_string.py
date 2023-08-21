@@ -77,6 +77,7 @@ def test_str_not_json(input_value, expected):
         ({'max_length': 5}, '123456', Err('String should have at most 5 characters [type=string_too_long')),
         ({'pattern': r'^\d+$'}, '12345', '12345'),
         ({'pattern': r'\d+$'}, 'foobar 123', 'foobar 123'),
+        ({'pattern': '^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{8,}$'}, 'PASSWORDabc123', 'PASSWORDabc123'),
         ({'pattern': r'^\d+$'}, '12345a', Err("String should match pattern '^\\d+$' [type=string_pattern_mismatch")),
         # strip comes after length check
         ({'max_length': 5, 'strip_whitespace': True}, '1234  ', '1234'),
@@ -176,11 +177,7 @@ def test_invalid_regex():
     with pytest.raises(SchemaError) as exc_info:
         SchemaValidator({'type': 'str', 'pattern': '(abc'})
     assert exc_info.value.args[0] == (
-        'Error building "str" validator:\n'
-        '  SchemaError: regex parse error:\n'
-        '    (abc\n'
-        '    ^\n'
-        'error: unclosed group'
+        'Error building "str" validator:\n' '  SchemaError: error: missing ), unterminated subpattern at position 0'
     )
 
 

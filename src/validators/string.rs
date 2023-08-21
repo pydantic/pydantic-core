@@ -70,7 +70,7 @@ impl Validator for StrValidator {
 #[derive(Debug, Clone, Default)]
 pub struct StrConstrainedValidator {
     strict: bool,
-    pattern: Option<Regex>,
+    pattern: Option<EitherRegex>,
     max_length: Option<usize>,
     min_length: Option<usize>,
     strip_whitespace: bool,
@@ -123,10 +123,10 @@ impl Validator for StrConstrainedValidator {
         }
 
         if let Some(pattern) = &self.pattern {
-            if !pattern.is_match(str) {
+            if !pattern.is_match(py, str)? {
                 return Err(ValError::new(
                     ErrorType::StringPatternMismatch {
-                        pattern: pattern.to_string(),
+                        pattern: pattern.pattern.clone(),
                         context: None,
                     },
                     input,
@@ -168,7 +168,7 @@ impl StrConstrainedValidator {
     fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
         let py = schema.py();
         let pattern = match schema.get_as(intern!(py, "pattern"))? {
-            Some(s) => Some(Regex::new(s).map_err(|e| py_schema_error_type!("{}", e))?),
+            Some(s) => Some(EitherRegex::compile(py, s).map_err(|e| py_schema_error_type!("{}", e))?),
             None => None,
         };
         let min_length: Option<usize> =
@@ -208,5 +208,38 @@ impl StrConstrainedValidator {
             || self.strip_whitespace
             || self.to_lower
             || self.to_upper
+    }
+}
+
+#[derive(Debug, Clone)]
+struct EitherRegex {
+    pattern: String,
+    inner: EitherRegexInner,
+}
+
+#[derive(Debug, Clone)]
+enum EitherRegexInner {
+    Rust(Regex),
+    Py(PyObject),
+}
+
+impl EitherRegex {
+    fn compile(py: Python<'_>, pattern: String) -> PyResult<Self> {
+        let inner = if let Ok(regex) = Regex::new(&pattern) {
+            EitherRegexInner::Rust(regex)
+        } else {
+            let re_compile = py.import(intern!(py, "re"))?.getattr(intern!(py, "compile"))?;
+            EitherRegexInner::Py(re_compile.call1((&pattern,))?.into())
+        };
+        Ok(Self { pattern, inner })
+    }
+
+    fn is_match(&self, py: Python<'_>, target: &str) -> PyResult<bool> {
+        match &self.inner {
+            EitherRegexInner::Rust(regex) => Ok(regex.is_match(target)),
+            EitherRegexInner::Py(py_regex) => {
+                Ok(!py_regex.call_method1(py, intern!(py, "match"), (target,))?.is_none(py))
+            }
+        }
     }
 }
