@@ -16,6 +16,8 @@ pub(crate) use extra::{Extra, SerMode, SerializationState};
 pub use shared::CombinedSerializer;
 use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
 
+pub use self::extra::SerializationMode;
+
 mod computed_fields;
 mod config;
 mod errors;
@@ -51,7 +53,7 @@ impl SchemaSerializer {
         rec_guard: &'a SerRecursionGuard,
         serialize_unknown: bool,
         fallback: Option<&'a PyAny>,
-        duck_typed_serialization: bool,
+        duck_typed_serialization: SerializationMode,
     ) -> Extra<'b> {
         Extra::new(
             py,
@@ -124,7 +126,11 @@ impl SchemaSerializer {
             &rec_guard,
             false,
             fallback,
-            duck_typed_serialization,
+            if duck_typed_serialization {
+                SerializationMode::NeedsInference
+            } else {
+                SerializationMode::SchemaBased
+            },
         );
         let v = self.serializer.to_python(value, include, exclude, &extra)?;
         warnings.final_check(py)?;
@@ -165,7 +171,11 @@ impl SchemaSerializer {
             &rec_guard,
             false,
             fallback,
-            duck_typed_serialization,
+            if duck_typed_serialization {
+                SerializationMode::NeedsInference
+            } else {
+                SerializationMode::SchemaBased
+            },
         );
         let bytes = to_json_bytes(
             value,
@@ -229,7 +239,11 @@ pub fn to_json(
         round_trip,
         serialize_unknown,
         fallback,
-        duck_typed_serialization,
+        if duck_typed_serialization {
+            SerializationMode::NeedsInference
+        } else {
+            SerializationMode::SchemaBased
+        },
     );
     let serializer = type_serializers::any::AnySerializer.into();
     let bytes = to_json_bytes(value, &serializer, include, exclude, &extra, indent, 1024)?;
@@ -265,7 +279,11 @@ pub fn to_jsonable_python(
         round_trip,
         serialize_unknown,
         fallback,
-        duck_typed_serialization,
+        if duck_typed_serialization {
+            SerializationMode::NeedsInference
+        } else {
+            SerializationMode::SchemaBased
+        },
     );
     let v = infer::infer_to_python(value, include, exclude, &extra)?;
     state.final_check(py)?;

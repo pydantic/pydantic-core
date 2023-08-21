@@ -22,6 +22,19 @@ pub(crate) struct SerializationState {
     config: SerializationConfig,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum SerializationMode {
+    // Don't check the type of the value, use the type of the schema
+    SchemaBased,
+    // Check the type of the value, use the type of the value
+    NeedsInference,
+    // We already checked the type of the value
+    // we don't want to infer again, but if we recurse down
+    // we do want to flip this back to NeedsInference for the
+    // fields / keys / items of any inner serializers
+    Inferred,
+}
+
 impl SerializationState {
     pub fn new(timedelta_mode: &str, bytes_mode: &str) -> PyResult<Self> {
         let warnings = CollectWarnings::new(false);
@@ -44,7 +57,7 @@ impl SerializationState {
         round_trip: bool,
         serialize_unknown: bool,
         fallback: Option<&'py PyAny>,
-        duck_typed_serialization: bool,
+        duck_typed_serialization: SerializationMode,
     ) -> Extra<'py> {
         Extra::new(
             py,
@@ -74,7 +87,7 @@ impl SerializationState {
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) struct Extra<'a> {
     pub mode: &'a SerMode,
-    pub duck_typed_serialization: bool,
+    pub duck_typed_serialization: SerializationMode,
     pub definitions: &'a Definitions<CombinedSerializer>,
     pub ob_type_lookup: &'a ObTypeLookup,
     pub warnings: &'a CollectWarnings,
@@ -112,7 +125,7 @@ impl<'a> Extra<'a> {
         rec_guard: &'a SerRecursionGuard,
         serialize_unknown: bool,
         fallback: Option<&'a PyAny>,
-        duck_typed_serialization: bool,
+        duck_typed_serialization: SerializationMode,
     ) -> Self {
         Self {
             mode,
@@ -175,7 +188,7 @@ pub(crate) struct ExtraOwned {
     field_name: Option<String>,
     serialize_unknown: bool,
     fallback: Option<PyObject>,
-    duck_typed_serialization: bool,
+    duck_typed_serialization: SerializationMode,
 }
 
 impl ExtraOwned {

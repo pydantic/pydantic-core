@@ -154,14 +154,25 @@ impl TypeSerializer for ModelSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let mut extra = Extra {
-            model: Some(value),
-            field_name: None,
-            ..*extra
+        let mut extra = match extra.duck_typed_serialization {
+            crate::serializers::SerializationMode::Inferred => Extra {
+                duck_typed_serialization: crate::serializers::SerializationMode::NeedsInference,
+                model: Some(value),
+                field_name: None,
+                ..*extra
+            },
+            crate::serializers::SerializationMode::NeedsInference => {
+                let extra = Extra {
+                    duck_typed_serialization: crate::serializers::SerializationMode::Inferred,
+                    model: Some(value),
+                    field_name: None,
+                    ..*extra
+                };
+                return infer_to_python(value, include, exclude, &extra);
+            }
+            crate::serializers::SerializationMode::SchemaBased => extra.clone(),
         };
-        if extra.duck_typed_serialization {
-            infer_to_python(value, include, exclude, &extra)
-        } else if self.root_model {
+        if self.root_model {
             extra.field_name = Some(ROOT_FIELD);
             let py = value.py();
             let root = value.getattr(intern!(py, ROOT_FIELD)).map_err(|original_err| {

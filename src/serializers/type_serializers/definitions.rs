@@ -70,16 +70,11 @@ impl TypeSerializer for DefinitionRefSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        if extra.duck_typed_serialization {
-            let comb_serializer = extra.definitions.get(self.serializer_id).unwrap();
-            comb_serializer.to_python(value, include, exclude, extra)
-        } else {
-            let value_id = extra.rec_guard.add(value, self.serializer_id)?;
-            let comb_serializer = extra.definitions.get(self.serializer_id).unwrap();
-            let r = comb_serializer.to_python(value, include, exclude, extra);
-            extra.rec_guard.pop(value_id, self.serializer_id);
-            r
-        }
+        let value_id = extra.rec_guard.add(value, self.serializer_id)?;
+        let comb_serializer = extra.definitions.get(self.serializer_id).unwrap();
+        let r = comb_serializer.to_python(value, include, exclude, extra);
+        extra.rec_guard.pop(value_id, self.serializer_id);
+        r
     }
 
     fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {

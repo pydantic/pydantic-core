@@ -1,4 +1,4 @@
-use ahash::AHashSet;
+use ahash::AHashMap;
 
 type RecursionKey = (
     // Identifier for the input object, e.g. the id() of a Python dict
@@ -13,9 +13,7 @@ type RecursionKey = (
 /// It's used in `validators/definition` to detect when a reference is reused within itself.
 #[derive(Debug, Clone, Default)]
 pub struct RecursionGuard {
-    ids: Option<AHashSet<RecursionKey>>,
-    // depth could be a hashmap {validator_id => depth} but for simplicity and performance it's easier to just
-    // use one number for all validators
+    counts: Option<AHashMap<RecursionKey, u16>>,
     depth: u16,
 }
 
@@ -30,24 +28,40 @@ pub const RECURSION_GUARD_LIMIT: u16 = if cfg!(any(target_family = "wasm", all(w
     255
 };
 
+// Maximum number of times we see the same object during serialization before we error
+// In theory we should only need to visit the same object twice (in the case of duck typed serialization)
+pub const CYCLE_LIMIT: u16 = 2;
+
 impl RecursionGuard {
-    // insert a new id into the set, return whether the set already had the id in it
-    pub fn contains_or_insert(&mut self, obj_id: usize, node_id: usize) -> bool {
-        match self.ids {
-            // https://doc.rust-lang.org/std/collections/struct.HashSet.html#method.insert
-            // "If the set did not have this value present, `true` is returned."
-            Some(ref mut set) => !set.insert((obj_id, node_id)),
-            None => {
-                let mut set: AHashSet<RecursionKey> = AHashSet::with_capacity(10);
-                set.insert((obj_id, node_id));
-                self.ids = Some(set);
+    fn visit(obj_id: usize, node_id: usize, counts: &mut AHashMap<(usize, usize), u16>) -> bool {
+        let key = (obj_id, node_id);
+        let entry = counts.entry(key);
+        match entry {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                let count = entry.get_mut();
+                *count += 1;
+                *count >= CYCLE_LIMIT
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(1);
                 false
             }
         }
     }
 
-    // see #143 this is used as a backup in case the identity check recursion guard fails
-    #[must_use]
+    // insert a new id into the set, return whether we exceeded the cycle limit
+    pub fn contains_or_insert(&mut self, obj_id: usize, node_id: usize) -> bool {
+        match self.counts {
+            Some(ref mut counts) => Self::visit(obj_id, node_id, counts),
+            None => {
+                let mut counts = AHashMap::new();
+                Self::visit(obj_id, node_id, &mut counts);
+                self.counts = Some(counts);
+                false
+            }
+        }
+    }
+
     pub fn incr_depth(&mut self) -> bool {
         self.depth += 1;
         self.depth >= RECURSION_GUARD_LIMIT
@@ -58,11 +72,28 @@ impl RecursionGuard {
     }
 
     pub fn remove(&mut self, obj_id: usize, node_id: usize) {
-        match self.ids {
-            Some(ref mut set) => {
-                set.remove(&(obj_id, node_id));
+        match self.counts {
+            Some(ref mut counts) => {
+                // decrease the count and pop the key if it's zero
+                let key = (obj_id, node_id);
+                let entry = counts.entry(key);
+                match entry {
+                    std::collections::hash_map::Entry::Occupied(mut entry) => {
+                        let count = entry.get_mut();
+                        *count -= 1;
+                        if *count == 0 {
+                            entry.remove();
+                        }
+                    }
+                    std::collections::hash_map::Entry::Vacant(_) => {
+                        panic!("RecursionGuard::remove called on a key that was not present: {key:?}")
+                    }
+                };
+                if counts.is_empty() {
+                    self.counts = None;
+                }
             }
-            None => unreachable!(),
+            None => panic!("RecursionGuard::remove called on a RecursionGuard with no active counts"),
         };
     }
 }

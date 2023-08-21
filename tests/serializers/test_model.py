@@ -926,6 +926,12 @@ def test_duck_typed_serialization() -> None:
         __pydantic_validator__: SchemaValidator
         __pydantic_serializer__: SchemaSerializer
 
+    def debug_wrap_serializer(
+        v: Any, handler: core_schema.SerializerFunctionWrapHandler, info: core_schema.SerializationInfo
+    ) -> Any:
+        print(v, info)
+        return handler(v)
+
     Parent.__pydantic_core_schema__ = core_schema.model_schema(
         Parent,
         core_schema.model_fields_schema(
@@ -937,6 +943,7 @@ def test_duck_typed_serialization() -> None:
             }
         ),
         ref='parent',
+        serialization=core_schema.wrap_serializer_function_ser_schema(debug_wrap_serializer, info_arg=True),
     )
     Parent.__pydantic_validator__ = SchemaValidator(Parent.__pydantic_core_schema__)
     Parent.__pydantic_serializer__ = SchemaSerializer(Parent.__pydantic_core_schema__)
@@ -956,6 +963,7 @@ def test_duck_typed_serialization() -> None:
                     'y': core_schema.model_field(core_schema.str_schema()),
                 }
             ),
+            serialization=core_schema.wrap_serializer_function_ser_schema(debug_wrap_serializer, info_arg=True),
         ),
         [Parent.__pydantic_core_schema__],
     )
@@ -970,13 +978,11 @@ def test_duck_typed_serialization() -> None:
         Parent.__pydantic_validator__.validate_python({'x': 2, 'nested': child}),
     ]
 
-    res = s.to_python(data, duck_typed_serialization=True)
+    res = s.to_python(data, duck_typed_serialization=False)
+    assert res == [{'x': 1, 'nested': {'x': 1, 'nested': None}}, {'x': 2, 'nested': {'x': 1, 'nested': None}}]
 
+    res = s.to_python(data, duck_typed_serialization=True)
     assert res == [
         {'x': 1, 'nested': {'x': 1, 'nested': None, 'y': 'hopefully not a secret'}, 'y': 'hopefully not a secret'},
         {'x': 2, 'nested': {'x': 1, 'nested': None, 'y': 'hopefully not a secret'}},
     ]
-
-    res = s.to_python(data, duck_typed_serialization=False)
-
-    assert res == [{'x': 1, 'nested': {'x': 1, 'nested': None}}, {'x': 2, 'nested': {'x': 1, 'nested': None}}]

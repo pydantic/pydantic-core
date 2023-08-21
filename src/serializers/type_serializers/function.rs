@@ -8,6 +8,7 @@ use pyo3::types::PyDict;
 use pyo3::types::PyString;
 
 use crate::definitions::DefinitionsBuilder;
+use crate::serializers::SerializationMode;
 use crate::tools::SchemaDict;
 use crate::tools::{function_name, py_err, py_error_type};
 use crate::{PydanticOmit, PydanticSerializationUnexpectedValue};
@@ -500,6 +501,8 @@ struct SerializationInfo {
     #[pyo3(get)]
     round_trip: bool,
     field_name: Option<String>,
+    #[pyo3(get)]
+    duck_typed_serialization: bool,
 }
 
 impl SerializationInfo {
@@ -522,6 +525,10 @@ impl SerializationInfo {
                     exclude_none: extra.exclude_none,
                     round_trip: extra.round_trip,
                     field_name: Some(field_name.to_string()),
+                    duck_typed_serialization: matches!(
+                        extra.duck_typed_serialization,
+                        SerializationMode::Inferred | SerializationMode::NeedsInference
+                    ),
                 }),
                 _ => Err(PyRuntimeError::new_err(
                     "Model field context expected for field serialization info but no model field was found",
@@ -538,6 +545,10 @@ impl SerializationInfo {
                 exclude_none: extra.exclude_none,
                 round_trip: extra.round_trip,
                 field_name: None,
+                duck_typed_serialization: matches!(
+                    extra.duck_typed_serialization,
+                    SerializationMode::Inferred | SerializationMode::NeedsInference
+                ),
             })
         }
     }

@@ -16,6 +16,7 @@ use serde_json::ser::PrettyFormatter;
 use crate::build_tools::py_schema_error_type;
 use crate::errors::LocItem;
 use crate::get_pydantic_version;
+use crate::serializers::SerializationMode;
 use crate::serializers::{SerMode, SerializationState};
 use crate::tools::{safe_repr, SchemaDict};
 
@@ -201,7 +202,16 @@ impl ValidationError {
         include_context: bool,
     ) -> PyResult<&'py PyString> {
         let state = SerializationState::new("iso8601", "utf8")?;
-        let extra = state.extra(py, &SerMode::Json, true, false, false, true, None, false);
+        let extra = state.extra(
+            py,
+            &SerMode::Json,
+            true,
+            false,
+            false,
+            true,
+            None,
+            SerializationMode::SchemaBased,
+        );
         let serializer = ValidationErrorSerializer {
             py,
             line_errors: &self.line_errors,

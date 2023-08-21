@@ -130,6 +130,10 @@ class SerializationInfo(Protocol):
     def round_trip(self) -> bool:
         ...
 
+    @property
+    def duck_typed_serialization(self) -> bool:
+        ...
+
     def mode_is_json(self) -> bool:
         ...
 
