@@ -311,10 +311,18 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
-        if let Ok(either_int) = self.strict_int() {
-            Ok(either_int)
+        if PyInt::is_exact_type_of(self) {
+            Ok(EitherInt::Py(self))
         } else if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::IntParsing)? {
+            // Try strings before subclasses of int as that will be far more common
             str_as_int(self, &cow_str)
+        } else if PyInt::is_type_of(self) {
+            // bools are a subclass of int, so check for bool type in this specific case
+            if PyBool::is_exact_type_of(self) {
+                Err(ValError::new(ErrorTypeDefaults::IntType, self))
+            } else {
+                Ok(EitherInt::Py(self))
+            }
         } else if let Ok(float) = self.extract::<f64>() {
             float_as_int(self, float)
         } else {
