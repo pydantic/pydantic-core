@@ -37,19 +37,19 @@ def test_str(py_and_json: PyAndJson, input_value, expected):
         (b'foobar', 'foobar'),
         (bytearray(b'foobar'), 'foobar'),
         (
-                b'\x81',
-                Err('Input should be a valid string, unable to parse raw data as a unicode string [type=string_unicode'),
+            b'\x81',
+            Err('Input should be a valid string, unable to parse raw data as a unicode string [type=string_unicode'),
         ),
         (
-                bytearray(b'\x81'),
-                Err('Input should be a valid string, unable to parse raw data as a unicode string [type=string_unicode'),
+            bytearray(b'\x81'),
+            Err('Input should be a valid string, unable to parse raw data as a unicode string [type=string_unicode'),
         ),
         # null bytes are very annoying, but we can't really block them here
         (b'\x00', '\x00'),
         (123, Err('Input should be a valid string [type=string_type, input_value=123, input_type=int]')),
         (
-                Decimal('123'),
-                Err("Input should be a valid string [type=string_type, input_value=Decimal('123'), input_type=Decimal]"),
+            Decimal('123'),
+            Err("Input should be a valid string [type=string_type, input_value=Decimal('123'), input_type=Decimal]"),
         ),
     ],
 )
@@ -101,9 +101,9 @@ def test_constrained_str(py_and_json: PyAndJson, kwargs: Dict[str, Any], input_v
         ({}, b'abc', 'abc'),
         ({'strict': True}, 'Foobar', 'Foobar'),
         (
-                {'strict': True},
-                123,
-                Err('Input should be a valid string [type=string_type, input_value=123, input_type=int]'),
+            {'strict': True},
+            123,
+            Err('Input should be a valid string [type=string_type, input_value=123, input_type=int]'),
         ),
     ],
 )
