@@ -141,11 +141,7 @@ def test_timedelta_strict_json(input_value, expected):
         ({'lt': timedelta(days=3)}, 'P3DT1H', Err('Input should be less than 3 days')),
         ({'ge': timedelta(days=3)}, 'P3DT1H', timedelta(days=3, hours=1)),
         ({'ge': timedelta(days=3)}, 'P3D', timedelta(days=3)),
-        (
-            {'ge': timedelta(days=3)},
-            'P2DT1H',
-            Err('Input should be greater than or equal to 3 days'),
-        ),
+        ({'ge': timedelta(days=3)}, 'P2DT1H', Err('Input should be greater than or equal to 3 days')),
         ({'gt': timedelta(days=3)}, 'P3DT1H', timedelta(days=3, hours=1)),
         ({'gt': 'P3D'}, 'P2DT1H', Err('Input should be greater than 3 days')),
         ({'le': timedelta(seconds=-86400.123)}, '-PT86400.123S', timedelta(seconds=-86400.123)),
@@ -169,40 +165,16 @@ def test_timedelta_strict_json(input_value, expected):
         (
             {'gt': timedelta(hours=1, minutes=30)},
             'PT180S',
-            Err(
-                'Input should be greater than 1 hour and 30 minutes [type=greater_than'
-            ),
+            Err('Input should be greater than 1 hour and 30 minutes [type=greater_than'),
         ),
+        ({'gt': timedelta()}, '-P0DT0.1S', Err('Input should be greater than 0 seconds [type=greater_than')),
+        ({'gt': timedelta()}, 'P0DT0.0S', Err('Input should be greater than 0 seconds [type=greater_than')),
+        ({'ge': timedelta()}, 'P0DT0.0S', timedelta()),
+        ({'lt': timedelta()}, '-PT0S', timedelta()),
         (
-                {'gt': timedelta()},
-                '-P0DT0.1S',
-                Err(
-                    'Input should be greater than 0 seconds [type=greater_than'
-                ),
-        ),
-        (
-                {'gt': timedelta()},
-                'P0DT0.0S',
-                Err(
-                    'Input should be greater than 0 seconds [type=greater_than'
-                ),
-        ),
-        (
-                {'ge': timedelta()},
-                'P0DT0.0S',
-                timedelta(),
-        ),
-        (
-                {'lt': timedelta()},
-                '-PT0S',
-                timedelta(),
-        ),
-        (
-                {'lt': timedelta(days=740, weeks=1, hours=48, minutes=60, seconds=61, microseconds=100000)},
-                'P2Y1W10DT48H60M61.100000S',
-                Err(
-                    'Input should be less than 749 days and 1 hour and 1 minute and 1 second and 100000 microseconds'
-                ),
+            {'lt': timedelta(days=740, weeks=1, hours=48, minutes=60, seconds=61, microseconds=100000)},
+            'P2Y1W10DT48H60M61.100000S',
+            Err('Input should be less than 749 days and 1 hour and 1 minute and 1 second and 100000 microseconds'),
         ),
     ],
     ids=repr,
@@ -313,7 +285,7 @@ def test_pandas():
     assert v.validate_python(two_hours.to_pytimedelta()) == two_hours
 
     one_55 = pandas.Timestamp('2023-01-01T01:55:00Z') - pandas.Timestamp('2023-01-01T00:00:00Z')
-    msg = r'Input should be greater than or equal to datetime.timedelta\(seconds=7200\)'
+    msg = r'Input should be greater than or equal to 2 hours'
     with pytest.raises(ValidationError, match=msg):
         v.validate_python(one_55)
     with pytest.raises(ValidationError, match=msg):

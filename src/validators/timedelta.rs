@@ -144,7 +144,11 @@ fn pydelta_to_human_readable(py_delta: &PyDelta) -> String {
     }
 
     if microseconds != 0 {
-        formatted_duration.push(format!("{} microsecond{}", microseconds, if microseconds != 1 { "s" } else { "" }));
+        formatted_duration.push(format!(
+            "{} microsecond{}",
+            microseconds,
+            if microseconds != 1 { "s" } else { "" }
+        ));
     }
 
     if formatted_duration.is_empty() {
