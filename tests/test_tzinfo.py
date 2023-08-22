@@ -72,6 +72,11 @@ DSTEND = datetime(1, 10, 25, 1)
 
 
 class TestTzInfo(unittest.TestCase):
+    """Adapted from CPython `timezone` tests
+
+    Original tests are located here https://github.com/python/cpython/blob/a0bb4a39d1ca10e4a75f50a9fbe90cc9db28d29e/Lib/test/datetimetester.py#L256
+    """
+
     def setUp(self):
         self.ACDT = TzInfo(timedelta(hours=9.5).total_seconds())
         self.EST = TzInfo(-timedelta(hours=5).total_seconds())
