@@ -226,7 +226,7 @@ impl<'a> EitherTime<'a> {
 fn time_as_tzinfo<'py>(py: Python<'py>, time: &Time) -> PyResult<Option<&'py PyTzInfo>> {
     match time.tz_offset {
         Some(offset) => {
-            let tz_info = TzInfo::py_new(offset as f32)?;
+            let tz_info: TzInfo = offset.try_into()?;
             let py_tz_info = Py::new(py, tz_info)?.to_object(py).into_ref(py);
             Ok(Some(py_tz_info.extract()?))
         }
@@ -513,14 +513,7 @@ pub struct TzInfo {
 impl TzInfo {
     #[new]
     fn py_new(seconds: f32) -> PyResult<Self> {
-        let seconds = seconds.trunc() as i32;
-        if seconds.abs() >= 86400 {
-            Err(PyValueError::new_err(format!(
-                "TzInfo offset must be strictly between -86400 and 86400 (24 hours) seconds, got {seconds}"
-            )))
-        } else {
-            Ok(Self { seconds })
-        }
+        Self::try_from(seconds.trunc() as i32)
     }
 
     fn utcoffset<'py>(&self, py: Python<'py>, _dt: &PyAny) -> PyResult<&'py PyDelta> {
@@ -582,5 +575,19 @@ impl TzInfo {
         let args = (self.seconds,);
         let cls = Py::new(py, self.clone())?.getattr(py, "__class__")?;
         Ok((cls, args).into_py(py))
+    }
+}
+
+impl TryFrom<i32> for TzInfo {
+    type Error = PyErr;
+
+    fn try_from(seconds: i32) -> PyResult<Self> {
+        if seconds.abs() >= 86400 {
+            Err(PyValueError::new_err(format!(
+                "TzInfo offset must be strictly between -86400 and 86400 (24 hours) seconds, got {seconds}"
+            )))
+        } else {
+            Ok(Self { seconds })
+        }
     }
 }
