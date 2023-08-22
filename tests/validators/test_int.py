@@ -405,3 +405,16 @@ def test_string_as_int_with_underscores() -> None:
             v.validate_python(edge_case)
         with pytest.raises(ValidationError):
             v.validate_json(f'"{edge_case}"')
+
+
+class IntSubclass(int):
+    pass
+
+
+def test_int_subclass() -> None:
+    v = SchemaValidator({'type': 'int'})
+    assert v.validate_python(IntSubclass(1)) == 1
+    assert v.validate_python(IntSubclass(1), strict=True) == 1
+
+    assert v.validate_python(IntSubclass(1136885225876639845)) == 1136885225876639845
+    assert v.validate_python(IntSubclass(1136885225876639845), strict=True) == 1136885225876639845

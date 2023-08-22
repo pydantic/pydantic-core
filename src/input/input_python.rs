@@ -311,8 +311,8 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
-        if PyInt::is_exact_type_of(self) {
-            Ok(EitherInt::Py(self))
+        if let Ok(either_int) = self.strict_int() {
+            Ok(either_int)
         } else if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::IntParsing)? {
             str_as_int(self, &cow_str)
         } else if let Ok(float) = self.extract::<f64>() {
