@@ -317,9 +317,8 @@ impl<'a> Input<'a> for PyAny {
             // Try strings before subclasses of int as that will be far more common
             str_as_int(self, &cow_str)
         } else if PyInt::is_type_of(self) {
-            // bools are a subclass of int, so check for bool type in this specific case
-            if PyBool::is_exact_type_of(self) {
-                Err(ValError::new(ErrorTypeDefaults::IntType, self))
+            if let Ok(bool) = self.downcast::<PyBool>() {
+                Ok(EitherInt::I64(i64::from(bool.is_true())))
             } else {
                 Ok(EitherInt::Py(self))
             }
