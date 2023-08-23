@@ -927,7 +927,7 @@ def test_extra_custom_serializer():
         core_schema.model_fields_schema(
             {},
             extra_behavior='allow',
-            extra_schema=core_schema.any_schema(
+            extras_schema=core_schema.any_schema(
                 serialization=core_schema.plain_serializer_function_ser_schema(lambda v: v + ' bam!')
             ),
         ),

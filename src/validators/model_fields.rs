@@ -36,7 +36,7 @@ pub struct ModelFieldsValidator {
     fields: Vec<Field>,
     model_name: String,
     extra_behavior: ExtraBehavior,
-    extra_schema: Option<Box<CombinedValidator>>,
+    extras_schema: Option<Box<CombinedValidator>>,
     strict: bool,
     from_attributes: bool,
     loc_by_alias: bool,
@@ -58,9 +58,9 @@ impl BuildValidator for ModelFieldsValidator {
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
-        let extra_schema = match (schema.get_item(intern!(py, "extra_schema")), &extra_behavior) {
+        let extras_schema = match (schema.get_item(intern!(py, "extras_schema")), &extra_behavior) {
             (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(v, config, definitions)?)),
-            (Some(_), _) => return py_schema_err!("extra_schema can only be used if extra_behavior=allow"),
+            (Some(_), _) => return py_schema_err!("extras_schema can only be used if extra_behavior=allow"),
             (_, _) => None,
         };
         let model_name: String = schema
@@ -102,7 +102,7 @@ impl BuildValidator for ModelFieldsValidator {
             fields,
             model_name,
             extra_behavior,
-            extra_schema,
+            extras_schema,
             strict,
             from_attributes,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
@@ -111,7 +111,7 @@ impl BuildValidator for ModelFieldsValidator {
     }
 }
 
-impl_py_gc_traverse!(ModelFieldsValidator { fields, extra_schema });
+impl_py_gc_traverse!(ModelFieldsValidator { fields, extras_schema });
 
 impl Validator for ModelFieldsValidator {
     fn validate<'data>(
@@ -262,7 +262,7 @@ impl Validator for ModelFieldsValidator {
                             ExtraBehavior::Ignore => {}
                             ExtraBehavior::Allow => {
                             let py_key = either_str.as_py_string(py);
-                                if let Some(ref validator) = self.extra_schema {
+                                if let Some(ref validator) = self.extras_schema {
                                     match validator.validate(py, value, state) {
                                         Ok(value) => {
                                             model_extra_dict.set_item(py_key, value)?;
@@ -370,7 +370,7 @@ impl Validator for ModelFieldsValidator {
             // For models / typed dicts we forbid assigning extra attributes
             // unless the user explicitly set extra_behavior to 'allow'
             match self.extra_behavior {
-                ExtraBehavior::Allow => match self.extra_schema {
+                ExtraBehavior::Allow => match self.extras_schema {
                     Some(ref validator) => prepare_result(
                         state.with_new_extra(new_extra, |state| validator.validate(py, field_value, state)),
                     ),
@@ -427,7 +427,7 @@ impl Validator for ModelFieldsValidator {
         self.fields
             .iter_mut()
             .try_for_each(|f| f.validator.complete(definitions))?;
-        match &mut self.extra_schema {
+        match &mut self.extras_schema {
             Some(v) => v.complete(definitions),
             None => Ok(()),
         }

@@ -91,7 +91,7 @@ impl Validator for TupleVariableValidator {
 pub struct TuplePositionalValidator {
     strict: bool,
     items_validators: Vec<CombinedValidator>,
-    extra_schema: Option<Box<CombinedValidator>>,
+    extras_schema: Option<Box<CombinedValidator>>,
     name: String,
 }
 
@@ -117,7 +117,7 @@ impl BuildValidator for TuplePositionalValidator {
         Ok(Self {
             strict: is_strict(schema, config)?,
             items_validators: validators,
-            extra_schema: match schema.get_item(intern!(py, "extra_schema")) {
+            extras_schema: match schema.get_item(intern!(py, "extras_schema")) {
                 Some(v) => Some(Box::new(build_validator(v, config, definitions)?)),
                 None => None,
             },
@@ -134,7 +134,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
     state: &mut ValidationState,
     output: &mut Vec<PyObject>,
     errors: &mut Vec<ValLineError<'data>>,
-    extra_schema: &Option<Box<CombinedValidator>>,
+    extras_schema: &Option<Box<CombinedValidator>>,
     items_validators: &[CombinedValidator],
     collection_iter: &mut T,
     collection_len: Option<usize>,
@@ -160,8 +160,8 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
     }
     for (index, result) in collection_iter.enumerate() {
         let item = result?;
-        match extra_schema {
-            Some(ref extra_schema) => match extra_schema.validate(py, item, state) {
+        match extras_schema {
+            Some(ref extras_schema) => match extras_schema.validate(py, item, state) {
                 Ok(item) => output.push(item),
                 Err(ValError::LineErrors(line_errors)) => {
                     errors.extend(
@@ -193,7 +193,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
 
 impl_py_gc_traverse!(TuplePositionalValidator {
     items_validators,
-    extra_schema
+    extras_schema
 });
 
 impl Validator for TuplePositionalValidator {
@@ -218,7 +218,7 @@ impl Validator for TuplePositionalValidator {
                     state,
                     &mut output,
                     &mut errors,
-                    &self.extra_schema,
+                    &self.extras_schema,
                     &self.items_validators,
                     &mut $collection_iter,
                     collection_len,
@@ -252,7 +252,7 @@ impl Validator for TuplePositionalValidator {
                 .any(|v| v.different_strict_behavior(definitions, true))
             {
                 true
-            } else if let Some(ref v) = self.extra_schema {
+            } else if let Some(ref v) = self.extras_schema {
                 v.different_strict_behavior(definitions, true)
             } else {
                 false
@@ -270,7 +270,7 @@ impl Validator for TuplePositionalValidator {
         self.items_validators
             .iter_mut()
             .try_for_each(|v| v.complete(definitions))?;
-        match &mut self.extra_schema {
+        match &mut self.extras_schema {
             Some(v) => v.complete(definitions),
             None => Ok(()),
         }
