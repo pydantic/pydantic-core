@@ -178,7 +178,7 @@ def test_extra_custom_serializer():
             'Model',
             [],
             extra_behavior='allow',
-            # extra_validator=core_schema.any_schema(
+            # extra_schema=core_schema.any_schema(
             #     serialization=core_schema.plain_serializer_function_ser_schema(
             #         lambda v: v + ' bam!',
             #     )
