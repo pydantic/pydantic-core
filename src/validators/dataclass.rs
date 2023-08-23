@@ -38,7 +38,7 @@ pub struct DataclassArgsValidator {
     dataclass_name: String,
     validator_name: String,
     extra_behavior: ExtraBehavior,
-    extras_schema: Option<Box<CombinedValidator>>,
+    extras_validator: Option<Box<CombinedValidator>>,
     loc_by_alias: bool,
 }
 
@@ -56,7 +56,7 @@ impl BuildValidator for DataclassArgsValidator {
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
-        let extras_schema = match (schema.get_item(intern!(py, "extras_schema")), &extra_behavior) {
+        let extras_validator = match (schema.get_item(intern!(py, "extras_schema")), &extra_behavior) {
             (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(v, config, definitions)?)),
             (Some(_), _) => return py_schema_err!("extras_schema can only be used if extra_behavior=allow"),
             (_, _) => None,
@@ -125,7 +125,7 @@ impl BuildValidator for DataclassArgsValidator {
             dataclass_name,
             validator_name,
             extra_behavior,
-            extras_schema,
+            extras_validator,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
         }
         .into())
@@ -275,7 +275,7 @@ impl Validator for DataclassArgsValidator {
                                                     }
                                                     ExtraBehavior::Ignore => {}
                                                     ExtraBehavior::Allow => {
-                                                        if let Some(ref validator) = self.extras_schema {
+                                                        if let Some(ref validator) = self.extras_validator {
                                                             match validator.validate(py, value, state) {
                                                                 Ok(value) => output_dict
                                                                     .set_item(either_str.as_py_string(py), value)?,
