@@ -14,6 +14,7 @@ mod argument_markers;
 mod build_tools;
 mod definitions;
 mod errors;
+mod experiment;
 mod input;
 mod lazy_index_map;
 mod lookup_key;
@@ -97,5 +98,7 @@ fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(to_json, m)?)?;
     m.add_function(wrap_pyfunction!(to_jsonable_python, m)?)?;
     m.add_function(wrap_pyfunction!(list_all_errors, m)?)?;
+    m.add_class::<experiment::ModelByIter>()?;
+    m.add_class::<experiment::ModelByLookup>()?;
     Ok(())
 }
