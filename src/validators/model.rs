@@ -1,14 +1,16 @@
-use std::ptr::null_mut;
+use std::ptr::{null, null_mut};
 
 use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyTypeError;
+use pyo3::ffi::Py_None;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
 use pyo3::{ffi, intern};
 
 use super::function::convert_err;
 use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, ValidationState, Validator,
+    build_validator, BuildValidator, CombinedValidator, ConstructionState, DefinitionsBuilder, Extra, ValidationState,
+    Validator,
 };
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
@@ -22,6 +24,8 @@ const DUNDER_DICT: &str = "__dict__";
 const DUNDER_FIELDS_SET_KEY: &str = "__pydantic_fields_set__";
 const DUNDER_MODEL_EXTRA_KEY: &str = "__pydantic_extra__";
 const DUNDER_MODEL_PRIVATE_KEY: &str = "__pydantic_private__";
+const ROOT_MODEL_DELIMETER: &str = "__pydantic_root_model__";
+const POST_INIT_METHOD: &str = "__pydantic_post_init__";
 
 #[derive(Debug, Clone)]
 pub(super) enum Revalidate {
@@ -103,6 +107,82 @@ impl BuildValidator for ModelValidator {
 impl_py_gc_traverse!(ModelValidator { class, validator });
 
 impl Validator for ModelValidator {
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        // Create a new instance of the class
+        let model = create_class(self.class.as_ref(py))?;
+        let model_ref = model.as_ref(py);
+
+        let is_root_model: bool = self.class.getattr(py, ROOT_MODEL_DELIMETER)?.is_true(py)?;
+
+        // Make sure that input is a dict
+        // Should this be part of the signature?
+        let input_object = input.to_object(py);
+        let input_dict = input_object.downcast::<PyDict>(py)?;
+
+        // Iterate over every field in model_fields
+        let fields = self.class.getattr(py, "model_fields").unwrap(); // FIXME
+        let fields = fields.downcast::<PyDict>(py).unwrap(); // FIXME
+        let fields_values = PyDict::new(py);
+        let defaults = PyDict::new(py);
+        for field in fields.items() {
+            let item = field.downcast::<PyTuple>().unwrap();
+            let field_name = &item[0];
+            let field_info = &item[1];
+            let field_alias = field_info.getattr("alias")?;
+            // let field_annotation = field_info.getattr("annotation")?;
+            if field_alias.is_true()? && input_dict.contains(field_alias)? {
+                let value = input_dict.get_item(field_alias);
+                if state.recursive {
+                    // recurse annotation
+                }
+                fields_values.set_item(field_name, value)?;
+            } else if input_dict.contains(field_name)? {
+                let value = input_dict.get_item(field_name);
+                if state.recursive {
+                    // recurse annotation
+                }
+                fields_values.set_item(field_name, value)?;
+            } else if !field_info.call_method0(intern!(py, "is_required"))?.is_true()? {
+                let kwargs = PyDict::new(py);
+                kwargs.set_item("call_default_factory", true)?;
+                let default = field_info.call_method("get_default", (), Some(kwargs))?;
+                defaults.set_item(field_name, default)?;
+            }
+        }
+        let fields_set;
+        if state.fields_set.is_none() {
+            fields_set = PySet::new(py, fields_values.keys())?;
+        } else {
+            fields_set = state.fields_set.unwrap(); // FIXME
+        }
+        fields_values.update(defaults.as_mapping())?;
+
+        // let (model_dict, model_extra, val_fields_set): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
+        // let fields_set = existing_fields_set.unwrap_or(val_fields_set);
+        // set_model_attrs(instance, model_dict, model_extra, fields_set);
+        force_setattr(py, model_ref, DUNDER_DICT, fields_values)?;
+        force_setattr(py, model_ref, DUNDER_FIELDS_SET_KEY, fields_set)?;
+        if !is_root_model {
+            force_setattr(py, model_ref, DUNDER_MODEL_EXTRA_KEY, PyDict::new(py))?;
+        }
+
+        let post_init_method = self.class.getattr(py, POST_INIT_METHOD);
+        if post_init_method.is_ok() {
+            // call that
+            model.call_method1(py, "model_post_init", (py.None(),))?;
+        } else if !is_root_model {
+            force_setattr(py, model_ref, DUNDER_MODEL_PRIVATE_KEY, py.None())?;
+        }
+
+        // Return the instance
+        Ok(model)
+    }
+
     fn validate<'data>(
         &self,
         py: Python<'data>,

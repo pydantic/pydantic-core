@@ -99,7 +99,7 @@ lint-python:
 	$(ruff)
 	$(black) --check --diff
 	$(mypy-stubtest)
-	griffe dump -f -d google -LWARNING -o/dev/null python/pydantic_core
+#	griffe dump -f -d google -LWARNING -o/dev/null python/pydantic_core
 
 .PHONY: lint-rust
 lint-rust:

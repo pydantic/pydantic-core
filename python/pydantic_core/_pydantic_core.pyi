@@ -91,6 +91,22 @@ class SchemaValidator:
         """
         The title of the schema, as used in the heading of [`ValidationError.__str__()`][pydantic_core.ValidationError].
         """
+    def construct_python(self, input: Any, *, fields_set: 'set[str]' | None = None, recursive: bool = False) -> Any:
+        """
+        Creates a new instance of the `Model` class with validated data.
+
+        Creates a new model setting `__dict__` and `__pydantic_fields_set__` from trusted or pre-validated data.
+        Default values are respected, but no other validation is performed.
+        Behaves as if `Config.extra = 'allow'` was set since it adds all passed values
+
+        Args:
+            input: Trusted or pre-validated data dictionary.
+            fields_set: The set of field names accepted for the Model instance.
+            recursive: Whether or not to call construct on any annotated sub-model.
+
+        Returns:
+            A new instance of the `Model` class with validated data.
+        """
     def validate_python(
         self,
         input: Any,

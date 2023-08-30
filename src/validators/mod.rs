@@ -5,7 +5,7 @@ use enum_dispatch::enum_dispatch;
 use pyo3::exceptions::PyTypeError;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
+use pyo3::types::{PyAny, PyDict, PySet, PyTuple, PyType};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
@@ -23,6 +23,7 @@ mod bytes;
 mod call;
 mod callable;
 mod chain;
+mod construction_state;
 mod custom_error;
 mod dataclass;
 mod date;
@@ -60,6 +61,7 @@ mod with_default;
 
 pub use with_default::DefaultType;
 
+pub use self::construction_state::ConstructionState;
 use self::definitions::DefinitionRefValidator;
 pub use self::validation_state::ValidationState;
 
@@ -146,6 +148,18 @@ impl SchemaValidator {
         let args = (self.schema.as_ref(py),);
         let cls = Py::new(py, self.clone())?.getattr(py, "__class__")?;
         Ok((cls, args).into_py(py))
+    }
+
+    #[pyo3(signature = (input, *, fields_set=None, recursive=false))]
+    pub fn construct_python(
+        &self,
+        py: Python,
+        input: &PyAny,
+        fields_set: Option<&PySet>,
+        recursive: bool,
+    ) -> PyResult<PyObject> {
+        self._construct(py, input, fields_set, recursive)
+            .map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Python))
     }
 
     #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]
@@ -298,6 +312,20 @@ impl SchemaValidator {
 }
 
 impl SchemaValidator {
+    fn _construct<'s, 'data>(
+        &'data self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        fields_set: Option<&PySet>,
+        recursive: bool,
+    ) -> ValResult<'data, PyObject>
+    where
+        's: 'data,
+    {
+        let mut state = ConstructionState::new(fields_set, recursive);
+        self.validator.construct(py, input, &mut state)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn _validate<'s, 'data>(
         &'data self,
@@ -682,6 +710,16 @@ pub enum CombinedValidator {
 /// validators defined in `build_validator` also need `EXPECTED_TYPE` as a const, but that can't be part of the trait
 #[enum_dispatch(CombinedValidator)]
 pub trait Validator: Send + Sync + Clone + Debug {
+    /// Construct a model (or all models) with pre-validated data
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        _state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        Ok(input.to_object(py))
+    }
+
     /// Do the actual validation for this schema/type
     fn validate<'data>(
         &self,
