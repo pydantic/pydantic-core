@@ -404,7 +404,7 @@ class Url(SupportsAllComparisons):
     by Mozilla.
     """
 
-    def __new__(cls, url: str, allowed_schemes: list[str] | None = None) -> Self:
+    def __new__(cls, url: str) -> Self:
         """
         Create a new `Url` instance.
 
