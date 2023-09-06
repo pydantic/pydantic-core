@@ -447,3 +447,14 @@ def test_int_subclass_constraint() -> None:
 
     with pytest.raises(ValidationError, match='Input should be greater than 0'):
         v.validate_python(IntSubclass(0))
+
+
+class FloatSubclass(float):
+    pass
+
+
+def test_float_subclass() -> None:
+    v = SchemaValidator({'type': 'int'})
+    v_lax = v.validate_python(FloatSubclass(1))
+    assert v_lax == 1
+    assert type(v_lax) == int
