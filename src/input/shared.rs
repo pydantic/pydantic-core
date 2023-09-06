@@ -1,4 +1,5 @@
 use num_bigint::BigInt;
+use pyo3::{intern, PyAny, Python};
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::EitherInt;
@@ -134,5 +135,24 @@ pub fn float_as_int<'a>(input: &'a impl Input<'a>, float: f64) -> ValResult<'a, 
         Ok(EitherInt::I64(float as i64))
     } else {
         Err(ValError::new(ErrorTypeDefaults::IntParsingSize, input))
+    }
+}
+
+pub fn decimal_as_int<'a>(py: Python, input: &'a impl Input<'a>, decimal: &PyAny) -> ValResult<'a, EitherInt<'a>> {
+    if !decimal.call_method0(intern!(py, "is_finite"))?.extract::<bool>()?
+        || decimal.call_method0(intern!(py, "is_nan"))?.extract::<bool>()?
+    {
+        return Err(ValError::new(ErrorTypeDefaults::FiniteNumber, input));
+    }
+    let (numerator, denominator) = decimal
+        .call_method0(intern!(py, "as_integer_ratio"))?
+        .extract::<(BigInt, BigInt)>()?;
+    if denominator != 1.into() {
+        return Err(ValError::new(ErrorTypeDefaults::IntFromFloat, input));
+    }
+    if let Ok(i) = i64::try_from(&numerator) {
+        Ok(EitherInt::I64(i))
+    } else {
+        Ok(EitherInt::BigInt(numerator))
     }
 }
