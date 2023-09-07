@@ -145,13 +145,9 @@ pub fn decimal_as_int<'a>(py: Python, input: &'a impl Input<'a>, decimal: &PyAny
     }
     let (numerator, denominator) = decimal
         .call_method0(intern!(py, "as_integer_ratio"))?
-        .extract::<(BigInt, BigInt)>()?;
-    if denominator != 1.into() {
+        .extract::<(&PyAny, &PyAny)>()?;
+    if denominator.extract::<i64>().map_or(true, |d| d != 1) {
         return Err(ValError::new(ErrorTypeDefaults::IntFromFloat, input));
     }
-    if let Ok(i) = i64::try_from(&numerator) {
-        Ok(EitherInt::I64(i))
-    } else {
-        Ok(EitherInt::BigInt(numerator))
-    }
+    Ok(EitherInt::Py(numerator))
 }
