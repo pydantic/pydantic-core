@@ -70,7 +70,7 @@ jobs:
           - '3.9'
           - '3.10'
           - '3.11'
-          - '3.12-dev'
+          - '3.12rc1'
           - 'pypy3.7'
           - 'pypy3.8'
           - 'pypy3.9'
@@ -474,13 +474,13 @@ jobs:
         os: [ubuntu, windows]
         target: [x86_64]
         manylinux: [auto]
-        interpreter: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12-dev", "pypy3.7", "pypy3.8", "pypy3.9", "pypy3.10"]
+        interpreter: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12rc1", "pypy3.7", "pypy3.8", "pypy3.9", "pypy3.10"]
         include:
           - os: ubuntu
             platform: linux
           - os: windows
             ls: dir
-          - interpreter: 3.12-dev
+          - interpreter: 3.12rc1
             maturin-interpreter: "3.12"
 
     runs-on: ${{ matrix.os }}-latest
