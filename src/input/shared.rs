@@ -140,7 +140,6 @@ pub fn float_as_int<'a>(input: &'a impl Input<'a>, float: f64) -> ValResult<'a, 
 
 pub fn decimal_as_int<'a>(py: Python, input: &'a impl Input<'a>, decimal: &PyAny) -> ValResult<'a, EitherInt<'a>> {
     if !decimal.call_method0(intern!(py, "is_finite"))?.extract::<bool>()?
-        || decimal.call_method0(intern!(py, "is_nan"))?.extract::<bool>()?
     {
         return Err(ValError::new(ErrorTypeDefaults::FiniteNumber, input));
     }
