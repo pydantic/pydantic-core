@@ -3,10 +3,11 @@ use std::fmt::{Display, Write};
 use std::str::from_utf8;
 
 use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
-use pyo3::intern;
+use pyo3::ffi;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
+use pyo3::{intern, AsPyPointer};
 use serde::ser::{Error, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 
@@ -50,7 +51,7 @@ impl ValidationError {
         error_mode: ErrorMode,
         error: ValError,
         outer_location: Option<LocItem>,
-        hide_input_in_errors: bool,
+        hide_input: bool,
         validation_error_cause: bool,
     ) -> PyErr {
         match error {
@@ -63,7 +64,7 @@ impl ValidationError {
                     None => raw_errors.into_iter().map(|e| e.into_py(py)).collect(),
                 };
 
-                let validation_error = Self::new(line_errors, title, error_mode, hide_input_in_errors);
+                let validation_error = Self::new(line_errors, title, error_mode, hide_input);
 
                 match Py::new(py, validation_error) {
                     Ok(err) => {
