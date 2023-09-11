@@ -521,44 +521,9 @@ def test_all_errors():
         pytest.fail('core_schema.ErrorType needs to be updated')
 
 
-def test_validation_error_cause_usage():
-    if sys.version_info < (3, 11):
-        from exceptiongroup import BaseExceptionGroup
-    else:
-        from builtins import BaseExceptionGroup
-
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='This is the modern version used post 3.10.')
+def test_validation_error_cause_contents():
     enabled_config: CoreConfig = {'validation_error_cause': True}
-
-    def check_grouped_exception(exc: BaseException) -> BaseException:
-        """
-        Handled the difference pre 3.11 and after,
-        returns the exception to keep testing with:
-        pre 3.11 and extra UserWarning exception gets added, so unwrapping that.
-        """
-        if sys.version_info < (3, 11):
-            assert repr(exc).startswith("UserWarning('Pydantic: ")
-            assert exc.__cause__ is not None
-            return exc.__cause__
-        else:
-            assert exc.__notes__
-            assert exc.__notes__[-1].startswith('\nPydantic: ')
-            return exc
-
-    # Important to test a singular as well as a multi,
-    # because the singular originally had problems with losing the traceback
-    def singular_raise_py_error(v: Any) -> Any:
-        raise ValueError('Oh no!')
-
-    s1 = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), config=enabled_config)
-    with pytest.raises(ValidationError) as exc_info:
-        s1.validate_python('anything')
-
-    assert isinstance(exc_info.value.__cause__, BaseExceptionGroup)
-    assert len(exc_info.value.__cause__.exceptions) == 1
-    cause = exc_info.value.__cause__.exceptions[0]
-    cause = check_grouped_exception(cause)
-    assert repr(cause) == repr(ValueError('Oh no!'))
-    assert cause.__traceback__ is not None
 
     def multi_raise_py_error(v: Any) -> Any:
         try:
@@ -570,22 +535,20 @@ def test_validation_error_cause_usage():
     with pytest.raises(ValidationError) as exc_info:
         s2.validate_python('anything')
 
-    def validate_s2_chain(val_err: ValidationError):
-        cause_group = val_err.__cause__
-        assert isinstance(cause_group, BaseExceptionGroup)
-        assert len(cause_group.exceptions) == 1
+    cause_group = exc_info.value.__cause__
+    assert isinstance(cause_group, BaseExceptionGroup)
+    assert len(cause_group.exceptions) == 1
 
-        cause = cause_group.exceptions[0]
-        cause = check_grouped_exception(cause)
-        assert repr(cause) == repr(ValueError('Oh no!'))
-        assert cause.__traceback__ is not None
+    cause = cause_group.exceptions[0]
+    assert cause.__notes__
+    assert cause.__notes__[-1].startswith('\nPydantic: ')
+    assert repr(cause) == repr(ValueError('Oh no!'))
+    assert cause.__traceback__ is not None
 
-        sub_cause = cause.__cause__
-        assert repr(sub_cause) == repr(AssertionError('Wrong'))
-        assert sub_cause.__cause__ is None
-        assert sub_cause.__traceback__ is not None
-
-    validate_s2_chain(exc_info.value)
+    sub_cause = cause.__cause__
+    assert repr(sub_cause) == repr(AssertionError('Wrong'))
+    assert sub_cause.__cause__ is None
+    assert sub_cause.__traceback__ is not None
 
     # Edge case: make sure a deep inner ValidationError(s) causing a validator failure doesn't cause any problems:
     def outer_raise_py_error(v: Any) -> Any:
@@ -601,55 +564,167 @@ def test_validation_error_cause_usage():
     assert isinstance(exc_info.value.__cause__, BaseExceptionGroup)
     assert len(exc_info.value.__cause__.exceptions) == 1
     cause = exc_info.value.__cause__.exceptions[0]
-    cause = check_grouped_exception(cause)
+    assert cause.__notes__ and cause.__notes__[-1].startswith('\nPydantic: ')
     assert repr(cause) == repr(ValueError('Sub val failure'))
     subcause = cause.__cause__
     assert isinstance(subcause, ValidationError)
-    validate_s2_chain(subcause)
+
+    cause_group = subcause.__cause__
+    assert isinstance(cause_group, BaseExceptionGroup)
+    assert len(cause_group.exceptions) == 1
+
+    cause = cause_group.exceptions[0]
+    assert cause.__notes__
+    assert cause.__notes__[-1].startswith('\nPydantic: ')
+    assert repr(cause) == repr(ValueError('Oh no!'))
+    assert cause.__traceback__ is not None
+
+    sub_cause = cause.__cause__
+    assert repr(sub_cause) == repr(AssertionError('Wrong'))
+    assert sub_cause.__cause__ is None
+    assert sub_cause.__traceback__ is not None
 
 
-def test_validation_error_cause_version_variants():
-    class Result(enum.Enum):
-        CAUSE = enum.auto()
-        NO_CAUSE = enum.auto()
-        IMPORT_ERROR = enum.auto()
+@pytest.mark.skipif(sys.version_info >= (3, 11), reason='This is the backport/legacy version used pre 3.11 only.')
+def test_validation_error_cause_contents_legacy():
+    from exceptiongroup import BaseExceptionGroup
 
-    config: list[tuple[str, CoreConfig, Result]] = [
-        # Without the backport should still work after 3.10 as not needed:
+    enabled_config: CoreConfig = {'validation_error_cause': True}
+
+    def multi_raise_py_error(v: Any) -> Any:
+        try:
+            raise AssertionError('Wrong')
+        except AssertionError as e:
+            raise ValueError('Oh no!') from e
+
+    s2 = SchemaValidator(core_schema.no_info_plain_validator_function(multi_raise_py_error), config=enabled_config)
+    with pytest.raises(ValidationError) as exc_info:
+        s2.validate_python('anything')
+
+    cause_group = exc_info.value.__cause__
+    assert isinstance(cause_group, BaseExceptionGroup)
+    assert len(cause_group.exceptions) == 1
+
+    cause = cause_group.exceptions[0]
+    assert repr(cause).startswith("UserWarning('Pydantic: ")
+
+    assert cause.__cause__ is not None
+    cause = cause.__cause__
+    assert repr(cause) == repr(ValueError('Oh no!'))
+    assert cause.__traceback__ is not None
+
+    sub_cause = cause.__cause__
+    assert repr(sub_cause) == repr(AssertionError('Wrong'))
+    assert sub_cause.__cause__ is None
+    assert sub_cause.__traceback__ is not None
+
+    # Make sure a deep inner ValidationError(s) causing a validator failure doesn't cause any problems:
+    def outer_raise_py_error(v: Any) -> Any:
+        try:
+            s2.validate_python('anything')
+        except ValidationError as e:
+            raise ValueError('Sub val failure') from e
+
+    s3 = SchemaValidator(core_schema.no_info_plain_validator_function(outer_raise_py_error), config=enabled_config)
+    with pytest.raises(ValidationError) as exc_info:
+        s3.validate_python('anything')
+
+    assert isinstance(exc_info.value.__cause__, BaseExceptionGroup)
+    assert len(exc_info.value.__cause__.exceptions) == 1
+    cause = exc_info.value.__cause__.exceptions[0]
+    assert repr(cause).startswith("UserWarning('Pydantic: ")
+    assert cause.__cause__ is not None
+    cause = cause.__cause__
+    assert repr(cause) == repr(ValueError('Sub val failure'))
+    subcause = cause.__cause__
+    assert isinstance(subcause, ValidationError)
+
+    cause_group = subcause.__cause__
+    assert isinstance(cause_group, BaseExceptionGroup)
+    assert len(cause_group.exceptions) == 1
+
+    cause = cause_group.exceptions[0]
+    assert repr(cause).startswith("UserWarning('Pydantic: ")
+    assert cause.__cause__ is not None
+    cause = cause.__cause__
+    assert repr(cause) == repr(ValueError('Oh no!'))
+    assert cause.__traceback__ is not None
+
+    sub_cause = cause.__cause__
+    assert repr(sub_cause) == repr(AssertionError('Wrong'))
+    assert sub_cause.__cause__ is None
+    assert sub_cause.__traceback__ is not None
+
+
+class CauseResult(enum.Enum):
+    CAUSE = enum.auto()
+    NO_CAUSE = enum.auto()
+    IMPORT_ERROR = enum.auto()
+
+
+@pytest.mark.parametrize(
+    'desc,config,expected_result',
+    [  # Without the backport should still work after 3.10 as not needed:
         (
             'Enabled',
             {'validation_error_cause': True},
-            Result.CAUSE if sys.version_info >= (3, 11) else Result.IMPORT_ERROR,
+            CauseResult.CAUSE if sys.version_info >= (3, 11) else CauseResult.IMPORT_ERROR,
         ),
-        ('Disabled specifically', {'validation_error_cause': False}, Result.NO_CAUSE),
-        ('Disabled implicitly', {}, Result.NO_CAUSE),
-    ]
-
+        ('Disabled specifically', {'validation_error_cause': False}, CauseResult.NO_CAUSE),
+        ('Disabled implicitly', {}, CauseResult.NO_CAUSE),
+    ],
+)
+def test_validation_error_cause_config_variants(desc: str, config: CoreConfig, expected_result: CauseResult):
     # Simulate the package being missing:
     with patch.dict('sys.modules', {'exceptiongroup': None}):
 
         def singular_raise_py_error(v: Any) -> Any:
             raise ValueError('Oh no!')
 
-        for _, config, expected in config:
-            s = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), config=config)
+        s = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), config=config)
 
-            if expected is Result.IMPORT_ERROR:
-                # Confirm error message contains "requires the exceptiongroup module" in the middle of the string:
-                with pytest.raises(ImportError, match='requires the exceptiongroup module'):
-                    s.validate_python('anything')
-            elif expected is Result.CAUSE:
-                with pytest.raises(ValidationError) as exc_info:
-                    s.validate_python('anything')
-                assert isinstance(exc_info.value.__cause__, BaseExceptionGroup)
-                assert len(exc_info.value.__cause__.exceptions) == 1
-                assert repr(exc_info.value.__cause__.exceptions[0]) == repr(ValueError('Oh no!'))
-            elif expected is Result.NO_CAUSE:
-                with pytest.raises(ValidationError) as exc_info:
-                    s.validate_python('anything')
-                assert exc_info.value.__cause__ is None
-            else:
-                raise AssertionError('Unhandled result: {}'.format(expected))
+        if expected_result is CauseResult.IMPORT_ERROR:
+            # Confirm error message contains "requires the exceptiongroup module" in the middle of the string:
+            with pytest.raises(ImportError, match='requires the exceptiongroup module'):
+                s.validate_python('anything')
+        elif expected_result is CauseResult.CAUSE:
+            with pytest.raises(ValidationError) as exc_info:
+                s.validate_python('anything')
+            assert exc_info.value.__cause__ is not None
+            assert hasattr(exc_info.value.__cause__, 'exceptions')
+            assert len(exc_info.value.__cause__.exceptions) == 1
+            assert repr(exc_info.value.__cause__.exceptions[0]) == repr(ValueError('Oh no!'))
+        elif expected_result is CauseResult.NO_CAUSE:
+            with pytest.raises(ValidationError) as exc_info:
+                s.validate_python('anything')
+            assert exc_info.value.__cause__ is None
+        else:
+            raise AssertionError('Unhandled result: {}'.format(expected_result))
+
+
+def test_validation_error_cause_traceback_preserved():
+    """Makes sure historic bug of traceback being lost is fixed."""
+
+    enabled_config: CoreConfig = {'validation_error_cause': True}
+
+    def singular_raise_py_error(v: Any) -> Any:
+        raise ValueError('Oh no!')
+
+    s1 = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), config=enabled_config)
+    with pytest.raises(ValidationError) as exc_info:
+        s1.validate_python('anything')
+
+    base_errs = getattr(exc_info.value.__cause__, 'exceptions', [])
+    assert len(base_errs) == 1
+    base_err = base_errs[0]
+
+    # Get to the root error:
+    cause = base_err
+    while cause.__cause__ is not None:
+        cause = cause.__cause__
+
+    # Should still have a traceback:
+    assert cause.__traceback__ is not None
 
 
 class BadRepr:
