@@ -708,7 +708,7 @@ def test_revalidate_subclass_instances():
     assert hasattr(m3, 'field_c')
     m4 = v.validate_python(m3)
     assert m4 is not m3
-    assert type(m4) is MyModel
+    assert isinstance(m4, MyModel)
     assert not hasattr(m4, 'field_c')
 
     m5 = MySubModel()

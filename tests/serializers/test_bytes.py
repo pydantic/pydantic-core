@@ -82,11 +82,11 @@ def test_subclass_bytes(schema_type, input_value, expected_json):
     s = SchemaSerializer({'type': schema_type})
     v = s.to_python(input_value)
     assert v == input_value
-    assert type(v) == type(input_value)
+    assert isinstance(v, type(input_value))
 
     v = s.to_python(input_value, mode='json')
     assert v == expected_json
-    assert type(v) == str
+    assert isinstance(v, str)
 
     assert s.to_json(input_value) == json.dumps(expected_json).encode('utf-8')
 

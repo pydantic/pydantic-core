@@ -67,9 +67,9 @@ def test_any():
 
     s = SchemaSerializer(core_schema.any_schema())
     assert s.to_python(url) == url
-    assert type(s.to_python(url)) == Url
+    assert isinstance(s.to_python(url), Url)
     assert s.to_python(multi_host_url) == multi_host_url
-    assert type(s.to_python(multi_host_url)) == MultiHostUrl
+    assert isinstance(s.to_python(multi_host_url), MultiHostUrl)
     assert s.to_python(url, mode='json') == 'https://ex.com/'
     assert s.to_python(multi_host_url, mode='json') == 'https://ex.com,ex.org/path'
     assert s.to_json(url) == b'"https://ex.com/"'

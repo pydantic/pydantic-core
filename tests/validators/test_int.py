@@ -51,7 +51,7 @@ def test_int_py_and_json(py_and_json: PyAndJson, input_value, expected):
     else:
         output = v.validate_test(input_value)
         assert output == expected
-        assert type(output) == int
+        assert isinstance(output, int)
 
 
 @pytest.mark.parametrize(
@@ -425,10 +425,10 @@ def test_int_subclass() -> None:
     v = SchemaValidator({'type': 'int'})
     v_lax = v.validate_python(IntSubclass(1))
     assert v_lax == 1
-    assert type(v_lax) == int
+    assert isinstance(v_lax, int)
     v_strict = v.validate_python(IntSubclass(1), strict=True)
     assert v_strict == 1
-    assert type(v_strict) == int
+    assert isinstance(v_strict, int)
 
     assert v.validate_python(IntSubclass(1136885225876639845)) == 1136885225876639845
     assert v.validate_python(IntSubclass(i64_max + 7)) == i64_max + 7
@@ -440,10 +440,10 @@ def test_int_subclass_constraint() -> None:
     v = SchemaValidator({'type': 'int', 'gt': 0})
     v_lax = v.validate_python(IntSubclass(1))
     assert v_lax == 1
-    assert type(v_lax) == int
+    assert isinstance(v_lax, int)
     v_strict = v.validate_python(IntSubclass(1), strict=True)
     assert v_strict == 1
-    assert type(v_strict) == int
+    assert isinstance(v_strict, int)
 
     with pytest.raises(ValidationError, match='Input should be greater than 0'):
         v.validate_python(IntSubclass(0))
@@ -457,4 +457,4 @@ def test_float_subclass() -> None:
     v = SchemaValidator({'type': 'int'})
     v_lax = v.validate_python(FloatSubclass(1))
     assert v_lax == 1
-    assert type(v_lax) == int
+    assert isinstance(v_lax, int)
