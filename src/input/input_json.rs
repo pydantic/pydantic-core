@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString, PyType};
+use pyo3::types::{PyDict, PyString};
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 use strum::EnumMessage;
 
@@ -31,7 +31,8 @@ impl<'a> Input<'a> for JsonInput {
     }
 
     fn as_error_value(&'a self) -> InputValue<'a> {
-        InputValue::JsonInput(self)
+        // cloning JsonInput is cheap due to use of Arc
+        InputValue::JsonInput(self.clone())
     }
 
     fn is_none(&self) -> bool {
@@ -178,13 +179,12 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
-    fn strict_decimal(&'a self, decimal_type: &'a PyType) -> ValResult<&'a PyAny> {
-        let py = decimal_type.py();
+    fn strict_decimal(&'a self, py: Python<'a>) -> ValResult<&'a PyAny> {
         match self {
-            JsonInput::Float(f) => create_decimal(PyString::new(py, &f.to_string()), self, decimal_type),
+            JsonInput::Float(f) => create_decimal(PyString::new(py, &f.to_string()), self, py),
 
             JsonInput::String(..) | JsonInput::Int(..) | JsonInput::Uint(..) | JsonInput::BigInt(..) => {
-                create_decimal(self.to_object(py).into_ref(py), self, decimal_type)
+                create_decimal(self.to_object(py).into_ref(py), self, py)
             }
             _ => Err(ValError::new(ErrorTypeDefaults::DecimalType, self)),
         }
@@ -263,7 +263,7 @@ impl<'a> Input<'a> for JsonInput {
             JsonInput::String(s) => Ok(string_to_vec(s).into()),
             JsonInput::Object(object) => {
                 // return keys iterator to match python's behavior
-                let keys: Vec<JsonInput> = object.keys().map(|k| JsonInput::String(k.clone())).collect();
+                let keys: JsonArray = JsonArray::new(object.keys().map(|k| JsonInput::String(k.clone())).collect());
                 Ok(keys.into())
             }
             _ => Err(ValError::new(ErrorTypeDefaults::IterableType, self)),
@@ -439,9 +439,8 @@ impl<'a> Input<'a> for String {
         str_as_float(self, self)
     }
 
-    fn strict_decimal(&'a self, decimal_type: &'a PyType) -> ValResult<&'a PyAny> {
-        let py = decimal_type.py();
-        create_decimal(self.to_object(py).into_ref(py), self, decimal_type)
+    fn strict_decimal(&'a self, py: Python<'a>) -> ValResult<&'a PyAny> {
+        create_decimal(self.to_object(py).into_ref(py), self, py)
     }
 
     #[cfg_attr(has_no_coverage, no_coverage)]
@@ -552,5 +551,5 @@ impl<'a> Input<'a> for String {
 }
 
 fn string_to_vec(s: &str) -> JsonArray {
-    s.chars().map(|c| JsonInput::String(c.to_string())).collect()
+    JsonArray::new(s.chars().map(|c| JsonInput::String(c.to_string())).collect())
 }
