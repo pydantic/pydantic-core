@@ -56,8 +56,19 @@ class PyAndJsonValidator:
         self.validator = SchemaValidator(schema, config)
         self.validator_type = validator_type
 
+    def construct_python(self, py_input, fields_set: 'set[str]' | None = None, recursive: bool = False):
+        return self.validator.construct_python(py_input, fields_set=fields_set, recursive=recursive)
+
     def validate_python(self, py_input, strict: bool | None = None, context: Any = None):
         return self.validator.validate_python(py_input, strict=strict, context=context)
+
+    def construct_test(self, py_input, fields_set: 'set[str]' | None = None, recursive: bool = False):
+        if self.validator_type == 'json':
+            return self.validator.construct_json(
+                json.dumps(py_input, default=json_default), fields_set=fields_set, recursive=recursive
+            )
+        else:
+            return self.validator.construct_python(py_input, fields_set=fields_set, recursive=recursive)
 
     def validate_test(self, py_input, strict: bool | None = None, context: Any = None):
         if self.validator_type == 'json':

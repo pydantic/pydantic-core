@@ -16,7 +16,8 @@ use crate::validators::function::convert_err;
 use super::arguments::{json_get, json_slice, py_get, py_slice};
 use super::model::{create_class, force_setattr, Revalidate};
 use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, ValidationState, Validator,
+    build_validator, BuildValidator, CombinedValidator, ConstructionState, DefinitionsBuilder, Extra, ValidationState,
+    Validator,
 };
 
 #[derive(Debug, Clone)]
@@ -137,6 +138,191 @@ impl_py_gc_traverse!(Field { validator });
 impl_py_gc_traverse!(DataclassArgsValidator { fields });
 
 impl Validator for DataclassArgsValidator {
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        let args = input.validate_dataclass_args(&self.dataclass_name)?;
+
+        let output_dict = PyDict::new(py);
+        let mut init_only_args = self.init_only_count.map(Vec::with_capacity);
+
+        let mut errors: Vec<ValLineError> = Vec::new();
+        let mut used_keys: AHashSet<&str> = AHashSet::with_capacity(self.fields.len());
+
+        macro_rules! set_item {
+            ($field:ident, $value:expr) => {{
+                let py_name = $field.py_name.as_ref(py);
+                if $field.init_only {
+                    if let Some(ref mut init_only_args) = init_only_args {
+                        init_only_args.push($value);
+                    }
+                } else {
+                    output_dict.set_item(py_name, $value)?;
+                }
+            }};
+        }
+
+        macro_rules! process {
+            ($args:ident, $get_method:ident, $get_macro:ident, $slice_macro:ident) => {{
+                // go through fields getting the value from args or kwargs and constructing it
+                for (index, field) in self.fields.iter().enumerate() {
+                    let mut pos_value = None;
+                    if let Some(args) = $args.args {
+                        if !field.kw_only {
+                            pos_value = $get_macro!(args, index);
+                        }
+                    }
+
+                    let mut kw_value = None;
+                    if let Some(kwargs) = $args.kwargs {
+                        if let Some((lookup_path, value)) = field.lookup_key.$get_method(kwargs)? {
+                            used_keys.insert(lookup_path.first_key());
+                            kw_value = Some((lookup_path, value));
+                        }
+                    }
+
+                    match (pos_value, kw_value) {
+                        // found both positional and keyword arguments, error
+                        (Some(_), Some((_, kw_value))) => {
+                            errors.push(ValLineError::new_with_loc(
+                                ErrorTypeDefaults::MultipleArgumentValues,
+                                kw_value,
+                                field.name.clone(),
+                            ));
+                        }
+                        // found a positional argument, construct it
+                        (Some(pos_value), None) => match field.validator.construct(py, pos_value, state) {
+                            Ok(value) => set_item!(field, value),
+                            // Err(ValError::LineErrors(line_errors)) => {
+                            //     errors.extend(
+                            //         line_errors
+                            //             .into_iter()
+                            //             .map(|err| err.with_outer_location(index.into())),
+                            //     );
+                            // }
+                            Err(err) => return Err(err),
+                        },
+                        // found a keyword argument, construct it
+                        (None, Some((_lookup_path, kw_value))) => {
+                            match field.validator.construct(py, kw_value, state) {
+                                Ok(value) => set_item!(field, value),
+                                // Err(ValError::LineErrors(line_errors)) => {
+                                //     errors.extend(line_errors.into_iter().map(|err| {
+                                //         lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name)
+                                //     }));
+                                // }
+                                Err(err) => return Err(err),
+                            }
+                        }
+                        // found neither, check if there is a default value, otherwise error
+                        (None, None) => {
+                            if let Some(value) =
+                                field
+                                    .validator
+                                    .default_construct(py, Some(field.name.as_str()), state)?
+                            {
+                                set_item!(field, value);
+                            }
+                            // else {
+                            //     errors.push(field.lookup_key.error(
+                            //         ErrorTypeDefaults::Missing,
+                            //         input,
+                            //         self.loc_by_alias,
+                            //         &field.name,
+                            //     ));
+                            // }
+                        }
+                    }
+                }
+                // if there are more args than positional_count, add an error for each one
+                // if let Some(args) = $args.args {
+                //     let len = args.len();
+                //     if len > self.positional_count {
+                //         for (index, item) in $slice_macro!(args, self.positional_count, len)
+                //             .iter()
+                //             .enumerate()
+                //         {
+                //             errors.push(ValLineError::new_with_loc(
+                //                 ErrorTypeDefaults::UnexpectedPositionalArgument,
+                //                 item,
+                //                 index + self.positional_count,
+                //             ));
+                //         }
+                //     }
+                // }
+                // if there are kwargs check any that haven't been processed yet
+                if let Some(kwargs) = $args.kwargs {
+                    if kwargs.len() != used_keys.len() {
+                        for (raw_key, value) in kwargs.iter() {
+                            match raw_key.strict_str() {
+                                Ok(either_str) => {
+                                    if !used_keys.contains(either_str.as_cow()?.as_ref()) {
+                                        // All members are added to output regardless of extra behavior
+                                        // match self.extra_behavior {
+                                        //     // ExtraBehavior::Forbid => {
+                                        //     //     errors.push(ValLineError::new_with_loc(
+                                        //     //         ErrorTypeDefaults::UnexpectedKeywordArgument,
+                                        //     //         value,
+                                        //     //         raw_key.as_loc_item(),
+                                        //     //     ));
+                                        //     // }
+                                        //     ExtraBehavior::Forbid | ExtraBehavior::Ignore => {}
+                                        //     ExtraBehavior::Allow => {
+                                        if let Some(ref validator) = self.extras_validator {
+                                            match validator.construct(py, value, state) {
+                                                Ok(value) => {
+                                                    output_dict.set_item(either_str.as_py_string(py), value)?
+                                                }
+                                                // Err(ValError::LineErrors(line_errors)) => {
+                                                //     for err in line_errors {
+                                                //         errors.push(err.with_outer_location(
+                                                //             raw_key.as_loc_item(),
+                                                //         ));
+                                                //     }
+                                                // }
+                                                Err(err) => return Err(err),
+                                            }
+                                        } else {
+                                            output_dict.set_item(either_str.as_py_string(py), value)?
+                                        }
+                                        //     }
+                                        // }
+                                    }
+                                }
+                                // Err(ValError::LineErrors(line_errors)) => {
+                                //     for err in line_errors {
+                                //         errors.push(
+                                //             err.with_outer_location(raw_key.as_loc_item())
+                                //                 .with_type(ErrorTypeDefaults::InvalidKey),
+                                //         );
+                                //     }
+                                // }
+                                Err(err) => return Err(err),
+                            }
+                        }
+                    }
+                }
+            }};
+        }
+
+        match args {
+            GenericArguments::Py(a) => process!(a, py_get_dict_item, py_get, py_slice),
+            GenericArguments::Json(a) => process!(a, json_get, json_get, json_slice),
+        }
+        if errors.is_empty() {
+            if let Some(init_only_args) = init_only_args {
+                Ok((output_dict, PyTuple::new(py, init_only_args)).to_object(py))
+            } else {
+                Ok((output_dict, py.None()).to_object(py))
+            }
+        } else {
+            Err(ValError::LineErrors(errors))
+        }
+    }
+
     fn validate<'data>(
         &self,
         py: Python<'data>,
@@ -428,6 +614,7 @@ pub struct DataclassValidator {
     class: Py<PyType>,
     fields: Vec<Py<PyString>>,
     post_init: Option<Py<PyString>>,
+    reconstruct: Revalidate,
     revalidate: Revalidate,
     name: String,
     frozen: bool,
@@ -473,6 +660,11 @@ impl BuildValidator for DataclassValidator {
             class: class.into(),
             fields,
             post_init,
+            reconstruct: Revalidate::from_str(schema_or_config_same(
+                schema,
+                config,
+                intern!(py, "reconstruct_instances"),
+            )?)?,
             revalidate: Revalidate::from_str(schema_or_config_same(
                 schema,
                 config,
@@ -489,6 +681,46 @@ impl BuildValidator for DataclassValidator {
 impl_py_gc_traverse!(DataclassValidator { class, validator });
 
 impl Validator for DataclassValidator {
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        // Construct has no `self_instance`, because that would mean that construct was called from within
+        // `Dataclass.__init__`, which is impossible
+
+        // same logic as on models
+        let class = self.class.as_ref(py);
+        if let Some(py_input) = input.input_is_instance(class) {
+            if self.reconstruct.should_revalidate(py_input, class) {
+                let input_dict: &PyAny = self.dataclass_to_dict(py, py_input)?;
+
+                let con_output = self.validator.construct(py, input_dict, state)?;
+
+                let dc = create_class(self.class.as_ref(py))?;
+                self.set_dict_call(py, dc.as_ref(py), con_output, input)?;
+                Ok(dc)
+            } else {
+                Ok(input.to_object(py))
+            }
+        } else {
+            // Construct the dataclass fields
+            // `input` at this point could be an instance of a different dataclass (or anything else for that matter)
+            // If it fails to validate the input to dataclass args, we return as-is
+            let Ok(con_output) = self.validator.construct(py, input, state) else {
+                // Unable to interpret as anything meaningful in this context; return as-is
+                return Ok(input.to_object(py));
+            };
+
+            // At this point con_output should be (dc_dict, post_init_kwargs)
+            // Construct a new dataclass instance and set it's attributes
+            let dc = create_class(self.class.as_ref(py))?;
+            self.set_dict_call(py, dc.as_ref(py), con_output, input)?;
+            Ok(dc)
+        }
+    }
+
     fn validate<'data>(
         &self,
         py: Python<'data>,

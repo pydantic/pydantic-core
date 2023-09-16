@@ -5,7 +5,7 @@ use enum_dispatch::enum_dispatch;
 use pyo3::exceptions::PyTypeError;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PySet, PyTuple, PyType};
+use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
@@ -64,6 +64,12 @@ pub use with_default::DefaultType;
 pub use self::construction_state::ConstructionState;
 use self::definitions::DefinitionRefValidator;
 pub use self::validation_state::ValidationState;
+
+pub static BUILTINS_TYPE: GILOnceCell<PyObject> = GILOnceCell::new();
+
+pub fn get_type(py: Python) -> PyResult<PyObject> {
+    Ok(py.import("builtins")?.getattr("type")?.into_py(py))
+}
 
 #[pyclass(module = "pydantic_core._pydantic_core", name = "Some")]
 pub struct PySome {
@@ -155,10 +161,10 @@ impl SchemaValidator {
         &self,
         py: Python,
         input: &PyAny,
-        fields_set: Option<&PySet>,
+        fields_set: Option<&PyAny>,
         recursive: bool,
     ) -> PyResult<PyObject> {
-        self._construct(py, input, fields_set, recursive)
+        self._construct(py, input, fields_set, recursive, InputType::Python)
             .map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Python))
     }
 
@@ -210,6 +216,22 @@ impl SchemaValidator {
             Err(ValError::Omit) => Err(ValidationError::omit_error()),
             Err(ValError::UseDefault) => Err(ValidationError::use_default_error()),
             Err(ValError::LineErrors(_)) => Ok(false),
+        }
+    }
+
+    #[pyo3(signature = (input, *, fields_set=None, recursive=false))]
+    pub fn construct_json(
+        &self,
+        py: Python,
+        input: &PyAny,
+        fields_set: Option<&PyAny>,
+        recursive: bool,
+    ) -> PyResult<PyObject> {
+        match input.parse_json() {
+            Ok(input) => self
+                ._construct(py, &input, fields_set, recursive, InputType::Json)
+                .map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Json)),
+            Err(err) => Err(self.prepare_validation_err(py, err, ErrorMode::Json)),
         }
     }
 
@@ -316,13 +338,14 @@ impl SchemaValidator {
         &'data self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        fields_set: Option<&PySet>,
+        fields_set: Option<&PyAny>,
         recursive: bool,
+        mode: InputType,
     ) -> ValResult<'data, PyObject>
     where
         's: 'data,
     {
-        let mut state = ConstructionState::new(fields_set, recursive);
+        let mut state = ConstructionState::new(fields_set, recursive, mode, false, false, &self.definitions);
         self.validator.construct(py, input, &mut state)
     }
 
@@ -710,7 +733,7 @@ pub enum CombinedValidator {
 /// validators defined in `build_validator` also need `EXPECTED_TYPE` as a const, but that can't be part of the trait
 #[enum_dispatch(CombinedValidator)]
 pub trait Validator: Send + Sync + Clone + Debug {
-    /// Construct a model (or all models) with pre-validated data
+    /// Construct this schema/type without running validation (perhaps recursively)
     fn construct<'data>(
         &self,
         py: Python<'data>,
@@ -728,7 +751,17 @@ pub trait Validator: Send + Sync + Clone + Debug {
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject>;
 
-    /// Get a default value, currently only used by `WithDefaultValidator`
+    /// Get a default value when constructing, currently only used by `WithDefaultValidator`
+    fn default_construct<'data>(
+        &self,
+        _py: Python<'data>,
+        _outer_loc: Option<impl Into<LocItem>>,
+        _state: &mut ConstructionState,
+    ) -> ValResult<'data, Option<PyObject>> {
+        Ok(None)
+    }
+
+    /// Get a default value when validating, currently only used by `WithDefaultValidator`
     fn default_value<'data>(
         &self,
         _py: Python<'data>,

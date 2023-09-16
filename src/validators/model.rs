@@ -1,8 +1,7 @@
-use std::ptr::{null, null_mut};
+use std::ptr::null_mut;
 
 use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyTypeError;
-use pyo3::ffi::Py_None;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
 use pyo3::{ffi, intern};
@@ -24,8 +23,6 @@ const DUNDER_DICT: &str = "__dict__";
 const DUNDER_FIELDS_SET_KEY: &str = "__pydantic_fields_set__";
 const DUNDER_MODEL_EXTRA_KEY: &str = "__pydantic_extra__";
 const DUNDER_MODEL_PRIVATE_KEY: &str = "__pydantic_private__";
-const ROOT_MODEL_DELIMETER: &str = "__pydantic_root_model__";
-const POST_INIT_METHOD: &str = "__pydantic_post_init__";
 
 #[derive(Debug, Clone)]
 pub(super) enum Revalidate {
@@ -56,6 +53,7 @@ impl Revalidate {
 
 #[derive(Debug, Clone)]
 pub struct ModelValidator {
+    reconstruct: Revalidate,
     revalidate: Revalidate,
     validator: Box<CombinedValidator>,
     class: Py<PyType>,
@@ -83,6 +81,11 @@ impl BuildValidator for ModelValidator {
         let validator = build_validator(sub_schema, config, definitions)?;
 
         Ok(Self {
+            reconstruct: Revalidate::from_str(schema_or_config_same(
+                schema,
+                config,
+                intern!(py, "reconstruct_instances"),
+            )?)?,
             revalidate: Revalidate::from_str(schema_or_config_same(
                 schema,
                 config,
@@ -113,98 +116,17 @@ impl Validator for ModelValidator {
         input: &'data impl Input<'data>,
         state: &mut ConstructionState,
     ) -> ValResult<'data, PyObject> {
-        // Create a new instance of the class
-        let model = create_class(self.class.as_ref(py))?;
-        let model_ref = model.as_ref(py);
+        // Construct has no `self_instance`, because that would mean that construct was called from within
+        // `BaseModel.__init__`, which is impossible
 
-        let is_root_model: bool = self.class.getattr(py, ROOT_MODEL_DELIMETER)?.is_true(py)?;
-
-        // Make sure that input is a dict
-        // Should this be part of the signature?
-        let input_object = input.to_object(py);
-        let input_dict = input_object.downcast::<PyDict>(py)?;
-
-        // Iterate over every field in model_fields
-        let fields = self.class.getattr(py, "model_fields").unwrap(); // FIXME
-        let fields = fields.downcast::<PyDict>(py).unwrap(); // FIXME
-        let fields_values = PyDict::new(py);
-        let defaults = PyDict::new(py);
-        for field in fields.items() {
-            let item = field.downcast::<PyTuple>().unwrap();
-            let field_name = &item[0];
-            let field_info = &item[1];
-            let field_alias = field_info.getattr("alias")?;
-            // let field_annotation = field_info.getattr("annotation")?;
-            if field_alias.is_true()? && input_dict.contains(field_alias)? {
-                let value = input_dict.get_item(field_alias);
-                if state.recursive {
-                    // recurse annotation
-                }
-                fields_values.set_item(field_name, value)?;
-            } else if input_dict.contains(field_name)? {
-                let value = input_dict.get_item(field_name);
-                if state.recursive {
-                    // recurse annotation
-                }
-                fields_values.set_item(field_name, value)?;
-            } else if !field_info.call_method0(intern!(py, "is_required"))?.is_true()? {
-                let kwargs = PyDict::new(py);
-                kwargs.set_item("call_default_factory", true)?;
-                let default = field_info.call_method("get_default", (), Some(kwargs))?;
-                defaults.set_item(field_name, default)?;
-            }
-        }
-        let fields_set;
-        if state.fields_set.is_none() {
-            fields_set = PySet::new(py, fields_values.keys())?;
-        } else {
-            fields_set = state.fields_set.unwrap(); // FIXME
-        }
-        fields_values.update(defaults.as_mapping())?;
-
-        // let (model_dict, model_extra, val_fields_set): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
-        // let fields_set = existing_fields_set.unwrap_or(val_fields_set);
-        // set_model_attrs(instance, model_dict, model_extra, fields_set);
-        force_setattr(py, model_ref, DUNDER_DICT, fields_values)?;
-        force_setattr(py, model_ref, DUNDER_FIELDS_SET_KEY, fields_set)?;
-        if !is_root_model {
-            force_setattr(py, model_ref, DUNDER_MODEL_EXTRA_KEY, PyDict::new(py))?;
-        }
-
-        let post_init_method = self.class.getattr(py, POST_INIT_METHOD);
-        if post_init_method.is_ok() {
-            // call that
-            model.call_method1(py, "model_post_init", (py.None(),))?;
-        } else if !is_root_model {
-            force_setattr(py, model_ref, DUNDER_MODEL_PRIVATE_KEY, py.None())?;
-        }
-
-        // Return the instance
-        Ok(model)
-    }
-
-    fn validate<'data>(
-        &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
-    ) -> ValResult<'data, PyObject> {
-        if let Some(self_instance) = state.extra().self_instance {
-            // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
-            return self.validate_init(py, self_instance, input, state);
-        }
-
-        // if we're in strict mode, we require an exact instance of the class (from python, with JSON an object is ok)
-        // if we're not in strict mode, instances subclasses are okay, as well as dicts, mappings, from attributes etc.
-        // if the input is an instance of the class, we "revalidate" it - e.g. we extract and reuse `__pydantic_fields_set__`
-        // but use from attributes to create a new instance of the model field type
         let class = self.class.as_ref(py);
         if let Some(py_input) = input.input_is_instance(class) {
-            if self.revalidate.should_revalidate(py_input, class) {
+            if self.reconstruct.should_revalidate(py_input, class) {
+                // Return a newly constructed Model with it's fields constructed
                 let fields_set = py_input.getattr(intern!(py, DUNDER_FIELDS_SET_KEY))?;
                 if self.root_model {
                     let inner_input = py_input.getattr(intern!(py, ROOT_FIELD))?;
-                    self.validate_construct(py, inner_input, Some(fields_set), state)
+                    self.construct_new(py, inner_input, Some(fields_set), state)
                 } else {
                     // get dict here so from_attributes logic doesn't apply
                     let dict = py_input.getattr(intern!(py, DUNDER_DICT))?;
@@ -217,13 +139,61 @@ impl Validator for ModelValidator {
                         full_model_dict.update(model_extra.downcast()?)?;
                         full_model_dict
                     };
-                    self.validate_construct(py, inner_input, Some(fields_set), state)
+                    self.construct_new(py, inner_input, Some(fields_set), state)
+                }
+            } else {
+                // We assume the input instance is already maximally constructed (or at least as far as the user wants)
+                return Ok(input.to_object(py));
+            }
+        } else if state.ultra_strict {
+            // Ultra strict failure; expected a Model instance but found something else
+            Err(ValError::Omit) // TODO: this maybe should be something other than "omit"
+        } else {
+            self.construct_new(py, input, None, state)
+        }
+    }
+
+    fn validate<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut ValidationState,
+    ) -> ValResult<'data, PyObject> {
+        if let Some(self_instance) = state.extra().self_instance {
+            // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
+            return self.validate_existing(py, self_instance, input, state);
+        }
+
+        // if we're in strict mode, we require an exact instance of the class (from python, with JSON an object is ok)
+        // if we're not in strict mode, instances subclasses are okay, as well as dicts, mappings, from attributes etc.
+        // if the input is an instance of the class, we "revalidate" it - e.g. we extract and reuse `__pydantic_fields_set__`
+        // but use from attributes to create a new instance of the model field type
+        let class = self.class.as_ref(py);
+        if let Some(py_input) = input.input_is_instance(class) {
+            if self.revalidate.should_revalidate(py_input, class) {
+                let fields_set = py_input.getattr(intern!(py, DUNDER_FIELDS_SET_KEY))?;
+                if self.root_model {
+                    let inner_input = py_input.getattr(intern!(py, ROOT_FIELD))?;
+                    self.validate_new(py, inner_input, Some(fields_set), state)
+                } else {
+                    // get dict here so from_attributes logic doesn't apply
+                    let dict = py_input.getattr(intern!(py, DUNDER_DICT))?;
+                    let model_extra = py_input.getattr(intern!(py, DUNDER_MODEL_EXTRA_KEY))?;
+
+                    let inner_input: &PyAny = if model_extra.is_none() {
+                        dict
+                    } else {
+                        let full_model_dict = dict.downcast::<PyDict>()?.copy()?;
+                        full_model_dict.update(model_extra.downcast()?)?;
+                        full_model_dict
+                    };
+                    self.validate_new(py, inner_input, Some(fields_set), state)
                 }
             } else {
                 Ok(input.to_object(py))
             }
         } else {
-            self.validate_construct(py, input, None, state)
+            self.validate_new(py, input, None, state)
         }
     }
 
@@ -308,8 +278,66 @@ impl Validator for ModelValidator {
 }
 
 impl ModelValidator {
-    /// here we just call the inner validator, then set attributes on `self_instance`
-    fn validate_init<'s, 'data>(
+    /// Create a new instance of the Model with constructed fields
+    fn construct_new<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        existing_fields_set: Option<&'data PyAny>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        // As per current spec, `model_construct` should not call any custom __init__ method
+        // (except for when coercing types)
+
+        let output = match self.validator.construct(py, input, state) {
+            Ok(output) => output,
+            Err(ValError::Omit) => {
+                // Strict failure; constructed model had extra fields
+                return Err(ValError::Omit);
+            }
+            Err(_) => {
+                // Couldn't construct at all; only option is to return the input unchanged
+                return Ok(input.to_object(py));
+            }
+        };
+
+        let instance = create_class(self.class.as_ref(py))?;
+        let instance_ref = instance.as_ref(py);
+
+        if self.root_model {
+            let fields_set = if input.to_object(py).is(&PydanticUndefinedType::py_undefined()) {
+                PySet::empty(py)?
+            } else {
+                PySet::new(py, [&String::from(ROOT_FIELD)])?
+            };
+            force_setattr(py, instance_ref, intern!(py, DUNDER_FIELDS_SET_KEY), fields_set)?;
+            force_setattr(py, instance_ref, intern!(py, ROOT_FIELD), output)?;
+        } else {
+            let (model_dict, model_extra, val_fields_set): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
+            let fields_set = existing_fields_set.unwrap_or(val_fields_set);
+            set_model_attrs(instance_ref, model_dict, model_extra, fields_set)?;
+        }
+        self.construct_post_init(py, instance, input)
+    }
+
+    /// Call the `__pydantic_post_init__` method
+    fn construct_post_init<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        instance: PyObject,
+        input: &'data impl Input<'data>,
+    ) -> ValResult<'data, PyObject> {
+        // No context is provided for construction (at least, for now)
+        if let Some(ref post_init) = self.post_init {
+            instance
+                .call_method1(py, post_init.as_ref(py), (py.None(),))
+                .map_err(|e| convert_err(py, e, input))?;
+        }
+        Ok(instance)
+    }
+
+    /// Call the inner validator, then set attributes on the existing Model instance
+    fn validate_existing<'s, 'data>(
         &'s self,
         py: Python<'data>,
         self_instance: &'s PyAny,
@@ -333,10 +361,11 @@ impl ModelValidator {
             let (model_dict, model_extra, fields_set): (&PyAny, &PyAny, &PyAny) = output.extract(py)?;
             set_model_attrs(self_instance, model_dict, model_extra, fields_set)?;
         }
-        self.call_post_init(py, self_instance.into_py(py), input, state.extra())
+        self.validate_post_init(py, self_instance.into_py(py), input, state.extra())
     }
 
-    fn validate_construct<'s, 'data>(
+    /// Create a new instance of the Model with validated fields
+    fn validate_new<'s, 'data>(
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
@@ -372,10 +401,11 @@ impl ModelValidator {
             let fields_set = existing_fields_set.unwrap_or(val_fields_set);
             set_model_attrs(instance_ref, model_dict, model_extra, fields_set)?;
         }
-        self.call_post_init(py, instance, input, state.extra())
+        self.validate_post_init(py, instance, input, state.extra())
     }
 
-    fn call_post_init<'s, 'data>(
+    /// Call the `__pydantic_post_init__` method (with Extra.context)
+    fn validate_post_init<'s, 'data>(
         &'s self,
         py: Python<'data>,
         instance: PyObject,

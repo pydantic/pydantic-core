@@ -5,7 +5,10 @@ use pyo3::types::PyDict;
 use pyo3::PyTraverseError;
 use pyo3::PyVisit;
 
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
+use super::{
+    build_validator, BuildValidator, CombinedValidator, ConstructionState, DefinitionsBuilder, ValidationState,
+    Validator,
+};
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
 use crate::errors::{LocItem, ValError, ValResult};
@@ -72,6 +75,7 @@ pub struct WithDefaultValidator {
     on_error: OnError,
     validator: Box<CombinedValidator>,
     validate_default: bool,
+    construct_default: bool,
     copy_default: bool,
     name: String,
 }
@@ -116,6 +120,8 @@ impl BuildValidator for WithDefaultValidator {
             on_error,
             validator,
             validate_default: schema_or_config_same(schema, config, intern!(py, "validate_default"))?.unwrap_or(false),
+            construct_default: schema_or_config_same(schema, config, intern!(py, "construct_default"))?
+                .unwrap_or(false),
             copy_default,
             name,
         }
@@ -126,6 +132,29 @@ impl BuildValidator for WithDefaultValidator {
 impl_py_gc_traverse!(WithDefaultValidator { default, validator });
 
 impl Validator for WithDefaultValidator {
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        if input.to_object(py).is(&PydanticUndefinedType::py_undefined()) {
+            Ok(self.default_construct(py, None::<usize>, state)?.unwrap())
+        } else {
+            match self.validator.construct(py, input, state) {
+                Ok(v) => Ok(v),
+                Err(e) => match e {
+                    ValError::UseDefault => Ok(self.default_construct(py, None::<usize>, state)?.ok_or(e)?),
+                    e => match self.on_error {
+                        OnError::Raise => Err(e),
+                        OnError::Default => Ok(self.default_construct(py, None::<usize>, state)?.ok_or(e)?),
+                        OnError::Omit => Err(ValError::Omit),
+                    },
+                },
+            }
+        }
+    }
+
     fn validate<'data>(
         &self,
         py: Python<'data>,
@@ -146,6 +175,34 @@ impl Validator for WithDefaultValidator {
                     },
                 },
             }
+        }
+    }
+
+    fn default_construct<'data>(
+        &self,
+        py: Python<'data>,
+        _outer_loc: Option<impl Into<LocItem>>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, Option<PyObject>> {
+        match self.default.default_value(py)? {
+            Some(stored_dft) => {
+                let dft: Py<PyAny> = if self.copy_default {
+                    let deepcopy_func = COPY_DEEPCOPY.get_or_init(py, || get_deepcopy(py).unwrap());
+                    deepcopy_func.call1(py, (&stored_dft,))?.into_py(py)
+                } else {
+                    stored_dft
+                };
+
+                if self.construct_default && state.recursive {
+                    match self.construct(py, dft.into_ref(py), state) {
+                        Ok(v) => Ok(Some(v)),
+                        Err(e) => Err(e),
+                    }
+                } else {
+                    Ok(Some(dft))
+                }
+            }
+            None => Ok(None),
         }
     }
 

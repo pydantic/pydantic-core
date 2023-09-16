@@ -8,7 +8,10 @@ use crate::input::{GenericIterable, Input};
 use crate::tools::SchemaDict;
 
 use super::list::{get_items_schema, min_length_check};
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
+use super::{
+    build_validator, get_type, BuildValidator, CombinedValidator, ConstructionState, DefinitionsBuilder,
+    ValidationState, Validator, BUILTINS_TYPE,
+};
 
 #[derive(Debug, Clone)]
 pub struct TupleVariableValidator {
@@ -44,6 +47,50 @@ impl BuildValidator for TupleVariableValidator {
 impl_py_gc_traverse!(TupleVariableValidator { item_validator });
 
 impl Validator for TupleVariableValidator {
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        if !state.recursive {
+            return Ok(input.to_object(py));
+        }
+
+        let Ok(seq) = input.lax_tuple() else {
+            return Ok(input.to_object(py));
+        };
+
+        let output = match self.item_validator {
+            Some(ref v) => seq.construct_to_vec(py, input, v, state)?,
+            _ => seq.to_vec(py, input, "Tuple", self.max_length)?,
+        };
+
+        // Deduce the (likely) type of the input
+        let collection = input.lax_tuple()?;
+
+        match collection {
+            // In the cases below, copying is not really an option; so we instead return it as a concrete frozenset
+            GenericIterable::Iterator(_)
+            | GenericIterable::DictKeys(_)
+            | GenericIterable::DictValues(_)
+            | GenericIterable::DictItems(_) => Ok(PyTuple::new(py, &output).into_py(py)),
+            // JSON stuff should also be explicitly handled
+            GenericIterable::JsonArray(_) => Ok(PyTuple::new(py, &output).into_py(py)),
+            // Otherwise, we get the type of the input object and pass the output vector positionally to it's constructor
+            // This causes issues if the input object does not implement a constructor that takes an iterable as it's
+            // first argument, but I'm not sure we really have another good option to handle custom abstract classes
+            // Alternatively, we could devise some other callback that a custom class must implement in order for
+            // construct to work on it
+            _ => {
+                // return type(input)(output)
+                let type_func = BUILTINS_TYPE.get_or_init(py, || get_type(py).unwrap());
+                let input_type = type_func.call1(py, (input.to_object(py),))?;
+                Ok(input_type.call1(py, (&output.into_py(py),))?.into_py(py))
+            }
+        }
+    }
+
     fn validate<'data>(
         &self,
         py: Python<'data>,
@@ -127,6 +174,46 @@ impl BuildValidator for TuplePositionalValidator {
     }
 }
 
+fn construct_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, I: Input<'data> + 'data>(
+    py: Python<'data>,
+    state: &mut ConstructionState,
+    output: &mut Vec<PyObject>,
+    items_validators: &[CombinedValidator],
+    collection_iter: &mut T,
+) -> ValResult<'data, ()> {
+    for (index, validator) in items_validators.iter().enumerate() {
+        match collection_iter.next() {
+            Some(result) => {
+                if state.recursive {
+                    match validator.construct(py, result?, state) {
+                        Ok(item) => output.push(item),
+                        Err(err) => return Err(err),
+                    }
+                } else {
+                    output.push(result?.to_object(py));
+                }
+            }
+            None => {
+                // Only do defaults if recursive=True
+                let value = validator.default_construct(py, Some(index), state)?;
+                match (value, state.recursive) {
+                    (Some(value), true) => output.push(value),
+                    (_, _) => (),
+                };
+            }
+        }
+    }
+    // Iterate over the remainder of the collection and return the input values
+    // They have no annotations so we cannot construct them, but we append them to the resultant object unchanged
+    for result in collection_iter {
+        match result {
+            Ok(result) => output.push(result.to_object(py)),
+            Err(err) => return Err(ValError::InternalErr(err)),
+        }
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, I: Input<'data> + 'data>(
     py: Python<'data>,
@@ -197,6 +284,67 @@ impl_py_gc_traverse!(TuplePositionalValidator {
 });
 
 impl Validator for TuplePositionalValidator {
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        if !state.recursive {
+            return Ok(input.to_object(py));
+        }
+
+        let Ok(collection) = input.lax_tuple() else {
+            // Could not be interpreted as generic tuple
+            return Ok(input.to_object(py));
+        };
+
+        let expected_length = self.items_validators.len();
+
+        let mut output: Vec<PyObject> = Vec::with_capacity(expected_length);
+
+        macro_rules! iter {
+            ($collection_iter:expr, $return_val:expr) => {{
+                construct_tuple_positional(
+                    py,
+                    state,
+                    &mut output,
+                    &self.items_validators,
+                    &mut $collection_iter,
+                )?;
+                Ok($return_val)
+            }};
+        }
+
+        match collection {
+            // In the cases below, copying is not really an option; so we instead return it as a concrete frozenset
+            GenericIterable::Iterator(collection_iter)
+            | GenericIterable::DictKeys(collection_iter)
+            | GenericIterable::DictValues(collection_iter)
+            | GenericIterable::DictItems(collection_iter) => {
+                iter!(collection_iter.iter()?, PyTuple::new(py, &output).into_py(py))
+            }
+            // Otherwise, we get the type of the input object and pass the output vector positionally to it's constructor
+            // This causes issues if the input object does not implement a constructor that takes an iterable as it's
+            // first argument, but I'm not sure we really have another good option to handle custom abstract classes
+            // Alternatively, we could devise some other callback that a custom class must implement in order for
+            // construct to work on it
+            collection_iter => {
+                // return type(input)(output)
+                construct_tuple_positional(
+                    py,
+                    state,
+                    &mut output,
+                    &self.items_validators,
+                    &mut collection_iter.as_sequence_iterator(py)?,
+                )?;
+                let type_func = BUILTINS_TYPE.get_or_init(py, || get_type(py).unwrap());
+                let input_type = type_func.call1(py, (input.to_object(py),))?;
+                Ok(input_type.call1(py, (&output.into_py(py),))?.into_py(py))
+            }
+        }
+    }
+
     fn validate<'data>(
         &self,
         py: Python<'data>,

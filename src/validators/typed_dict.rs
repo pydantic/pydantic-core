@@ -15,7 +15,8 @@ use crate::lookup_key::LookupKey;
 use crate::tools::SchemaDict;
 
 use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, ValidationState, Validator,
+    build_validator, BuildValidator, CombinedValidator, ConstructionState, DefinitionsBuilder, Extra, ValidationState,
+    Validator,
 };
 
 use std::ops::ControlFlow;
@@ -143,6 +144,121 @@ impl_py_gc_traverse!(TypedDictValidator {
 });
 
 impl Validator for TypedDictValidator {
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        let Ok(dict) = input.lax_dict() else {
+            return Ok(input.to_object(py));
+        };
+
+        let output_dict = PyDict::new(py);
+        // let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
+
+        // we only care about which keys have been used if we're iterating over the object for extra after
+        // the first pass
+        let mut used_keys: Option<AHashSet<&str>> = match (&self.extra_behavior, &dict) {
+            (_, GenericMapping::PyGetAttr(_, _)) => None,
+            _ => Some(AHashSet::with_capacity(self.fields.len())),
+        };
+
+        macro_rules! control_flow {
+            ($e: expr) => {
+                match $e {
+                    Ok(v) => ControlFlow::Continue(v),
+                    Err(err) => ControlFlow::Break(ValError::from(err)),
+                }
+            };
+        }
+
+        macro_rules! process {
+            ($dict:ident, $get_method:ident, $iter:ty $(,$kwargs:ident)?) => {{
+                for field in &self.fields {
+                    let op_key_value = match field.lookup_key.$get_method($dict $(, $kwargs )? ) {
+                        Ok(v) => v,
+                        Err(_err) => {
+                            continue;
+                        }
+                    };
+                    if let Some((lookup_path, value)) = op_key_value {
+                        if let Some(ref mut used_keys) = used_keys {
+                            // key is "used" whether or not validation passes, since we want to skip this key in
+                            // extra logic either way
+                            used_keys.insert(lookup_path.first_key());
+                        }
+                        if state.recursive {
+                            match field.validator.construct(py, value, state) {
+                                Ok(value) => {
+                                    control_flow!(output_dict.set_item(&field.name_py, value));
+                                }
+                                Err(ValError::Omit) => continue,
+                                Err(err) => return Err(err),
+                            }
+                        } else {
+                            control_flow!(output_dict.set_item(&field.name_py, value.to_object(py)));
+                        }
+                    } else if state.recursive { // Only do defaults if recursive=True
+                        if let Some(value) = field.validator.default_construct(py, Some(field.name.as_str()), state)? {
+                            control_flow!(output_dict.set_item(&field.name_py, value));
+                        }
+                    }
+                }
+
+                if let Some(ref mut used_keys) = used_keys {
+                    for item_result in <$iter>::new($dict)? {
+                        let (raw_key, value) = item_result?;
+                        let either_str = match raw_key.lax_str() {
+                            Ok(k) => k,
+                            // Err(ValError::LineErrors(line_errors)) => {
+                            //     for err in line_errors {
+                            //         errors.push(
+                            //             err.with_outer_location(raw_key.as_loc_item())
+                            //                 .with_type(ErrorTypeDefaults::InvalidKey),
+                            //         );
+                            //     }
+                            //     continue;
+                            // }
+                            Err(err) => return Err(err)
+                        };
+                        if used_keys.contains(either_str.as_cow()?.as_ref()) {
+                            continue;
+                        }
+
+                        // All found fields are added regardless of allow/forbid
+                        match (&self.extras_validator, state.recursive) {
+                            (Some(ref validator), true) => {
+                                match validator.construct(py, value, state) {
+                                    Ok(value) => {
+                                        output_dict.set_item(raw_key, value)?;
+                                    }
+                                    // Err(ValError::LineErrors(line_errors)) => {
+                                    //     for err in line_errors {
+                                    //         errors.push(err.with_outer_location(raw_key.as_loc_item()));
+                                    //     }
+                                    // }
+                                    Err(err) => return Err(err),
+                                }
+                            }
+                            (_, _) => {
+                                output_dict.set_item(raw_key, value.to_object(py))?;
+                            }
+                        }
+                    }
+                }
+            }};
+        }
+        match dict {
+            GenericMapping::PyDict(d) => process!(d, py_get_dict_item, DictGenericIterator),
+            GenericMapping::PyGetAttr(d, kwargs) => process!(d, py_get_attr, AttributesGenericIterator, kwargs),
+            GenericMapping::PyMapping(d) => process!(d, py_get_mapping_item, MappingGenericIterator),
+            GenericMapping::JsonObject(d) => process!(d, json_get, JsonObjectGenericIterator),
+        }
+
+        Ok(output_dict.to_object(py))
+    }
+
     fn validate<'data>(
         &self,
         py: Python<'data>,

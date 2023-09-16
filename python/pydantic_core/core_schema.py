@@ -2353,6 +2353,7 @@ class WithDefaultSchema(TypedDict, total=False):
     default_factory: Callable[[], Any]
     on_error: Literal['raise', 'omit', 'default']  # default: 'raise'
     validate_default: bool  # default: False
+    construct_default: bool  # default: False
     strict: bool
     ref: str
     metadata: Any
@@ -2365,6 +2366,7 @@ def with_default_schema(
     default: Any = PydanticUndefined,
     default_factory: Callable[[], Any] | None = None,
     on_error: Literal['raise', 'omit', 'default'] | None = None,
+    construct_default: bool | None = None,
     validate_default: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
@@ -2401,6 +2403,7 @@ def with_default_schema(
         schema=schema,
         default_factory=default_factory,
         on_error=on_error,
+        construct_default=construct_default,
         validate_default=validate_default,
         strict=strict,
         ref=ref,
@@ -3022,6 +3025,7 @@ class ModelSchema(TypedDict, total=False):
     custom_init: bool
     root_model: bool
     post_init: str
+    reconstruct_instances: Literal['always', 'never', 'subclass-instances']  # default: 'never'
     revalidate_instances: Literal['always', 'never', 'subclass-instances']  # default: 'never'
     strict: bool
     frozen: bool
@@ -3039,6 +3043,7 @@ def model_schema(
     custom_init: bool | None = None,
     root_model: bool | None = None,
     post_init: str | None = None,
+    reconstruct_instances: Literal['always', 'never', 'subclass-instances'] | None = None,
     revalidate_instances: Literal['always', 'never', 'subclass-instances'] | None = None,
     strict: bool | None = None,
     frozen: bool | None = None,
@@ -3085,6 +3090,8 @@ def model_schema(
         custom_init: Whether the model has a custom init method
         root_model: Whether the model is a `RootModel`
         post_init: The call after init to use for the model
+        reconstruct_instances: whether instances of models and dataclasses (including subclass instances)
+            should re-construct any of their fields, default 'never'
         revalidate_instances: whether instances of models and dataclasses (including subclass instances)
             should re-validate defaults to config.revalidate_instances, else 'never'
         strict: Whether the model is strict
@@ -3102,6 +3109,7 @@ def model_schema(
         custom_init=custom_init,
         root_model=root_model,
         post_init=post_init,
+        reconstruct_instances=reconstruct_instances,
         revalidate_instances=revalidate_instances,
         strict=strict,
         frozen=frozen,
@@ -3251,6 +3259,7 @@ class DataclassSchema(TypedDict, total=False):
     fields: Required[List[str]]
     cls_name: str
     post_init: bool  # default: False
+    reconstruct_instances: Literal['always', 'never', 'subclass-instances']  # default: 'never'
     revalidate_instances: Literal['always', 'never', 'subclass-instances']  # default: 'never'
     strict: bool  # default: False
     frozen: bool  # default False
@@ -3268,6 +3277,7 @@ def dataclass_schema(
     *,
     cls_name: str | None = None,
     post_init: bool | None = None,
+    reconstruct_instances: Literal['always', 'never', 'subclass-instances'] | None = None,
     revalidate_instances: Literal['always', 'never', 'subclass-instances'] | None = None,
     strict: bool | None = None,
     ref: str | None = None,
@@ -3288,6 +3298,8 @@ def dataclass_schema(
             and while validating assignment
         cls_name: The name to use in error locs, etc; this is useful for generics (default: `cls.__name__`)
         post_init: Whether to call `__post_init__` after validation
+        reconstruct_instances: whether instances of models and dataclasses (including subclass instances)
+            should re-construct any of their fields, default 'never'
         revalidate_instances: whether instances of models and dataclasses (including subclass instances)
             should re-validate defaults to config.revalidate_instances, else 'never'
         strict: Whether to require an exact instance of `cls`
@@ -3305,6 +3317,7 @@ def dataclass_schema(
         cls_name=cls_name,
         schema=schema,
         post_init=post_init,
+        reconstruct_instances=reconstruct_instances,
         revalidate_instances=revalidate_instances,
         strict=strict,
         ref=ref,

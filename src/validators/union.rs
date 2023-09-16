@@ -9,14 +9,19 @@ use smallvec::SmallVec;
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config};
 use crate::errors::{ErrorType, LocItem, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input};
+use crate::input::{GenericMapping, Input, InputType};
 use crate::lookup_key::LookupKey;
 use crate::py_gc::PyGcTraverse;
+use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
+use crate::validators::Extra;
 
 use super::custom_error::CustomError;
 use super::literal::LiteralLookup;
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
+use super::{
+    build_validator, BuildValidator, CombinedValidator, ConstructionState, DefinitionsBuilder, ValidationState,
+    Validator,
+};
 
 #[derive(Debug, Clone, Copy)]
 enum UnionMode {
@@ -112,6 +117,96 @@ impl BuildValidator for UnionValidator {
 }
 
 impl UnionValidator {
+    fn construct_smart<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        construction_state: &mut ConstructionState,
+        strict_required: bool,
+        ultra_strict_required: bool,
+    ) -> ValResult<'data, PyObject> {
+        // Construct a new validation state object, since we run the validator in order to help determine best-fit
+        let mut recursion_gaurd = RecursionGuard::default();
+        let mut validation_state = ValidationState::new(
+            Extra::new(Some(true), Some(true), None, None, InputType::Python),
+            construction_state.definitions,
+            &mut recursion_gaurd,
+        );
+
+        // Always defer to instances of the union choices, regardless of any other criteria
+        let strict_state = &mut ConstructionState::new(
+            construction_state.fields_set,
+            construction_state.recursive,
+            construction_state.mode,
+            false,
+            true,
+            construction_state.definitions,
+        );
+        if let Some(res) = self
+            .choices
+            .iter()
+            .map(|(validator, _label)| validator.construct(py, input, strict_state))
+            .find(ValResult::is_ok)
+        {
+            return res;
+        }
+
+        if ultra_strict_required {
+            // Do an ultra strict validation check
+            let validation_state = &mut validation_state.rebind_extra(|extra| {
+                extra.strict = Some(true);
+                extra.ultra_strict = true;
+            });
+            for (validator, _label) in self.choices.iter() {
+                match validator.validate(py, input, validation_state) {
+                    Ok(_) => return validator.construct(py, input, construction_state),
+                    Err(_) => (),
+                }
+            }
+        }
+
+        if strict_required || validation_state.strict_or(self.strict) {
+            // Prefer models that correctly validate
+            let validation_state = &mut validation_state.rebind_extra(|extra| extra.strict = Some(true));
+            for (validator, _label) in &self.choices {
+                match validator.validate(py, input, validation_state) {
+                    Err(ValError::LineErrors(_)) => continue,
+                    _ => return validator.construct(py, input, construction_state),
+                };
+            }
+
+            // Prefer models that construct without extra fields
+            let strict_state = &mut ConstructionState::new(
+                construction_state.fields_set,
+                construction_state.recursive,
+                construction_state.mode,
+                true,
+                false,
+                construction_state.definitions,
+            );
+            if let Some(res) = self
+                .choices
+                .iter()
+                .map(|(validator, _label)| validator.construct(py, input, strict_state))
+                .find(ValResult::is_ok)
+            {
+                return res;
+            }
+        }
+
+        // Otherwise, see if any of them can be constructed at all; return the first one that does
+        for (validator, _label) in &self.choices {
+            match validator.construct(py, input, construction_state) {
+                Err(ValError::Omit) => continue,
+                Err(err) => return Err(err),
+                otherwise => return otherwise,
+            };
+        }
+
+        // If all other attempts error, return the original object unchanged
+        Ok(input.to_object(py))
+    }
+
     fn validate_smart<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -175,6 +270,42 @@ impl UnionValidator {
         }
     }
 
+    fn construct_left_to_right<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        construction_state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        // Check for premade instances first by setting `ultra_strict` to true
+        let strict_state = &mut ConstructionState::new(
+            construction_state.fields_set,
+            construction_state.recursive,
+            construction_state.mode,
+            false,
+            true,
+            construction_state.definitions,
+        );
+        if let Some(res) = self
+            .choices
+            .iter()
+            .map(|(validator, _label)| validator.construct(py, input, strict_state))
+            .find(ValResult::is_ok)
+        {
+            return res;
+        }
+
+        // Otherwise, iterate over each one and return the first one that constructs without errors
+        for (validator, _label) in &self.choices {
+            match validator.construct(py, input, construction_state) {
+                Err(_) => continue,
+                otherwise => return otherwise,
+            };
+        }
+
+        // If all construction attempts error, return the original object unchanged
+        Ok(input.to_object(py))
+    }
+
     fn validate_left_to_right<'s, 'data>(
         &'s self,
         py: Python<'data>,
@@ -210,6 +341,21 @@ impl PyGcTraverse for UnionValidator {
 }
 
 impl Validator for UnionValidator {
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        construction_state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        match self.mode {
+            UnionMode::Smart {
+                strict_required,
+                ultra_strict_required,
+            } => self.construct_smart(py, input, construction_state, strict_required, ultra_strict_required),
+            UnionMode::LeftToRight => self.construct_left_to_right(py, input, construction_state),
+        }
+    }
+
     fn validate<'data>(
         &self,
         py: Python<'data>,
@@ -431,6 +577,47 @@ impl BuildValidator for TaggedUnionValidator {
 impl_py_gc_traverse!(TaggedUnionValidator { discriminator, lookup });
 
 impl Validator for TaggedUnionValidator {
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        match (&self.discriminator, state.recursive) {
+            (Discriminator::LookupKey(ref lookup_key), true) => {
+                macro_rules! find_validator {
+                    ($get_method:ident, $($dict:ident),+) => {{
+                        // note all these methods return PyResult<Option<(data, data)>>, the outer Err is just for
+                        // errors when getting attributes which should be "raised"
+                        match lookup_key.$get_method($( $dict ),+)? {
+                            Some((_, value)) => {
+                                Ok(value.to_object(py).into_ref(py))
+                            }
+                            None => Err(self.tag_not_found(input)),
+                        }
+                    }};
+                }
+                // If we can't coerce to dict, return as-is
+                let Ok(dict) = input.validate_model_fields(self.strict, self.from_attributes) else {
+                    return Ok(input.to_object(py));
+                };
+                // If we can't find the tag, return as-is
+                let tag = match dict {
+                    GenericMapping::PyDict(dict) => find_validator!(py_get_dict_item, dict),
+                    GenericMapping::PyGetAttr(obj, kwargs) => find_validator!(py_get_attr, obj, kwargs),
+                    GenericMapping::PyMapping(mapping) => find_validator!(py_get_mapping_item, mapping),
+                    GenericMapping::JsonObject(mapping) => find_validator!(json_get, mapping),
+                };
+                let Ok(tag) = tag else { return Ok(input.to_object(py)) };
+                self.find_call_constructor(py, tag, input, state)
+            }
+            (Discriminator::SelfSchema, true) => {
+                self.find_call_constructor(py, self.self_schema_tag(py, input)?.as_ref(), input, state)
+            }
+            _ => Ok(input.to_object(py)),
+        }
+    }
+
     fn validate<'data>(
         &self,
         py: Python<'data>,
@@ -541,6 +728,23 @@ impl TaggedUnionValidator {
             }
         } else {
             Ok(PyString::new(py, tag))
+        }
+    }
+
+    fn find_call_constructor<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        tag: &'data PyAny,
+        input: &'data impl Input<'data>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        if let Ok(Some((_tag, validator))) = self.lookup.validate(py, tag) {
+            return match validator.construct(py, input, state) {
+                Ok(res) => Ok(res),
+                Err(_) => Ok(input.to_object(py)),
+            };
+        } else {
+            return Ok(input.to_object(py));
         }
     }
 

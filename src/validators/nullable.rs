@@ -7,7 +7,7 @@ use crate::input::Input;
 use crate::tools::SchemaDict;
 
 use super::ValidationState;
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, ConstructionState, DefinitionsBuilder, Validator};
 
 #[derive(Debug, Clone)]
 pub struct NullableValidator {
@@ -33,6 +33,19 @@ impl BuildValidator for NullableValidator {
 impl_py_gc_traverse!(NullableValidator { validator });
 
 impl Validator for NullableValidator {
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        match (input.is_none(), state.recursive) {
+            (true, _) => Ok(py.None()),
+            (false, true) => Ok(self.validator.construct(py, input, state)?),
+            (false, false) => Ok(input.to_object(py)),
+        }
+    }
+
     fn validate<'data>(
         &self,
         py: Python<'data>,

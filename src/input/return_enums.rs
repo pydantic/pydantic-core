@@ -23,7 +23,7 @@ use serde::{ser::Error, Serialize, Serializer};
 
 use crate::errors::{py_err_string, ErrorType, ErrorTypeDefaults, InputValue, ValError, ValLineError, ValResult};
 use crate::tools::py_err;
-use crate::validators::{CombinedValidator, ValidationState, Validator};
+use crate::validators::{CombinedValidator, ConstructionState, ValidationState, Validator};
 
 use super::parse_json::{JsonArray, JsonInput, JsonObject};
 use super::{py_error_on_minusone, Input};
@@ -172,6 +172,30 @@ macro_rules! any_next_error {
     };
 }
 
+fn construct_iter_to_vec<'a, 's>(
+    py: Python<'a>,
+    iter: impl Iterator<Item = PyResult<&'a (impl Input<'a> + 'a)>>,
+    input: &'a impl Input<'a>,
+    capacity: usize,
+    validator: &'s CombinedValidator,
+    state: &mut ConstructionState,
+) -> ValResult<'a, Vec<PyObject>> {
+    let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
+    for (index, item_result) in iter.enumerate() {
+        let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
+        if state.recursive {
+            match validator.construct(py, item, state) {
+                Ok(item) => output.push(item),
+                // Err(ValError::Omit) => (), // IIRC this shouldn't need to be enabled
+                Err(err) => return Err(err),
+            }
+        } else {
+            output.push(item.to_object(py));
+        }
+    }
+    Ok(output)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn validate_iter_to_vec<'a, 's>(
     py: Python<'a>,
@@ -234,6 +258,25 @@ impl BuildSet for &PyFrozenSet {
     fn build_len(&self) -> usize {
         self.len()
     }
+}
+
+fn construct_iter_to_set<'a, 's>(
+    py: Python<'a>,
+    set: impl BuildSet,
+    iter: impl Iterator<Item = PyResult<&'a (impl Input<'a> + 'a)>>,
+    input: &'a (impl Input<'a> + 'a),
+    validator: &'s CombinedValidator,
+    state: &mut ConstructionState,
+) -> ValResult<'a, ()> {
+    for (index, item_result) in iter.enumerate() {
+        let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
+        match validator.construct(py, item, state) {
+            Ok(item) => set.build_add(item)?,
+            Err(ValError::Omit) => (),
+            Err(err) => return Err(err),
+        }
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -324,6 +367,33 @@ impl<'a> GenericIterable<'a> {
         }
     }
 
+    pub fn construct_to_vec<'s>(
+        &'s self,
+        py: Python<'a>,
+        input: &'a impl Input<'a>,
+        validator: &'s CombinedValidator,
+        state: &mut ConstructionState,
+    ) -> ValResult<'a, Vec<PyObject>> {
+        let capacity = self.generic_len().unwrap_or_else(|| DEFAULT_CAPACITY);
+
+        macro_rules! construct {
+            ($iter:expr) => {
+                construct_iter_to_vec(py, $iter, input, capacity, validator, state)
+            };
+        }
+
+        match self {
+            GenericIterable::List(collection) => construct!(collection.iter().map(Ok)),
+            GenericIterable::Tuple(collection) => construct!(collection.iter().map(Ok)),
+            GenericIterable::Set(collection) => construct!(collection.iter().map(Ok)),
+            GenericIterable::FrozenSet(collection) => construct!(collection.iter().map(Ok)),
+            GenericIterable::Sequence(collection) => construct!(collection.iter()?),
+            GenericIterable::Iterator(collection) => construct!(collection.iter()?),
+            GenericIterable::JsonArray(collection) => construct!(collection.iter().map(Ok)),
+            other => construct!(other.as_sequence_iterator(py)?),
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn validate_to_vec<'s>(
         &'s self,
@@ -354,6 +424,32 @@ impl<'a> GenericIterable<'a> {
             GenericIterable::Iterator(collection) => validate!(collection.iter()?),
             GenericIterable::JsonArray(collection) => validate!(collection.iter().map(Ok)),
             other => validate!(other.as_sequence_iterator(py)?),
+        }
+    }
+
+    pub fn construct_to_set<'s>(
+        &'s self,
+        py: Python<'a>,
+        set: impl BuildSet,
+        input: &'a impl Input<'a>,
+        validator: &'s CombinedValidator,
+        state: &mut ConstructionState,
+    ) -> ValResult<'a, ()> {
+        macro_rules! construct_set {
+            ($iter:expr) => {
+                construct_iter_to_set(py, set, $iter, input, validator, state)
+            };
+        }
+
+        match self {
+            GenericIterable::List(collection) => construct_set!(collection.iter().map(Ok)),
+            GenericIterable::Tuple(collection) => construct_set!(collection.iter().map(Ok)),
+            GenericIterable::Set(collection) => construct_set!(collection.iter().map(Ok)),
+            GenericIterable::FrozenSet(collection) => construct_set!(collection.iter().map(Ok)),
+            GenericIterable::Sequence(collection) => construct_set!(collection.iter()?),
+            GenericIterable::Iterator(collection) => construct_set!(collection.iter()?),
+            GenericIterable::JsonArray(collection) => construct_set!(collection.iter().map(Ok)),
+            other => construct_set!(other.as_sequence_iterator(py)?),
         }
     }
 

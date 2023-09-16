@@ -10,6 +10,7 @@ use crate::tools::SchemaDict;
 
 use super::any::AnyValidator;
 use super::list::length_check;
+use super::ConstructionState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug, Clone)]
@@ -63,6 +64,32 @@ impl_py_gc_traverse!(DictValidator {
 });
 
 impl Validator for DictValidator {
+    fn construct<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut super::ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        if !state.recursive {
+            return Ok(input.to_object(py));
+        }
+        let Ok(dict) = input.validate_dict(false) else {
+            return Ok(input.to_object(py));
+        };
+        match dict {
+            GenericMapping::PyDict(py_dict) => {
+                self.construct_generic_mapping(py, DictGenericIterator::new(py_dict)?, state)
+            }
+            GenericMapping::PyMapping(mapping) => {
+                self.construct_generic_mapping(py, MappingGenericIterator::new(mapping)?, state)
+            }
+            GenericMapping::PyGetAttr(_, _) => unreachable!(),
+            GenericMapping::JsonObject(json_object) => {
+                self.construct_generic_mapping(py, JsonObjectGenericIterator::new(json_object)?, state)
+            }
+        }
+    }
+
     fn validate<'data>(
         &self,
         py: Python<'data>,
@@ -109,6 +136,38 @@ impl Validator for DictValidator {
 }
 
 impl DictValidator {
+    fn construct_generic_mapping<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        mapping_iter: impl Iterator<
+            Item = ValResult<'data, (&'data (impl Input<'data> + 'data), &'data (impl Input<'data> + 'data))>,
+        >,
+        state: &mut ConstructionState,
+    ) -> ValResult<'data, PyObject> {
+        let output = PyDict::new(py);
+
+        let key_validator = self.key_validator.as_ref();
+        let value_validator = self.value_validator.as_ref();
+        for item_result in mapping_iter {
+            let (key, value) = item_result?;
+            let output_key = match key_validator.construct(py, key, state) {
+                Ok(value) => Some(value),
+                Err(ValError::Omit) => continue,
+                Err(err) => return Err(err),
+            };
+            let output_value = match value_validator.construct(py, value, state) {
+                Ok(value) => Some(value),
+                Err(ValError::Omit) => continue,
+                Err(err) => return Err(err),
+            };
+            if let (Some(key), Some(value)) = (output_key, output_value) {
+                output.set_item(key, value)?;
+            }
+        }
+
+        Ok(output.into())
+    }
+
     fn validate_generic_mapping<'s, 'data>(
         &'s self,
         py: Python<'data>,
