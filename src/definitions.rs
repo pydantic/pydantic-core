@@ -67,10 +67,13 @@ impl<T: Clone + std::fmt::Debug> DefinitionsBuilder<T> {
     pub fn add_definition(&mut self, reference: String, value: T) -> PyResult<ReferenceId> {
         let next_id = self.definitions.len();
         match self.definitions.entry(reference.clone()) {
-            Entry::Occupied(mut entry) => match entry.get_mut().value.replace(value) {
-                Some(_) => py_schema_err!("Duplicate ref: `{}`", reference),
-                None => Ok(entry.get().id),
-            },
+            Entry::Occupied(mut entry) => {
+                // Make the "outermost" schema with a given ref prevail
+                // This means we need to be careful to never generate distinct schemas with the same ref
+                // which would lead to an undetected bug
+                entry.get_mut().value = Some(value);
+                Ok(entry.get().id)
+            }
             Entry::Vacant(entry) => {
                 entry.insert(Definition {
                     id: next_id,
