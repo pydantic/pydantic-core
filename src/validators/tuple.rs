@@ -196,10 +196,9 @@ fn construct_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>,
             None => {
                 // Only do defaults if recursive=True
                 let value = validator.default_construct(py, Some(index), state)?;
-                match (value, state.recursive) {
-                    (Some(value), true) => output.push(value),
-                    (_, _) => (),
-                };
+                if let (Some(value), true) = (value, state.recursive) {
+                    output.push(value);
+                }
             }
         }
     }

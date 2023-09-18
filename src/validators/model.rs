@@ -143,7 +143,7 @@ impl Validator for ModelValidator {
                 }
             } else {
                 // We assume the input instance is already maximally constructed (or at least as far as the user wants)
-                return Ok(input.to_object(py));
+                Ok(input.to_object(py))
             }
         } else if state.ultra_strict {
             // Ultra strict failure; expected a Model instance but found something else

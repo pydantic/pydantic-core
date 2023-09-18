@@ -216,15 +216,14 @@ impl Validator for ModelFieldsValidator {
                             fields_set_vec.push(field.name_py.clone_ref(py).into_py(py)); // .clone_ref(py)
                         }
                         continue;
-                    } else {
-                        // Attempt to get a default value
-                        let result = field.validator.default_construct(py, Some(field.name.as_str()), state)?;
-                        match result {
-                            Some(value) => {
-                                control_flow!(defaults.set_item(&field.name_py, value));
-                            }
-                            None => ()
+                    }
+                    // Attempt to get a default value
+                    let result = field.validator.default_construct(py, Some(field.name.as_str()), state)?;
+                    match result {
+                        Some(value) => {
+                            control_flow!(defaults.set_item(&field.name_py, value));
                         }
+                        None => ()
                     }
                 }
 

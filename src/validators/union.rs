@@ -157,10 +157,9 @@ impl UnionValidator {
                 extra.strict = Some(true);
                 extra.ultra_strict = true;
             });
-            for (validator, _label) in self.choices.iter() {
-                match validator.validate(py, input, validation_state) {
-                    Ok(_) => return validator.construct(py, input, construction_state),
-                    Err(_) => (),
+            for (validator, _label) in &self.choices {
+                if validator.validate(py, input, validation_state).is_ok() {
+                    return validator.construct(py, input, construction_state);
                 }
             }
         }
@@ -743,9 +742,8 @@ impl TaggedUnionValidator {
                 Ok(res) => Ok(res),
                 Err(_) => Ok(input.to_object(py)),
             };
-        } else {
-            return Ok(input.to_object(py));
         }
+        Ok(input.to_object(py))
     }
 
     fn find_call_validator<'s, 'data>(

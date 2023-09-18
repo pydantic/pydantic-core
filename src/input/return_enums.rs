@@ -374,7 +374,7 @@ impl<'a> GenericIterable<'a> {
         validator: &'s CombinedValidator,
         state: &mut ConstructionState,
     ) -> ValResult<'a, Vec<PyObject>> {
-        let capacity = self.generic_len().unwrap_or_else(|| DEFAULT_CAPACITY);
+        let capacity = self.generic_len().unwrap_or(DEFAULT_CAPACITY);
 
         macro_rules! construct {
             ($iter:expr) => {
