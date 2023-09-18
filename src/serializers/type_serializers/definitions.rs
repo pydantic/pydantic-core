@@ -25,9 +25,10 @@ impl BuildSerializer for DefinitionsSerializerBuilder {
 
         let schema_definitions: &PyList = schema.get_as_req(intern!(py, "definitions"))?;
 
-        for schema_def in schema_definitions {
-            CombinedSerializer::build(schema_def.downcast()?, config, definitions)?;
-            // no need to store the serializer here, it has already been stored in definitions if necessary
+        for schema_definition in schema_definitions {
+            let reference = schema.get_as_req::<String>(intern!(py, "ref"))?;
+            let serializer = CombinedSerializer::build(schema_definition.downcast()?, config, definitions)?;
+            definitions.add_definition(reference, serializer)?;
         }
 
         let inner_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
