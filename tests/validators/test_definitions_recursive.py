@@ -413,30 +413,27 @@ def test_definition_list():
 @pytest.fixture(scope='module')
 def multiple_tuple_schema() -> SchemaValidator:
     return SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'fields': {
-                'f1': {
-                    'type': 'typed-dict-field',
-                    'schema': {
-                        'type': 'tuple-positional',
-                        'items_schema': [
-                            {'type': 'int'},
-                            {'type': 'nullable', 'schema': {'type': 'definition-ref', 'schema_ref': 't'}},
-                        ],
-                        'ref': 't',
-                    },
-                },
-                'f2': {
-                    'type': 'typed-dict-field',
-                    'schema': {
-                        'type': 'default',
-                        'schema': {'type': 'nullable', 'schema': {'type': 'definition-ref', 'schema_ref': 't'}},
-                        'default': None,
-                    },
-                },
-            },
-        }
+        core_schema.definitions_schema(
+            core_schema.typed_dict_schema(
+                {
+                    'f1': core_schema.typed_dict_field(core_schema.definition_reference_schema('t')),
+                    'f2': core_schema.typed_dict_field(
+                        core_schema.with_default_schema(
+                            core_schema.nullable_schema(core_schema.definition_reference_schema('t')), default=None
+                        )
+                    ),
+                }
+            ),
+            [
+                core_schema.tuple_positional_schema(
+                    [
+                        core_schema.int_schema(),
+                        core_schema.nullable_schema(core_schema.definition_reference_schema('t')),
+                    ],
+                    ref='t',
+                )
+            ],
+        )
     )
 
 
