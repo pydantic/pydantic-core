@@ -706,18 +706,19 @@ class ValidationError(ValueError):
         Returns:
             The number of errors in the validation error.
         """
-    def errors(self, *, include_url: bool = True, include_context: bool = True) -> list[ErrorDetails]:
+    def errors(self, *, include_url: bool = True, include_context: bool = True, hide_input: bool = False) -> list[ErrorDetails]:
         """
         Details about each error in the validation error.
 
         Args:
             include_url: Whether to include a URL to documentation on the error each error.
             include_context: Whether to include the context of each error.
+            hide_input: Whether to hide the input value of each error.
 
         Returns:
             A list of [`ErrorDetails`][pydantic_core.ErrorDetails] for each error in the validation error.
         """
-    def json(self, *, indent: int | None = None, include_url: bool = True, include_context: bool = True) -> str:
+    def json(self, *, indent: int | None = None, include_url: bool = True, include_context: bool = True, hide_input: bool = False) -> str:
         """
         Same as [`errors()`][pydantic_core.ValidationError.errors] but returns a JSON string.
 
@@ -725,6 +726,7 @@ class ValidationError(ValueError):
             indent: The number of spaces to indent the JSON by, or `None` for no indentation - compact JSON.
             include_url: Whether to include a URL to documentation on the error each error.
             include_context: Whether to include the context of each error.
+            hide_input: Whether to hide the input value of each error.
 
         Returns:
             a JSON string.
