@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from pydantic_core import core_schema
+
 
 def schema(*, strict: bool = False) -> dict:
     class MyModel:
@@ -190,24 +192,25 @@ def schema(*, strict: bool = False) -> dict:
                 },
                 'field_recursive': {
                     'type': 'model-field',
-                    'schema': {
-                        'ref': 'Branch',
-                        'type': 'typed-dict',
-                        'fields': {
-                            'name': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                            'sub_branch': {
-                                'type': 'typed-dict-field',
-                                'schema': {
-                                    'type': 'default',
-                                    'schema': {
-                                        'type': 'nullable',
-                                        'schema': {'type': 'definition-ref', 'schema_ref': 'Branch'},
-                                    },
-                                    'default': None,
+                    'schema': core_schema.definitions_schema(
+                        core_schema.definition_reference_schema(schema_ref='Branch'),
+                        definitions=[
+                            core_schema.typed_dict_schema(
+                                {
+                                    'name': core_schema.typed_dict_field(core_schema.str_schema()),
+                                    'sub_branch': core_schema.typed_dict_field(
+                                        core_schema.with_default_schema(
+                                            core_schema.nullable_schema(
+                                                core_schema.definition_reference_schema(schema_ref='Branch')
+                                            ),
+                                            default=None,
+                                        )
+                                    ),
                                 },
-                            },
-                        },
-                    },
+                                ref='Branch',
+                            )
+                        ],
+                    ),
                 },
             },
         },
