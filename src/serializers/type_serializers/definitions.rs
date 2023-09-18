@@ -43,12 +43,6 @@ pub struct DefinitionRefSerializer {
     serializer_id: usize,
 }
 
-impl DefinitionRefSerializer {
-    pub fn from_id(serializer_id: usize) -> CombinedSerializer {
-        Self { serializer_id }.into()
-    }
-}
-
 impl BuildSerializer for DefinitionRefSerializer {
     const EXPECTED_TYPE: &'static str = "definition-ref";
 
