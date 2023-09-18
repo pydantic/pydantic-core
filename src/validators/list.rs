@@ -13,7 +13,7 @@ use super::{
 #[derive(Debug, Clone)]
 pub struct ListValidator {
     strict: bool,
-    item_validator: Box<CombinedValidator>,
+    item_validator: Option<Box<CombinedValidator>>,
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: String,
@@ -101,15 +101,8 @@ impl BuildValidator for ListValidator {
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let item_validator = match get_items_schema(schema, config, definitions)? {
-            Some(d) => d,
-            None => Box::new(crate::validators::any::AnyValidator::build(
-                schema,
-                config,
-                definitions,
-            )?),
-        };
-        let inner_name = item_validator.as_ref().get_name();
+        let item_validator = get_items_schema(schema, config, definitions)?;
+        let inner_name = item_validator.as_ref().map_or("any", |v| v.get_name());
         let name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
         Ok(Self {
             strict: crate::build_tools::is_strict(schema, config)?,
@@ -142,7 +135,10 @@ impl Validator for ListValidator {
         };
 
         // Construct a vector of the (potentially) changed contents
-        let output = seq.construct_to_vec(py, input, &self.item_validator, state)?;
+        let output = match &self.item_validator {
+            Some(ref item_validator) => seq.construct_to_vec(py, input, item_validator, state)?,
+            None => seq.to_vec(py, input, "List", None)?,
+        };
 
         // Ensure input type is output type (where possible)
         match seq {
@@ -173,18 +169,17 @@ impl Validator for ListValidator {
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_list(state.strict_or(self.strict))?;
 
-        // let output = match self.item_validator {
-        //     Some(ref v) => seq.validate_to_vec(py, input, self.max_length, "List", v, state)?,
-        //     None => match seq {
-        //         GenericIterable::List(list) => {
-        //             length_check!(input, "List", self.min_length, self.max_length, list);
-        //             let list_copy = list.get_slice(0, usize::MAX);
-        //             return Ok(list_copy.into_py(py));
-        //         }
-        //         _ => seq.to_vec(py, input, "List", self.max_length)?,
-        //     },
-        // };
-        let output = seq.validate_to_vec(py, input, self.max_length, "List", &self.item_validator, state)?;
+        let output = match self.item_validator {
+            Some(ref v) => seq.validate_to_vec(py, input, self.max_length, "List", v, state)?,
+            None => match seq {
+                GenericIterable::List(list) => {
+                    length_check!(input, "List", self.min_length, self.max_length, list);
+                    let list_copy = list.get_slice(0, usize::MAX);
+                    return Ok(list_copy.into_py(py));
+                }
+                _ => seq.to_vec(py, input, "List", self.max_length)?,
+            },
+        };
         min_length_check!(input, "List", self.min_length, output);
         Ok(output.into_py(py))
     }
@@ -195,11 +190,10 @@ impl Validator for ListValidator {
         ultra_strict: bool,
     ) -> bool {
         if ultra_strict {
-            // match self.item_validator {
-            //     Some(ref v) => v.different_strict_behavior(definitions, true),
-            //     None => false,
-            // }
-            self.item_validator.different_strict_behavior(definitions, true)
+            match self.item_validator {
+                Some(ref v) => v.different_strict_behavior(definitions, true),
+                None => false,
+            }
         } else {
             true
         }
@@ -210,14 +204,11 @@ impl Validator for ListValidator {
     }
 
     fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        // if let Some(ref mut v) = self.item_validator {
-        //     v.complete(definitions)?;
-        //     let inner_name = v.get_name();
-        //     self.name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
-        // }
-        self.item_validator.complete(definitions)?;
-        let inner_name = self.item_validator.get_name();
-        self.name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
+        if let Some(ref mut v) = self.item_validator {
+            v.complete(definitions)?;
+            let inner_name = v.get_name();
+            self.name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
+        }
         Ok(())
     }
 }
