@@ -224,8 +224,6 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn lax_str(&'a self, coerce_numbers_to_str: bool) -> ValResult<EitherString<'a>> {
-        let py = self.py();
-
         if let Ok(py_str) = <PyString as PyTryFrom>::try_from_exact(self) {
             Ok(py_str.into())
         } else if let Ok(py_str) = self.downcast::<PyString>() {
@@ -249,8 +247,14 @@ impl<'a> Input<'a> for PyAny {
             };
             Ok(s.into())
         } else if coerce_numbers_to_str {
-            if let Ok(py_decimal) = self.lax_decimal(py) {
-                let s = match py_decimal.str() {
+            let py = self.py();
+            let decimal_type: Py<PyType> = get_decimal_type(py);
+
+            if self.is_instance_of::<PyInt>()
+                || self.is_instance_of::<PyFloat>()
+                || self.is_instance(decimal_type.as_ref(py)).unwrap_or_default()
+            {
+                let s = match self.str() {
                     Ok(s) => s,
                     Err(_) => return Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
                 };
