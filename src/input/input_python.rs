@@ -8,7 +8,9 @@ use pyo3::types::{
 };
 #[cfg(not(PyPy))]
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
-use pyo3::{intern, PyTypeInfo};
+use pyo3::{intern, AsPyPointer, PyTypeInfo};
+
+use jiter::JsonValue;
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
@@ -27,7 +29,7 @@ use super::shared::{
 };
 use super::{
     py_string_str, BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments,
-    GenericIterable, GenericIterator, GenericMapping, Input, JsonInput, PyArgs,
+    GenericIterable, GenericIterator, GenericMapping, Input, PyArgs,
 };
 
 #[cfg(not(PyPy))]
@@ -183,19 +185,20 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
-        if let Ok(py_bytes) = self.downcast::<PyBytes>() {
-            serde_json::from_slice(py_bytes.as_bytes()).map_err(|e| map_json_err(self, e))
+    fn parse_json(&'a self) -> ValResult<'a, JsonValue> {
+        let bytes = if let Ok(py_bytes) = self.downcast::<PyBytes>() {
+            py_bytes.as_bytes()
         } else if let Ok(py_str) = self.downcast::<PyString>() {
             let str = py_string_str(py_str)?;
-            serde_json::from_str(str).map_err(|e| map_json_err(self, e))
+            str.as_bytes()
         } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
             // Safety: from_slice does not run arbitrary Python code and the GIL is held so the
             // bytes array will not be mutated while from_slice is reading it
-            serde_json::from_slice(unsafe { py_byte_array.as_bytes() }).map_err(|e| map_json_err(self, e))
+            unsafe { py_byte_array.as_bytes() }
         } else {
-            Err(ValError::new(ErrorTypeDefaults::JsonType, self))
-        }
+            return Err(ValError::new(ErrorTypeDefaults::JsonType, self));
+        };
+        JsonValue::parse(bytes).map_err(|e| map_json_err(self, e))
     }
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {

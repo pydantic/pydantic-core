@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use jiter::{JsonArray, JsonValue};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 use speedate::MicrosecondsPrecisionOverflowBehavior;
@@ -12,35 +13,35 @@ use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
     float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
-use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_float, str_as_int, string_to_vec};
+use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_float, str_as_int};
 use super::{
     BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable,
-    GenericIterator, GenericMapping, Input, JsonArgs, JsonArray, JsonInput,
+    GenericIterator, GenericMapping, Input, JsonArgs
 };
 
-impl<'a> Input<'a> for JsonInput {
+impl<'a> Input<'a> for JsonValue {
     /// This is required by since JSON object keys are always strings, I don't think it can be called
     #[cfg_attr(has_coverage_attribute, coverage(off))]
     fn as_loc_item(&self) -> LocItem {
         match self {
-            JsonInput::Int(i) => (*i).into(),
-            JsonInput::String(s) => s.as_str().into(),
+            JsonValue::Int(i) => (*i).into(),
+            JsonValue::String(s) => s.as_str().into(),
             v => format!("{v:?}").into(),
         }
     }
 
     fn as_error_value(&'a self) -> InputValue<'a> {
-        // cloning JsonInput is cheap due to use of Arc
+        // cloning JsonValue is cheap due to use of Arc
         InputValue::JsonInput(self.clone())
     }
 
     fn is_none(&self) -> bool {
-        matches!(self, JsonInput::Null)
+        matches!(self, JsonValue::Null)
     }
 
     fn as_kwargs(&'a self, py: Python<'a>) -> Option<&'a PyDict> {
         match self {
-            JsonInput::Object(object) => {
+            JsonValue::Object(object) => {
                 let dict = PyDict::new(py);
                 for (k, v) in object.iter() {
                     dict.set_item(k, v.to_object(py)).unwrap();
@@ -53,15 +54,15 @@ impl<'a> Input<'a> for JsonInput {
 
     fn validate_args(&'a self) -> ValResult<'a, GenericArguments<'a>> {
         match self {
-            JsonInput::Object(object) => Ok(JsonArgs::new(None, Some(object)).into()),
-            JsonInput::Array(array) => Ok(JsonArgs::new(Some(array), None).into()),
+            JsonValue::Object(object) => Ok(JsonArgs::new(None, Some(object)).into()),
+            JsonValue::Array(array) => Ok(JsonArgs::new(Some(array), None).into()),
             _ => Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self)),
         }
     }
 
     fn validate_dataclass_args(&'a self, class_name: &str) -> ValResult<'a, GenericArguments<'a>> {
         match self {
-            JsonInput::Object(object) => Ok(JsonArgs::new(None, Some(object)).into()),
+            JsonValue::Object(object) => Ok(JsonArgs::new(None, Some(object)).into()),
             _ => {
                 let class_name = class_name.to_string();
                 Err(ValError::new(
@@ -75,33 +76,32 @@ impl<'a> Input<'a> for JsonInput {
         }
     }
 
-    fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
+    fn parse_json(&'a self) -> ValResult<'a, JsonValue> {
         match self {
-            JsonInput::String(s) => serde_json::from_str(s.as_str()).map_err(|e| map_json_err(self, e)),
+            JsonValue::String(s) => JsonValue::parse(s.as_bytes()).map_err(|e| map_json_err(self, e)),
             _ => Err(ValError::new(ErrorTypeDefaults::JsonType, self)),
         }
     }
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
         match self {
-            JsonInput::String(s) => Ok(s.as_str().into()),
+            JsonValue::String(s) => Ok(s.as_str().into()),
             _ => Err(ValError::new(ErrorTypeDefaults::StringType, self)),
         }
     }
     fn lax_str(&'a self, coerce_numbers_to_str: bool) -> ValResult<EitherString<'a>> {
         match self {
-            JsonInput::String(s) => Ok(s.as_str().into()),
-            JsonInput::BigInt(v) if coerce_numbers_to_str => Ok(v.to_string().into()),
-            JsonInput::Float(v) if coerce_numbers_to_str => Ok(v.to_string().into()),
-            JsonInput::Int(v) if coerce_numbers_to_str => Ok(v.to_string().into()),
-            JsonInput::Uint(v) if coerce_numbers_to_str => Ok(v.to_string().into()),
+            JsonValue::String(s) => Ok(s.as_str().into()),
+            JsonValue::Int(i) if coerce_numbers_to_str => Ok(i.to_string().into()),
+            JsonValue::BigInt(b) if coerce_numbers_to_str => Ok(b.to_string().into()),
+            JsonValue::Float(f) if coerce_numbers_to_str => Ok(f.to_string().into()),
             _ => Err(ValError::new(ErrorTypeDefaults::StringType, self)),
         }
     }
 
     fn validate_bytes(&'a self, _strict: bool) -> ValResult<EitherBytes<'a>> {
         match self {
-            JsonInput::String(s) => Ok(s.as_bytes().into()),
+            JsonValue::String(s) => Ok(s.as_bytes().into()),
             _ => Err(ValError::new(ErrorTypeDefaults::BytesType, self)),
         }
     }
@@ -112,16 +112,16 @@ impl<'a> Input<'a> for JsonInput {
 
     fn strict_bool(&self) -> ValResult<bool> {
         match self {
-            JsonInput::Bool(b) => Ok(*b),
+            JsonValue::Bool(b) => Ok(*b),
             _ => Err(ValError::new(ErrorTypeDefaults::BoolType, self)),
         }
     }
     fn lax_bool(&self) -> ValResult<bool> {
         match self {
-            JsonInput::Bool(b) => Ok(*b),
-            JsonInput::String(s) => str_as_bool(self, s),
-            JsonInput::Int(int) => int_as_bool(self, *int),
-            JsonInput::Float(float) => match float_as_int(self, *float) {
+            JsonValue::Bool(b) => Ok(*b),
+            JsonValue::String(s) => str_as_bool(self, s),
+            JsonValue::Int(int) => int_as_bool(self, *int),
+            JsonValue::Float(float) => match float_as_int(self, *float) {
                 Ok(int) => int
                     .as_bool()
                     .ok_or_else(|| ValError::new(ErrorTypeDefaults::BoolParsing, self)),
@@ -133,60 +133,56 @@ impl<'a> Input<'a> for JsonInput {
 
     fn strict_int(&'a self) -> ValResult<EitherInt<'a>> {
         match self {
-            JsonInput::Int(i) => Ok(EitherInt::I64(*i)),
-            JsonInput::Uint(u) => Ok(EitherInt::U64(*u)),
-            JsonInput::BigInt(b) => Ok(EitherInt::BigInt(b.clone())),
+            JsonValue::Int(i) => Ok(EitherInt::I64(*i)),
+            JsonValue::BigInt(b) => Ok(EitherInt::BigInt(b.clone())),
             _ => Err(ValError::new(ErrorTypeDefaults::IntType, self)),
         }
     }
     fn lax_int(&'a self) -> ValResult<EitherInt<'a>> {
         match self {
-            JsonInput::Bool(b) => match *b {
+            JsonValue::Bool(b) => match *b {
                 true => Ok(EitherInt::I64(1)),
                 false => Ok(EitherInt::I64(0)),
             },
-            JsonInput::Int(i) => Ok(EitherInt::I64(*i)),
-            JsonInput::Uint(u) => Ok(EitherInt::U64(*u)),
-            JsonInput::BigInt(b) => Ok(EitherInt::BigInt(b.clone())),
-            JsonInput::Float(f) => float_as_int(self, *f),
-            JsonInput::String(str) => str_as_int(self, str),
+            JsonValue::Int(i) => Ok(EitherInt::I64(*i)),
+            JsonValue::BigInt(b) => Ok(EitherInt::BigInt(b.clone())),
+            JsonValue::Float(f) => float_as_int(self, *f),
+            JsonValue::String(str) => str_as_int(self, str),
             _ => Err(ValError::new(ErrorTypeDefaults::IntType, self)),
         }
     }
 
     fn ultra_strict_float(&'a self) -> ValResult<EitherFloat<'a>> {
         match self {
-            JsonInput::Float(f) => Ok(EitherFloat::F64(*f)),
+            JsonValue::Float(f) => Ok(EitherFloat::F64(*f)),
             _ => Err(ValError::new(ErrorTypeDefaults::FloatType, self)),
         }
     }
     fn strict_float(&'a self) -> ValResult<EitherFloat<'a>> {
         match self {
-            JsonInput::Float(f) => Ok(EitherFloat::F64(*f)),
-            JsonInput::Int(i) => Ok(EitherFloat::F64(*i as f64)),
-            JsonInput::Uint(u) => Ok(EitherFloat::F64(*u as f64)),
+            JsonValue::Float(f) => Ok(EitherFloat::F64(*f)),
+            JsonValue::Int(i) => Ok(EitherFloat::F64(*i as f64)),
             _ => Err(ValError::new(ErrorTypeDefaults::FloatType, self)),
         }
     }
     fn lax_float(&'a self) -> ValResult<EitherFloat<'a>> {
         match self {
-            JsonInput::Bool(b) => match *b {
+            JsonValue::Bool(b) => match *b {
                 true => Ok(EitherFloat::F64(1.0)),
                 false => Ok(EitherFloat::F64(0.0)),
             },
-            JsonInput::Float(f) => Ok(EitherFloat::F64(*f)),
-            JsonInput::Int(i) => Ok(EitherFloat::F64(*i as f64)),
-            JsonInput::Uint(u) => Ok(EitherFloat::F64(*u as f64)),
-            JsonInput::String(str) => str_as_float(self, str),
+            JsonValue::Float(f) => Ok(EitherFloat::F64(*f)),
+            JsonValue::Int(i) => Ok(EitherFloat::F64(*i as f64)),
+            JsonValue::String(str) => str_as_float(self, str),
             _ => Err(ValError::new(ErrorTypeDefaults::FloatType, self)),
         }
     }
 
     fn strict_decimal(&'a self, py: Python<'a>) -> ValResult<&'a PyAny> {
         match self {
-            JsonInput::Float(f) => create_decimal(PyString::new(py, &f.to_string()), self, py),
+            JsonValue::Float(f) => create_decimal(PyString::new(py, &f.to_string()), self, py),
 
-            JsonInput::String(..) | JsonInput::Int(..) | JsonInput::Uint(..) | JsonInput::BigInt(..) => {
+            JsonValue::String(..) | JsonValue::Int(..) | JsonValue::BigInt(..) => {
                 create_decimal(self.to_object(py).into_ref(py), self, py)
             }
             _ => Err(ValError::new(ErrorTypeDefaults::DecimalType, self)),
@@ -195,7 +191,7 @@ impl<'a> Input<'a> for JsonInput {
 
     fn validate_dict(&'a self, _strict: bool) -> ValResult<GenericMapping<'a>> {
         match self {
-            JsonInput::Object(dict) => Ok(dict.into()),
+            JsonValue::Object(dict) => Ok(dict.into()),
             _ => Err(ValError::new(ErrorTypeDefaults::DictType, self)),
         }
     }
@@ -206,7 +202,7 @@ impl<'a> Input<'a> for JsonInput {
 
     fn validate_list(&'a self, _strict: bool) -> ValResult<GenericIterable<'a>> {
         match self {
-            JsonInput::Array(a) => Ok(GenericIterable::JsonArray(a)),
+            JsonValue::Array(a) => Ok(GenericIterable::JsonArray(a)),
             _ => Err(ValError::new(ErrorTypeDefaults::ListType, self)),
         }
     }
@@ -218,7 +214,7 @@ impl<'a> Input<'a> for JsonInput {
     fn validate_tuple(&'a self, _strict: bool) -> ValResult<GenericIterable<'a>> {
         // just as in set's case, List has to be allowed
         match self {
-            JsonInput::Array(a) => Ok(GenericIterable::JsonArray(a)),
+            JsonValue::Array(a) => Ok(GenericIterable::JsonArray(a)),
             _ => Err(ValError::new(ErrorTypeDefaults::TupleType, self)),
         }
     }
@@ -230,7 +226,7 @@ impl<'a> Input<'a> for JsonInput {
     fn validate_set(&'a self, _strict: bool) -> ValResult<GenericIterable<'a>> {
         // we allow a list here since otherwise it would be impossible to create a set from JSON
         match self {
-            JsonInput::Array(a) => Ok(GenericIterable::JsonArray(a)),
+            JsonValue::Array(a) => Ok(GenericIterable::JsonArray(a)),
             _ => Err(ValError::new(ErrorTypeDefaults::SetType, self)),
         }
     }
@@ -242,7 +238,7 @@ impl<'a> Input<'a> for JsonInput {
     fn validate_frozenset(&'a self, _strict: bool) -> ValResult<GenericIterable<'a>> {
         // we allow a list here since otherwise it would be impossible to create a frozenset from JSON
         match self {
-            JsonInput::Array(a) => Ok(GenericIterable::JsonArray(a)),
+            JsonValue::Array(a) => Ok(GenericIterable::JsonArray(a)),
             _ => Err(ValError::new(ErrorTypeDefaults::FrozenSetType, self)),
         }
     }
@@ -253,20 +249,20 @@ impl<'a> Input<'a> for JsonInput {
 
     fn extract_generic_iterable(&self) -> ValResult<GenericIterable> {
         match self {
-            JsonInput::Array(a) => Ok(GenericIterable::JsonArray(a)),
-            JsonInput::String(s) => Ok(GenericIterable::JsonString(s)),
-            JsonInput::Object(object) => Ok(GenericIterable::JsonObject(object)),
+            JsonValue::Array(a) => Ok(GenericIterable::JsonArray(a)),
+            JsonValue::String(s) => Ok(GenericIterable::JsonString(s)),
+            JsonValue::Object(object) => Ok(GenericIterable::JsonObject(object)),
             _ => Err(ValError::new(ErrorTypeDefaults::IterableType, self)),
         }
     }
 
     fn validate_iter(&self) -> ValResult<GenericIterator> {
         match self {
-            JsonInput::Array(a) => Ok(a.clone().into()),
-            JsonInput::String(s) => Ok(string_to_vec(s).into()),
-            JsonInput::Object(object) => {
+            JsonValue::Array(a) => Ok(a.clone().into()),
+            JsonValue::String(s) => Ok(string_to_vec(s).into()),
+            JsonValue::Object(object) => {
                 // return keys iterator to match python's behavior
-                let keys: JsonArray = JsonArray::new(object.keys().map(|k| JsonInput::String(k.clone())).collect());
+                let keys: JsonArray = JsonArray::new(object.keys().map(|k| JsonValue::String(k.clone())).collect());
                 Ok(keys.into())
             }
             _ => Err(ValError::new(ErrorTypeDefaults::IterableType, self)),
@@ -275,7 +271,7 @@ impl<'a> Input<'a> for JsonInput {
 
     fn validate_date(&self, _strict: bool) -> ValResult<EitherDate> {
         match self {
-            JsonInput::String(v) => bytes_as_date(self, v.as_bytes()),
+            JsonValue::String(v) => bytes_as_date(self, v.as_bytes()),
             _ => Err(ValError::new(ErrorTypeDefaults::DateType, self)),
         }
     }
@@ -291,16 +287,16 @@ impl<'a> Input<'a> for JsonInput {
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
     ) -> ValResult<EitherTime> {
         match self {
-            JsonInput::String(v) => bytes_as_time(self, v.as_bytes(), microseconds_overflow_behavior),
+            JsonValue::String(v) => bytes_as_time(self, v.as_bytes(), microseconds_overflow_behavior),
             _ => Err(ValError::new(ErrorTypeDefaults::TimeType, self)),
         }
     }
     fn lax_time(&self, microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior) -> ValResult<EitherTime> {
         match self {
-            JsonInput::String(v) => bytes_as_time(self, v.as_bytes(), microseconds_overflow_behavior),
-            JsonInput::Int(v) => int_as_time(self, *v, 0),
-            JsonInput::Float(v) => float_as_time(self, *v),
-            JsonInput::BigInt(_) => Err(ValError::new(
+            JsonValue::String(v) => bytes_as_time(self, v.as_bytes(), microseconds_overflow_behavior),
+            JsonValue::Int(v) => int_as_time(self, *v, 0),
+            JsonValue::Float(v) => float_as_time(self, *v),
+            JsonValue::BigInt(_) => Err(ValError::new(
                 ErrorType::TimeParsing {
                     error: Cow::Borrowed(
                         speedate::ParseError::TimeTooLarge
@@ -320,7 +316,7 @@ impl<'a> Input<'a> for JsonInput {
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
     ) -> ValResult<EitherDateTime> {
         match self {
-            JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes(), microseconds_overflow_behavior),
+            JsonValue::String(v) => bytes_as_datetime(self, v.as_bytes(), microseconds_overflow_behavior),
             _ => Err(ValError::new(ErrorTypeDefaults::DatetimeType, self)),
         }
     }
@@ -329,9 +325,9 @@ impl<'a> Input<'a> for JsonInput {
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
     ) -> ValResult<EitherDateTime> {
         match self {
-            JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes(), microseconds_overflow_behavior),
-            JsonInput::Int(v) => int_as_datetime(self, *v, 0),
-            JsonInput::Float(v) => float_as_datetime(self, *v),
+            JsonValue::String(v) => bytes_as_datetime(self, v.as_bytes(), microseconds_overflow_behavior),
+            JsonValue::Int(v) => int_as_datetime(self, *v, 0),
+            JsonValue::Float(v) => float_as_datetime(self, *v),
             _ => Err(ValError::new(ErrorTypeDefaults::DatetimeType, self)),
         }
     }
@@ -341,7 +337,7 @@ impl<'a> Input<'a> for JsonInput {
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
     ) -> ValResult<EitherTimedelta> {
         match self {
-            JsonInput::String(v) => bytes_as_timedelta(self, v.as_bytes(), microseconds_overflow_behavior),
+            JsonValue::String(v) => bytes_as_timedelta(self, v.as_bytes(), microseconds_overflow_behavior),
             _ => Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self)),
         }
     }
@@ -350,9 +346,9 @@ impl<'a> Input<'a> for JsonInput {
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
     ) -> ValResult<EitherTimedelta> {
         match self {
-            JsonInput::String(v) => bytes_as_timedelta(self, v.as_bytes(), microseconds_overflow_behavior),
-            JsonInput::Int(v) => Ok(int_as_duration(self, *v)?.into()),
-            JsonInput::Float(v) => Ok(float_as_duration(self, *v)?.into()),
+            JsonValue::String(v) => bytes_as_timedelta(self, v.as_bytes(), microseconds_overflow_behavior),
+            JsonValue::Int(v) => Ok(int_as_duration(self, *v)?.into()),
+            JsonValue::Float(v) => Ok(float_as_duration(self, *v)?.into()),
             _ => Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self)),
         }
     }
@@ -398,8 +394,8 @@ impl<'a> Input<'a> for String {
         ))
     }
 
-    fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
-        serde_json::from_str(self.as_str()).map_err(|e| map_json_err(self, e))
+    fn parse_json(&'a self) -> ValResult<'a, JsonValue> {
+        JsonValue::parse(self.as_bytes()).map_err(|e| map_json_err(self, e))
     }
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
@@ -503,4 +499,8 @@ impl BorrowInput for String {
     fn borrow_input(&self) -> &Self::Input<'_> {
         self
     }
+}
+
+fn string_to_vec(s: &str) -> JsonArray {
+    JsonArray::new(s.chars().map(|c| JsonValue::String(c.to_string())).collect())
 }

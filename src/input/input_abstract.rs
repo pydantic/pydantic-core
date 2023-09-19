@@ -4,13 +4,15 @@ use pyo3::exceptions::PyValueError;
 use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*};
 
+use jiter::JsonValue;
+
 use crate::errors::{InputValue, LocItem, ValResult};
 use crate::tools::py_err;
 use crate::{PyMultiHostUrl, PyUrl};
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
 use super::return_enums::{EitherBytes, EitherInt, EitherString};
-use super::{EitherFloat, GenericArguments, GenericIterable, GenericIterator, GenericMapping, JsonInput};
+use super::{EitherFloat, GenericArguments, GenericIterable, GenericIterator, GenericMapping};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InputType {
@@ -89,7 +91,7 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn validate_dataclass_args(&'a self, dataclass_name: &str) -> ValResult<'a, GenericArguments<'a>>;
 
-    fn parse_json(&'a self) -> ValResult<'a, JsonInput>;
+    fn parse_json(&'a self) -> ValResult<'a, JsonValue>;
 
     fn validate_str(&'a self, strict: bool, coerce_numbers_to_str: bool) -> ValResult<EitherString<'a>> {
         if strict {

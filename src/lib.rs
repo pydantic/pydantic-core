@@ -15,7 +15,6 @@ mod build_tools;
 mod definitions;
 mod errors;
 mod input;
-mod lazy_index_map;
 mod lookup_key;
 mod recursion_guard;
 mod serializers;
