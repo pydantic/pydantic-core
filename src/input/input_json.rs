@@ -16,7 +16,7 @@ use super::datetime::{
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_float, str_as_int};
 use super::{
     BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable,
-    GenericIterator, GenericMapping, Input, JsonArgs
+    GenericIterator, GenericMapping, Input, JsonArgs,
 };
 
 impl<'a> Input<'a> for JsonValue {
@@ -354,8 +354,8 @@ impl<'a> Input<'a> for JsonValue {
     }
 }
 
-impl BorrowInput for &'_ JsonInput {
-    type Input<'a> = JsonInput where Self: 'a;
+impl BorrowInput for &'_ JsonValue {
+    type Input<'a> = JsonValue where Self: 'a;
     fn borrow_input(&self) -> &Self::Input<'_> {
         self
     }

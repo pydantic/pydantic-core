@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
+use jiter::JsonValue;
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 
 use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
@@ -14,7 +15,7 @@ use super::datetime::{
 use super::shared::{map_json_err, str_as_bool, str_as_float};
 use super::{
     BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable,
-    GenericIterator, GenericMapping, Input, JsonInput,
+    GenericIterator, GenericMapping, Input,
 };
 
 #[derive(Debug)]
@@ -83,11 +84,11 @@ impl<'a> Input<'a> for StringMapping<'a> {
         }
     }
 
-    fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
+    fn parse_json(&'a self) -> ValResult<'a, JsonValue> {
         match self {
             Self::String(s) => {
                 let str = py_string_str(s)?;
-                serde_json::from_str(str).map_err(|e| map_json_err(self, e))
+                JsonValue::parse(str.as_bytes()).map_err(|e| map_json_err(self, e))
             }
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::JsonType, self)),
         }

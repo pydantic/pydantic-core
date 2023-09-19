@@ -7,7 +7,6 @@ use num_bigint::BigInt;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 
-use super::parse_json::{JsonArray, JsonInput};
 use super::{EitherFloat, EitherInt, Input};
 static ENUM_META_OBJECT: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
