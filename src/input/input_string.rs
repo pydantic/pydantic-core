@@ -4,7 +4,7 @@ use pyo3::types::{PyDict, PyString};
 use jiter::JsonValue;
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 
-use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
+use crate::errors::{AsLocItem, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::input::py_string_str;
 use crate::tools::safe_repr;
 use crate::validators::decimal::create_decimal;
@@ -53,14 +53,16 @@ impl<'py> StringMapping<'py> {
     }
 }
 
-impl<'a> Input<'a> for StringMapping<'a> {
+impl AsLocItem for StringMapping<'_> {
     fn as_loc_item(&self) -> LocItem {
         match self {
             Self::String(s) => s.to_string_lossy().as_ref().into(),
             Self::Mapping(d) => safe_repr(d).to_string().into(),
         }
     }
+}
 
+impl<'a> Input<'a> for StringMapping<'a> {
     fn as_error_value(&'a self) -> InputValue<'a> {
         match self {
             Self::String(s) => s.as_error_value(),

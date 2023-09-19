@@ -6,7 +6,7 @@ use pyo3::types::{PyDict, PyString};
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 use strum::EnumMessage;
 
-use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
+use crate::errors::{AsLocItem, ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::validators::decimal::create_decimal;
 
 use super::datetime::{
@@ -19,9 +19,8 @@ use super::{
     GenericIterator, GenericMapping, Input, JsonArgs,
 };
 
-impl<'a> Input<'a> for JsonValue {
-    /// This is required by since JSON object keys are always strings, I don't think it can be called
-    #[cfg_attr(has_coverage_attribute, coverage(off))]
+/// This is required but since JSON object keys are always strings, I don't think it can be called
+impl AsLocItem for JsonValue {
     fn as_loc_item(&self) -> LocItem {
         match self {
             JsonValue::Int(i) => (*i).into(),
@@ -29,7 +28,9 @@ impl<'a> Input<'a> for JsonValue {
             v => format!("{v:?}").into(),
         }
     }
+}
 
+impl<'a> Input<'a> for JsonValue {
     fn as_error_value(&'a self) -> InputValue<'a> {
         // cloning JsonValue is cheap due to use of Arc
         InputValue::JsonInput(self.clone())
@@ -361,14 +362,16 @@ impl BorrowInput for &'_ JsonValue {
     }
 }
 
-/// TODO: it would be good to get JsonInput and StringMapping string variants to go through this
-/// implementation
-/// Required for Dict keys so the string can behave like an Input
-impl<'a> Input<'a> for String {
+impl AsLocItem for String {
     fn as_loc_item(&self) -> LocItem {
         self.to_string().into()
     }
+}
 
+/// TODO: it would be good to get JsonInput and StringMapping string variants to go through this
+/// implementation
+/// Required for JSON Object keys so the string can behave like an Input
+impl<'a> Input<'a> for String {
     fn as_error_value(&'a self) -> InputValue<'a> {
         InputValue::String(self)
     }

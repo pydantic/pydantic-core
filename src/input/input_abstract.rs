@@ -6,7 +6,7 @@ use pyo3::{intern, prelude::*};
 
 use jiter::JsonValue;
 
-use crate::errors::{InputValue, LocItem, ValResult};
+use crate::errors::{AsLocItem, InputValue, ValResult};
 use crate::tools::py_err;
 use crate::{PyMultiHostUrl, PyUrl};
 
@@ -48,9 +48,7 @@ impl TryFrom<&str> for InputType {
 /// the convention is to either implement:
 /// * `strict_*` & `lax_*` if they have different behavior
 /// * or, `validate_*` and `strict_*` to just call `validate_*` if the behavior for strict and lax is the same
-pub trait Input<'a>: fmt::Debug + ToPyObject {
-    fn as_loc_item(&self) -> LocItem;
-
+pub trait Input<'a>: fmt::Debug + ToPyObject + AsLocItem {
     fn as_error_value(&'a self) -> InputValue<'a>;
 
     fn identity(&self) -> Option<usize> {
