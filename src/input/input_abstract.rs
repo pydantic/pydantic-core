@@ -339,3 +339,19 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         self.strict_timedelta(microseconds_overflow_behavior)
     }
 }
+
+/// The problem to solve here is that iterating a `StringMapping` returns an owned
+/// `StringMapping`, but all the other iterators return references. By introducing
+/// this trait we abstract over whether the return value from the iterator is owned
+/// or borrowed; all we care about is that we can borrow it again with `borrow_input`
+/// for some lifetime 'a.
+///
+/// This lifetime `'a` is shorter than the original lifetime `'data` of the input,
+/// which is only a problem in error branches. To resolve we have to call `into_owned`
+/// to extend out the lifetime to match the original input.
+pub trait BorrowInput {
+    type Input<'a>: Input<'a>
+    where
+        Self: 'a;
+    fn borrow_input(&self) -> &Self::Input<'_>;
+}

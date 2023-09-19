@@ -14,7 +14,7 @@ use super::datetime::{
 };
 use super::shared::{float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_float, str_as_int, string_to_vec};
 use super::{
-    EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable,
+    BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable,
     GenericIterator, GenericMapping, Input, JsonArgs, JsonArray, JsonInput,
 };
 
@@ -354,6 +354,13 @@ impl<'a> Input<'a> for JsonInput {
     }
 }
 
+impl BorrowInput for &'_ JsonInput {
+    type Input<'a> = JsonInput where Self: 'a;
+    fn borrow_input(&self) -> &Self::Input<'_> {
+        self
+    }
+}
+
 /// TODO: it would be good to get JsonInput and StringMapping string variants to go through this
 /// implementation
 /// Required for Dict keys so the string can behave like an Input
@@ -477,5 +484,19 @@ impl<'a> Input<'a> for String {
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
     ) -> ValResult<EitherTimedelta> {
         bytes_as_timedelta(self, self.as_bytes(), microseconds_overflow_behavior)
+    }
+}
+
+impl BorrowInput for &'_ String {
+    type Input<'a> = String where Self: 'a;
+    fn borrow_input(&self) -> &Self::Input<'_> {
+        self
+    }
+}
+
+impl BorrowInput for String {
+    type Input<'a> = String where Self: 'a;
+    fn borrow_input(&self) -> &Self::Input<'_> {
+        self
     }
 }

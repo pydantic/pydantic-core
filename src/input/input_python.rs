@@ -23,7 +23,7 @@ use super::datetime::{
 };
 use super::shared::{decimal_as_int, float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_float, str_as_int};
 use super::{
-    py_string_str, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments,
+    py_string_str, BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments,
     GenericIterable, GenericIterator, GenericMapping, Input, JsonInput, PyArgs,
 };
 
@@ -707,6 +707,13 @@ impl<'a> Input<'a> for PyAny {
         } else {
             Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self))
         }
+    }
+}
+
+impl BorrowInput for &'_ PyAny {
+    type Input<'a> = PyAny where Self: 'a;
+    fn borrow_input(&self) -> &Self::Input<'_> {
+        self
     }
 }
 

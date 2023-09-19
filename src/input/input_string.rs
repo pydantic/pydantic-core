@@ -13,7 +13,7 @@ use super::datetime::{
 };
 use super::shared::{map_json_err, str_as_bool, str_as_float};
 use super::{
-    EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable,
+    BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable,
     GenericIterator, GenericMapping, Input, JsonInput,
 };
 
@@ -77,7 +77,10 @@ impl<'a> Input<'a> for StringMapping<'a> {
     }
 
     fn validate_dataclass_args(&'a self, _dataclass_name: &str) -> ValResult<'a, GenericArguments<'a>> {
-        self.validate_args()
+        match self {
+            StringMapping::String(_) => Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self)),
+            StringMapping::Mapping(m) => Ok(GenericArguments::StringMapping(m)),
+        }
     }
 
     fn parse_json(&'a self) -> ValResult<'a, JsonInput> {
@@ -215,5 +218,12 @@ impl<'a> Input<'a> for StringMapping<'a> {
             Self::String(s) => bytes_as_timedelta(self, py_string_str(s)?.as_bytes(), microseconds_overflow_behavior),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self)),
         }
+    }
+}
+
+impl BorrowInput for StringMapping<'_> {
+    type Input<'a> = StringMapping<'a> where Self: 'a;
+    fn borrow_input(&self) -> &Self::Input<'_> {
+        self
     }
 }

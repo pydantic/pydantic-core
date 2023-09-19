@@ -725,6 +725,7 @@ impl<'a> JsonArgs<'a> {
 pub enum GenericArguments<'a> {
     Py(PyArgs<'a>),
     Json(JsonArgs<'a>),
+    StringMapping(&'a PyDict),
 }
 
 impl<'a> From<PyArgs<'a>> for GenericArguments<'a> {

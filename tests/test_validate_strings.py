@@ -1,3 +1,4 @@
+import dataclasses
 import re
 from datetime import date, datetime
 
@@ -60,8 +61,8 @@ def test_model():
     class MyModel:
         # this is not required, but it avoids `__pydantic_fields_set__` being included in `__dict__`
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
-        field_a: str
-        field_b: int
+        field_a: int
+        field_b: date
 
     v = SchemaValidator(
         core_schema.model_schema(
@@ -78,3 +79,43 @@ def test_model():
     assert m2.__dict__ == {'field_a': 1, 'field_b': date(2017, 1, 1)}
     m2 = v.validate_strings({'field_a': '1', 'field_b': '2017-01-01'}, strict=True)
     assert m2.__dict__ == {'field_a': 1, 'field_b': date(2017, 1, 1)}
+
+
+def test_dataclass():
+    @dataclasses.dataclass
+    class MyDataClass:
+        field_a: int
+        field_b: date
+
+    v = SchemaValidator(
+        core_schema.dataclass_schema(
+            MyDataClass,
+            core_schema.dataclass_args_schema(
+                'MyDataClass',
+                [
+                    core_schema.dataclass_field('field_a', core_schema.int_schema()),
+                    core_schema.dataclass_field('field_b', core_schema.date_schema()),
+                ],
+            ),
+            ['field_a', 'field_b'],
+        )
+    )
+    m2 = v.validate_strings({'field_a': '1', 'field_b': '2017-01-01'})
+    assert m2.__dict__ == {'field_a': 1, 'field_b': date(2017, 1, 1)}
+    m2 = v.validate_strings({'field_a': '1', 'field_b': '2017-01-01'}, strict=True)
+    assert m2.__dict__ == {'field_a': 1, 'field_b': date(2017, 1, 1)}
+
+
+def test_typed_dict():
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            {
+                'field_a': core_schema.typed_dict_field(core_schema.int_schema()),
+                'field_b': core_schema.typed_dict_field(core_schema.date_schema()),
+            }
+        )
+    )
+    m2 = v.validate_strings({'field_a': '1', 'field_b': '2017-01-01'})
+    assert m2 == {'field_a': 1, 'field_b': date(2017, 1, 1)}
+    m2 = v.validate_strings({'field_a': '1', 'field_b': '2017-01-01'}, strict=True)
+    assert m2 == {'field_a': 1, 'field_b': date(2017, 1, 1)}

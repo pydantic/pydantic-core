@@ -4,8 +4,7 @@ use pyo3::types::PyDict;
 
 use crate::build_tools::is_strict;
 use crate::errors::{ValError, ValLineError, ValResult};
-use crate::input::JsonInput;
-use crate::input::StringMapping;
+use crate::input::BorrowInput;
 use crate::input::{
     DictGenericIterator, GenericMapping, Input, JsonObjectGenericIterator, MappingGenericIterator,
     StringMappingGenericIterator,
@@ -113,57 +112,6 @@ impl Validator for DictValidator {
     fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
         self.key_validator.complete(definitions)?;
         self.value_validator.complete(definitions)
-    }
-}
-
-/// The problem to solve here is that iterating a `StringMapping` returns an owned
-/// `StringMapping`, but all the other iterators return references. By introducing
-/// this trait we abstract over whether the return value from the iterator is owned
-/// or borrowed; all we care about is that we can borrow it again with `borrow_input`
-/// for some lifetime 'a.
-///
-/// This lifetime `'a` is shorter than the original lifetime `'data` of the input,
-/// which is only a problem in error branches. To resolve we have to call `into_owned`
-/// to extend out the lifetime to match the original input.
-pub trait BorrowInput {
-    type Input<'a>: Input<'a>
-    where
-        Self: 'a;
-    fn borrow_input(&self) -> &Self::Input<'_>;
-}
-
-impl BorrowInput for &'_ PyAny {
-    type Input<'a> = PyAny where Self: 'a;
-    fn borrow_input(&self) -> &Self::Input<'_> {
-        self
-    }
-}
-
-impl BorrowInput for StringMapping<'_> {
-    type Input<'a> = StringMapping<'a> where Self: 'a;
-    fn borrow_input(&self) -> &Self::Input<'_> {
-        self
-    }
-}
-
-impl BorrowInput for &'_ JsonInput {
-    type Input<'a> = JsonInput where Self: 'a;
-    fn borrow_input(&self) -> &Self::Input<'_> {
-        self
-    }
-}
-
-impl BorrowInput for &'_ String {
-    type Input<'a> = String where Self: 'a;
-    fn borrow_input(&self) -> &Self::Input<'_> {
-        self
-    }
-}
-
-impl BorrowInput for String {
-    type Input<'a> = String where Self: 'a;
-    fn borrow_input(&self) -> &Self::Input<'_> {
-        self
     }
 }
 

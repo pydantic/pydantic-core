@@ -16,7 +16,7 @@ pub(crate) use datetime::{
     duration_as_pytimedelta, pydate_as_date, pydatetime_as_datetime, pytime_as_time, EitherDate, EitherDateTime,
     EitherTime, EitherTimedelta,
 };
-pub(crate) use input_abstract::{Input, InputType};
+pub(crate) use input_abstract::{BorrowInput, Input, InputType};
 pub(crate) use input_string::StringMapping;
 pub(crate) use parse_json::{JsonArray, JsonInput, JsonObject};
 pub(crate) use return_enums::{
