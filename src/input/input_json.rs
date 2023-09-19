@@ -91,19 +91,11 @@ impl<'a> Input<'a> for JsonInput {
     fn lax_str(&'a self, coerce_numbers_to_str: bool) -> ValResult<EitherString<'a>> {
         match self {
             JsonInput::String(s) => Ok(s.as_str().into()),
-            _ => {
-                if coerce_numbers_to_str {
-                    match self {
-                        JsonInput::BigInt(v) => Ok(EitherString::Cow(Cow::Owned(v.to_string()))),
-                        JsonInput::Float(v) => Ok(EitherString::Cow(Cow::Owned(v.to_string()))),
-                        JsonInput::Int(v) => Ok(EitherString::Cow(Cow::Owned(v.to_string()))),
-                        JsonInput::Uint(v) => Ok(EitherString::Cow(Cow::Owned(v.to_string()))),
-                        _ => Err(ValError::new(ErrorTypeDefaults::StringType, self)),
-                    }
-                } else {
-                    Err(ValError::new(ErrorTypeDefaults::StringType, self))
-                }
-            }
+            JsonInput::BigInt(v) if coerce_numbers_to_str => Ok(v.to_string().into()),
+            JsonInput::Float(v) if coerce_numbers_to_str => Ok(v.to_string().into()),
+            JsonInput::Int(v) if coerce_numbers_to_str => Ok(v.to_string().into()),
+            JsonInput::Uint(v) if coerce_numbers_to_str => Ok(v.to_string().into()),
+            _ => Err(ValError::new(ErrorTypeDefaults::StringType, self)),
         }
     }
 
