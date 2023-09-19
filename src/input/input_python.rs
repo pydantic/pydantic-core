@@ -223,7 +223,9 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
+    fn lax_str(&'a self, coerce_numbers_to_str: bool) -> ValResult<EitherString<'a>> {
+        let py = self.py();
+
         if let Ok(py_str) = <PyString as PyTryFrom>::try_from_exact(self) {
             Ok(py_str.into())
         } else if let Ok(py_str) = self.downcast::<PyString>() {
@@ -240,12 +242,22 @@ impl<'a> Input<'a> for PyAny {
             // Safety: the gil is held while from_utf8 is running so py_byte_array is not mutated,
             // and we immediately copy the bytes into a new Python string
             let s = match from_utf8(unsafe { py_byte_array.as_bytes() }) {
-                // Why Python not Rust? to avoid an unnecessary allocation on the Rust side, the
+                // Why Python not Rust? to avoid an unnecessary allocation o(n the Rust side, the
                 // final output needs to be Python anyway.
                 Ok(s) => PyString::new(self.py(), s),
                 Err(_) => return Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
             };
             Ok(s.into())
+        } else if coerce_numbers_to_str {
+            if let Ok(py_decimal) = self.lax_decimal(py) {
+                let s = match py_decimal.str() {
+                    Ok(s) => s,
+                    Err(_) => return Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
+                };
+                Ok(s.into())
+            } else {
+                Err(ValError::new(ErrorTypeDefaults::StringType, self))
+            }
         } else {
             Err(ValError::new(ErrorTypeDefaults::StringType, self))
         }
