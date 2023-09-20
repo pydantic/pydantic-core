@@ -732,7 +732,7 @@ class ValidationError(ValueError):
             The number of errors in the validation error.
         """
     def errors(
-        self, *, include_url: bool = True, include_context: bool = True, include_input: bool = False
+        self, *, include_url: bool = True, include_context: bool = True, include_input: bool = True
     ) -> list[ErrorDetails]:
         """
         Details about each error in the validation error.
@@ -751,7 +751,7 @@ class ValidationError(ValueError):
         indent: int | None = None,
         include_url: bool = True,
         include_context: bool = True,
-        include_input: bool = False,
+        include_input: bool = True,
     ) -> str:
         """
         Same as [`errors()`][pydantic_core.ValidationError.errors] but returns a JSON string.

@@ -617,11 +617,10 @@ impl<'py> Serialize for PyLineErrorSerializer<'py> {
         S: Serializer,
     {
         let py = self.py;
-        let size = 3 + [
-            self.url_prefix.is_some(),
-            self.include_context,
-            self.include_input,
-        ].into_iter().filter(|b| *b).count()
+        let size = 3 + [self.url_prefix.is_some(), self.include_context, self.include_input]
+            .into_iter()
+            .filter(|b| *b)
+            .count();
         let mut map = serializer.serialize_map(Some(size))?;
 
         map.serialize_entry("type", &self.line_error.error_type.type_string())?;
