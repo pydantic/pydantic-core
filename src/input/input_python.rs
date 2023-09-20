@@ -240,7 +240,7 @@ impl<'a> Input<'a> for PyAny {
             // Safety: the gil is held while from_utf8 is running so py_byte_array is not mutated,
             // and we immediately copy the bytes into a new Python string
             let s = match from_utf8(unsafe { py_byte_array.as_bytes() }) {
-                // Why Python not Rust? to avoid an unnecessary allocation o(n the Rust side, the
+                // Why Python not Rust? to avoid an unnecessary allocation on the Rust side, the
                 // final output needs to be Python anyway.
                 Ok(s) => PyString::new(self.py(), s),
                 Err(_) => return Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
