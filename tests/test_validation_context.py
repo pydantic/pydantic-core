@@ -10,7 +10,7 @@ def test_after(py_and_json: PyAndJson):
         return input_value + f'| context: {info.context}'
 
     v = py_and_json(
-        {'type': 'function-after', 'function': {'type': 'general', 'function': f}, 'schema': {'type': 'str'}}
+        {'type': 'function-after', 'function': {'type': 'with-info', 'function': f}, 'schema': {'type': 'str'}}
     )
 
     assert v.validate_test('foobar') == 'foobar| context: None'
@@ -24,7 +24,7 @@ def test_mutable_context(py_and_json: PyAndJson):
         return input_value
 
     v = py_and_json(
-        {'type': 'function-before', 'function': {'type': 'general', 'function': f}, 'schema': {'type': 'str'}}
+        {'type': 'function-before', 'function': {'type': 'with-info', 'function': f}, 'schema': {'type': 'str'}}
     )
     mutable_context = {}
     assert v.validate_test('foobar', None, mutable_context) == 'foobar'
@@ -46,11 +46,11 @@ def test_typed_dict(py_and_json: PyAndJson):
             'fields': {
                 'f1': {
                     'type': 'typed-dict-field',
-                    'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f1}},
+                    'schema': {'type': 'function-plain', 'function': {'type': 'with-info', 'function': f1}},
                 },
                 'f2': {
                     'type': 'typed-dict-field',
-                    'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f2}},
+                    'schema': {'type': 'function-plain', 'function': {'type': 'with-info', 'function': f2}},
                 },
             },
         }
@@ -67,7 +67,7 @@ def test_wrap(py_and_json: PyAndJson):
         return validator(input_value) + f'| context: {info.context}'
 
     v = py_and_json(
-        {'type': 'function-wrap', 'function': {'type': 'general', 'function': f}, 'schema': {'type': 'str'}}
+        {'type': 'function-wrap', 'function': {'type': 'with-info', 'function': f}, 'schema': {'type': 'str'}}
     )
 
     assert v.validate_test('foobar') == 'foobar| context: None'
@@ -82,7 +82,7 @@ def test_isinstance(py_and_json: PyAndJson):
         return validator(input_value)
 
     v = py_and_json(
-        {'type': 'function-wrap', 'function': {'type': 'general', 'function': f}, 'schema': {'type': 'str'}}
+        {'type': 'function-wrap', 'function': {'type': 'with-info', 'function': f}, 'schema': {'type': 'str'}}
     )
 
     assert v.validate_python('foobar', None, {}) == 'foobar'
@@ -120,11 +120,11 @@ def test_validate_assignment_with_context():
             'fields': {
                 'f1': {
                     'type': 'model-field',
-                    'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f1}},
+                    'schema': {'type': 'function-plain', 'function': {'type': 'with-info', 'function': f1}},
                 },
                 'f2': {
                     'type': 'model-field',
-                    'schema': {'type': 'function-plain', 'function': {'type': 'general', 'function': f2}},
+                    'schema': {'type': 'function-plain', 'function': {'type': 'with-info', 'function': f2}},
                 },
             },
         }
