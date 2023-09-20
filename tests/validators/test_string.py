@@ -264,9 +264,9 @@ def test_coerce_numbers_to_str_disabled_in_strict_mode() -> None:
 
     v = SchemaValidator(core_schema.str_schema(strict=True), config)
     with pytest.raises(ValidationError):
-        assert v.validate_python(42)
+        v.validate_python(42)
     with pytest.raises(ValidationError):
-        assert v.validate_json('42')
+        v.validate_json('42')
 
 
 @pytest.mark.parametrize(
