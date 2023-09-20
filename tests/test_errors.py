@@ -1077,7 +1077,8 @@ def test_hide_input_in_error() -> None:
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('definitely not an int')
 
-    assert 'input' not in exc_info.value.errors(hide_input=True)
+    for error in exc_info.value.errors(hide_input=True):
+        assert 'input' not in error
 
 
 def test_hide_input_in_json() -> None:
