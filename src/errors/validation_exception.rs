@@ -284,7 +284,7 @@ impl ValidationError {
                 if iteration_error.is_some() {
                     return py.None();
                 }
-                e.as_dict(py, url_prefix, include_context, &self.error_mode, include_input)
+                e.as_dict(py, url_prefix, include_context, self.input_type, include_input)
                     .unwrap_or_else(|err| {
                         iteration_error = Some(err);
                         py.None()
@@ -484,13 +484,13 @@ impl PyLineError {
         py: Python,
         url_prefix: Option<&str>,
         include_context: bool,
-        error_mode: &ErrorMode,
+        input_type: InputType,
         include_input: bool,
     ) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
         dict.set_item("type", self.error_type.type_string())?;
         dict.set_item("loc", self.location.to_object(py))?;
-        dict.set_item("msg", self.error_type.render_message(py, error_mode)?)?;
+        dict.set_item("msg", self.error_type.render_message(py, input_type)?)?;
         if include_input {
             dict.set_item("input", &self.input_value)?;
         }
