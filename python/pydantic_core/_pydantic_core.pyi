@@ -41,6 +41,7 @@ __all__ = [
     'PydanticUndefinedType',
     'Some',
     'to_json',
+    'from_json',
     'to_jsonable_python',
     'list_all_errors',
     'TzInfo',
@@ -382,6 +383,22 @@ def to_json(
 
     Returns:
        JSON bytes.
+    """
+
+def from_json(data: str | bytes | bytearray) -> Any:
+    """
+    Deserialize JSON data to a Python object.
+
+    This is effectively a faster version of [`json.loads()`][json.loads].
+
+    Arguments:
+        data: The JSON data to deserialize.
+
+    Raises:
+        ValueError: If deserialization fails.
+
+    Returns:
+        The deserialized Python object.
     """
 
 def to_jsonable_python(
