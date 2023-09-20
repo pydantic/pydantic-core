@@ -266,13 +266,13 @@ impl ValidationError {
         self.line_errors.len()
     }
 
-    #[pyo3(signature = (*, include_url = true, include_context = true, hide_input = false))]
+    #[pyo3(signature = (*, include_url = true, include_context = true, include_input = true))]
     pub fn errors(
         &self,
         py: Python,
         include_url: bool,
         include_context: bool,
-        hide_input: bool,
+        include_input: bool,
     ) -> PyResult<Py<PyList>> {
         let url_prefix = get_url_prefix(py, include_url);
         let mut iteration_error = None;
@@ -285,7 +285,7 @@ impl ValidationError {
                 if iteration_error.is_some() {
                     return py.None();
                 }
-                e.as_dict(py, url_prefix, include_context, &self.error_mode, hide_input)
+                e.as_dict(py, url_prefix, include_context, &self.error_mode, include_input)
                     .unwrap_or_else(|err| {
                         iteration_error = Some(err);
                         py.None()
@@ -299,14 +299,14 @@ impl ValidationError {
         }
     }
 
-    #[pyo3(signature = (*, indent = None, include_url = true, include_context = true, hide_input = false))]
+    #[pyo3(signature = (*, indent = None, include_url = true, include_context = true, include_input = true))]
     pub fn json<'py>(
         &self,
         py: Python<'py>,
         indent: Option<usize>,
         include_url: bool,
         include_context: bool,
-        hide_input: bool,
+        include_input: bool,
     ) -> PyResult<&'py PyString> {
         let state = SerializationState::new("iso8601", "utf8")?;
         let extra = state.extra(py, &SerMode::Json, true, false, false, true, None);
@@ -315,7 +315,7 @@ impl ValidationError {
             line_errors: &self.line_errors,
             url_prefix: get_url_prefix(py, include_url),
             include_context,
-            hide_input,
+            include_input,
             extra: &extra,
             error_mode: &self.error_mode,
         };
@@ -486,13 +486,13 @@ impl PyLineError {
         url_prefix: Option<&str>,
         include_context: bool,
         error_mode: &ErrorMode,
-        hide_input: bool,
+        include_input: bool,
     ) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
         dict.set_item("type", self.error_type.type_string())?;
         dict.set_item("loc", self.location.to_object(py))?;
         dict.set_item("msg", self.error_type.render_message(py, error_mode)?)?;
-        if !hide_input {
+        if include_input {
             dict.set_item("input", &self.input_value)?;
         }
         if include_context {
@@ -575,7 +575,7 @@ struct ValidationErrorSerializer<'py> {
     line_errors: &'py [PyLineError],
     url_prefix: Option<&'py str>,
     include_context: bool,
-    hide_input: bool,
+    include_input: bool,
     extra: &'py crate::serializers::Extra<'py>,
     error_mode: &'py ErrorMode,
 }
@@ -592,7 +592,7 @@ impl<'py> Serialize for ValidationErrorSerializer<'py> {
                 line_error,
                 url_prefix: self.url_prefix,
                 include_context: self.include_context,
-                hide_input: self.hide_input,
+                include_input: self.include_input,
                 extra: self.extra,
                 error_mode: self.error_mode,
             };
@@ -607,7 +607,7 @@ struct PyLineErrorSerializer<'py> {
     line_error: &'py PyLineError,
     url_prefix: Option<&'py str>,
     include_context: bool,
-    hide_input: bool,
+    include_input: bool,
     extra: &'py crate::serializers::Extra<'py>,
     error_mode: &'py ErrorMode,
 }
@@ -618,16 +618,11 @@ impl<'py> Serialize for PyLineErrorSerializer<'py> {
         S: Serializer,
     {
         let py = self.py;
-        let mut size = 3;
-        if self.url_prefix.is_some() {
-            size += 1;
-        }
-        if self.include_context {
-            size += 1;
-        }
-        if !self.hide_input {
-            size += 1;
-        }
+        let size = 3 + [
+            self.url_prefix.is_some(),
+            self.include_context,
+            self.include_input,
+        ].into_iter().filter(|b| *b).count()
         let mut map = serializer.serialize_map(Some(size))?;
 
         map.serialize_entry("type", &self.line_error.error_type.type_string())?;
@@ -641,7 +636,7 @@ impl<'py> Serialize for PyLineErrorSerializer<'py> {
             .map_err(py_err_json::<S>)?;
         map.serialize_entry("msg", &msg)?;
 
-        if !self.hide_input {
+        if self.include_input {
             map.serialize_entry(
                 "input",
                 &self.extra.serialize_infer(self.line_error.input_value.as_ref(py)),
