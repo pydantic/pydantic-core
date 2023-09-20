@@ -121,7 +121,7 @@ def test_model_class_root_validator_wrap():
 
     schema = core_schema.model_schema(
         MyModel,
-        core_schema.general_wrap_validator_function(
+        core_schema.with_info_wrap_validator_function(
             f, core_schema.model_fields_schema({'field_a': core_schema.model_field(core_schema.int_schema())})
         ),
     )
@@ -155,7 +155,7 @@ def test_model_class_root_validator_before():
 
     schema = core_schema.model_schema(
         MyModel,
-        core_schema.general_before_validator_function(
+        core_schema.with_info_before_validator_function(
             f, core_schema.model_fields_schema({'field_a': core_schema.model_field(core_schema.int_schema())})
         ),
     )
@@ -1085,17 +1085,17 @@ def test_frozen():
     'function_schema,call1, call2',
     [
         (
-            core_schema.general_after_validator_function,
+            core_schema.with_info_after_validator_function,
             (({'a': 1, 'b': 2}, None, {'b'}), 'ValidationInfo(config=None, context=None)'),
             (({'a': 10, 'b': 2}, None, {'a'}), 'ValidationInfo(config=None, context=None)'),
         ),
         (
-            core_schema.general_before_validator_function,
+            core_schema.with_info_before_validator_function,
             ({'b': 2}, 'ValidationInfo(config=None, context=None)'),
             ({'a': 10, 'b': 2}, 'ValidationInfo(config=None, context=None)'),
         ),
         (
-            core_schema.general_wrap_validator_function,
+            core_schema.with_info_wrap_validator_function,
             ({'b': 2}, 'ValidationInfo(config=None, context=None)'),
             ({'a': 10, 'b': 2}, 'ValidationInfo(config=None, context=None)'),
         ),

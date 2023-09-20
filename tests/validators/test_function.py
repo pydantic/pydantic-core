@@ -2,7 +2,7 @@ import datetime
 import platform
 import re
 from copy import deepcopy
-from typing import Any, Dict, List, Type, Union
+from typing import Any, Dict, List, Type
 
 import pytest
 from dirty_equals import HasRepr
@@ -12,11 +12,11 @@ from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_sc
 from ..conftest import plain_repr
 
 
-def deepcopy_info(info: Union[core_schema.ValidationInfo, core_schema.FieldValidationInfo]) -> Dict[str, Any]:
+def deepcopy_info(info: core_schema.ValidationInfo) -> Dict[str, Any]:
     return {
         'context': deepcopy(info.context),
-        'data': deepcopy(getattr(info, 'data', None)),
-        'field_name': deepcopy(getattr(info, 'field_name', None)),
+        'data': deepcopy(info.data),
+        'field_name': deepcopy(info.field_name),
         'config': deepcopy(info.config),
     }
 
@@ -747,7 +747,7 @@ def test_non_model_field_before_validator_tries_to_access_field_info() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.general_before_validator_function(f, core_schema.str_schema())
+                        core_schema.with_info_before_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -771,7 +771,7 @@ def test_non_model_field_after_validator_tries_to_access_field_info() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.general_after_validator_function(f, core_schema.str_schema())
+                        core_schema.with_info_after_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -794,7 +794,7 @@ def test_non_model_field_plain_validator_tries_to_access_field_info() -> None:
         core_schema.model_schema(
             Model,
             core_schema.model_fields_schema(
-                {'x': core_schema.model_field(core_schema.general_plain_validator_function(f))}
+                {'x': core_schema.model_field(core_schema.with_info_plain_validator_function(f))}
             ),
         )
     )
@@ -815,7 +815,11 @@ def test_non_model_field_wrap_validator_tries_to_access_field_info() -> None:
         core_schema.model_schema(
             Model,
             core_schema.model_fields_schema(
-                {'x': core_schema.model_field(core_schema.general_wrap_validator_function(f, core_schema.str_schema()))}
+                {
+                    'x': core_schema.model_field(
+                        core_schema.with_info_wrap_validator_function(f, core_schema.str_schema())
+                    )
+                }
             ),
         )
     )
@@ -922,7 +926,7 @@ def test_function_validation_info_mode():
         calls.append(info.mode)
         return v
 
-    v = SchemaValidator(core_schema.general_before_validator_function(f, core_schema.int_schema()))
+    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
     assert v.validate_python(1) == 1
     assert calls == ['python']
     calls.clear()
@@ -930,7 +934,7 @@ def test_function_validation_info_mode():
     assert calls == ['json']
     calls.clear()
 
-    v = SchemaValidator(core_schema.general_after_validator_function(f, core_schema.int_schema()))
+    v = SchemaValidator(core_schema.with_info_after_validator_function(f, core_schema.int_schema()))
     assert v.validate_python(1) == 1
     assert calls == ['python']
     calls.clear()
@@ -942,7 +946,7 @@ def test_function_validation_info_mode():
         calls.append(info.mode)
         return handler(v)
 
-    v = SchemaValidator(core_schema.general_wrap_validator_function(f_w, core_schema.int_schema()))
+    v = SchemaValidator(core_schema.with_info_wrap_validator_function(f_w, core_schema.int_schema()))
     assert v.validate_python(1) == 1
     assert calls == ['python']
     calls.clear()
@@ -961,7 +965,7 @@ def test_reprs() -> None:
     v = SchemaValidator(
         core_schema.chain_schema(
             [
-                core_schema.general_plain_validator_function(sample_repr),
+                core_schema.with_info_plain_validator_function(sample_repr),
                 core_schema.field_plain_validator_function(sample_repr, field_name='x'),
             ]
         )

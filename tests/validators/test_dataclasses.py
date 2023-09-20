@@ -1526,9 +1526,11 @@ def test_leak_dataclass(validator):
         )
 
         if validator == 'dataclass':
-            dataclass_schema = core_schema.general_before_validator_function(Dataclass._validator, dataclass_schema)
-            dataclass_schema = core_schema.general_wrap_validator_function(Dataclass._wrap_validator, dataclass_schema)
-            dataclass_schema = core_schema.general_after_validator_function(Dataclass._validator, dataclass_schema)
+            dataclass_schema = core_schema.with_info_before_validator_function(Dataclass._validator, dataclass_schema)
+            dataclass_schema = core_schema.with_info_wrap_validator_function(
+                Dataclass._wrap_validator, dataclass_schema
+            )
+            dataclass_schema = core_schema.with_info_after_validator_function(Dataclass._validator, dataclass_schema)
 
         # If any of the Rust validators don't implement traversal properly,
         # there will be an undetectable cycle created by this assignment
