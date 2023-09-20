@@ -267,7 +267,13 @@ impl ValidationError {
     }
 
     #[pyo3(signature = (*, include_url = true, include_context = true, hide_input = false))]
-    pub fn errors(&self, py: Python, include_url: bool, include_context: bool, hide_input: bool) -> PyResult<Py<PyList>> {
+    pub fn errors(
+        &self,
+        py: Python,
+        include_url: bool,
+        include_context: bool,
+        hide_input: bool,
+    ) -> PyResult<Py<PyList>> {
         let url_prefix = get_url_prefix(py, include_url);
         let mut iteration_error = None;
         let list = PyList::new(
@@ -300,7 +306,7 @@ impl ValidationError {
         indent: Option<usize>,
         include_url: bool,
         include_context: bool,
-        hide_input: bool
+        hide_input: bool,
     ) -> PyResult<&'py PyString> {
         let state = SerializationState::new("iso8601", "utf8")?;
         let extra = state.extra(py, &SerMode::Json, true, false, false, true, None);
