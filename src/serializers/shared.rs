@@ -13,7 +13,7 @@ use serde_json::ser::PrettyFormatter;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::py_schema_error_type;
-use crate::definitions::DefinitionsBuilder;
+use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::py_gc::PyGcTraverse;
 use crate::tools::{py_err, SchemaDict};
 
@@ -21,7 +21,6 @@ use super::errors::se_err_py_err;
 use super::extra::Extra;
 use super::infer::infer_json_key;
 use super::ob_type::{IsType, ObType};
-use super::type_serializers::definitions::DefinitionRefSerializer;
 
 pub(crate) trait BuildSerializer: Sized {
     const EXPECTED_TYPE: &'static str;
@@ -207,13 +206,6 @@ impl BuildSerializer for CombinedSerializer {
         config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        let py: Python = schema.py();
-        if let Some(schema_ref) = schema.get_as::<String>(intern!(py, "ref"))? {
-            let inner_ser = Self::_build(schema, config, definitions)?;
-            let ser_id = definitions.add_definition(schema_ref, inner_ser)?;
-            return Ok(DefinitionRefSerializer::from_id(ser_id));
-        }
-
         Self::_build(schema, config, definitions)
     }
 }
@@ -301,7 +293,7 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
     fn get_name(&self) -> &str;
 
     /// Used by union serializers to decide if it's worth trying again while allowing subclasses
-    fn retry_with_lax_check(&self) -> bool {
+    fn retry_with_lax_check(&self, _definitions: &Definitions<CombinedSerializer>) -> bool {
         false
     }
 

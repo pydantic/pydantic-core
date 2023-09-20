@@ -10,8 +10,8 @@ use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
 use crate::definitions::DefinitionsBuilder;
-use crate::errors::{ErrorMode, LocItem, ValError, ValResult, ValidationError};
-use crate::input::{Input, InputType};
+use crate::errors::{LocItem, ValError, ValResult, ValidationError};
+use crate::input::{Input, InputType, StringMapping};
 use crate::py_gc::PyGcTraverse;
 use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
@@ -60,7 +60,6 @@ mod with_default;
 
 pub use with_default::DefaultType;
 
-use self::definitions::DefinitionRefValidator;
 pub use self::validation_state::ValidationState;
 
 #[pyclass(module = "pydantic_core._pydantic_core", name = "Some")]
@@ -171,7 +170,7 @@ impl SchemaValidator {
             self_instance,
             &mut RecursionGuard::default(),
         )
-        .map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Python))
+        .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
     }
 
     #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]
@@ -224,8 +223,26 @@ impl SchemaValidator {
                     self_instance,
                     recursion_guard,
                 )
-                .map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Json)),
-            Err(err) => Err(self.prepare_validation_err(py, err, ErrorMode::Json)),
+                .map_err(|e| self.prepare_validation_err(py, e, InputType::Json)),
+            Err(err) => Err(self.prepare_validation_err(py, err, InputType::Json)),
+        }
+    }
+
+    #[pyo3(signature = (input, *, strict=None, context=None))]
+    pub fn validate_strings(
+        &self,
+        py: Python,
+        input: &PyAny,
+        strict: Option<bool>,
+        context: Option<&PyAny>,
+    ) -> PyResult<PyObject> {
+        let t = InputType::String;
+        let string_mapping = StringMapping::new_value(input).map_err(|e| self.prepare_validation_err(py, e, t))?;
+
+        let recursion_guard = &mut RecursionGuard::default();
+        match self._validate(py, &string_mapping, t, strict, None, context, None, recursion_guard) {
+            Ok(r) => Ok(r),
+            Err(e) => Err(self.prepare_validation_err(py, e, t)),
         }
     }
 
@@ -242,7 +259,7 @@ impl SchemaValidator {
         context: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         let extra = Extra {
-            mode: InputType::Python,
+            input_type: InputType::Python,
             data: None,
             strict,
             from_attributes,
@@ -255,13 +272,13 @@ impl SchemaValidator {
         let mut state = ValidationState::new(extra, &self.definitions, guard);
         self.validator
             .validate_assignment(py, obj, field_name, field_value, &mut state)
-            .map_err(|e| self.prepare_validation_err(py, e, ErrorMode::Python))
+            .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
     }
 
     #[pyo3(signature = (*, strict=None, context=None))]
     pub fn get_default_value(&self, py: Python, strict: Option<bool>, context: Option<&PyAny>) -> PyResult<PyObject> {
         let extra = Extra {
-            mode: InputType::Python,
+            input_type: InputType::Python,
             data: None,
             strict,
             from_attributes: None,
@@ -277,7 +294,7 @@ impl SchemaValidator {
                 Some(v) => Ok(PySome::new(v).into_py(py)),
                 None => Ok(py.None().into_py(py)),
             },
-            Err(e) => Err(self.prepare_validation_err(py, e, ErrorMode::Python)),
+            Err(e) => Err(self.prepare_validation_err(py, e, InputType::Python)),
         }
     }
 
@@ -306,7 +323,7 @@ impl SchemaValidator {
         &'data self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-        mode: InputType,
+        input_type: InputType,
         strict: Option<bool>,
         from_attributes: Option<bool>,
         context: Option<&'data PyAny>,
@@ -317,18 +334,18 @@ impl SchemaValidator {
         's: 'data,
     {
         let mut state = ValidationState::new(
-            Extra::new(strict, from_attributes, context, self_instance, mode),
+            Extra::new(strict, from_attributes, context, self_instance, input_type),
             &self.definitions,
             recursion_guard,
         );
         self.validator.validate(py, input, &mut state)
     }
 
-    fn prepare_validation_err(&self, py: Python, error: ValError, error_mode: ErrorMode) -> PyErr {
+    fn prepare_validation_err(&self, py: Python, error: ValError, input_type: InputType) -> PyErr {
         ValidationError::from_val_error(
             py,
             self.title.clone_ref(py),
-            error_mode,
+            input_type,
             error,
             None,
             self.hide_input_in_errors,
@@ -413,13 +430,6 @@ fn build_specific_validator<'a, T: BuildValidator>(
     config: Option<&'a PyDict>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<CombinedValidator> {
-    let py = schema_dict.py();
-    if let Some(schema_ref) = schema_dict.get_as::<String>(intern!(py, "ref"))? {
-        let inner_val = T::build(schema_dict, config, definitions)?;
-        let validator_id = definitions.add_definition(schema_ref, inner_val)?;
-        return Ok(DefinitionRefValidator::new(validator_id).into());
-    }
-
     T::build(schema_dict, config, definitions)
         .map_err(|err| py_schema_error_type!("Error building \"{}\" validator:\n  {}", val_type, err))
 }
@@ -541,7 +551,7 @@ pub fn build_validator<'a>(
 #[derive(Debug)]
 pub struct Extra<'a> {
     /// Validation mode
-    pub mode: InputType,
+    pub input_type: InputType,
     /// This is used as the `data` kwargs to validator functions
     pub data: Option<&'a PyDict>,
     /// whether we're in strict or lax mode
@@ -562,10 +572,10 @@ impl<'a> Extra<'a> {
         from_attributes: Option<bool>,
         context: Option<&'a PyAny>,
         self_instance: Option<&'a PyAny>,
-        mode: InputType,
+        input_type: InputType,
     ) -> Self {
         Extra {
-            mode,
+            input_type,
             data: None,
             strict,
             ultra_strict: false,
@@ -579,7 +589,7 @@ impl<'a> Extra<'a> {
 impl<'a> Extra<'a> {
     pub fn as_strict(&self, ultra_strict: bool) -> Self {
         Self {
-            mode: self.mode,
+            input_type: self.input_type,
             data: self.data,
             strict: Some(true),
             ultra_strict,

@@ -256,7 +256,10 @@ def test_empty_choices():
 
 def test_one_choice():
     v = SchemaValidator({'type': 'union', 'choices': [{'type': 'str'}]})
-    assert plain_repr(v) == 'SchemaValidator(title="str",validator=Str(StrValidator{strict:false}),definitions=[])'
+    assert (
+        plain_repr(v)
+        == 'SchemaValidator(title="str",validator=Str(StrValidator{strict:false,coerce_numbers_to_str:false}),definitions=[])'
+    )
     assert v.validate_python('hello') == 'hello'
 
 
@@ -396,14 +399,19 @@ def test_no_strict_check():
 
 def test_strict_reference():
     v = SchemaValidator(
-        core_schema.tuple_positional_schema(
+        core_schema.definitions_schema(
+            core_schema.definition_reference_schema(schema_ref='tuple-ref'),
             [
-                core_schema.float_schema(),
-                core_schema.union_schema(
-                    [core_schema.int_schema(), core_schema.definition_reference_schema('tuple-ref')]
-                ),
+                core_schema.tuple_positional_schema(
+                    [
+                        core_schema.float_schema(),
+                        core_schema.union_schema(
+                            [core_schema.int_schema(), core_schema.definition_reference_schema('tuple-ref')]
+                        ),
+                    ],
+                    ref='tuple-ref',
+                )
             ],
-            ref='tuple-ref',
         )
     )
     assert 'strict_required:true' in plain_repr(v)

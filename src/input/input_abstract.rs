@@ -1,9 +1,11 @@
 use std::fmt;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*};
 
 use crate::errors::{InputValue, LocItem, ValResult};
+use crate::tools::py_err;
 use crate::{PyMultiHostUrl, PyUrl};
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
@@ -14,6 +16,7 @@ use super::{EitherFloat, GenericArguments, GenericIterable, GenericIterator, Gen
 pub enum InputType {
     Python,
     Json,
+    String,
 }
 
 impl IntoPy<PyObject> for InputType {
@@ -21,6 +24,20 @@ impl IntoPy<PyObject> for InputType {
         match self {
             Self::Json => intern!(py, "json").into(),
             Self::Python => intern!(py, "python").into(),
+            Self::String => intern!(py, "string").into(),
+        }
+    }
+}
+
+impl TryFrom<&str> for InputType {
+    type Error = PyErr;
+
+    fn try_from(error_mode: &str) -> PyResult<Self> {
+        match error_mode {
+            "python" => Ok(Self::Python),
+            "json" => Ok(Self::Json),
+            "string" => Ok(Self::String),
+            s => py_err!(PyValueError; "Invalid error mode: {}", s),
         }
     }
 }
@@ -38,7 +55,9 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         None
     }
 
-    fn is_none(&self) -> bool;
+    fn is_none(&self) -> bool {
+        false
+    }
 
     fn input_is_instance(&self, _class: &PyType) -> Option<&PyAny> {
         None
@@ -72,16 +91,16 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
 
     fn parse_json(&'a self) -> ValResult<'a, JsonInput>;
 
-    fn validate_str(&'a self, strict: bool) -> ValResult<EitherString<'a>> {
+    fn validate_str(&'a self, strict: bool, coerce_numbers_to_str: bool) -> ValResult<EitherString<'a>> {
         if strict {
             self.strict_str()
         } else {
-            self.lax_str()
+            self.lax_str(coerce_numbers_to_str)
         }
     }
     fn strict_str(&'a self) -> ValResult<EitherString<'a>>;
     #[cfg_attr(has_coverage_attribute, coverage(off))]
-    fn lax_str(&'a self) -> ValResult<EitherString<'a>> {
+    fn lax_str(&'a self, _coerce_numbers_to_str: bool) -> ValResult<EitherString<'a>> {
         self.strict_str()
     }
 
@@ -319,4 +338,20 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
     ) -> ValResult<EitherTimedelta> {
         self.strict_timedelta(microseconds_overflow_behavior)
     }
+}
+
+/// The problem to solve here is that iterating a `StringMapping` returns an owned
+/// `StringMapping`, but all the other iterators return references. By introducing
+/// this trait we abstract over whether the return value from the iterator is owned
+/// or borrowed; all we care about is that we can borrow it again with `borrow_input`
+/// for some lifetime 'a.
+///
+/// This lifetime `'a` is shorter than the original lifetime `'data` of the input,
+/// which is only a problem in error branches. To resolve we have to call `into_owned`
+/// to extend out the lifetime to match the original input.
+pub trait BorrowInput {
+    type Input<'a>: Input<'a>
+    where
+        Self: 'a;
+    fn borrow_input(&self) -> &Self::Input<'_>;
 }
