@@ -94,7 +94,10 @@ impl Validator for UuidValidator {
         if let Some(py_input) = input.input_is_instance(class) {
             if let Some(expected_version) = self.version {
                 let py_input_version: Option<usize> = py_input.getattr(intern!(py, "version"))?.extract()?;
-                if !matches!(py_input_version, Some(expected_version)) {
+                if !match py_input_version {
+                    Some(py_input_version) => py_input_version == expected_version,
+                    None => false,
+                } {
                     return Err(ValError::new(
                         ErrorType::UuidVersion {
                             expected_version,
