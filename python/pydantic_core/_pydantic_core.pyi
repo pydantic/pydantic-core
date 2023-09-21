@@ -40,11 +40,11 @@ __all__ = [
     'PydanticUndefined',
     'PydanticUndefinedType',
     'Some',
-    '_build_validator_and_serializer',
     'to_json',
     'to_jsonable_python',
     'list_all_errors',
     'TzInfo',
+    'validate_core_schema',
 ]
 __version__: str
 build_profile: str
@@ -838,6 +838,10 @@ class TzInfo(datetime.tzinfo):
     def fromutc(self, dt: datetime.datetime) -> datetime.datetime: ...
     def __deepcopy__(self, _memo: dict[Any, Any]) -> 'TzInfo': ...
 
-def _build_validator_and_serializer(
-    schema: CoreSchema, config: CoreConfig | None = None
-) -> tuple[SchemaValidator, SchemaSerializer]: ...
+def validate_core_schema(schema: CoreSchema) -> CoreSchema:
+    """Validate a CoreSchema
+    This currently uses lax mode for validation (i.e. will coerce strings to dates and such)
+    but may use strict mode in the future.
+    We may also remove this function altogether, do not rely on it being present if you are
+    using pydantic-core directly.
+    """

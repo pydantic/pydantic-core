@@ -9,6 +9,7 @@ from dirty_equals import IsList
 import pydantic_core
 from pydantic_core import (
     PydanticSerializationError,
+    SchemaSerializer,
     SchemaValidator,
     ValidationError,
     core_schema,
@@ -271,7 +272,8 @@ def test_to_jsonable_python_schema_serializer():
             )
         ],
     )
-    v, s = pydantic_core._build_validator_and_serializer(c)
+    v = SchemaValidator(c)
+    s = SchemaSerializer(c)
 
     Foobar.__pydantic_validator__ = v
     Foobar.__pydantic_serializer__ = s

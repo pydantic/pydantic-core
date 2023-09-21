@@ -100,7 +100,7 @@ impl BuildValidator for WithDefaultValidator {
             _ => unreachable!(),
         };
 
-        let sub_schema = schema.get_as_req(intern!(schema.py(), "schema"))?;
+        let sub_schema: &PyAny = schema.get_as_req(intern!(schema.py(), "schema"))?;
         let validator = Box::new(build_validator(sub_schema, config, definitions)?);
 
         let copy_default = if let DefaultType::Default(default_obj) = &default {

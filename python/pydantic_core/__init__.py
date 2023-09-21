@@ -22,9 +22,9 @@ from ._pydantic_core import (
     Url,
     ValidationError,
     __version__,
-    _build_validator_and_serializer,
     to_json,
     to_jsonable_python,
+    validate_core_schema,
 )
 from .core_schema import CoreConfig, CoreSchema, CoreSchemaType, ErrorType
 
@@ -62,9 +62,9 @@ __all__ = [
     'PydanticSerializationError',
     'PydanticSerializationUnexpectedValue',
     'TzInfo',
-    '_build_validator_and_serializer',
     'to_json',
     'to_jsonable_python',
+    'validate_core_schema',
 ]
 
 
