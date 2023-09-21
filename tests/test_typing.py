@@ -115,7 +115,7 @@ def test_schema_typing() -> None:
         'schema': {'type': 'str'},
     }
     SchemaValidator(schema)
-    schema: CoreSchema = {'type': 'function-plain', 'function': {'type': 'with-info', 'function': validator}}
+    schema: CoreSchema = core_schema.with_info_plain_validator_function(validator)
     SchemaValidator(schema)
     schema: CoreSchema = {
         'type': 'definitions',

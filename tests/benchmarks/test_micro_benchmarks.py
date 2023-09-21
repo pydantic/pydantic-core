@@ -791,7 +791,7 @@ def test_dont_raise_error(benchmark):
     def f(input_value, info):
         return input_value
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'with-info', 'function': f}})
+    v = SchemaValidator(core_schema.with_info_plain_validator_function(f))
 
     @benchmark
     def t():
@@ -815,7 +815,7 @@ def test_raise_error_value_error(benchmark):
     def f(input_value, info):
         raise ValueError('this is a custom error')
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'with-info', 'function': f}})
+    v = SchemaValidator(core_schema.with_info_plain_validator_function(f))
 
     @benchmark
     def t():
@@ -832,7 +832,7 @@ def test_raise_error_custom(benchmark):
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'this is a custom error {foo}', {'foo': 'FOOBAR'})
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'with-info', 'function': f}})
+    v = SchemaValidator(core_schema.with_info_plain_validator_function(f))
 
     @benchmark
     def t():
@@ -927,10 +927,7 @@ def test_chain_list(benchmark):
     validator = SchemaValidator(
         {
             'type': 'chain',
-            'steps': [
-                {'type': 'str'},
-                {'type': 'function-plain', 'function': {'type': 'with-info', 'function': lambda v, info: Decimal(v)}},
-            ],
+            'steps': [{'type': 'str'}, core_schema.with_info_plain_validator_function(lambda v, info: Decimal(v))],
         }
     )
     assert validator.validate_python('42.42') == Decimal('42.42')
@@ -959,8 +956,8 @@ def test_chain_two_functions(benchmark):
             'type': 'chain',
             'steps': [
                 {'type': 'str'},
-                {'type': 'function-plain', 'function': {'type': 'with-info', 'function': lambda v, info: Decimal(v)}},
-                {'type': 'function-plain', 'function': {'type': 'with-info', 'function': lambda v, info: v * 2}},
+                core_schema.with_info_plain_validator_function(lambda v, info: Decimal(v)),
+                core_schema.with_info_plain_validator_function(lambda v, info: v * 2),
             ],
         }
     )

@@ -137,7 +137,7 @@ all_schema_functions = [
     (
         core_schema.with_info_plain_validator_function,
         args(val_function),
-        {'type': 'function-plain', 'function': {'type': 'with-info', 'function': val_function}},
+        core_schema.with_info_plain_validator_function(val_function),
     ),
     (
         core_schema.with_default_schema,

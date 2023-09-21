@@ -3826,14 +3826,10 @@ def _dict_not_none(**kwargs: Any) -> Any:
 ###############################################################################
 # All this stuff is deprecated by #980 and will be removed eventually
 # They're kept because some code external code will be using them
-FieldValidationInfo = ValidationInfo
-FieldValidatorFunction = WithInfoValidatorFunction
-GeneralValidatorFunction = WithInfoValidatorFunction
-FieldWrapValidatorFunction = WithInfoWrapValidatorFunction
 
 
 @deprecated('`field_before_validator_function` is deprecated, use `with_info_before_validator_function` instead.')
-def field_before_validator_function(function: FieldValidatorFunction, field_name: str, schema: CoreSchema, **kwargs):
+def field_before_validator_function(function: WithInfoValidatorFunction, field_name: str, schema: CoreSchema, **kwargs):
     warnings.warn(
         '`field_before_validator_function` is deprecated, use `with_info_before_validator_function` instead.',
         DeprecationWarning,
@@ -3851,7 +3847,7 @@ def general_before_validator_function(*args, **kwargs):
 
 
 @deprecated('`field_after_validator_function` is deprecated, use `with_info_after_validator_function` instead.')
-def field_after_validator_function(function: FieldValidatorFunction, field_name: str, schema: CoreSchema, **kwargs):
+def field_after_validator_function(function: WithInfoValidatorFunction, field_name: str, schema: CoreSchema, **kwargs):
     warnings.warn(
         '`field_after_validator_function` is deprecated, use `with_info_after_validator_function` instead.',
         DeprecationWarning,
@@ -3869,7 +3865,9 @@ def general_after_validator_function(*args, **kwargs):
 
 
 @deprecated('`field_wrap_validator_function` is deprecated, use `with_info_wrap_validator_function` instead.')
-def field_wrap_validator_function(function: FieldWrapValidatorFunction, field_name: str, schema: CoreSchema, **kwargs):
+def field_wrap_validator_function(
+    function: WithInfoWrapValidatorFunction, field_name: str, schema: CoreSchema, **kwargs
+):
     warnings.warn(
         '`field_wrap_validator_function` is deprecated, use `with_info_wrap_validator_function` instead.',
         DeprecationWarning,
@@ -3887,7 +3885,7 @@ def general_wrap_validator_function(*args, **kwargs):
 
 
 @deprecated('`field_plain_validator_function` is deprecated, use `with_info_plain_validator_function` instead.')
-def field_plain_validator_function(function: FieldValidatorFunction, field_name: str, **kwargs):
+def field_plain_validator_function(function: WithInfoValidatorFunction, field_name: str, **kwargs):
     warnings.warn(
         '`field_plain_validator_function` is deprecated, use `with_info_plain_validator_function` instead.',
         DeprecationWarning,
@@ -3902,3 +3900,23 @@ def general_plain_validator_function(*args, **kwargs):
         DeprecationWarning,
     )
     return with_info_plain_validator_function(*args, **kwargs)
+
+
+_deprecated_import_lookup = {
+    'FieldValidationInfo': ValidationInfo,
+    'FieldValidatorFunction': WithInfoValidatorFunction,
+    'GeneralValidatorFunction': WithInfoValidatorFunction,
+    'FieldWrapValidatorFunction': WithInfoWrapValidatorFunction,
+}
+
+
+def __getattr__(attr_name: str) -> object:
+    new_attr = _deprecated_import_lookup.get(attr_name)
+    if new_attr is None:
+        raise AttributeError(f"module 'pydantic_core' has no attribute '{attr_name}'")
+    else:
+        import warnings
+
+        msg = f'`{attr_name}` is deprecated, use `{new_attr.__name__}` instead.'
+        warnings.warn(msg, DeprecationWarning, stacklevel=1)
+        return new_attr

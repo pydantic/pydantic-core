@@ -432,7 +432,7 @@ def test_function_plain():
     def f(input_value, _info):
         return input_value * 2
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'with-info', 'function': f}})
+    v = SchemaValidator(core_schema.with_info_plain_validator_function(f))
 
     assert v.validate_python(1) == 2
     assert v.validate_python('x') == 'xx'

@@ -64,7 +64,7 @@ def test_pydantic_value_error_usage():
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'this is a custom error {foo} {bar}', {'foo': 'FOOBAR', 'bar': 42})
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'with-info', 'function': f}})
+    v = SchemaValidator(core_schema.with_info_plain_validator_function(f))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(42)
@@ -84,7 +84,7 @@ def test_pydantic_value_error_invalid_dict():
     def my_function(input_value, info):
         raise PydanticCustomError('my_error', 'this is a custom error {foo}', {(): 'foobar'})
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'with-info', 'function': my_function}})
+    v = SchemaValidator(core_schema.with_info_plain_validator_function(my_function))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(42)
@@ -102,7 +102,7 @@ def test_pydantic_value_error_invalid_type():
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'this is a custom error {foo}', [('foo', 123)])
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'with-info', 'function': f}})
+    v = SchemaValidator(core_schema.with_info_plain_validator_function(f))
 
     with pytest.raises(TypeError, match="argument 'context': 'list' object cannot be converted to 'PyDict'"):
         v.validate_python(42)
@@ -118,13 +118,7 @@ def test_validator_instance_plain():
             return f'{input_value} {self.foo} {self.bar}'
 
     c = CustomValidator()
-    v = SchemaValidator(
-        {
-            'type': 'function-plain',
-            'metadata': {'instance': c},
-            'function': {'type': 'with-info', 'function': c.validate},
-        }
-    )
+    v = SchemaValidator(core_schema.with_info_plain_validator_function(c.validate, metadata={'instance': c}))
     c.foo += 1
 
     assert v.validate_python('input value') == 'input value 43 before'
@@ -426,7 +420,7 @@ def test_pydantic_value_error_plain(py_and_json: PyAndJson):
     def f(input_value, info):
         raise PydanticCustomError
 
-    v = py_and_json({'type': 'function-plain', 'function': {'type': 'with-info', 'function': f}})
+    v = py_and_json(core_schema.with_info_plain_validator_function(f))
     with pytest.raises(TypeError, match='missing 2 required positional arguments'):
         v.validate_test('4')
 
