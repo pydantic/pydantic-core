@@ -109,9 +109,10 @@ pub struct SchemaValidator {
     validation_error_cause: bool,
 }
 
+#[pymethods]
 impl SchemaValidator {
-    /// Construct from an already validated Schema. May raise
-    pub(crate) fn new(py: Python, schema: &ValidatedSchema<'_>, config: Option<&PyDict>) -> PyResult<Self> {
+    #[new]
+    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
         let mut definitions_builder = DefinitionsBuilder::new();
 
         let mut validator = build_validator(schema, config, &mut definitions_builder)?;
@@ -138,17 +139,6 @@ impl SchemaValidator {
             hide_input_in_errors,
             validation_error_cause,
         })
-    }
-}
-
-#[pymethods]
-impl SchemaValidator {
-    #[new]
-    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
-        let self_validator = SelfValidator::new(py)?;
-        let schema = self_validator.validate_schema(py, schema)?;
-
-        Self::new(py, &schema, config)
     }
 
     pub fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
@@ -368,19 +358,6 @@ pub struct SelfValidator<'py> {
     validator: &'py SchemaValidator,
 }
 
-/// Validated CoreSchema.
-///
-/// The only way to build this is by `SelfValidator::validate_schema`.
-pub struct ValidatedSchema<'py>(&'py PyDict);
-
-impl<'py> std::ops::Deref for ValidatedSchema<'py> {
-    type Target = &'py PyDict;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 impl<'py> SelfValidator<'py> {
     pub fn new(py: Python<'py>) -> PyResult<Self> {
         let validator = SCHEMA_DEFINITION.get_or_init(py, || match Self::build(py) {
@@ -390,7 +367,7 @@ impl<'py> SelfValidator<'py> {
         Ok(Self { validator })
     }
 
-    pub fn validate_schema(&self, py: Python<'py>, schema: &'py PyAny) -> PyResult<ValidatedSchema<'py>> {
+    pub fn validate_schema(&self, py: Python<'py>, schema: &'py PyAny) -> PyResult<&'py PyAny> {
         let mut recursion_guard = RecursionGuard::default();
         let mut state = ValidationState::new(
             Extra::new(None, None, None, None, InputType::Python),
@@ -398,7 +375,7 @@ impl<'py> SelfValidator<'py> {
             &mut recursion_guard,
         );
         match self.validator.validator.validate(py, schema, &mut state) {
-            Ok(schema_obj) => Ok(ValidatedSchema(schema_obj.into_ref(py).downcast()?)),
+            Ok(schema_obj) => Ok(schema_obj.into_ref(py)),
             Err(e) => Err(SchemaError::from_val_error(py, e)),
         }
     }
@@ -429,6 +406,12 @@ impl<'py> SelfValidator<'py> {
             validation_error_cause: false,
         })
     }
+}
+
+#[pyfunction]
+pub fn validate_core_schema<'a>(py: Python<'a>, schema: &'a PyAny) -> PyResult<&'a PyAny> {
+    let self_validator = SelfValidator::new(py)?;
+    self_validator.validate_schema(py, schema)
 }
 
 pub trait BuildValidator: Sized {
@@ -466,9 +449,9 @@ macro_rules! validator_match {
     };
 }
 
-pub fn build_validator(
-    schema: &PyAny,
-    config: Option<&PyDict>,
+pub fn build_validator<'a>(
+    schema: &'a PyAny,
+    config: Option<&'a PyDict>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<CombinedValidator> {
     let dict: &PyDict = schema.downcast()?;

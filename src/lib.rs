@@ -4,9 +4,7 @@ extern crate core;
 
 use std::sync::OnceLock;
 
-use pyo3::types::PyDict;
 use pyo3::{prelude::*, sync::GILOnceCell};
-use validators::SelfValidator;
 
 // parse this first to get access to the contained macro
 #[macro_use]
@@ -36,7 +34,7 @@ pub use errors::{
 pub use serializers::{
     to_json, to_jsonable_python, PydanticSerializationError, PydanticSerializationUnexpectedValue, SchemaSerializer,
 };
-pub use validators::{PySome, SchemaValidator};
+pub use validators::{validate_core_schema, PySome, SchemaValidator};
 
 pub fn get_pydantic_core_version() -> &'static str {
     static PYDANTIC_CORE_VERSION: OnceLock<String> = OnceLock::new();
@@ -73,23 +71,6 @@ pub fn build_info() -> String {
     )
 }
 
-/// Private API to build both a `SchemaValidator` and `SchemaSerializer` in one go. This can be
-/// helpful for performance because it avoids validating the schema twice.
-#[pyfunction]
-fn _build_validator_and_serializer(
-    py: Python,
-    schema: &PyAny,
-    config: Option<&PyDict>,
-) -> PyResult<(SchemaValidator, SchemaSerializer)> {
-    let self_validator = SelfValidator::new(py)?;
-    let schema = self_validator.validate_schema(py, schema)?;
-
-    Ok((
-        SchemaValidator::new(py, &schema, config)?,
-        SchemaSerializer::new(&schema, config)?,
-    ))
-}
-
 #[pymodule]
 fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", get_pydantic_core_version())?;
@@ -116,6 +97,6 @@ fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(to_json, m)?)?;
     m.add_function(wrap_pyfunction!(to_jsonable_python, m)?)?;
     m.add_function(wrap_pyfunction!(list_all_errors, m)?)?;
-    m.add_function(wrap_pyfunction!(_build_validator_and_serializer, m)?)?;
+    m.add_function(wrap_pyfunction!(validate_core_schema, m)?)?;
     Ok(())
 }
