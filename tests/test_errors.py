@@ -137,12 +137,7 @@ def test_validator_instance_after():
 
     c = CustomValidator()
     v = SchemaValidator(
-        {
-            'type': 'function-after',
-            'metadata': {'instance': c},
-            'function': {'type': 'with-info', 'function': c.validate},
-            'schema': {'type': 'str'},
-        }
+        core_schema.with_info_after_validator_function(c.validate, core_schema.str_schema(), metadata={'instance': c})
     )
     c.foo += 1
 
@@ -173,9 +168,7 @@ def test_pydantic_error_type_raise_no_ctx():
     def f(input_value, info):
         raise PydanticKnownError('finite_number')
 
-    v = SchemaValidator(
-        {'type': 'function-before', 'function': {'type': 'with-info', 'function': f}, 'schema': {'type': 'int'}}
-    )
+    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(4)
@@ -194,9 +187,7 @@ def test_pydantic_error_type_raise_ctx(extra: dict):
     def f(input_value, info):
         raise PydanticKnownError('greater_than', ctx)
 
-    v = SchemaValidator(
-        {'type': 'function-before', 'function': {'type': 'with-info', 'function': f}, 'schema': {'type': 'int'}}
-    )
+    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(4)
@@ -211,9 +202,7 @@ def test_pydantic_error_type_raise_custom_no_ctx(ctx: Optional[dict]):
     def f(input_value, info):
         raise PydanticKnownError('int_type', ctx)
 
-    v = SchemaValidator(
-        {'type': 'function-before', 'function': {'type': 'with-info', 'function': f}, 'schema': {'type': 'int'}}
-    )
+    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
 
     expect_ctx = {'ctx': {}} if ctx is not None else {}
 
@@ -234,9 +223,7 @@ def test_pydantic_custom_error_type_raise_custom_ctx(extra: dict):
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'my message with {val}', ctx)
 
-    v = SchemaValidator(
-        {'type': 'function-before', 'function': {'type': 'with-info', 'function': f}, 'schema': {'type': 'int'}}
-    )
+    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(4)
@@ -251,9 +238,7 @@ def test_pydantic_custom_error_type_raise_custom_no_ctx(ctx: Optional[dict]):
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'my message', ctx)
 
-    v = SchemaValidator(
-        {'type': 'function-before', 'function': {'type': 'with-info', 'function': f}, 'schema': {'type': 'int'}}
-    )
+    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
 
     expect_ctx = {'ctx': {}} if ctx is not None else {}
 
@@ -427,21 +412,12 @@ def test_pydantic_value_error_plain(py_and_json: PyAndJson):
 
 @pytest.mark.parametrize('exception', [PydanticOmit(), PydanticOmit])
 def test_list_omit_exception(py_and_json: PyAndJson, exception):
-    def f(input_value, info):
+    def f(input_value):
         if input_value % 2 == 0:
             raise exception
         return input_value
 
-    v = py_and_json(
-        {
-            'type': 'list',
-            'items_schema': {
-                'type': 'function-after',
-                'schema': {'type': 'int'},
-                'function': {'type': 'with-info', 'function': f},
-            },
-        }
-    )
+    v = py_and_json(core_schema.list_schema(core_schema.no_info_after_validator_function(f, core_schema.int_schema())))
     assert v.validate_test([1, 2, '3', '4']) == [1, 3]
 
 

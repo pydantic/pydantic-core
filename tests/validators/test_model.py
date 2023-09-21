@@ -244,13 +244,7 @@ def test_function_plain_ask():
     def f(input_value):
         return input_value, {1: 2}, {'field_a'}
 
-    v = SchemaValidator(
-        {
-            'type': 'model',
-            'cls': MyModel,
-            'schema': {'type': 'function-plain', 'function': {'type': 'no-info', 'function': f}},
-        }
-    )
+    v = SchemaValidator({'type': 'model', 'cls': MyModel, 'schema': core_schema.no_info_plain_validator_function(f)})
     m = v.validate_python({'field_a': 'test'})
     assert isinstance(m, MyModel)
     assert m.__dict__ == {'field_a': 'test'}

@@ -803,7 +803,7 @@ def test_dont_raise_error_no_info(benchmark):
     def f(input_value):
         return input_value
 
-    v = SchemaValidator({'type': 'function-plain', 'function': {'type': 'no-info', 'function': f}})
+    v = SchemaValidator(core_schema.no_info_plain_validator_function(f))
 
     @benchmark
     def t():
