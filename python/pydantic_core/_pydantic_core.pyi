@@ -40,6 +40,7 @@ __all__ = [
     'PydanticUndefined',
     'PydanticUndefinedType',
     'Some',
+    '_build_validator_and_serializer',
     'to_json',
     'to_jsonable_python',
     'list_all_errors',
@@ -836,3 +837,7 @@ class TzInfo(datetime.tzinfo):
     def dst(self, _dt: datetime.datetime | None) -> datetime.timedelta: ...
     def fromutc(self, dt: datetime.datetime) -> datetime.datetime: ...
     def __deepcopy__(self, _memo: dict[Any, Any]) -> 'TzInfo': ...
+
+def _build_validator_and_serializer(
+    schema: CoreSchema, config: CoreConfig | None = None
+) -> tuple[SchemaValidator, SchemaSerializer]: ...
