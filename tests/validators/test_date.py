@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
