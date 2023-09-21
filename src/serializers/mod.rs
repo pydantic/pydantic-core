@@ -7,7 +7,7 @@ use pyo3::{PyTraverseError, PyVisit};
 
 use crate::definitions::DefinitionsBuilder;
 use crate::py_gc::PyGcTraverse;
-use crate::validators::SelfValidator;
+use crate::validators::{SelfValidator, ValidatedSchema};
 
 use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
@@ -37,6 +37,16 @@ pub struct SchemaSerializer {
 }
 
 impl SchemaSerializer {
+    pub(crate) fn new(schema: &ValidatedSchema<'_>, config: Option<&PyDict>) -> PyResult<Self> {
+        let mut definitions_builder = DefinitionsBuilder::new();
+        Ok(Self {
+            serializer: CombinedSerializer::build(schema, config, &mut definitions_builder)?,
+            definitions: definitions_builder.finish()?,
+            expected_json_size: AtomicUsize::new(1024),
+            config: SerializationConfig::from_config(config)?,
+        })
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn build_extra<'b, 'a: 'b>(
         &'b self,
@@ -76,15 +86,7 @@ impl SchemaSerializer {
     pub fn py_new(py: Python, schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
         let self_validator = SelfValidator::new(py)?;
         let schema = self_validator.validate_schema(py, schema)?;
-        let mut definitions_builder = DefinitionsBuilder::new();
-
-        let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut definitions_builder)?;
-        Ok(Self {
-            serializer,
-            definitions: definitions_builder.finish()?,
-            expected_json_size: AtomicUsize::new(1024),
-            config: SerializationConfig::from_config(config)?,
-        })
+        Self::new(&schema, config)
     }
 
     #[allow(clippy::too_many_arguments)]
