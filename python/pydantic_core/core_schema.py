@@ -194,9 +194,6 @@ class ValidationInfo(Protocol):
         ...
 
 
-# FieldValidationInfo = ValidationInfo
-
-
 ExpectedSerializationTypes = Literal[
     'none',
     'int',
@@ -1811,24 +1808,6 @@ def no_info_before_validator_function(
     )
 
 
-@deprecated('`field_before_validator_function` is deprecated, use `with_info_before_validator_function` instead.')
-def field_before_validator_function(*args, **kwargs):
-    warnings.warn(
-        '`field_before_validator_function` is deprecated, use `with_info_before_validator_function` instead.',
-        DeprecationWarning,
-    )
-    return with_info_before_validator_function(*args, **kwargs)
-
-
-@deprecated('`general_before_validator_function` is deprecated, use `with_info_before_validator_function` instead.')
-def general_before_validator_function(*args, **kwargs):
-    warnings.warn(
-        '`general_before_validator_function` is deprecated, use `with_info_before_validator_function` instead.',
-        DeprecationWarning,
-    )
-    return with_info_before_validator_function(*args, **kwargs)
-
-
 def with_info_before_validator_function(
     function: WithInfoValidatorFunction,
     schema: CoreSchema,
@@ -1920,24 +1899,6 @@ def no_info_after_validator_function(
         metadata=metadata,
         serialization=serialization,
     )
-
-
-@deprecated('`field_after_validator_function` is deprecated, use `with_info_after_validator_function` instead.')
-def field_after_validator_function(*args, **kwargs):
-    warnings.warn(
-        '`field_after_validator_function` is deprecated, use `with_info_after_validator_function` instead.',
-        DeprecationWarning,
-    )
-    return with_info_after_validator_function(*args, **kwargs)
-
-
-@deprecated('`general_after_validator_function` is deprecated, use `with_info_after_validator_function` instead.')
-def general_after_validator_function(*args, **kwargs):
-    warnings.warn(
-        '`with_info_after_validator_function` is deprecated, use `with_info_after_validator_function` instead.',
-        DeprecationWarning,
-    )
-    return with_info_after_validator_function(*args, **kwargs)
 
 
 def with_info_after_validator_function(
@@ -2070,24 +2031,6 @@ def no_info_wrap_validator_function(
     )
 
 
-@deprecated('`field_wrap_validator_function` is deprecated, use `with_info_wrap_validator_function` instead.')
-def field_wrap_validator_function(*args, **kwargs):
-    warnings.warn(
-        '`field_wrap_validator_function` is deprecated, use `with_info_wrap_validator_function` instead.',
-        DeprecationWarning,
-    )
-    return with_info_wrap_validator_function(*args, **kwargs)
-
-
-@deprecated('`general_wrap_validator_function` is deprecated, use `with_info_wrap_validator_function` instead.')
-def general_wrap_validator_function(*args, **kwargs):
-    warnings.warn(
-        '`general_wrap_validator_function` is deprecated, use `with_info_wrap_validator_function` instead.',
-        DeprecationWarning,
-    )
-    return with_info_wrap_validator_function(*args, **kwargs)
-
-
 def with_info_wrap_validator_function(
     function: WithInfoWrapValidatorFunction,
     schema: CoreSchema,
@@ -2180,24 +2123,6 @@ def no_info_plain_validator_function(
         metadata=metadata,
         serialization=serialization,
     )
-
-
-@deprecated('`field_plain_validator_function` is deprecated, use `with_info_plain_validator_function` instead.')
-def field_plain_validator_function(*args, **kwargs):
-    warnings.warn(
-        '`field_plain_validator_function` is deprecated, use `with_info_plain_validator_function` instead.',
-        DeprecationWarning,
-    )
-    return with_info_plain_validator_function(*args, **kwargs)
-
-
-@deprecated('`general_plain_validator_function` is deprecated, use `with_info_plain_validator_function` instead.')
-def general_plain_validator_function(*args, **kwargs):
-    warnings.warn(
-        '`general_plain_validator_function` is deprecated, use `with_info_plain_validator_function` instead.',
-        DeprecationWarning,
-    )
-    return with_info_plain_validator_function(*args, **kwargs)
 
 
 def with_info_plain_validator_function(
@@ -3896,3 +3821,84 @@ ErrorType = Literal[
 
 def _dict_not_none(**kwargs: Any) -> Any:
     return {k: v for k, v in kwargs.items() if v is not None}
+
+
+###############################################################################
+# All this stuff is deprecated by #980 and will be removed eventually
+# They're kept because some code external code will be using them
+FieldValidationInfo = ValidationInfo
+FieldValidatorFunction = WithInfoValidatorFunction
+GeneralValidatorFunction = WithInfoValidatorFunction
+FieldWrapValidatorFunction = WithInfoWrapValidatorFunction
+
+
+@deprecated('`field_before_validator_function` is deprecated, use `with_info_before_validator_function` instead.')
+def field_before_validator_function(function: FieldValidatorFunction, field_name: str, schema: CoreSchema, **kwargs):
+    warnings.warn(
+        '`field_before_validator_function` is deprecated, use `with_info_before_validator_function` instead.',
+        DeprecationWarning,
+    )
+    return with_info_before_validator_function(function, schema, field_name=field_name, **kwargs)
+
+
+@deprecated('`general_before_validator_function` is deprecated, use `with_info_before_validator_function` instead.')
+def general_before_validator_function(*args, **kwargs):
+    warnings.warn(
+        '`general_before_validator_function` is deprecated, use `with_info_before_validator_function` instead.',
+        DeprecationWarning,
+    )
+    return with_info_before_validator_function(*args, **kwargs)
+
+
+@deprecated('`field_after_validator_function` is deprecated, use `with_info_after_validator_function` instead.')
+def field_after_validator_function(function: FieldValidatorFunction, field_name: str, schema: CoreSchema, **kwargs):
+    warnings.warn(
+        '`field_after_validator_function` is deprecated, use `with_info_after_validator_function` instead.',
+        DeprecationWarning,
+    )
+    return with_info_after_validator_function(function, schema, field_name=field_name, **kwargs)
+
+
+@deprecated('`general_after_validator_function` is deprecated, use `with_info_after_validator_function` instead.')
+def general_after_validator_function(*args, **kwargs):
+    warnings.warn(
+        '`with_info_after_validator_function` is deprecated, use `with_info_after_validator_function` instead.',
+        DeprecationWarning,
+    )
+    return with_info_after_validator_function(*args, **kwargs)
+
+
+@deprecated('`field_wrap_validator_function` is deprecated, use `with_info_wrap_validator_function` instead.')
+def field_wrap_validator_function(function: FieldWrapValidatorFunction, field_name: str, schema: CoreSchema, **kwargs):
+    warnings.warn(
+        '`field_wrap_validator_function` is deprecated, use `with_info_wrap_validator_function` instead.',
+        DeprecationWarning,
+    )
+    return with_info_wrap_validator_function(function, schema, field_name=field_name, **kwargs)
+
+
+@deprecated('`general_wrap_validator_function` is deprecated, use `with_info_wrap_validator_function` instead.')
+def general_wrap_validator_function(*args, **kwargs):
+    warnings.warn(
+        '`general_wrap_validator_function` is deprecated, use `with_info_wrap_validator_function` instead.',
+        DeprecationWarning,
+    )
+    return with_info_wrap_validator_function(*args, **kwargs)
+
+
+@deprecated('`field_plain_validator_function` is deprecated, use `with_info_plain_validator_function` instead.')
+def field_plain_validator_function(function: FieldValidatorFunction, field_name: str, **kwargs):
+    warnings.warn(
+        '`field_plain_validator_function` is deprecated, use `with_info_plain_validator_function` instead.',
+        DeprecationWarning,
+    )
+    return with_info_plain_validator_function(function, field_name=field_name, **kwargs)
+
+
+@deprecated('`general_plain_validator_function` is deprecated, use `with_info_plain_validator_function` instead.')
+def general_plain_validator_function(*args, **kwargs):
+    warnings.warn(
+        '`general_plain_validator_function` is deprecated, use `with_info_plain_validator_function` instead.',
+        DeprecationWarning,
+    )
+    return with_info_plain_validator_function(*args, **kwargs)
