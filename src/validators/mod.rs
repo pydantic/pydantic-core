@@ -9,7 +9,7 @@ use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
-use crate::definitions::DefinitionsBuilder;
+use crate::definitions::{Definition, DefinitionsBuilder};
 use crate::errors::{LocItem, ValError, ValResult, ValidationError};
 use crate::input::{Input, InputType, StringMapping};
 use crate::py_gc::PyGcTraverse;
@@ -101,7 +101,7 @@ impl PySome {
 #[derive(Debug, Clone)]
 pub struct SchemaValidator {
     validator: CombinedValidator,
-    definitions: Vec<CombinedValidator>,
+    definitions: Vec<Definition<CombinedValidator>>,
     schema: PyObject,
     #[pyo3(get)]
     title: PyObject,
@@ -119,7 +119,7 @@ impl SchemaValidator {
         validator.complete(&definitions_builder)?;
         let mut definitions = definitions_builder.clone().finish()?;
         for val in &mut definitions {
-            val.complete(&definitions_builder)?;
+            val.value.complete(&definitions_builder)?;
         }
         let config_title = match config {
             Some(c) => c.get_item("title"),
@@ -395,7 +395,7 @@ impl<'py> SelfValidator<'py> {
         validator.complete(&definitions_builder)?;
         let mut definitions = definitions_builder.clone().finish()?;
         for val in &mut definitions {
-            val.complete(&definitions_builder)?;
+            val.value.complete(&definitions_builder)?;
         }
         Ok(SchemaValidator {
             validator,

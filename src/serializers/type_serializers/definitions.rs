@@ -27,11 +27,11 @@ impl BuildSerializer for DefinitionsSerializerBuilder {
         let schema_definitions: &PyList = schema.get_as_req(intern!(py, "definitions"))?;
 
         for schema_definition in schema_definitions {
-            let reference = schema_definition
-                .extract::<&PyDict>()?
-                .get_as_req::<String>(intern!(py, "ref"))?;
-            let serializer = CombinedSerializer::build(schema_definition.downcast()?, config, definitions)?;
-            definitions.add_definition(reference, serializer)?;
+            let schema = schema_definition.downcast::<PyDict>()?;
+            let reference = schema.get_as_req::<String>(intern!(py, "ref"))?;
+            definitions.build_definition(reference, |definitions| {
+                CombinedSerializer::build(schema, config, definitions)
+            })?;
         }
 
         let inner_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
@@ -69,8 +69,8 @@ impl TypeSerializer for DefinitionRefSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let value_id = extra.rec_guard.add(value, self.serializer_id)?;
-        let comb_serializer = extra.definitions.get(self.serializer_id).unwrap();
-        let r = comb_serializer.to_python(value, include, exclude, extra);
+        let definition = extra.definitions.get(self.serializer_id).unwrap();
+        let r = definition.value.to_python(value, include, exclude, extra);
         extra.rec_guard.pop(value_id, self.serializer_id);
         r
     }
@@ -88,8 +88,10 @@ impl TypeSerializer for DefinitionRefSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let value_id = extra.rec_guard.add(value, self.serializer_id).map_err(py_err_se_err)?;
-        let comb_serializer = extra.definitions.get(self.serializer_id).unwrap();
-        let r = comb_serializer.serde_serialize(value, serializer, include, exclude, extra);
+        let definition = extra.definitions.get(self.serializer_id).unwrap();
+        let r = definition
+            .value
+            .serde_serialize(value, serializer, include, exclude, extra);
         extra.rec_guard.pop(value_id, self.serializer_id);
         r
     }
@@ -99,7 +101,7 @@ impl TypeSerializer for DefinitionRefSerializer {
     }
 
     fn retry_with_lax_check(&self, definitions: &Definitions<CombinedSerializer>) -> bool {
-        let comb_serializer = definitions.get(self.serializer_id).unwrap();
-        comb_serializer.retry_with_lax_check(definitions)
+        let definition = definitions.get(self.serializer_id).unwrap();
+        definition.value.retry_with_lax_check(definitions)
     }
 }

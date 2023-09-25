@@ -11,7 +11,7 @@ use super::config::SerializationConfig;
 use super::errors::{PydanticSerializationUnexpectedValue, UNEXPECTED_TYPE_SER_MARKER};
 use super::ob_type::ObTypeLookup;
 use super::shared::CombinedSerializer;
-use crate::definitions::Definitions;
+use crate::definitions::{Definition, Definitions};
 use crate::recursion_guard::RecursionGuard;
 
 /// this is ugly, would be much better if extra could be stored in `SerializationState`
@@ -156,7 +156,7 @@ impl SerCheck {
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) struct ExtraOwned {
     mode: SerMode,
-    definitions: Vec<CombinedSerializer>,
+    definitions: Vec<Definition<CombinedSerializer>>,
     warnings: CollectWarnings,
     by_alias: bool,
     exclude_unset: bool,

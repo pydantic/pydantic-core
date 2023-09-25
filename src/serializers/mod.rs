@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::{PyTraverseError, PyVisit};
 
-use crate::definitions::DefinitionsBuilder;
+use crate::definitions::{Definition, DefinitionsBuilder};
 use crate::py_gc::PyGcTraverse;
 
 use config::SerializationConfig;
@@ -30,7 +30,7 @@ mod type_serializers;
 #[derive(Debug)]
 pub struct SchemaSerializer {
     serializer: CombinedSerializer,
-    definitions: Vec<CombinedSerializer>,
+    definitions: Vec<Definition<CombinedSerializer>>,
     expected_json_size: AtomicUsize,
     config: SerializationConfig,
 }

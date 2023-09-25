@@ -3,6 +3,7 @@ use std::fmt;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::definitions::Definition;
 use crate::errors::{ErrorType, LocItem, ValError, ValResult};
 use crate::input::{GenericIterator, Input};
 use crate::recursion_guard::RecursionGuard;
@@ -223,7 +224,7 @@ impl ValidatorIterator {
 pub struct InternalValidator {
     name: String,
     validator: CombinedValidator,
-    definitions: Vec<CombinedValidator>,
+    definitions: Vec<Definition<CombinedValidator>>,
     // TODO, do we need data?
     data: Option<Py<PyDict>>,
     strict: Option<bool>,
