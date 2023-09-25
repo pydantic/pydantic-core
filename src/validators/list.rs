@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -13,7 +15,7 @@ pub struct ListValidator {
     item_validator: Option<Box<CombinedValidator>>,
     min_length: Option<usize>,
     max_length: Option<usize>,
-    name: String,
+    name: OnceLock<String>,
 }
 
 pub fn get_items_schema(
@@ -99,14 +101,12 @@ impl BuildValidator for ListValidator {
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let item_validator = get_items_schema(schema, config, definitions)?;
-        let inner_name = item_validator.as_ref().map_or("any", |v| v.get_name());
-        let name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
         Ok(Self {
             strict: crate::build_tools::is_strict(schema, config)?,
             item_validator,
             min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
             max_length: schema.get_as(pyo3::intern!(py, "max_length"))?,
-            name,
+            name: OnceLock::new(),
         }
         .into())
     }
@@ -138,14 +138,10 @@ impl Validator for ListValidator {
         Ok(output.into_py(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         if ultra_strict {
             match self.item_validator {
-                Some(ref v) => v.different_strict_behavior(definitions, true),
+                Some(ref v) => v.different_strict_behavior(true),
                 None => false,
             }
         } else {
@@ -154,14 +150,14 @@ impl Validator for ListValidator {
     }
 
     fn get_name(&self) -> &str {
-        &self.name
+        self.name.get().map_or("list[...]", String::as_str)
     }
 
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        if let Some(ref mut v) = self.item_validator {
-            v.complete(definitions)?;
+    fn complete(&self) -> PyResult<()> {
+        if let Some(v) = &self.item_validator {
+            v.complete()?;
             let inner_name = v.get_name();
-            self.name = format!("{}[{inner_name}]", Self::EXPECTED_TYPE);
+            let _ = self.name.set(format!("{}[{inner_name}]", Self::EXPECTED_TYPE));
         }
         Ok(())
     }

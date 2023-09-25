@@ -51,11 +51,7 @@ impl Validator for StrValidator {
         Ok(either_str.into_py(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         !ultra_strict
     }
 
@@ -63,7 +59,7 @@ impl Validator for StrValidator {
         Self::EXPECTED_TYPE
     }
 
-    fn complete(&mut self, _definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
+    fn complete(&self) -> PyResult<()> {
         Ok(())
     }
 }
@@ -150,11 +146,7 @@ impl Validator for StrConstrainedValidator {
         Ok(py_string.into_py(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        _definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         !ultra_strict
     }
 
@@ -162,7 +154,7 @@ impl Validator for StrConstrainedValidator {
         "constrained-str"
     }
 
-    fn complete(&mut self, _definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
+    fn complete(&self) -> PyResult<()> {
         Ok(())
     }
 }

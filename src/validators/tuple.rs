@@ -60,14 +60,10 @@ impl Validator for TupleVariableValidator {
         Ok(PyTuple::new(py, &output).into_py(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         if ultra_strict {
             match self.item_validator {
-                Some(ref v) => v.different_strict_behavior(definitions, true),
+                Some(ref v) => v.different_strict_behavior(true),
                 None => false,
             }
         } else {
@@ -79,9 +75,9 @@ impl Validator for TupleVariableValidator {
         &self.name
     }
 
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        match self.item_validator {
-            Some(ref mut v) => v.complete(definitions),
+    fn complete(&self) -> PyResult<()> {
+        match &self.item_validator {
+            Some(v) => v.complete(),
             None => Ok(()),
         }
     }
@@ -242,20 +238,12 @@ impl Validator for TuplePositionalValidator {
         }
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         if ultra_strict {
-            if self
-                .items_validators
-                .iter()
-                .any(|v| v.different_strict_behavior(definitions, true))
-            {
+            if self.items_validators.iter().any(|v| v.different_strict_behavior(true)) {
                 true
             } else if let Some(ref v) = self.extras_validator {
-                v.different_strict_behavior(definitions, true)
+                v.different_strict_behavior(true)
             } else {
                 false
             }
@@ -268,12 +256,10 @@ impl Validator for TuplePositionalValidator {
         &self.name
     }
 
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.items_validators
-            .iter_mut()
-            .try_for_each(|v| v.complete(definitions))?;
-        match &mut self.extras_validator {
-            Some(v) => v.complete(definitions),
+    fn complete(&self) -> PyResult<()> {
+        self.items_validators.iter().try_for_each(CombinedValidator::complete)?;
+        match &self.extras_validator {
+            Some(v) => v.complete(),
             None => Ok(()),
         }
     }

@@ -45,19 +45,15 @@ impl Validator for NullableValidator {
         }
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
-        self.validator.different_strict_behavior(definitions, ultra_strict)
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        self.validator.different_strict_behavior(ultra_strict)
     }
 
     fn get_name(&self) -> &str {
         &self.name
     }
 
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        self.validator.complete(definitions)
+    fn complete(&self) -> PyResult<()> {
+        self.validator.complete()
     }
 }

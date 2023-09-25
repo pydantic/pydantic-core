@@ -85,13 +85,9 @@ impl Validator for GeneratorValidator {
         Ok(v_iterator.into_py(py))
     }
 
-    fn different_strict_behavior(
-        &self,
-        definitions: Option<&DefinitionsBuilder<CombinedValidator>>,
-        ultra_strict: bool,
-    ) -> bool {
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         if let Some(ref v) = self.item_validator {
-            v.different_strict_behavior(definitions, ultra_strict)
+            v.different_strict_behavior(ultra_strict)
         } else {
             false
         }
@@ -101,9 +97,9 @@ impl Validator for GeneratorValidator {
         &self.name
     }
 
-    fn complete(&mut self, definitions: &DefinitionsBuilder<CombinedValidator>) -> PyResult<()> {
-        match self.item_validator {
-            Some(ref mut v) => v.complete(definitions),
+    fn complete(&self) -> PyResult<()> {
+        match &self.item_validator {
+            Some(v) => v.complete(),
             None => Ok(()),
         }
     }
@@ -223,7 +219,6 @@ impl ValidatorIterator {
 pub struct InternalValidator {
     name: String,
     validator: CombinedValidator,
-    definitions: Vec<CombinedValidator>,
     // TODO, do we need data?
     data: Option<Py<PyDict>>,
     strict: Option<bool>,
@@ -255,7 +250,6 @@ impl InternalValidator {
         Self {
             name: name.to_string(),
             validator: validator.clone(),
-            definitions: state.definitions.to_vec(),
             data: extra.data.map(|d| d.into_py(py)),
             strict: extra.strict,
             from_attributes: extra.from_attributes,
@@ -285,7 +279,7 @@ impl InternalValidator {
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.as_ref(py)),
         };
-        let mut state = ValidationState::new(extra, &self.definitions, &mut self.recursion_guard);
+        let mut state = ValidationState::new(extra, &mut self.recursion_guard);
         self.validator
             .validate_assignment(py, model, field_name, field_value, &mut state)
             .map_err(|e| {
@@ -316,7 +310,7 @@ impl InternalValidator {
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.as_ref(py)),
         };
-        let mut state = ValidationState::new(extra, &self.definitions, &mut self.recursion_guard);
+        let mut state = ValidationState::new(extra, &mut self.recursion_guard);
         self.validator.validate(py, input, &mut state).map_err(|e| {
             ValidationError::from_val_error(
                 py,
@@ -333,7 +327,6 @@ impl InternalValidator {
 
 impl_py_gc_traverse!(InternalValidator {
     validator,
-    definitions,
     data,
     context,
     self_instance
