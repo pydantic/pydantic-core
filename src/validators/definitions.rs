@@ -64,8 +64,7 @@ impl BuildValidator for DefinitionRefValidator {
         let schema_ref = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
 
         let definition = definitions.get_definition(schema_ref);
-
-        Ok(Self { definition }.into())
+        Ok(Self::new(definition).into())
     }
 }
 
@@ -131,8 +130,12 @@ impl Validator for DefinitionRefValidator {
 
         let id = self as *const _ as usize;
         // have to unwrap here, because we can't return an error from this function, should be okay
-        let validator = self.definition.get().unwrap();
-        if RECURSION_SET.with(|set| set.borrow_mut().get_or_insert_with(HashSet::new).insert(id)) {
+        let validator: &CombinedValidator = self.definition.get().unwrap();
+        if RECURSION_SET.with(
+            |set: &RefCell<Option<std::collections::HashSet<usize, ahash::RandomState>>>| {
+                set.borrow_mut().get_or_insert_with(HashSet::new).insert(id)
+            },
+        ) {
             let different_strict_behavior = validator.different_strict_behavior(ultra_strict);
             RECURSION_SET.with(|set| set.borrow_mut().get_or_insert_with(HashSet::new).remove(&id));
             different_strict_behavior
@@ -142,10 +145,9 @@ impl Validator for DefinitionRefValidator {
     }
 
     fn get_name(&self) -> &str {
-        self.definition.get().map_or("...", |validator| validator.get_name())
+        self.definition.get_or_init_name(|v| v.get_name().into())
     }
 
-    /// don't need to call complete on the inner validator here, complete_validators takes care of that.
     fn complete(&self) -> PyResult<()> {
         Ok(())
     }

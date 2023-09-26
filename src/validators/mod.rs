@@ -116,8 +116,8 @@ impl SchemaValidator {
         let mut definitions_builder = DefinitionsBuilder::new();
 
         let validator = build_validator(schema, config, &mut definitions_builder)?;
-        validator.complete()?;
         let definitions = definitions_builder.finish()?;
+        validator.complete()?;
         for val in definitions.values() {
             val.get().unwrap().complete()?;
         }
@@ -387,8 +387,8 @@ impl<'py> SelfValidator<'py> {
             Ok(v) => v,
             Err(err) => return py_schema_err!("Error building self-schema:\n  {}", err),
         };
-        validator.complete()?;
         let definitions = definitions_builder.finish()?;
+        validator.complete()?;
         for val in definitions.values() {
             val.get().unwrap().complete()?;
         }

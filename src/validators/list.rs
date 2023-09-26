@@ -150,14 +150,27 @@ impl Validator for ListValidator {
     }
 
     fn get_name(&self) -> &str {
-        self.name.get().map_or("list[...]", String::as_str)
+        // The logic here is a little janky, it's done to try to cache the formatted name
+        // while also trying to render definitions correctly when possible.
+        //
+        // Probably an opportunity for a future refactor
+        match self.name.get() {
+            Some(s) => s.as_str(),
+            None => {
+                let name = self.item_validator.as_ref().map_or("any", |v| v.get_name());
+                if name == "..." {
+                    // when inner name is not initialized yet, don't cache it here
+                    "list[...]"
+                } else {
+                    self.name.get_or_init(|| format!("list[{name}]")).as_str()
+                }
+            }
+        }
     }
 
     fn complete(&self) -> PyResult<()> {
         if let Some(v) = &self.item_validator {
             v.complete()?;
-            let inner_name = v.get_name();
-            let _ = self.name.set(format!("{}[{inner_name}]", Self::EXPECTED_TYPE));
         }
         Ok(())
     }

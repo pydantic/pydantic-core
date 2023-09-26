@@ -1,3 +1,4 @@
+import datetime
 import platform
 from dataclasses import dataclass
 from typing import List, Optional
@@ -243,7 +244,7 @@ def test_model_class():
 
 
 def test_invalid_schema():
-    with pytest.raises(SchemaError, match='Definitions error: attempted to use `Branch` before it was filled'):
+    with pytest.raises(SchemaError, match='Definitions error: definition `Branch` was never filled'):
         SchemaValidator(
             {
                 'type': 'list',
@@ -986,4 +987,101 @@ def test_cyclic_data_threeway() -> None:
             'msg': 'Recursion error - cyclic reference detected',
             'input': cyclic_data,
         }
+    ]
+
+
+def test_complex_recursive_type() -> None:
+    schema = core_schema.definitions_schema(
+        core_schema.definition_reference_schema('JsonType'),
+        [
+            core_schema.nullable_schema(
+                core_schema.union_schema(
+                    [
+                        core_schema.list_schema(core_schema.definition_reference_schema('JsonType')),
+                        core_schema.dict_schema(
+                            core_schema.str_schema(), core_schema.definition_reference_schema('JsonType')
+                        ),
+                        core_schema.str_schema(),
+                        core_schema.int_schema(),
+                        core_schema.float_schema(),
+                        core_schema.bool_schema(),
+                    ]
+                ),
+                ref='JsonType',
+            )
+        ],
+    )
+
+    validator = SchemaValidator(schema)
+
+    with pytest.raises(ValidationError) as exc_info:
+        validator.validate_python({'a': datetime.date(year=1992, month=12, day=11)})
+
+    assert exc_info.value.errors(include_url=False) == [
+        {
+            'type': 'list_type',
+            'loc': ('list[nullable[union[list[...],dict[str,...],str,int,float,bool]]]',),
+            'msg': 'Input should be a valid list',
+            'input': {'a': datetime.date(1992, 12, 11)},
+        },
+        {
+            'type': 'list_type',
+            'loc': ('dict[str,...]', 'a', 'list[nullable[union[list[...],dict[str,...],str,int,float,bool]]]'),
+            'msg': 'Input should be a valid list',
+            'input': datetime.date(1992, 12, 11),
+        },
+        {
+            'type': 'dict_type',
+            'loc': ('dict[str,...]', 'a', 'dict[str,...]'),
+            'msg': 'Input should be a valid dictionary',
+            'input': datetime.date(1992, 12, 11),
+        },
+        {
+            'type': 'string_type',
+            'loc': ('dict[str,...]', 'a', 'str'),
+            'msg': 'Input should be a valid string',
+            'input': datetime.date(1992, 12, 11),
+        },
+        {
+            'type': 'int_type',
+            'loc': ('dict[str,...]', 'a', 'int'),
+            'msg': 'Input should be a valid integer',
+            'input': datetime.date(1992, 12, 11),
+        },
+        {
+            'type': 'float_type',
+            'loc': ('dict[str,...]', 'a', 'float'),
+            'msg': 'Input should be a valid number',
+            'input': datetime.date(1992, 12, 11),
+        },
+        {
+            'type': 'bool_type',
+            'loc': ('dict[str,...]', 'a', 'bool'),
+            'msg': 'Input should be a valid boolean',
+            'input': datetime.date(1992, 12, 11),
+        },
+        {
+            'type': 'string_type',
+            'loc': ('str',),
+            'msg': 'Input should be a valid string',
+            'input': {'a': datetime.date(1992, 12, 11)},
+        },
+        {
+            'type': 'int_type',
+            'loc': ('int',),
+            'msg': 'Input should be a valid integer',
+            'input': {'a': datetime.date(1992, 12, 11)},
+        },
+        {
+            'type': 'float_type',
+            'loc': ('float',),
+            'msg': 'Input should be a valid number',
+            'input': {'a': datetime.date(1992, 12, 11)},
+        },
+        {
+            'type': 'bool_type',
+            'loc': ('bool',),
+            'msg': 'Input should be a valid boolean',
+            'input': {'a': datetime.date(1992, 12, 11)},
+        },
     ]
