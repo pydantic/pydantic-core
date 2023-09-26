@@ -121,39 +121,23 @@ impl<'a, INPUT: Input<'a>> MaxLengthCheck<'a, INPUT> {
     }
 
     fn incr(&mut self) -> ValResult<'a, ()> {
-        match self.max_length {
-            Some(max_length) => {
-                self.current_length += 1;
-                if self.current_length > max_length {
-                    let biggest_length = if self.known_input_length > self.current_length {
-                        self.known_input_length
-                    } else {
-                        self.current_length
-                    };
-                    return Err(ValError::new(
-                        ErrorType::TooLong {
-                            field_type: self.field_type.to_string(),
-                            max_length,
-                            actual_length: biggest_length,
-                            context: None,
-                        },
-                        self.input,
-                    ));
-                }
-            }
-            None => {
-                self.current_length += 1;
-                if self.current_length > self.known_input_length {
-                    return Err(ValError::new(
-                        ErrorType::TooLong {
-                            field_type: self.field_type.to_string(),
-                            max_length: self.known_input_length,
-                            actual_length: self.current_length,
-                            context: None,
-                        },
-                        self.input,
-                    ));
-                }
+        if let Some(max_length) = self.max_length {
+            self.current_length += 1;
+            if self.current_length > max_length {
+                let biggest_length = if self.known_input_length > self.current_length {
+                    self.known_input_length
+                } else {
+                    self.current_length
+                };
+                return Err(ValError::new(
+                    ErrorType::TooLong {
+                        field_type: self.field_type.to_string(),
+                        max_length,
+                        actual_length: biggest_length,
+                        context: None,
+                    },
+                    self.input,
+                ));
             }
         }
         Ok(())
