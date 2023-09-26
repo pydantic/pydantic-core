@@ -895,3 +895,95 @@ def test_validate_assignment(pydantic_version) -> None:
             'url': f'https://errors.pydantic.dev/{pydantic_version}/v/dataclass_type',
         }
     ]
+
+
+def test_cyclic_data() -> None:
+    cyclic_data = {}
+    cyclic_data['b'] = {'a': cyclic_data}
+
+    schema = core_schema.definitions_schema(
+        core_schema.definition_reference_schema('a'),
+        [
+            core_schema.typed_dict_schema(
+                {
+                    'b': core_schema.typed_dict_field(
+                        core_schema.nullable_schema(core_schema.definition_reference_schema('b'))
+                    )
+                },
+                ref='a',
+            ),
+            core_schema.typed_dict_schema(
+                {
+                    'a': core_schema.typed_dict_field(
+                        core_schema.nullable_schema(core_schema.definition_reference_schema('a'))
+                    )
+                },
+                ref='b',
+            ),
+        ],
+    )
+
+    validator = SchemaValidator(schema)
+
+    with pytest.raises(ValidationError) as exc_info:
+        validator.validate_python(cyclic_data)
+
+    assert exc_info.value.title == 'typed-dict'
+    assert exc_info.value.errors(include_url=False) == [
+        {
+            'type': 'recursion_loop',
+            'loc': ('b', 'a'),
+            'msg': 'Recursion error - cyclic reference detected',
+            'input': cyclic_data,
+        }
+    ]
+
+
+def test_cyclic_data_threeway() -> None:
+    cyclic_data = {}
+    cyclic_data['b'] = {'c': {'a': cyclic_data}}
+
+    schema = core_schema.definitions_schema(
+        core_schema.definition_reference_schema('a'),
+        [
+            core_schema.typed_dict_schema(
+                {
+                    'b': core_schema.typed_dict_field(
+                        core_schema.nullable_schema(core_schema.definition_reference_schema('b'))
+                    )
+                },
+                ref='a',
+            ),
+            core_schema.typed_dict_schema(
+                {
+                    'c': core_schema.typed_dict_field(
+                        core_schema.nullable_schema(core_schema.definition_reference_schema('c'))
+                    )
+                },
+                ref='b',
+            ),
+            core_schema.typed_dict_schema(
+                {
+                    'a': core_schema.typed_dict_field(
+                        core_schema.nullable_schema(core_schema.definition_reference_schema('a'))
+                    )
+                },
+                ref='c',
+            ),
+        ],
+    )
+
+    validator = SchemaValidator(schema)
+
+    with pytest.raises(ValidationError) as exc_info:
+        validator.validate_python(cyclic_data)
+
+    assert exc_info.value.title == 'typed-dict'
+    assert exc_info.value.errors(include_url=False) == [
+        {
+            'type': 'recursion_loop',
+            'loc': ('b', 'c', 'a'),
+            'msg': 'Recursion error - cyclic reference detected',
+            'input': cyclic_data,
+        }
+    ]
