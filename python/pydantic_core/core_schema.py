@@ -30,15 +30,17 @@ else:
     from typing import Literal
 
 if TYPE_CHECKING:
-    from pydantic_core import PydanticUndefined
+    from pydantic_core import PydanticUndefined, SchemaSerializer, SchemaValidator
 else:
-    # The initial build of pydantic_core requires PydanticUndefined to generate
+    # The initial build of pydantic_core requires some Rust structures to generate
     # the core schema; so we need to conditionally skip it. mypy doesn't like
     # this at all, hence the TYPE_CHECKING branch above.
     try:
-        from pydantic_core import PydanticUndefined
+        from pydantic_core import PydanticUndefined, SchemaSerializer, SchemaValidator
     except ImportError:
-        PydanticUndefined = object()
+        PydanticUndefined = 'PydanticUndefined'
+        SchemaValidator = 'SchemaValidator'
+        SchemaSerializer = 'SchemaSerializer'
 
 
 ExtraBehavior = Literal['allow', 'forbid', 'ignore']
@@ -3605,6 +3607,50 @@ def definition_reference_schema(
     return _dict_not_none(type='definition-ref', schema_ref=schema_ref, metadata=metadata, serialization=serialization)
 
 
+class PrecompiledSchema(TypedDict, total=False):
+    type: Required[Literal['precompiled']]
+    schema: CoreSchema
+    validator: SchemaValidator
+    serializer: SchemaSerializer
+    ref: str
+    metadata: Any
+
+
+def precompiled_schema(
+    schema: CoreSchema,
+    validator: SchemaValidator,
+    serializer: SchemaSerializer,
+    ref: str | None = None,
+    metadata: Any = None,
+) -> PrecompiledSchema:
+    """
+    Returns a schema that points to a schema stored in "definitions", this is useful for nested recursive
+    models and also when you want to define validators separately from the main schema, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    schema_definition = core_schema.definition_reference_schema('list-schema')
+    schema = core_schema.definitions_schema(
+        schema=schema_definition,
+        definitions=[
+            core_schema.list_schema(items_schema=schema_definition, ref='list-schema'),
+        ],
+    )
+    v = SchemaValidator(schema)
+    assert v.validate_python([()]) == [[]]
+    ```
+
+    Args:
+        schema_ref: The schema ref to use for the definition reference schema
+        metadata: Any other information you want to include with the schema, not used by pydantic-core
+        serialization: Custom serialization schema
+    """
+    return _dict_not_none(
+        type='precompiled', schema=schema, validator=validator, serializer=serializer, ref=ref, metadata=metadata
+    )
+
+
 MYPY = False
 # See https://github.com/python/mypy/issues/14034 for details, in summary mypy is extremely slow to process this
 # union which kills performance not just for pydantic, but even for code using pydantic
@@ -3658,6 +3704,7 @@ if not MYPY:
         DefinitionsSchema,
         DefinitionReferenceSchema,
         UuidSchema,
+        PrecompiledSchema,
     ]
 elif False:
     CoreSchema: TypeAlias = Mapping[str, Any]
@@ -3713,6 +3760,7 @@ CoreSchemaType = Literal[
     'definitions',
     'definition-ref',
     'uuid',
+    'precompiled',
 ]
 
 CoreSchemaFieldType = Literal['model-field', 'dataclass-field', 'typed-dict-field', 'computed-field']

@@ -46,6 +46,7 @@ mod model;
 mod model_fields;
 mod none;
 mod nullable;
+mod precompiled;
 mod set;
 mod string;
 mod time;
@@ -97,7 +98,7 @@ impl PySome {
     }
 }
 
-#[pyclass(module = "pydantic_core._pydantic_core")]
+#[pyclass(module = "pydantic_core._pydantic_core", frozen)]
 #[derive(Debug)]
 pub struct SchemaValidator {
     validator: CombinedValidator,
@@ -542,6 +543,8 @@ pub fn build_validator<'a>(
         // recursive (self-referencing) models
         definitions::DefinitionRefValidator,
         definitions::DefinitionsValidatorBuilder,
+        // precompiled models
+        precompiled::PrecompiledValidator,
     )
 }
 
@@ -690,6 +693,8 @@ pub enum CombinedValidator {
     DefinitionRef(definitions::DefinitionRefValidator),
     // input dependent
     JsonOrPython(json_or_python::JsonOrPython),
+    // reusing a sub-schema
+    Precompiled(precompiled::PrecompiledValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
