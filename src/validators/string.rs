@@ -10,7 +10,7 @@ use crate::tools::SchemaDict;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct StrValidator {
     strict: bool,
     coerce_numbers_to_str: bool,

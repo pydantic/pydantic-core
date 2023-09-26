@@ -9,7 +9,7 @@ use crate::tools::SchemaDict;
 use super::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct JsonValidator {
     validator: Option<Box<CombinedValidator>>,
     name: String,

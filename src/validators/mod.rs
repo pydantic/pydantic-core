@@ -98,7 +98,7 @@ impl PySome {
 }
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SchemaValidator {
     validator: CombinedValidator,
     definitions: Definitions<CombinedValidator>,
@@ -141,9 +141,10 @@ impl SchemaValidator {
         })
     }
 
-    pub fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
-        let args = (self.schema.as_ref(py),);
-        let cls = Py::new(py, self.clone())?.getattr(py, "__class__")?;
+    pub fn __reduce__(slf: &PyCell<Self>) -> PyResult<PyObject> {
+        let py = slf.py();
+        let args = (slf.try_borrow()?.schema.to_object(py),);
+        let cls = slf.getattr("__class__")?;
         Ok((cls, args).into_py(py))
     }
 
@@ -598,7 +599,7 @@ impl<'a> Extra<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 #[enum_dispatch(PyGcTraverse)]
 pub enum CombinedValidator {
     // typed dict e.g. heterogeneous dicts or simply a model
@@ -694,7 +695,7 @@ pub enum CombinedValidator {
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
 /// validators defined in `build_validator` also need `EXPECTED_TYPE` as a const, but that can't be part of the trait
 #[enum_dispatch(CombinedValidator)]
-pub trait Validator: Send + Sync + Clone + Debug {
+pub trait Validator: Send + Sync + Debug {
     /// Do the actual validation for this schema/type
     fn validate<'data>(
         &self,

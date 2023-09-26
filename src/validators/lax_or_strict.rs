@@ -10,7 +10,7 @@ use crate::tools::SchemaDict;
 use super::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct LaxOrStrictValidator {
     strict: bool,
     lax_validator: Box<CombinedValidator>,

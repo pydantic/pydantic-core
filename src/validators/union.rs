@@ -65,7 +65,7 @@ impl FromStr for UnionMode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct UnionValidator {
     mode: UnionMode,
     choices: Vec<(CombinedValidator, Option<String>)>,
@@ -375,7 +375,7 @@ impl PyGcTraverse for Discriminator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TaggedUnionValidator {
     discriminator: Discriminator,
     lookup: LiteralLookup<CombinedValidator>,

@@ -11,7 +11,7 @@ use crate::tools::SchemaDict;
 use super::validation_state::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct CallValidator {
     function: PyObject,
     arguments_validator: Box<CombinedValidator>,

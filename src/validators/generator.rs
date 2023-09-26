@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::Arc;
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -14,7 +15,7 @@ use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, InputT
 
 #[derive(Debug, Clone)]
 pub struct GeneratorValidator {
-    item_validator: Option<Box<CombinedValidator>>,
+    item_validator: Option<Arc<CombinedValidator>>,
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: String,
@@ -30,7 +31,7 @@ impl BuildValidator for GeneratorValidator {
         config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        let item_validator = get_items_schema(schema, config, definitions)?;
+        let item_validator = get_items_schema(schema, config, definitions)?.map(Arc::new);
         let name = match item_validator {
             Some(ref v) => format!("{}[{}]", Self::EXPECTED_TYPE, v.get_name()),
             None => format!("{}[any]", Self::EXPECTED_TYPE),
@@ -67,7 +68,7 @@ impl Validator for GeneratorValidator {
             InternalValidator::new(
                 py,
                 "ValidatorIterator",
-                v,
+                v.clone(),
                 state,
                 self.hide_input_in_errors,
                 self.validation_error_cause,
@@ -106,7 +107,7 @@ impl Validator for GeneratorValidator {
 }
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ValidatorIterator {
     iterator: GenericIterator,
     validator: Option<InternalValidator>,
@@ -213,12 +214,11 @@ impl ValidatorIterator {
     }
 }
 
-/// Cloneable validator wrapper for use in generators in functions, this can be passed back to python
+/// Owned validator wrapper for use in generators in functions, this can be passed back to python
 /// mid-validation
-#[derive(Clone)]
 pub struct InternalValidator {
     name: String,
-    validator: CombinedValidator,
+    validator: Arc<CombinedValidator>,
     // TODO, do we need data?
     data: Option<Py<PyDict>>,
     strict: Option<bool>,
@@ -241,7 +241,7 @@ impl InternalValidator {
     pub fn new(
         py: Python,
         name: &str,
-        validator: &CombinedValidator,
+        validator: Arc<CombinedValidator>,
         state: &ValidationState,
         hide_input_in_errors: bool,
         validation_error_cause: bool,
@@ -249,7 +249,7 @@ impl InternalValidator {
         let extra = state.extra();
         Self {
             name: name.to_string(),
-            validator: validator.clone(),
+            validator,
             data: extra.data.map(|d| d.into_py(py)),
             strict: extra.strict,
             from_attributes: extra.from_attributes,

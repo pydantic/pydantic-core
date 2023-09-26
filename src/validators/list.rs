@@ -9,7 +9,7 @@ use crate::tools::SchemaDict;
 
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ListValidator {
     strict: bool,
     item_validator: Option<Box<CombinedValidator>>,
@@ -22,13 +22,13 @@ pub fn get_items_schema(
     schema: &PyDict,
     config: Option<&PyDict>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
-) -> PyResult<Option<Box<CombinedValidator>>> {
+) -> PyResult<Option<CombinedValidator>> {
     match schema.get_item(pyo3::intern!(schema.py(), "items_schema")) {
         Some(d) => {
             let validator = build_validator(d, config, definitions)?;
             match validator {
                 CombinedValidator::Any(_) => Ok(None),
-                _ => Ok(Some(Box::new(validator))),
+                _ => Ok(Some(validator)),
             }
         }
         None => Ok(None),
@@ -100,7 +100,7 @@ impl BuildValidator for ListValidator {
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let item_validator = get_items_schema(schema, config, definitions)?;
+        let item_validator = get_items_schema(schema, config, definitions)?.map(Box::new);
         Ok(Self {
             strict: crate::build_tools::is_strict(schema, config)?,
             item_validator,

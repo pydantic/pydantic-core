@@ -10,7 +10,7 @@ use crate::tools::SchemaDict;
 use super::list::{get_items_schema, min_length_check};
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TupleVariableValidator {
     strict: bool,
     item_validator: Option<Box<CombinedValidator>>,
@@ -27,7 +27,7 @@ impl BuildValidator for TupleVariableValidator {
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let item_validator = get_items_schema(schema, config, definitions)?;
+        let item_validator = get_items_schema(schema, config, definitions)?.map(Box::new);
         let inner_name = item_validator.as_ref().map_or("any", |v| v.get_name());
         let name = format!("tuple[{inner_name}, ...]");
         Ok(Self {
@@ -83,7 +83,7 @@ impl Validator for TupleVariableValidator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TuplePositionalValidator {
     strict: bool,
     items_validators: Vec<CombinedValidator>,

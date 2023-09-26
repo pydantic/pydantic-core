@@ -10,7 +10,7 @@ use super::set::set_build;
 use super::validation_state::ValidationState;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FrozenSetValidator {
     strict: bool,
     item_validator: Box<CombinedValidator>,

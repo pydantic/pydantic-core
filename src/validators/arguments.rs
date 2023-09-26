@@ -15,7 +15,7 @@ use crate::tools::SchemaDict;
 use super::validation_state::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Parameter {
     positional: bool,
     name: String,
@@ -24,7 +24,7 @@ struct Parameter {
     validator: CombinedValidator,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ArgumentsValidator {
     parameters: Vec<Parameter>,
     positional_params_count: usize,
