@@ -122,20 +122,16 @@ def generate_repeats():
         ({'strict': True}, frozenset([1, 2, 3]), Err('Input should be a valid set [type=set_type,')),
         ({'strict': True}, 'abc', Err('Input should be a valid set [type=set_type,')),
         ({'min_length': 3}, {1, 2, 3}, {1, 2, 3}),
-        (
-            {'min_length': 3},
-            {1, 2},
-            Err('Set should have at least 3 items after validation, input had 2 items [type=too_short,'),
-        ),
+        ({'min_length': 3}, {1, 2}, Err('Set should have at least 3 items after validation, not 2 [type=too_short,')),
         (
             {'max_length': 3},
             {1, 2, 3, 4},
-            Err('Set should have at most 3 items after validation, input had more items [type=too_long,'),
+            Err('Set should have at most 3 items after validation, not more [type=too_long,'),
         ),
         (
             {'max_length': 3},
             [1, 2, 3, 4],
-            Err('Set should have at most 3 items after validation, input had more items [type=too_long,'),
+            Err('Set should have at most 3 items after validation, not more [type=too_long,'),
         ),
         ({'max_length': 3, 'items_schema': {'type': 'int'}}, {1, 2, 3, 4}, Err('type=too_long,')),
         ({'max_length': 3, 'items_schema': {'type': 'int'}}, [1, 2, 3, 4], Err('type=too_long,')),
@@ -145,7 +141,7 @@ def generate_repeats():
         (
             {'max_length': 3},
             infinite_generator(),
-            Err('Set should have at most 3 items after validation, input had more items [type=too_long,'),
+            Err('Set should have at most 3 items after validation, not more [type=too_long,'),
         ),
     ],
     ids=repr,

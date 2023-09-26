@@ -487,8 +487,8 @@ impl ErrorType {
             Self::LessThanEqual {..} => "Input should be less than or equal to {le}",
             Self::MultipleOf {..} => "Input should be a multiple of {multiple_of}",
             Self::FiniteNumber {..} => "Input should be a finite number",
-            Self::TooShort {..} => "{field_type} should have at least {min_length} item{expected_plural} after validation, input had {actual_length} item{actual_plural}",
-            Self::TooLong {..} => "{field_type} should have at most {max_length} item{expected_plural} after validation, input had {actual_length} item{actual_plural}",
+            Self::TooShort {..} => "{field_type} should have at least {min_length} item{expected_plural} after validation, not {actual_length}",
+            Self::TooLong {..} => "{field_type} should have at most {max_length} item{expected_plural} after validation, not {actual_length}",
             Self::IterableType {..} => "Input should be iterable",
             Self::IterationError {..} => "Error iterating over object, error: {error}",
             Self::StringType {..} => "Input should be a valid string",
@@ -630,15 +630,7 @@ impl ErrorType {
                 ..
             } => {
                 let expected_plural = plural_s(*min_length);
-                let actual_plural = plural_s(*actual_length);
-                to_string_render!(
-                    tmpl,
-                    field_type,
-                    min_length,
-                    actual_length,
-                    expected_plural,
-                    actual_plural
-                )
+                to_string_render!(tmpl, field_type, min_length, actual_length, expected_plural,)
             }
             Self::TooLong {
                 field_type,
@@ -647,16 +639,8 @@ impl ErrorType {
                 ..
             } => {
                 let expected_plural = plural_s(*max_length);
-                let actual_plural = plural_s(actual_length.unwrap_or(0));
                 let actual_length = actual_length.map_or(Cow::Borrowed("more"), |v| Cow::Owned(v.to_string()));
-                to_string_render!(
-                    tmpl,
-                    field_type,
-                    max_length,
-                    actual_length,
-                    expected_plural,
-                    actual_plural
-                )
+                to_string_render!(tmpl, field_type, max_length, actual_length, expected_plural,)
             }
             Self::IterationError { error, .. } => render!(tmpl, error),
             Self::StringTooShort { min_length, .. } => to_string_render!(tmpl, min_length),
