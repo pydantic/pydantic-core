@@ -143,29 +143,46 @@ def test_list_error(input_value, index):
     [
         ({}, [1, 2, 3, 4], [1, 2, 3, 4]),
         ({'min_length': 3}, [1, 2, 3, 4], [1, 2, 3, 4]),
-        ({'min_length': 3}, [1, 2], Err('List should have at least 3 items after validation, not 2 [type=too_short,')),
-        ({'min_length': 1}, [], Err('List should have at least 1 item after validation, not 0 [type=too_short,')),
+        (
+            {'min_length': 3},
+            [1, 2],
+            Err('List should have at least 3 items after validation, input had 2 items [type=too_short,'),
+        ),
+        (
+            {'min_length': 1},
+            [],
+            Err('List should have at least 1 item after validation, input had 0 items [type=too_short,'),
+        ),
         ({'max_length': 4}, [1, 2, 3, 4], [1, 2, 3, 4]),
         (
             {'max_length': 3},
             [1, 2, 3, 4],
-            Err('List should have at most 3 items after validation, not 4 [type=too_long,'),
+            Err('List should have at most 3 items after validation, input had 4 items [type=too_long,'),
         ),
         (
             {'max_length': 3},
             [1, 2, 3, 4, 5, 6, 7],
-            Err('List should have at most 3 items after validation, not 7 [type=too_long,'),
+            Err('List should have at most 3 items after validation, input had 7 items [type=too_long,'),
         ),
-        ({'max_length': 1}, [1, 2], Err('List should have at most 1 item after validation, not 2 [type=too_long,')),
+        (
+            {'max_length': 1},
+            [1, 2],
+            Err('List should have at most 1 item after validation, input had 2 items [type=too_long,'),
+        ),
+        (
+            {'max_length': 0},
+            [1],
+            Err('List should have at most 0 items after validation, input had 1 item [type=too_long,'),
+        ),
         (
             {'max_length': 44},
             infinite_generator(),
-            Err('List should have at most 44 items after validation, not 45 [type=too_long,'),
+            Err('List should have at most 44 items after validation, input had more items [type=too_long,'),
         ),
         (
             {'max_length': 4, 'items_schema': {'type': 'int'}},
             [0, 1, 2, 3, 4, 5, 6, 7, 8],
-            Err('List should have at most 4 items after validation, not 9 [type=too_long,'),
+            Err('List should have at most 4 items after validation, input had 9 items [type=too_long,'),
         ),
     ],
 )
@@ -182,7 +199,7 @@ def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
     'input_value,expected',
     [
         ([1, 2, 3, 4], [1, 2, 3, 4]),
-        ([1, 2, 3, 4, 5], Err('List should have at most 4 items after validation, not 5 [type=too_long,')),
+        ([1, 2, 3, 4, 5], Err('List should have at most 4 items after validation, input had 5 items [type=too_long,')),
         ([1, 2, 3, 'x', 4], [1, 2, 3, 4]),
     ],
 )
@@ -210,7 +227,7 @@ def test_length_ctx():
         {
             'type': 'too_short',
             'loc': (),
-            'msg': 'List should have at least 2 items after validation, not 1',
+            'msg': 'List should have at least 2 items after validation, input had 1 item',
             'input': [1],
             'ctx': {'field_type': 'List', 'min_length': 2, 'actual_length': 1},
         }
@@ -224,7 +241,7 @@ def test_length_ctx():
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 3 items after validation, not 4',
+            'msg': 'List should have at most 3 items after validation, input had 4 items',
             'input': [1, 2, 3, 4],
             'ctx': {'field_type': 'List', 'max_length': 3, 'actual_length': 4},
         }
@@ -390,7 +407,7 @@ def test_max_length_fail_fast(error_in_func: bool) -> None:
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'List should have at most 10 items after validation, not 15',
+            'msg': 'List should have at most 10 items after validation, input had 15 items',
             'input': data,
             'ctx': {'field_type': 'List', 'max_length': 10, 'actual_length': 15},
         }

@@ -276,12 +276,12 @@ all_errors = [
     ('finite_number', 'Input should be a finite number', None),
     (
         'too_short',
-        'Foobar should have at least 42 items after validation, not 40',
+        'Foobar should have at least 42 items after validation, input had 40 items',
         {'field_type': 'Foobar', 'min_length': 42, 'actual_length': 40},
     ),
     (
         'too_long',
-        'Foobar should have at most 42 items after validation, not 50',
+        'Foobar should have at most 42 items after validation, input had 50 items',
         {'field_type': 'Foobar', 'max_length': 42, 'actual_length': 50},
     ),
     ('string_type', 'Input should be a valid string', None),
