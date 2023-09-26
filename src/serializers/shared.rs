@@ -13,7 +13,7 @@ use serde_json::ser::PrettyFormatter;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::py_schema_error_type;
-use crate::definitions::{Definitions, DefinitionsBuilder};
+use crate::definitions::DefinitionsBuilder;
 use crate::py_gc::PyGcTraverse;
 use crate::tools::{py_err, SchemaDict};
 
@@ -141,6 +141,7 @@ combined_serializer! {
         Recursive: super::type_serializers::definitions::DefinitionRefSerializer;
         TuplePositional: super::type_serializers::tuple::TuplePositionalSerializer;
         TupleVariable: super::type_serializers::tuple::TupleVariableSerializer;
+        Precompiled: super::type_serializers::precompiled::PrecompiledSerializer;
     }
 }
 
@@ -250,6 +251,7 @@ impl PyGcTraverse for CombinedSerializer {
             CombinedSerializer::TuplePositional(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::TupleVariable(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Uuid(inner) => inner.py_gc_traverse(visit),
+            CombinedSerializer::Precompiled(inner) => inner.py_gc_traverse(visit),
         }
     }
 }
@@ -293,7 +295,7 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
     fn get_name(&self) -> &str;
 
     /// Used by union serializers to decide if it's worth trying again while allowing subclasses
-    fn retry_with_lax_check(&self, _definitions: &Definitions<CombinedSerializer>) -> bool {
+    fn retry_with_lax_check(&self) -> bool {
         false
     }
 

@@ -15,6 +15,7 @@ pub mod literal;
 pub mod model;
 pub mod nullable;
 pub mod other;
+pub mod precompiled;
 pub mod set_frozenset;
 pub mod simple;
 pub mod string;

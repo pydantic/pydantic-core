@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::{PyTraverseError, PyVisit};
 
-use crate::definitions::DefinitionsBuilder;
+use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::py_gc::PyGcTraverse;
 
 use config::SerializationConfig;
@@ -26,11 +26,12 @@ mod ob_type;
 mod shared;
 mod type_serializers;
 
-#[pyclass(module = "pydantic_core._pydantic_core")]
+#[pyclass(module = "pydantic_core._pydantic_core", frozen)]
 #[derive(Debug)]
 pub struct SchemaSerializer {
     serializer: CombinedSerializer,
-    definitions: Vec<CombinedSerializer>,
+    schema: PyObject,
+    definitions: Definitions<CombinedSerializer>,
     expected_json_size: AtomicUsize,
     config: SerializationConfig,
 }
@@ -54,7 +55,6 @@ impl SchemaSerializer {
         Extra::new(
             py,
             mode,
-            &self.definitions,
             by_alias,
             warnings,
             exclude_unset,
@@ -78,6 +78,7 @@ impl SchemaSerializer {
         let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut definitions_builder)?;
         Ok(Self {
             serializer,
+            schema: schema.into(),
             definitions: definitions_builder.finish()?,
             expected_json_size: AtomicUsize::new(1024),
             config: SerializationConfig::from_config(config)?,
@@ -184,9 +185,8 @@ impl SchemaSerializer {
 
     fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
         self.serializer.py_gc_traverse(&visit)?;
-        for slot in &self.definitions {
-            slot.py_gc_traverse(&visit)?;
-        }
+        visit.call(&self.schema)?;
+        self.definitions.py_gc_traverse(&visit)?;
         Ok(())
     }
 }

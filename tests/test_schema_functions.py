@@ -39,6 +39,10 @@ def args(*args, **kwargs):
     return args, kwargs
 
 
+INT_SCHEMA = core_schema.int_schema()
+INT_VALIDATOR = SchemaValidator(INT_SCHEMA)
+INT_SERIALIZER = SchemaSerializer(INT_SCHEMA)
+
 all_schema_functions = [
     (core_schema.any_schema, args(), {'type': 'any'}),
     (core_schema.any_schema, args(metadata=['foot', 'spa']), {'type': 'any', 'metadata': ['foot', 'spa']}),
@@ -289,6 +293,11 @@ all_schema_functions = [
     (core_schema.uuid_schema, args(), {'type': 'uuid'}),
     (core_schema.decimal_schema, args(), {'type': 'decimal'}),
     (core_schema.decimal_schema, args(multiple_of=5, gt=1.2), {'type': 'decimal', 'multiple_of': 5, 'gt': 1.2}),
+    (
+        core_schema.precompiled_schema,
+        args(schema=INT_SCHEMA, validator=INT_VALIDATOR, serializer=INT_SERIALIZER),
+        {'type': 'precompiled', 'schema': INT_SCHEMA, 'validator': INT_VALIDATOR, 'serializer': INT_SERIALIZER},
+    ),
 ]
 
 
