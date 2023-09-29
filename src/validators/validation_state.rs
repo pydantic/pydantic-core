@@ -6,9 +6,21 @@ pub struct ValidationState<'a> {
     pub recursion_depth: u16,
     // deliberately make Extra readonly
     extra: Extra<'a>,
+    #[cfg(debug_assertions)]
+    initial_recursion_depth: u16,
 }
 
 impl<'a> ValidationState<'a> {
+    #[cfg(debug_assertions)]
+    pub fn new(extra: Extra<'a>, recursion_depth: u16) -> Self {
+        Self {
+            recursion_depth,
+            extra,
+            initial_recursion_depth: recursion_depth,
+        }
+    }
+
+    #[cfg(not(debug_assertions))]
     pub fn new(extra: Extra<'a>, recursion_depth: u16) -> Self {
         Self { recursion_depth, extra }
     }
@@ -23,6 +35,7 @@ impl<'a> ValidationState<'a> {
         let mut new_state = ValidationState {
             recursion_depth: self.recursion_depth,
             extra,
+            initial_recursion_depth: self.recursion_depth,
         };
         f(&mut new_state)
     }
@@ -67,13 +80,16 @@ impl<'a> RecursionState for ValidationState<'a> {
     }
 }
 
-// impl Drop for ValidationState<'_> {
-//     fn drop(&mut self) {
-//         if self.recursion_depth != 0 {
-//             panic!("ValidationState dropped with non-zero recursion depth");
-//         }
-//     }
-// }
+#[cfg(debug_assertions)]
+impl Drop for ValidationState<'_> {
+    fn drop(&mut self) {
+        assert!(
+            self.recursion_depth == self.initial_recursion_depth,
+            "ValidationState dropped with non-zero recursion depth of {}",
+            self.recursion_depth - self.initial_recursion_depth
+        );
+    }
+}
 
 pub struct ValidationStateWithReboundExtra<'state, 'a> {
     state: &'state mut ValidationState<'a>,

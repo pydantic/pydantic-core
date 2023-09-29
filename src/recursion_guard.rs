@@ -76,7 +76,7 @@ pub const RECURSION_GUARD_DEPTH_LIMIT: u16 = if cfg!(any(target_family = "wasm",
     // PyPy and Windows in general have more restricted stack space
     750
 } else {
-    1_250
+    1_500
 };
 
 pub trait RecursionState {
