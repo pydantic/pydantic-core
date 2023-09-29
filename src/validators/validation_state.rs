@@ -11,18 +11,13 @@ pub struct ValidationState<'a> {
 }
 
 impl<'a> ValidationState<'a> {
-    #[cfg(debug_assertions)]
     pub fn new(extra: Extra<'a>, recursion_depth: u16) -> Self {
         Self {
             recursion_depth,
             extra,
+            #[cfg(debug_assertions)]
             initial_recursion_depth: recursion_depth,
         }
-    }
-
-    #[cfg(not(debug_assertions))]
-    pub fn new(extra: Extra<'a>, recursion_depth: u16) -> Self {
-        Self { recursion_depth, extra }
     }
 
     pub fn with_new_extra<'r, R: 'r>(
@@ -35,6 +30,7 @@ impl<'a> ValidationState<'a> {
         let mut new_state = ValidationState {
             recursion_depth: self.recursion_depth,
             extra,
+            #[cfg(debug_assertions)]
             initial_recursion_depth: self.recursion_depth,
         };
         f(&mut new_state)
@@ -81,6 +77,8 @@ impl<'a> RecursionState for ValidationState<'a> {
 }
 
 #[cfg(debug_assertions)]
+// This is just a sanity check that runs in our CI to catch any mistakes
+// in the usage of ValidationState or RecursionToken.
 impl Drop for ValidationState<'_> {
     fn drop(&mut self) {
         assert!(
