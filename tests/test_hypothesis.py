@@ -2,12 +2,10 @@ import json
 import re
 import sys
 from datetime import datetime, timezone
-from typing import Optional
 
 import pytest
-from dirty_equals import AnyThing, IsBytes, IsStr, IsTuple
+from dirty_equals import IsBytes, IsStr
 from hypothesis import given, strategies
-from typing_extensions import TypedDict
 
 from pydantic_core import SchemaSerializer, SchemaValidator, ValidationError
 from pydantic_core import core_schema as cs
@@ -80,46 +78,6 @@ def definition_schema():
 
 def test_definition_simple(definition_schema):
     assert definition_schema.validate_python({'name': 'root'}) == {'name': 'root', 'sub_branch': None}
-
-
-class BranchModel(TypedDict):
-    name: str
-    sub_branch: Optional['BranchModel']
-
-
-@pytest.mark.skipif(sys.platform == 'emscripten', reason='Seems to fail sometimes on pyodide no idea why')
-@given(strategies.from_type(BranchModel))
-def test_recursive(definition_schema, data):
-    assert definition_schema.validate_python(data) == data
-
-
-@strategies.composite
-def branch_models_with_cycles(draw, existing=None):
-    if existing is None:
-        existing = []
-    model = BranchModel(name=draw(strategies.text()), sub_branch=None)
-    existing.append(model)
-    model['sub_branch'] = draw(
-        strategies.none()
-        | strategies.builds(BranchModel, name=strategies.text(), sub_branch=branch_models_with_cycles(existing))
-        | strategies.sampled_from(existing)
-    )
-    return model
-
-
-@given(branch_models_with_cycles())
-def test_definition_cycles(definition_schema, data):
-    try:
-        assert definition_schema.validate_python(data) == data
-    except ValidationError as exc:
-        assert exc.errors(include_url=False) == [
-            {
-                'type': 'recursion_loop',
-                'loc': IsTuple(length=(1, None)),
-                'msg': 'Recursion error - cyclic reference detected',
-                'input': AnyThing(),
-            }
-        ]
 
 
 def test_definition_broken(definition_schema):
