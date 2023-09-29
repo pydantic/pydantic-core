@@ -750,6 +750,15 @@ impl Validator for OuterValidator {
             .validate_assignment(py, obj, field_name, field_value, token.get_state()?)
     }
 
+    fn default_value<'data>(
+        &self,
+        _py: Python<'data>,
+        _outer_loc: Option<impl Into<LocItem>>,
+        _state: &mut ValidationState,
+    ) -> ValResult<'data, Option<PyObject>> {
+        self.inner.default_value(_py, _outer_loc, _state)
+    }
+
     fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
         self.inner.different_strict_behavior(ultra_strict)
     }
