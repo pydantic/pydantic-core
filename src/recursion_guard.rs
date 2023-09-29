@@ -72,10 +72,10 @@ impl RecursionGuard {
 #[cfg(not(debug_assertions))]
 pub const RECURSION_GUARD_DEPTH_LIMIT: u16 = if cfg!(any(target_family = "wasm", all(windows, PyPy))) {
     // wasm and windows PyPy have very limited stack sizes
-    75
+    50
 } else if cfg!(any(PyPy, windows)) {
     // PyPy and Windows in general have more restricted stack space
-    200
+    100
 } else {
     2_000
 };
@@ -83,10 +83,10 @@ pub const RECURSION_GUARD_DEPTH_LIMIT: u16 = if cfg!(any(target_family = "wasm",
 #[cfg(debug_assertions)]
 pub const RECURSION_GUARD_DEPTH_LIMIT: u16 = if cfg!(any(target_family = "wasm", all(windows, PyPy))) {
     // wasm and windows PyPy have very limited stack sizes
-    50
+    25
 } else if cfg!(any(PyPy, windows)) {
     // PyPy and Windows in general have more restricted stack space
-    100
+    75
 } else {
     1_500
 };
