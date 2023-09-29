@@ -8,6 +8,7 @@ use crate::input::Input;
 use crate::tools::SchemaDict;
 
 use super::validation_state::ValidationState;
+use super::OuterValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
 #[derive(Debug, Clone)]
@@ -59,7 +60,7 @@ impl CustomError {
 
 #[derive(Debug)]
 pub struct CustomErrorValidator {
-    validator: Box<CombinedValidator>,
+    validator: Box<OuterValidator>,
     custom_error: CustomError,
     name: String,
 }

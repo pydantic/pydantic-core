@@ -5,6 +5,7 @@ use pyo3::types::PyDict;
 use pyo3::PyTraverseError;
 use pyo3::PyVisit;
 
+use super::OuterValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
@@ -70,7 +71,7 @@ enum OnError {
 pub struct WithDefaultValidator {
     default: DefaultType,
     on_error: OnError,
-    validator: Box<CombinedValidator>,
+    validator: Box<OuterValidator>,
     validate_default: bool,
     copy_default: bool,
     name: String,

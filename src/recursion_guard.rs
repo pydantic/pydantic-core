@@ -1,4 +1,5 @@
 use ahash::AHashSet;
+use pyo3::{exceptions::PyRecursionError, PyResult};
 
 type RecursionKey = (
     // Identifier for the input object, e.g. the id() of a Python dict
@@ -64,5 +65,45 @@ impl RecursionGuard {
             }
             None => unreachable!(),
         };
+    }
+}
+
+// A hard limit to avoid stack overflows when rampant recursion occurs
+pub const RECURSION_GUARD_DEPTH_LIMIT: u16 = if cfg!(any(target_family = "wasm", all(windows, PyPy))) {
+    // wasm and windows PyPy have very limited stack sizes
+    250
+} else if cfg!(any(PyPy, windows)) {
+    // PyPy and Windows in general have more restricted stack space
+    500
+} else {
+    1_000
+};
+
+pub trait RecursionState {
+    fn incr_depth(&mut self) -> u16;
+    fn decr_depth(&mut self);
+}
+
+pub struct RecursionToken<'a, S: RecursionState> {
+    state: &'a mut S,
+}
+
+impl<'a, S: RecursionState> Drop for RecursionToken<'a, S> {
+    fn drop(&mut self) {
+        self.state.decr_depth();
+    }
+}
+
+impl<'a, S: RecursionState> RecursionToken<'a, S> {
+    pub fn new(state: &'a mut S) -> Self {
+        Self { state }
+    }
+
+    pub fn get_state(&mut self) -> PyResult<&mut S> {
+        if self.state.incr_depth() >= RECURSION_GUARD_DEPTH_LIMIT {
+            Err(PyRecursionError::new_err("Maximum recursion depth exceeded"))
+        } else {
+            Ok(self.state)
+        }
     }
 }

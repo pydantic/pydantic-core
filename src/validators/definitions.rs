@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use crate::definitions::DefinitionRef;
-use crate::errors::{ErrorTypeDefaults, ValError, ValResult};
+use crate::errors::ValResult;
 use crate::input::Input;
 
 use crate::tools::SchemaDict;
@@ -34,11 +34,11 @@ impl BuildValidator for DefinitionsValidatorBuilder {
                 .extract::<&PyDict>()?
                 .get_as_req::<String>(intern!(py, "ref"))?;
             let validator = build_validator(schema_definition, config, definitions)?;
-            definitions.add_definition(reference, validator)?;
+            definitions.add_definition(reference, validator.inner)?;
         }
 
         let inner_schema: &PyAny = schema.get_as_req(intern!(py, "schema"))?;
-        build_validator(inner_schema, config, definitions)
+        Ok(build_validator(inner_schema, config, definitions)?.inner)
     }
 }
 
@@ -77,23 +77,7 @@ impl Validator for DefinitionRefValidator {
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        let validator = self.definition.get().unwrap();
-        if let Some(id) = input.identity() {
-            if state.recursion_guard.contains_or_insert(id, self.definition.id()) {
-                // we don't remove id here, we leave that to the validator which originally added id to `recursion_guard`
-                Err(ValError::new(ErrorTypeDefaults::RecursionLoop, input))
-            } else {
-                if state.recursion_guard.incr_depth() {
-                    return Err(ValError::new(ErrorTypeDefaults::RecursionLoop, input));
-                }
-                let output = validator.validate(py, input, state);
-                state.recursion_guard.remove(id, self.definition.id());
-                state.recursion_guard.decr_depth();
-                output
-            }
-        } else {
-            validator.validate(py, input, state)
-        }
+        self.definition.get().unwrap().validate(py, input, state)
     }
 
     fn validate_assignment<'data>(
@@ -104,23 +88,10 @@ impl Validator for DefinitionRefValidator {
         field_value: &'data PyAny,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        let validator = self.definition.get().unwrap();
-        if let Some(id) = obj.identity() {
-            if state.recursion_guard.contains_or_insert(id, self.definition.id()) {
-                // we don't remove id here, we leave that to the validator which originally added id to `recursion_guard`
-                Err(ValError::new(ErrorTypeDefaults::RecursionLoop, obj))
-            } else {
-                if state.recursion_guard.incr_depth() {
-                    return Err(ValError::new(ErrorTypeDefaults::RecursionLoop, obj));
-                }
-                let output = validator.validate_assignment(py, obj, field_name, field_value, state);
-                state.recursion_guard.remove(id, self.definition.id());
-                state.recursion_guard.decr_depth();
-                output
-            }
-        } else {
-            validator.validate_assignment(py, obj, field_name, field_value, state)
-        }
+        self.definition
+            .get()
+            .unwrap()
+            .validate_assignment(py, obj, field_name, field_value, state)
     }
 
     fn different_strict_behavior(&self, ultra_strict: bool) -> bool {

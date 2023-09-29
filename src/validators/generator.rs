@@ -6,16 +6,17 @@ use pyo3::types::PyDict;
 
 use crate::errors::{ErrorType, LocItem, ValError, ValResult};
 use crate::input::{GenericIterator, Input};
-use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 use crate::ValidationError;
 
 use super::list::get_items_schema;
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, InputType, ValidationState, Validator};
+use super::{
+    BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, InputType, OuterValidator, ValidationState, Validator,
+};
 
 #[derive(Debug, Clone)]
 pub struct GeneratorValidator {
-    item_validator: Option<Arc<CombinedValidator>>,
+    item_validator: Option<Arc<OuterValidator>>,
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: String,
@@ -218,14 +219,13 @@ impl ValidatorIterator {
 /// mid-validation
 pub struct InternalValidator {
     name: String,
-    validator: Arc<CombinedValidator>,
+    validator: Arc<OuterValidator>,
     // TODO, do we need data?
     data: Option<Py<PyDict>>,
     strict: Option<bool>,
     from_attributes: Option<bool>,
     context: Option<PyObject>,
     self_instance: Option<PyObject>,
-    recursion_guard: RecursionGuard,
     validation_mode: InputType,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
@@ -241,7 +241,7 @@ impl InternalValidator {
     pub fn new(
         py: Python,
         name: &str,
-        validator: Arc<CombinedValidator>,
+        validator: Arc<OuterValidator>,
         state: &ValidationState,
         hide_input_in_errors: bool,
         validation_error_cause: bool,
@@ -255,7 +255,6 @@ impl InternalValidator {
             from_attributes: extra.from_attributes,
             context: extra.context.map(|d| d.into_py(py)),
             self_instance: extra.self_instance.map(|d| d.into_py(py)),
-            recursion_guard: state.recursion_guard.clone(),
             validation_mode: extra.input_type,
             hide_input_in_errors,
             validation_error_cause,
@@ -279,7 +278,7 @@ impl InternalValidator {
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.as_ref(py)),
         };
-        let mut state = ValidationState::new(extra, &mut self.recursion_guard);
+        let mut state = ValidationState::new(extra);
         self.validator
             .validate_assignment(py, model, field_name, field_value, &mut state)
             .map_err(|e| {
@@ -310,7 +309,7 @@ impl InternalValidator {
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.as_ref(py)),
         };
-        let mut state = ValidationState::new(extra, &mut self.recursion_guard);
+        let mut state = ValidationState::new(extra);
         self.validator.validate(py, input, &mut state).map_err(|e| {
             ValidationError::from_val_error(
                 py,

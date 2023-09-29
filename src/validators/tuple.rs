@@ -8,12 +8,13 @@ use crate::input::{GenericIterable, Input};
 use crate::tools::SchemaDict;
 
 use super::list::{get_items_schema, min_length_check};
+use super::OuterValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug)]
 pub struct TupleVariableValidator {
     strict: bool,
-    item_validator: Option<Box<CombinedValidator>>,
+    item_validator: Option<Box<OuterValidator>>,
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: String,
@@ -86,8 +87,8 @@ impl Validator for TupleVariableValidator {
 #[derive(Debug)]
 pub struct TuplePositionalValidator {
     strict: bool,
-    items_validators: Vec<CombinedValidator>,
-    extras_validator: Option<Box<CombinedValidator>>,
+    items_validators: Vec<OuterValidator>,
+    extras_validator: Option<Box<OuterValidator>>,
     name: String,
 }
 
@@ -100,7 +101,7 @@ impl BuildValidator for TuplePositionalValidator {
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let items: &PyList = schema.get_as_req(intern!(py, "items_schema"))?;
-        let validators: Vec<CombinedValidator> = items
+        let validators: Vec<OuterValidator> = items
             .iter()
             .map(|item| build_validator(item, config, definitions))
             .collect::<PyResult<_>>()?;
@@ -130,8 +131,8 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
     state: &mut ValidationState,
     output: &mut Vec<PyObject>,
     errors: &mut Vec<ValLineError<'data>>,
-    extras_validator: &Option<Box<CombinedValidator>>,
-    items_validators: &[CombinedValidator],
+    extras_validator: &Option<Box<OuterValidator>>,
+    items_validators: &[OuterValidator],
     collection_iter: &mut T,
     actual_length: Option<usize>,
 ) -> ValResult<'data, ()> {
@@ -257,7 +258,7 @@ impl Validator for TuplePositionalValidator {
     }
 
     fn complete(&self) -> PyResult<()> {
-        self.items_validators.iter().try_for_each(CombinedValidator::complete)?;
+        self.items_validators.iter().try_for_each(OuterValidator::complete)?;
         match &self.extras_validator {
             Some(v) => v.complete(),
             None => Ok(()),

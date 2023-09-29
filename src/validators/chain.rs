@@ -8,11 +8,12 @@ use crate::input::Input;
 use crate::tools::SchemaDict;
 
 use super::validation_state::ValidationState;
+use super::OuterValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
 #[derive(Debug)]
 pub struct ChainValidator {
-    steps: Vec<CombinedValidator>,
+    steps: Vec<OuterValidator>,
     name: String,
 }
 
@@ -24,20 +25,20 @@ impl BuildValidator for ChainValidator {
         config: Option<&PyDict>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        let steps: Vec<CombinedValidator> = schema
+        let steps: Vec<OuterValidator> = schema
             .get_as_req::<&PyList>(intern!(schema.py(), "steps"))?
             .iter()
             .map(|step| build_validator_steps(step, config, definitions))
-            .collect::<PyResult<Vec<Vec<CombinedValidator>>>>()?
+            .collect::<PyResult<Vec<Vec<OuterValidator>>>>()?
             .into_iter()
             .flatten()
-            .collect::<Vec<CombinedValidator>>();
+            .collect::<Vec<OuterValidator>>();
 
         match steps.len() {
             0 => py_schema_err!("One or more steps are required for a chain validator"),
             1 => {
                 let step = steps.into_iter().next().unwrap();
-                Ok(step)
+                Ok(step.inner)
             }
             _ => {
                 let descr = steps.iter().map(Validator::get_name).collect::<Vec<_>>().join(",");
@@ -58,9 +59,12 @@ fn build_validator_steps<'a>(
     step: &'a PyAny,
     config: Option<&'a PyDict>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
-) -> PyResult<Vec<CombinedValidator>> {
+) -> PyResult<Vec<OuterValidator>> {
     let validator = build_validator(step, config, definitions)?;
-    if let CombinedValidator::Chain(chain_validator) = validator {
+    if let OuterValidator {
+        inner: CombinedValidator::Chain(chain_validator),
+    } = validator
+    {
         Ok(chain_validator.steps)
     } else {
         Ok(vec![validator])
@@ -92,6 +96,6 @@ impl Validator for ChainValidator {
     }
 
     fn complete(&self) -> PyResult<()> {
-        self.steps.iter().try_for_each(CombinedValidator::complete)
+        self.steps.iter().try_for_each(OuterValidator::complete)
     }
 }

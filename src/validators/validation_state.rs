@@ -1,16 +1,19 @@
-use crate::recursion_guard::RecursionGuard;
+use crate::recursion_guard::{RecursionState, RecursionToken};
 
 use super::Extra;
 
 pub struct ValidationState<'a> {
-    pub recursion_guard: &'a mut RecursionGuard,
+    recursion_depth: u16,
     // deliberately make Extra readonly
     extra: Extra<'a>,
 }
 
 impl<'a> ValidationState<'a> {
-    pub fn new(extra: Extra<'a>, recursion_guard: &'a mut RecursionGuard) -> Self {
-        Self { recursion_guard, extra }
+    pub fn new(extra: Extra<'a>) -> Self {
+        Self {
+            recursion_depth: 0,
+            extra,
+        }
     }
 
     pub fn with_new_extra<'r, R: 'r>(
@@ -21,7 +24,7 @@ impl<'a> ValidationState<'a> {
         // TODO: It would be nice to implement this function with a drop guard instead of a closure,
         // but lifetimes get in a tangle. Maybe someone brave wants to have a go at unpicking lifetimes.
         let mut new_state = ValidationState {
-            recursion_guard: self.recursion_guard,
+            recursion_depth: self.recursion_depth,
             extra,
         };
         f(&mut new_state)
@@ -47,7 +50,33 @@ impl<'a> ValidationState<'a> {
     pub fn strict_or(&self, default: bool) -> bool {
         self.extra.strict.unwrap_or(default)
     }
+
+    pub fn descend<'token, 's>(&'s mut self) -> RecursionToken<'token, ValidationState<'a>>
+    where
+        's: 'token,
+    {
+        RecursionToken::new(self)
+    }
 }
+
+impl<'a> RecursionState for ValidationState<'a> {
+    fn incr_depth(&mut self) -> u16 {
+        self.recursion_depth += 1;
+        self.recursion_depth
+    }
+
+    fn decr_depth(&mut self) {
+        self.recursion_depth -= 1;
+    }
+}
+
+// impl Drop for ValidationState<'_> {
+//     fn drop(&mut self) {
+//         if self.recursion_depth != 0 {
+//             panic!("ValidationState dropped with non-zero recursion depth");
+//         }
+//     }
+// }
 
 pub struct ValidationStateWithReboundExtra<'state, 'a> {
     state: &'state mut ValidationState<'a>,

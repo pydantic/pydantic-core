@@ -7,12 +7,14 @@ use crate::errors::ValResult;
 use crate::input::{GenericIterable, Input};
 use crate::tools::SchemaDict;
 
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
+use super::{
+    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, OuterValidator, ValidationState, Validator,
+};
 
 #[derive(Debug)]
 pub struct ListValidator {
     strict: bool,
-    item_validator: Option<Box<CombinedValidator>>,
+    item_validator: Option<Box<OuterValidator>>,
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: OnceLock<String>,
@@ -22,12 +24,14 @@ pub fn get_items_schema(
     schema: &PyDict,
     config: Option<&PyDict>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
-) -> PyResult<Option<CombinedValidator>> {
+) -> PyResult<Option<OuterValidator>> {
     match schema.get_item(pyo3::intern!(schema.py(), "items_schema")) {
         Some(d) => {
             let validator = build_validator(d, config, definitions)?;
             match validator {
-                CombinedValidator::Any(_) => Ok(None),
+                OuterValidator {
+                    inner: CombinedValidator::Any(_),
+                } => Ok(None),
                 _ => Ok(Some(validator)),
             }
         }

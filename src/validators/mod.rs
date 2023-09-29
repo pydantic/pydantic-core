@@ -13,7 +13,6 @@ use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::errors::{LocItem, ValError, ValResult, ValidationError};
 use crate::input::{Input, InputType, StringMapping};
 use crate::py_gc::PyGcTraverse;
-use crate::recursion_guard::RecursionGuard;
 use crate::tools::SchemaDict;
 
 mod any;
@@ -100,7 +99,7 @@ impl PySome {
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug)]
 pub struct SchemaValidator {
-    validator: CombinedValidator,
+    validator: OuterValidator,
     definitions: Definitions<CombinedValidator>,
     schema: PyObject,
     #[pyo3(get)]
@@ -166,7 +165,6 @@ impl SchemaValidator {
             from_attributes,
             context,
             self_instance,
-            &mut RecursionGuard::default(),
         )
         .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
     }
@@ -189,7 +187,6 @@ impl SchemaValidator {
             from_attributes,
             context,
             self_instance,
-            &mut RecursionGuard::default(),
         ) {
             Ok(_) => Ok(true),
             Err(ValError::InternalErr(err)) => Err(err),
@@ -208,19 +205,9 @@ impl SchemaValidator {
         context: Option<&PyAny>,
         self_instance: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        let recursion_guard = &mut RecursionGuard::default();
         match input.parse_json() {
             Ok(input) => self
-                ._validate(
-                    py,
-                    &input,
-                    InputType::Json,
-                    strict,
-                    None,
-                    context,
-                    self_instance,
-                    recursion_guard,
-                )
+                ._validate(py, &input, InputType::Json, strict, None, context, self_instance)
                 .map_err(|e| self.prepare_validation_err(py, e, InputType::Json)),
             Err(err) => Err(self.prepare_validation_err(py, err, InputType::Json)),
         }
@@ -237,8 +224,7 @@ impl SchemaValidator {
         let t = InputType::String;
         let string_mapping = StringMapping::new_value(input).map_err(|e| self.prepare_validation_err(py, e, t))?;
 
-        let recursion_guard = &mut RecursionGuard::default();
-        match self._validate(py, &string_mapping, t, strict, None, context, None, recursion_guard) {
+        match self._validate(py, &string_mapping, t, strict, None, context, None) {
             Ok(r) => Ok(r),
             Err(e) => Err(self.prepare_validation_err(py, e, t)),
         }
@@ -266,8 +252,7 @@ impl SchemaValidator {
             self_instance: None,
         };
 
-        let guard = &mut RecursionGuard::default();
-        let mut state = ValidationState::new(extra, guard);
+        let mut state = ValidationState::new(extra);
         self.validator
             .validate_assignment(py, obj, field_name, field_value, &mut state)
             .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
@@ -284,8 +269,7 @@ impl SchemaValidator {
             context,
             self_instance: None,
         };
-        let recursion_guard = &mut RecursionGuard::default();
-        let mut state = ValidationState::new(extra, recursion_guard);
+        let mut state = ValidationState::new(extra);
         let r = self.validator.default_value(py, None::<i64>, &mut state);
         match r {
             Ok(maybe_default) => match maybe_default {
@@ -323,15 +307,11 @@ impl SchemaValidator {
         from_attributes: Option<bool>,
         context: Option<&'data PyAny>,
         self_instance: Option<&PyAny>,
-        recursion_guard: &'data mut RecursionGuard,
     ) -> ValResult<'data, PyObject>
     where
         's: 'data,
     {
-        let mut state = ValidationState::new(
-            Extra::new(strict, from_attributes, context, self_instance, input_type),
-            recursion_guard,
-        );
+        let mut state = ValidationState::new(Extra::new(strict, from_attributes, context, self_instance, input_type));
         self.validator.validate(py, input, &mut state)
     }
 
@@ -365,11 +345,7 @@ impl<'py> SelfValidator<'py> {
     }
 
     pub fn validate_schema(&self, py: Python<'py>, schema: &'py PyAny, strict: Option<bool>) -> PyResult<&'py PyAny> {
-        let mut recursion_guard = RecursionGuard::default();
-        let mut state = ValidationState::new(
-            Extra::new(strict, None, None, None, InputType::Python),
-            &mut recursion_guard,
-        );
+        let mut state = ValidationState::new(Extra::new(strict, None, None, None, InputType::Python));
         match self.validator.validator.validate(py, schema, &mut state) {
             Ok(schema_obj) => Ok(schema_obj.into_ref(py)),
             Err(e) => Err(SchemaError::from_val_error(py, e)),
@@ -428,9 +404,10 @@ fn build_specific_validator<'a, T: BuildValidator>(
     schema_dict: &'a PyDict,
     config: Option<&'a PyDict>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
-) -> PyResult<CombinedValidator> {
+) -> PyResult<OuterValidator> {
     T::build(schema_dict, config, definitions)
         .map_err(|err| py_schema_error_type!("Error building \"{}\" validator:\n  {}", val_type, err))
+        .map(OuterValidator::new)
 }
 
 // macro to build the match statement for validator selection
@@ -449,7 +426,7 @@ pub fn build_validator<'a>(
     schema: &'a PyAny,
     config: Option<&'a PyDict>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
-) -> PyResult<CombinedValidator> {
+) -> PyResult<OuterValidator> {
     let dict: &PyDict = schema.downcast()?;
     let type_: &str = dict.get_as_req(intern!(schema.py(), "type"))?;
     validator_match!(
@@ -739,4 +716,58 @@ pub trait Validator: Send + Sync + Debug {
     /// this method must be implemented for any validator which holds references to other validators,
     /// it is used by `UnionValidator` to calculate strictness
     fn complete(&self) -> PyResult<()>;
+}
+
+#[derive(Debug)]
+pub struct OuterValidator {
+    pub inner: CombinedValidator,
+}
+
+impl Validator for OuterValidator {
+    fn validate<'data>(
+        &self,
+        py: Python<'data>,
+        input: &'data impl Input<'data>,
+        state: &mut ValidationState,
+    ) -> ValResult<'data, PyObject> {
+        let mut token = state.descend();
+        self.inner.validate(py, input, token.get_state()?)
+    }
+
+    fn validate_assignment<'data>(
+        &self,
+        py: Python<'data>,
+        obj: &'data PyAny,
+        field_name: &'data str,
+        field_value: &'data PyAny,
+        state: &mut ValidationState,
+    ) -> ValResult<'data, PyObject> {
+        let mut token = state.descend();
+        self.inner
+            .validate_assignment(py, obj, field_name, field_value, token.get_state()?)
+    }
+
+    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
+        self.inner.different_strict_behavior(ultra_strict)
+    }
+
+    fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
+    fn complete(&self) -> PyResult<()> {
+        self.inner.complete()
+    }
+}
+
+impl OuterValidator {
+    pub fn new(inner: CombinedValidator) -> Self {
+        Self { inner }
+    }
+}
+
+impl PyGcTraverse for OuterValidator {
+    fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
+        self.inner.py_gc_traverse(visit)
+    }
 }

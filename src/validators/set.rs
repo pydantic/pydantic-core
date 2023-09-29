@@ -6,12 +6,12 @@ use crate::input::Input;
 use crate::tools::SchemaDict;
 
 use super::list::min_length_check;
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, OuterValidator, ValidationState, Validator};
 
 #[derive(Debug)]
 pub struct SetValidator {
     strict: bool,
-    item_validator: Box<CombinedValidator>,
+    item_validator: Box<OuterValidator>,
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: String,
@@ -27,11 +27,11 @@ macro_rules! set_build {
             let py = schema.py();
             let item_validator = match schema.get_item(pyo3::intern!(schema.py(), "items_schema")) {
                 Some(d) => Box::new(crate::validators::build_validator(d, config, definitions)?),
-                None => Box::new(crate::validators::any::AnyValidator::build(
+                None => Box::new(OuterValidator::new(crate::validators::any::AnyValidator::build(
                     schema,
                     config,
                     definitions,
-                )?),
+                )?)),
             };
             let inner_name = item_validator.get_name();
             let max_length = schema.get_as(pyo3::intern!(py, "max_length"))?;

@@ -15,6 +15,7 @@ use crate::validators::function::convert_err;
 
 use super::arguments::{json_get, json_slice, py_get, py_slice};
 use super::model::{create_class, force_setattr, Revalidate};
+use super::OuterValidator;
 use super::{
     build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, ValidationState, Validator,
 };
@@ -26,7 +27,7 @@ struct Field {
     py_name: Py<PyString>,
     init_only: bool,
     lookup_key: LookupKey,
-    validator: CombinedValidator,
+    validator: OuterValidator,
     frozen: bool,
 }
 
@@ -38,7 +39,7 @@ pub struct DataclassArgsValidator {
     dataclass_name: String,
     validator_name: String,
     extra_behavior: ExtraBehavior,
-    extras_validator: Option<Box<CombinedValidator>>,
+    extras_validator: Option<Box<OuterValidator>>,
     loc_by_alias: bool,
 }
 
@@ -88,7 +89,10 @@ impl BuildValidator for DataclassArgsValidator {
                 Err(err) => return py_schema_err!("Field '{}':\n  {}", name, err),
             };
 
-            if let CombinedValidator::WithDefault(ref v) = validator {
+            if let OuterValidator {
+                inner: CombinedValidator::WithDefault(ref v),
+            } = validator
+            {
                 if v.omit_on_error() {
                     return py_schema_err!("Field `{}`: omit_on_error cannot be used with arguments", name);
                 }
@@ -444,7 +448,7 @@ impl Validator for DataclassArgsValidator {
 #[derive(Debug)]
 pub struct DataclassValidator {
     strict: bool,
-    validator: Box<CombinedValidator>,
+    validator: Box<OuterValidator>,
     class: Py<PyType>,
     fields: Vec<Py<PyString>>,
     post_init: Option<Py<PyString>>,

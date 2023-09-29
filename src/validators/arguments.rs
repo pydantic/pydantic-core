@@ -13,6 +13,7 @@ use crate::lookup_key::LookupKey;
 use crate::tools::SchemaDict;
 
 use super::validation_state::ValidationState;
+use super::OuterValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
 #[derive(Debug)]
@@ -21,15 +22,15 @@ struct Parameter {
     name: String,
     kw_lookup_key: Option<LookupKey>,
     kwarg_key: Option<Py<PyString>>,
-    validator: CombinedValidator,
+    validator: OuterValidator,
 }
 
 #[derive(Debug)]
 pub struct ArgumentsValidator {
     parameters: Vec<Parameter>,
     positional_params_count: usize,
-    var_args_validator: Option<Box<CombinedValidator>>,
-    var_kwargs_validator: Option<Box<CombinedValidator>>,
+    var_args_validator: Option<Box<OuterValidator>>,
+    var_kwargs_validator: Option<Box<OuterValidator>>,
     loc_by_alias: bool,
 }
 
@@ -84,7 +85,9 @@ impl BuildValidator for ArgumentsValidator {
             };
 
             let has_default = match validator {
-                CombinedValidator::WithDefault(ref v) => {
+                OuterValidator {
+                    inner: CombinedValidator::WithDefault(ref v),
+                } => {
                     if v.omit_on_error() {
                         return py_schema_err!("Parameter '{}': omit_on_error cannot be used with arguments", name);
                     }

@@ -8,7 +8,8 @@ use pyo3::{ffi, intern};
 
 use super::function::convert_err;
 use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, ValidationState, Validator,
+    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, OuterValidator, ValidationState,
+    Validator,
 };
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
@@ -53,7 +54,7 @@ impl Revalidate {
 #[derive(Debug)]
 pub struct ModelValidator {
     revalidate: Revalidate,
-    validator: Box<CombinedValidator>,
+    validator: Box<OuterValidator>,
     class: Py<PyType>,
     post_init: Option<Py<PyString>>,
     frozen: bool,

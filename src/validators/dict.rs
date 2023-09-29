@@ -14,13 +14,14 @@ use crate::tools::SchemaDict;
 
 use super::any::AnyValidator;
 use super::list::length_check;
+use super::OuterValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug)]
 pub struct DictValidator {
     strict: bool,
-    key_validator: Box<CombinedValidator>,
-    value_validator: Box<CombinedValidator>,
+    key_validator: Box<OuterValidator>,
+    value_validator: Box<OuterValidator>,
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: String,
@@ -37,11 +38,11 @@ impl BuildValidator for DictValidator {
         let py = schema.py();
         let key_validator = match schema.get_item(intern!(py, "keys_schema")) {
             Some(schema) => Box::new(build_validator(schema, config, definitions)?),
-            None => Box::new(AnyValidator::build(schema, config, definitions)?),
+            None => Box::new(OuterValidator::new(AnyValidator::build(schema, config, definitions)?)),
         };
         let value_validator = match schema.get_item(intern!(py, "values_schema")) {
             Some(d) => Box::new(build_validator(d, config, definitions)?),
-            None => Box::new(AnyValidator::build(schema, config, definitions)?),
+            None => Box::new(OuterValidator::new(AnyValidator::build(schema, config, definitions)?)),
         };
         let name = format!(
             "{}[{},{}]",

@@ -8,12 +8,12 @@ use crate::tools::SchemaDict;
 use super::list::min_length_check;
 use super::set::set_build;
 use super::validation_state::ValidationState;
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, OuterValidator, Validator};
 
 #[derive(Debug)]
 pub struct FrozenSetValidator {
     strict: bool,
-    item_validator: Box<CombinedValidator>,
+    item_validator: Box<OuterValidator>,
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: String,

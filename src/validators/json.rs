@@ -6,12 +6,13 @@ use crate::errors::ValResult;
 use crate::input::Input;
 use crate::tools::SchemaDict;
 
+use super::OuterValidator;
 use super::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
 #[derive(Debug)]
 pub struct JsonValidator {
-    validator: Option<Box<CombinedValidator>>,
+    validator: Option<Box<OuterValidator>>,
     name: String,
 }
 
@@ -27,7 +28,9 @@ impl BuildValidator for JsonValidator {
             Some(schema) => {
                 let validator = build_validator(schema, config, definitions)?;
                 match validator {
-                    CombinedValidator::Any(_) => None,
+                    OuterValidator {
+                        inner: CombinedValidator::Any(_),
+                    } => None,
                     _ => Some(Box::new(validator)),
                 }
             }

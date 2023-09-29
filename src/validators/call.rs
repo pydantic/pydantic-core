@@ -9,13 +9,14 @@ use crate::input::Input;
 use crate::tools::SchemaDict;
 
 use super::validation_state::ValidationState;
+use super::OuterValidator;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
 #[derive(Debug)]
 pub struct CallValidator {
     function: PyObject,
-    arguments_validator: Box<CombinedValidator>,
-    return_validator: Option<Box<CombinedValidator>>,
+    arguments_validator: Box<OuterValidator>,
+    return_validator: Option<Box<OuterValidator>>,
     name: String,
 }
 

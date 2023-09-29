@@ -17,7 +17,9 @@ use crate::tools::SchemaDict;
 
 use super::custom_error::CustomError;
 use super::literal::LiteralLookup;
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
+use super::{
+    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, OuterValidator, ValidationState, Validator,
+};
 
 #[derive(Debug)]
 enum UnionMode {
@@ -68,7 +70,7 @@ impl FromStr for UnionMode {
 #[derive(Debug)]
 pub struct UnionValidator {
     mode: UnionMode,
-    choices: Vec<(CombinedValidator, Option<String>)>,
+    choices: Vec<(OuterValidator, Option<String>)>,
     custom_error: Option<CustomError>,
     strict: bool,
     name: String,
@@ -83,7 +85,7 @@ impl BuildValidator for UnionValidator {
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let choices: Vec<(CombinedValidator, Option<String>)> = schema
+        let choices: Vec<(OuterValidator, Option<String>)> = schema
             .get_as_req::<&PyList>(intern!(py, "choices"))?
             .iter()
             .map(|choice| {
@@ -98,7 +100,7 @@ impl BuildValidator for UnionValidator {
                 };
                 Ok((build_validator(choice, config, definitions)?, label))
             })
-            .collect::<PyResult<Vec<(CombinedValidator, Option<String>)>>>()?;
+            .collect::<PyResult<Vec<(OuterValidator, Option<String>)>>>()?;
 
         let auto_collapse = || schema.get_as_req(intern!(py, "auto_collapse")).unwrap_or(true);
         let mode = schema
@@ -106,7 +108,7 @@ impl BuildValidator for UnionValidator {
             .map_or(Ok(UnionMode::default_smart()), UnionMode::from_str)?;
         match choices.len() {
             0 => py_schema_err!("One or more union choices required"),
-            1 if auto_collapse() => Ok(choices.into_iter().next().unwrap().0),
+            1 if auto_collapse() => Ok(choices.into_iter().next().unwrap().0.inner),
             _ => {
                 let descr = choices
                     .iter()
@@ -158,7 +160,7 @@ impl UnionValidator {
             let state = &mut state.rebind_extra(|extra| extra.strict = Some(true));
             for (validator, label) in &self.choices {
                 match validator.validate(py, input, state) {
-                    Err(ValError::LineErrors(lines)) => errors.push(validator, label.as_deref(), lines),
+                    Err(ValError::LineErrors(lines)) => errors.push(&validator.inner, label.as_deref(), lines),
                     otherwise => return otherwise,
                 };
             }
@@ -182,7 +184,7 @@ impl UnionValidator {
             // 2nd pass: check if the value can be coerced into one of the Union types, e.g. use validate
             for (validator, label) in &self.choices {
                 match validator.validate(py, input, state) {
-                    Err(ValError::LineErrors(lines)) => errors.push(validator, label.as_deref(), lines),
+                    Err(ValError::LineErrors(lines)) => errors.push(&validator.inner, label.as_deref(), lines),
                     otherwise => return otherwise,
                 };
             }
@@ -209,7 +211,7 @@ impl UnionValidator {
 
         for (validator, label) in &self.choices {
             match validator.validate(py, input, state) {
-                Err(ValError::LineErrors(lines)) => errors.push(validator, label.as_deref(), lines),
+                Err(ValError::LineErrors(lines)) => errors.push(&validator.inner, label.as_deref(), lines),
                 otherwise => return otherwise,
             };
         }
@@ -378,7 +380,7 @@ impl PyGcTraverse for Discriminator {
 #[derive(Debug)]
 pub struct TaggedUnionValidator {
     discriminator: Discriminator,
-    lookup: LiteralLookup<CombinedValidator>,
+    lookup: LiteralLookup<OuterValidator>,
     from_attributes: bool,
     strict: bool,
     custom_error: Option<CustomError>,
@@ -506,7 +508,7 @@ impl Validator for TaggedUnionValidator {
     }
 
     fn complete(&self) -> PyResult<()> {
-        self.lookup.values.iter().try_for_each(CombinedValidator::complete)
+        self.lookup.values.iter().try_for_each(OuterValidator::complete)
     }
 }
 

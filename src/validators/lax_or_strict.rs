@@ -7,14 +7,15 @@ use crate::errors::ValResult;
 use crate::input::Input;
 use crate::tools::SchemaDict;
 
+use super::OuterValidator;
 use super::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
 #[derive(Debug)]
 pub struct LaxOrStrictValidator {
     strict: bool,
-    lax_validator: Box<CombinedValidator>,
-    strict_validator: Box<CombinedValidator>,
+    lax_validator: Box<OuterValidator>,
+    strict_validator: Box<OuterValidator>,
     name: String,
 }
 

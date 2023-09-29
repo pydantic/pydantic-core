@@ -15,8 +15,8 @@ use crate::PydanticUseDefault;
 
 use super::generator::InternalValidator;
 use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, InputType, ValidationState,
-    Validator,
+    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, InputType, OuterValidator,
+    ValidationState, Validator,
 };
 
 struct FunctionInfo {
@@ -134,7 +134,7 @@ macro_rules! impl_validator {
 
 #[derive(Debug)]
 pub struct FunctionBeforeValidator {
-    validator: Box<CombinedValidator>,
+    validator: Box<OuterValidator>,
     func: PyObject,
     config: PyObject,
     name: String,
@@ -167,7 +167,7 @@ impl_validator!(FunctionBeforeValidator);
 
 #[derive(Debug)]
 pub struct FunctionAfterValidator {
-    validator: Box<CombinedValidator>,
+    validator: Box<OuterValidator>,
     func: PyObject,
     config: PyObject,
     name: String,
@@ -268,7 +268,7 @@ impl Validator for FunctionPlainValidator {
 
 #[derive(Debug)]
 pub struct FunctionWrapValidator {
-    validator: Arc<CombinedValidator>,
+    validator: Arc<OuterValidator>,
     func: PyObject,
     config: PyObject,
     name: String,

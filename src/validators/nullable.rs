@@ -6,12 +6,13 @@ use crate::errors::ValResult;
 use crate::input::Input;
 use crate::tools::SchemaDict;
 
+use super::OuterValidator;
 use super::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
 
 #[derive(Debug)]
 pub struct NullableValidator {
-    validator: Box<CombinedValidator>,
+    validator: Box<OuterValidator>,
     name: String,
 }
 

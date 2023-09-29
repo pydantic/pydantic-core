@@ -8,13 +8,14 @@ use crate::input::Input;
 use crate::tools::SchemaDict;
 
 use super::InputType;
+use super::OuterValidator;
 use super::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, Validator};
 
 #[derive(Debug)]
 pub struct JsonOrPython {
-    json: Box<CombinedValidator>,
-    python: Box<CombinedValidator>,
+    json: Box<OuterValidator>,
+    python: Box<OuterValidator>,
     name: String,
 }
 

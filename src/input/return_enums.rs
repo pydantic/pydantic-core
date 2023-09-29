@@ -23,7 +23,7 @@ use serde::{ser::Error, Serialize, Serializer};
 
 use crate::errors::{py_err_string, ErrorType, ErrorTypeDefaults, InputValue, ValError, ValLineError, ValResult};
 use crate::tools::py_err;
-use crate::validators::{CombinedValidator, ValidationState, Validator};
+use crate::validators::{OuterValidator, ValidationState, Validator};
 
 use super::input_string::StringMapping;
 use super::parse_json::{JsonArray, JsonInput, JsonObject};
@@ -158,7 +158,7 @@ fn validate_iter_to_vec<'a, 's>(
     iter: impl Iterator<Item = PyResult<&'a (impl Input<'a> + 'a)>>,
     capacity: usize,
     mut max_length_check: MaxLengthCheck<'a, impl Input<'a>>,
-    validator: &'s CombinedValidator,
+    validator: &'s OuterValidator,
     state: &mut ValidationState,
 ) -> ValResult<'a, Vec<PyObject>> {
     let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
@@ -224,7 +224,7 @@ fn validate_iter_to_set<'a, 's>(
     input: &'a (impl Input<'a> + 'a),
     field_type: &'static str,
     max_length: Option<usize>,
-    validator: &'s CombinedValidator,
+    validator: &'s OuterValidator,
     state: &mut ValidationState,
 ) -> ValResult<'a, ()> {
     let mut errors: Vec<ValLineError> = Vec::new();
@@ -313,7 +313,7 @@ impl<'a> GenericIterable<'a> {
         input: &'a impl Input<'a>,
         max_length: Option<usize>,
         field_type: &'static str,
-        validator: &'s CombinedValidator,
+        validator: &'s OuterValidator,
         state: &mut ValidationState,
     ) -> ValResult<'a, Vec<PyObject>> {
         let actual_length = self.generic_len();
@@ -346,7 +346,7 @@ impl<'a> GenericIterable<'a> {
         input: &'a impl Input<'a>,
         max_length: Option<usize>,
         field_type: &'static str,
-        validator: &'s CombinedValidator,
+        validator: &'s OuterValidator,
         state: &mut ValidationState,
     ) -> ValResult<'a, ()> {
         macro_rules! validate_set {

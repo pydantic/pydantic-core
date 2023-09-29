@@ -15,6 +15,7 @@ use crate::input::{
 use crate::lookup_key::LookupKey;
 use crate::tools::SchemaDict;
 
+use super::OuterValidator;
 use super::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, Validator};
 
@@ -25,7 +26,7 @@ struct Field {
     name: String,
     lookup_key: LookupKey,
     name_py: Py<PyString>,
-    validator: CombinedValidator,
+    validator: OuterValidator,
     frozen: bool,
 }
 
@@ -36,7 +37,7 @@ pub struct ModelFieldsValidator {
     fields: Vec<Field>,
     model_name: String,
     extra_behavior: ExtraBehavior,
-    extras_validator: Option<Box<CombinedValidator>>,
+    extras_validator: Option<Box<OuterValidator>>,
     strict: bool,
     from_attributes: bool,
     loc_by_alias: bool,

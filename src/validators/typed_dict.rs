@@ -16,6 +16,7 @@ use crate::input::{
 use crate::lookup_key::LookupKey;
 use crate::tools::SchemaDict;
 
+use super::OuterValidator;
 use super::{
     build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, ValidationState, Validator,
 };
@@ -26,7 +27,7 @@ struct TypedDictField {
     lookup_key: LookupKey,
     name_py: Py<PyString>,
     required: bool,
-    validator: CombinedValidator,
+    validator: OuterValidator,
 }
 
 impl_py_gc_traverse!(TypedDictField { validator });
@@ -35,7 +36,7 @@ impl_py_gc_traverse!(TypedDictField { validator });
 pub struct TypedDictValidator {
     fields: Vec<TypedDictField>,
     extra_behavior: ExtraBehavior,
-    extras_validator: Option<Box<CombinedValidator>>,
+    extras_validator: Option<Box<OuterValidator>>,
     strict: bool,
     loc_by_alias: bool,
 }
@@ -84,7 +85,10 @@ impl BuildValidator for TypedDictValidator {
             let required = match field_info.get_as::<bool>(intern!(py, "required"))? {
                 Some(required) => {
                     if required {
-                        if let CombinedValidator::WithDefault(ref val) = validator {
+                        if let OuterValidator {
+                            inner: CombinedValidator::WithDefault(ref val),
+                        } = validator
+                        {
                             if val.has_default() {
                                 return py_schema_err!(
                                     "Field '{}': a required field cannot have a default value",
@@ -99,7 +103,10 @@ impl BuildValidator for TypedDictValidator {
             };
 
             if required {
-                if let CombinedValidator::WithDefault(ref val) = validator {
+                if let OuterValidator {
+                    inner: CombinedValidator::WithDefault(ref val),
+                } = validator
+                {
                     if val.omit_on_error() {
                         return py_schema_err!(
                             "Field '{}': 'on_error = omit' cannot be set for required fields",
