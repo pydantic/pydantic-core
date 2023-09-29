@@ -71,12 +71,12 @@ impl RecursionGuard {
 // A hard limit to avoid stack overflows when rampant recursion occurs
 pub const RECURSION_GUARD_DEPTH_LIMIT: u16 = if cfg!(any(target_family = "wasm", all(windows, PyPy))) {
     // wasm and windows PyPy have very limited stack sizes
-    250
+    350
 } else if cfg!(any(PyPy, windows)) {
     // PyPy and Windows in general have more restricted stack space
-    500
+    750
 } else {
-    1_000
+    1_250
 };
 
 pub trait RecursionState {

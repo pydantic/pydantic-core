@@ -235,7 +235,7 @@ pub struct InternalValidator {
 
 impl fmt::Debug for InternalValidator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.validator)
+        write!(f, "{:?}", self.validator.inner)
     }
 }
 

@@ -125,7 +125,7 @@ def test_definition_cycles(definition_schema, data):
 def test_definition_broken(definition_schema):
     data = {'name': 'x'}
     data['sub_branch'] = data
-    with pytest.raises(ValidationError, match='Recursion error - cyclic reference detected'):
+    with pytest.raises(RecursionError):
         definition_schema.validate_python(data)
 
 

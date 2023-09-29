@@ -284,7 +284,7 @@ impl SchemaValidator {
         format!(
             "SchemaValidator(title={:?}, validator={:#?}, definitions={:#?})",
             self.title.extract::<&str>(py).unwrap(),
-            self.validator,
+            self.validator.inner,
             self.definitions,
         )
     }
@@ -721,7 +721,6 @@ pub trait Validator: Send + Sync + Debug {
     fn complete(&self) -> PyResult<()>;
 }
 
-#[derive(Debug)]
 pub struct OuterValidator {
     pub inner: CombinedValidator,
 }
@@ -781,5 +780,11 @@ impl OuterValidator {
 impl PyGcTraverse for OuterValidator {
     fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
         self.inner.py_gc_traverse(visit)
+    }
+}
+
+impl Debug for OuterValidator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.inner.fmt(f)
     }
 }
