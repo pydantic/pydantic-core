@@ -283,7 +283,8 @@ def definition_model_data():
     data = {'width': -1}
 
     _data = data
-    for i in range(pydantic_core._pydantic_core._recursion_limit - 2):
+    # we have about 4 layers of schemas before we hit the actual field
+    for i in range(pydantic_core._pydantic_core._recursion_limit // 4):
         _data['branch'] = {'width': i}
         _data = _data['branch']
     return data

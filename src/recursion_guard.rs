@@ -72,23 +72,23 @@ impl RecursionGuard {
 #[cfg(not(debug_assertions))]
 pub const RECURSION_GUARD_DEPTH_LIMIT: u16 = if cfg!(any(target_family = "wasm", all(windows, PyPy))) {
     // wasm and windows PyPy have very limited stack sizes
-    50
+    200
 } else if cfg!(any(PyPy, windows)) {
     // PyPy and Windows in general have more restricted stack space
-    100
+    400
 } else {
-    2_000
+    1_000
 };
 
 #[cfg(debug_assertions)]
 pub const RECURSION_GUARD_DEPTH_LIMIT: u16 = if cfg!(any(target_family = "wasm", all(windows, PyPy))) {
     // wasm and windows PyPy have very limited stack sizes
-    25
+    15
 } else if cfg!(any(PyPy, windows)) {
     // PyPy and Windows in general have more restricted stack space
-    75
+    25
 } else {
-    1_500
+    500
 };
 
 pub trait RecursionState {
@@ -113,7 +113,9 @@ impl<'a, S: RecursionState> RecursionToken<'a, S> {
 
     pub fn get_state(&mut self) -> PyResult<&mut S> {
         if self.state.incr_depth() >= RECURSION_GUARD_DEPTH_LIMIT {
-            Err(PyRecursionError::new_err("Maximum recursion depth exceeded"))
+            Err(PyRecursionError::new_err(format!(
+                "Maximum recursion depth exceeded: {RECURSION_GUARD_DEPTH_LIMIT} validators traversed",
+            )))
         } else {
             Ok(self.state)
         }
