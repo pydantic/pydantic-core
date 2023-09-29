@@ -3,17 +3,14 @@ use crate::recursion_guard::{RecursionState, RecursionToken};
 use super::Extra;
 
 pub struct ValidationState<'a> {
-    recursion_depth: u16,
+    pub recursion_depth: u16,
     // deliberately make Extra readonly
     extra: Extra<'a>,
 }
 
 impl<'a> ValidationState<'a> {
-    pub fn new(extra: Extra<'a>) -> Self {
-        Self {
-            recursion_depth: 0,
-            extra,
-        }
+    pub fn new(extra: Extra<'a>, recursion_depth: u16) -> Self {
+        Self { recursion_depth, extra }
     }
 
     pub fn with_new_extra<'r, R: 'r>(

@@ -252,7 +252,7 @@ impl SchemaValidator {
             self_instance: None,
         };
 
-        let mut state = ValidationState::new(extra);
+        let mut state = ValidationState::new(extra, 0);
         self.validator
             .validate_assignment(py, obj, field_name, field_value, &mut state)
             .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
@@ -269,7 +269,7 @@ impl SchemaValidator {
             context,
             self_instance: None,
         };
-        let mut state = ValidationState::new(extra);
+        let mut state = ValidationState::new(extra, 0);
         let r = self.validator.default_value(py, None::<i64>, &mut state);
         match r {
             Ok(maybe_default) => match maybe_default {
@@ -311,7 +311,10 @@ impl SchemaValidator {
     where
         's: 'data,
     {
-        let mut state = ValidationState::new(Extra::new(strict, from_attributes, context, self_instance, input_type));
+        let mut state = ValidationState::new(
+            Extra::new(strict, from_attributes, context, self_instance, input_type),
+            0,
+        );
         self.validator.validate(py, input, &mut state)
     }
 
@@ -345,7 +348,7 @@ impl<'py> SelfValidator<'py> {
     }
 
     pub fn validate_schema(&self, py: Python<'py>, schema: &'py PyAny, strict: Option<bool>) -> PyResult<&'py PyAny> {
-        let mut state = ValidationState::new(Extra::new(strict, None, None, None, InputType::Python));
+        let mut state = ValidationState::new(Extra::new(strict, None, None, None, InputType::Python), 0);
         match self.validator.validator.validate(py, schema, &mut state) {
             Ok(schema_obj) => Ok(schema_obj.into_ref(py)),
             Err(e) => Err(SchemaError::from_val_error(py, e)),

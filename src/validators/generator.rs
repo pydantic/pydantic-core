@@ -73,6 +73,7 @@ impl Validator for GeneratorValidator {
                 state,
                 self.hide_input_in_errors,
                 self.validation_error_cause,
+                state.recursion_depth,
             )
         });
 
@@ -229,6 +230,7 @@ pub struct InternalValidator {
     validation_mode: InputType,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
+    recursion_depth: u16,
 }
 
 impl fmt::Debug for InternalValidator {
@@ -245,6 +247,7 @@ impl InternalValidator {
         state: &ValidationState,
         hide_input_in_errors: bool,
         validation_error_cause: bool,
+        recursion_depth: u16,
     ) -> Self {
         let extra = state.extra();
         Self {
@@ -258,6 +261,7 @@ impl InternalValidator {
             validation_mode: extra.input_type,
             hide_input_in_errors,
             validation_error_cause,
+            recursion_depth,
         }
     }
 
@@ -278,7 +282,7 @@ impl InternalValidator {
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.as_ref(py)),
         };
-        let mut state = ValidationState::new(extra);
+        let mut state = ValidationState::new(extra, self.recursion_depth);
         self.validator
             .validate_assignment(py, model, field_name, field_value, &mut state)
             .map_err(|e| {
@@ -309,7 +313,7 @@ impl InternalValidator {
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.as_ref(py)),
         };
-        let mut state = ValidationState::new(extra);
+        let mut state = ValidationState::new(extra, self.recursion_depth);
         self.validator.validate(py, input, &mut state).map_err(|e| {
             ValidationError::from_val_error(
                 py,

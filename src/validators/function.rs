@@ -347,6 +347,7 @@ impl Validator for FunctionWrapValidator {
                 state,
                 self.hide_input_in_errors,
                 self.validation_error_cause,
+                state.recursion_depth,
             ),
         };
         self._validate(
@@ -373,6 +374,7 @@ impl Validator for FunctionWrapValidator {
                 state,
                 self.hide_input_in_errors,
                 self.validation_error_cause,
+                state.recursion_depth,
             ),
             updated_field_name: field_name.to_string(),
             updated_field_value: field_value.to_object(py),
