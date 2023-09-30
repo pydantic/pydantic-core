@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pydantic_core import core_schema as cs
 
-N = 5  # arbitrary number that takes ~0.05s per run
+N = 4  # arbitrary number that takes ~0.05s per run
 
 
 class MyModel:
