@@ -77,8 +77,7 @@ impl Validator for DefinitionRefValidator {
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        let mut token = state.descend();
-        self.definition.get().unwrap().validate(py, input, token.get_state()?)
+        self.definition.get().unwrap().validate(py, input, state)
     }
 
     fn validate_assignment<'data>(
@@ -89,11 +88,10 @@ impl Validator for DefinitionRefValidator {
         field_value: &'data PyAny,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        let mut token = state.descend();
         self.definition
             .get()
             .unwrap()
-            .validate_assignment(py, obj, field_name, field_value, token.get_state()?)
+            .validate_assignment(py, obj, field_name, field_value, state)
     }
 
     fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
