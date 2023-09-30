@@ -1,35 +1,82 @@
-from typing import Any
+from __future__ import annotations
 
-from pydantic_core import core_schema as cs
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pydantic_core import core_schema as cs
 
 N = 5  # arbitrary number that takes ~0.05s per run
 
 
-def schema() -> cs.CoreSchema:
-    class MyModel:
-        # __slots__ is not required, but it avoids __pydantic_fields_set__ falling into __dict__
-        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
+class MyModel:
+    # __slots__ is not required, but it avoids __pydantic_fields_set__ falling into __dict__
+    __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
 
+
+def schema_using_defs() -> cs.CoreSchema:
     definitions: list[cs.CoreSchema] = [
-        cs.int_schema(ref='int'),
-        cs.model_schema(
-            MyModel,
-            cs.model_fields_schema({str(c): cs.model_field(cs.definition_reference_schema('int')) for c in range(N)}),
-            ref=f'model_{N}',
-        ),
+        {'type': 'int', 'ref': 'int'},
+        {
+            'type': 'model',
+            'cls': MyModel,
+            'schema': {
+                'type': 'model-fields',
+                'fields': {
+                    str(c): {'type': 'model-field', 'schema': {'type': 'definition-ref', 'schema_ref': 'int'}}
+                    for c in range(N)
+                },
+            },
+            'ref': f'model_{N}',
+        },
     ]
     level = N
     for level in reversed(range(N)):
         definitions.append(
-            cs.model_schema(
-                MyModel,
-                cs.model_fields_schema(
-                    {str(c): cs.model_field(cs.definition_reference_schema(f'model_{level+1}')) for c in range(N)}
-                ),
-                ref=f'model_{level}',
-            )
+            {
+                'type': 'model',
+                'cls': MyModel,
+                'schema': {
+                    'type': 'model-fields',
+                    'fields': {
+                        str(c): {
+                            'type': 'model-field',
+                            'schema': {'type': 'definition-ref', 'schema_ref': f'model_{level+1}'},
+                        }
+                        for c in range(N)
+                    },
+                },
+                'ref': f'model_{level}',
+            }
         )
-    return cs.definitions_schema(cs.definition_reference_schema('model_0'), definitions)
+    return {
+        'type': 'definitions',
+        'definitions': definitions,
+        'schema': {'type': 'definition-ref', 'schema_ref': 'model_0'},
+    }
+
+
+def inlined_schema() -> cs.CoreSchema:
+    level = N
+    schema: cs.CoreSchema = {
+        'type': 'model',
+        'cls': MyModel,
+        'schema': {
+            'type': 'model-fields',
+            'fields': {str(c): {'type': 'model-field', 'schema': {'type': 'int'}} for c in range(N)},
+        },
+        'ref': f'model_{N}',
+    }
+    for level in reversed(range(N)):
+        schema = {
+            'type': 'model',
+            'cls': MyModel,
+            'schema': {
+                'type': 'model-fields',
+                'fields': {str(c): {'type': 'model-field', 'schema': schema} for c in range(N)},
+            },
+            'ref': f'model_{level}',
+        }
+    return schema
 
 
 def input_data_valid(levels: int = N) -> Any:
@@ -42,5 +89,5 @@ def input_data_valid(levels: int = N) -> Any:
 if __name__ == '__main__':
     from pydantic_core import SchemaValidator
 
-    v = SchemaValidator(schema())
-    v.validate_python(input_data_valid())
+    SchemaValidator(schema_using_defs()).validate_python(input_data_valid())
+    SchemaValidator(inlined_schema()).validate_python(input_data_valid())
