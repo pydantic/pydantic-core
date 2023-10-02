@@ -234,7 +234,7 @@ impl Validator for ModelFieldsValidator {
                                     // However, we don't mind so much because this error can only happen if the
                                     // default value fails validation, which is arguably a developer error.
                                     // We could try to "fix" this in the future if desired.
-                                    errors.push(err.with_outer_location(field.name.as_loc_item()));
+                                    errors.push(err);
                                 }
                             }
                             Err(err) => return ControlFlow::Break(err),
