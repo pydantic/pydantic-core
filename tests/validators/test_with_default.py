@@ -802,4 +802,5 @@ def test_validate_default_raises_dataclass(input_value: dict, expected: Any) -> 
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(input_value)
-        assert exc_info.value.errors(include_url=False, include_context=False) == expected
+    
+    assert exc_info.value.errors(include_url=False, include_context=False) == expected
