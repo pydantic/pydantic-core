@@ -656,10 +656,6 @@ def test_leak_with_default():
     assert ref() is None
 
 
-def _raise(ex: Exception) -> None:
-    raise ex()
-
-
 @pytest.mark.parametrize(
     'core_schema_constructor,field_constructor',
     [
@@ -759,6 +755,9 @@ def test_validate_default_raises(
     input_value: dict,
     expected: Any,
 ) -> None:
+    def _raise(ex: Exception) -> None:
+        raise ex()
+
     inner_schema = core_schema.no_info_after_validator_function(
         lambda x: _raise(AssertionError), core_schema.nullable_schema(core_schema.int_schema())
     )

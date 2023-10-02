@@ -221,12 +221,14 @@ impl Validator for TypedDictValidator {
                             },
                             Ok(None) => {
                                 // This means there was no default value
-                                errors.push(field.lookup_key.error(
-                                    ErrorTypeDefaults::Missing,
-                                    input,
-                                    self.loc_by_alias,
-                                    &field.name
-                                ));
+                                if (field.required) {
+                                    errors.push(field.lookup_key.error(
+                                        ErrorTypeDefaults::Missing,
+                                        input,
+                                        self.loc_by_alias,
+                                        &field.name
+                                    ));
+                                }
                             },
                             Err(ValError::Omit) => continue,
                             Err(ValError::LineErrors(line_errors)) => {
