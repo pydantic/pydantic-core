@@ -527,7 +527,6 @@ class Url(SupportsAllComparisons):
         """
         The URL as a string, this will punycode encode the host if required.
         """
-    def __deepcopy__(self, memo: dict) -> str: ...
     @classmethod
     def build(
         cls,
@@ -641,7 +640,6 @@ class MultiHostUrl(SupportsAllComparisons):
         """
         The URL as a string, this will punycode encode the hosts if required.
         """
-    def __deepcopy__(self, memo: dict) -> Self: ...
     @classmethod
     def build(
         cls,
@@ -836,7 +834,6 @@ class TzInfo(datetime.tzinfo):
     def utcoffset(self, _dt: datetime.datetime | None) -> datetime.timedelta: ...
     def dst(self, _dt: datetime.datetime | None) -> datetime.timedelta: ...
     def fromutc(self, dt: datetime.datetime) -> datetime.datetime: ...
-    def __deepcopy__(self, _memo: dict[Any, Any]) -> 'TzInfo': ...
 
 def validate_core_schema(schema: CoreSchema, *, strict: bool | None = None) -> CoreSchema:
     """Validate a CoreSchema

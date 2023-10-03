@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
-use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyTzInfo};
+use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyTime, PyTzInfo};
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 use speedate::{Date, DateTime, Duration, ParseError, Time, TimeConfig};
 use std::borrow::Cow;
@@ -565,10 +565,6 @@ impl TzInfo {
 
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> bool {
         op.matches(self.seconds.cmp(&other.seconds))
-    }
-
-    fn __deepcopy__(&self, py: Python, _memo: &PyDict) -> PyResult<Py<Self>> {
-        Py::new(py, self.clone())
     }
 
     pub fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
