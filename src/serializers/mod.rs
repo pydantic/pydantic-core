@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
+use pyo3::PyTypeInfo;
 use pyo3::{PyTraverseError, PyVisit};
 
 use crate::definitions::{Definitions, DefinitionsBuilder};
@@ -33,6 +34,10 @@ pub struct SchemaSerializer {
     definitions: Definitions<CombinedSerializer>,
     expected_json_size: AtomicUsize,
     config: SerializationConfig,
+    // References to the Python schema and config objects are saved to enable
+    // reconstructing the object for cloudpickle support (see `__reduce__`).
+    py_schema: Py<PyDict>,
+    py_config: Option<Py<PyDict>>,
 }
 
 impl SchemaSerializer {
@@ -71,15 +76,19 @@ impl SchemaSerializer {
 #[pymethods]
 impl SchemaSerializer {
     #[new]
-    pub fn py_new(schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
+    pub fn py_new(py: Python, schema: &PyDict, config: Option<&PyDict>) -> PyResult<Self> {
         let mut definitions_builder = DefinitionsBuilder::new();
-
         let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut definitions_builder)?;
         Ok(Self {
             serializer,
             definitions: definitions_builder.finish()?,
             expected_json_size: AtomicUsize::new(1024),
             config: SerializationConfig::from_config(config)?,
+            py_schema: schema.into_py(py),
+            py_config: match config {
+                Some(d) if !d.is_empty() => Some(d.into_py(py)),
+                _ => None,
+            },
         })
     }
 
@@ -172,6 +181,14 @@ impl SchemaSerializer {
         self.expected_json_size.store(bytes.len(), Ordering::Relaxed);
         let py_bytes = PyBytes::new(py, &bytes);
         Ok(py_bytes.into())
+    }
+
+    pub fn __reduce__(&self, py: Python) -> PyResult<(PyObject, (PyObject, PyObject))> {
+        // Enables support for `cloudpickle` serialization.
+        Ok((
+            SchemaSerializer::type_object(py).to_object(py),
+            (self.py_schema.to_object(py), self.py_config.to_object(py)),
+        ))
     }
 
     pub fn __repr__(&self) -> String {
