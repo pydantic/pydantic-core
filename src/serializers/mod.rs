@@ -199,6 +199,8 @@ impl SchemaSerializer {
     }
 
     fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
+        visit.call(&self.py_schema)?;
+        visit.call(&self.py_config)?;
         self.serializer.py_gc_traverse(&visit)?;
         self.definitions.py_gc_traverse(&visit)?;
         Ok(())
