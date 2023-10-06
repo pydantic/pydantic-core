@@ -5,9 +5,7 @@ from datetime import timedelta
 import pytest
 
 from pydantic_core import core_schema
-from pydantic_core._pydantic_core import (
-    SchemaSerializer,
-)
+from pydantic_core._pydantic_core import SchemaSerializer
 
 
 def repr_function(value, _info):
