@@ -27,7 +27,10 @@ def test_gc_schema_serializer() -> None:
         __schema__: SchemaSerializer
 
         def __init_subclass__(cls) -> None:
-            cls.__schema__ = SchemaSerializer(core_schema.model_schema(cls, GC_TEST_SCHEMA_INNER))
+            cls.__schema__ = SchemaSerializer(
+                core_schema.model_schema(cls, GC_TEST_SCHEMA_INNER),
+                config={'ser_json_timedelta': 'float'}
+            )
 
     cache: 'WeakValueDictionary[int, Any]' = WeakValueDictionary()
 
