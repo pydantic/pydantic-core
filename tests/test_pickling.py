@@ -5,16 +5,10 @@ import re
 from datetime import timedelta
 
 import pytest
-from typing_extensions import get_args
 
-from pydantic_core import CoreSchema, CoreSchemaType, PydanticUndefined, core_schema
+from pydantic_core import core_schema
 from pydantic_core._pydantic_core import (
-    SchemaError,
     SchemaSerializer,
-    ValidationError,
-    __version__,
-    build_info,
-    build_profile,
 )
 
 
