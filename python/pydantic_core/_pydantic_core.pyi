@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import sys
-from typing import Any, Callable, Generic, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, Generic, Optional, Type, TypeVar
 
 from pydantic_core import ErrorDetails, ErrorTypeInfo, InitErrorDetails, MultiHostHost
 from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
@@ -263,9 +263,6 @@ class SchemaSerializer:
             schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for serialization.
             config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to to configure serialization.
         """
-    def __init__(self, schema: CoreSchema, config: CoreConfig | None = None) -> Self:
-        self._schema = schema
-        self._config = config
     def to_python(
         self,
         value: Any,
