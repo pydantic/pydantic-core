@@ -107,7 +107,7 @@ pub struct SchemaValidator {
     py_schema: Py<PyAny>,
     py_config: Option<Py<PyDict>>,
     #[pyo3(get)]
-    title: Py<PyAny>,
+    title: PyObject,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
 }
