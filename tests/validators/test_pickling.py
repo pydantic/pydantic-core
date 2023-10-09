@@ -1,4 +1,3 @@
-import dataclasses
 import pickle
 import re
 from datetime import datetime, timedelta, timezone
@@ -28,30 +27,21 @@ def test_schema_validator_containing_config():
     """
     Verify that the config object is not lost during (de)serialization.
     """
-
-    @dataclasses.dataclass
-    class MyModel:
-        f: str
-
     v = SchemaValidator(
-        core_schema.dataclass_schema(
-            MyModel,
-            core_schema.dataclass_args_schema('MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())]),
-            ['f'],
-            config=core_schema.CoreConfig(extra_fields_behavior='allow'),
-        )
+        core_schema.model_fields_schema({'f': core_schema.model_field(core_schema.str_schema())}),
+        config=core_schema.CoreConfig(extra_fields_behavior='allow'),
     )
-
-    m: MyModel = v.validate_python({'f': 'x', 'extra_field': '123'})
-    assert m.f == 'x'
-    assert getattr(m, 'extra_field') == '123'
-
-    # If the config was lost during (de)serialization, the validation call below would
-    # fail due to the `extra_field`.
     v = pickle.loads(pickle.dumps(v))
-    m: MyModel = v.validate_python({'f': 'x', 'extra_field': '123'})
-    assert m.f == 'x'
-    assert getattr(m, 'extra_field') == '123'
+
+    m, model_extra, fields_set = v.validate_python({'f': 'x', 'extra_field': '123'})
+    assert m == {'f': 'x'}
+    # If the config was lost during (de)serialization, the below checks would fail as
+    # the default behavior is to ignore extra fields.
+    assert model_extra == {'extra_field': '123'}
+    assert fields_set == {'f', 'extra_field'}
+
+    v.validate_assignment(m, 'f', 'y')
+    assert m == {'f': 'y'}
 
 
 def test_schema_validator_tz_pickle() -> None:
