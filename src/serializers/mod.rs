@@ -3,7 +3,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
-use pyo3::PyTypeInfo;
 use pyo3::{PyTraverseError, PyVisit};
 
 use crate::definitions::{Definitions, DefinitionsBuilder};
@@ -27,7 +26,7 @@ mod ob_type;
 mod shared;
 mod type_serializers;
 
-#[pyclass(module = "pydantic_core._pydantic_core")]
+#[pyclass(module = "pydantic_core._pydantic_core", frozen)]
 #[derive(Debug)]
 pub struct SchemaSerializer {
     serializer: CombinedSerializer,
@@ -183,12 +182,12 @@ impl SchemaSerializer {
         Ok(py_bytes.into())
     }
 
-    pub fn __reduce__(&self, py: Python) -> PyResult<(PyObject, (PyObject, PyObject))> {
+    pub fn __reduce__(slf: &PyCell<Self>) -> PyResult<(PyObject, (PyObject, PyObject))> {
         // Enables support for `cloudpickle` serialization.
-        Ok((
-            SchemaSerializer::type_object(py).to_object(py),
-            (self.py_schema.to_object(py), self.py_config.to_object(py)),
-        ))
+        let py = slf.py();
+        let cls = slf.get_type().into();
+        let init_args = (slf.get().py_schema.to_object(py), slf.get().py_config.to_object(py));
+        Ok((cls, init_args))
     }
 
     pub fn __repr__(&self) -> String {
