@@ -34,7 +34,7 @@ pub struct SchemaSerializer {
     expected_json_size: AtomicUsize,
     config: SerializationConfig,
     // References to the Python schema and config objects are saved to enable
-    // reconstructing the object for cloudpickle support (see `__reduce__`).
+    // reconstructing the object for pickle support (see `__reduce__`).
     py_schema: Py<PyDict>,
     py_config: Option<Py<PyDict>>,
 }
@@ -85,7 +85,7 @@ impl SchemaSerializer {
             config: SerializationConfig::from_config(config)?,
             py_schema: schema.into_py(py),
             py_config: match config {
-                Some(d) if !d.is_empty() => Some(d.into_py(py)),
+                Some(c) if !c.is_empty() => Some(c.into_py(py)),
                 _ => None,
             },
         })
@@ -183,7 +183,7 @@ impl SchemaSerializer {
     }
 
     pub fn __reduce__(slf: &PyCell<Self>) -> PyResult<(PyObject, (PyObject, PyObject))> {
-        // Enables support for `cloudpickle` serialization.
+        // Enables support for `pickle` serialization.
         let py = slf.py();
         let cls = slf.get_type().into();
         let init_args = (slf.get().py_schema.to_object(py), slf.get().py_config.to_object(py));
