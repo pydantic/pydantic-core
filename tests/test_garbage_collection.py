@@ -60,7 +60,7 @@ def test_gc_schema_validator() -> None:
         def __init_subclass__(cls) -> None:
             cls.__validator__ = SchemaValidator(
                 core_schema.model_schema(cls, GC_TEST_SCHEMA_INNER),
-                core_schema.CoreConfig(extra_fields_behavior='allow'),
+                config=core_schema.CoreConfig(extra_fields_behavior='allow'),
             )
 
     cache: 'WeakValueDictionary[int, Any]' = WeakValueDictionary()
