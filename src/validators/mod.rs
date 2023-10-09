@@ -107,7 +107,7 @@ pub struct SchemaValidator {
     py_schema: Py<PyAny>,
     py_config: Option<Py<PyDict>>,
     #[pyo3(get)]
-    py_title: Py<PyAny>,
+    title: Py<PyAny>,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
 }
@@ -133,7 +133,7 @@ impl SchemaValidator {
             Some(c) => c.get_item("title"),
             None => None,
         };
-        let py_title = match config_title {
+        let title = match config_title {
             Some(t) => t.into_py(py),
             None => validator.get_name().into_py(py),
         };
@@ -144,7 +144,7 @@ impl SchemaValidator {
             definitions,
             py_schema,
             py_config,
-            py_title,
+            title,
             hide_input_in_errors,
             validation_error_cause,
         })
@@ -309,7 +309,7 @@ impl SchemaValidator {
     pub fn __repr__(&self, py: Python) -> String {
         format!(
             "SchemaValidator(title={:?}, validator={:#?}, definitions={:#?})",
-            self.py_title.extract::<&str>(py).unwrap(),
+            self.title.extract::<&str>(py).unwrap(),
             self.validator,
             self.definitions,
         )
@@ -351,7 +351,7 @@ impl SchemaValidator {
     fn prepare_validation_err(&self, py: Python, error: ValError, input_type: InputType) -> PyErr {
         ValidationError::from_val_error(
             py,
-            self.py_title.clone_ref(py),
+            self.title.clone_ref(py),
             input_type,
             error,
             None,
@@ -411,7 +411,7 @@ impl<'py> SelfValidator<'py> {
             definitions,
             py_schema: py.None(),
             py_config: None,
-            py_title: "Self Schema".into_py(py),
+            title: "Self Schema".into_py(py),
             hide_input_in_errors: false,
             validation_error_cause: false,
         })

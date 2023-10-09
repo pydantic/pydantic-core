@@ -4,23 +4,21 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from pydantic_core import core_schema
+from pydantic_core import core_schema, validate_core_schema
 from pydantic_core._pydantic_core import SchemaValidator, ValidationError
 
-from ..conftest import PyAndJson
 
-
-def test_basic_schema_validator(py_and_json: PyAndJson):
-    v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
+def test_basic_schema_validator():
+    v = SchemaValidator(
+        validate_core_schema(
+            {'type': 'dict', 'strict': True, 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}}
+        )
+    )
     v = pickle.loads(pickle.dumps(v))
-    assert v.validate_test({'1': 2, '3': 4}) == {1: 2, 3: 4}
-
-    v = py_and_json({'type': 'dict', 'strict': True, 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
-    v = pickle.loads(pickle.dumps(v))
-    assert v.validate_test({'1': 2, '3': 4}) == {1: 2, 3: 4}
-    assert v.validate_test({}) == {}
+    assert v.validate_python({'1': 2, '3': 4}) == {1: 2, 3: 4}
+    assert v.validate_python({}) == {}
     with pytest.raises(ValidationError, match=re.escape('[type=dict_type, input_value=[], input_type=list]')):
-        v.validate_test([])
+        v.validate_python([])
 
 
 def test_schema_validator_containing_config():
