@@ -132,5 +132,5 @@ def test_defs_with_dict():
         )
     )
 
-    assert s.to_json({'foo': {'key': 'val'}}) == '{"foo":{"key":"val"}}'
+    assert s.to_json({'foo': {'key': 'val'}}) == b'{"foo":{"key":"val"}}'
     assert s.to_python({'foo': {'key': 'val'}}) == {'foo': {'key': 'val'}}
