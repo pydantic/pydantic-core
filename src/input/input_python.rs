@@ -21,7 +21,10 @@ use super::datetime::{
     float_as_duration, float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime,
     EitherTime,
 };
-use super::shared::{decimal_as_int, float_as_int, int_as_bool, map_json_err, str_as_bool, str_as_float, str_as_int};
+use super::shared::{
+    decimal_as_int, float_as_int, get_enum_meta_object, int_as_bool, map_json_err, str_as_bool, str_as_float,
+    str_as_int,
+};
 use super::{
     py_string_str, BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments,
     GenericIterable, GenericIterator, GenericMapping, Input, JsonInput, PyArgs,
@@ -765,7 +768,7 @@ fn maybe_as_string(v: &PyAny, unicode_error: ErrorType) -> ValResult<Option<Cow<
 /// Utility for extracting an enum value, if possible.
 fn maybe_as_enum<'a>(v: &'a PyAny) -> Option<&'a PyAny> {
     let py = v.py();
-    let enum_meta_object = py.import("enum").unwrap().getattr("EnumMeta").unwrap().to_object(py);
+    let enum_meta_object = get_enum_meta_object(py);
     let meta_type = v.get_type().get_type();
     if meta_type.is(&enum_meta_object) {
         v.getattr(intern!(py, "value")).ok()
