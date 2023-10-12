@@ -259,7 +259,7 @@ impl<'a> Input<'a> for PyAny {
         } {
             Ok(self.str()?.into())
         } else if let Some(enum_val) = maybe_as_enum(self) {
-            return Ok(enum_val.str()?.into());
+            Ok(enum_val.str()?.into())
         } else {
             Err(ValError::new(ErrorTypeDefaults::StringType, self))
         }
