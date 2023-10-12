@@ -766,7 +766,7 @@ fn maybe_as_string(v: &PyAny, unicode_error: ErrorType) -> ValResult<Option<Cow<
 }
 
 /// Utility for extracting an enum value, if possible.
-fn maybe_as_enum<'a>(v: &'a PyAny) -> Option<&'a PyAny> {
+fn maybe_as_enum(v: &PyAny) -> Option<&PyAny> {
     let py = v.py();
     let enum_meta_object = get_enum_meta_object(py);
     let meta_type = v.get_type().get_type();
