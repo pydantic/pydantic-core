@@ -255,7 +255,17 @@ impl<'a> Input<'a> for PyAny {
                 || self.is_instance(decimal_type.as_ref(py)).unwrap_or_default()
         } {
             Ok(self.str()?.into())
+        } else if let Some(enum_val) = maybe_as_enum(self.py(), self) {
+            return Ok(enum_val.str()?.into());
         } else {
+            // let py = self.py();
+            // // Enum value not inherited from `str`
+            // let enum_object = py.import("enum").unwrap().getattr("EnumMeta").unwrap().to_object(py);
+            // let meta_type = self.get_type().get_type();
+            // if meta_type.is(&enum_object) {
+            //     let val = self.getattr(intern!(py, "value"))?;
+            //     return Ok(val.str()?.into());
+            // }
             Err(ValError::new(ErrorTypeDefaults::StringType, self))
         }
     }
@@ -339,6 +349,8 @@ impl<'a> Input<'a> for PyAny {
             decimal_as_int(self.py(), self, decimal)
         } else if let Ok(float) = self.extract::<f64>() {
             float_as_int(self, float)
+        } else if let Some(enum_val) = maybe_as_enum(self.py(), self) {
+            Ok(EitherInt::Py(enum_val))
         } else {
             Err(ValError::new(ErrorTypeDefaults::IntType, self))
         }
@@ -755,6 +767,17 @@ fn maybe_as_string(v: &PyAny, unicode_error: ErrorType) -> ValResult<Option<Cow<
         }
     } else {
         Ok(None)
+    }
+}
+
+/// Utility for extracting an enum value, if possible.
+fn maybe_as_enum<'a>(py: Python<'a>, v: &'a PyAny) -> Option<&'a PyAny> {
+    let enum_meta_object = py.import("enum").unwrap().getattr("EnumMeta").unwrap().to_object(py);
+    let meta_type = v.get_type().get_type();
+    if meta_type.is(&enum_meta_object) {
+        v.getattr(intern!(py, "value")).ok()
+    } else {
+        None
     }
 }
 
