@@ -280,7 +280,7 @@ def test_coerce_numbers_to_str_disabled_in_strict_mode() -> None:
 def test_coerce_numbers_to_str_raises_for_bool() -> None:
     config = core_schema.CoreConfig(coerce_numbers_to_str=True)
 
-    v = SchemaValidator(core_schema.str_schema(strict=True), config)
+    v = SchemaValidator(core_schema.str_schema(), config)
     with pytest.raises(ValidationError):
         v.validate_python(True)
     with pytest.raises(ValidationError):
