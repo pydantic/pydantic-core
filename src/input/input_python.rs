@@ -246,6 +246,9 @@ impl<'a> Input<'a> for PyAny {
                 Err(_) => return Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
             };
             Ok(s.into())
+        } else if coerce_numbers_to_str && PyBool::is_exact_type_of(self) {
+            // bools are a subclass of int, so check for bool type in this specific case
+            Err(ValError::new(ErrorTypeDefaults::StringType, self))
         } else if coerce_numbers_to_str && {
             let py = self.py();
             let decimal_type: Py<PyType> = get_decimal_type(py);
