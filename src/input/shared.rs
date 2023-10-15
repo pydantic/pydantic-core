@@ -12,8 +12,8 @@ static ENUM_META_OBJECT: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 pub fn get_enum_meta_object(py: Python) -> Py<PyAny> {
     ENUM_META_OBJECT
         .get_or_init(py, || {
-            py.import("enum")
-                .and_then(|enum_module| enum_module.getattr("EnumMeta"))
+            py.import(intern!(py, "enum"))
+                .and_then(|enum_module| enum_module.getattr(intern!(py, "EnumMeta")))
                 .unwrap()
                 .to_object(py)
         })

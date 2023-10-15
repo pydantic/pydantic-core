@@ -82,7 +82,12 @@ impl ObTypeLookup {
             timedelta: PyDelta::new(py, 0, 0, 0, false).unwrap().get_type_ptr() as usize,
             url: PyUrl::new(lib_url.clone()).into_py(py).as_ref(py).get_type_ptr() as usize,
             multi_host_url: PyMultiHostUrl::new(lib_url, None).into_py(py).as_ref(py).get_type_ptr() as usize,
-            enum_object: py.import("enum").unwrap().getattr("EnumMeta").unwrap().to_object(py),
+            enum_object: py
+                .import(intern!(py, "enum"))
+                .unwrap()
+                .getattr(intern!(py, "EnumMeta"))
+                .unwrap()
+                .to_object(py),
             generator_object: py
                 .import("types")
                 .unwrap()
