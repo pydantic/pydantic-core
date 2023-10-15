@@ -211,14 +211,16 @@ fn get_next_value<'a>(
     input_value: &'a PyAny,
     ob_type_lookup: &'a ObTypeLookup,
 ) -> PyResult<&'a PyAny> {
+    let property_name = field.property_name_py.as_ref(input_value.py());
     match ob_type_lookup.get_type(input_value) {
-        ObType::Dataclass | ObType::PydanticSerializable | ObType::Unknown => {
-            input_value.getattr(field.property_name_py.as_ref(input_value.py()))
-        }
+        ObType::Dataclass | ObType::PydanticSerializable => input_value.getattr(property_name),
         _ => {
             if field.has_ser_func {
                 Ok(input_value)
             } else {
+                if input_value.hasattr(property_name).unwrap_or_default() {
+                    return input_value.getattr(property_name);
+                }
                 Err(PydanticSerializationError::new_err(format!(
                     "no serialization function found for {}",
                     field.property_name
