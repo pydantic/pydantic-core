@@ -214,33 +214,34 @@ fn get_next_value<'a>(
 ) -> PyResult<&'a PyAny> {
     // Backwards compatiability.
     let legacy_result = match ob_type_lookup.get_type(input_value) {
-        ObType::Dataclass | ObType::PydanticSerializable | ObType::Unknown => {
+        ObType::Dataclass | ObType::PydanticSerializable => {
             py_get_attrs(input_value, field.property_name_py.as_ref(input_value.py()))
         }
         _ => Ok(None),
     };
-    let legacy_next_value = match legacy_result {
-        Ok(res) => res,
+    match legacy_result {
+        Ok(opt) => {
+            if let Some(legacy_next_value) = opt {
+                return Ok(legacy_next_value);
+            }
+        }
         Err(err) => return Err(err),
     };
-    if legacy_next_value.is_some() {
-        return Ok(legacy_next_value.unwrap());
-    }
 
     // Default behavior: If custom serialization function provided, compute value based on input.
     if field.has_ser_func {
         return Ok(input_value);
     }
-
-    // Fallback behavior: Check if computed field is a property of input object.
-    let property_name = field.property_name_py.as_ref(input_value.py());
-    if input_value.hasattr(property_name).unwrap_or_default() {
-        return input_value.getattr(property_name);
+    // Fallback behavior: Check if computed field is a property of input object
+    // (i.e. in some cases input_value can be ObType::Unknown)
+    if let Ok(Some(next_value_from_input)) = py_get_attrs(input_value, field.property_name_py.as_ref(input_value.py()))
+    {
+        return Ok(next_value_from_input);
     }
 
     Err(PydanticSerializationError::new_err(format!(
         "No serialization function found for '{}'",
-        property_name
+        field.property_name
     )))
 }
 
