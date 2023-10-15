@@ -354,6 +354,7 @@ def test_computed_fields_with_plain_serializer_function():
     s = SchemaSerializer(schema)
     value = {'0': 0, '1': 1}
     assert s.to_python(value) == {'0': 0, '1': 1, '2': 2}
+    assert s.to_json(value) == b'{"0":0,"1":1,"2":2}'
 
     def ser_foo(_v: dict):
         return 'bar'
@@ -368,6 +369,7 @@ def test_computed_fields_with_plain_serializer_function():
     )
     s = SchemaSerializer(schema)
     assert s.to_python({}) == {'foo': 'bar'}
+    assert s.to_json({}) == b'{"foo":"bar"}'
 
 
 def test_computed_fields_with_warpped_serializer_function():
@@ -402,3 +404,4 @@ def test_computed_fields_with_warpped_serializer_function():
     s = SchemaSerializer(schema)
     value = {'one': 1, 'two': 2, 'three': 3}
     assert s.to_python(value) == {'one': 1, 'two': 2, 'three': 3, 'columns': ['ONE', 'TWO', 'THREE']}
+    assert s.to_json(value) == b'{"one":1,"two":2,"three":3,"columns":["ONE","TWO","THREE"]}'

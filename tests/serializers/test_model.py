@@ -690,12 +690,12 @@ def test_property_attribute_error():
             ),
         )
     )
-    with pytest.raises(AttributeError, match="^'Model' object has no attribute 'area'$"):
+    with pytest.raises(PydanticSerializationError, match="^No serialization function found for 'area'$"):
         s.to_python(Model(3))
-    with pytest.raises(AttributeError, match="^'Model' object has no attribute 'area'$"):
+    with pytest.raises(PydanticSerializationError, match="^No serialization function found for 'area'$"):
         s.to_python(Model(3), mode='json')
 
-    e = "^Error serializing to JSON: AttributeError: 'Model' object has no attribute 'area'$"
+    e = "^Error serializing to JSON: PydanticSerializationError: No serialization function found for 'area'$"
     with pytest.raises(PydanticSerializationError, match=e):
         s.to_json(Model(3))
 
