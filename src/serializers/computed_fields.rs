@@ -12,6 +12,8 @@ use crate::serializers::shared::{BuildSerializer, CombinedSerializer, PydanticSe
 use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
+use super::errors::PydanticSerializationError;
+use super::ob_type::{IsType, ObType};
 use super::Extra;
 
 #[derive(Debug, Clone)]
@@ -142,10 +144,17 @@ impl ComputedField {
         let property_name_py = self.property_name_py.as_ref(py);
 
         if let Some((next_include, next_exclude)) = filter.key_filter(property_name_py, include, exclude)? {
-            let next_value = if self.has_ser_func {
-                model
-            } else {
-                model.getattr(property_name_py)?
+            let next_value = match extra.ob_type_lookup.is_type(model, ObType::Dict) {
+                IsType::Exact => {
+                    if !self.has_ser_func {
+                        return Err(PydanticSerializationError::new_err(format!(
+                            "no serialization function found for {}",
+                            self.property_name
+                        )));
+                    }
+                    model
+                }
+                _ => model.getattr(property_name_py)?,
             };
 
             let value = self
@@ -186,11 +195,20 @@ impl<'py> Serialize for ComputedFieldSerializer<'py> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let py = self.model.py();
         let property_name_py = self.computed_field.property_name_py.as_ref(py);
-        let next_value = if self.computed_field.has_ser_func {
-            self.model
-        } else {
-            self.model.getattr(property_name_py).map_err(py_err_se_err)?
-        };
+        let next_value = match self.extra.ob_type_lookup.is_type(self.model, ObType::Dict) {
+            IsType::Exact => {
+                if self.computed_field.has_ser_func {
+                    Ok(self.model)
+                } else {
+                    Err(PydanticSerializationError::new_err(format!(
+                        "no serialization function found for {}",
+                        self.computed_field.property_name
+                    )))
+                }
+            }
+            _ => self.model.getattr(property_name_py),
+        }
+        .map_err(py_err_se_err)?;
         let s = PydanticSerializer::new(
             next_value,
             &self.computed_field.serializer,
