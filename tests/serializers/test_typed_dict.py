@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pytest
 from dirty_equals import IsStrictDict
@@ -333,3 +333,72 @@ def test_extra_custom_serializer():
     m = {'extra': 'extra'}
 
     assert s.to_python(m) == {'extra': 'extra bam!'}
+
+
+def test_computed_fields_with_plain_serializer_function():
+    def ser_x(v: dict):
+        two = v['0'] + v['1'] + 1
+        return two
+
+    schema = core_schema.typed_dict_schema(
+        {
+            '0': core_schema.typed_dict_field(core_schema.int_schema()),
+            '1': core_schema.typed_dict_field(core_schema.int_schema()),
+        },
+        computed_fields=[
+            core_schema.computed_field(
+                '2', core_schema.int_schema(serialization=core_schema.plain_serializer_function_ser_schema(ser_x))
+            )
+        ],
+    )
+    s = SchemaSerializer(schema)
+    value = {'0': 0, '1': 1}
+    assert s.to_python(value) == {'0': 0, '1': 1, '2': 2}
+
+    def ser_foo(_v: dict):
+        return 'bar'
+
+    schema = core_schema.typed_dict_schema(
+        {},
+        computed_fields=[
+            core_schema.computed_field(
+                'foo', core_schema.str_schema(serialization=core_schema.plain_serializer_function_ser_schema(ser_foo))
+            )
+        ],
+    )
+    s = SchemaSerializer(schema)
+    assert s.to_python({}) == {'foo': 'bar'}
+
+
+def test_computed_fields_with_warpped_serializer_function():
+    def ser_to_upper(string_arr: List[str]) -> List[str]:
+        return [s.upper() for s in string_arr]
+
+    def ser_columns(v: dict, serializer: core_schema.SerializerFunctionWrapHandler, _) -> str:
+        column_keys = serializer([key for key in v.keys()])
+        return column_keys
+
+    schema = core_schema.typed_dict_schema(
+        {
+            'one': core_schema.typed_dict_field(core_schema.int_schema()),
+            'two': core_schema.typed_dict_field(core_schema.int_schema()),
+            'three': core_schema.typed_dict_field(core_schema.int_schema()),
+        },
+        computed_fields=[
+            core_schema.computed_field(
+                'columns',
+                core_schema.int_schema(
+                    serialization=core_schema.wrap_serializer_function_ser_schema(
+                        ser_columns,
+                        info_arg=True,
+                        schema=core_schema.list_schema(
+                            serialization=core_schema.plain_serializer_function_ser_schema(ser_to_upper)
+                        ),
+                    )
+                ),
+            )
+        ],
+    )
+    s = SchemaSerializer(schema)
+    value = {'one': 1, 'two': 2, 'three': 3}
+    assert s.to_python(value) == {'one': 1, 'two': 2, 'three': 3, 'columns': ['ONE', 'TWO', 'THREE']}

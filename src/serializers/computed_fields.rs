@@ -52,9 +52,10 @@ impl ComputedFields {
             // Do not serialize computed fields
             return Ok(());
         }
-        for computed_fields in &self.0 {
-            computed_fields.to_python(model, output_dict, filter, include, exclude, extra)?;
+        for computed_field in &self.0 {
+            computed_field.to_python(model, output_dict, filter, include, exclude, extra)?;
         }
+
         Ok(())
     }
 
@@ -102,6 +103,7 @@ struct ComputedField {
     serializer: CombinedSerializer,
     alias: String,
     alias_py: Py<PyString>,
+    has_ser_func: bool,
 }
 
 impl ComputedField {
@@ -123,6 +125,7 @@ impl ComputedField {
             serializer,
             alias: alias_py.extract()?,
             alias_py: alias_py.into_py(py),
+            has_ser_func: has_ser_function(return_schema),
         })
     }
 
@@ -139,7 +142,11 @@ impl ComputedField {
         let property_name_py = self.property_name_py.as_ref(py);
 
         if let Some((next_include, next_exclude)) = filter.key_filter(property_name_py, include, exclude)? {
-            let next_value = model.getattr(property_name_py)?;
+            let next_value = if self.has_ser_func {
+                model
+            } else {
+                model.getattr(property_name_py)?
+            };
 
             let value = self
                 .serializer
@@ -179,7 +186,11 @@ impl<'py> Serialize for ComputedFieldSerializer<'py> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let py = self.model.py();
         let property_name_py = self.computed_field.property_name_py.as_ref(py);
-        let next_value = self.model.getattr(property_name_py).map_err(py_err_se_err)?;
+        let next_value = if self.computed_field.has_ser_func {
+            self.model
+        } else {
+            self.model.getattr(property_name_py).map_err(py_err_se_err)?
+        };
         let s = PydanticSerializer::new(
             next_value,
             &self.computed_field.serializer,
@@ -188,5 +199,17 @@ impl<'py> Serialize for ComputedFieldSerializer<'py> {
             self.extra,
         );
         s.serialize(serializer)
+    }
+}
+
+fn has_ser_function(schema: &PyDict) -> bool {
+    let py = schema.py();
+    let ser_schema = schema
+        .get_as::<&PyDict>(intern!(py, "serialization"))
+        .unwrap_or_default();
+
+    match ser_schema {
+        Some(s) => s.contains(intern!(py, "function")).unwrap_or_default(),
+        None => false,
     }
 }
