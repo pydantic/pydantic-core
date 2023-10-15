@@ -13,7 +13,7 @@ use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
 use super::errors::PydanticSerializationError;
-use super::ob_type::{IsType, ObType};
+use super::ob_type::{ObType, ObTypeLookup};
 use super::Extra;
 
 #[derive(Debug, Clone)]
@@ -144,19 +144,7 @@ impl ComputedField {
         let property_name_py = self.property_name_py.as_ref(py);
 
         if let Some((next_include, next_exclude)) = filter.key_filter(property_name_py, include, exclude)? {
-            let next_value = match extra.ob_type_lookup.is_type(model, ObType::Dict) {
-                IsType::Exact => {
-                    if !self.has_ser_func {
-                        return Err(PydanticSerializationError::new_err(format!(
-                            "no serialization function found for {}",
-                            self.property_name
-                        )));
-                    }
-                    model
-                }
-                _ => model.getattr(property_name_py)?,
-            };
-
+            let next_value = get_next_value(self, model, extra.ob_type_lookup)?;
             let value = self
                 .serializer
                 .to_python(next_value, next_include, next_exclude, extra)?;
@@ -193,22 +181,8 @@ impl_py_gc_traverse!(ComputedFieldSerializer<'_> { computed_field });
 
 impl<'py> Serialize for ComputedFieldSerializer<'py> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let py = self.model.py();
-        let property_name_py = self.computed_field.property_name_py.as_ref(py);
-        let next_value = match self.extra.ob_type_lookup.is_type(self.model, ObType::Dict) {
-            IsType::Exact => {
-                if self.computed_field.has_ser_func {
-                    Ok(self.model)
-                } else {
-                    Err(PydanticSerializationError::new_err(format!(
-                        "no serialization function found for {}",
-                        self.computed_field.property_name
-                    )))
-                }
-            }
-            _ => self.model.getattr(property_name_py),
-        }
-        .map_err(py_err_se_err)?;
+        let next_value =
+            get_next_value(self.computed_field, self.model, self.extra.ob_type_lookup).map_err(py_err_se_err)?;
         let s = PydanticSerializer::new(
             next_value,
             &self.computed_field.serializer,
@@ -230,4 +204,25 @@ fn has_ser_function(schema: &PyDict) -> bool {
         Some(s) => s.contains(intern!(py, "function")).unwrap_or_default(),
         None => false,
     }
+}
+
+fn get_next_value<'a>(
+    field: &'a ComputedField,
+    input_value: &'a PyAny,
+    ob_type_lookup: &'a ObTypeLookup,
+) -> PyResult<&'a PyAny> {
+    let next_value = match ob_type_lookup.get_type(input_value) {
+        ObType::Unknown | ObType::Dataclass => input_value.getattr(field.property_name_py.as_ref(input_value.py())),
+        _ => {
+            if field.has_ser_func {
+                Ok(input_value)
+            } else {
+                Err(PydanticSerializationError::new_err(format!(
+                    "no serialization function found for {}",
+                    field.property_name
+                )))
+            }
+        }
+    };
+    next_value
 }
