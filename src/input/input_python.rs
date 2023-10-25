@@ -8,7 +8,7 @@ use pyo3::types::{
 };
 #[cfg(not(PyPy))]
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
-use pyo3::{intern, AsPyPointer, PyTypeInfo};
+use pyo3::{intern, PyTypeInfo};
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
@@ -35,7 +35,7 @@ macro_rules! extract_dict_keys {
     ($py:expr, $obj:ident) => {
         $obj.downcast::<PyDictKeys>()
             .ok()
-            .map(|v| PyIterator::from_object($py, v).unwrap())
+            .map(|v| PyIterator::from_object(v).unwrap())
     };
 }
 
@@ -43,7 +43,7 @@ macro_rules! extract_dict_keys {
 macro_rules! extract_dict_keys {
     ($py:expr, $obj:ident) => {
         if is_dict_keys_type($obj) {
-            Some(PyIterator::from_object($py, $obj).unwrap())
+            Some(PyIterator::from_object($obj).unwrap())
         } else {
             None
         }
@@ -55,7 +55,7 @@ macro_rules! extract_dict_values {
     ($py:expr, $obj:ident) => {
         $obj.downcast::<PyDictValues>()
             .ok()
-            .map(|v| PyIterator::from_object($py, v).unwrap())
+            .map(|v| PyIterator::from_object(v).unwrap())
     };
 }
 
@@ -63,7 +63,7 @@ macro_rules! extract_dict_values {
 macro_rules! extract_dict_values {
     ($py:expr, $obj:ident) => {
         if is_dict_values_type($obj) {
-            Some(PyIterator::from_object($py, $obj).unwrap())
+            Some(PyIterator::from_object($obj).unwrap())
         } else {
             None
         }
@@ -75,7 +75,7 @@ macro_rules! extract_dict_items {
     ($py:expr, $obj:ident) => {
         $obj.downcast::<PyDictItems>()
             .ok()
-            .map(|v| PyIterator::from_object($py, v).unwrap())
+            .map(|v| PyIterator::from_object(v).unwrap())
     };
 }
 
@@ -83,7 +83,7 @@ macro_rules! extract_dict_items {
 macro_rules! extract_dict_items {
     ($py:expr, $obj:ident) => {
         if is_dict_items_type($obj) {
-            Some(PyIterator::from_object($py, $obj).unwrap())
+            Some(PyIterator::from_object($obj).unwrap())
         } else {
             None
         }
@@ -249,10 +249,11 @@ impl<'a> Input<'a> for PyAny {
                 Err(_) => return Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
             };
             Ok(s.into())
-        } else if coerce_numbers_to_str && {
+        } else if coerce_numbers_to_str && !PyBool::is_exact_type_of(self) && {
             let py = self.py();
             let decimal_type: Py<PyType> = get_decimal_type(py);
 
+            // only allow int, float, and decimal (not bool)
             self.is_instance_of::<PyInt>()
                 || self.is_instance_of::<PyFloat>()
                 || self.is_instance(decimal_type.as_ref(py)).unwrap_or_default()

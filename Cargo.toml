@@ -1,6 +1,6 @@
 [package]
 name = "pydantic-core"
-version = "2.10.1"
+version = "2.11.0"
 edition = "2021"
 license = "MIT"
 homepage = "https://github.com/pydantic/pydantic-core"
@@ -26,23 +26,23 @@ include = [
 ]
 
 [dependencies]
-pyo3 = { version = "0.19.2", features = ["generate-import-lib", "num-bigint"] }
-regex = "1.9.6"
+pyo3 = { version = "0.20.0", features = ["generate-import-lib", "num-bigint"] }
+regex = "1.10.2"
 strum = { version = "0.25.0", features = ["derive"] }
-strum_macros = "0.25.2"
+strum_macros = "0.25.3"
 serde_json = {version = "1.0.107", features = ["arbitrary_precision", "preserve_order"]}
 enum_dispatch = "0.3.8"
-serde = { version = "1.0.188", features = ["derive"] }
+serde = { version = "1.0.189", features = ["derive"] }
 speedate = "0.12.0"
 smallvec = "1.11.1"
-ahash = "0.8.0"
+ahash = "0.8.4"
 url = "2.4.1"
 # idna is already required by url, added here to be explicit
 idna = "0.4.0"
-base64 = "0.21.4"
+base64 = "0.21.5"
 num-bigint = "0.4.4"
 python3-dll-a = "0.2.7"
-uuid = "1.4.1"
+uuid = "1.5.0"
 
 [lib]
 name = "_pydantic_core"
@@ -62,9 +62,9 @@ debug = true
 strip = false
 
 [dev-dependencies]
-pyo3 = { version= "0.19.2", features = ["auto-initialize"] }
+pyo3 = { version = "0.20.0", features = ["auto-initialize"] }
 
 [build-dependencies]
 version_check = "0.9.4"
 # used where logic has to be version/distribution specific, e.g. pypy
-pyo3-build-config = { version = "0.19.2" }
+pyo3-build-config = { version = "0.20.0" }
