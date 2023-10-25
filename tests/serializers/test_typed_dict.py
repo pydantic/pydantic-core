@@ -405,3 +405,23 @@ def test_computed_fields_with_warpped_serializer_function():
     value = {'one': 1, 'two': 2, 'three': 3}
     assert s.to_python(value) == {'one': 1, 'two': 2, 'three': 3, 'columns': ['ONE', 'TWO', 'THREE']}
     assert s.to_json(value) == b'{"one":1,"two":2,"three":3,"columns":["ONE","TWO","THREE"]}'
+
+
+def test_computed_fields_with_typed_dict_model():
+    class Model(TypedDict):
+        x: int
+
+    def ser_y(v: Any) -> str:
+        return f'{v["x"]}.00'
+
+    s = SchemaSerializer(
+        core_schema.typed_dict_schema(
+            {'x': core_schema.typed_dict_field(core_schema.int_schema())},
+            computed_fields=[
+                core_schema.computed_field(
+                    'y', core_schema.str_schema(serialization=core_schema.plain_serializer_function_ser_schema(ser_y))
+                )
+            ],
+        )
+    )
+    assert s.to_python(Model(x=1000)) == {'x': 1000, 'y': '1000.00'}
