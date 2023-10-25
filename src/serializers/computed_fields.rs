@@ -200,11 +200,7 @@ fn has_ser_function(schema: &PyDict) -> bool {
     let ser_schema = schema
         .get_as::<&PyDict>(intern!(py, "serialization"))
         .unwrap_or_default();
-
-    match ser_schema {
-        Some(s) => s.contains(intern!(py, "function")).unwrap_or_default(),
-        None => false,
-    }
+    ser_schema.is_some_and(|s| s.contains(intern!(py, "function")).unwrap_or_default())
 }
 
 fn get_next_value<'a>(
