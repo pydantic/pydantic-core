@@ -1,7 +1,7 @@
 use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::intern;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{IntoPyDict, PyDict, PyTuple, PyType};
-use pyo3::{intern, AsPyPointer};
 use pyo3::{prelude::*, PyTypeInfo};
 
 use crate::build_tools::{is_strict, schema_or_config_same};
@@ -182,8 +182,19 @@ impl Validator for DecimalValidator {
             }
         }
 
+        // Decimal raises DecimalOperation when comparing NaN, so if it's necessary to compare
+        // the value to a number, we need to check for NaN first. We cache the result on the first
+        // time we check it.
+        let mut is_nan: Option<bool> = None;
+        let mut is_nan = || -> PyResult<bool> {
+            match is_nan {
+                Some(is_nan) => Ok(is_nan),
+                None => Ok(*is_nan.insert(decimal.call_method0(intern!(py, "is_nan"))?.extract()?)),
+            }
+        };
+
         if let Some(le) = &self.le {
-            if !decimal.le(le)? {
+            if is_nan()? || !decimal.le(le)? {
                 return Err(ValError::new(
                     ErrorType::LessThanEqual {
                         le: Number::String(le.to_string()),
@@ -194,7 +205,7 @@ impl Validator for DecimalValidator {
             }
         }
         if let Some(lt) = &self.lt {
-            if !decimal.lt(lt)? {
+            if is_nan()? || !decimal.lt(lt)? {
                 return Err(ValError::new(
                     ErrorType::LessThan {
                         lt: Number::String(lt.to_string()),
@@ -205,7 +216,7 @@ impl Validator for DecimalValidator {
             }
         }
         if let Some(ge) = &self.ge {
-            if !decimal.ge(ge)? {
+            if is_nan()? || !decimal.ge(ge)? {
                 return Err(ValError::new(
                     ErrorType::GreaterThanEqual {
                         ge: Number::String(ge.to_string()),
@@ -216,7 +227,7 @@ impl Validator for DecimalValidator {
             }
         }
         if let Some(gt) = &self.gt {
-            if !decimal.gt(gt)? {
+            if is_nan()? || !decimal.gt(gt)? {
                 return Err(ValError::new(
                     ErrorType::GreaterThan {
                         gt: Number::String(gt.to_string()),
