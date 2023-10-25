@@ -208,10 +208,22 @@ fn get_next_value<'a>(
     input_value: &'a PyAny,
     ob_type_lookup: &'a ObTypeLookup,
 ) -> PyResult<&'a PyAny> {
+    let py = input_value.py();
+    let mut legacy_attr_error: Option<PyErr> = None;
     // Backwards compatiability.
     let legacy_result = match ob_type_lookup.get_type(input_value) {
         ObType::Dataclass | ObType::PydanticSerializable => {
-            py_get_attrs(input_value, field.property_name_py.as_ref(input_value.py()))
+            match input_value.getattr(field.property_name_py.as_ref(py)) {
+                Ok(attr) => Ok(Some(attr)),
+                Err(err) => {
+                    if err.get_type(py).is_subclass_of::<PyAttributeError>()? {
+                        legacy_attr_error = Some(err);
+                        Ok(None)
+                    } else {
+                        Err(err)
+                    }
+                }
+            }
         }
         _ => Ok(None),
     };
@@ -230,26 +242,12 @@ fn get_next_value<'a>(
     }
     // Fallback behavior: Check if computed field is a property of input object
     // (i.e. in some cases input_value can be ObType::Unknown)
-    if let Ok(Some(next_value_from_input)) = py_get_attrs(input_value, field.property_name_py.as_ref(input_value.py()))
-    {
+    if let Ok(next_value_from_input) = input_value.getattr(field.property_name_py.as_ref(py)) {
         return Ok(next_value_from_input);
     }
 
-    Err(PydanticSerializationError::new_err(format!(
+    Err(legacy_attr_error.unwrap_or(PydanticSerializationError::new_err(format!(
         "No serialization function found for '{}'",
         field.property_name
-    )))
-}
-
-fn py_get_attrs<'a>(obj: &'a PyAny, attr_name: &PyString) -> PyResult<Option<&'a PyAny>> {
-    match obj.getattr(attr_name) {
-        Ok(attr) => Ok(Some(attr)),
-        Err(err) => {
-            if err.get_type(obj.py()).is_subclass_of::<PyAttributeError>()? {
-                Ok(None)
-            } else {
-                Err(err)
-            }
-        }
-    }
+    ))))
 }

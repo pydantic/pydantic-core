@@ -5,7 +5,7 @@ import pytest
 from dirty_equals import IsStrictDict
 from typing_extensions import TypedDict
 
-from pydantic_core import SchemaSerializer, core_schema
+from pydantic_core import PydanticSerializationError, SchemaSerializer, core_schema
 
 
 @pytest.mark.parametrize('extra_behavior_kw', [{}, {'extra_behavior': 'ignore'}, {'extra_behavior': None}])
@@ -425,3 +425,17 @@ def test_computed_fields_with_typed_dict_model():
         )
     )
     assert s.to_python(Model(x=1000)) == {'x': 1000, 'y': '1000.00'}
+
+
+def test_computed_fields_without_ser_function():
+    class Model(TypedDict):
+        x: int
+
+    s = SchemaSerializer(
+        core_schema.typed_dict_schema(
+            {'x': core_schema.typed_dict_field(core_schema.int_schema())},
+            computed_fields=[core_schema.computed_field('y', core_schema.str_schema())],
+        )
+    )
+    with pytest.raises(PydanticSerializationError, match="^No serialization function found for 'y'$"):
+        s.to_python(Model(x=1000))
