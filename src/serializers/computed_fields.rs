@@ -209,8 +209,8 @@ fn get_next_value<'a>(
     ob_type_lookup: &'a ObTypeLookup,
 ) -> PyResult<&'a PyAny> {
     let py = input_value.py();
-    let mut legacy_attr_error: Option<PyErr> = None;
     // Backwards compatiability.
+    let mut legacy_attr_error: Option<PyErr> = None;
     let legacy_result = match ob_type_lookup.get_type(input_value) {
         ObType::Dataclass | ObType::PydanticSerializable => {
             match input_value.getattr(field.property_name_py.as_ref(py)) {
