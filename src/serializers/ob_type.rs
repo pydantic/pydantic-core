@@ -82,12 +82,7 @@ impl ObTypeLookup {
             timedelta: PyDelta::new(py, 0, 0, 0, false).unwrap().get_type_ptr() as usize,
             url: PyUrl::new(lib_url.clone()).into_py(py).as_ref(py).get_type_ptr() as usize,
             multi_host_url: PyMultiHostUrl::new(lib_url, None).into_py(py).as_ref(py).get_type_ptr() as usize,
-            enum_object: py
-                .import(intern!(py, "enum"))
-                .unwrap()
-                .getattr(intern!(py, "EnumMeta"))
-                .unwrap()
-                .to_object(py),
+            enum_object: py.import("enum").unwrap().getattr("Enum").unwrap().to_object(py),
             generator_object: py
                 .import("types")
                 .unwrap()
@@ -264,8 +259,9 @@ impl ObTypeLookup {
     fn is_enum(&self, op_value: Option<&PyAny>, py_type: &PyType) -> bool {
         // only test on the type itself, not base types
         if op_value.is_some() {
+            let enum_meta_type = self.enum_object.as_ref(py_type.py()).get_type();
             let meta_type = py_type.get_type();
-            meta_type.is(&self.enum_object)
+            meta_type.is(enum_meta_type)
         } else {
             false
         }
