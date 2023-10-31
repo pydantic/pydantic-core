@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := all
-black = black python/pydantic_core tests generate_self_schema.py wasm-preview/run_tests.py
-ruff = ruff python/pydantic_core tests generate_self_schema.py wasm-preview/run_tests.py
+sources = python/pydantic_core tests generate_self_schema.py wasm-preview/run_tests.py 
+
 mypy-stubtest = python -m mypy.stubtest pydantic_core._pydantic_core --allowlist .mypy-stubtest-allowlist
 
 # using pip install cargo (via maturin via pip) doesn't get the tty handle
@@ -90,14 +90,12 @@ build-wasm:
 
 .PHONY: format
 format:
-	$(black)
-	$(ruff) --fix --exit-zero
+	ruff format --check --diff $(sources) 
 	cargo fmt
 
 .PHONY: lint-python
 lint-python:
-	$(ruff)
-	$(black) --check --diff
+	ruff --fix --exit-zero $(sources) 
 	$(mypy-stubtest)
 	griffe dump -f -d google -LWARNING -o/dev/null python/pydantic_core
 
