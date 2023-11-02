@@ -1,8 +1,8 @@
 use pyo3::sync::GILOnceCell;
 use pyo3::{intern, Py, PyAny, Python, ToPyObject};
 
-use num_bigint::BigInt;
 use jiter::JsonValueError;
+use num_bigint::BigInt;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 

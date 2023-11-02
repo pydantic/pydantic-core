@@ -38,12 +38,12 @@ pub use serializers::{
 pub use validators::{validate_core_schema, PySome, SchemaValidator};
 
 #[pyfunction]
-pub fn from_json(py: Python, obj: &PyAny) -> PyResult<PyObject> {
-    if let Ok(py_bytes) = obj.downcast::<PyBytes>() {
+pub fn from_json(py: Python, data: &PyAny) -> PyResult<PyObject> {
+    if let Ok(py_bytes) = data.downcast::<PyBytes>() {
         jiter::python_parse(py, py_bytes.as_bytes())
-    } else if let Ok(py_str) = obj.downcast::<PyString>() {
+    } else if let Ok(py_str) = data.downcast::<PyString>() {
         jiter::python_parse(py, py_str.to_str()?.as_bytes())
-    } else if let Ok(py_byte_array) = obj.downcast::<PyByteArray>() {
+    } else if let Ok(py_byte_array) = data.downcast::<PyByteArray>() {
         jiter::python_parse(py, &py_byte_array.to_vec())
     } else {
         Err(PyTypeError::new_err("Expected bytes, bytearray or str"))
