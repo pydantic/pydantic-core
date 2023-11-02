@@ -8,7 +8,7 @@ use pyo3::types::{
 };
 #[cfg(not(PyPy))]
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
-use pyo3::{intern, AsPyPointer, PyTypeInfo};
+use pyo3::{intern, PyTypeInfo};
 
 use jiter::JsonValue;
 use speedate::MicrosecondsPrecisionOverflowBehavior;

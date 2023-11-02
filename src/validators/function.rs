@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use pyo3::exceptions::{PyAssertionError, PyTypeError, PyAttributeError, PyValueError};
+use pyo3::exceptions::{PyAssertionError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
@@ -10,7 +10,7 @@ use crate::errors::{
 };
 use crate::input::Input;
 use crate::py_gc::PyGcTraverse;
-use crate::tools::{function_name, py_err, safe_repr, SchemaDict};
+use crate::tools::{function_name, safe_repr, SchemaDict};
 use crate::PydanticUseDefault;
 
 use super::generator::InternalValidator;

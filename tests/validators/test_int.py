@@ -185,6 +185,7 @@ def test_negative_int(input_value, expected):
 def test_positive_json(input_value, expected):
     v = SchemaValidator({'type': 'int', 'gt': 0})
     json_input = json.dumps(input_value)
+    print('json input:', json_input)
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_json(json_input)
