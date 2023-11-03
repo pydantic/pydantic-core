@@ -92,8 +92,6 @@ def test_float_strict(py_and_json: PyAndJson, input_value, expected):
 )
 def test_float_kwargs(py_and_json: PyAndJson, kwargs: Dict[str, Any], input_value, expected):
     v = py_and_json({'type': 'float', **kwargs})
-    if v.validator_type == 'json' and isinstance(input_value, float) and not math.isfinite(input_value):
-        expected = Err('Invalid JSON')
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)

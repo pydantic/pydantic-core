@@ -37,14 +37,14 @@ pub use serializers::{
 };
 pub use validators::{validate_core_schema, PySome, SchemaValidator};
 
-#[pyfunction]
-pub fn from_json(py: Python, data: &PyAny) -> PyResult<PyObject> {
+#[pyfunction(signature = (data, *, allow_inf_nan=true))]
+pub fn from_json(py: Python, data: &PyAny, allow_inf_nan: bool) -> PyResult<PyObject> {
     if let Ok(py_bytes) = data.downcast::<PyBytes>() {
-        jiter::python_parse(py, py_bytes.as_bytes())
+        jiter::python_parse(py, py_bytes.as_bytes(), allow_inf_nan)
     } else if let Ok(py_str) = data.downcast::<PyString>() {
-        jiter::python_parse(py, py_str.to_str()?.as_bytes())
+        jiter::python_parse(py, py_str.to_str()?.as_bytes(), allow_inf_nan)
     } else if let Ok(py_byte_array) = data.downcast::<PyByteArray>() {
-        jiter::python_parse(py, &py_byte_array.to_vec())
+        jiter::python_parse(py, &py_byte_array.to_vec(), allow_inf_nan)
     } else {
         Err(PyTypeError::new_err("Expected bytes, bytearray or str"))
     }

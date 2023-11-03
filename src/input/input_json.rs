@@ -79,7 +79,7 @@ impl<'a> Input<'a> for JsonValue {
 
     fn parse_json(&'a self) -> ValResult<'a, JsonValue> {
         match self {
-            JsonValue::Str(s) => JsonValue::parse(s.as_bytes()).map_err(|e| map_json_err(self, e)),
+            JsonValue::Str(s) => JsonValue::parse(s.as_bytes(), true).map_err(|e| map_json_err(self, e)),
             _ => Err(ValError::new(ErrorTypeDefaults::JsonType, self)),
         }
     }
@@ -398,7 +398,7 @@ impl<'a> Input<'a> for String {
     }
 
     fn parse_json(&'a self) -> ValResult<'a, JsonValue> {
-        JsonValue::parse(self.as_bytes()).map_err(|e| map_json_err(self, e))
+        JsonValue::parse(self.as_bytes(), true).map_err(|e| map_json_err(self, e))
     }
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {

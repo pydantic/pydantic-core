@@ -200,7 +200,7 @@ impl<'a> Input<'a> for PyAny {
         } else {
             return Err(ValError::new(ErrorTypeDefaults::JsonType, self));
         };
-        JsonValue::parse(bytes).map_err(|e| map_json_err(self, e))
+        JsonValue::parse(bytes, true).map_err(|e| map_json_err(self, e))
     }
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {

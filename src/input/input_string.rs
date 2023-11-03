@@ -90,7 +90,8 @@ impl<'a> Input<'a> for StringMapping<'a> {
         match self {
             Self::String(s) => {
                 let str = py_string_str(s)?;
-                JsonValue::parse(str.as_bytes()).map_err(|e| map_json_err(self, e))
+                // TODO control allow_inf_nan
+                JsonValue::parse(str.as_bytes(), true).map_err(|e| map_json_err(self, e))
             }
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::JsonType, self)),
         }

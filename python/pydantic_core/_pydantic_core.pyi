@@ -385,7 +385,7 @@ def to_json(
        JSON bytes.
     """
 
-def from_json(data: str | bytes | bytearray) -> Any:
+def from_json(data: str | bytes | bytearray, *, allow_inf_nan: bool = True) -> Any:
     """
     Deserialize JSON data to a Python object.
 
@@ -393,6 +393,7 @@ def from_json(data: str | bytes | bytearray) -> Any:
 
     Arguments:
         data: The JSON data to deserialize.
+        allow_inf_nan: Whether to allow `Infinity`, `-Infinity` and `NaN` values as `json.loads()` does by default.
 
     Raises:
         ValueError: If deserialization fails.
