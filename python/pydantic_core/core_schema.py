@@ -73,6 +73,8 @@ class CoreConfig(TypedDict, total=False):
             Requires exceptiongroup backport pre Python 3.11.
         coerce_numbers_to_str: Whether to enable coercion of any `Number` type to `str` (not applicable in `strict` mode).
         regex_engine: The regex engine to use for regex pattern validation. Default is 'rust-regex'. See `StringSchema`.
+        timestamp_unit: The unit in which to interpret timestamps: `s`, `ms` or `infer`.
+            Default is `infer`.
     """
 
     title: str
@@ -107,6 +109,8 @@ class CoreConfig(TypedDict, total=False):
     validation_error_cause: bool  # default: False
     coerce_numbers_to_str: bool  # default: False
     regex_engine: Literal['rust-regex', 'python-re']  # default: 'rust-regex'
+    # settings related to timestamps
+    timestamp_unit: Literal['s', 'ms', 'infer']  # default: 'infer'
 
 
 IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'

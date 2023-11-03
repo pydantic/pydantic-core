@@ -45,6 +45,14 @@ pub fn is_strict(schema: &PyDict, config: Option<&PyDict>) -> PyResult<bool> {
     Ok(schema_or_config_same(schema, config, intern!(py, "strict"))?.unwrap_or(false))
 }
 
+pub fn extract_timestamp_unit(schema: &PyDict, config: Option<&PyDict>) -> PyResult<speedate::TimestampUnit> {
+    schema_or_config_same(schema, config, intern!(schema.py(), "timestamp_unit"))?
+        .map_or(Ok(speedate::TimestampUnit::Infer), |v: &PyString| {
+            speedate::TimestampUnit::try_from(String::extract(v).unwrap().as_str())
+        })
+        .map_err(|_| py_schema_error_type!("Invalid `timestamp_unit`, must be one of \"s\" \"ms\" or \"infer\""))
+}
+
 enum SchemaErrorEnum {
     Message(String),
     ValidationError(ValidationError),

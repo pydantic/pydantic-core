@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
-use speedate::MicrosecondsPrecisionOverflowBehavior;
+use speedate::{MicrosecondsPrecisionOverflowBehavior, TimestampUnit};
 use strum::EnumMessage;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
@@ -318,20 +318,26 @@ impl<'a> Input<'a> for JsonInput {
     fn strict_datetime(
         &self,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+        timestamp_unit: TimestampUnit,
     ) -> ValResult<EitherDateTime> {
         match self {
-            JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes(), microseconds_overflow_behavior),
+            JsonInput::String(v) => {
+                bytes_as_datetime(self, v.as_bytes(), microseconds_overflow_behavior, timestamp_unit)
+            }
             _ => Err(ValError::new(ErrorTypeDefaults::DatetimeType, self)),
         }
     }
     fn lax_datetime(
         &self,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+        timestamp_unit: TimestampUnit,
     ) -> ValResult<EitherDateTime> {
         match self {
-            JsonInput::String(v) => bytes_as_datetime(self, v.as_bytes(), microseconds_overflow_behavior),
-            JsonInput::Int(v) => int_as_datetime(self, *v, 0),
-            JsonInput::Float(v) => float_as_datetime(self, *v),
+            JsonInput::String(v) => {
+                bytes_as_datetime(self, v.as_bytes(), microseconds_overflow_behavior, timestamp_unit)
+            }
+            JsonInput::Int(v) => int_as_datetime(self, *v, 0, timestamp_unit),
+            JsonInput::Float(v) => float_as_datetime(self, *v, timestamp_unit),
             _ => Err(ValError::new(ErrorTypeDefaults::DatetimeType, self)),
         }
     }
@@ -479,8 +485,9 @@ impl<'a> Input<'a> for String {
     fn strict_datetime(
         &self,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+        timestamp_unit: TimestampUnit,
     ) -> ValResult<EitherDateTime> {
-        bytes_as_datetime(self, self.as_bytes(), microseconds_overflow_behavior)
+        bytes_as_datetime(self, self.as_bytes(), microseconds_overflow_behavior, timestamp_unit)
     }
 
     fn strict_timedelta(

@@ -4,7 +4,7 @@ use pyo3::types::{PyDate, PyDict, PyString};
 use speedate::{Date, Time};
 use strum::EnumMessage;
 
-use crate::build_tools::{is_strict, py_schema_error_type};
+use crate::build_tools::{extract_timestamp_unit, is_strict, py_schema_error_type};
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::{EitherDate, Input};
 
@@ -17,6 +17,7 @@ use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationSta
 pub struct DateValidator {
     strict: bool,
     constraints: Option<DateConstraints>,
+    timestamp_unit: speedate::TimestampUnit,
 }
 
 impl BuildValidator for DateValidator {
@@ -30,6 +31,7 @@ impl BuildValidator for DateValidator {
         Ok(Self {
             strict: is_strict(schema, config)?,
             constraints: DateConstraints::from_py(schema)?,
+            timestamp_unit: extract_timestamp_unit(schema, config)?,
         }
         .into())
     }
@@ -48,7 +50,9 @@ impl Validator for DateValidator {
         let date = match input.validate_date(strict) {
             Ok(date) => date,
             // if the error was a parsing error, in lax mode we allow datetimes at midnight
-            Err(line_errors @ ValError::LineErrors(..)) if !strict => date_from_datetime(input)?.ok_or(line_errors)?,
+            Err(line_errors @ ValError::LineErrors(..)) if !strict => {
+                date_from_datetime(input, self.timestamp_unit)?.ok_or(line_errors)?
+            }
             Err(otherwise) => return Err(otherwise),
         };
         if let Some(constraints) = &self.constraints {
@@ -113,8 +117,15 @@ impl Validator for DateValidator {
 /// "exact date", e.g. has a zero time component.
 ///
 /// Ok(None) means that this is not relevant to dates (the input was not a datetime nor a string)
-fn date_from_datetime<'data>(input: &'data impl Input<'data>) -> Result<Option<EitherDate<'data>>, ValError<'data>> {
-    let either_dt = match input.validate_datetime(false, speedate::MicrosecondsPrecisionOverflowBehavior::Truncate) {
+fn date_from_datetime<'data>(
+    input: &'data impl Input<'data>,
+    timestamp_unit: speedate::TimestampUnit,
+) -> Result<Option<EitherDate<'data>>, ValError<'data>> {
+    let either_dt = match input.validate_datetime(
+        false,
+        speedate::MicrosecondsPrecisionOverflowBehavior::Truncate,
+        timestamp_unit,
+    ) {
         Ok(dt) => dt,
         // if the error was a parsing error, update the error type from DatetimeParsing to DateFromDatetimeParsing
         // and return it
