@@ -3820,7 +3820,7 @@ ErrorType = Literal[
 ]
 
 
-def _dict_not_none(**kwargs: Any) -> Any:
+def _dict_not_none(**kwargs: Any) -> dict[str, Any]:
     return {k: v for k, v in kwargs.items() if v is not None}
 
 
