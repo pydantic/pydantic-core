@@ -297,23 +297,26 @@ pub trait Input<'a>: fmt::Debug + ToPyObject {
         &self,
         strict: bool,
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
+        timestamp_unit: speedate::TimestampUnit,
     ) -> ValResult<EitherDateTime> {
         if strict {
-            self.strict_datetime(microseconds_overflow_behavior)
+            self.strict_datetime(microseconds_overflow_behavior, timestamp_unit)
         } else {
-            self.lax_datetime(microseconds_overflow_behavior)
+            self.lax_datetime(microseconds_overflow_behavior, timestamp_unit)
         }
     }
     fn strict_datetime(
         &self,
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
+        timestamp_unit: speedate::TimestampUnit,
     ) -> ValResult<EitherDateTime>;
     #[cfg_attr(has_coverage_attribute, coverage(off))]
     fn lax_datetime(
         &self,
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
+        timestamp_unit: speedate::TimestampUnit,
     ) -> ValResult<EitherDateTime> {
-        self.strict_datetime(microseconds_overflow_behavior)
+        self.strict_datetime(microseconds_overflow_behavior, timestamp_unit)
     }
 
     fn validate_timedelta(

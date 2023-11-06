@@ -4,8 +4,9 @@ use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
 use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyTzInfo};
-use speedate::MicrosecondsPrecisionOverflowBehavior;
-use speedate::{Date, DateTime, Duration, ParseError, Time, TimeConfig};
+use speedate::{
+    Date, DateTime, Duration, MicrosecondsPrecisionOverflowBehavior, ParseError, Time, TimeConfig, TimestampUnit,
+};
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
@@ -309,6 +310,7 @@ pub fn bytes_as_time<'a>(
         &TimeConfig {
             microseconds_precision_overflow_behavior: microseconds_overflow_behavior,
             unix_timestamp_offset: Some(0),
+            ..Default::default()
         },
     ) {
         Ok(date) => Ok(date.into()),
@@ -326,12 +328,14 @@ pub fn bytes_as_datetime<'a, 'b>(
     input: &'a impl Input<'a>,
     bytes: &'b [u8],
     microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+    timestamp_unit: TimestampUnit,
 ) -> ValResult<'a, EitherDateTime<'a>> {
     match DateTime::parse_bytes_with_config(
         bytes,
         &TimeConfig {
             microseconds_precision_overflow_behavior: microseconds_overflow_behavior,
             unix_timestamp_offset: Some(0),
+            timestamp_unit,
         },
     ) {
         Ok(dt) => Ok(dt.into()),
@@ -349,12 +353,14 @@ pub fn int_as_datetime<'a>(
     input: &'a impl Input<'a>,
     timestamp: i64,
     timestamp_microseconds: u32,
+    timestamp_unit: TimestampUnit,
 ) -> ValResult<EitherDateTime> {
     match DateTime::from_timestamp_with_config(
         timestamp,
         timestamp_microseconds,
         &TimeConfig {
             unix_timestamp_offset: Some(0),
+            timestamp_unit,
             ..Default::default()
         },
     ) {
@@ -383,12 +389,21 @@ macro_rules! nan_check {
     };
 }
 
-pub fn float_as_datetime<'a>(input: &'a impl Input<'a>, timestamp: f64) -> ValResult<EitherDateTime> {
+pub fn float_as_datetime<'a>(
+    input: &'a impl Input<'a>,
+    timestamp: f64,
+    timestamp_unit: TimestampUnit,
+) -> ValResult<EitherDateTime> {
     nan_check!(input, timestamp, DatetimeParsing);
     let microseconds = timestamp.fract().abs() * 1_000_000.0;
     // checking for extra digits in microseconds is unreliable with large floats,
     // so we just round to the nearest microsecond
-    int_as_datetime(input, timestamp.floor() as i64, microseconds.round() as u32)
+    int_as_datetime(
+        input,
+        timestamp.floor() as i64,
+        microseconds.round() as u32,
+        timestamp_unit,
+    )
 }
 
 pub fn date_as_datetime(date: &PyDate) -> PyResult<EitherDateTime> {
@@ -475,6 +490,7 @@ pub fn bytes_as_timedelta<'a, 'b>(
         &TimeConfig {
             microseconds_precision_overflow_behavior: microseconds_overflow_behavior,
             unix_timestamp_offset: Some(0),
+            ..Default::default()
         },
     ) {
         Ok(dt) => Ok(dt.into()),

@@ -71,6 +71,20 @@ def test_datetime_strict(input_value, expected):
         assert output == expected
 
 
+@pytest.mark.parametrize(
+    'input_value,unit,expected',
+    [
+        (800_000_000, 's', datetime(1995, 5, 9, 6, 13, 20, tzinfo=timezone.utc)),
+        (800_000_000, 'ms', datetime(1970, 1, 10, 5, 13, 20, tzinfo=timezone.utc)),
+        (800_000_000, 'infer', datetime(1995, 5, 9, 6, 13, 20, tzinfo=timezone.utc)),
+        (800_000_000_000, 'infer', datetime(1995, 5, 9, 6, 13, 20, tzinfo=timezone.utc)),
+    ],
+)
+def test_from_timestamp_units(input_value, unit, expected):
+    v = SchemaValidator({'type': 'datetime', 'timestamp_unit': unit})
+    assert v.validate_python(input_value) == expected
+
+
 def test_keep_tz():
     tz = pytz.timezone('Europe/London')
     dt = tz.localize(datetime(2022, 6, 14, 12, 13, 14))

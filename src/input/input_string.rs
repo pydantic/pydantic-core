@@ -203,9 +203,15 @@ impl<'a> Input<'a> for StringMapping<'a> {
     fn strict_datetime(
         &self,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+        timestamp_unit: speedate::TimestampUnit,
     ) -> ValResult<EitherDateTime> {
         match self {
-            Self::String(s) => bytes_as_datetime(self, py_string_str(s)?.as_bytes(), microseconds_overflow_behavior),
+            Self::String(s) => bytes_as_datetime(
+                self,
+                py_string_str(s)?.as_bytes(),
+                microseconds_overflow_behavior,
+                timestamp_unit,
+            ),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::DatetimeType, self)),
         }
     }

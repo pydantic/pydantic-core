@@ -140,6 +140,20 @@ def test_date_strict(input_value, expected, strict_mode_type):
 
 
 @pytest.mark.parametrize(
+    'input_value,unit,expected',
+    [
+        (799_977_600, 's', date(1995, 5, 9)),
+        (799_977_600, 'ms', date(1970, 1, 10)),
+        (799_977_600, 'infer', date(1995, 5, 9)),
+        (799_977_600_000, 'infer', date(1995, 5, 9)),
+    ],
+)
+def test_from_timestamp_units(input_value, unit, expected):
+    v = SchemaValidator({'type': 'date', 'timestamp_unit': unit})
+    assert v.validate_python(input_value) == expected
+
+
+@pytest.mark.parametrize(
     'input_value,expected',
     [
         ('"2022-06-08"', date(2022, 6, 8)),

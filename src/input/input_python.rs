@@ -9,7 +9,7 @@ use pyo3::types::{
 #[cfg(not(PyPy))]
 use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 use pyo3::{intern, PyTypeInfo};
-use speedate::MicrosecondsPrecisionOverflowBehavior;
+use speedate::{MicrosecondsPrecisionOverflowBehavior, TimestampUnit};
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::tools::{extract_i64, safe_repr};
@@ -663,6 +663,7 @@ impl<'a> Input<'a> for PyAny {
     fn strict_datetime(
         &self,
         _microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+        _timestamp_unit: TimestampUnit,
     ) -> ValResult<EitherDateTime> {
         if let Ok(dt) = self.downcast::<PyDateTime>() {
             Ok(dt.into())
@@ -674,20 +675,26 @@ impl<'a> Input<'a> for PyAny {
     fn lax_datetime(
         &self,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+        timestamp_unit: TimestampUnit,
     ) -> ValResult<EitherDateTime> {
         if let Ok(dt) = self.downcast::<PyDateTime>() {
             Ok(dt.into())
         } else if let Ok(py_str) = self.downcast::<PyString>() {
             let str = py_string_str(py_str)?;
-            bytes_as_datetime(self, str.as_bytes(), microseconds_overflow_behavior)
+            bytes_as_datetime(self, str.as_bytes(), microseconds_overflow_behavior, timestamp_unit)
         } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
-            bytes_as_datetime(self, py_bytes.as_bytes(), microseconds_overflow_behavior)
+            bytes_as_datetime(
+                self,
+                py_bytes.as_bytes(),
+                microseconds_overflow_behavior,
+                timestamp_unit,
+            )
         } else if PyBool::is_exact_type_of(self) {
             Err(ValError::new(ErrorTypeDefaults::DatetimeType, self))
         } else if let Ok(int) = extract_i64(self) {
-            int_as_datetime(self, int, 0)
+            int_as_datetime(self, int, 0, timestamp_unit)
         } else if let Ok(float) = self.extract::<f64>() {
-            float_as_datetime(self, float)
+            float_as_datetime(self, float, timestamp_unit)
         } else if let Ok(date) = self.downcast::<PyDate>() {
             Ok(date_as_datetime(date)?)
         } else {
