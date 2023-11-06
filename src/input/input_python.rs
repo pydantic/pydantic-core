@@ -195,7 +195,7 @@ impl<'a> Input<'a> for PyAny {
             str.as_bytes()
         } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
             // Safety: from_slice does not run arbitrary Python code and the GIL is held so the
-            // bytes array will not be mutated while from_slice is reading it
+            // bytes array will not be mutated while `JsonValue::parse` is reading it
             unsafe { py_byte_array.as_bytes() }
         } else {
             return Err(ValError::new(ErrorTypeDefaults::JsonType, self));
