@@ -1,6 +1,6 @@
 [package]
 name = "pydantic-core"
-version = "2.11.0"
+version = "2.12.0"
 edition = "2021"
 license = "MIT"
 homepage = "https://github.com/pydantic/pydantic-core"
@@ -30,12 +30,12 @@ pyo3 = { version = "0.20.0", features = ["generate-import-lib", "num-bigint"] }
 regex = "1.10.2"
 strum = { version = "0.25.0", features = ["derive"] }
 strum_macros = "0.25.3"
-serde_json = {version = "1.0.107", features = ["arbitrary_precision", "preserve_order"]}
+serde_json = {version = "1.0.108", features = ["arbitrary_precision", "preserve_order"]}
 enum_dispatch = "0.3.8"
-serde = { version = "1.0.189", features = ["derive"] }
-speedate = "0.12.0"
+serde = { version = "1.0.190", features = ["derive"] }
+speedate = "0.13.0"
 smallvec = "1.11.1"
-ahash = "0.8.4"
+ahash = "0.8.6"
 url = "2.4.1"
 # idna is already required by url, added here to be explicit
 idna = "0.4.0"
@@ -43,6 +43,8 @@ base64 = "0.21.5"
 num-bigint = "0.4.4"
 python3-dll-a = "0.2.7"
 uuid = "1.5.0"
+jiter = {version = "0.0.4", features = ["python"]}
+#jiter = {path = "../jiter", features = ["python"]}
 
 [lib]
 name = "_pydantic_core"
