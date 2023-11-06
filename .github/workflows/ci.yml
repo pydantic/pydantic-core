@@ -70,7 +70,7 @@ jobs:
           - '3.9'
           - '3.10'
           - '3.11'
-          - '3.12-dev'
+          - '3.12'
           - 'pypy3.7'
           - 'pypy3.8'
           - 'pypy3.9'
@@ -465,33 +465,25 @@ jobs:
           path: dist
 
   build-pgo:
-    name: build pgo-optimized on ${{ matrix.platform || matrix.os }} (${{ matrix.interpreter}} - ${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
+    name: build pgo-optimized on ${{ matrix.os }}
     # only run on push to main and on release
     if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'Full Build')
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu, windows]
-        target: [x86_64]
-        manylinux: [auto]
-        interpreter: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12-dev", "pypy3.7", "pypy3.8", "pypy3.9", "pypy3.10"]
+        os: [ubuntu-latest, windows-latest, macos-latest-xlarge]
         include:
-          - os: ubuntu
-            platform: linux
-          - os: windows
+          - os: windows-latest
             ls: dir
-          - interpreter: 3.12-dev
-            maturin-interpreter: "3.12"
 
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       - name: set up python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.interpreter }}
-          architecture: ${{ matrix.python-architecture || 'x64' }}
+          python-version: '3.11'
 
       - name: install rust stable
         id: rust-toolchain
@@ -504,15 +496,15 @@ jobs:
       # generate self-schema now, so we don't have to do so inside docker in maturin build
       - run: python generate_self_schema.py
 
+      - run: rustc --version --verbose
+
       - name: build initial wheel
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.target }}
-          manylinux: ${{ matrix.manylinux || 'auto' }}
           args: >
             --release
             --out pgo-wheel
-            --interpreter ${{ matrix.maturin-interpreter || matrix.interpreter }}
+            --interpreter 3.7 3.8 3.9 3.10 3.11 3.12
           rust-toolchain: stable
           docker-options: -e CI
         env:
@@ -536,12 +528,10 @@ jobs:
       - name: build pgo-optimized wheel
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.target }}
-          manylinux: ${{ matrix.manylinux || 'auto' }}
           args: >
             --release
             --out dist
-            --interpreter ${{ matrix.maturin-interpreter || matrix.interpreter }}
+            --interpreter 3.7 3.8 3.9 3.10 3.11 3.12
           rust-toolchain: stable
           docker-options: -e CI
         env:
