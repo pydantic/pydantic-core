@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use serde::Serializer;
 
 use crate::definitions::DefinitionsBuilder;
+use crate::serializers::config::InfNanMode;
 use crate::tools::SchemaDict;
 
 use super::simple::to_str_json_key;
@@ -16,7 +17,7 @@ use super::{
 
 #[derive(Debug, Clone)]
 pub struct FloatSerializer {
-    allow_inf_nan: bool,
+    inf_nan_mode: InfNanMode,
 }
 
 impl BuildSerializer for FloatSerializer {
@@ -24,13 +25,14 @@ impl BuildSerializer for FloatSerializer {
 
     fn build(
         schema: &PyDict,
-        _config: Option<&PyDict>,
+        config: Option<&PyDict>,
         _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        let allow_inf_nan = schema
-            .get_as::<bool>(intern!(schema.py(), "allow_inf_nan"))?
-            .unwrap_or(false);
-        Ok(Self { allow_inf_nan }.into())
+        let inf_nan_mode = config
+            .and_then(|c| c.get_as(intern!(schema.py(), "ser_json_inf_nan")).transpose())
+            .transpose()?
+            .unwrap_or_default();
+        Ok(Self { inf_nan_mode }.into())
     }
 }
 
@@ -81,10 +83,11 @@ impl TypeSerializer for FloatSerializer {
     ) -> Result<S::Ok, S::Error> {
         match value.extract::<f64>() {
             Ok(v) => {
-                if (v.is_nan() || v.is_infinite()) && !self.allow_inf_nan {
-                    return serializer.serialize_none();
+                if (v.is_nan() || v.is_infinite()) && self.inf_nan_mode == InfNanMode::Null {
+                    serializer.serialize_none()
+                } else {
+                    serializer.serialize_f64(v)
                 }
-                serializer.serialize_f64(v)
             }
             Err(_) => {
                 extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;

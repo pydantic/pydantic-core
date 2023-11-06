@@ -139,35 +139,27 @@ def test_numpy():
 
 
 @pytest.mark.parametrize(
-    'schema_type,value,expected,allow_inf_nan',
+    'value,expected_json,config',
     [
-        ('float', float('inf'), float('inf'), True),
-        ('float', float('+inf'), float('+inf'), True),
-        ('float', float('-inf'), float('-inf'), True),
-        ('float', float('inf'), None, False),
-        ('float', float('+inf'), None, False),
-        ('float', float('-inf'), None, False),
-        ('float', float('NaN'), float('NaN'), True),
-        ('float', float('NAN'), float('NAN'), True),
-        ('float', float('NaN'), None, False),
-        ('float', float('NAN'), None, False),
+        # default values of ser_json_inf_nan
+        (float('inf'), 'null', {}),
+        (float('-inf'), 'null', {}),
+        (float('nan'), 'null', {}),
+        # explicit values of ser_json_inf_nan
+        (float('inf'), 'null', {'ser_json_inf_nan': 'null'}),
+        (float('-inf'), 'null', {'ser_json_inf_nan': 'null'}),
+        (float('nan'), 'null', {'ser_json_inf_nan': 'null'}),
+        (float('inf'), 'Infinity', {'ser_json_inf_nan': 'constants'}),
+        (float('-inf'), '-Infinity', {'ser_json_inf_nan': 'constants'}),
+        (float('nan'), 'NaN', {'ser_json_inf_nan': 'constants'}),
     ],
 )
-def test_float_inf_and_nan_serializers(schema_type, value, expected, allow_inf_nan):
-    schema = {'type': schema_type, 'allow_inf_nan': allow_inf_nan}
+def test_float_inf_and_nan_serializers(value, expected_json, config):
+    s = SchemaSerializer(core_schema.float_schema(), config)
 
-    s = SchemaSerializer(schema)
-    v = s.to_python(value)
+    # Python can represent these values without needing any changes
+    assert s.to_python(value) is value
+    assert s.to_python(value, mode='json') is value
 
-    if allow_inf_nan:
-        assert type(v) == type(expected)
-    else:
-        assert expected is None
-
-    assert s.to_json(value) == json.dumps(expected).encode('utf-8')
-
-    v_json = s.to_python(value, mode='json')
-    if allow_inf_nan:
-        assert type(v_json) == type(expected)
-    else:
-        assert expected is None
+    # Serialized JSON value respects the ser_json_inf_nan setting
+    assert s.to_json(value).decode() == expected_json
