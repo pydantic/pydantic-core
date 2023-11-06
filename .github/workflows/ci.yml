@@ -541,7 +541,7 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: pypi_files
+          name: pypi_files_pgo
           path: dist
 
   inspect-pypi-assets:
@@ -557,7 +557,19 @@ jobs:
           name: pypi_files
           path: dist
 
-      - name: list dist files
+      - name: list dist files before PGO builds
+        run: |
+         ls -lh dist/
+         ls -l dist/
+         echo "`ls dist | wc -l` files"
+
+      - name: get PGO dist artifacts (comes after "get dist artifacts" to so these files override the non-PGO builds)
+        uses: actions/download-artifact@v3
+        with:
+          name: pypi_files_pgo
+          path: dist
+
+      - name: list dist files with PGO builds
         run: |
          ls -lh dist/
          ls -l dist/
@@ -595,6 +607,12 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: pypi_files
+          path: dist
+
+      - name: get PGO dist artifacts (comes after "get dist artifacts" to so these files override the non-PGO builds)
+        uses: actions/download-artifact@v3
+        with:
+          name: pypi_files_pgo
           path: dist
 
       - uses: uraimo/run-on-arch-action@v2.5.1
@@ -649,6 +667,12 @@ jobs:
           name: pypi_files
           path: dist
 
+      - name: get PGO dist artifacts (comes after "get dist artifacts" to so these files override the non-PGO builds)
+        uses: actions/download-artifact@v3
+        with:
+          name: pypi_files_pgo
+          path: dist
+
       - run: pip install typing-extensions
       - run: pip install -r tests/requirements.txt
       - run: pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
@@ -676,6 +700,12 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: pypi_files
+          path: dist
+
+      - name: get PGO dist artifacts (comes after "get dist artifacts" to so these files override the non-PGO builds)
+        uses: actions/download-artifact@v3
+        with:
+          name: pypi_files_pgo
           path: dist
 
       - run: twine check --strict dist/*
