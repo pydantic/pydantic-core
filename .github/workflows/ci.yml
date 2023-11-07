@@ -476,8 +476,9 @@ jobs:
         include:
           - os: windows-latest
             ls: dir
+        exclude:
           - os: macos-latest-xlarge
-            setup-python-interpreter: '3.11'
+            interpreter: ['3.7', '3.8', '3.9']
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -486,7 +487,7 @@ jobs:
       - name: set up python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.setup-python-interpreter || matrix.interpreter }}
+          python-version: ${{ matrix.interpreter }}
 
       - name: install rust stable
         id: rust-toolchain
