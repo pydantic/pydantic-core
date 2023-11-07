@@ -465,7 +465,7 @@ jobs:
           path: dist
 
   build-pgo:
-    name: build pgo-optimized on ${{ matrix.os }}
+    name: build pgo-optimized on ${{ matrix.os }} / ${{ matrix.interpreter }}
     # only run on push to main and on release
     if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'Full Build')
     strategy:
@@ -476,6 +476,8 @@ jobs:
         include:
           - os: windows-latest
             ls: dir
+          - os: macos-latest-xlarge
+            setup-python-interpreter: '3.11'
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -484,7 +486,7 @@ jobs:
       - name: set up python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.interpreter }}
+          python-version: ${{ matrix.setup-python-interpreter || matrix.interpreter }}
 
       - name: install rust stable
         id: rust-toolchain
