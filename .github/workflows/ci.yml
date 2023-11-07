@@ -478,7 +478,11 @@ jobs:
             ls: dir
         exclude:
           - os: macos-latest-xlarge
-            interpreter: ['3.7', '3.8', '3.9']
+            interpreter: '3.7'
+          - os: macos-latest-xlarge
+            interpreter: '3.8'
+          - os: macos-latest-xlarge
+            interpreter: '3.9'
 
     runs-on: ${{ matrix.os }}
     steps:
