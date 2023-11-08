@@ -396,18 +396,18 @@ impl<'a> Input<'a> for String {
     }
 
     fn validate_bool(&self, _strict: bool) -> ValResult<'_, ValidationMatch<bool>> {
-        str_as_bool(self, self).map(ValidationMatch::strict)
+        str_as_bool(self, self).map(ValidationMatch::lax)
     }
 
     fn validate_int(&'a self, _strict: bool) -> ValResult<'a, ValidationMatch<EitherInt<'a>>> {
         match self.parse() {
-            Ok(i) => Ok(ValidationMatch::strict(EitherInt::I64(i))),
+            Ok(i) => Ok(ValidationMatch::lax(EitherInt::I64(i))),
             Err(_) => Err(ValError::new(ErrorTypeDefaults::IntParsing, self)),
         }
     }
 
     fn validate_float(&'a self, _strict: bool) -> ValResult<'a, ValidationMatch<EitherFloat<'a>>> {
-        str_as_float(self, self).map(ValidationMatch::strict)
+        str_as_float(self, self).map(ValidationMatch::lax)
     }
 
     fn strict_decimal(&'a self, py: Python<'a>) -> ValResult<&'a PyAny> {
