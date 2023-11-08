@@ -2,8 +2,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet};
 
 use crate::errors::ValResult;
-use crate::input::Input;
+use crate::input::{GenericIterable, Input};
 use crate::tools::SchemaDict;
+use crate::validators::Exactness;
 
 use super::list::min_length_check;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
@@ -64,10 +65,15 @@ impl Validator for SetValidator {
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
         let collection = input.validate_set(state.strict_or(self.strict))?;
+        let exactness = match &collection {
+            GenericIterable::Set(_) => Exactness::Exact,
+            GenericIterable::FrozenSet(_) | GenericIterable::JsonArray(_) => Exactness::Strict,
+            _ => Exactness::Lax,
+        };
+        state.floor_exactness(exactness);
         let set = PySet::empty(py)?;
         collection.validate_to_set(py, set, input, self.max_length, "Set", &self.item_validator, state)?;
         min_length_check!(input, "Set", self.min_length, set);
-        state.set_exactness_unknown();
         Ok(set.into_py(py))
     }
 

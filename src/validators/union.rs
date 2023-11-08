@@ -141,8 +141,7 @@ impl UnionValidator {
                 }
             }
         } else {
-            // one-pass lax validation; for validators which have unknown exactness need to
-            // revalidate in strict mode
+            // one-pass lax validation
             for (choice, label) in &self.choices {
                 state.exactness = Some(Exactness::Exact);
                 let result = choice.validate(py, input, state);
@@ -155,27 +154,9 @@ impl UnionValidator {
                                 strict_success = Some(success);
                             }
                         }
-                        Some(Exactness::Lax) => {
-                            if lax_success.is_none() {
-                                lax_success = Some(success);
-                            }
-                        }
-                        None => {
-                            // unknown match during lax validation, try requiring a strict
-                            // validation, but only if we haven't already had a strict match
-                            if strict_success.is_none() {
-                                state.exactness = Some(Exactness::Exact);
-                                let state = &mut state.rebind_extra(|extra| extra.strict = Some(true));
-                                let res_strict = choice.validate(py, input, state);
-
-                                if let Ok(success_strict) = res_strict {
-                                    // strict validation should never succeed with "lax" result
-                                    debug_assert_ne!(state.exactness, Some(Exactness::Lax));
-                                    strict_success = Some(success_strict);
-                                }
-                            }
-
-                            // record this as a lax match irrespective of the above
+                        _ => {
+                            // success should always have an exactness
+                            debug_assert_eq!(state.exactness, Some(Exactness::Lax));
                             if lax_success.is_none() {
                                 lax_success = Some(success);
                             }

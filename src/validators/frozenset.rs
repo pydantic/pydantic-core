@@ -2,8 +2,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFrozenSet};
 
 use crate::errors::ValResult;
-use crate::input::Input;
+use crate::input::{GenericIterable, Input};
 use crate::tools::SchemaDict;
+use crate::validators::Exactness;
 
 use super::list::min_length_check;
 use super::set::set_build;
@@ -34,6 +35,12 @@ impl Validator for FrozenSetValidator {
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
         let collection = input.validate_frozenset(state.strict_or(self.strict))?;
+        let exactness = match &collection {
+            GenericIterable::FrozenSet(_) => Exactness::Exact,
+            GenericIterable::Set(_) | GenericIterable::JsonArray(_) => Exactness::Strict,
+            _ => Exactness::Lax,
+        };
+        state.floor_exactness(exactness);
         let f_set = PyFrozenSet::empty(py)?;
         collection.validate_to_set(
             py,
@@ -45,7 +52,6 @@ impl Validator for FrozenSetValidator {
             state,
         )?;
         min_length_check!(input, "Frozenset", self.min_length, f_set);
-        state.set_exactness_unknown();
         Ok(f_set.into_py(py))
     }
 

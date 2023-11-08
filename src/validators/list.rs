@@ -6,6 +6,7 @@ use pyo3::types::PyDict;
 use crate::errors::ValResult;
 use crate::input::{GenericIterable, Input};
 use crate::tools::SchemaDict;
+use crate::validators::Exactness;
 
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
@@ -122,6 +123,12 @@ impl Validator for ListValidator {
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_list(state.strict_or(self.strict))?;
+        let exactness = match &seq {
+            GenericIterable::List(_) | GenericIterable::JsonArray(_) => Exactness::Exact,
+            GenericIterable::Tuple(_) => Exactness::Strict,
+            _ => Exactness::Lax,
+        };
+        state.floor_exactness(exactness);
 
         let output = match self.item_validator {
             Some(ref v) => seq.validate_to_vec(py, input, self.max_length, "List", v, state)?,
@@ -135,7 +142,6 @@ impl Validator for ListValidator {
             },
         };
         min_length_check!(input, "List", self.min_length, output);
-        state.set_exactness_unknown();
         Ok(output.into_py(py))
     }
 

@@ -66,14 +66,6 @@ impl<'a> ValidationState<'a> {
         self.extra.strict.unwrap_or(default)
     }
 
-    /// Sets the exactness of this state to unknown.
-    ///
-    /// In general this de-optimizes union validation by forcing strict & lax validation passes,
-    /// so it's better to determine exactness and call `floor_exactness` when possible.
-    pub fn set_exactness_unknown(&mut self) {
-        self.exactness = None;
-    }
-
     /// Sets the exactness to the lower of the current exactness
     /// and the given exactness.
     ///

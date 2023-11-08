@@ -6,6 +6,7 @@ use crate::build_tools::is_strict;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{GenericIterable, Input};
 use crate::tools::SchemaDict;
+use crate::validators::Exactness;
 
 use super::list::{get_items_schema, min_length_check};
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
@@ -51,13 +52,18 @@ impl Validator for TupleVariableValidator {
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
         let seq = input.validate_tuple(state.strict_or(self.strict))?;
+        let exactness = match &seq {
+            GenericIterable::Tuple(_) | GenericIterable::JsonArray(_) => Exactness::Exact,
+            GenericIterable::List(_) => Exactness::Strict,
+            _ => Exactness::Lax,
+        };
+        state.floor_exactness(exactness);
 
         let output = match self.item_validator {
             Some(ref v) => seq.validate_to_vec(py, input, self.max_length, "Tuple", v, state)?,
             None => seq.to_vec(py, input, "Tuple", self.max_length)?,
         };
         min_length_check!(input, "Tuple", self.min_length, output);
-        state.set_exactness_unknown();
         Ok(PyTuple::new(py, &output).into_py(py))
     }
 
@@ -182,6 +188,13 @@ impl Validator for TuplePositionalValidator {
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
         let collection = input.validate_tuple(state.strict_or(self.strict))?;
+        let exactness: crate::validators::Exactness = match &collection {
+            GenericIterable::Tuple(_) | GenericIterable::JsonArray(_) => Exactness::Exact,
+            GenericIterable::List(_) => Exactness::Strict,
+            _ => Exactness::Lax,
+        };
+        state.floor_exactness(exactness);
+
         let actual_length = collection.generic_len();
         let expected_length = if self.extras_validator.is_some() {
             actual_length.unwrap_or(self.items_validators.len())
@@ -215,7 +228,6 @@ impl Validator for TuplePositionalValidator {
             other => iter!(other.as_sequence_iterator(py)?),
         }
         if errors.is_empty() {
-            state.set_exactness_unknown();
             Ok(PyTuple::new(py, &output).into_py(py))
         } else {
             Err(ValError::LineErrors(errors))
