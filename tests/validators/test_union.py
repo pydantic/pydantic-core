@@ -623,6 +623,10 @@ def test_smart_union_default_fallback():
     assert result.x == 1
     assert result.y == 1
 
+    # passing a ModelB explicitly will not match the default value
+    b = ModelB()
+    assert validator.validate_python(b) is b
+
 
 def test_smart_union_model_field():
     class ModelA:
