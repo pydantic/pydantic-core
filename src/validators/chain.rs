@@ -83,10 +83,6 @@ impl Validator for ChainValidator {
         steps_iter.try_fold(value, |v, step| step.validate(py, v.into_ref(py), state))
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        self.steps.iter().any(|v| v.different_strict_behavior(ultra_strict))
-    }
-
     fn get_name(&self) -> &str {
         &self.name
     }

@@ -75,6 +75,7 @@ impl Validator for DictValidator {
     ) -> ValResult<'data, PyObject> {
         let strict = state.strict_or(self.strict);
         let dict = input.validate_dict(strict)?;
+        state.set_exactness_unknown();
         match dict {
             GenericMapping::PyDict(py_dict) => {
                 self.validate_generic_mapping(py, input, DictGenericIterator::new(py_dict)?, state)
@@ -89,14 +90,6 @@ impl Validator for DictValidator {
             GenericMapping::JsonObject(json_object) => {
                 self.validate_generic_mapping(py, input, JsonObjectGenericIterator::new(json_object)?, state)
             }
-        }
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        if ultra_strict {
-            self.key_validator.different_strict_behavior(true) || self.value_validator.different_strict_behavior(true)
-        } else {
-            true
         }
     }
 

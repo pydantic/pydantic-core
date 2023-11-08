@@ -264,10 +264,6 @@ impl Validator for DecimalValidator {
         Ok(decimal.into())
     }
 
-    fn different_strict_behavior(&self, _ultra_strict: bool) -> bool {
-        true
-    }
-
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }

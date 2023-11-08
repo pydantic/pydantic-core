@@ -67,15 +67,8 @@ impl Validator for SetValidator {
         let set = PySet::empty(py)?;
         collection.validate_to_set(py, set, input, self.max_length, "Set", &self.item_validator, state)?;
         min_length_check!(input, "Set", self.min_length, set);
+        state.set_exactness_unknown();
         Ok(set.into_py(py))
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        if ultra_strict {
-            self.item_validator.different_strict_behavior(true)
-        } else {
-            true
-        }
     }
 
     fn get_name(&self) -> &str {

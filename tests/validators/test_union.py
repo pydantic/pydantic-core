@@ -1,7 +1,20 @@
+from datetime import date, datetime, time
+from enum import Enum
+from typing import Any
+from uuid import UUID
+
 import pytest
 from dirty_equals import IsFloat, IsInt
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema, validate_core_schema
+from pydantic_core import (
+    MultiHostUrl,
+    SchemaError,
+    SchemaValidator,
+    Url,
+    ValidationError,
+    core_schema,
+    validate_core_schema,
+)
 
 from ..conftest import plain_repr
 
@@ -342,9 +355,6 @@ def test_dirty_behaviour():
 
 def test_int_float():
     v = SchemaValidator(core_schema.union_schema([core_schema.int_schema(), core_schema.float_schema()]))
-    assert 'strict_required:true' in plain_repr(v)
-    assert 'ultra_strict_required:true' in plain_repr(v)  # since "float" schema has ultra-strict behaviour
-
     assert v.validate_python(1) == IsInt(approx=1, delta=0)
     assert v.validate_json('1') == IsInt(approx=1, delta=0)
     assert v.validate_python(1.0) == IsFloat(approx=1, delta=0)
@@ -382,17 +392,8 @@ def test_str_float():
     assert v.validate_json('"1"') == '1'
 
 
-def test_strict_check():
-    v = SchemaValidator(core_schema.union_schema([core_schema.int_schema(), core_schema.json_schema()]))
-    assert 'strict_required:true' in plain_repr(v)
-    assert 'ultra_strict_required:false' in plain_repr(v)
-
-
 def test_no_strict_check():
     v = SchemaValidator(core_schema.union_schema([core_schema.is_instance_schema(int), core_schema.json_schema()]))
-    assert 'strict_required:false' in plain_repr(v)
-    assert 'ultra_strict_required:false' in plain_repr(v)
-
     assert v.validate_python(123) == 123
     assert v.validate_python('[1, 2, 3]') == [1, 2, 3]
 
@@ -414,8 +415,6 @@ def test_strict_reference():
             ],
         )
     )
-    assert 'strict_required:true' in plain_repr(v)
-    assert 'ultra_strict_required:true' in plain_repr(v)  # since "float" schema has ultra-strict behaviour
 
     assert repr(v.validate_python((1, 2))) == '(1.0, 2)'
     assert repr(v.validate_python((1.0, (2.0, 3)))) == '(1.0, (2.0, 3))'
@@ -501,3 +500,87 @@ def test_left_to_right_union_strict():
     out = v.validate_python(1)
     assert out == 1.0
     assert isinstance(out, float)
+
+
+def test_union_function_before_called_once():
+    # See https://github.com/pydantic/pydantic/issues/6830 - in particular the
+    # smart union validator used to call `remove_prefix` twice, which is not
+    # ideal from a user perspective.
+    class SpecialValues(str, Enum):
+        DEFAULT = 'default'
+        OTHER = 'other'
+
+    special_values_schema = core_schema.no_info_after_validator_function(SpecialValues, core_schema.str_schema())
+
+    validator_called_count = 0
+
+    def remove_prefix(v: str):
+        nonlocal validator_called_count
+        validator_called_count += 1
+        if v.startswith('uuid::'):
+            return v[6:]
+        return v
+
+    prefixed_uuid_schema = core_schema.no_info_before_validator_function(remove_prefix, core_schema.uuid_schema())
+
+    v = SchemaValidator(core_schema.union_schema([special_values_schema, prefixed_uuid_schema]))
+
+    assert v.validate_python('uuid::12345678-1234-5678-1234-567812345678') == UUID(
+        '12345678-1234-5678-1234-567812345678'
+    )
+    assert validator_called_count == 1
+
+
+@pytest.mark.parametrize(
+    ('schema', 'input_value', 'expected_value'),
+    (
+        (
+            core_schema.uuid_schema(),
+            '12345678-1234-5678-1234-567812345678',
+            UUID('12345678-1234-5678-1234-567812345678'),
+        ),
+        pytest.param(
+            core_schema.date_schema(),
+            '2020-01-01',
+            date(2020, 1, 1),
+            marks=pytest.mark.xfail(reason='remove set_exactness_unknown from date validator'),
+        ),
+        pytest.param(
+            core_schema.time_schema(),
+            '00:00:00',
+            time(0, 0, 0),
+            marks=pytest.mark.xfail(reason='remove set_exactness_unknown from time validator'),
+        ),
+        pytest.param(
+            core_schema.datetime_schema(),
+            '2020-01-01:00:00:00',
+            datetime(2020, 1, 1, 0, 0, 0),
+            marks=pytest.mark.xfail(reason='remove set_exactness_unknown from datetime validator'),
+        ),
+        pytest.param(
+            core_schema.url_schema(),
+            'https://foo.com',
+            Url('https://foo.com'),
+            marks=pytest.mark.xfail(reason='remove set_exactness_unknown from url validator'),
+        ),
+        pytest.param(
+            core_schema.multi_host_url_schema(),
+            'https://bar.com,foo.com',
+            MultiHostUrl('https://bar.com,foo.com'),
+            marks=pytest.mark.xfail(reason='remove set_exactness_unknown from multihosturl validator'),
+        ),
+    ),
+)
+def test_smart_union_json_string_types(schema: core_schema.CoreSchema, input_value: str, expected_value: Any):
+    # Many types have to be represented in strings as JSON, we make sure that
+    # when parsing in JSON mode these types are preferred
+
+    validator = SchemaValidator(core_schema.union_schema([schema, core_schema.str_schema()]))
+    assert validator.validate_json(f'"{input_value}"') == expected_value
+    # in Python mode the string will be preferred
+    assert validator.validate_python(input_value) == input_value
+
+    # Repeat with reversed order
+    validator = SchemaValidator(core_schema.union_schema([core_schema.str_schema(), schema]))
+    assert validator.validate_json(f'"{input_value}"') == expected_value
+    assert validator.validate_python(input_value) == input_value

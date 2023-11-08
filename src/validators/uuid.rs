@@ -13,7 +13,7 @@ use crate::tools::SchemaDict;
 
 use super::model::create_class;
 use super::model::force_setattr;
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, ValidationState, Validator};
 
 const UUID_INT: &str = "int";
 const UUID_IS_SAFE: &str = "is_safe";
@@ -117,13 +117,14 @@ impl Validator for UuidValidator {
                 input,
             ))
         } else {
+            // In python mode this is a coercion, in JSON mode we treat a UUID string as an
+            // exact match
+            if input.is_python() {
+                state.set_exactness_ceiling(Exactness::Lax);
+            }
             let uuid = self.get_uuid(input)?;
             self.create_py_uuid(py, class, &uuid)
         }
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        !ultra_strict
     }
 
     fn get_name(&self) -> &str {

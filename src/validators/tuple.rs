@@ -57,18 +57,8 @@ impl Validator for TupleVariableValidator {
             None => seq.to_vec(py, input, "Tuple", self.max_length)?,
         };
         min_length_check!(input, "Tuple", self.min_length, output);
+        state.set_exactness_unknown();
         Ok(PyTuple::new(py, &output).into_py(py))
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        if ultra_strict {
-            match self.item_validator {
-                Some(ref v) => v.different_strict_behavior(true),
-                None => false,
-            }
-        } else {
-            true
-        }
     }
 
     fn get_name(&self) -> &str {
@@ -232,23 +222,10 @@ impl Validator for TuplePositionalValidator {
             other => iter!(other.as_sequence_iterator(py)?),
         }
         if errors.is_empty() {
+            state.set_exactness_unknown();
             Ok(PyTuple::new(py, &output).into_py(py))
         } else {
             Err(ValError::LineErrors(errors))
-        }
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        if ultra_strict {
-            if self.items_validators.iter().any(|v| v.different_strict_behavior(true)) {
-                true
-            } else if let Some(ref v) = self.extras_validator {
-                v.different_strict_behavior(true)
-            } else {
-                false
-            }
-        } else {
-            true
         }
     }
 

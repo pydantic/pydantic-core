@@ -1,7 +1,3 @@
-use std::cell::RefCell;
-
-use ahash::HashSet;
-use ahash::HashSetExt;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -120,27 +116,6 @@ impl Validator for DefinitionRefValidator {
             }
         } else {
             validator.validate_assignment(py, obj, field_name, field_value, state)
-        }
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        thread_local! {
-            static RECURSION_SET: RefCell<Option<HashSet<usize>>> = RefCell::new(None);
-        }
-
-        let id = self as *const _ as usize;
-        // have to unwrap here, because we can't return an error from this function, should be okay
-        let validator: &CombinedValidator = self.definition.get().unwrap();
-        if RECURSION_SET.with(
-            |set: &RefCell<Option<std::collections::HashSet<usize, ahash::RandomState>>>| {
-                set.borrow_mut().get_or_insert_with(HashSet::new).insert(id)
-            },
-        ) {
-            let different_strict_behavior = validator.different_strict_behavior(ultra_strict);
-            RECURSION_SET.with(|set| set.borrow_mut().get_or_insert_with(HashSet::new).remove(&id));
-            different_strict_behavior
-        } else {
-            false
         }
     }
 

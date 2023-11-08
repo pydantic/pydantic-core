@@ -86,14 +86,6 @@ impl Validator for GeneratorValidator {
         Ok(v_iterator.into_py(py))
     }
 
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        if let Some(ref v) = self.item_validator {
-            v.different_strict_behavior(ultra_strict)
-        } else {
-            false
-        }
-    }
-
     fn get_name(&self) -> &str {
         &self.name
     }
@@ -274,7 +266,6 @@ impl InternalValidator {
             input_type: self.validation_mode,
             data: self.data.as_ref().map(|data| data.as_ref(py)),
             strict: self.strict,
-            ultra_strict: false,
             from_attributes: self.from_attributes,
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.as_ref(py)),
@@ -305,7 +296,6 @@ impl InternalValidator {
             input_type: self.validation_mode,
             data: self.data.as_ref().map(|data| data.as_ref(py)),
             strict: self.strict,
-            ultra_strict: false,
             from_attributes: self.from_attributes,
             context: self.context.as_ref().map(|data| data.as_ref(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.as_ref(py)),

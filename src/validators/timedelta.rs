@@ -98,11 +98,8 @@ impl Validator for TimeDeltaValidator {
             check_constraint!(ge, GreaterThanEqual);
             check_constraint!(gt, GreaterThan);
         }
+        state.set_exactness_unknown();
         Ok(py_timedelta.into())
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        !ultra_strict
     }
 
     fn get_name(&self) -> &str {

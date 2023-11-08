@@ -5,6 +5,7 @@ use pyo3::types::PyDict;
 use pyo3::PyTraverseError;
 use pyo3::PyVisit;
 
+use super::validation_state::Exactness;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
@@ -155,6 +156,8 @@ impl Validator for WithDefaultValidator {
         outer_loc: Option<impl Into<LocItem>>,
         state: &mut ValidationState,
     ) -> ValResult<'data, Option<PyObject>> {
+        // using default value is always lowest exactness on union
+        state.set_exactness_ceiling(Exactness::Lax);
         match self.default.default_value(py)? {
             Some(stored_dft) => {
                 let dft: Py<PyAny> = if self.copy_default {
@@ -180,10 +183,6 @@ impl Validator for WithDefaultValidator {
             }
             None => Ok(None),
         }
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        self.validator.different_strict_behavior(ultra_strict)
     }
 
     fn get_name(&self) -> &str {

@@ -47,12 +47,9 @@ impl Validator for StrValidator {
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        let either_str = input.validate_str(state.strict_or(self.strict), self.coerce_numbers_to_str)?;
-        Ok(either_str.into_py(py))
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        !ultra_strict
+        input
+            .validate_str(state.strict_or(self.strict), self.coerce_numbers_to_str)
+            .map(|val_match| val_match.unpack(state).into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -86,7 +83,9 @@ impl Validator for StrConstrainedValidator {
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        let either_str = input.validate_str(state.strict_or(self.strict), self.coerce_numbers_to_str)?;
+        let either_str = input
+            .validate_str(state.strict_or(self.strict), self.coerce_numbers_to_str)?
+            .unpack(state);
         let cow = either_str.as_cow()?;
         let mut str = cow.as_ref();
         if self.strip_whitespace {
@@ -144,10 +143,6 @@ impl Validator for StrConstrainedValidator {
             either_str.as_py_string(py)
         };
         Ok(py_string.into_py(py))
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        !ultra_strict
     }
 
     fn get_name(&self) -> &str {

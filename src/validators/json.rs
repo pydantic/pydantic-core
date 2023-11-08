@@ -6,8 +6,7 @@ use crate::errors::ValResult;
 use crate::input::Input;
 use crate::tools::SchemaDict;
 
-use super::ValidationState;
-use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug)]
 pub struct JsonValidator {
@@ -58,14 +57,6 @@ impl Validator for JsonValidator {
                 Err(err) => Err(err.into_owned(py)),
             },
             None => Ok(json_value.to_object(py)),
-        }
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        if let Some(ref v) = self.validator {
-            v.different_strict_behavior(ultra_strict)
-        } else {
-            false
         }
     }
 

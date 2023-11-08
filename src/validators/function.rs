@@ -15,8 +15,8 @@ use crate::PydanticUseDefault;
 
 use super::generator::InternalValidator;
 use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, InputType, ValidationState,
-    Validator,
+    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, Extra, InputType,
+    ValidationState, Validator,
 };
 
 struct FunctionInfo {
@@ -96,7 +96,10 @@ macro_rules! impl_validator {
                 state: &mut ValidationState<'_>,
             ) -> ValResult<'data, PyObject> {
                 let validate = |v, s: &mut ValidationState<'_>| self.validator.validate(py, v, s);
-                self._validate(validate, py, input, state)
+                // Rationale: calling a Python function may always introduce coercions, so it is
+                // never an "exact" match
+                state.set_exactness_ceiling(Exactness::Strict);
+                self._validate(validate, py, input.to_object(py).into_ref(py), state)
             }
             fn validate_assignment<'data>(
                 &self,
@@ -111,14 +114,6 @@ macro_rules! impl_validator {
                         .validate_assignment(py, v, field_name, field_value, s)
                 };
                 self._validate(validate, py, obj, state)
-            }
-
-            fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-                if ultra_strict {
-                    self.validator.different_strict_behavior(ultra_strict)
-                } else {
-                    true
-                }
             }
 
             fn get_name(&self) -> &str {
@@ -249,12 +244,10 @@ impl Validator for FunctionPlainValidator {
         } else {
             self.func.call1(py, (input.to_object(py),))
         };
+        // Rationale: calling a Python function may always introduce coercions, so it is
+        // never an "exact" match
+        state.set_exactness_ceiling(Exactness::Strict);
         r.map_err(|e| convert_err(py, e, input))
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        // best guess, should we change this?
-        !ultra_strict
     }
 
     fn get_name(&self) -> &str {
@@ -349,6 +342,9 @@ impl Validator for FunctionWrapValidator {
                 self.validation_error_cause,
             ),
         };
+        // Rationale: calling a Python function may always introduce coercions, so it is
+        // never an "exact" match
+        state.set_exactness_ceiling(Exactness::Strict);
         self._validate(
             Py::new(py, handler)?.into_ref(py),
             py,
@@ -378,14 +374,6 @@ impl Validator for FunctionWrapValidator {
             updated_field_value: field_value.to_object(py),
         };
         self._validate(Py::new(py, handler)?.into_ref(py), py, obj, state)
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        if ultra_strict {
-            self.validator.different_strict_behavior(ultra_strict)
-        } else {
-            true
-        }
     }
 
     fn get_name(&self) -> &str {

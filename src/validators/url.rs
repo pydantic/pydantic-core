@@ -87,13 +87,12 @@ impl Validator for UrlValidator {
             self.default_port,
             &self.default_path,
         ) {
-            Ok(()) => Ok(PyUrl::new(lib_url).into_py(py)),
+            Ok(()) => {
+                state.set_exactness_unknown();
+                Ok(PyUrl::new(lib_url).into_py(py))
+            }
             Err(error_type) => return Err(ValError::new(error_type, input)),
         }
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        !ultra_strict
     }
 
     fn get_name(&self) -> &str {
@@ -108,7 +107,8 @@ impl Validator for UrlValidator {
 impl UrlValidator {
     fn get_url<'s, 'data>(&'s self, input: &'data impl Input<'data>, strict: bool) -> ValResult<'data, Url> {
         match input.validate_str(strict, false) {
-            Ok(either_str) => {
+            Ok(val_match) => {
+                let either_str = val_match.into_inner();
                 let cow = either_str.as_cow()?;
                 let url_str = cow.as_ref();
 
@@ -223,13 +223,12 @@ impl Validator for MultiHostUrlValidator {
             self.default_port,
             &self.default_path,
         ) {
-            Ok(()) => Ok(multi_url.into_py(py)),
+            Ok(()) => {
+                state.set_exactness_unknown();
+                Ok(multi_url.into_py(py))
+            }
             Err(error_type) => return Err(ValError::new(error_type, input)),
         }
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        !ultra_strict
     }
 
     fn get_name(&self) -> &str {
@@ -244,7 +243,8 @@ impl Validator for MultiHostUrlValidator {
 impl MultiHostUrlValidator {
     fn get_url<'s, 'data>(&'s self, input: &'data impl Input<'data>, strict: bool) -> ValResult<'data, PyMultiHostUrl> {
         match input.validate_str(strict, false) {
-            Ok(either_str) => {
+            Ok(val_match) => {
+                let either_str = val_match.into_inner();
                 let cow = either_str.as_cow()?;
                 let url_str = cow.as_ref();
 

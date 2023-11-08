@@ -15,7 +15,7 @@ use super::datetime::{
 use super::shared::{map_json_err, str_as_bool, str_as_float};
 use super::{
     BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable,
-    GenericIterator, GenericMapping, Input,
+    GenericIterator, GenericMapping, Input, ValidationMatch,
 };
 
 #[derive(Debug)]
@@ -96,9 +96,13 @@ impl<'a> Input<'a> for StringMapping<'a> {
         }
     }
 
-    fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
+    fn validate_str(
+        &'a self,
+        strict: bool,
+        coerce_numbers_to_str: bool,
+    ) -> ValResult<ValidationMatch<EitherString<'a>>> {
         match self {
-            Self::String(s) => Ok((*s).into()),
+            Self::String(s) => Ok(ValidationMatch::strict((*s).into())),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::StringType, self)),
         }
     }
@@ -120,30 +124,26 @@ impl<'a> Input<'a> for StringMapping<'a> {
         }
     }
 
-    fn strict_bool(&self) -> ValResult<bool> {
+    fn validate_bool(&self, _strict: bool) -> ValResult<'_, ValidationMatch<bool>> {
         match self {
-            Self::String(s) => str_as_bool(self, py_string_str(s)?),
+            Self::String(s) => str_as_bool(self, py_string_str(s)?).map(ValidationMatch::strict),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::BoolType, self)),
         }
     }
 
-    fn strict_int(&'a self) -> ValResult<EitherInt<'a>> {
+    fn validate_int(&'a self, strict: bool) -> ValResult<'a, ValidationMatch<EitherInt<'a>>> {
         match self {
             Self::String(s) => match py_string_str(s)?.parse() {
-                Ok(i) => Ok(EitherInt::I64(i)),
+                Ok(i) => Ok(ValidationMatch::strict(EitherInt::I64(i))),
                 Err(_) => Err(ValError::new(ErrorTypeDefaults::IntParsing, self)),
             },
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::IntType, self)),
         }
     }
 
-    fn ultra_strict_float(&'a self) -> ValResult<EitherFloat<'a>> {
-        self.strict_float()
-    }
-
-    fn strict_float(&'a self) -> ValResult<EitherFloat<'a>> {
+    fn validate_float(&'a self, strict: bool) -> ValResult<'a, ValidationMatch<EitherFloat<'a>>> {
         match self {
-            Self::String(s) => str_as_float(self, py_string_str(s)?),
+            Self::String(s) => str_as_float(self, py_string_str(s)?).map(ValidationMatch::strict),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::FloatType, self)),
         }
     }

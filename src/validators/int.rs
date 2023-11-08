@@ -8,8 +8,7 @@ use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{Input, Int};
 use crate::tools::SchemaDict;
 
-use super::ValidationState;
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug, Clone)]
 pub struct IntValidator {
@@ -50,12 +49,9 @@ impl Validator for IntValidator {
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        let either_int = input.validate_int(state.strict_or(self.strict))?;
-        Ok(either_int.into_py(py))
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        !ultra_strict
+        input
+            .validate_int(state.strict_or(self.strict))
+            .map(|val_match| val_match.unpack(state).into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -86,7 +82,7 @@ impl Validator for ConstrainedIntValidator {
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        let either_int = input.validate_int(state.strict_or(self.strict))?;
+        let either_int = input.validate_int(state.strict_or(self.strict))?.unpack(state);
         let int_value = either_int.as_int()?;
 
         if let Some(ref multiple_of) = self.multiple_of {
@@ -145,10 +141,6 @@ impl Validator for ConstrainedIntValidator {
             }
         }
         Ok(either_int.into_py(py))
-    }
-
-    fn different_strict_behavior(&self, ultra_strict: bool) -> bool {
-        !ultra_strict
     }
 
     fn get_name(&self) -> &str {
