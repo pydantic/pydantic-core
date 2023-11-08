@@ -2,7 +2,7 @@ use crate::recursion_guard::RecursionGuard;
 
 use super::Extra;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub enum Exactness {
     Lax,
     Strict,

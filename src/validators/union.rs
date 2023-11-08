@@ -111,76 +111,55 @@ impl UnionValidator {
         let strict = state.strict_or(self.strict);
         let mut errors = MaybeErrors::new(self.custom_error.as_ref());
 
-        let mut strict_success = None;
-        let mut lax_success = None;
+        let mut success = None;
 
-        if strict {
-            // one-pass strict validation
-            let state = &mut state.rebind_extra(|extra| extra.strict = Some(true));
-            for (choice, label) in &self.choices {
-                state.exactness = Some(Exactness::Exact);
-                match choice.validate(py, input, state) {
-                    Ok(success) => {
-                        if state.exactness == Some(Exactness::Exact) {
+        for (choice, label) in &self.choices {
+            let state = &mut state.rebind_extra(|extra| {
+                if strict {
+                    extra.strict = Some(strict);
+                }
+            });
+            state.exactness = Some(Exactness::Exact);
+            let result = choice.validate(py, input, state);
+            match result {
+                Ok(new_success) => match state.exactness {
+                    // exact match, return
+                    Some(Exactness::Exact) => {
+                        return {
                             // exact match, return, restore any previous exactness
                             state.exactness = old_exactness;
-                            return Ok(success);
-                        } else if strict_success.is_none() {
-                            // remember first success for later as a fallback
-                            // we know this must have been strict, because we ran strict validation
-                            strict_success = Some(success);
+                            Ok(new_success)
+                        };
+                    }
+                    _ => {
+                        // success should always have an exactness
+                        debug_assert_ne!(state.exactness, None);
+                        let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
+                        // if the new result has higher exactness than the current success, replace it
+                        if success
+                            .as_ref()
+                            .map_or(true, |(_, current_exactness)| *current_exactness < new_exactness)
+                        {
+                            // TODO: is there a possible optimization here, where once there has
+                            // been one success, we turn on strict mode, to avoid unnecessary
+                            // coercions for further validation?
+                            success = Some((new_success, new_exactness));
                         }
                     }
-                    Err(ValError::LineErrors(lines)) => {
-                        // if we don't yet know this validation will succeed, record the error
-                        if strict_success.is_none() {
-                            errors.push(choice, label.as_deref(), lines);
-                        }
+                },
+                Err(ValError::LineErrors(lines)) => {
+                    // if we don't yet know this validation will succeed, record the error
+                    if success.is_none() {
+                        errors.push(choice, label.as_deref(), lines);
                     }
-                    otherwise => return otherwise,
                 }
-            }
-        } else {
-            // one-pass lax validation
-            for (choice, label) in &self.choices {
-                state.exactness = Some(Exactness::Exact);
-                let result = choice.validate(py, input, state);
-                match result {
-                    Ok(success) => match state.exactness {
-                        // exact match, return
-                        Some(Exactness::Exact) => return Ok(success),
-                        Some(Exactness::Strict) => {
-                            if strict_success.is_none() {
-                                strict_success = Some(success);
-                            }
-                        }
-                        _ => {
-                            // success should always have an exactness
-                            debug_assert_eq!(state.exactness, Some(Exactness::Lax));
-                            if lax_success.is_none() {
-                                lax_success = Some(success);
-                            }
-                        }
-                    },
-                    Err(ValError::LineErrors(lines)) => {
-                        // if we don't yet know this validation will succeed, record the error
-                        if strict_success.is_none() && lax_success.is_none() {
-                            errors.push(choice, label.as_deref(), lines);
-                        }
-                    }
-                    otherwise => return otherwise,
-                }
+                otherwise => return otherwise,
             }
         }
         state.exactness = old_exactness;
 
-        if let Some(success) = strict_success {
-            state.floor_exactness(Exactness::Strict);
-            return Ok(success);
-        }
-
-        if let Some(success) = lax_success {
-            state.floor_exactness(Exactness::Lax);
+        if let Some((success, exactness)) = success {
+            state.floor_exactness(exactness);
             return Ok(success);
         }
 
