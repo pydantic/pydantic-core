@@ -63,11 +63,4 @@ impl Validator for JsonValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        match &self.validator {
-            Some(v) => v.complete(),
-            None => Ok(()),
-        }
-    }
 }

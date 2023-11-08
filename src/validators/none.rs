@@ -39,8 +39,4 @@ impl Validator for NoneValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
-
-    fn complete(&self) -> PyResult<()> {
-        Ok(())
-    }
 }

@@ -86,8 +86,4 @@ impl Validator for ChainValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        self.steps.iter().try_for_each(CombinedValidator::complete)
-    }
 }

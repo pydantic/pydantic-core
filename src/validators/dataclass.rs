@@ -442,10 +442,6 @@ impl Validator for DataclassArgsValidator {
     fn get_name(&self) -> &str {
         &self.validator_name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        self.fields.iter().try_for_each(|field| field.validator.complete())
-    }
 }
 
 #[derive(Debug)]
@@ -592,10 +588,6 @@ impl Validator for DataclassValidator {
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&self) -> PyResult<()> {
-        self.validator.complete()
     }
 }
 

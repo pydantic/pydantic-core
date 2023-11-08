@@ -101,12 +101,4 @@ impl Validator for CallValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        self.arguments_validator.complete()?;
-        match &self.return_validator {
-            Some(v) => v.complete(),
-            None => Ok(()),
-        }
-    }
 }

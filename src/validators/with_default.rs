@@ -188,10 +188,6 @@ impl Validator for WithDefaultValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        self.validator.complete()
-    }
 }
 
 impl WithDefaultValidator {

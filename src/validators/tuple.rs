@@ -64,13 +64,6 @@ impl Validator for TupleVariableValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        match &self.item_validator {
-            Some(v) => v.complete(),
-            None => Ok(()),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -231,13 +224,5 @@ impl Validator for TuplePositionalValidator {
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&self) -> PyResult<()> {
-        self.items_validators.iter().try_for_each(CombinedValidator::complete)?;
-        match &self.extras_validator {
-            Some(v) => v.complete(),
-            None => Ok(()),
-        }
     }
 }

@@ -252,11 +252,6 @@ impl Validator for UnionValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        self.choices.iter().try_for_each(|(v, _)| v.complete())?;
-        Ok(())
-    }
 }
 
 struct ChoiceLineErrors<'a, 'data> {
@@ -477,10 +472,6 @@ impl Validator for TaggedUnionValidator {
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&self) -> PyResult<()> {
-        self.lookup.values.iter().try_for_each(CombinedValidator::complete)
     }
 }
 

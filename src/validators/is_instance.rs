@@ -85,8 +85,4 @@ impl Validator for IsInstanceValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        Ok(())
-    }
 }

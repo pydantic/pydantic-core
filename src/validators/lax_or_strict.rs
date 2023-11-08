@@ -71,9 +71,4 @@ impl Validator for LaxOrStrictValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        self.lax_validator.complete()?;
-        self.strict_validator.complete()
-    }
 }

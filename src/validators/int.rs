@@ -57,10 +57,6 @@ impl Validator for IntValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
-
-    fn complete(&self) -> PyResult<()> {
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -145,10 +141,6 @@ impl Validator for ConstrainedIntValidator {
 
     fn get_name(&self) -> &str {
         "constrained-int"
-    }
-
-    fn complete(&self) -> PyResult<()> {
-        Ok(())
     }
 }
 

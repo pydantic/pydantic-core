@@ -64,8 +64,4 @@ impl Validator for IsSubclassValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        Ok(())
-    }
 }

@@ -122,8 +122,4 @@ impl Validator for DefinitionRefValidator {
     fn get_name(&self) -> &str {
         self.definition.get_or_init_name(|v| v.get_name().into())
     }
-
-    fn complete(&self) -> PyResult<()> {
-        Ok(())
-    }
 }

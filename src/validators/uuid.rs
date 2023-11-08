@@ -130,10 +130,6 @@ impl Validator for UuidValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
-
-    fn complete(&self) -> PyResult<()> {
-        Ok(())
-    }
 }
 
 impl UuidValidator {

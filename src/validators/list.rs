@@ -157,11 +157,4 @@ impl Validator for ListValidator {
             }
         }
     }
-
-    fn complete(&self) -> PyResult<()> {
-        if let Some(v) = &self.item_validator {
-            v.complete()?;
-        }
-        Ok(())
-    }
 }

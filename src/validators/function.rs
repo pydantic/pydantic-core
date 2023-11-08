@@ -119,10 +119,6 @@ macro_rules! impl_validator {
             fn get_name(&self) -> &str {
                 &self.name
             }
-
-            fn complete(&self) -> PyResult<()> {
-                self.validator.complete()
-            }
         }
     };
 }
@@ -253,10 +249,6 @@ impl Validator for FunctionPlainValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        Ok(())
-    }
 }
 
 #[derive(Debug)]
@@ -378,10 +370,6 @@ impl Validator for FunctionWrapValidator {
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn complete(&self) -> PyResult<()> {
-        self.validator.complete()
     }
 }
 

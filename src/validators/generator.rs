@@ -89,13 +89,6 @@ impl Validator for GeneratorValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn complete(&self) -> PyResult<()> {
-        match &self.item_validator {
-            Some(v) => v.complete(),
-            None => Ok(()),
-        }
-    }
 }
 
 #[pyclass(module = "pydantic_core._pydantic_core")]

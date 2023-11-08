@@ -335,17 +335,4 @@ impl Validator for ArgumentsValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
-
-    fn complete(&self) -> PyResult<()> {
-        self.parameters
-            .iter()
-            .try_for_each(|parameter| parameter.validator.complete())?;
-        if let Some(v) = &self.var_args_validator {
-            v.complete()?;
-        }
-        if let Some(v) = &self.var_kwargs_validator {
-            v.complete()?;
-        };
-        Ok(())
-    }
 }

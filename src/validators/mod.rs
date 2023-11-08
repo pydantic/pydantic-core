@@ -119,10 +119,6 @@ impl SchemaValidator {
 
         let validator = build_validator(schema, config, &mut definitions_builder)?;
         let definitions = definitions_builder.finish()?;
-        validator.complete()?;
-        for val in definitions.values() {
-            val.get().unwrap().complete()?;
-        }
         let py_schema = schema.into_py(py);
         let py_config = match config {
             Some(c) if !c.is_empty() => Some(c.into_py(py)),
@@ -399,10 +395,6 @@ impl<'py> SelfValidator<'py> {
             Err(err) => return py_schema_err!("Error building self-schema:\n  {}", err),
         };
         let definitions = definitions_builder.finish()?;
-        validator.complete()?;
-        for val in definitions.values() {
-            val.get().unwrap().complete()?;
-        }
         Ok(SchemaValidator {
             validator,
             definitions,
@@ -738,8 +730,4 @@ pub trait Validator: Send + Sync + Debug {
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`
     fn get_name(&self) -> &str;
-
-    /// this method must be implemented for any validator which holds references to other validators,
-    /// it is used by `UnionValidator` to calculate strictness
-    fn complete(&self) -> PyResult<()>;
 }

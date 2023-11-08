@@ -267,10 +267,6 @@ impl Validator for DecimalValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
-
-    fn complete(&self) -> PyResult<()> {
-        Ok(())
-    }
 }
 
 pub(crate) fn create_decimal<'a>(

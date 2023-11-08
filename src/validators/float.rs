@@ -80,10 +80,6 @@ impl Validator for FloatValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
-
-    fn complete(&self) -> PyResult<()> {
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -173,10 +169,6 @@ impl Validator for ConstrainedFloatValidator {
 
     fn get_name(&self) -> &str {
         "constrained-float"
-    }
-
-    fn complete(&self) -> PyResult<()> {
-        Ok(())
     }
 }
 

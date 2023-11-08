@@ -330,12 +330,4 @@ impl Validator for TypedDictValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
-
-    fn complete(&self) -> PyResult<()> {
-        self.fields.iter().try_for_each(|f| f.validator.complete())?;
-        match &self.extras_validator {
-            Some(v) => v.complete(),
-            None => Ok(()),
-        }
-    }
 }
