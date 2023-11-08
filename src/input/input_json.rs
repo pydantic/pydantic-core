@@ -87,9 +87,6 @@ impl<'a> Input<'a> for JsonValue {
 
     fn exact_str(&'a self) -> ValResult<EitherString<'a>> {
         match self {
-            // Justification for `strict` instead of `exact` is that in JSON strings can also
-            // represent other datatypes such as UUID and date more exactly, so string is a
-            // converting input
             JsonValue::Str(s) => Ok(s.as_str().into()),
             _ => Err(ValError::new(ErrorTypeDefaults::StringType, self)),
         }
@@ -103,6 +100,8 @@ impl<'a> Input<'a> for JsonValue {
         // Justification for `strict` instead of `exact` is that in JSON strings can also
         // represent other datatypes such as UUID and date more exactly, so string is a
         // converting input
+        // TODO: in V3 we may want to make JSON str always win if in union, for consistency,
+        // see https://github.com/pydantic/pydantic-core/pull/867#discussion_r1386582501
         match self {
             JsonValue::Str(s) => Ok(ValidationMatch::strict(s.as_str().into())),
             JsonValue::Int(i) if !strict && coerce_numbers_to_str => Ok(ValidationMatch::lax(i.to_string().into())),
@@ -388,6 +387,8 @@ impl<'a> Input<'a> for String {
         // Justification for `strict` instead of `exact` is that in JSON strings can also
         // represent other datatypes such as UUID and date more exactly, so string is a
         // converting input
+        // TODO: in V3 we may want to make JSON str always win if in union, for consistency,
+        // see https://github.com/pydantic/pydantic-core/pull/867#discussion_r1386582501
         Ok(ValidationMatch::strict(self.as_str().into()))
     }
 
