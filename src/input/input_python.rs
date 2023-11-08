@@ -15,8 +15,7 @@ use speedate::MicrosecondsPrecisionOverflowBehavior;
 
 use crate::errors::{AsLocItem, ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::tools::{extract_i64, safe_repr};
-use crate::validators::decimal::create_decimal;
-use crate::validators::decimal::get_decimal_type;
+use crate::validators::decimal::{create_decimal, get_decimal_type};
 use crate::validators::Exactness;
 use crate::{ArgsKwargs, PyMultiHostUrl, PyUrl};
 
