@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date, datetime, time
 from enum import Enum
 from typing import Any
@@ -584,3 +585,108 @@ def test_smart_union_json_string_types(schema: core_schema.CoreSchema, input_val
     validator = SchemaValidator(core_schema.union_schema([core_schema.str_schema(), schema]))
     assert validator.validate_json(f'"{input_value}"') == expected_value
     assert validator.validate_python(input_value) == input_value
+
+
+def test_smart_union_default_fallback():
+    """Using a default value does not affect the exactness of the smart union match."""
+
+    class ModelA:
+        x: int
+        y: int = 1
+
+    class ModelB:
+        x: int
+
+    schema = core_schema.union_schema(
+        [
+            core_schema.model_schema(
+                ModelA,
+                core_schema.model_fields_schema(
+                    {
+                        'x': core_schema.model_field(core_schema.int_schema()),
+                        'y': core_schema.model_field(
+                            core_schema.with_default_schema(core_schema.int_schema(), default=1)
+                        ),
+                    }
+                ),
+            ),
+            core_schema.model_schema(
+                ModelB, core_schema.model_fields_schema({'x': core_schema.model_field(core_schema.int_schema())})
+            ),
+        ]
+    )
+
+    validator = SchemaValidator(schema)
+
+    result = validator.validate_python({'x': 1})
+    assert isinstance(result, ModelA)
+    assert result.x == 1
+    assert result.y == 1
+
+
+def test_smart_union_model_field():
+    class ModelA:
+        x: int
+
+    class ModelB:
+        x: str
+
+    schema = core_schema.union_schema(
+        [
+            core_schema.model_schema(
+                ModelA, core_schema.model_fields_schema({'x': core_schema.model_field(core_schema.int_schema())})
+            ),
+            core_schema.model_schema(
+                ModelB, core_schema.model_fields_schema({'x': core_schema.model_field(core_schema.str_schema())})
+            ),
+        ]
+    )
+
+    validator = SchemaValidator(schema)
+
+    result = validator.validate_python({'x': 1})
+    assert isinstance(result, ModelA)
+    assert result.x == 1
+
+    result = validator.validate_python({'x': '1'})
+    assert isinstance(result, ModelB)
+    assert result.x == '1'
+
+
+def test_smart_union_dataclass_field():
+    @dataclass
+    class ModelA:
+        x: int
+
+    @dataclass
+    class ModelB:
+        x: str
+
+    schema = core_schema.union_schema(
+        [
+            core_schema.dataclass_schema(
+                ModelA,
+                core_schema.dataclass_args_schema(
+                    'ModelA', [core_schema.dataclass_field('x', core_schema.int_schema())]
+                ),
+                ['x'],
+            ),
+            core_schema.dataclass_schema(
+                ModelB,
+                core_schema.dataclass_args_schema(
+                    'ModelB', [core_schema.dataclass_field('x', core_schema.str_schema())]
+                ),
+                ['x'],
+            ),
+        ]
+    )
+
+    validator = SchemaValidator(schema)
+
+    result = validator.validate_python({'x': 1})
+    assert isinstance(result, ModelA)
+    assert result.x == 1
+
+    result = validator.validate_python({'x': '1'})
+    assert isinstance(result, ModelB)
+    assert result.x == '1'
