@@ -98,8 +98,8 @@ impl<'a> Input<'a> for StringMapping<'a> {
 
     fn validate_str(
         &'a self,
-        strict: bool,
-        coerce_numbers_to_str: bool,
+        _strict: bool,
+        _coerce_numbers_to_str: bool,
     ) -> ValResult<ValidationMatch<EitherString<'a>>> {
         match self {
             Self::String(s) => Ok(ValidationMatch::strict((*s).into())),
@@ -131,7 +131,7 @@ impl<'a> Input<'a> for StringMapping<'a> {
         }
     }
 
-    fn validate_int(&'a self, strict: bool) -> ValResult<'a, ValidationMatch<EitherInt<'a>>> {
+    fn validate_int(&'a self, _strict: bool) -> ValResult<'a, ValidationMatch<EitherInt<'a>>> {
         match self {
             Self::String(s) => match py_string_str(s)?.parse() {
                 Ok(i) => Ok(ValidationMatch::strict(EitherInt::I64(i))),
@@ -141,7 +141,7 @@ impl<'a> Input<'a> for StringMapping<'a> {
         }
     }
 
-    fn validate_float(&'a self, strict: bool) -> ValResult<'a, ValidationMatch<EitherFloat<'a>>> {
+    fn validate_float(&'a self, _strict: bool) -> ValResult<'a, ValidationMatch<EitherFloat<'a>>> {
         match self {
             Self::String(s) => str_as_float(self, py_string_str(s)?).map(ValidationMatch::strict),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::FloatType, self)),

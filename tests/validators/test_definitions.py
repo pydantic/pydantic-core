@@ -140,19 +140,3 @@ def test_use_after():
         )
     )
     assert v.validate_python(['1', '2']) == (1, 2)
-
-
-def test_ultra_strict_with_definitions():
-    v = SchemaValidator(
-        core_schema.definitions_schema(
-            core_schema.union_schema(
-                [core_schema.definition_reference_schema('a'), core_schema.definition_reference_schema('b')]
-            ),
-            [
-                core_schema.list_schema(core_schema.any_schema(), ref='a'),
-                core_schema.list_schema(core_schema.definition_reference_schema('float'), ref='b'),
-                core_schema.float_schema(ref='float'),
-            ],
-        )
-    )
-    assert 'ultra_strict_required:true' in plain_repr(v)

@@ -99,7 +99,7 @@ macro_rules! impl_validator {
                 // Rationale: calling a Python function may always introduce coercions, so it is
                 // never an "exact" match
                 state.set_exactness_ceiling(Exactness::Strict);
-                self._validate(validate, py, input.to_object(py).into_ref(py), state)
+                self._validate(validate, py, input, state)
             }
             fn validate_assignment<'data>(
                 &self,

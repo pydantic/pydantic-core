@@ -219,23 +219,38 @@ impl<'a> Input<'a> for PyAny {
             return Ok(ValidationMatch::strict(py_string_str(py_str)?.into()));
         }
 
-        if !strict {
-            if let Ok(bytes) = self.downcast::<PyBytes>() {
-                let str = match from_utf8(bytes.as_bytes()) {
-                    Ok(s) => s,
-                    Err(_) => return Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
-                };
-                return Ok(ValidationMatch::lax(str.into()));
-            } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
-                // Safety: the gil is held while from_utf8 is running so py_byte_array is not mutated,
-                // and we immediately copy the bytes into a new Python string
-                let str = match from_utf8(unsafe { py_byte_array.as_bytes() }) {
-                    // Why Python not Rust? to avoid an unnecessary allocation on the Rust side, the
-                    // final output needs to be Python anyway.
-                    Ok(s) => PyString::new(self.py(), s),
-                    Err(_) => return Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
-                };
-                return Ok(ValidationMatch::lax(str.into()));
+        'lax: {
+            if !strict {
+                return if let Ok(bytes) = self.downcast::<PyBytes>() {
+                    match from_utf8(bytes.as_bytes()) {
+                        Ok(str) => Ok(str.into()),
+                        Err(_) => Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
+                    }
+                } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
+                    // Safety: the gil is held while from_utf8 is running so py_byte_array is not mutated,
+                    // and we immediately copy the bytes into a new Python string
+                    match from_utf8(unsafe { py_byte_array.as_bytes() }) {
+                        // Why Python not Rust? to avoid an unnecessary allocation on the Rust side, the
+                        // final output needs to be Python anyway.
+                        Ok(s) => Ok(PyString::new(self.py(), s).into()),
+                        Err(_) => Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
+                    }
+                } else if coerce_numbers_to_str && !PyBool::is_exact_type_of(self) && {
+                    let py = self.py();
+                    let decimal_type: Py<PyType> = get_decimal_type(py);
+
+                    // only allow int, float, and decimal (not bool)
+                    self.is_instance_of::<PyInt>()
+                        || self.is_instance_of::<PyFloat>()
+                        || self.is_instance(decimal_type.as_ref(py)).unwrap_or_default()
+                } {
+                    Ok(self.str()?.into())
+                } else if let Some(enum_val) = maybe_as_enum(self) {
+                    Ok(enum_val.str()?.into())
+                } else {
+                    break 'lax;
+                }
+                .map(ValidationMatch::lax);
             }
         }
 
@@ -320,11 +335,22 @@ impl<'a> Input<'a> for PyAny {
             return EitherInt::upcast(self).map(|either_int| ValidationMatch::new(either_int, exactness));
         }
 
-        if !strict {
-            if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::IntParsing)? {
-                return str_as_int(self, &cow_str).map(ValidationMatch::lax);
-            } else if let Ok(float) = self.extract::<f64>() {
-                return float_as_int(self, float).map(ValidationMatch::lax);
+        'lax: {
+            if !strict {
+                return if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::IntParsing)? {
+                    str_as_int(self, &cow_str)
+                } else if self.is_exact_instance_of::<PyFloat>() {
+                    float_as_int(self, self.extract::<f64>()?)
+                } else if let Ok(decimal) = self.strict_decimal(self.py()) {
+                    decimal_as_int(self.py(), self, decimal)
+                } else if let Ok(float) = self.extract::<f64>() {
+                    float_as_int(self, float)
+                } else if let Some(enum_val) = maybe_as_enum(self) {
+                    Ok(EitherInt::Py(enum_val))
+                } else {
+                    break 'lax;
+                }
+                .map(ValidationMatch::lax);
             }
         }
 
