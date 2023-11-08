@@ -107,6 +107,7 @@ impl UnionValidator {
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
+        let old_exactness = state.exactness;
         let strict = state.strict_or(self.strict);
         let mut errors = MaybeErrors::new(self.custom_error.as_ref());
 
@@ -121,7 +122,8 @@ impl UnionValidator {
                 match choice.validate(py, input, state) {
                     Ok(success) => {
                         if state.exactness == Some(Exactness::Exact) {
-                            // exact match, return
+                            // exact match, return, restore any previous exactness
+                            state.exactness = old_exactness;
                             return Ok(success);
                         } else if strict_success.is_none() {
                             // remember first success for later as a fallback
@@ -189,12 +191,15 @@ impl UnionValidator {
                 }
             }
         }
+        state.exactness = old_exactness;
 
         if let Some(success) = strict_success {
+            state.floor_exactness(Exactness::Strict);
             return Ok(success);
         }
 
         if let Some(success) = lax_success {
+            state.floor_exactness(Exactness::Lax);
             return Ok(success);
         }
 

@@ -15,8 +15,8 @@ use crate::PydanticUseDefault;
 
 use super::generator::InternalValidator;
 use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, Extra, InputType,
-    ValidationState, Validator,
+    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, InputType, ValidationState,
+    Validator,
 };
 
 struct FunctionInfo {
@@ -96,9 +96,6 @@ macro_rules! impl_validator {
                 state: &mut ValidationState<'_>,
             ) -> ValResult<'data, PyObject> {
                 let validate = |v, s: &mut ValidationState<'_>| self.validator.validate(py, v, s);
-                // Rationale: calling a Python function may always introduce coercions, so it is
-                // never an "exact" match
-                state.floor_exactness(Exactness::Strict);
                 self._validate(validate, py, input, state)
             }
             fn validate_assignment<'data>(
@@ -240,9 +237,6 @@ impl Validator for FunctionPlainValidator {
         } else {
             self.func.call1(py, (input.to_object(py),))
         };
-        // Rationale: calling a Python function may always introduce coercions, so it is
-        // never an "exact" match
-        state.floor_exactness(Exactness::Strict);
         r.map_err(|e| convert_err(py, e, input))
     }
 
@@ -334,15 +328,10 @@ impl Validator for FunctionWrapValidator {
                 self.validation_error_cause,
             ),
         };
-        // Rationale: calling a Python function may always introduce coercions, so it is
-        // never an "exact" match
-        state.floor_exactness(Exactness::Strict);
-        self._validate(
-            Py::new(py, handler)?.into_ref(py),
-            py,
-            input.to_object(py).into_ref(py),
-            state,
-        )
+        let handler = Py::new(py, handler)?.into_ref(py);
+        let result = self._validate(handler, py, input.to_object(py).into_ref(py), state);
+        state.exactness = handler.borrow_mut().validator.exactness;
+        result
     }
 
     fn validate_assignment<'data>(

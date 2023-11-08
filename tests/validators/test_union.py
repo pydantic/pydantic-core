@@ -694,3 +694,74 @@ def test_smart_union_dataclass_field():
     result = validator.validate_python({'x': '1'})
     assert isinstance(result, ModelB)
     assert result.x == '1'
+
+
+def test_smart_union_with_any():
+    """any is preferred over lax validations"""
+
+    # str not coerced to int
+    schema = core_schema.union_schema([core_schema.int_schema(), core_schema.any_schema()])
+    validator = SchemaValidator(schema)
+    assert validator.validate_python('1') == '1'
+
+    # int *is* coerced to float, this is a strict validation
+    schema = core_schema.union_schema([core_schema.float_schema(), core_schema.any_schema()])
+    validator = SchemaValidator(schema)
+    assert repr(validator.validate_python(1)) == '1.0'
+
+
+def test_smart_union_validator_function():
+    """adding a validator function should not change smart union behaviour"""
+
+    inner_schema = core_schema.union_schema([core_schema.int_schema(), core_schema.float_schema()])
+
+    # validator = SchemaValidator(inner_schema)
+    # assert repr(validator.validate_python(1)) == '1'
+    # assert repr(validator.validate_python(1.0)) == '1.0'
+
+    # schema = core_schema.union_schema(
+    #     [core_schema.no_info_after_validator_function(lambda v: v * 2, inner_schema), core_schema.str_schema()]
+    # )
+
+    # validator = SchemaValidator(schema)
+    # assert repr(validator.validate_python(1)) == '2'
+    # assert repr(validator.validate_python(1.0)) == '2.0'
+    # assert validator.validate_python('1') == '1'
+
+    schema = core_schema.union_schema(
+        [
+            core_schema.no_info_wrap_validator_function(lambda v, handler: handler(v) * 2, inner_schema),
+            core_schema.str_schema(),
+        ]
+    )
+
+    validator = SchemaValidator(schema)
+    # assert repr(validator.validate_python(1)) == '2'
+    # assert repr(validator.validate_python(1.0)) == '2.0'
+    assert validator.validate_python('1') == '1'
+
+
+def test_smart_union_validator_function_one_arm():
+    """adding a validator function should not change smart union behaviour"""
+
+    schema = core_schema.union_schema(
+        [
+            core_schema.float_schema(),
+            core_schema.no_info_after_validator_function(lambda v: v * 2, core_schema.int_schema()),
+        ]
+    )
+
+    validator = SchemaValidator(schema)
+    assert repr(validator.validate_python(1)) == '2'
+    assert repr(validator.validate_python(1.0)) == '1.0'
+
+    schema = core_schema.union_schema(
+        [
+            core_schema.float_schema(),
+            core_schema.no_info_wrap_validator_function(lambda v, handler: handler(v) * 2, core_schema.int_schema()),
+        ]
+    )
+
+    validator = SchemaValidator(schema)
+    assert repr(validator.validate_python(1)) == '2'
+    assert repr(validator.validate_python(1.0)) == '1.0'
