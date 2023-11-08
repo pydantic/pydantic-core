@@ -120,7 +120,7 @@ impl Validator for UuidValidator {
             // In python mode this is a coercion, in JSON mode we treat a UUID string as an
             // exact match
             if input.is_python() {
-                state.set_exactness_ceiling(Exactness::Lax);
+                state.floor_exactness(Exactness::Lax);
             }
             let uuid = self.get_uuid(input)?;
             self.create_py_uuid(py, class, &uuid)

@@ -545,7 +545,7 @@ impl Validator for DataclassValidator {
             ))
         } else {
             let val_output = self.validator.validate(py, input, state)?;
-            state.set_exactness_ceiling(Exactness::Lax);
+            state.floor_exactness(Exactness::Lax);
             let dc = create_class(self.class.as_ref(py))?;
             self.set_dict_call(py, dc.as_ref(py), val_output, input)?;
             Ok(dc)

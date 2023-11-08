@@ -31,7 +31,7 @@ impl Validator for CallableValidator {
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        state.set_exactness_ceiling(Exactness::Lax);
+        state.floor_exactness(Exactness::Lax);
         match input.callable() {
             true => Ok(input.to_object(py)),
             false => Err(ValError::new(ErrorTypeDefaults::CallableType, input)),

@@ -34,7 +34,7 @@ impl Validator for AnyValidator {
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
         // in a union, Any should be preferred to doing lax coercions
-        state.set_exactness_ceiling(Exactness::Strict);
+        state.floor_exactness(Exactness::Strict);
         Ok(input.to_object(py))
     }
 

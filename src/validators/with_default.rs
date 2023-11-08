@@ -157,7 +157,7 @@ impl Validator for WithDefaultValidator {
         state: &mut ValidationState,
     ) -> ValResult<'data, Option<PyObject>> {
         // using default value is always lowest exactness on union
-        state.set_exactness_ceiling(Exactness::Lax);
+        state.floor_exactness(Exactness::Lax);
         match self.default.default_value(py)? {
             Some(stored_dft) => {
                 let dft: Py<PyAny> = if self.copy_default {

@@ -98,7 +98,7 @@ macro_rules! impl_validator {
                 let validate = |v, s: &mut ValidationState<'_>| self.validator.validate(py, v, s);
                 // Rationale: calling a Python function may always introduce coercions, so it is
                 // never an "exact" match
-                state.set_exactness_ceiling(Exactness::Strict);
+                state.floor_exactness(Exactness::Strict);
                 self._validate(validate, py, input, state)
             }
             fn validate_assignment<'data>(
@@ -242,7 +242,7 @@ impl Validator for FunctionPlainValidator {
         };
         // Rationale: calling a Python function may always introduce coercions, so it is
         // never an "exact" match
-        state.set_exactness_ceiling(Exactness::Strict);
+        state.floor_exactness(Exactness::Strict);
         r.map_err(|e| convert_err(py, e, input))
     }
 
@@ -336,7 +336,7 @@ impl Validator for FunctionWrapValidator {
         };
         // Rationale: calling a Python function may always introduce coercions, so it is
         // never an "exact" match
-        state.set_exactness_ceiling(Exactness::Strict);
+        state.floor_exactness(Exactness::Strict);
         self._validate(
             Py::new(py, handler)?.into_ref(py),
             py,
