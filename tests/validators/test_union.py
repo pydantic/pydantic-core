@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, datetime, time
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Any
 from uuid import UUID
 
@@ -765,3 +765,23 @@ def test_smart_union_validator_function_one_arm():
     validator = SchemaValidator(schema)
     assert repr(validator.validate_python(1)) == '2'
     assert repr(validator.validate_python(1.0)) == '1.0'
+
+
+def test_int_not_coerced_to_enum():
+    class BinaryEnum(IntEnum):
+        ZERO = 0
+        ONE = 1
+
+    enum_schema = core_schema.lax_or_strict_schema(
+        core_schema.no_info_after_validator_function(BinaryEnum, core_schema.int_schema()),
+        core_schema.is_instance_schema(BinaryEnum),
+    )
+
+    schema = core_schema.union_schema([enum_schema, core_schema.int_schema()])
+
+    validator = SchemaValidator(schema)
+
+    assert validator.validate_python(0) is not BinaryEnum.ZERO
+    assert validator.validate_python(1) is not BinaryEnum.ONE
+    assert validator.validate_python(BinaryEnum.ZERO) is BinaryEnum.ZERO
+    assert validator.validate_python(BinaryEnum.ONE) is BinaryEnum.ONE
