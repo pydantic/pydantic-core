@@ -97,18 +97,7 @@ pub trait Input<'a>: fmt::Debug + ToPyObject + AsLocItem + Sized {
         coerce_numbers_to_str: bool,
     ) -> ValResult<ValidationMatch<EitherString<'a>>>;
 
-    fn validate_bytes(&'a self, strict: bool) -> ValResult<EitherBytes<'a>> {
-        if strict {
-            self.strict_bytes()
-        } else {
-            self.lax_bytes()
-        }
-    }
-    fn strict_bytes(&'a self) -> ValResult<EitherBytes<'a>>;
-    #[cfg_attr(has_coverage_attribute, coverage(off))]
-    fn lax_bytes(&'a self) -> ValResult<EitherBytes<'a>> {
-        self.strict_bytes()
-    }
+    fn validate_bytes(&'a self, strict: bool) -> ValResult<ValidationMatch<EitherBytes<'a>>>;
 
     fn validate_bool(&self, strict: bool) -> ValResult<'_, ValidationMatch<bool>>;
 
@@ -220,87 +209,25 @@ pub trait Input<'a>: fmt::Debug + ToPyObject + AsLocItem + Sized {
 
     fn validate_iter(&self) -> ValResult<GenericIterator>;
 
-    fn validate_date(&self, strict: bool) -> ValResult<EitherDate> {
-        if strict {
-            self.strict_date()
-        } else {
-            self.lax_date()
-        }
-    }
-    fn strict_date(&self) -> ValResult<EitherDate>;
-    #[cfg_attr(has_coverage_attribute, coverage(off))]
-    fn lax_date(&self) -> ValResult<EitherDate> {
-        self.strict_date()
-    }
+    fn validate_date(&self, strict: bool) -> ValResult<ValidationMatch<EitherDate>>;
 
     fn validate_time(
         &self,
         strict: bool,
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherTime> {
-        if strict {
-            self.strict_time(microseconds_overflow_behavior)
-        } else {
-            self.lax_time(microseconds_overflow_behavior)
-        }
-    }
-    fn strict_time(
-        &self,
-        microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherTime>;
-    #[cfg_attr(has_coverage_attribute, coverage(off))]
-    fn lax_time(
-        &self,
-        microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherTime> {
-        self.strict_time(microseconds_overflow_behavior)
-    }
+    ) -> ValResult<ValidationMatch<EitherTime>>;
 
     fn validate_datetime(
         &self,
         strict: bool,
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherDateTime> {
-        if strict {
-            self.strict_datetime(microseconds_overflow_behavior)
-        } else {
-            self.lax_datetime(microseconds_overflow_behavior)
-        }
-    }
-    fn strict_datetime(
-        &self,
-        microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherDateTime>;
-    #[cfg_attr(has_coverage_attribute, coverage(off))]
-    fn lax_datetime(
-        &self,
-        microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherDateTime> {
-        self.strict_datetime(microseconds_overflow_behavior)
-    }
+    ) -> ValResult<ValidationMatch<EitherDateTime>>;
 
     fn validate_timedelta(
         &self,
         strict: bool,
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherTimedelta> {
-        if strict {
-            self.strict_timedelta(microseconds_overflow_behavior)
-        } else {
-            self.lax_timedelta(microseconds_overflow_behavior)
-        }
-    }
-    fn strict_timedelta(
-        &self,
-        microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherTimedelta>;
-    #[cfg_attr(has_coverage_attribute, coverage(off))]
-    fn lax_timedelta(
-        &self,
-        microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherTimedelta> {
-        self.strict_timedelta(microseconds_overflow_behavior)
-    }
+    ) -> ValResult<ValidationMatch<EitherTimedelta>>;
 }
 
 /// The problem to solve here is that iterating a `StringMapping` returns an owned

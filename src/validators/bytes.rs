@@ -46,9 +46,9 @@ impl Validator for BytesValidator {
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        let either_bytes = input.validate_bytes(state.strict_or(self.strict))?;
-        state.set_exactness_unknown();
-        Ok(either_bytes.into_py(py))
+        input
+            .validate_bytes(state.strict_or(self.strict))
+            .map(|m| m.unpack(state).into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -72,7 +72,7 @@ impl Validator for BytesConstrainedValidator {
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        let either_bytes = input.validate_bytes(state.strict_or(self.strict))?;
+        let either_bytes = input.validate_bytes(state.strict_or(self.strict))?.unpack(state);
         let len = either_bytes.len()?;
 
         if let Some(min_length) = self.min_length {
@@ -97,8 +97,6 @@ impl Validator for BytesConstrainedValidator {
                 ));
             }
         }
-
-        state.set_exactness_unknown();
         Ok(either_bytes.into_py(py))
     }
 

@@ -151,7 +151,8 @@ impl UuidValidator {
             None => {
                 let either_bytes = input
                     .validate_bytes(true)
-                    .map_err(|_| ValError::new(ErrorTypeDefaults::UuidType, input))?;
+                    .map_err(|_| ValError::new(ErrorTypeDefaults::UuidType, input))?
+                    .into_inner();
                 let bytes_slice = either_bytes.as_slice();
                 'parse: {
                     // Try parsing as utf8, but don't care if it fails

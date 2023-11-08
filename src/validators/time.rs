@@ -46,7 +46,9 @@ impl Validator for TimeValidator {
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
-        let time = input.validate_time(state.strict_or(self.strict), self.microseconds_precision)?;
+        let time = input
+            .validate_time(state.strict_or(self.strict), self.microseconds_precision)?
+            .unpack(state);
         if let Some(constraints) = &self.constraints {
             let raw_time = time.as_raw()?;
 
@@ -75,7 +77,6 @@ impl Validator for TimeValidator {
                 tz_constraint.tz_check(raw_time.tz_offset, input)?;
             }
         }
-        state.set_exactness_unknown();
         Ok(time.try_into_py(py)?)
     }
 

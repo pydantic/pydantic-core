@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, time
 from enum import Enum, IntEnum
 from typing import Any
 from uuid import UUID
@@ -7,15 +7,7 @@ from uuid import UUID
 import pytest
 from dirty_equals import IsFloat, IsInt
 
-from pydantic_core import (
-    MultiHostUrl,
-    SchemaError,
-    SchemaValidator,
-    Url,
-    ValidationError,
-    core_schema,
-    validate_core_schema,
-)
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema, validate_core_schema
 
 from ..conftest import plain_repr
 
@@ -540,50 +532,44 @@ def test_union_function_before_called_once():
             '12345678-1234-5678-1234-567812345678',
             UUID('12345678-1234-5678-1234-567812345678'),
         ),
-        pytest.param(
-            core_schema.date_schema(),
-            '2020-01-01',
-            date(2020, 1, 1),
-            marks=pytest.mark.xfail(reason='remove set_exactness_unknown from date validator'),
-        ),
-        pytest.param(
-            core_schema.time_schema(),
-            '00:00:00',
-            time(0, 0, 0),
-            marks=pytest.mark.xfail(reason='remove set_exactness_unknown from time validator'),
-        ),
-        pytest.param(
-            core_schema.datetime_schema(),
-            '2020-01-01:00:00:00',
-            datetime(2020, 1, 1, 0, 0, 0),
-            marks=pytest.mark.xfail(reason='remove set_exactness_unknown from datetime validator'),
-        ),
-        pytest.param(
-            core_schema.url_schema(),
-            'https://foo.com',
-            Url('https://foo.com'),
-            marks=pytest.mark.xfail(reason='remove set_exactness_unknown from url validator'),
-        ),
-        pytest.param(
-            core_schema.multi_host_url_schema(),
-            'https://bar.com,foo.com',
-            MultiHostUrl('https://bar.com,foo.com'),
-            marks=pytest.mark.xfail(reason='remove set_exactness_unknown from multihosturl validator'),
-        ),
+        (core_schema.date_schema(), '2020-01-01', date(2020, 1, 1)),
+        (core_schema.time_schema(), '00:00:00', time(0, 0, 0)),
+        # In V2.4 these already returned strings, so we keep this behaviour in V2
+        (core_schema.datetime_schema(), '2020-01-01:00:00:00', '2020-01-01:00:00:00'),
+        (core_schema.url_schema(), 'https://foo.com', 'https://foo.com'),
+        (core_schema.multi_host_url_schema(), 'https://bar.com,foo.com', 'https://bar.com,foo.com'),
     ),
 )
 def test_smart_union_json_string_types(schema: core_schema.CoreSchema, input_value: str, expected_value: Any):
     # Many types have to be represented in strings as JSON, we make sure that
     # when parsing in JSON mode these types are preferred
+    # TODO: in V3 we will make str win in all these cases.
 
     validator = SchemaValidator(core_schema.union_schema([schema, core_schema.str_schema()]))
     assert validator.validate_json(f'"{input_value}"') == expected_value
     # in Python mode the string will be preferred
     assert validator.validate_python(input_value) == input_value
 
-    # Repeat with reversed order
+
+@pytest.mark.parametrize(
+    ('schema', 'input_value'),
+    (
+        pytest.param(
+            core_schema.uuid_schema(),
+            '12345678-1234-5678-1234-567812345678',
+            marks=pytest.mark.xfail(reason='TODO: V3'),
+        ),
+        (core_schema.date_schema(), '2020-01-01'),
+        (core_schema.time_schema(), '00:00:00'),
+        (core_schema.datetime_schema(), '2020-01-01:00:00:00'),
+        (core_schema.url_schema(), 'https://foo.com'),
+        (core_schema.multi_host_url_schema(), 'https://bar.com,foo.com'),
+    ),
+)
+def test_smart_union_json_string_types_str_first(schema: core_schema.CoreSchema, input_value: str):
+    # As above, but reversed order; str should always win
     validator = SchemaValidator(core_schema.union_schema([core_schema.str_schema(), schema]))
-    assert validator.validate_json(f'"{input_value}"') == expected_value
+    assert validator.validate_json(f'"{input_value}"') == input_value
     assert validator.validate_python(input_value) == input_value
 
 
@@ -715,18 +701,18 @@ def test_smart_union_validator_function():
 
     inner_schema = core_schema.union_schema([core_schema.int_schema(), core_schema.float_schema()])
 
-    # validator = SchemaValidator(inner_schema)
-    # assert repr(validator.validate_python(1)) == '1'
-    # assert repr(validator.validate_python(1.0)) == '1.0'
+    validator = SchemaValidator(inner_schema)
+    assert repr(validator.validate_python(1)) == '1'
+    assert repr(validator.validate_python(1.0)) == '1.0'
 
-    # schema = core_schema.union_schema(
-    #     [core_schema.no_info_after_validator_function(lambda v: v * 2, inner_schema), core_schema.str_schema()]
-    # )
+    schema = core_schema.union_schema(
+        [core_schema.no_info_after_validator_function(lambda v: v * 2, inner_schema), core_schema.str_schema()]
+    )
 
-    # validator = SchemaValidator(schema)
-    # assert repr(validator.validate_python(1)) == '2'
-    # assert repr(validator.validate_python(1.0)) == '2.0'
-    # assert validator.validate_python('1') == '1'
+    validator = SchemaValidator(schema)
+    assert repr(validator.validate_python(1)) == '2'
+    assert repr(validator.validate_python(1.0)) == '2.0'
+    assert validator.validate_python('1') == '1'
 
     schema = core_schema.union_schema(
         [
@@ -736,8 +722,8 @@ def test_smart_union_validator_function():
     )
 
     validator = SchemaValidator(schema)
-    # assert repr(validator.validate_python(1)) == '2'
-    # assert repr(validator.validate_python(1.0)) == '2.0'
+    assert repr(validator.validate_python(1)) == '2'
+    assert repr(validator.validate_python(1.0)) == '2.0'
     assert validator.validate_python('1') == '1'
 
 

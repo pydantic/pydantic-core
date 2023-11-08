@@ -75,12 +75,12 @@ impl Validator for DictValidator {
     ) -> ValResult<'data, PyObject> {
         let strict = state.strict_or(self.strict);
         let dict = input.validate_dict(strict)?;
-        state.set_exactness_unknown();
         match dict {
             GenericMapping::PyDict(py_dict) => {
                 self.validate_generic_mapping(py, input, DictGenericIterator::new(py_dict)?, state)
             }
             GenericMapping::PyMapping(mapping) => {
+                state.floor_exactness(super::Exactness::Lax);
                 self.validate_generic_mapping(py, input, MappingGenericIterator::new(mapping)?, state)
             }
             GenericMapping::StringMapping(dict) => {

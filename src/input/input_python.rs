@@ -272,25 +272,28 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_bytes(&'a self) -> ValResult<EitherBytes<'a>> {
-        if let Ok(py_bytes) = self.downcast::<PyBytes>() {
-            Ok(py_bytes.into())
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::BytesType, self))
+    fn validate_bytes(&'a self, strict: bool) -> ValResult<ValidationMatch<EitherBytes<'a>>> {
+        if let Ok(py_bytes) = self.downcast_exact::<PyBytes>() {
+            return Ok(ValidationMatch::exact(py_bytes.into()));
+        } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
+            return Ok(ValidationMatch::strict(py_bytes.into()));
         }
-    }
 
-    fn lax_bytes(&'a self) -> ValResult<EitherBytes<'a>> {
-        if let Ok(py_bytes) = self.downcast::<PyBytes>() {
-            Ok(py_bytes.into())
-        } else if let Ok(py_str) = self.downcast::<PyString>() {
-            let str = py_string_str(py_str)?;
-            Ok(str.as_bytes().into())
-        } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
-            Ok(py_byte_array.to_vec().into())
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::BytesType, self))
+        'lax: {
+            if !strict {
+                return if let Ok(py_str) = self.downcast::<PyString>() {
+                    let str = py_string_str(py_str)?;
+                    Ok(str.as_bytes().into())
+                } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
+                    Ok(py_byte_array.to_vec().into())
+                } else {
+                    break 'lax;
+                }
+                .map(ValidationMatch::lax);
+            }
         }
+
+        Err(ValError::new(ErrorTypeDefaults::BytesType, self))
     }
 
     fn validate_bool(&self, strict: bool) -> ValResult<'_, ValidationMatch<bool>> {
@@ -597,128 +600,136 @@ impl<'a> Input<'a> for PyAny {
         }
     }
 
-    fn strict_date(&self) -> ValResult<EitherDate> {
-        if PyDateTime::is_type_of(self) {
-            // have to check if it's a datetime first, otherwise the line below converts to a date
-            Err(ValError::new(ErrorTypeDefaults::DateType, self))
-        } else if let Ok(date) = self.downcast::<PyDate>() {
-            Ok(date.into())
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::DateType, self))
-        }
-    }
-
-    fn lax_date(&self) -> ValResult<EitherDate> {
-        if PyDateTime::is_type_of(self) {
+    fn validate_date(&self, strict: bool) -> ValResult<ValidationMatch<EitherDate>> {
+        if let Ok(date) = self.downcast_exact::<PyDate>() {
+            Ok(ValidationMatch::exact(date.into()))
+        } else if PyDateTime::is_type_of(self) {
             // have to check if it's a datetime first, otherwise the line below converts to a date
             // even if we later try coercion from a datetime, we don't want to return a datetime now
             Err(ValError::new(ErrorTypeDefaults::DateType, self))
         } else if let Ok(date) = self.downcast::<PyDate>() {
-            Ok(date.into())
-        } else if let Ok(py_str) = self.downcast::<PyString>() {
-            let str = py_string_str(py_str)?;
-            bytes_as_date(self, str.as_bytes())
-        } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
-            bytes_as_date(self, py_bytes.as_bytes())
+            Ok(ValidationMatch::strict(date.into()))
+        } else if let Some(bytes) = {
+            if strict {
+                None
+            } else if let Ok(py_str) = self.downcast::<PyString>() {
+                let str = py_string_str(py_str)?;
+                Some(str.as_bytes())
+            } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
+                Some(py_bytes.as_bytes())
+            } else {
+                None
+            }
+        } {
+            bytes_as_date(self, bytes).map(ValidationMatch::lax)
         } else {
             Err(ValError::new(ErrorTypeDefaults::DateType, self))
         }
     }
 
-    fn strict_time(
+    fn validate_time(
         &self,
-        _microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherTime> {
-        if let Ok(time) = self.downcast::<PyTime>() {
-            Ok(time.into())
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::TimeType, self))
-        }
-    }
-
-    fn lax_time(&self, microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior) -> ValResult<EitherTime> {
-        if let Ok(time) = self.downcast::<PyTime>() {
-            Ok(time.into())
-        } else if let Ok(py_str) = self.downcast::<PyString>() {
-            let str = py_string_str(py_str)?;
-            bytes_as_time(self, str.as_bytes(), microseconds_overflow_behavior)
-        } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
-            bytes_as_time(self, py_bytes.as_bytes(), microseconds_overflow_behavior)
-        } else if PyBool::is_exact_type_of(self) {
-            Err(ValError::new(ErrorTypeDefaults::TimeType, self))
-        } else if let Ok(int) = extract_i64(self) {
-            int_as_time(self, int, 0)
-        } else if let Ok(float) = self.extract::<f64>() {
-            float_as_time(self, float)
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::TimeType, self))
-        }
-    }
-
-    fn strict_datetime(
-        &self,
-        _microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherDateTime> {
-        if let Ok(dt) = self.downcast::<PyDateTime>() {
-            Ok(dt.into())
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::DatetimeType, self))
-        }
-    }
-
-    fn lax_datetime(
-        &self,
+        strict: bool,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherDateTime> {
-        if let Ok(dt) = self.downcast::<PyDateTime>() {
-            Ok(dt.into())
-        } else if let Ok(py_str) = self.downcast::<PyString>() {
-            let str = py_string_str(py_str)?;
-            bytes_as_datetime(self, str.as_bytes(), microseconds_overflow_behavior)
-        } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
-            bytes_as_datetime(self, py_bytes.as_bytes(), microseconds_overflow_behavior)
-        } else if PyBool::is_exact_type_of(self) {
-            Err(ValError::new(ErrorTypeDefaults::DatetimeType, self))
-        } else if let Ok(int) = extract_i64(self) {
-            int_as_datetime(self, int, 0)
-        } else if let Ok(float) = self.extract::<f64>() {
-            float_as_datetime(self, float)
-        } else if let Ok(date) = self.downcast::<PyDate>() {
-            Ok(date_as_datetime(date)?)
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::DatetimeType, self))
+    ) -> ValResult<ValidationMatch<EitherTime>> {
+        if let Ok(time) = self.downcast_exact::<PyTime>() {
+            return Ok(ValidationMatch::exact(time.into()));
+        } else if let Ok(time) = self.downcast::<PyTime>() {
+            return Ok(ValidationMatch::strict(time.into()));
         }
+
+        'lax: {
+            if !strict {
+                return if let Ok(py_str) = self.downcast::<PyString>() {
+                    let str = py_string_str(py_str)?;
+                    bytes_as_time(self, str.as_bytes(), microseconds_overflow_behavior)
+                } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
+                    bytes_as_time(self, py_bytes.as_bytes(), microseconds_overflow_behavior)
+                } else if PyBool::is_exact_type_of(self) {
+                    Err(ValError::new(ErrorTypeDefaults::TimeType, self))
+                } else if let Ok(int) = extract_i64(self) {
+                    int_as_time(self, int, 0)
+                } else if let Ok(float) = self.extract::<f64>() {
+                    float_as_time(self, float)
+                } else {
+                    break 'lax;
+                }
+                .map(ValidationMatch::lax);
+            }
+        }
+
+        Err(ValError::new(ErrorTypeDefaults::TimeType, self))
     }
 
-    fn strict_timedelta(
+    fn validate_datetime(
         &self,
-        _microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherTimedelta> {
-        if let Ok(either_dt) = EitherTimedelta::try_from(self) {
-            Ok(either_dt)
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self))
-        }
-    }
-
-    fn lax_timedelta(
-        &self,
+        strict: bool,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<EitherTimedelta> {
-        if let Ok(either_dt) = EitherTimedelta::try_from(self) {
-            Ok(either_dt)
-        } else if let Ok(py_str) = self.downcast::<PyString>() {
-            let str = py_string_str(py_str)?;
-            bytes_as_timedelta(self, str.as_bytes(), microseconds_overflow_behavior)
-        } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
-            bytes_as_timedelta(self, py_bytes.as_bytes(), microseconds_overflow_behavior)
-        } else if let Ok(int) = extract_i64(self) {
-            Ok(int_as_duration(self, int)?.into())
-        } else if let Ok(float) = self.extract::<f64>() {
-            Ok(float_as_duration(self, float)?.into())
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self))
+    ) -> ValResult<ValidationMatch<EitherDateTime>> {
+        if let Ok(dt) = self.downcast_exact::<PyDateTime>() {
+            return Ok(ValidationMatch::exact(dt.into()));
+        } else if let Ok(dt) = self.downcast::<PyDateTime>() {
+            return Ok(ValidationMatch::strict(dt.into()));
         }
+
+        'lax: {
+            if !strict {
+                return if let Ok(py_str) = self.downcast::<PyString>() {
+                    let str = py_string_str(py_str)?;
+                    bytes_as_datetime(self, str.as_bytes(), microseconds_overflow_behavior)
+                } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
+                    bytes_as_datetime(self, py_bytes.as_bytes(), microseconds_overflow_behavior)
+                } else if PyBool::is_exact_type_of(self) {
+                    Err(ValError::new(ErrorTypeDefaults::DatetimeType, self))
+                } else if let Ok(int) = extract_i64(self) {
+                    int_as_datetime(self, int, 0)
+                } else if let Ok(float) = self.extract::<f64>() {
+                    float_as_datetime(self, float)
+                } else if let Ok(date) = self.downcast::<PyDate>() {
+                    Ok(date_as_datetime(date)?)
+                } else {
+                    break 'lax;
+                }
+                .map(ValidationMatch::lax);
+            }
+        }
+
+        Err(ValError::new(ErrorTypeDefaults::DatetimeType, self))
+    }
+
+    fn validate_timedelta(
+        &self,
+        strict: bool,
+        microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+    ) -> ValResult<ValidationMatch<EitherTimedelta>> {
+        if let Ok(either_dt) = EitherTimedelta::try_from(self) {
+            let exactness = if matches!(either_dt, EitherTimedelta::PyExact(_)) {
+                Exactness::Exact
+            } else {
+                Exactness::Strict
+            };
+            return Ok(ValidationMatch::new(either_dt, exactness));
+        }
+
+        'lax: {
+            if !strict {
+                return if let Ok(py_str) = self.downcast::<PyString>() {
+                    let str = py_string_str(py_str)?;
+                    bytes_as_timedelta(self, str.as_bytes(), microseconds_overflow_behavior)
+                } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
+                    bytes_as_timedelta(self, py_bytes.as_bytes(), microseconds_overflow_behavior)
+                } else if let Ok(int) = extract_i64(self) {
+                    Ok(int_as_duration(self, int)?.into())
+                } else if let Ok(float) = self.extract::<f64>() {
+                    Ok(float_as_duration(self, float)?.into())
+                } else {
+                    break 'lax;
+                }
+                .map(ValidationMatch::lax);
+            }
+        }
+
+        Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self))
     }
 }
 

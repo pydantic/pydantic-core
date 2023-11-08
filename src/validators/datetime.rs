@@ -65,7 +65,9 @@ impl Validator for DateTimeValidator {
         state: &mut ValidationState,
     ) -> ValResult<'data, PyObject> {
         let strict = state.strict_or(self.strict);
-        let datetime = input.validate_datetime(strict, self.microseconds_precision)?;
+        let datetime = input
+            .validate_datetime(strict, self.microseconds_precision)?
+            .unpack(state);
         if let Some(constraints) = &self.constraints {
             // if we get an error from as_speedate, it's probably because the input datetime was invalid
             // specifically had an invalid tzinfo, hence here we return a validation error
@@ -122,7 +124,6 @@ impl Validator for DateTimeValidator {
                 tz_constraint.tz_check(speedate_dt.time.tz_offset, input)?;
             }
         }
-        state.set_exactness_unknown();
         Ok(datetime.try_into_py(py)?)
     }
 

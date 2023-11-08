@@ -16,6 +16,7 @@ use crate::tools::SchemaDict;
 use crate::url::{schema_is_special, PyMultiHostUrl, PyUrl};
 
 use super::literal::expected_repr_name;
+use super::Exactness;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 type AllowedSchemas = Option<(AHashSet<String>, String)>;
@@ -88,7 +89,8 @@ impl Validator for UrlValidator {
             &self.default_path,
         ) {
             Ok(()) => {
-                state.set_exactness_unknown();
+                // Lax rather than strict to preserve V2.4 semantic that str wins over url in union
+                state.floor_exactness(Exactness::Lax);
                 Ok(PyUrl::new(lib_url).into_py(py))
             }
             Err(error_type) => return Err(ValError::new(error_type, input)),
@@ -220,7 +222,8 @@ impl Validator for MultiHostUrlValidator {
             &self.default_path,
         ) {
             Ok(()) => {
-                state.set_exactness_unknown();
+                // Lax rather than strict to preserve V2.4 semantic that str wins over url in union
+                state.floor_exactness(Exactness::Lax);
                 Ok(multi_url.into_py(py))
             }
             Err(error_type) => return Err(ValError::new(error_type, input)),
