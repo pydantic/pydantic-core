@@ -123,6 +123,7 @@ impl<T: Debug> LiteralLookup<T> {
                 // of parsing types like UUID; see the implementation of `validate_str` for Json
                 // inputs for justification. We might change that eventually, but for now we need
                 // to work around this when loading from JSON
+                // V3 TODO: revisit making this "exact" for JSON inputs
                 input.validate_str(true, false).map(ValidationMatch::into_inner)
             };
 
