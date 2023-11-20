@@ -26,7 +26,7 @@ include = [
 ]
 
 [dependencies]
-pyo3 = { version = "0.20.0", features = ["generate-import-lib", "num-bigint"] }
+pyo3 = { git = "https://github.com/davidhewitt/pyo3", branch="complete-py2", version = "0.21.0-dev", default-features=false, features = ["macros", "generate-import-lib", "num-bigint"] }
 regex = "1.10.2"
 strum = { version = "0.25.0", features = ["derive"] }
 strum_macros = "0.25.3"
@@ -43,7 +43,8 @@ base64 = "0.21.5"
 num-bigint = "0.4.4"
 python3-dll-a = "0.2.7"
 uuid = "1.5.0"
-jiter = {version = "0.0.5", features = ["python"]}
+jiter = { git = "https://github.com/pydantic/jiter", branch = "dh/py2", version = "0.0.5", features = ["python"]}
+
 
 [lib]
 name = "_pydantic_core"
@@ -68,12 +69,12 @@ debug = true
 strip = false
 
 [dev-dependencies]
-pyo3 = { version = "0.20.0", features = ["auto-initialize"] }
+pyo3 = { git = "https://github.com/davidhewitt/pyo3", branch="complete-py2", version = "0.21.0-dev", default-features=false, features = ["auto-initialize"] }
 
 [build-dependencies]
 version_check = "0.9.4"
 # used where logic has to be version/distribution specific, e.g. pypy
-pyo3-build-config = { version = "0.20.0" }
+pyo3-build-config = { git = "https://github.com/davidhewitt/pyo3", branch="complete-py2", version = "0.21.0-dev" }
 
 [lints.clippy]
 dbg_macro = "warn"
@@ -105,3 +106,10 @@ too_many_lines = "allow"
 unnecessary_wraps = "allow"
 unused_self = "allow"
 used_underscore_binding = "allow"
+
+[patch.'https://github.com/davidhewitt/pyo3']
+pyo3 = { path = "../pyo3" }
+pyo3-build-config = { path = "../pyo3/pyo3-build-config" }
+
+[patch.'https://github.com/pydantic/jiter']
+jiter = { path = "../jiter" }
