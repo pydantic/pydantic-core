@@ -62,7 +62,7 @@ pub enum IsType {
 impl ObTypeLookup {
     fn new(py: Python) -> Self {
         Self {
-            none: py.None().as_ref(py).get_type_ptr() as usize,
+            none: py.None().get_type_ptr() as usize,
             int: PyInt::type_object_raw(py) as usize,
             bool: PyBool::type_object_raw(py) as usize,
             float: PyFloat::type_object_raw(py) as usize,

@@ -50,7 +50,7 @@ impl ArgsKwargs {
                 Ok(b) => (!b).into_py(py),
                 Err(e) => e.into_py(py),
             },
-            _ => py.NotImplemented(),
+            _ => py.NotImplemented().into(),
         }
     }
 

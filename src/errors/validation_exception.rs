@@ -294,12 +294,12 @@ impl ValidationError {
             // away safely.
             self.line_errors.iter().map(|e| -> PyObject {
                 if iteration_error.is_some() {
-                    return py.None();
+                    return py.None().into();
                 }
                 e.as_dict(py, url_prefix, include_context, self.input_type, include_input)
                     .unwrap_or_else(|err| {
                         iteration_error = Some(err);
-                        py.None()
+                        py.None().into()
                     })
             }),
         );
@@ -489,7 +489,7 @@ impl TryFrom<&PyAny> for PyLineError {
 
         let input_value = match dict.get_item("input")? {
             Some(i) => i.into_py(py),
-            None => py.None(),
+            None => py.None().into(),
         };
 
         Ok(Self {

@@ -405,7 +405,7 @@ impl<'py> SelfValidator<'py> {
         Ok(SchemaValidator {
             validator,
             definitions,
-            py_schema: py.None(),
+            py_schema: py.None().into(),
             py_config: None,
             title: "Self Schema".into_py(py),
             hide_input_in_errors: false,
