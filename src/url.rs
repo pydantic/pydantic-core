@@ -469,8 +469,8 @@ fn host_to_dict<'a>(py: Python<'a>, lib_url: &Url) -> PyResult<&'a PyDict> {
     dict.set_item(
         "username",
         match lib_url.username() {
-            "" => py.None(),
-            user => user.into_py(py),
+            "" => py.None().into(),
+            user => user.to_object(py),
         },
     )?;
     dict.set_item("password", lib_url.password())?;

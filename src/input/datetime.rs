@@ -530,7 +530,7 @@ impl TzInfo {
 
     fn fromutc<'py>(&self, dt: &'py PyDateTime) -> PyResult<&'py PyAny> {
         let py = dt.py();
-        dt.call_method1("__add__", (self.utcoffset(py, py.None().as_ref(py))?,))
+        dt.call_method1("__add__", (self.utcoffset(py, py.None())?,))
     }
 
     fn __repr__(&self) -> String {

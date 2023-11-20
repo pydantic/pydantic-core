@@ -68,7 +68,7 @@ macro_rules! impl_build {
                     func: func_info.function,
                     config: match config {
                         Some(c) => c.into(),
-                        None => py.None(),
+                        None => py.None().into(),
                     },
                     name,
                     field_name: func_info.field_name,
@@ -209,7 +209,7 @@ impl BuildValidator for FunctionPlainValidator {
             func: function_info.function.clone(),
             config: match config {
                 Some(c) => c.into(),
-                None => py.None(),
+                None => py.None().into(),
             },
             name: format!(
                 "function-plain[{}()]",
@@ -275,7 +275,7 @@ impl BuildValidator for FunctionWrapValidator {
             func: function_info.function.clone(),
             config: match config {
                 Some(c) => c.into(),
-                None => py.None(),
+                None => py.None().into(),
             },
             name: format!("function-wrap[{}()]", function_name(function_info.function.as_ref(py))?),
             field_name: function_info.field_name.clone(),

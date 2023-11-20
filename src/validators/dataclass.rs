@@ -381,7 +381,7 @@ impl Validator for DataclassArgsValidator {
             // which doesn't make much sense in this context but we need to put something there
             // so that function validators that sit between DataclassValidator and DataclassArgsValidator
             // always get called the same shape of data.
-            Ok(PyTuple::new(py, vec![dict.to_object(py), py.None()]).into_py(py))
+            Ok(PyTuple::new(py, vec![dict.to_object(py), py.None().into()]).into_py(py))
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {

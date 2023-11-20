@@ -427,7 +427,7 @@ impl Validator for ModelFieldsValidator {
                 new_data.update(non_extra_data.as_mapping())?;
                 new_extra.to_object(py)
             }
-            _ => py.None(),
+            _ => py.None().into(),
         };
 
         let fields_set: &PySet = PySet::new(py, &[field_name.to_string()])?;
