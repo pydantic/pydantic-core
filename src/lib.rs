@@ -41,7 +41,7 @@ use crate::input::Input;
 #[pyfunction(signature = (data, *, allow_inf_nan=true, cache_strings=true))]
 pub fn from_json<'py>(
     py: Python<'py>,
-    data: &PyAny,
+    data: &Bound<'_, PyAny>,
     allow_inf_nan: bool,
     cache_strings: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -73,7 +73,7 @@ fn get_pydantic_version(py: Python<'_>) -> Option<&'static str> {
 
     PYDANTIC_VERSION
         .get_or_init(py, || {
-            py.import("pydantic")
+            py.import_bound("pydantic")
                 .and_then(|pydantic| pydantic.getattr("__version__")?.extract())
                 .ok()
         })
@@ -89,7 +89,7 @@ pub fn build_info() -> String {
 }
 
 #[pymodule]
-fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
+fn _pydantic_core(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", get_pydantic_core_version())?;
     m.add("build_profile", env!("PROFILE"))?;
     m.add("build_info", build_info())?;

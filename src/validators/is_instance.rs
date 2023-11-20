@@ -21,13 +21,13 @@ impl BuildValidator for IsInstanceValidator {
     const EXPECTED_TYPE: &'static str = "is-instance";
 
     fn build(
-        schema: &PyDict,
-        _config: Option<&PyDict>,
+        schema: &Bound<'_, PyDict>,
+        _config: Option<&Bound<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         let cls_key = intern!(py, "cls");
-        let class: Bound<'_, PyAny> = schema.get_as_req(cls_key)?;
+        let class = schema.get_as_req(cls_key)?;
 
         // test that class works with isinstance to avoid errors at call time, reuse cls_key since it doesn't
         // matter what object is being checked
@@ -68,8 +68,8 @@ impl Validator for IsInstanceValidator {
             )));
         }
 
-        let ob = input.to_object(py);
-        match ob.as_ref(py).is_instance(self.class.as_ref(py))? {
+        let ob: Py<PyAny> = input.to_object(py);
+        match ob.bind(py).is_instance(self.class.bind(py))? {
             true => Ok(ob),
             false => Err(ValError::new(
                 ErrorType::IsInstanceOf {

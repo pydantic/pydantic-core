@@ -19,8 +19,8 @@ impl BuildValidator for IsSubclassValidator {
     const EXPECTED_TYPE: &'static str = "is-subclass";
 
     fn build(
-        schema: &PyDict,
-        _config: Option<&PyDict>,
+        schema: &Bound<'_, PyDict>,
+        _config: Option<&Bound<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
@@ -49,7 +49,7 @@ impl Validator for IsSubclassValidator {
         input: &'data impl Input<'data>,
         _state: &mut ValidationState,
     ) -> ValResult<PyObject> {
-        match input.input_is_subclass(self.class.as_ref(py))? {
+        match input.input_is_subclass(self.class.bind(py))? {
             true => Ok(input.to_object(py)),
             false => Err(ValError::new(
                 ErrorType::IsSubclassOf {
