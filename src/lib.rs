@@ -39,7 +39,12 @@ pub use validators::{validate_core_schema, PySome, SchemaValidator};
 use crate::input::Input;
 
 #[pyfunction(signature = (data, *, allow_inf_nan=true, cache_strings=true))]
-pub fn from_json(py: Python, data: &PyAny, allow_inf_nan: bool, cache_strings: bool) -> PyResult<PyObject> {
+pub fn from_json<'py>(
+    py: Python<'py>,
+    data: &PyAny,
+    allow_inf_nan: bool,
+    cache_strings: bool,
+) -> PyResult<Py2<'py, PyAny>> {
     let v_match = data
         .validate_bytes(false)
         .map_err(|_| PyTypeError::new_err("Expected bytes, bytearray or str"))?;
