@@ -1,4 +1,4 @@
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -19,19 +19,19 @@ pub enum CustomError {
 
 impl CustomError {
     pub fn build(
-        schema: &PyDict,
-        _config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        _config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<Option<Self>> {
         let py = schema.py();
-        let error_type: String = match schema.get_as(intern!(py, "custom_error_type"))? {
+        let error_type: String = match schema.get_as(intern2!(py, "custom_error_type"))? {
             Some(error_type) => error_type,
             None => return Ok(None),
         };
-        let context: Option<&PyDict> = schema.get_as(intern!(py, "custom_error_context"))?;
+        let context: Option<&PyDict> = schema.get_as(intern2!(py, "custom_error_context"))?;
 
         if ErrorType::valid_type(py, &error_type) {
-            if schema.contains(intern!(py, "custom_error_message"))? {
+            if schema.contains(intern2!(py, "custom_error_message"))? {
                 py_schema_err!(
                     "custom_error_message should not be provided if 'custom_error_type' matches a known error"
                 )
@@ -43,7 +43,7 @@ impl CustomError {
             let error = PydanticCustomError::py_new(
                 py,
                 error_type,
-                schema.get_as_req::<String>(intern!(py, "custom_error_message"))?,
+                schema.get_as_req::<String>(intern2!(py, "custom_error_message"))?,
                 context,
             );
             Ok(Some(Self::Custom(error)))
@@ -69,13 +69,13 @@ impl BuildValidator for CustomErrorValidator {
     const EXPECTED_TYPE: &'static str = "custom-error";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let custom_error = CustomError::build(schema, config, definitions)?.unwrap();
-        let schema: &PyAny = schema.get_as_req(intern!(schema.py(), "schema"))?;
-        let validator = Box::new(build_validator(schema, config, definitions)?);
+        let schema = schema.get_as_req(intern2!(schema.py(), "schema"))?;
+        let validator = Box::new(build_validator(&schema, config, definitions)?);
         let name = format!("{}[{}]", Self::EXPECTED_TYPE, validator.get_name());
         Ok(Self {
             validator,

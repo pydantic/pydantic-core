@@ -4,7 +4,7 @@ use std::fmt;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
-use pyo3::{intern, FromPyObject, PyErrArguments};
+use pyo3::{intern2, FromPyObject, PyErrArguments};
 
 use crate::errors::ValError;
 use crate::input::InputType;
@@ -12,10 +12,10 @@ use crate::tools::SchemaDict;
 use crate::ValidationError;
 
 pub fn schema_or_config<'py, T>(
-    schema: &'py PyDict,
-    config: Option<&'py PyDict>,
-    schema_key: &PyString,
-    config_key: &PyString,
+    schema: &Py2<'py, PyDict>,
+    config: Option<&Py2<'py, PyDict>>,
+    schema_key: &Py2<'_, PyString>,
+    config_key: &Py2<'_, PyString>,
 ) -> PyResult<Option<T>>
 where
     T: FromPyObject<'py>,
@@ -30,9 +30,9 @@ where
 }
 
 pub fn schema_or_config_same<'py, T>(
-    schema: &'py PyDict,
-    config: Option<&'py PyDict>,
-    key: &PyString,
+    schema: &Py2<'py, PyDict>,
+    config: Option<&Py2<'py, PyDict>>,
+    key: &Py2<'_, PyString>,
 ) -> PyResult<Option<T>>
 where
     T: FromPyObject<'py>,
@@ -40,9 +40,9 @@ where
     schema_or_config(schema, config, key, key)
 }
 
-pub fn is_strict(schema: &PyDict, config: Option<&PyDict>) -> PyResult<bool> {
+pub fn is_strict(schema: &Py2<'_, PyDict>, config: Option<&Py2<'_, PyDict>>) -> PyResult<bool> {
     let py = schema.py();
-    Ok(schema_or_config_same(schema, config, intern!(py, "strict"))?.unwrap_or(false))
+    Ok(schema_or_config_same(schema, config, intern2!(py, "strict"))?.unwrap_or(false))
 }
 
 enum SchemaErrorEnum {
@@ -90,7 +90,7 @@ impl SchemaError {
                     ValidationError::new(line_errors, "Schema".to_object(py), InputType::Python, false);
                 let schema_error = SchemaError(SchemaErrorEnum::ValidationError(validation_error));
                 match Py::new(py, schema_error) {
-                    Ok(err) => PyErr::from_value(err.into_ref(py)),
+                    Ok(err) => PyErr::from_value(err.as_ref(py)),
                     Err(err) => err,
                 }
             }
@@ -174,18 +174,18 @@ pub(crate) enum ExtraBehavior {
 impl ExtraBehavior {
     pub fn from_schema_or_config(
         py: Python,
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         default: Self,
     ) -> PyResult<Self> {
-        let extra_behavior = schema_or_config::<Option<&str>>(
+        let extra_behavior = schema_or_config::<Option<Py2<'_, PyString>>>(
             schema,
             config,
-            intern!(py, "extra_behavior"),
-            intern!(py, "extra_fields_behavior"),
+            intern2!(py, "extra_behavior"),
+            intern2!(py, "extra_fields_behavior"),
         )?
         .flatten();
-        let res = match extra_behavior {
+        let res = match extra_behavior.as_ref().map(|s| s.to_str()).transpose()? {
             Some("allow") => Self::Allow,
             Some("ignore") => Self::Ignore,
             Some("forbid") => Self::Forbid,

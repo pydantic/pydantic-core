@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
-use pyo3::{intern, PyTraverseError, PyVisit};
+use pyo3::{intern2, PyTraverseError, PyVisit};
 use serde::ser::SerializeMap;
 use serde::Serialize;
 
@@ -19,15 +19,15 @@ pub(super) struct ComputedFields(Vec<ComputedField>);
 
 impl ComputedFields {
     pub fn new(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<Option<Self>> {
         let py = schema.py();
-        if let Some(computed_fields) = schema.get_as::<&PyList>(intern!(py, "computed_fields"))? {
+        if let Some(computed_fields) = schema.get_as::<Py2<'_, PyList>>(intern2!(py, "computed_fields"))? {
             let computed_fields = computed_fields
                 .iter()
-                .map(|field| ComputedField::new(field, config, definitions))
+                .map(|field| ComputedField::new(&field, config, definitions))
                 .collect::<PyResult<Vec<_>>>()?;
             Ok(Some(Self(computed_fields)))
         } else {
@@ -41,11 +41,11 @@ impl ComputedFields {
 
     pub fn to_python(
         &self,
-        model: &PyAny,
-        output_dict: &PyDict,
+        model: &Py2<'_, PyAny>,
+        output_dict: &Py2<'_, PyDict>,
         filter: &SchemaFilter<isize>,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<()> {
         if extra.round_trip {
@@ -60,11 +60,11 @@ impl ComputedFields {
 
     pub fn serde_serialize<S: serde::ser::Serializer>(
         &self,
-        model: &PyAny,
+        model: &Py2<'_, PyAny>,
         map: &mut S::SerializeMap,
         filter: &SchemaFilter<isize>,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<(), S::Error> {
         if extra.round_trip {
@@ -72,9 +72,9 @@ impl ComputedFields {
             return Ok(());
         }
         for computed_field in &self.0 {
-            let property_name_py = computed_field.property_name_py.as_ref(model.py());
+            let property_name_py = computed_field.property_name_py.attach(model.py());
             let value = model.getattr(property_name_py).map_err(py_err_se_err)?;
-            if extra.exclude_none && value.is_none() {
+            if extra.exclude_none && PyAnyMethods::is_none(&value) {
                 return Ok(());
             }
             if let Some((next_include, next_exclude)) = filter
@@ -84,8 +84,8 @@ impl ComputedFields {
                 let cfs = ComputedFieldSerializer {
                     model,
                     computed_field,
-                    include: next_include,
-                    exclude: next_exclude,
+                    include: next_include.as_ref(),
+                    exclude: next_exclude.as_ref(),
                     extra,
                 };
                 let key = match extra.by_alias {
@@ -110,17 +110,19 @@ struct ComputedField {
 
 impl ComputedField {
     pub fn new(
-        schema: &PyAny,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyAny>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<Self> {
         let py = schema.py();
-        let schema: &PyDict = schema.downcast()?;
-        let property_name: &PyString = schema.get_as_req(intern!(py, "property_name"))?;
-        let return_schema = schema.get_as_req(intern!(py, "return_schema"))?;
-        let serializer = CombinedSerializer::build(return_schema, config, definitions)
+        let schema: &Py2<'_, PyDict> = schema.downcast()?;
+        let property_name: Py2<'_, PyString> = schema.get_as_req(intern2!(py, "property_name"))?;
+        let return_schema = schema.get_as_req(intern2!(py, "return_schema"))?;
+        let serializer = CombinedSerializer::build(&return_schema, config, definitions)
             .map_err(|e| py_schema_error_type!("Computed field `{}`:\n  {}", property_name, e))?;
-        let alias_py: &PyString = schema.get_as(intern!(py, "alias"))?.unwrap_or(property_name);
+        let alias_py = schema
+            .get_as(intern2!(py, "alias"))?
+            .unwrap_or_else(|| property_name.clone());
         Ok(Self {
             property_name: property_name.extract()?,
             property_name_py: property_name.into_py(py),
@@ -132,27 +134,27 @@ impl ComputedField {
 
     fn to_python(
         &self,
-        model: &PyAny,
-        output_dict: &PyDict,
+        model: &Py2<'_, PyAny>,
+        output_dict: &Py2<'_, PyDict>,
         filter: &SchemaFilter<isize>,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<()> {
         let py = model.py();
-        let property_name_py = self.property_name_py.as_ref(py);
+        let property_name_py = self.property_name_py.attach(py);
 
         if let Some((next_include, next_exclude)) = filter.key_filter(property_name_py, include, exclude)? {
             let next_value = model.getattr(property_name_py)?;
 
             let value = self
                 .serializer
-                .to_python(next_value, next_include, next_exclude, extra)?;
+                .to_python(&next_value, next_include.as_ref(), next_exclude.as_ref(), extra)?;
             if extra.exclude_none && value.is_none(py) {
                 return Ok(());
             }
             let key = match extra.by_alias {
-                true => self.alias_py.as_ref(py),
+                true => self.alias_py.attach(py),
                 false => property_name_py,
             };
             output_dict.set_item(key, value)?;
@@ -162,10 +164,10 @@ impl ComputedField {
 }
 
 pub(crate) struct ComputedFieldSerializer<'py> {
-    model: &'py PyAny,
+    model: &'py Py2<'py, PyAny>,
     computed_field: &'py ComputedField,
-    include: Option<&'py PyAny>,
-    exclude: Option<&'py PyAny>,
+    include: Option<&'py Py2<'py, PyAny>>,
+    exclude: Option<&'py Py2<'py, PyAny>>,
     extra: &'py Extra<'py>,
 }
 
@@ -185,7 +187,7 @@ impl<'py> Serialize for ComputedFieldSerializer<'py> {
         let property_name_py = self.computed_field.property_name_py.as_ref(py);
         let next_value = self.model.getattr(property_name_py).map_err(py_err_se_err)?;
         let s = PydanticSerializer::new(
-            next_value,
+            &next_value,
             &self.computed_field.serializer,
             self.include,
             self.exclude,

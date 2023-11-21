@@ -126,9 +126,9 @@ static EMPTY_TUPLE: GILOnceCell<PyObject> = GILOnceCell::new();
 impl ToPyObject for Location {
     fn to_object(&self, py: Python<'_>) -> PyObject {
         match self {
-            Self::List(loc) => PyTuple::new(py, loc.iter().rev()).to_object(py),
+            Self::List(loc) => PyTuple::new2(py, loc.iter().rev()).to_object(py),
             Self::Empty => EMPTY_TUPLE
-                .get_or_init(py, || PyTuple::empty(py).to_object(py))
+                .get_or_init(py, || PyTuple::empty2(py).to_object(py))
                 .clone_ref(py),
         }
     }
@@ -193,17 +193,17 @@ impl Serialize for Location {
     }
 }
 
-impl TryFrom<Option<&PyAny>> for Location {
+impl TryFrom<Option<&Py2<'_, PyAny>>> for Location {
     type Error = PyErr;
 
     /// Only ever called by ValidationError -> PyLineError to convert user input to our internal Location
     /// Thus this expects the location to *not* be reversed and reverses it before storing it.
-    fn try_from(location: Option<&PyAny>) -> PyResult<Self> {
+    fn try_from(location: Option<&Py2<'_, PyAny>>) -> PyResult<Self> {
         if let Some(location) = location {
             let mut loc_vec: Vec<LocItem> = if let Ok(tuple) = location.downcast::<PyTuple>() {
-                tuple.iter().map(AsLocItem::as_loc_item).collect()
+                tuple.iter().map(|any| any.as_loc_item()).collect()
             } else if let Ok(list) = location.downcast::<PyList>() {
-                list.iter().map(AsLocItem::as_loc_item).collect()
+                list.iter().map(|any| any.as_loc_item()).collect()
             } else {
                 return Err(PyTypeError::new_err(
                     "Location must be a list or tuple of strings and ints",

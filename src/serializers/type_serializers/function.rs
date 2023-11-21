@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use pyo3::exceptions::{PyAttributeError, PyRecursionError, PyRuntimeError};
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -26,14 +26,14 @@ impl BuildSerializer for FunctionBeforeSerializerBuilder {
     const EXPECTED_TYPE: &'static str = "function-before";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         // `before` schemas will obviously have type from `schema` since the validator is called second
-        let schema = schema.get_as_req(intern!(py, "schema"))?;
-        CombinedSerializer::build(schema, config, definitions)
+        let schema = schema.get_as_req(intern2!(py, "schema"))?;
+        CombinedSerializer::build(&schema, config, definitions)
     }
 }
 
@@ -42,8 +42,8 @@ pub struct FunctionAfterSerializerBuilder;
 impl BuildSerializer for FunctionAfterSerializerBuilder {
     const EXPECTED_TYPE: &'static str = "function-after";
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
@@ -51,8 +51,8 @@ impl BuildSerializer for FunctionAfterSerializerBuilder {
         // serialization), for `after` schemas, there's no way to directly infer what schema should
         // be used for serialization. For convenience, the default is to assume the wrapped schema
         // should be used; the user/lib can override the serializer if necessary.
-        let schema = schema.get_as_req(intern!(py, "schema"))?;
-        CombinedSerializer::build(schema, config, definitions)
+        let schema = schema.get_as_req(intern2!(py, "schema"))?;
+        CombinedSerializer::build(&schema, config, definitions)
     }
 }
 
@@ -61,8 +61,8 @@ pub struct FunctionPlainSerializerBuilder;
 impl BuildSerializer for FunctionPlainSerializerBuilder {
     const EXPECTED_TYPE: &'static str = "function-plain";
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         super::any::AnySerializer::build(schema, config, definitions)
@@ -82,12 +82,12 @@ pub struct FunctionPlainSerializer {
     info_arg: bool,
 }
 
-fn destructure_function_schema(schema: &PyDict) -> PyResult<(bool, bool, &PyAny)> {
-    let function: &PyAny = schema.get_as_req(intern!(schema.py(), "function"))?;
+fn destructure_function_schema<'py>(schema: &Py2<'py, PyDict>) -> PyResult<(bool, bool, Py2<'py, PyAny>)> {
+    let function = schema.get_as_req(intern2!(schema.py(), "function"))?;
     let is_field_serializer: bool = schema
-        .get_as(intern!(schema.py(), "is_field_serializer"))?
+        .get_as(intern2!(schema.py(), "is_field_serializer"))?
         .unwrap_or(false);
-    let info_arg: bool = schema.get_as(intern!(schema.py(), "info_arg"))?.unwrap_or(false);
+    let info_arg: bool = schema.get_as(intern2!(schema.py(), "info_arg"))?.unwrap_or(false);
     Ok((is_field_serializer, info_arg, function))
 }
 
@@ -97,28 +97,28 @@ impl BuildSerializer for FunctionPlainSerializer {
     /// NOTE! `schema` here is the actual `CoreSchema`, not `schema.serialization` as in the other builders
     /// (done this way to match `FunctionWrapSerializer` which requires the full schema)
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
-        let ser_schema: &PyDict = schema.get_as_req(intern!(py, "serialization"))?;
+        let ser_schema = schema.get_as_req(intern2!(py, "serialization"))?;
 
-        let (is_field_serializer, info_arg, function) = destructure_function_schema(ser_schema)?;
-        let function_name = function_name(function)?;
+        let (is_field_serializer, info_arg, function) = destructure_function_schema(&ser_schema)?;
+        let function_name = function_name(&function)?;
 
-        let return_serializer = match ser_schema.get_as::<&PyDict>(intern!(py, "return_schema"))? {
-            Some(s) => Box::new(CombinedSerializer::build(s, config, definitions)?),
+        let return_serializer = match ser_schema.get_as(intern2!(py, "return_schema"))? {
+            Some(s) => Box::new(CombinedSerializer::build(&s, config, definitions)?),
             None => Box::new(AnySerializer::build(schema, config, definitions)?),
         };
 
-        let when_used = WhenUsed::new(ser_schema, WhenUsed::Always)?;
+        let when_used = WhenUsed::new(&ser_schema, WhenUsed::Always)?;
         let fallback_serializer = match when_used {
             WhenUsed::Always => None,
             _ => {
                 let new_schema = copy_outer_schema(schema)?;
-                Some(Box::new(CombinedSerializer::build(new_schema, config, definitions)?))
+                Some(Box::new(CombinedSerializer::build(&new_schema, config, definitions)?))
             }
         };
 
@@ -140,9 +140,9 @@ impl BuildSerializer for FunctionPlainSerializer {
 impl FunctionPlainSerializer {
     fn call(
         &self,
-        value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        value: &Py2<'_, PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<(bool, PyObject)> {
         let py = value.py();
@@ -203,20 +203,18 @@ macro_rules! function_type_serializer {
         impl TypeSerializer for $name {
             fn to_python(
                 &self,
-                value: &PyAny,
-                include: Option<&PyAny>,
-                exclude: Option<&PyAny>,
+                value: &Py2<'_, PyAny>,
+                include: Option<&Py2<'_, PyAny>>,
+                exclude: Option<&Py2<'_, PyAny>>,
                 extra: &Extra,
             ) -> PyResult<PyObject> {
                 let py = value.py();
                 match self.call(value, include, exclude, extra) {
                     // None for include/exclude here, as filtering should be done
-                    Ok((true, v)) => self
-                        .return_serializer
-                        .to_python(v.into_ref(py), None, None, extra),
+                    Ok((true, v)) => self.return_serializer.to_python(v.attach(py), None, None, extra),
                     Ok((false, v)) => self
                         .get_fallback_serializer()
-                        .to_python(v.into_ref(py), None, None, extra),
+                        .to_python(v.attach(py), None, None, extra),
                     Err(err) => {
                         on_error(py, err, &self.function_name, extra)?;
                         infer_to_python(value, include, exclude, extra)
@@ -224,11 +222,17 @@ macro_rules! function_type_serializer {
                 }
             }
 
-            fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+            fn json_key<'py>(&self, key: &Py2<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
                 let py = key.py();
                 match self.call(key, None, None, extra) {
-                    Ok((true, v)) => self.return_serializer.json_key(v.into_ref(py), extra),
-                    Ok((false, v)) => self.get_fallback_serializer().json_key(v.into_ref(py), extra),
+                    Ok((true, v)) => self
+                        .return_serializer
+                        .json_key(v.attach(py), extra)
+                        .map(|cow| Cow::Owned(cow.into_owned())),
+                    Ok((false, v)) => self
+                        .get_fallback_serializer()
+                        .json_key(v.attach(py), extra)
+                        .map(|cow| Cow::Owned(cow.into_owned())),
                     Err(err) => {
                         on_error(py, err, &self.function_name, extra)?;
                         infer_json_key(key, extra)
@@ -238,10 +242,10 @@ macro_rules! function_type_serializer {
 
             fn serde_serialize<S: serde::ser::Serializer>(
                 &self,
-                value: &PyAny,
+                value: &Py2<'_, PyAny>,
                 serializer: S,
-                include: Option<&PyAny>,
-                exclude: Option<&PyAny>,
+                include: Option<&Py2<'_, PyAny>>,
+                exclude: Option<&Py2<'_, PyAny>>,
                 extra: &Extra,
             ) -> Result<S::Ok, S::Error> {
                 let py = value.py();
@@ -249,11 +253,11 @@ macro_rules! function_type_serializer {
                     // None for include/exclude here, as filtering should be done
                     Ok((true, v)) => {
                         self.return_serializer
-                            .serde_serialize(v.into_ref(py), serializer, None, None, extra)
+                            .serde_serialize(v.attach(py), serializer, None, None, extra)
                     }
                     Ok((false, v)) => {
                         self.get_fallback_serializer()
-                            .serde_serialize(v.into_ref(py), serializer, None, None, extra)
+                            .serde_serialize(v.attach(py), serializer, None, None, extra)
                     }
                     Err(err) => {
                         on_error(py, err, &self.function_name, extra).map_err(py_err_se_err)?;
@@ -277,16 +281,16 @@ impl_py_gc_traverse!(FunctionPlainSerializer {
 
 function_type_serializer!(FunctionPlainSerializer);
 
-fn copy_outer_schema(schema: &PyDict) -> PyResult<&PyDict> {
+fn copy_outer_schema<'py>(schema: &Py2<'py, PyDict>) -> PyResult<Py2<'py, PyDict>> {
     let py = schema.py();
     // we copy the schema so we can modify it without affecting the original
     let schema_copy = schema.copy()?;
     // remove the serialization key from the schema so we don't recurse
-    schema_copy.del_item(intern!(py, "serialization"))?;
+    schema_copy.del_item(intern2!(py, "serialization"))?;
     // remove ref if it exists - the point is that `schema` here has already run through
     // `CombinedSerializer::build` so "ref" here will have already been added to `Definitions::used_ref`
     // we don't want to error by "finding" it now
-    schema_copy.del_item(intern!(py, "ref")).ok();
+    schema_copy.del_item(intern2!(py, "ref")).ok();
     Ok(schema_copy)
 }
 
@@ -295,8 +299,8 @@ pub struct FunctionWrapSerializerBuilder;
 impl BuildSerializer for FunctionWrapSerializerBuilder {
     const EXPECTED_TYPE: &'static str = "function-wrap";
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
@@ -304,8 +308,8 @@ impl BuildSerializer for FunctionWrapSerializerBuilder {
         // serialization), for `wrap` schemas (like `after`), there's no way to directly infer what
         // schema should be used for serialization. For convenience, the default is to assume the
         // wrapped schema should be used; the user/lib can override the serializer if necessary.
-        let schema = schema.get_as_req(intern!(py, "schema"))?;
-        CombinedSerializer::build(schema, config, definitions)
+        let schema = schema.get_as_req(intern2!(py, "schema"))?;
+        CombinedSerializer::build(&schema, config, definitions)
     }
 }
 
@@ -327,27 +331,27 @@ impl BuildSerializer for FunctionWrapSerializer {
     /// NOTE! `schema` here is the actual `CoreSchema`, not `schema.serialization` as in the other builders
     /// (done this way since we need the `CoreSchema`)
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
-        let ser_schema: &PyDict = schema.get_as_req(intern!(py, "serialization"))?;
+        let ser_schema = schema.get_as_req(intern2!(py, "serialization"))?;
 
-        let (is_field_serializer, info_arg, function) = destructure_function_schema(ser_schema)?;
-        let function_name = function_name(function)?;
+        let (is_field_serializer, info_arg, function) = destructure_function_schema(&ser_schema)?;
+        let function_name = function_name(&function)?;
 
         // try to get `schema.serialization.schema`, otherwise use `schema` with `serialization` key removed
-        let inner_schema: &PyDict = if let Some(s) = ser_schema.get_as(intern!(py, "schema"))? {
+        let inner_schema = if let Some(s) = ser_schema.get_as(intern2!(py, "schema"))? {
             s
         } else {
             copy_outer_schema(schema)?
         };
 
-        let serializer = CombinedSerializer::build(inner_schema, config, definitions)?;
+        let serializer = CombinedSerializer::build(&inner_schema, config, definitions)?;
 
-        let return_serializer = match ser_schema.get_as::<&PyDict>(intern!(py, "return_schema"))? {
-            Some(s) => CombinedSerializer::build(s, config, definitions)?,
+        let return_serializer = match ser_schema.get_as(intern2!(py, "return_schema"))? {
+            Some(s) => CombinedSerializer::build(&s, config, definitions)?,
             None => AnySerializer::build(schema, config, definitions)?,
         };
 
@@ -358,7 +362,7 @@ impl BuildSerializer for FunctionWrapSerializer {
             function_name,
             name,
             return_serializer: Box::new(return_serializer),
-            when_used: WhenUsed::new(ser_schema, WhenUsed::Always)?,
+            when_used: WhenUsed::new(&ser_schema, WhenUsed::Always)?,
             is_field_serializer,
             info_arg,
         }
@@ -369,9 +373,9 @@ impl BuildSerializer for FunctionWrapSerializer {
 impl FunctionWrapSerializer {
     fn call(
         &self,
-        value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        value: &Py2<'_, PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<(bool, PyObject)> {
         let py = value.py();
@@ -428,8 +432,8 @@ impl SerializationCallable {
     pub fn new(
         py: Python,
         serializer: &CombinedSerializer,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> Self {
         Self {
@@ -444,9 +448,14 @@ impl SerializationCallable {
 
 #[pymethods]
 impl SerializationCallable {
-    fn __call__(&mut self, py: Python, value: &PyAny, index_key: Option<&PyAny>) -> PyResult<Option<PyObject>> {
-        let include = self.include.as_ref().map(|o| o.as_ref(py));
-        let exclude = self.exclude.as_ref().map(|o| o.as_ref(py));
+    fn __call__(
+        &mut self,
+        py: Python,
+        value: &Py2<'_, PyAny>,
+        index_key: Option<&Py2<'_, PyAny>>,
+    ) -> PyResult<Option<PyObject>> {
+        let include = self.include.as_ref().map(|o| o.attach(py));
+        let exclude = self.exclude.as_ref().map(|o| o.attach(py));
         let extra = self.extra_owned.to_extra(py);
 
         if let Some(index_key) = index_key {
@@ -456,7 +465,9 @@ impl SerializationCallable {
                 self.filter.key_filter(index_key, include, exclude)?
             };
             if let Some((next_include, next_exclude)) = filter {
-                let v = self.serializer.to_python(value, next_include, next_exclude, &extra)?;
+                let v = self
+                    .serializer
+                    .to_python(value, next_include.as_ref(), next_exclude.as_ref(), &extra)?;
                 extra.warnings.final_check(py)?;
                 Ok(Some(v))
             } else {
@@ -505,8 +516,8 @@ struct SerializationInfo {
 impl SerializationInfo {
     fn new(
         py: Python,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
         is_field_serializer: bool,
     ) -> PyResult<Self> {
@@ -555,8 +566,8 @@ impl SerializationInfo {
     }
 
     #[getter]
-    fn __dict__<'py>(&'py self, py: Python<'py>) -> PyResult<&'py PyDict> {
-        let d = PyDict::new(py);
+    fn __dict__<'py>(&'py self, py: Python<'py>) -> PyResult<Py2<'py, PyDict>> {
+        let d = PyDict::new2(py);
         if let Some(ref include) = self.include {
             d.set_item("include", include)?;
         }
@@ -596,9 +607,9 @@ impl SerializationInfo {
         self.__repr__(py)
     }
     #[getter]
-    fn get_field_name<'py>(&self, py: Python<'py>) -> PyResult<&'py PyString> {
+    fn get_field_name<'py>(&self, py: Python<'py>) -> PyResult<Py2<'py, PyString>> {
         match self.field_name {
-            Some(ref field_name) => Ok(PyString::new(py, field_name)),
+            Some(ref field_name) => Ok(PyString::new2(py, field_name)),
             None => Err(PyAttributeError::new_err("No attribute named 'field_name'")),
         }
     }

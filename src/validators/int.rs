@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -19,16 +19,16 @@ impl BuildValidator for IntValidator {
     const EXPECTED_TYPE: &'static str = "int";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let use_constrained = schema.get_item(intern!(py, "multiple_of"))?.is_some()
-            || schema.get_item(intern!(py, "le"))?.is_some()
-            || schema.get_item(intern!(py, "lt"))?.is_some()
-            || schema.get_item(intern!(py, "ge"))?.is_some()
-            || schema.get_item(intern!(py, "gt"))?.is_some();
+        let use_constrained = schema.get_item(intern2!(py, "multiple_of"))?.is_some()
+            || schema.get_item(intern2!(py, "le"))?.is_some()
+            || schema.get_item(intern2!(py, "lt"))?.is_some()
+            || schema.get_item(intern2!(py, "ge"))?.is_some()
+            || schema.get_item(intern2!(py, "gt"))?.is_some();
         if use_constrained {
             ConstrainedIntValidator::build(schema, config)
         } else {
@@ -145,15 +145,15 @@ impl Validator for ConstrainedIntValidator {
 }
 
 impl ConstrainedIntValidator {
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedValidator> {
+    fn build(schema: &Py2<'_, PyDict>, config: Option<&Py2<'_, PyDict>>) -> PyResult<CombinedValidator> {
         let py = schema.py();
         Ok(Self {
             strict: is_strict(schema, config)?,
-            multiple_of: schema.get_as(intern!(py, "multiple_of"))?,
-            le: schema.get_as(intern!(py, "le"))?,
-            lt: schema.get_as(intern!(py, "lt"))?,
-            ge: schema.get_as(intern!(py, "ge"))?,
-            gt: schema.get_as(intern!(py, "gt"))?,
+            multiple_of: schema.get_as(intern2!(py, "multiple_of"))?,
+            le: schema.get_as(intern2!(py, "le"))?,
+            lt: schema.get_as(intern2!(py, "lt"))?,
+            ge: schema.get_as(intern2!(py, "ge"))?,
+            gt: schema.get_as(intern2!(py, "gt"))?,
         }
         .into())
     }

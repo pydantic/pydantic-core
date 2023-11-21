@@ -16,8 +16,8 @@ impl BuildValidator for BoolValidator {
     const EXPECTED_TYPE: &'static str = "bool";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         Ok(Self {

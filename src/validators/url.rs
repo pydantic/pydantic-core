@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::iter::Peekable;
 use std::str::Chars;
 
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -37,19 +37,19 @@ impl BuildValidator for UrlValidator {
     const EXPECTED_TYPE: &'static str = "url";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let (allowed_schemes, name) = get_allowed_schemas(schema, Self::EXPECTED_TYPE)?;
 
         Ok(Self {
             strict: is_strict(schema, config)?,
-            max_length: schema.get_as(intern!(schema.py(), "max_length"))?,
-            host_required: schema.get_as(intern!(schema.py(), "host_required"))?.unwrap_or(false),
-            default_host: schema.get_as(intern!(schema.py(), "default_host"))?,
-            default_port: schema.get_as(intern!(schema.py(), "default_port"))?,
-            default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
+            max_length: schema.get_as(intern2!(schema.py(), "max_length"))?,
+            host_required: schema.get_as(intern2!(schema.py(), "host_required"))?.unwrap_or(false),
+            default_host: schema.get_as(intern2!(schema.py(), "default_host"))?,
+            default_port: schema.get_as(intern2!(schema.py(), "default_port"))?,
+            default_path: schema.get_as(intern2!(schema.py(), "default_path"))?,
             allowed_schemes,
             name,
         }
@@ -165,13 +165,13 @@ impl BuildValidator for MultiHostUrlValidator {
     const EXPECTED_TYPE: &'static str = "multi-host-url";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let (allowed_schemes, name) = get_allowed_schemas(schema, Self::EXPECTED_TYPE)?;
 
-        let default_host: Option<String> = schema.get_as(intern!(schema.py(), "default_host"))?;
+        let default_host: Option<String> = schema.get_as(intern2!(schema.py(), "default_host"))?;
         if let Some(ref default_host) = default_host {
             if default_host.contains(',') {
                 return py_schema_err!("default_host cannot contain a comma, see pydantic-core#326");
@@ -179,12 +179,12 @@ impl BuildValidator for MultiHostUrlValidator {
         }
         Ok(Self {
             strict: is_strict(schema, config)?,
-            max_length: schema.get_as(intern!(schema.py(), "max_length"))?,
+            max_length: schema.get_as(intern2!(schema.py(), "max_length"))?,
             allowed_schemes,
-            host_required: schema.get_as(intern!(schema.py(), "host_required"))?.unwrap_or(false),
+            host_required: schema.get_as(intern2!(schema.py(), "host_required"))?.unwrap_or(false),
             default_host,
-            default_port: schema.get_as(intern!(schema.py(), "default_port"))?,
-            default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
+            default_port: schema.get_as(intern2!(schema.py(), "default_port"))?,
+            default_path: schema.get_as(intern2!(schema.py(), "default_path"))?,
             name,
         }
         .into())
@@ -501,8 +501,8 @@ fn check_sub_defaults(
     Ok(())
 }
 
-fn get_allowed_schemas(schema: &PyDict, name: &'static str) -> PyResult<(AllowedSchemas, String)> {
-    match schema.get_as::<&PyList>(intern!(schema.py(), "allowed_schemes"))? {
+fn get_allowed_schemas(schema: &Py2<'_, PyDict>, name: &'static str) -> PyResult<(AllowedSchemas, String)> {
+    match schema.get_as::<&PyList>(intern2!(schema.py(), "allowed_schemes"))? {
         Some(list) => {
             if list.is_empty() {
                 return py_schema_err!("`allowed_schemes` should have length > 0");

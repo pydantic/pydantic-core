@@ -89,7 +89,7 @@ impl PydanticCustomError {
     }
 
     pub fn message(&self, py: Python) -> PyResult<String> {
-        Self::format_message(&self.message_template, self.context.as_ref().map(|c| c.as_ref(py)))
+        Self::format_message(&self.message_template, self.context.as_ref().map(|c| c.attach(py)))
     }
 
     fn __str__(&self, py: Python) -> PyResult<String> {
@@ -115,14 +115,14 @@ impl PydanticCustomError {
         ValError::new(error_type, input)
     }
 
-    pub fn format_message(message_template: &str, context: Option<&PyDict>) -> PyResult<String> {
+    pub fn format_message(message_template: &str, context: Option<&Py2<'_, PyDict>>) -> PyResult<String> {
         let mut message = message_template.to_string();
         if let Some(ctx) = context {
             for (key, value) in ctx {
-                let key: &PyString = key.downcast()?;
+                let key = key.downcast::<PyString>()?;
                 if let Ok(py_str) = value.downcast::<PyString>() {
                     message = message.replace(&format!("{{{}}}", key.to_str()?), py_str.to_str()?);
-                } else if let Ok(value_int) = extract_i64(value) {
+                } else if let Ok(value_int) = extract_i64(&value) {
                     message = message.replace(&format!("{{{}}}", key.to_str()?), &value_int.to_string());
                 } else {
                     // fallback for anything else just in case

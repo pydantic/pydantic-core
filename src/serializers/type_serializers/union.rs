@@ -1,4 +1,4 @@
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use std::borrow::Cow;
@@ -23,17 +23,17 @@ impl BuildSerializer for UnionSerializer {
     const EXPECTED_TYPE: &'static str = "union";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let choices: Vec<CombinedSerializer> = schema
-            .get_as_req::<&PyList>(intern!(py, "choices"))?
+            .get_as_req::<Py2<'_, PyList>>(intern2!(py, "choices"))?
             .iter()
             .map(|choice| {
-                let choice: &PyAny = match choice.downcast::<PyTuple>() {
-                    Ok(py_tuple) => py_tuple.get_item(0)?,
+                let choice = match choice.downcast::<PyTuple>() {
+                    Ok(py_tuple) => py_tuple.get_item(0)?.clone(),
                     Err(_) => choice,
                 };
                 CombinedSerializer::build(choice.downcast()?, config, definitions)
@@ -70,9 +70,9 @@ impl_py_gc_traverse!(UnionSerializer { choices });
 impl TypeSerializer for UnionSerializer {
     fn to_python(
         &self,
-        value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        value: &Py2<'_, PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         // try the serializers in left to right order with error_on fallback=true
@@ -105,7 +105,7 @@ impl TypeSerializer for UnionSerializer {
         infer_to_python(value, include, exclude, extra)
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &Py2<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
         for comb_serializer in &self.choices {
@@ -136,10 +136,10 @@ impl TypeSerializer for UnionSerializer {
 
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,
-        value: &PyAny,
+        value: &Py2<'_, PyAny>,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let py = value.py();
@@ -147,7 +147,7 @@ impl TypeSerializer for UnionSerializer {
         new_extra.check = SerCheck::Strict;
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
-                Ok(v) => return infer_serialize(v.as_ref(py), serializer, None, None, extra),
+                Ok(v) => return infer_serialize(v.attach(py), serializer, None, None, extra),
                 Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
                     true => (),
                     false => return Err(py_err_se_err(err)),
@@ -158,7 +158,7 @@ impl TypeSerializer for UnionSerializer {
             new_extra.check = SerCheck::Lax;
             for comb_serializer in &self.choices {
                 match comb_serializer.to_python(value, include, exclude, &new_extra) {
-                    Ok(v) => return infer_serialize(v.as_ref(py), serializer, None, None, extra),
+                    Ok(v) => return infer_serialize(v.attach(py), serializer, None, None, extra),
                     Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
                         true => (),
                         false => return Err(py_err_se_err(err)),
@@ -186,11 +186,11 @@ impl BuildSerializer for TaggedUnionBuilder {
     const EXPECTED_TYPE: &'static str = "tagged-union";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        let schema_choices: &PyDict = schema.get_as_req(intern!(schema.py(), "choices"))?;
+        let schema_choices: Py2<'_, PyDict> = schema.get_as_req(intern2!(schema.py(), "choices"))?;
         let mut choices: Vec<CombinedSerializer> = Vec::with_capacity(schema_choices.len());
 
         for (_, value) in schema_choices {

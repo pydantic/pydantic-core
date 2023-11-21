@@ -38,7 +38,7 @@ impl SerField {
         serializer: Option<CombinedSerializer>,
         required: bool,
     ) -> Self {
-        let alias_py = alias.as_ref().map(|alias| PyString::new(py, alias.as_str()).into());
+        let alias_py = alias.as_ref().map(|alias| PyString::new2(py, alias.as_str()).into());
         Self {
             key_py,
             alias,
@@ -67,7 +67,7 @@ impl SerField {
     }
 }
 
-fn exclude_default(value: &PyAny, extra: &Extra, serializer: &CombinedSerializer) -> PyResult<bool> {
+fn exclude_default(value: &Py2<'_, PyAny>, extra: &Extra, serializer: &CombinedSerializer) -> PyResult<bool> {
     if extra.exclude_defaults {
         if let Some(default) = serializer.get_default(value.py())? {
             if value.eq(default)? {
@@ -118,10 +118,10 @@ impl GeneralFieldsSerializer {
         }
     }
 
-    fn extract_dicts<'a>(&self, value: &'a PyAny) -> Option<(&'a PyDict, Option<&'a PyDict>)> {
+    fn extract_dicts<'a>(&self, value: &Py2<'a, PyAny>) -> Option<(Py2<'a, PyDict>, Option<Py2<'a, PyDict>>)> {
         match self.mode {
             FieldsMode::ModelExtra => {
-                if let Ok((main_dict, extra_dict)) = value.extract::<(&PyDict, &PyDict)>() {
+                if let Ok((main_dict, extra_dict)) = value.extract() {
                     Some((main_dict, Some(extra_dict)))
                 } else {
                     None
@@ -129,7 +129,7 @@ impl GeneralFieldsSerializer {
             }
             _ => {
                 if let Ok(main_dict) = value.downcast::<PyDict>() {
-                    Some((main_dict, None))
+                    Some((main_dict.clone(), None))
                 } else {
                     None
                 }
@@ -155,9 +155,9 @@ impl_py_gc_traverse!(GeneralFieldsSerializer {
 impl TypeSerializer for GeneralFieldsSerializer {
     fn to_python(
         &self,
-        value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        value: &Py2<'_, PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
@@ -175,12 +175,13 @@ impl TypeSerializer for GeneralFieldsSerializer {
             return infer_to_python(value, include, exclude, &td_extra);
         };
 
-        let output_dict = PyDict::new(py);
+        let output_dict = PyDict::new2(py);
         let mut used_req_fields: usize = 0;
 
         // NOTE! we maintain the order of the input dict assuming that's right
         for (key, value) in main_dict {
-            let key_str = key_str(key)?;
+            let key = key.downcast::<PyString>()?;
+            let key_str = key.to_str()?;
             let op_field = self.fields.get(key_str);
             if extra.exclude_none && value.is_none() {
                 if let Some(field) = op_field {
@@ -197,8 +198,9 @@ impl TypeSerializer for GeneralFieldsSerializer {
             if let Some((next_include, next_exclude)) = self.filter.key_filter(key, include, exclude)? {
                 if let Some(field) = op_field {
                     if let Some(ref serializer) = field.serializer {
-                        if !exclude_default(value, &extra, serializer)? {
-                            let value = serializer.to_python(value, next_include, next_exclude, &extra)?;
+                        if !exclude_default(&value, &extra, serializer)? {
+                            let value =
+                                serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &extra)?;
                             let output_key = field.get_key_py(output_dict.py(), &extra);
                             output_dict.set_item(output_key, value)?;
                         }
@@ -209,8 +211,10 @@ impl TypeSerializer for GeneralFieldsSerializer {
                     }
                 } else if self.mode == FieldsMode::TypedDictAllow {
                     let value = match &self.extra_serializer {
-                        Some(serializer) => serializer.to_python(value, next_include, next_exclude, &extra)?,
-                        None => infer_to_python(value, next_include, next_exclude, &extra)?,
+                        Some(serializer) => {
+                            serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &extra)?
+                        }
+                        None => infer_to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &extra)?,
                     };
                     output_dict.set_item(key, value)?;
                 } else if extra.check == SerCheck::Strict {
@@ -232,10 +236,12 @@ impl TypeSerializer for GeneralFieldsSerializer {
                 if extra.exclude_none && value.is_none() {
                     continue;
                 }
-                if let Some((next_include, next_exclude)) = self.filter.key_filter(key, include, exclude)? {
+                if let Some((next_include, next_exclude)) = self.filter.key_filter(&key, include, exclude)? {
                     let value = match &self.extra_serializer {
-                        Some(serializer) => serializer.to_python(value, next_include, next_exclude, extra)?,
-                        None => infer_to_python(value, next_include, next_exclude, extra)?,
+                        Some(serializer) => {
+                            serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), extra)?
+                        }
+                        None => infer_to_python(&value, next_include.as_ref(), next_exclude.as_ref(), extra)?,
                     };
                     output_dict.set_item(key, value)?;
                 }
@@ -243,22 +249,22 @@ impl TypeSerializer for GeneralFieldsSerializer {
         }
         if let Some(ref computed_fields) = self.computed_fields {
             if let Some(model) = td_extra.model {
-                computed_fields.to_python(model, output_dict, &self.filter, include, exclude, &td_extra)?;
+                computed_fields.to_python(model, &output_dict, &self.filter, include, exclude, &td_extra)?;
             }
         }
         Ok(output_dict.into_py(py))
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &Py2<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
         self._invalid_as_json_key(key, extra, "fields")
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,
-        value: &PyAny,
+        value: &Py2<'_, PyAny>,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let (main_dict, extra_dict) = if let Some(main_extra_dict) = self.extract_dicts(value) {
@@ -287,7 +293,8 @@ impl TypeSerializer for GeneralFieldsSerializer {
             if extra.exclude_none && value.is_none() {
                 continue;
             }
-            let key_str = key_str(key).map_err(py_err_se_err)?;
+            let key = key.downcast::<PyString>().map_err(py_err_se_err)?;
+            let key_str = key.to_str().map_err(py_err_se_err)?;
             let extra = Extra {
                 field_name: Some(key_str),
                 ..td_extra
@@ -297,15 +304,21 @@ impl TypeSerializer for GeneralFieldsSerializer {
             if let Some((next_include, next_exclude)) = filter {
                 if let Some(field) = self.fields.get(key_str) {
                     if let Some(ref serializer) = field.serializer {
-                        if !exclude_default(value, &extra, serializer).map_err(py_err_se_err)? {
-                            let s = PydanticSerializer::new(value, serializer, next_include, next_exclude, &extra);
+                        if !exclude_default(&value, &extra, serializer).map_err(py_err_se_err)? {
+                            let s = PydanticSerializer::new(
+                                &value,
+                                serializer,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                &extra,
+                            );
                             let output_key = field.get_key_json(key_str, &extra);
                             map.serialize_entry(&output_key, &s)?;
                         }
                     }
                 } else if self.mode == FieldsMode::TypedDictAllow {
                     let output_key = infer_json_key(key, &extra).map_err(py_err_se_err)?;
-                    let s = SerializeInfer::new(value, next_include, next_exclude, &extra);
+                    let s = SerializeInfer::new(&value, next_include.as_ref(), next_exclude.as_ref(), &extra);
                     map.serialize_entry(&output_key, &s)?;
                 }
                 // no error case here since unions (which need the error case) use `to_python(..., mode='json')`
@@ -317,10 +330,10 @@ impl TypeSerializer for GeneralFieldsSerializer {
                 if extra.exclude_none && value.is_none() {
                     continue;
                 }
-                let filter = self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
+                let filter = self.filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
                 if let Some((next_include, next_exclude)) = filter {
-                    let output_key = infer_json_key(key, &td_extra).map_err(py_err_se_err)?;
-                    let s = SerializeInfer::new(value, next_include, next_exclude, &td_extra);
+                    let output_key = infer_json_key(&key, &td_extra).map_err(py_err_se_err)?;
+                    let s = SerializeInfer::new(&value, next_include.as_ref(), next_exclude.as_ref(), &td_extra);
                     map.serialize_entry(&output_key, &s)?;
                 }
             }
@@ -336,8 +349,4 @@ impl TypeSerializer for GeneralFieldsSerializer {
     fn get_name(&self) -> &str {
         "general-fields"
     }
-}
-
-fn key_str(key: &PyAny) -> PyResult<&str> {
-    key.downcast::<PyString>()?.to_str()
 }

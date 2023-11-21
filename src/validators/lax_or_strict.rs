@@ -1,4 +1,4 @@
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -23,16 +23,16 @@ impl BuildValidator for LaxOrStrictValidator {
     const EXPECTED_TYPE: &'static str = "lax-or-strict";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let lax_schema = schema.get_as_req(intern!(py, "lax_schema"))?;
-        let lax_validator = Box::new(build_validator(lax_schema, config, definitions)?);
+        let lax_schema = schema.get_as_req(intern2!(py, "lax_schema"))?;
+        let lax_validator = Box::new(build_validator(&lax_schema, config, definitions)?);
 
-        let strict_schema = schema.get_as_req(intern!(py, "strict_schema"))?;
-        let strict_validator = Box::new(build_validator(strict_schema, config, definitions)?);
+        let strict_schema = schema.get_as_req(intern2!(py, "strict_schema"))?;
+        let strict_validator = Box::new(build_validator(&strict_schema, config, definitions)?);
 
         let name = format!(
             "{}[lax={},strict={}]",

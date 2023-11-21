@@ -1,6 +1,7 @@
 use pyo3::exceptions::PyTypeError;
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
+use pyo3::types::PyString;
 use pyo3::types::{PyDict, PyTuple};
 
 use crate::errors::ValResult;
@@ -23,37 +24,38 @@ impl BuildValidator for CallValidator {
     const EXPECTED_TYPE: &'static str = "call";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
-        let arguments_schema: &PyAny = schema.get_as_req(intern!(py, "arguments_schema"))?;
-        let arguments_validator = Box::new(build_validator(arguments_schema, config, definitions)?);
+        let arguments_schema = schema.get_as_req(intern2!(py, "arguments_schema"))?;
+        let arguments_validator = Box::new(build_validator(&arguments_schema, config, definitions)?);
 
-        let return_schema = schema.get_item(intern!(py, "return_schema"))?;
+        let return_schema = schema.get_item(intern2!(py, "return_schema"))?;
         let return_validator = match return_schema {
-            Some(return_schema) => Some(Box::new(build_validator(return_schema, config, definitions)?)),
+            Some(return_schema) => Some(Box::new(build_validator(&return_schema, config, definitions)?)),
             None => None,
         };
-        let function: &PyAny = schema.get_as_req(intern!(py, "function"))?;
-        let function_name: &str = match schema.get_as(intern!(py, "function_name"))? {
+        let function: Py2<'_, PyAny> = schema.get_as_req(intern2!(py, "function"))?;
+        let function_name: Py<PyString> = match schema.get_as(intern2!(py, "function_name"))? {
             Some(name) => name,
             None => {
-                match function.getattr(intern!(py, "__name__")) {
+                match function.getattr(intern2!(py, "__name__")) {
                     Ok(name) => name.extract()?,
                     Err(_) => {
                         // partials we use `function.func.__name__`
-                        if let Ok(func) = function.getattr(intern!(py, "func")) {
-                            func.getattr(intern!(py, "__name__"))?.extract()?
+                        if let Ok(func) = function.getattr(intern2!(py, "func")) {
+                            func.getattr(intern2!(py, "__name__"))?.extract()?
                         } else {
-                            "<unknown>"
+                            intern2!(py, "<unknown>").clone().into()
                         }
                     }
                 }
             }
         };
+        let function_name = function_name.as_ref(py);
         let name = format!("{}[{function_name}]", Self::EXPECTED_TYPE);
 
         Ok(Self {
@@ -92,7 +94,7 @@ impl Validator for CallValidator {
 
         if let Some(return_validator) = &self.return_validator {
             return_validator
-                .validate(py, return_value.into_ref(py), state)
+                .validate(py, return_value.attach(py), state)
                 .map_err(|e| e.with_outer_location("return".into()))
         } else {
             Ok(return_value.to_object(py))

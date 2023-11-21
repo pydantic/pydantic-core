@@ -1,5 +1,5 @@
 use pyo3::exceptions::PyNotImplementedError;
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 
@@ -21,22 +21,21 @@ impl BuildValidator for IsInstanceValidator {
     const EXPECTED_TYPE: &'static str = "is-instance";
 
     fn build(
-        schema: &PyDict,
-        _config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        _config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let cls_key = intern!(py, "cls");
-        let class: &PyAny = schema.get_as_req(cls_key)?;
+        let cls_key = intern2!(py, "cls");
+        let class = schema.get_as_req(cls_key)?;
 
         // test that class works with isinstance to avoid errors at call time, reuse cls_key since it doesn't
         // matter what object is being checked
-        let test_value: &PyAny = cls_key.as_ref();
-        if test_value.is_instance(class).is_err() {
+        if cls_key.is_instance(&class).is_err() {
             return py_schema_err!("'cls' must be valid as the first argument to 'isinstance'");
         }
 
-        let class_repr = match schema.get_as(intern!(py, "cls_repr"))? {
+        let class_repr = match schema.get_as(intern2!(py, "cls_repr"))? {
             Some(s) => s,
             None => match class.extract::<&PyType>() {
                 Ok(t) => t.name()?.to_string(),

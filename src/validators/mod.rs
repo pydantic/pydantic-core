@@ -5,8 +5,8 @@ use enum_dispatch::enum_dispatch;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
-use pyo3::{intern, PyTraverseError, PyVisit};
+use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
+use pyo3::{intern2, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
 use crate::definitions::{Definitions, DefinitionsBuilder};
@@ -91,8 +91,8 @@ impl PySome {
     }
 
     #[classattr]
-    fn __match_args__(py: Python) -> &PyTuple {
-        PyTuple::new(py, vec![intern!(py, "value")])
+    fn __match_args__(py: Python) -> Py2<'_, PyTuple> {
+        PyTuple::new2(py, vec![intern2!(py, "value")])
     }
 }
 
@@ -114,14 +114,14 @@ pub struct SchemaValidator {
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(py: Python, schema: &PyAny, config: Option<&PyDict>) -> PyResult<Self> {
+    pub fn py_new(py: Python, schema: &Py2<'_, PyAny>, config: Option<&Py2<'_, PyDict>>) -> PyResult<Self> {
         let mut definitions_builder = DefinitionsBuilder::new();
 
         let validator = build_validator(schema, config, &mut definitions_builder)?;
         let definitions = definitions_builder.finish()?;
         let py_schema = schema.into_py(py);
         let py_config = match config {
-            Some(c) if !c.is_empty() => Some(c.into_py(py)),
+            Some(c) if !c.is_empty() => Some(c.clone().into()),
             _ => None,
         };
         let config_title = match config {
@@ -132,8 +132,8 @@ impl SchemaValidator {
             Some(t) => t.into_py(py),
             None => validator.get_name().into_py(py),
         };
-        let hide_input_in_errors: bool = config.get_as(intern!(py, "hide_input_in_errors"))?.unwrap_or(false);
-        let validation_error_cause: bool = config.get_as(intern!(py, "validation_error_cause"))?.unwrap_or(false);
+        let hide_input_in_errors: bool = config.get_as(intern2!(py, "hide_input_in_errors"))?.unwrap_or(false);
+        let validation_error_cause: bool = config.get_as(intern2!(py, "validation_error_cause"))?.unwrap_or(false);
         Ok(Self {
             validator,
             definitions,
@@ -157,11 +157,11 @@ impl SchemaValidator {
     pub fn validate_python(
         &self,
         py: Python,
-        input: &PyAny,
+        input: &Py2<'_, PyAny>,
         strict: Option<bool>,
         from_attributes: Option<bool>,
-        context: Option<&PyAny>,
-        self_instance: Option<&PyAny>,
+        context: Option<&Py2<'_, PyAny>>,
+        self_instance: Option<&Py2<'_, PyAny>>,
     ) -> PyResult<PyObject> {
         self._validate(
             py,
@@ -179,11 +179,11 @@ impl SchemaValidator {
     pub fn isinstance_python(
         &self,
         py: Python,
-        input: &PyAny,
+        input: &Py2<'_, PyAny>,
         strict: Option<bool>,
         from_attributes: Option<bool>,
-        context: Option<&PyAny>,
-        self_instance: Option<&PyAny>,
+        context: Option<&Py2<'_, PyAny>>,
+        self_instance: Option<&Py2<'_, PyAny>>,
     ) -> PyResult<bool> {
         match self._validate(
             py,
@@ -206,10 +206,10 @@ impl SchemaValidator {
     pub fn validate_json(
         &self,
         py: Python,
-        input: &PyAny,
+        input: &Py2<'_, PyAny>,
         strict: Option<bool>,
-        context: Option<&PyAny>,
-        self_instance: Option<&PyAny>,
+        context: Option<&Py2<'_, PyAny>>,
+        self_instance: Option<&Py2<'_, PyAny>>,
     ) -> PyResult<PyObject> {
         let r = match json::validate_json_bytes(input) {
             Ok(v_match) => self._validate_json(
@@ -229,12 +229,12 @@ impl SchemaValidator {
     pub fn validate_strings(
         &self,
         py: Python,
-        input: &PyAny,
+        input: Py2<'_, PyAny>,
         strict: Option<bool>,
-        context: Option<&PyAny>,
+        context: Option<&Py2<'_, PyAny>>,
     ) -> PyResult<PyObject> {
         let t = InputType::String;
-        let string_mapping = StringMapping::new_value(input).map_err(|e| self.prepare_validation_err(py, e, t))?;
+        let string_mapping = StringMapping::new_value(&input).map_err(|e| self.prepare_validation_err(py, e, t))?;
 
         match self._validate(py, &string_mapping, t, strict, None, context, None) {
             Ok(r) => Ok(r),
@@ -247,12 +247,12 @@ impl SchemaValidator {
     pub fn validate_assignment(
         &self,
         py: Python,
-        obj: &PyAny,
+        obj: Py2<'_, PyAny>,
         field_name: &str,
-        field_value: &PyAny,
+        field_value: Py2<'_, PyAny>,
         strict: Option<bool>,
         from_attributes: Option<bool>,
-        context: Option<&PyAny>,
+        context: Option<&Py2<'_, PyAny>>,
     ) -> PyResult<PyObject> {
         let extra = Extra {
             input_type: InputType::Python,
@@ -266,12 +266,17 @@ impl SchemaValidator {
         let guard = &mut RecursionGuard::default();
         let mut state = ValidationState::new(extra, guard);
         self.validator
-            .validate_assignment(py, obj, field_name, field_value, &mut state)
+            .validate_assignment(py, &obj, field_name, &field_value, &mut state)
             .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
     }
 
     #[pyo3(signature = (*, strict=None, context=None))]
-    pub fn get_default_value(&self, py: Python, strict: Option<bool>, context: Option<&PyAny>) -> PyResult<PyObject> {
+    pub fn get_default_value(
+        &self,
+        py: Python,
+        strict: Option<bool>,
+        context: Option<&Py2<'_, PyAny>>,
+    ) -> PyResult<PyObject> {
         let extra = Extra {
             input_type: InputType::Python,
             data: None,
@@ -320,8 +325,8 @@ impl SchemaValidator {
         input_type: InputType,
         strict: Option<bool>,
         from_attributes: Option<bool>,
-        context: Option<&'data PyAny>,
-        self_instance: Option<&PyAny>,
+        context: Option<&Py2<'data, PyAny>>,
+        self_instance: Option<&Py2<'_, PyAny>>,
     ) -> ValResult<PyObject>
     where
         's: 'data,
@@ -337,11 +342,11 @@ impl SchemaValidator {
     fn _validate_json(
         &self,
         py: Python,
-        input: &PyAny,
+        input: &Py2<'_, PyAny>,
         json_data: &[u8],
         strict: Option<bool>,
-        context: Option<&PyAny>,
-        self_instance: Option<&PyAny>,
+        context: Option<&Py2<'_, PyAny>>,
+        self_instance: Option<&Py2<'_, PyAny>>,
     ) -> ValResult<PyObject> {
         let json_value =
             jiter::JsonValue::parse(json_data, true).map_err(|e| json::map_json_err(input, e, json_data))?;
@@ -377,27 +382,28 @@ impl<'py> SelfValidator<'py> {
         Ok(Self { validator })
     }
 
-    pub fn validate_schema(&self, py: Python<'py>, schema: &'py PyAny, strict: Option<bool>) -> PyResult<&'py PyAny> {
+    pub fn validate_schema(&self, schema: Py2<'py, PyAny>, strict: Option<bool>) -> PyResult<Py2<'py, PyAny>> {
+        let py = schema.py();
         let mut recursion_guard = RecursionGuard::default();
         let mut state = ValidationState::new(
             Extra::new(strict, None, None, None, InputType::Python),
             &mut recursion_guard,
         );
-        match self.validator.validator.validate(py, schema, &mut state) {
-            Ok(schema_obj) => Ok(schema_obj.into_ref(py)),
+        match self.validator.validator.validate(py, &schema, &mut state) {
+            Ok(schema_obj) => Ok(schema_obj.attach_into(py)),
             Err(e) => Err(SchemaError::from_val_error(py, e)),
         }
     }
 
     fn build(py: Python) -> PyResult<SchemaValidator> {
         let code = include_str!("../self_schema.py");
-        let locals = PyDict::new(py);
-        py.run(code, None, Some(locals))?;
-        let self_schema: &PyDict = locals.get_as_req(intern!(py, "self_schema"))?;
+        let locals = PyDict::new2(py);
+        py.run(code, None, Some(locals.as_gil_ref()))?;
+        let self_schema = locals.get_as_req(intern2!(py, "self_schema"))?;
 
         let mut definitions_builder = DefinitionsBuilder::new();
 
-        let validator = match build_validator(self_schema, None, &mut definitions_builder) {
+        let validator = match build_validator(&self_schema, None, &mut definitions_builder) {
             Ok(v) => v,
             Err(err) => return py_schema_err!("Error building self-schema:\n  {}", err),
         };
@@ -415,9 +421,9 @@ impl<'py> SelfValidator<'py> {
 }
 
 #[pyfunction(signature = (schema, *, strict = None))]
-pub fn validate_core_schema<'a>(py: Python<'a>, schema: &'a PyAny, strict: Option<bool>) -> PyResult<&'a PyAny> {
-    let self_validator = SelfValidator::new(py)?;
-    self_validator.validate_schema(py, schema, strict)
+pub fn validate_core_schema(schema: Py2<'_, PyAny>, strict: Option<bool>) -> PyResult<Py2<'_, PyAny>> {
+    let self_validator = SelfValidator::new(schema.py())?;
+    self_validator.validate_schema(schema, strict)
 }
 
 pub trait BuildValidator: Sized {
@@ -426,17 +432,17 @@ pub trait BuildValidator: Sized {
     /// Build a new validator from the schema, the return type is a trait to provide a way for validators
     /// to return other validators, see `string.rs`, `int.rs`, `float.rs` and `function.rs` for examples
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator>;
 }
 
 /// Logic to create a particular validator, called in the `validator_match` macro, then in turn by `build_validator`
-fn build_specific_validator<'a, T: BuildValidator>(
+fn build_specific_validator<T: BuildValidator>(
     val_type: &str,
-    schema_dict: &'a PyDict,
-    config: Option<&'a PyDict>,
+    schema_dict: &Py2<'_, PyDict>,
+    config: Option<&Py2<'_, PyDict>>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<CombinedValidator> {
     T::build(schema_dict, config, definitions)
@@ -455,13 +461,14 @@ macro_rules! validator_match {
     };
 }
 
-pub fn build_validator<'a>(
-    schema: &'a PyAny,
-    config: Option<&'a PyDict>,
+pub fn build_validator(
+    schema: &Py2<'_, PyAny>,
+    config: Option<&Py2<'_, PyDict>>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<CombinedValidator> {
-    let dict: &PyDict = schema.downcast()?;
-    let type_: &str = dict.get_as_req(intern!(schema.py(), "type"))?;
+    let dict = schema.downcast::<PyDict>()?;
+    let type_: Py2<'_, PyString> = dict.get_as_req(intern2!(schema.py(), "type"))?;
+    let type_ = type_.to_str()?;
     validator_match!(
         type_,
         dict,
@@ -562,23 +569,23 @@ pub struct Extra<'a> {
     /// Validation mode
     pub input_type: InputType,
     /// This is used as the `data` kwargs to validator functions
-    pub data: Option<&'a PyDict>,
+    pub data: Option<Py2<'a, PyDict>>,
     /// whether we're in strict or lax mode
     pub strict: Option<bool>,
     /// Validation time setting of `from_attributes`
     pub from_attributes: Option<bool>,
     /// context used in validator functions
-    pub context: Option<&'a PyAny>,
+    pub context: Option<&'a Py2<'a, PyAny>>,
     /// This is an instance of the model or dataclass being validated, when validation is performed from `__init__`
-    self_instance: Option<&'a PyAny>,
+    self_instance: Option<&'a Py2<'a, PyAny>>,
 }
 
 impl<'a> Extra<'a> {
     pub fn new(
         strict: Option<bool>,
         from_attributes: Option<bool>,
-        context: Option<&'a PyAny>,
-        self_instance: Option<&'a PyAny>,
+        context: Option<&'a Py2<'a, PyAny>>,
+        self_instance: Option<&'a Py2<'a, PyAny>>,
         input_type: InputType,
     ) -> Self {
         Extra {
@@ -596,7 +603,7 @@ impl<'a> Extra<'a> {
     pub fn as_strict(&self) -> Self {
         Self {
             input_type: self.input_type,
-            data: self.data,
+            data: self.data.clone(),
             strict: Some(true),
             from_attributes: self.from_attributes,
             context: self.context,
@@ -725,9 +732,9 @@ pub trait Validator: Send + Sync + Debug {
     fn validate_assignment<'data>(
         &self,
         _py: Python<'data>,
-        _obj: &'data PyAny,
-        _field_name: &'data str,
-        _field_value: &'data PyAny,
+        _obj: &Py2<'data, PyAny>,
+        _field_name: &str,
+        _field_value: &Py2<'data, PyAny>,
         _state: &mut ValidationState,
     ) -> ValResult<PyObject> {
         let py_err = PyTypeError::new_err(format!("validate_assignment is not supported for {}", self.get_name()));

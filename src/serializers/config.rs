@@ -2,9 +2,9 @@ use std::borrow::Cow;
 use std::str::{from_utf8, FromStr, Utf8Error};
 
 use base64::Engine;
+use pyo3::intern2;
 use pyo3::prelude::*;
-use pyo3::types::{PyDelta, PyDict};
-use pyo3::{intern, PyNativeType};
+use pyo3::types::{PyDelta, PyDict, PyString};
 
 use serde::ser::Error;
 
@@ -21,7 +21,7 @@ pub(crate) struct SerializationConfig {
 }
 
 impl SerializationConfig {
-    pub fn from_config(config: Option<&PyDict>) -> PyResult<Self> {
+    pub fn from_config(config: Option<&Py2<'_, PyDict>>) -> PyResult<Self> {
         let timedelta_mode = TimedeltaMode::from_config(config)?;
         let bytes_mode = BytesMode::from_config(config)?;
         Ok(Self {
@@ -61,16 +61,18 @@ impl FromStr for TimedeltaMode {
 }
 
 impl TimedeltaMode {
-    pub fn from_config(config: Option<&PyDict>) -> PyResult<Self> {
+    pub fn from_config(config: Option<&Py2<'_, PyDict>>) -> PyResult<Self> {
         let Some(config_dict) = config else {
             return Ok(Self::default());
         };
-        let raw_mode = config_dict.get_as::<&str>(intern!(config_dict.py(), "ser_json_timedelta"))?;
-        raw_mode.map_or_else(|| Ok(Self::default()), Self::from_str)
+        match config_dict.get_as::<Py2<'_, PyString>>(intern2!(config_dict.py(), "ser_json_timedelta"))? {
+            None => Ok(Self::default()),
+            Some(raw_mode) => Self::from_str(raw_mode.to_str()?),
+        }
     }
 
-    fn total_seconds(py_timedelta: &PyDelta) -> PyResult<&PyAny> {
-        py_timedelta.call_method0(intern!(py_timedelta.py(), "total_seconds"))
+    fn total_seconds<'py>(py_timedelta: &Py2<'py, PyDelta>) -> PyResult<Py2<'py, PyAny>> {
+        py_timedelta.call_method0(intern2!(py_timedelta.py(), "total_seconds"))
     }
 
     pub fn either_delta_to_json(&self, py: Python, either_delta: &EitherTimedelta) -> PyResult<PyObject> {
@@ -83,7 +85,7 @@ impl TimedeltaMode {
                 // convert to int via a py timedelta not duration since we know this this case the input would have
                 // been a py timedelta
                 let py_timedelta = either_delta.try_into_py(py)?;
-                let seconds = Self::total_seconds(py_timedelta)?;
+                let seconds = Self::total_seconds(&py_timedelta)?;
                 Ok(seconds.into_py(py))
             }
         }
@@ -97,7 +99,7 @@ impl TimedeltaMode {
             }
             Self::Float => {
                 let py_timedelta = either_delta.try_into_py(py)?;
-                let seconds: f64 = Self::total_seconds(py_timedelta)?.extract()?;
+                let seconds: f64 = Self::total_seconds(&py_timedelta)?.extract()?;
                 Ok(seconds.to_string().into())
             }
         }
@@ -116,7 +118,7 @@ impl TimedeltaMode {
             }
             Self::Float => {
                 let py_timedelta = either_delta.try_into_py(py).map_err(py_err_se_err)?;
-                let seconds = Self::total_seconds(py_timedelta).map_err(py_err_se_err)?;
+                let seconds = Self::total_seconds(&py_timedelta).map_err(py_err_se_err)?;
                 let seconds: f64 = seconds.extract().map_err(py_err_se_err)?;
                 serializer.serialize_f64(seconds)
             }
@@ -149,12 +151,14 @@ impl FromStr for BytesMode {
 }
 
 impl BytesMode {
-    pub fn from_config(config: Option<&PyDict>) -> PyResult<Self> {
+    pub fn from_config(config: Option<&Py2<'_, PyDict>>) -> PyResult<Self> {
         let Some(config_dict) = config else {
             return Ok(Self::default());
         };
-        let raw_mode = config_dict.get_as::<&str>(intern!(config_dict.py(), "ser_json_bytes"))?;
-        raw_mode.map_or_else(|| Ok(Self::default()), Self::from_str)
+        match config_dict.get_as::<Py2<'_, PyString>>(intern2!(config_dict.py(), "ser_json_bytes"))? {
+            None => Ok(Self::default()),
+            Some(raw_mode) => Self::from_str(raw_mode.to_str()?),
+        }
     }
 
     pub fn bytes_to_string<'py>(&self, py: Python, bytes: &'py [u8]) -> PyResult<Cow<'py, str>> {
@@ -213,8 +217,7 @@ impl FromStr for InfNanMode {
 }
 
 impl FromPyObject<'_> for InfNanMode {
-    fn extract(ob: &'_ PyAny) -> PyResult<Self> {
-        let s = ob.extract::<&str>()?;
-        Self::from_str(s)
+    fn extract(ob: &Py2<'_, PyAny>) -> PyResult<Self> {
+        Self::from_str(ob.downcast::<PyString>()?.to_str()?)
     }
 }

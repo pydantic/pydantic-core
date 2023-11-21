@@ -1,6 +1,6 @@
 use std::str::from_utf8;
 
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyType};
@@ -22,13 +22,13 @@ const UUID_IS_SAFE: &str = "is_safe";
 static UUID_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 
 fn import_type(py: Python, module: &str, attr: &str) -> PyResult<Py<PyType>> {
-    py.import(module)?.getattr(attr)?.extract()
+    py.import2(module)?.getattr(attr)?.extract()
 }
 
-fn get_uuid_type(py: Python) -> PyResult<&PyType> {
+fn get_uuid_type(py: Python) -> PyResult<&Py2<'_, PyType>> {
     Ok(UUID_TYPE
         .get_or_init(py, || import_type(py, "uuid", "UUID").unwrap())
-        .as_ref(py))
+        .attach(py))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -67,13 +67,13 @@ impl BuildValidator for UuidValidator {
     const EXPECTED_TYPE: &'static str = "uuid";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         // Note(lig): let's keep this conversion through the Version enum just for the sake of validation
-        let version = schema.get_as::<u8>(intern!(py, "version"))?.map(Version::from);
+        let version = schema.get_as::<u8>(intern2!(py, "version"))?.map(Version::from);
         Ok(Self {
             strict: is_strict(schema, config)?,
             version: version.map(usize::from),
@@ -94,7 +94,7 @@ impl Validator for UuidValidator {
         let class = get_uuid_type(py)?;
         if let Some(py_input) = input.input_is_instance(class) {
             if let Some(expected_version) = self.version {
-                let py_input_version: Option<usize> = py_input.getattr(intern!(py, "version"))?.extract()?;
+                let py_input_version: Option<usize> = py_input.getattr(intern2!(py, "version"))?.extract()?;
                 if !match py_input_version {
                     Some(py_input_version) => py_input_version == expected_version,
                     None => false,
@@ -112,7 +112,10 @@ impl Validator for UuidValidator {
         } else if state.strict_or(self.strict) && state.extra().input_type == InputType::Python {
             Err(ValError::new(
                 ErrorType::IsInstanceOf {
-                    class: class.name().unwrap_or("UUID").to_string(),
+                    class: class
+                        .name()
+                        .and_then(|any| any.extract())
+                        .unwrap_or_else(|_| "UUID".into()),
                     context: None,
                 },
                 input,
@@ -125,7 +128,7 @@ impl Validator for UuidValidator {
                 state.floor_exactness(Exactness::Lax);
             }
             let uuid = self.get_uuid(input)?;
-            self.create_py_uuid(py, class, &uuid)
+            self.create_py_uuid(class, &uuid)
         }
     }
 
@@ -198,16 +201,16 @@ impl UuidValidator {
     ///
     /// This implementation does not use the Python `__init__` function to speed up the process,
     /// as the `__init__` function in the Python `uuid` module performs extensive checks.
-    fn create_py_uuid(&self, py: Python<'_>, py_type: &PyType, uuid: &Uuid) -> ValResult<Py<PyAny>> {
-        let class = create_class(py_type)?;
-        let dc = class.as_ref(py);
+    fn create_py_uuid(&self, py_type: &Py2<'_, PyType>, uuid: &Uuid) -> ValResult<PyObject> {
+        let py = py_type.py();
+        let dc = create_class(py_type)?;
         let int = uuid.as_u128();
         let safe = py
-            .import(intern!(py, "uuid"))?
-            .getattr(intern!(py, "SafeUUID"))?
+            .import(intern2!(py, "uuid"))?
+            .getattr(intern2!(py, "SafeUUID"))?
             .get_item("safe")?;
-        force_setattr(py, dc, intern!(py, UUID_INT), int)?;
-        force_setattr(py, dc, intern!(py, UUID_IS_SAFE), safe)?;
-        Ok(dc.to_object(py))
+        force_setattr(py, &dc, intern2!(py, UUID_INT), int)?;
+        force_setattr(py, &dc, intern2!(py, UUID_IS_SAFE), safe)?;
+        Ok(dc.into())
     }
 }

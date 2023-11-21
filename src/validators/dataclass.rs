@@ -1,5 +1,5 @@
 use pyo3::exceptions::PyKeyError;
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
 
@@ -48,44 +48,45 @@ impl BuildValidator for DataclassArgsValidator {
     const EXPECTED_TYPE: &'static str = "dataclass-args";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
+        let populate_by_name =
+            schema_or_config_same(schema, config, intern2!(py, "populate_by_name"))?.unwrap_or(false);
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
-        let extras_validator = match (schema.get_item(intern!(py, "extras_schema"))?, &extra_behavior) {
-            (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(v, config, definitions)?)),
+        let extras_validator = match (schema.get_item(intern2!(py, "extras_schema"))?, &extra_behavior) {
+            (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(&v, config, definitions)?)),
             (Some(_), _) => return py_schema_err!("extras_schema can only be used if extra_behavior=allow"),
             (_, _) => None,
         };
 
-        let fields_schema: &PyList = schema.get_as_req(intern!(py, "fields"))?;
+        let fields_schema: Py2<'_, PyList> = schema.get_as_req(intern2!(py, "fields"))?;
         let mut fields: Vec<Field> = Vec::with_capacity(fields_schema.len());
 
         let mut positional_count = 0;
 
         for field in fields_schema {
-            let field: &PyDict = field.downcast()?;
+            let field = field.downcast::<PyDict>()?;
 
-            let py_name: &PyString = field.get_as_req(intern!(py, "name"))?;
+            let py_name: Py2<'_, PyString> = field.get_as_req(intern2!(py, "name"))?;
             let name: String = py_name.extract()?;
 
-            let lookup_key = match field.get_item(intern!(py, "validation_alias"))? {
+            let lookup_key = match field.get_item(intern2!(py, "validation_alias"))? {
                 Some(alias) => {
                     let alt_alias = if populate_by_name { Some(name.as_str()) } else { None };
-                    LookupKey::from_py(py, alias, alt_alias)?
+                    LookupKey::from_py(py, &alias, alt_alias)?
                 }
                 None => LookupKey::from_string(py, &name),
             };
 
-            let schema: &PyAny = field.get_as_req(intern!(py, "schema"))?;
+            let schema = field.get_as_req(intern2!(py, "schema"))?;
 
-            let validator = match build_validator(schema, config, definitions) {
+            let validator = match build_validator(&schema, config, definitions) {
                 Ok(v) => v,
                 Err(err) => return py_schema_err!("Field '{}':\n  {}", name, err),
             };
@@ -96,7 +97,7 @@ impl BuildValidator for DataclassArgsValidator {
                 }
             }
 
-            let kw_only = field.get_as(intern!(py, "kw_only"))?.unwrap_or(true);
+            let kw_only = field.get_as(intern2!(py, "kw_only"))?.unwrap_or(true);
             if !kw_only {
                 positional_count += 1;
             }
@@ -107,17 +108,17 @@ impl BuildValidator for DataclassArgsValidator {
                 py_name: py_name.into(),
                 lookup_key,
                 validator,
-                init_only: field.get_as(intern!(py, "init_only"))?.unwrap_or(false),
-                frozen: field.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
+                init_only: field.get_as(intern2!(py, "init_only"))?.unwrap_or(false),
+                frozen: field.get_as::<bool>(intern2!(py, "frozen"))?.unwrap_or(false),
             });
         }
 
-        let init_only_count = if schema.get_as(intern!(py, "collect_init_only"))?.unwrap_or(false) {
+        let init_only_count = if schema.get_as(intern2!(py, "collect_init_only"))?.unwrap_or(false) {
             Some(fields.iter().filter(|f| f.init_only).count())
         } else {
             None
         };
-        let dataclass_name: String = schema.get_as_req(intern!(py, "dataclass_name"))?;
+        let dataclass_name: String = schema.get_as_req(intern2!(py, "dataclass_name"))?;
         let validator_name = format!("dataclass-args[{dataclass_name}]");
 
         Ok(Self {
@@ -128,7 +129,7 @@ impl BuildValidator for DataclassArgsValidator {
             validator_name,
             extra_behavior,
             extras_validator,
-            loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
+            loc_by_alias: config.get_as(intern2!(py, "loc_by_alias"))?.unwrap_or(true),
         }
         .into())
     }
@@ -147,7 +148,7 @@ impl Validator for DataclassArgsValidator {
     ) -> ValResult<PyObject> {
         let args = input.validate_dataclass_args(&self.dataclass_name)?;
 
-        let output_dict = PyDict::new(py);
+        let output_dict = PyDict::new2(py);
         let mut init_only_args = self.init_only_count.map(Vec::with_capacity);
 
         let mut errors: Vec<ValLineError> = Vec::new();
@@ -155,7 +156,7 @@ impl Validator for DataclassArgsValidator {
 
         state.with_new_extra(
             Extra {
-                data: Some(output_dict),
+                data: Some(output_dict.clone()),
                 ..*state.extra()
             },
             |state| {
@@ -177,15 +178,15 @@ impl Validator for DataclassArgsValidator {
                         // go through fields getting the value from args or kwargs and validating it
                         for (index, field) in self.fields.iter().enumerate() {
                             let mut pos_value = None;
-                            if let Some(args) = $args.args {
+                            if let Some(args) = &$args.args {
                                 if !field.kw_only {
                                     pos_value = $get_macro!(args, index);
                                 }
                             }
 
                             let mut kw_value = None;
-                            if let Some(kwargs) = $args.kwargs {
-                                if let Some((lookup_path, value)) = field.lookup_key.$get_method(kwargs)? {
+                            if let Some(kwargs) = &$args.kwargs {
+                                if let Some((lookup_path, value)) = field.lookup_key.$get_method(&kwargs)? {
                                     used_keys.insert(lookup_path.first_key());
                                     kw_value = Some((lookup_path, value));
                                 }
@@ -206,7 +207,7 @@ impl Validator for DataclassArgsValidator {
                                     );
                                 }
                                 // found a positional argument, validate it
-                                (Some(pos_value), None) => match field.validator.validate(py, pos_value, state) {
+                                (Some(pos_value), None) => match field.validator.validate(py, pos_value.borrow_input(), state) {
                                     Ok(value) => set_item!(field, value),
                                     Err(ValError::LineErrors(line_errors)) => {
                                         errors.extend(
@@ -271,7 +272,7 @@ impl Validator for DataclassArgsValidator {
                                 {
                                     errors.push(ValLineError::new_with_loc(
                                         ErrorTypeDefaults::UnexpectedPositionalArgument,
-                                        item,
+                                        item.borrow_input(),
                                         index + self.positional_count,
                                     ));
                                 }
@@ -290,7 +291,7 @@ impl Validator for DataclassArgsValidator {
                                                         errors.push(
                                                             ValLineError::new_with_loc(
                                                                 ErrorTypeDefaults::UnexpectedKeywordArgument,
-                                                                value,
+                                                                value.borrow_input(),
                                                                 raw_key.as_loc_item(),
                                                             ),
                                                         );
@@ -298,7 +299,7 @@ impl Validator for DataclassArgsValidator {
                                                     ExtraBehavior::Ignore => {}
                                                     ExtraBehavior::Allow => {
                                                         if let Some(ref validator) = self.extras_validator {
-                                                            match validator.validate(py, value, state) {
+                                                            match validator.validate(py, value.borrow_input(), state) {
                                                                 Ok(value) => output_dict
                                                                     .set_item(either_str.as_py_string(py), value)?,
                                                                 Err(ValError::LineErrors(line_errors)) => {
@@ -340,13 +341,13 @@ impl Validator for DataclassArgsValidator {
                         // StringMapping cannot pass positional args, so wrap the PyDict
                         // in a type with guaranteed empty args array for sake of the process
                         // macro
-                        struct StringMappingArgs<'a> {
-                            args: Option<&'a PyTuple>,
-                            kwargs: Option<&'a PyDict>,
+                        struct StringMappingArgs<'py> {
+                            args: Option<Py2<'py, PyTuple>>,
+                            kwargs: Option<Py2<'py, PyDict>>,
                         }
                         let a = StringMappingArgs {
                             args: None,
-                            kwargs: Some(a),
+                            kwargs: Some(a.clone()),
                         };
                         process!(a, py_get_string_mapping_item, py_get, py_slice);
                     }
@@ -356,7 +357,7 @@ impl Validator for DataclassArgsValidator {
         )?;
         if errors.is_empty() {
             if let Some(init_only_args) = init_only_args {
-                Ok((output_dict, PyTuple::new(py, init_only_args)).to_object(py))
+                Ok((output_dict, PyTuple::new2(py, init_only_args)).to_object(py))
             } else {
                 Ok((output_dict, py.None()).to_object(py))
             }
@@ -368,12 +369,12 @@ impl Validator for DataclassArgsValidator {
     fn validate_assignment<'data>(
         &self,
         py: Python<'data>,
-        obj: &'data PyAny,
-        field_name: &'data str,
-        field_value: &'data PyAny,
+        obj: &Py2<'data, PyAny>,
+        field_name: &str,
+        field_value: &Py2<'data, PyAny>,
         state: &mut ValidationState,
     ) -> ValResult<PyObject> {
-        let dict: &PyDict = obj.downcast()?;
+        let dict = obj.downcast::<PyDict>()?;
 
         let ok = |output: PyObject| {
             dict.set_item(field_name, output)?;
@@ -381,7 +382,7 @@ impl Validator for DataclassArgsValidator {
             // which doesn't make much sense in this context but we need to put something there
             // so that function validators that sit between DataclassValidator and DataclassArgsValidator
             // always get called the same shape of data.
-            Ok(PyTuple::new(py, vec![dict.to_object(py), py.None().into()]).into_py(py))
+            Ok(PyTuple::new2(py, vec![dict.to_object(py), py.None().into()]).into_py(py))
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
@@ -402,7 +403,7 @@ impl Validator for DataclassArgsValidator {
             }
             match state.with_new_extra(
                 Extra {
-                    data: Some(data_dict),
+                    data: Some(data_dict.clone()),
                     ..*state.extra()
                 },
                 |state| field.validator.validate(py, field_value, state),
@@ -459,31 +460,32 @@ impl BuildValidator for DataclassValidator {
     const EXPECTED_TYPE: &'static str = "dataclass";
 
     fn build(
-        schema: &PyDict,
-        _config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        _config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
         // dataclasses ignore the parent config and always use the config from this dataclasses
-        let config = schema.get_as(intern!(py, "config"))?;
+        let config = schema.get_as(intern2!(py, "config"))?;
+        let config = config.as_ref();
 
-        let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
-        let name = match schema.get_as_req::<String>(intern!(py, "cls_name")) {
+        let class: &PyType = schema.get_as_req(intern2!(py, "cls"))?;
+        let name = match schema.get_as_req::<String>(intern2!(py, "cls_name")) {
             Ok(name) => name,
-            Err(_) => class.getattr(intern!(py, "__name__"))?.extract()?,
+            Err(_) => class.getattr(intern2!(py, "__name__"))?.extract()?,
         };
-        let sub_schema: &PyAny = schema.get_as_req(intern!(py, "schema"))?;
-        let validator = build_validator(sub_schema, config, definitions)?;
+        let sub_schema = schema.get_as_req(intern2!(py, "schema"))?;
+        let validator = build_validator(&sub_schema, config, definitions)?;
 
-        let post_init = if schema.get_as::<bool>(intern!(py, "post_init"))?.unwrap_or(false) {
-            Some(PyString::new(py, "__post_init__").into_py(py))
+        let post_init = if schema.get_as::<bool>(intern2!(py, "post_init"))?.unwrap_or(false) {
+            Some(PyString::new2(py, "__post_init__").into())
         } else {
             None
         };
 
         let fields = schema
-            .get_as_req::<&PyList>(intern!(py, "fields"))?
+            .get_as_req::<&PyList>(intern2!(py, "fields"))?
             .iter()
             .map(|s| Ok(s.downcast::<PyString>()?.into_py(py)))
             .collect::<PyResult<Vec<_>>>()?;
@@ -494,14 +496,15 @@ impl BuildValidator for DataclassValidator {
             class: class.into(),
             fields,
             post_init,
-            revalidate: Revalidate::from_str(schema_or_config_same(
-                schema,
-                config,
-                intern!(py, "revalidate_instances"),
-            )?)?,
+            revalidate: Revalidate::from_str(
+                schema_or_config_same::<Py2<'_, PyString>>(schema, config, intern2!(py, "revalidate_instances"))?
+                    .as_ref()
+                    .map(|s| s.to_str())
+                    .transpose()?,
+            )?,
             name,
-            frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
-            slots: schema.get_as(intern!(py, "slots"))?.unwrap_or(false),
+            frozen: schema.get_as(intern2!(py, "frozen"))?.unwrap_or(false),
+            slots: schema.get_as(intern2!(py, "slots"))?.unwrap_or(false),
         }
         .into())
     }
@@ -522,14 +525,14 @@ impl Validator for DataclassValidator {
         }
 
         // same logic as on models
-        let class = self.class.as_ref(py);
+        let class = self.class.attach(py);
         if let Some(py_input) = input.input_is_instance(class) {
             if self.revalidate.should_revalidate(py_input, class) {
-                let input_dict: &PyAny = self.dataclass_to_dict(py, py_input)?;
-                let val_output = self.validator.validate(py, input_dict, state)?;
-                let dc = create_class(self.class.as_ref(py))?;
-                self.set_dict_call(py, dc.as_ref(py), val_output, input)?;
-                Ok(dc)
+                let input_dict = self.dataclass_to_dict(py_input)?;
+                let val_output = self.validator.validate(py, input_dict.as_any(), state)?;
+                let dc = create_class(self.class.attach(py))?;
+                self.set_dict_call(py, &dc, val_output, input)?;
+                Ok(dc.into())
             } else {
                 Ok(input.to_object(py))
             }
@@ -544,31 +547,31 @@ impl Validator for DataclassValidator {
         } else {
             let val_output = self.validator.validate(py, input, state)?;
             state.floor_exactness(Exactness::Strict);
-            let dc = create_class(self.class.as_ref(py))?;
-            self.set_dict_call(py, dc.as_ref(py), val_output, input)?;
-            Ok(dc)
+            let dc = create_class(self.class.attach(py))?;
+            self.set_dict_call(py, &dc, val_output, input)?;
+            Ok(dc.into())
         }
     }
 
     fn validate_assignment<'data>(
         &self,
         py: Python<'data>,
-        obj: &'data PyAny,
-        field_name: &'data str,
-        field_value: &'data PyAny,
+        obj: &Py2<'data, PyAny>,
+        field_name: &str,
+        field_value: &Py2<'data, PyAny>,
         state: &mut ValidationState,
     ) -> ValResult<PyObject> {
         if self.frozen {
             return Err(ValError::new(ErrorTypeDefaults::FrozenInstance, field_value));
         }
 
-        let new_dict = self.dataclass_to_dict(py, obj)?;
+        let new_dict = self.dataclass_to_dict(obj)?;
 
         new_dict.set_item(field_name, field_value)?;
 
-        let val_assignment_result = self
-            .validator
-            .validate_assignment(py, new_dict, field_name, field_value, state)?;
+        let val_assignment_result =
+            self.validator
+                .validate_assignment(py, new_dict.as_any(), field_name, field_value, state)?;
 
         let (dc_dict, _): (&PyDict, PyObject) = val_assignment_result.extract(py)?;
 
@@ -578,7 +581,7 @@ impl Validator for DataclassValidator {
                 .ok_or_else(|| PyKeyError::new_err(field_name.to_string()))?;
             force_setattr(py, obj, field_name, value)?;
         } else {
-            force_setattr(py, obj, intern!(py, "__dict__"), dc_dict)?;
+            force_setattr(py, obj, intern2!(py, "__dict__"), dc_dict)?;
         }
 
         Ok(obj.to_object(py))
@@ -594,7 +597,7 @@ impl DataclassValidator {
     fn validate_init<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        self_instance: &'s PyAny,
+        self_instance: &Py2<'_, PyAny>,
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<PyObject> {
@@ -608,11 +611,11 @@ impl DataclassValidator {
         Ok(self_instance.into_py(py))
     }
 
-    fn dataclass_to_dict<'py>(&self, py: Python<'py>, dc: &'py PyAny) -> PyResult<&'py PyDict> {
-        let dict = PyDict::new(py);
+    fn dataclass_to_dict<'py>(&self, dc: &Py2<'py, PyAny>) -> PyResult<Py2<'py, PyDict>> {
+        let py = dc.py();
+        let dict = PyDict::new2(py);
 
         for field_name in &self.fields {
-            let field_name = field_name.as_ref(py);
             dict.set_item(field_name, dc.getattr(field_name)?)?;
         }
         Ok(dict)
@@ -621,27 +624,27 @@ impl DataclassValidator {
     fn set_dict_call<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        dc: &PyAny,
+        dc: &Py2<'_, PyAny>,
         val_output: PyObject,
         input: &'data impl Input<'data>,
     ) -> ValResult<()> {
-        let (dc_dict, post_init_kwargs): (&PyAny, &PyAny) = val_output.extract(py)?;
+        let (dc_dict, post_init_kwargs): (Py2<'_, PyAny>, Py2<'_, PyAny>) = val_output.extract(py)?;
         if self.slots {
-            let dc_dict: &PyDict = dc_dict.downcast()?;
+            let dc_dict = dc_dict.downcast::<PyDict>()?;
             for (key, value) in dc_dict {
                 force_setattr(py, dc, key, value)?;
             }
         } else {
-            force_setattr(py, dc, intern!(py, "__dict__"), dc_dict)?;
+            force_setattr(py, dc, intern2!(py, "__dict__"), dc_dict)?;
         }
 
         if let Some(ref post_init) = self.post_init {
             let post_init = post_init.as_ref(py);
-            let r = if post_init_kwargs.is_none() {
+            let r = if PyAnyMethods::is_none(&post_init_kwargs) {
                 dc.call_method0(post_init)
             } else {
                 let args = post_init_kwargs.downcast::<PyTuple>()?;
-                dc.call_method1(post_init, args)
+                dc.call_method1(post_init, args.as_gil_ref())
             };
             r.map_err(|e| convert_err(py, e, input))?;
         }

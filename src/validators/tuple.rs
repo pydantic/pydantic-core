@@ -1,9 +1,10 @@
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::build_tools::is_strict;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
+use crate::input::BorrowInput;
 use crate::input::{GenericIterable, Input};
 use crate::tools::SchemaDict;
 use crate::validators::Exactness;
@@ -23,8 +24,8 @@ pub struct TupleVariableValidator {
 impl BuildValidator for TupleVariableValidator {
     const EXPECTED_TYPE: &'static str = "tuple-variable";
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
@@ -34,8 +35,8 @@ impl BuildValidator for TupleVariableValidator {
         Ok(Self {
             strict: is_strict(schema, config)?,
             item_validator,
-            min_length: schema.get_as(intern!(py, "min_length"))?,
-            max_length: schema.get_as(intern!(py, "max_length"))?,
+            min_length: schema.get_as(intern2!(py, "min_length"))?,
+            max_length: schema.get_as(intern2!(py, "max_length"))?,
             name,
         }
         .into())
@@ -64,7 +65,7 @@ impl Validator for TupleVariableValidator {
             None => seq.to_vec(py, input, "Tuple", self.max_length)?,
         };
         min_length_check!(input, "Tuple", self.min_length, output);
-        Ok(PyTuple::new(py, &output).into_py(py))
+        Ok(PyTuple::new2(py, output).into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -83,15 +84,15 @@ pub struct TuplePositionalValidator {
 impl BuildValidator for TuplePositionalValidator {
     const EXPECTED_TYPE: &'static str = "tuple-positional";
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let items: &PyList = schema.get_as_req(intern!(py, "items_schema"))?;
+        let items: Py2<'_, PyList> = schema.get_as_req(intern2!(py, "items_schema"))?;
         let validators: Vec<CombinedValidator> = items
             .iter()
-            .map(|item| build_validator(item, config, definitions))
+            .map(|item| build_validator(&item, config, definitions))
             .collect::<PyResult<_>>()?;
 
         let descr = validators
@@ -102,8 +103,8 @@ impl BuildValidator for TuplePositionalValidator {
         Ok(Self {
             strict: is_strict(schema, config)?,
             items_validators: validators,
-            extras_validator: match schema.get_item(intern!(py, "extras_schema"))? {
-                Some(v) => Some(Box::new(build_validator(v, config, definitions)?)),
+            extras_validator: match schema.get_item(intern2!(py, "extras_schema"))? {
+                Some(v) => Some(Box::new(build_validator(&v, config, definitions)?)),
                 None => None,
             },
             name: format!("tuple[{descr}]"),
@@ -113,7 +114,7 @@ impl BuildValidator for TuplePositionalValidator {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, I: Input<'data> + 'data>(
+fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<impl BorrowInput>>>(
     py: Python<'data>,
     input: &'data impl Input<'data>,
     state: &mut ValidationState,
@@ -126,7 +127,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
 ) -> ValResult<()> {
     for (index, validator) in items_validators.iter().enumerate() {
         match collection_iter.next() {
-            Some(result) => match validator.validate(py, result?, state) {
+            Some(result) => match validator.validate(py, result?.borrow_input(), state) {
                 Ok(item) => output.push(item),
                 Err(ValError::LineErrors(line_errors)) => {
                     errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index.into())));
@@ -145,7 +146,7 @@ fn validate_tuple_positional<'s, 'data, T: Iterator<Item = PyResult<&'data I>>, 
     for (index, result) in collection_iter.enumerate() {
         let item = result?;
         match extras_validator {
-            Some(ref extras_validator) => match extras_validator.validate(py, item, state) {
+            Some(ref extras_validator) => match extras_validator.validate(py, item.borrow_input(), state) {
                 Ok(item) => output.push(item),
                 Err(ValError::LineErrors(line_errors)) => {
                     errors.extend(
@@ -228,7 +229,7 @@ impl Validator for TuplePositionalValidator {
             other => iter!(other.as_sequence_iterator(py)?),
         }
         if errors.is_empty() {
-            Ok(PyTuple::new(py, &output).into_py(py))
+            Ok(PyTuple::new2(py, output).into_py(py))
         } else {
             Err(ValError::LineErrors(errors))
         }

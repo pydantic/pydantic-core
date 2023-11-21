@@ -1,7 +1,7 @@
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::{PyDateTime, PyDict, PyString};
+use pyo3::types::{PyDict, PyString};
 use speedate::DateTime;
 use std::cmp::Ordering;
 use strum::EnumMessage;
@@ -23,14 +23,14 @@ pub struct DateTimeValidator {
 }
 
 pub(crate) fn extract_microseconds_precision(
-    schema: &PyDict,
-    config: Option<&PyDict>,
+    schema: &Py2<'_, PyDict>,
+    config: Option<&Py2<'_, PyDict>>,
 ) -> PyResult<speedate::MicrosecondsPrecisionOverflowBehavior> {
-    schema_or_config_same(schema, config, intern!(schema.py(), "microseconds_precision"))?
+    schema_or_config_same(schema, config, intern2!(schema.py(), "microseconds_precision"))?
         .map_or(
             Ok(speedate::MicrosecondsPrecisionOverflowBehavior::Truncate),
             |v: &PyString| {
-                speedate::MicrosecondsPrecisionOverflowBehavior::try_from(String::extract(v).unwrap().as_str())
+                speedate::MicrosecondsPrecisionOverflowBehavior::try_from(v.extract::<String>().unwrap().as_str())
             },
         )
         .map_err(|_| {
@@ -42,8 +42,8 @@ impl BuildValidator for DateTimeValidator {
     const EXPECTED_TYPE: &'static str = "datetime";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         Ok(Self {
@@ -143,13 +143,13 @@ struct DateTimeConstraints {
 }
 
 impl DateTimeConstraints {
-    fn from_py(schema: &PyDict) -> PyResult<Option<Self>> {
+    fn from_py(schema: &Py2<'_, PyDict>) -> PyResult<Option<Self>> {
         let py = schema.py();
         let c = Self {
-            le: py_datetime_as_datetime(schema, intern!(py, "le"))?,
-            lt: py_datetime_as_datetime(schema, intern!(py, "lt"))?,
-            ge: py_datetime_as_datetime(schema, intern!(py, "ge"))?,
-            gt: py_datetime_as_datetime(schema, intern!(py, "gt"))?,
+            le: py_datetime_as_datetime(schema, intern2!(py, "le"))?,
+            lt: py_datetime_as_datetime(schema, intern2!(py, "lt"))?,
+            ge: py_datetime_as_datetime(schema, intern2!(py, "ge"))?,
+            gt: py_datetime_as_datetime(schema, intern2!(py, "gt"))?,
             now: NowConstraint::from_py(schema)?,
             tz: TZConstraint::from_py(schema)?,
         };
@@ -161,8 +161,8 @@ impl DateTimeConstraints {
     }
 }
 
-fn py_datetime_as_datetime(schema: &PyDict, field: &PyString) -> PyResult<Option<DateTime>> {
-    match schema.get_as::<&PyDateTime>(field)? {
+fn py_datetime_as_datetime(schema: &Py2<'_, PyDict>, field: &Py2<'_, PyString>) -> PyResult<Option<DateTime>> {
+    match schema.get_as(field)? {
         Some(dt) => Ok(Some(EitherDateTime::Py(dt).as_raw()?)),
         None => Ok(None),
     }
@@ -216,17 +216,17 @@ impl NowConstraint {
             localtime
                 .as_ref(py)
                 .call0()?
-                .getattr(intern!(py, "tm_gmtoff"))?
+                .getattr(intern2!(py, "tm_gmtoff"))?
                 .extract()
         }
     }
 
-    pub fn from_py(schema: &PyDict) -> PyResult<Option<Self>> {
+    pub fn from_py(schema: &Py2<'_, PyDict>) -> PyResult<Option<Self>> {
         let py = schema.py();
-        match schema.get_as(intern!(py, "now_op"))? {
+        match schema.get_as::<Py2<'_, PyString>>(intern2!(py, "now_op"))? {
             Some(op) => Ok(Some(Self {
-                op: NowOp::from_str(op)?,
-                utc_offset: schema.get_as(intern!(py, "now_utc_offset"))?,
+                op: NowOp::from_str(op.to_str()?)?,
+                utc_offset: schema.get_as(intern2!(py, "now_utc_offset"))?,
             })),
             None => Ok(None),
         }
@@ -248,9 +248,9 @@ impl TZConstraint {
         }
     }
 
-    pub(super) fn from_py(schema: &PyDict) -> PyResult<Option<Self>> {
+    pub(super) fn from_py(schema: &Py2<'_, PyDict>) -> PyResult<Option<Self>> {
         let py = schema.py();
-        let tz_constraint = match schema.get_item(intern!(py, "tz_constraint"))? {
+        let tz_constraint = match schema.get_item(intern2!(py, "tz_constraint"))? {
             Some(c) => c,
             None => return Ok(None),
         };

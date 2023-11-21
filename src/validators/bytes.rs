@@ -1,4 +1,4 @@
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -19,13 +19,13 @@ impl BuildValidator for BytesValidator {
     const EXPECTED_TYPE: &'static str = "bytes";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let use_constrained = schema.get_item(intern!(py, "max_length"))?.is_some()
-            || schema.get_item(intern!(py, "min_length"))?.is_some();
+        let use_constrained = schema.get_item(intern2!(py, "max_length"))?.is_some()
+            || schema.get_item(intern2!(py, "min_length"))?.is_some();
         if use_constrained {
             BytesConstrainedValidator::build(schema, config)
         } else {
@@ -106,12 +106,12 @@ impl Validator for BytesConstrainedValidator {
 }
 
 impl BytesConstrainedValidator {
-    fn build(schema: &PyDict, config: Option<&PyDict>) -> PyResult<CombinedValidator> {
+    fn build(schema: &Py2<'_, PyDict>, config: Option<&Py2<'_, PyDict>>) -> PyResult<CombinedValidator> {
         let py = schema.py();
         Ok(Self {
             strict: is_strict(schema, config)?,
-            min_length: schema.get_as(intern!(py, "min_length"))?,
-            max_length: schema.get_as(intern!(py, "max_length"))?,
+            min_length: schema.get_as(intern2!(py, "min_length"))?,
+            max_length: schema.get_as(intern2!(py, "max_length"))?,
         }
         .into())
     }

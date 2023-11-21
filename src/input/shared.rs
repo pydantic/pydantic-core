@@ -1,5 +1,6 @@
+use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
-use pyo3::{intern, Py, PyAny, Python, ToPyObject};
+use pyo3::{intern2, Py, PyAny, Python};
 
 use num_bigint::BigInt;
 
@@ -8,15 +9,15 @@ use crate::errors::{ErrorTypeDefaults, ValError, ValResult};
 use super::{EitherFloat, EitherInt, Input};
 static ENUM_META_OBJECT: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
-pub fn get_enum_meta_object(py: Python) -> Py<PyAny> {
+pub fn get_enum_meta_object(py: Python) -> &Py2<'_, PyAny> {
     ENUM_META_OBJECT
         .get_or_init(py, || {
-            py.import(intern!(py, "enum"))
-                .and_then(|enum_module| enum_module.getattr(intern!(py, "EnumMeta")))
+            py.import2(intern2!(py, "enum"))
+                .and_then(|enum_module| enum_module.getattr(intern2!(py, "EnumMeta")))
                 .unwrap()
-                .to_object(py)
+                .into()
         })
-        .clone()
+        .attach(py)
 }
 
 pub fn str_as_bool<'a>(input: &'a impl Input<'a>, str: &str) -> ValResult<bool> {
@@ -141,13 +142,14 @@ pub fn float_as_int<'a>(input: &'a impl Input<'a>, float: f64) -> ValResult<Eith
     }
 }
 
-pub fn decimal_as_int<'a>(py: Python, input: &'a impl Input<'a>, decimal: &'a PyAny) -> ValResult<EitherInt<'a>> {
-    if !decimal.call_method0(intern!(py, "is_finite"))?.extract::<bool>()? {
+pub fn decimal_as_int<'a>(input: &'a impl Input<'a>, decimal: &Py2<'a, PyAny>) -> ValResult<EitherInt<'a>> {
+    let py = decimal.py();
+    if !decimal.call_method0(intern2!(py, "is_finite"))?.extract::<bool>()? {
         return Err(ValError::new(ErrorTypeDefaults::FiniteNumber, input));
     }
     let (numerator, denominator) = decimal
-        .call_method0(intern!(py, "as_integer_ratio"))?
-        .extract::<(&PyAny, &PyAny)>()?;
+        .call_method0(intern2!(py, "as_integer_ratio"))?
+        .extract::<(Py2<'_, PyAny>, Py2<'_, PyAny>)>()?;
     if denominator.extract::<i64>().map_or(true, |d| d != 1) {
         return Err(ValError::new(ErrorTypeDefaults::IntFromFloat, input));
     }

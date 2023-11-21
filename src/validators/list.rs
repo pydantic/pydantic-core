@@ -20,13 +20,13 @@ pub struct ListValidator {
 }
 
 pub fn get_items_schema(
-    schema: &PyDict,
-    config: Option<&PyDict>,
+    schema: &Py2<'_, PyDict>,
+    config: Option<&Py2<'_, PyDict>>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<Option<CombinedValidator>> {
-    match schema.get_item(pyo3::intern!(schema.py(), "items_schema"))? {
+    match schema.get_item(pyo3::intern2!(schema.py(), "items_schema"))? {
         Some(d) => {
-            let validator = build_validator(d, config, definitions)?;
+            let validator = build_validator(&d, config, definitions)?;
             match validator {
                 CombinedValidator::Any(_) => Ok(None),
                 _ => Ok(Some(validator)),
@@ -96,8 +96,8 @@ impl BuildValidator for ListValidator {
     const EXPECTED_TYPE: &'static str = "list";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
@@ -105,8 +105,8 @@ impl BuildValidator for ListValidator {
         Ok(Self {
             strict: crate::build_tools::is_strict(schema, config)?,
             item_validator,
-            min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
-            max_length: schema.get_as(pyo3::intern!(py, "max_length"))?,
+            min_length: schema.get_as(pyo3::intern2!(py, "min_length"))?,
+            max_length: schema.get_as(pyo3::intern2!(py, "max_length"))?,
             name: OnceLock::new(),
         }
         .into())

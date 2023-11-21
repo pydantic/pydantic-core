@@ -41,7 +41,7 @@ use crate::input::Input;
 #[pyfunction(signature = (data, *, allow_inf_nan=true, cache_strings=true))]
 pub fn from_json<'py>(
     py: Python<'py>,
-    data: &PyAny,
+    data: Py2<'_, PyAny>,
     allow_inf_nan: bool,
     cache_strings: bool,
 ) -> PyResult<Py2<'py, PyAny>> {

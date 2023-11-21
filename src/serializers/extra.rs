@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::fmt;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 
 use serde::ser::Error;
@@ -41,7 +41,7 @@ impl SerializationState {
         exclude_none: bool,
         round_trip: bool,
         serialize_unknown: bool,
-        fallback: Option<&'py PyAny>,
+        fallback: Option<&'py Py2<'py, PyAny>>,
     ) -> Extra<'py> {
         Extra::new(
             py,
@@ -83,10 +83,10 @@ pub(crate) struct Extra<'a> {
     // data representing the current model field
     // that is being serialized, if this is a model serializer
     // it will be None otherwise
-    pub model: Option<&'a PyAny>,
+    pub model: Option<&'a Py2<'a, PyAny>>,
     pub field_name: Option<&'a str>,
     pub serialize_unknown: bool,
-    pub fallback: Option<&'a PyAny>,
+    pub fallback: Option<&'a Py2<'a, PyAny>>,
 }
 
 impl<'a> Extra<'a> {
@@ -103,7 +103,7 @@ impl<'a> Extra<'a> {
         config: &'a SerializationConfig,
         rec_guard: &'a SerRecursionGuard,
         serialize_unknown: bool,
-        fallback: Option<&'a PyAny>,
+        fallback: Option<&'a Py2<'a, PyAny>>,
     ) -> Self {
         Self {
             mode,
@@ -124,7 +124,7 @@ impl<'a> Extra<'a> {
         }
     }
 
-    pub fn serialize_infer<'py>(&'py self, value: &'py PyAny) -> super::infer::SerializeInfer<'py> {
+    pub fn serialize_infer<'py>(&'py self, value: &'py Py2<'py, PyAny>) -> super::infer::SerializeInfer<'py> {
         super::infer::SerializeInfer::new(value, None, None, self)
     }
 }
@@ -178,10 +178,10 @@ impl ExtraOwned {
             config: extra.config.clone(),
             rec_guard: extra.rec_guard.clone(),
             check: extra.check,
-            model: extra.model.map(Into::into),
+            model: extra.model.map(|model| model.clone().into()),
             field_name: extra.field_name.map(ToString::to_string),
             serialize_unknown: extra.serialize_unknown,
-            fallback: extra.fallback.map(Into::into),
+            fallback: extra.fallback.map(|fallback| fallback.clone().into()),
         }
     }
 
@@ -198,10 +198,10 @@ impl ExtraOwned {
             config: &self.config,
             rec_guard: &self.rec_guard,
             check: self.check,
-            model: self.model.as_ref().map(|m| m.as_ref(py)),
+            model: self.model.as_ref().map(|m| m.attach(py)),
             field_name: self.field_name.as_deref(),
             serialize_unknown: self.serialize_unknown,
-            fallback: self.fallback.as_ref().map(|m| m.as_ref(py)),
+            fallback: self.fallback.as_ref().map(|m| m.attach(py)),
         }
     }
 }
@@ -244,8 +244,8 @@ impl From<Option<&str>> for SerMode {
 impl ToPyObject for SerMode {
     fn to_object(&self, py: Python<'_>) -> PyObject {
         match self {
-            SerMode::Python => intern!(py, "python").to_object(py),
-            SerMode::Json => intern!(py, "json").to_object(py),
+            SerMode::Python => intern2!(py, "python").to_object(py),
+            SerMode::Json => intern2!(py, "json").to_object(py),
             SerMode::Other(s) => s.to_object(py),
         }
     }
@@ -272,7 +272,7 @@ impl CollectWarnings {
         }
     }
 
-    pub fn on_fallback_py(&self, field_type: &str, value: &PyAny, extra: &Extra) -> PyResult<()> {
+    pub fn on_fallback_py(&self, field_type: &str, value: &Py2<'_, PyAny>, extra: &Extra) -> PyResult<()> {
         // special case for None as it's very common e.g. as a default value
         if value.is_none() {
             Ok(())
@@ -287,7 +287,7 @@ impl CollectWarnings {
     pub fn on_fallback_ser<S: serde::ser::Serializer>(
         &self,
         field_type: &str,
-        value: &PyAny,
+        value: &Py2<'_, PyAny>,
         extra: &Extra,
     ) -> Result<(), S::Error> {
         // special case for None as it's very common e.g. as a default value
@@ -304,9 +304,13 @@ impl CollectWarnings {
         }
     }
 
-    fn fallback_warning(&self, field_type: &str, value: &PyAny) {
+    fn fallback_warning(&self, field_type: &str, value: &Py2<'_, PyAny>) {
         if self.active {
-            let type_name = value.get_type().name().unwrap_or("<unknown python object>");
+            let type_name = value.get_type().name().ok();
+            let type_name = type_name
+                .as_ref()
+                .and_then(|s| s.to_str().ok())
+                .unwrap_or("<unknown python object>");
             self.add_warning(format!(
                 "Expected `{field_type}` but got `{type_name}` - serialized value may not be as expected"
             ));
@@ -345,7 +349,7 @@ pub struct SerRecursionGuard {
 }
 
 impl SerRecursionGuard {
-    pub fn add(&self, value: &PyAny, def_ref_id: usize) -> PyResult<usize> {
+    pub fn add(&self, value: &Py2<'_, PyAny>, def_ref_id: usize) -> PyResult<usize> {
         // https://doc.rust-lang.org/std/collections/struct.HashSet.html#method.insert
         // "If the set did not have this value present, `true` is returned."
         let id = value.as_ptr() as usize;

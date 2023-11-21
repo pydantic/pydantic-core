@@ -18,11 +18,11 @@ use crate::tools::{extract_i64, py_err, py_error_type};
 use super::PydanticCustomError;
 
 #[pyfunction]
-pub fn list_all_errors(py: Python) -> PyResult<&PyList> {
-    let mut errors: Vec<&PyDict> = Vec::with_capacity(100);
+pub fn list_all_errors(py: Python) -> PyResult<Py2<'_, PyList>> {
+    let mut errors: Vec<Py2<'_, PyDict>> = Vec::with_capacity(100);
     for error_type in ErrorType::iter() {
         if !matches!(error_type, ErrorType::CustomError { .. }) {
-            let d = PyDict::new(py);
+            let d = PyDict::new2(py);
             d.set_item("type", error_type.to_string())?;
             let message_template_python = error_type.message_template_python();
             d.set_item("message_template_python", message_template_python)?;
@@ -39,7 +39,7 @@ pub fn list_all_errors(py: Python) -> PyResult<&PyList> {
             errors.push(d);
         }
     }
-    Ok(PyList::new(py, errors))
+    Ok(PyList::new2(py, errors))
 }
 
 fn field_from_context<'py, T: FromPyObject<'py>>(
@@ -121,7 +121,8 @@ macro_rules! error_types {
                 }
             }
 
-            fn py_dict_update_ctx(&self, py: Python, dict: &PyDict) -> PyResult<bool> {
+            fn py_dict_update_ctx(&self, py: Python, dict: &Py2<'_, PyDict>) -> PyResult<bool> {
+                use pyo3::types::PyMapping;
                 match self {
                     $(
                         Self::$item { context, $($key,)* } => {
@@ -129,7 +130,7 @@ macro_rules! error_types {
                                 dict.set_item::<&str, Py<PyAny>>(stringify!($key), $key.to_object(py))?;
                             )*
                             if let Some(ctx) = context {
-                                dict.update(ctx.as_ref(py).downcast()?)?;
+                                dict.update(ctx.attach(py).downcast::<PyMapping>()?)?;
                                 Ok(true)
                             } else {
                                 Ok(false)
@@ -678,7 +679,7 @@ impl ErrorType {
                 message_template,
                 context,
                 ..
-            } => PydanticCustomError::format_message(message_template, context.as_ref().map(|c| c.as_ref(py))),
+            } => PydanticCustomError::format_message(message_template, context.as_ref().map(|c| c.attach(py))),
             Self::LiteralError { expected, .. } => render!(tmpl, expected),
             Self::DateParsing { error, .. } => render!(tmpl, error),
             Self::DateFromDatetimeParsing { error, .. } => render!(tmpl, error),
@@ -724,8 +725,8 @@ impl ErrorType {
     }
 
     pub fn py_dict(&self, py: Python) -> PyResult<Option<Py<PyDict>>> {
-        let dict = PyDict::new(py);
-        let custom_ctx_used = self.py_dict_update_ctx(py, dict)?;
+        let dict = PyDict::new2(py);
+        let custom_ctx_used = self.py_dict_update_ctx(py, &dict)?;
 
         if let Self::CustomError { .. } = self {
             if custom_ctx_used {
@@ -780,7 +781,7 @@ impl From<Int> for Number {
 }
 
 impl FromPyObject<'_> for Number {
-    fn extract(obj: &PyAny) -> PyResult<Self> {
+    fn extract(obj: &Py2<'_, PyAny>) -> PyResult<Self> {
         if let Ok(int) = extract_i64(obj) {
             Ok(Number::Int(int))
         } else if let Ok(float) = obj.extract::<f64>() {

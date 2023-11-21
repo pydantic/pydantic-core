@@ -1,5 +1,5 @@
 use pyo3::types::PyDict;
-use pyo3::{intern, prelude::*};
+use pyo3::{intern2, prelude::*};
 
 use std::borrow::Cow;
 
@@ -24,12 +24,12 @@ impl BuildSerializer for FloatSerializer {
     const EXPECTED_TYPE: &'static str = "float";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let inf_nan_mode = config
-            .and_then(|c| c.get_as(intern!(schema.py(), "ser_json_inf_nan")).transpose())
+            .and_then(|c| c.get_as(intern2!(schema.py(), "ser_json_inf_nan")).transpose())
             .transpose()?
             .unwrap_or_default();
         Ok(Self { inf_nan_mode }.into())
@@ -41,9 +41,9 @@ impl_py_gc_traverse!(FloatSerializer {});
 impl TypeSerializer for FloatSerializer {
     fn to_python(
         &self,
-        value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        value: &Py2<'_, PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
@@ -63,7 +63,7 @@ impl TypeSerializer for FloatSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &Py2<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
         match extra.ob_type_lookup.is_type(key, ObType::Float) {
             IsType::Exact | IsType::Subclass => to_str_json_key(key),
             IsType::False => {
@@ -75,10 +75,10 @@ impl TypeSerializer for FloatSerializer {
 
     fn serde_serialize<S: Serializer>(
         &self,
-        value: &PyAny,
+        value: &Py2<'_, PyAny>,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match value.extract::<f64>() {

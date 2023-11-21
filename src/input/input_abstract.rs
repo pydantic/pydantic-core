@@ -2,7 +2,7 @@ use std::fmt;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::types::{PyDict, PyType};
-use pyo3::{intern, prelude::*};
+use pyo3::{intern2, prelude::*};
 
 use crate::errors::{AsLocItem, ErrorTypeDefaults, InputValue, ValError, ValResult};
 use crate::tools::py_err;
@@ -22,9 +22,9 @@ pub enum InputType {
 impl IntoPy<PyObject> for InputType {
     fn into_py(self, py: Python<'_>) -> PyObject {
         match self {
-            Self::Json => intern!(py, "json").into(),
-            Self::Python => intern!(py, "python").into(),
-            Self::String => intern!(py, "string").into(),
+            Self::Json => intern2!(py, "json").into_py(py),
+            Self::Python => intern2!(py, "python").into_py(py),
+            Self::String => intern2!(py, "string").into_py(py),
         }
     }
 }
@@ -57,7 +57,7 @@ pub trait Input<'a>: fmt::Debug + ToPyObject + AsLocItem + Sized {
         false
     }
 
-    fn input_is_instance(&self, _class: &PyType) -> Option<&PyAny> {
+    fn input_is_instance(&self, _class: &Py2<'_, PyType>) -> Option<&Py2<'a, PyAny>> {
         None
     }
 
@@ -65,9 +65,9 @@ pub trait Input<'a>: fmt::Debug + ToPyObject + AsLocItem + Sized {
         false
     }
 
-    fn as_kwargs(&'a self, py: Python<'a>) -> Option<&'a PyDict>;
+    fn as_kwargs(&self, py: Python<'a>) -> Option<Py2<'a, PyDict>>;
 
-    fn input_is_subclass(&self, _class: &PyType) -> PyResult<bool> {
+    fn input_is_subclass(&self, _class: &Py2<'_, PyType>) -> PyResult<bool> {
         Ok(false)
     }
 
@@ -119,16 +119,16 @@ pub trait Input<'a>: fmt::Debug + ToPyObject + AsLocItem + Sized {
 
     fn validate_float(&'a self, strict: bool) -> ValResult<ValidationMatch<EitherFloat<'a>>>;
 
-    fn validate_decimal(&'a self, strict: bool, py: Python<'a>) -> ValResult<&'a PyAny> {
+    fn validate_decimal(&'a self, strict: bool, py: Python<'a>) -> ValResult<Py2<'a, PyAny>> {
         if strict {
             self.strict_decimal(py)
         } else {
             self.lax_decimal(py)
         }
     }
-    fn strict_decimal(&'a self, py: Python<'a>) -> ValResult<&'a PyAny>;
+    fn strict_decimal(&'a self, py: Python<'a>) -> ValResult<Py2<'a, PyAny>>;
     #[cfg_attr(has_coverage_attribute, coverage(off))]
-    fn lax_decimal(&'a self, py: Python<'a>) -> ValResult<&'a PyAny> {
+    fn lax_decimal(&'a self, py: Python<'a>) -> ValResult<Py2<'a, PyAny>> {
         self.strict_decimal(py)
     }
 

@@ -1,5 +1,5 @@
 use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{IntoPyDict, PyDict, PyTuple, PyType};
 use pyo3::{prelude::*, PyTypeInfo};
@@ -16,7 +16,7 @@ use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationSta
 
 static DECIMAL_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 
-pub fn get_decimal_type(py: Python) -> Py<PyType> {
+pub fn get_decimal_type(py: Python) -> &Py2<'_, PyType> {
     DECIMAL_TYPE
         .get_or_init(py, || {
             py.import("decimal")
@@ -26,7 +26,7 @@ pub fn get_decimal_type(py: Python) -> Py<PyType> {
                 .unwrap()
                 .into()
         })
-        .clone()
+        .attach(py)
 }
 
 #[derive(Debug, Clone)]
@@ -46,14 +46,14 @@ pub struct DecimalValidator {
 impl BuildValidator for DecimalValidator {
     const EXPECTED_TYPE: &'static str = "decimal";
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let allow_inf_nan = schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(false);
-        let decimal_places = schema.get_as(intern!(py, "decimal_places"))?;
-        let max_digits = schema.get_as(intern!(py, "max_digits"))?;
+        let allow_inf_nan = schema_or_config_same(schema, config, intern2!(py, "allow_inf_nan"))?.unwrap_or(false);
+        let decimal_places = schema.get_as(intern2!(py, "decimal_places"))?;
+        let max_digits = schema.get_as(intern2!(py, "max_digits"))?;
         if allow_inf_nan && (decimal_places.is_some() || max_digits.is_some()) {
             return Err(PyValueError::new_err(
                 "allow_inf_nan=True cannot be used with max_digits or decimal_places",
@@ -64,11 +64,11 @@ impl BuildValidator for DecimalValidator {
             allow_inf_nan,
             check_digits: decimal_places.is_some() || max_digits.is_some(),
             decimal_places,
-            multiple_of: schema.get_as(intern!(py, "multiple_of"))?,
-            le: schema.get_as(intern!(py, "le"))?,
-            lt: schema.get_as(intern!(py, "lt"))?,
-            ge: schema.get_as(intern!(py, "ge"))?,
-            gt: schema.get_as(intern!(py, "gt"))?,
+            multiple_of: schema.get_as(intern2!(py, "multiple_of"))?,
+            le: schema.get_as(intern2!(py, "le"))?,
+            lt: schema.get_as(intern2!(py, "lt"))?,
+            ge: schema.get_as(intern2!(py, "ge"))?,
+            gt: schema.get_as(intern2!(py, "gt"))?,
             max_digits,
         }
         .into())
@@ -83,14 +83,16 @@ impl_py_gc_traverse!(DecimalValidator {
     gt
 });
 
-fn extract_decimal_digits_info(decimal: &PyAny, normalized: bool, py: Python<'_>) -> ValResult<(u64, u64)> {
-    let mut normalized_decimal: Option<&PyAny> = None;
+fn extract_decimal_digits_info(decimal: &Py2<'_, PyAny>, normalized: bool) -> ValResult<(u64, u64)> {
+    let py = decimal.py();
+    let mut normalized_decimal: Option<Py2<'_, PyAny>> = None;
     if normalized {
-        normalized_decimal = Some(decimal.call_method0(intern!(py, "normalize")).unwrap_or(decimal));
+        normalized_decimal = decimal.call_method0(intern2!(py, "normalize")).ok();
     }
-    let (_, digit_tuple, exponent): (&PyAny, &PyTuple, &PyAny) = normalized_decimal
+    let (_, digit_tuple, exponent): (Py2<'_, PyAny>, Py2<'_, PyTuple>, Py2<'_, PyAny>) = normalized_decimal
+        .as_ref()
         .unwrap_or(decimal)
-        .call_method0(intern!(py, "as_tuple"))?
+        .call_method0(intern2!(py, "as_tuple"))?
         .extract()?;
 
     // finite values have numeric exponent, we checked is_finite above
@@ -124,13 +126,13 @@ impl Validator for DecimalValidator {
         let decimal = input.validate_decimal(state.strict_or(self.strict), py)?;
 
         if !self.allow_inf_nan || self.check_digits {
-            if !decimal.call_method0(intern!(py, "is_finite"))?.extract()? {
+            if !decimal.call_method0(intern2!(py, "is_finite"))?.extract()? {
                 return Err(ValError::new(ErrorTypeDefaults::FiniteNumber, input));
             }
 
             if self.check_digits {
-                if let Ok((normalized_decimals, normalized_digits)) = extract_decimal_digits_info(decimal, true, py) {
-                    if let Ok((decimals, digits)) = extract_decimal_digits_info(decimal, false, py) {
+                if let Ok((normalized_decimals, normalized_digits)) = extract_decimal_digits_info(&decimal, true) {
+                    if let Ok((decimals, digits)) = extract_decimal_digits_info(&decimal, false) {
                         if let Some(max_digits) = self.max_digits {
                             if (digits > max_digits) & (normalized_digits > max_digits) {
                                 return Err(ValError::new(
@@ -208,7 +210,7 @@ impl Validator for DecimalValidator {
         let mut is_nan = || -> PyResult<bool> {
             match is_nan {
                 Some(is_nan) => Ok(is_nan),
-                None => Ok(*is_nan.insert(decimal.call_method0(intern!(py, "is_nan"))?.extract()?)),
+                None => Ok(*is_nan.insert(decimal.call_method0(intern2!(py, "is_nan"))?.extract()?)),
             }
         };
 
@@ -265,30 +267,22 @@ impl Validator for DecimalValidator {
     }
 }
 
-pub(crate) fn create_decimal<'a>(arg: &'a PyAny, input: &'a impl Input<'a>, py: Python<'a>) -> ValResult<&'a PyAny> {
-    let decimal_type_obj: Py<PyType> = get_decimal_type(py);
-    decimal_type_obj
-        .call1(py, (arg,))
-        .map_err(|e| {
-            let decimal_exception = match arg
-                .py()
-                .import("decimal")
-                .and_then(|decimal_module| decimal_module.getattr("DecimalException"))
-            {
-                Ok(decimal_exception) => decimal_exception,
-                Err(e) => return ValError::InternalErr(e),
-            };
-            handle_decimal_new_error(arg.py(), input.as_error_value(), e, decimal_exception)
-        })
-        .map(|v| v.into_ref(py))
+pub(crate) fn create_decimal<'a>(arg: &Py2<'a, PyAny>, input: &'a impl Input<'a>) -> ValResult<Py2<'a, PyAny>> {
+    let py = arg.py();
+    get_decimal_type(py).call1((arg,)).map_err(|e| {
+        let decimal_exception = match py
+            .import2("decimal")
+            .and_then(|decimal_module| decimal_module.getattr("DecimalException"))
+        {
+            Ok(decimal_exception) => decimal_exception,
+            Err(e) => return ValError::InternalErr(e),
+        };
+        handle_decimal_new_error(input.as_error_value(), e, decimal_exception)
+    })
 }
 
-fn handle_decimal_new_error<'a>(
-    py: Python<'a>,
-    input: InputValue,
-    error: PyErr,
-    decimal_exception: &'a PyAny,
-) -> ValError {
+fn handle_decimal_new_error(input: InputValue, error: PyErr, decimal_exception: Py2<'_, PyAny>) -> ValError {
+    let py = decimal_exception.py();
     if error.matches(py, decimal_exception) {
         ValError::new_custom_input(ErrorTypeDefaults::DecimalParsing, input)
     } else if error.matches(py, PyTypeError::type_object(py)) {

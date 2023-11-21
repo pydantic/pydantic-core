@@ -1,4 +1,4 @@
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -20,13 +20,13 @@ impl BuildValidator for JsonValidator {
     const EXPECTED_TYPE: &'static str = "json";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        let validator = match schema.get_as(intern!(schema.py(), "schema"))? {
+        let validator = match schema.get_as(intern2!(schema.py(), "schema"))? {
             Some(schema) => {
-                let validator = build_validator(schema, config, definitions)?;
+                let validator = build_validator(&schema, config, definitions)?;
                 match validator {
                     CombinedValidator::Any(_) => None,
                     _ => Some(Box::new(validator)),

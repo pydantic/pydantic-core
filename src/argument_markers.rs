@@ -55,9 +55,9 @@ impl ArgsKwargs {
     }
 
     pub fn __repr__(&self, py: Python) -> String {
-        let args = safe_repr(self.args.as_ref(py));
+        let args = safe_repr(self.args.attach(py));
         match self.kwargs {
-            Some(ref d) => format!("ArgsKwargs({args}, {})", safe_repr(d.as_ref(py))),
+            Some(ref d) => format!("ArgsKwargs({args}, {})", safe_repr(d.attach(py))),
             None => format!("ArgsKwargs({args})"),
         }
     }

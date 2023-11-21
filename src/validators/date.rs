@@ -1,4 +1,4 @@
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::{PyDate, PyDict, PyString};
 use speedate::{Date, Time};
@@ -24,8 +24,8 @@ impl BuildValidator for DateValidator {
     const EXPECTED_TYPE: &'static str = "date";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         Ok(Self {
@@ -158,13 +158,13 @@ struct DateConstraints {
 }
 
 impl DateConstraints {
-    fn from_py(schema: &PyDict) -> PyResult<Option<Self>> {
+    fn from_py(schema: &Py2<'_, PyDict>) -> PyResult<Option<Self>> {
         let py = schema.py();
         let c = Self {
-            le: convert_pydate(schema, intern!(py, "le"))?,
-            lt: convert_pydate(schema, intern!(py, "lt"))?,
-            ge: convert_pydate(schema, intern!(py, "ge"))?,
-            gt: convert_pydate(schema, intern!(py, "gt"))?,
+            le: convert_pydate(schema, intern2!(py, "le"))?,
+            lt: convert_pydate(schema, intern2!(py, "lt"))?,
+            ge: convert_pydate(schema, intern2!(py, "ge"))?,
+            gt: convert_pydate(schema, intern2!(py, "gt"))?,
             today: NowConstraint::from_py(schema)?,
         };
         if c.le.is_some() || c.lt.is_some() || c.ge.is_some() || c.gt.is_some() || c.today.is_some() {
@@ -175,8 +175,8 @@ impl DateConstraints {
     }
 }
 
-fn convert_pydate(schema: &PyDict, field: &PyString) -> PyResult<Option<Date>> {
-    match schema.get_as::<&PyDate>(field)? {
+fn convert_pydate(schema: &Py2<'_, PyDict>, field: &Py2<'_, PyString>) -> PyResult<Option<Date>> {
+    match schema.get_as::<Py2<'_, PyDate>>(field)? {
         Some(date) => Ok(Some(EitherDate::Py(date).as_raw()?)),
         None => Ok(None),
     }

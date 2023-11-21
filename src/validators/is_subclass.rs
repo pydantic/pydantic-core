@@ -1,4 +1,4 @@
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 
@@ -19,14 +19,14 @@ impl BuildValidator for IsSubclassValidator {
     const EXPECTED_TYPE: &'static str = "is-subclass";
 
     fn build(
-        schema: &PyDict,
-        _config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        _config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
+        let class: &PyType = schema.get_as_req(intern2!(py, "cls"))?;
 
-        let class_repr = match schema.get_as(intern!(py, "cls_repr"))? {
+        let class_repr = match schema.get_as(intern2!(py, "cls_repr"))? {
             Some(s) => s,
             None => class.name()?.to_string(),
         };
@@ -49,7 +49,7 @@ impl Validator for IsSubclassValidator {
         input: &'data impl Input<'data>,
         _state: &mut ValidationState,
     ) -> ValResult<PyObject> {
-        match input.input_is_subclass(self.class.as_ref(py))? {
+        match input.input_is_subclass(self.class.attach(py))? {
             true => Ok(input.to_object(py)),
             false => Err(ValError::new(
                 ErrorType::IsSubclassOf {

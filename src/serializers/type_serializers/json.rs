@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::str::from_utf8;
 
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -25,14 +25,14 @@ impl BuildSerializer for JsonSerializer {
     const EXPECTED_TYPE: &'static str = "json";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
 
-        let serializer = match schema.get_as::<&PyDict>(intern!(py, "schema"))? {
-            Some(items_schema) => CombinedSerializer::build(items_schema, config, definitions)?,
+        let serializer = match schema.get_as(intern2!(py, "schema"))? {
+            Some(items_schema) => CombinedSerializer::build(&items_schema, config, definitions)?,
             None => AnySerializer::build(schema, config, definitions)?,
         };
         Ok(Self {
@@ -47,9 +47,9 @@ impl_py_gc_traverse!(JsonSerializer { serializer });
 impl TypeSerializer for JsonSerializer {
     fn to_python(
         &self,
-        value: &PyAny,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        value: &Py2<'_, PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
         if extra.round_trip {
@@ -62,7 +62,7 @@ impl TypeSerializer for JsonSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'py>(&self, key: &Py2<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
         if extra.round_trip {
             let bytes = to_json_bytes(key, &self.serializer, None, None, extra, None, 0)?;
             let py = key.py();
@@ -75,10 +75,10 @@ impl TypeSerializer for JsonSerializer {
 
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,
-        value: &PyAny,
+        value: &Py2<'_, PyAny>,
         serializer: S,
-        include: Option<&PyAny>,
-        exclude: Option<&PyAny>,
+        include: Option<&Py2<'_, PyAny>>,
+        exclude: Option<&Py2<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         if extra.round_trip {

@@ -4,7 +4,7 @@ use pyo3::types::PyEllipsis;
 use std::hash::Hash;
 
 use pyo3::exceptions::PyTypeError;
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PySet};
 
@@ -16,53 +16,55 @@ pub(crate) struct SchemaFilter<T> {
     exclude: Option<AHashSet<T>>,
 }
 
-fn map_negative_index(value: &PyAny, len: Option<usize>) -> PyResult<&PyAny> {
+fn map_negative_index<'py>(value: &Py2<'py, PyAny>, len: Option<usize>) -> PyResult<Py2<'py, PyAny>> {
     let py = value.py();
     match len {
         Some(len) => Ok(value
-            .call_method1(intern!(py, "__mod__"), (len,))
-            .map_or_else(|_| value, |v| v)),
+            .call_method1(intern2!(py, "__mod__"), (len,))
+            .unwrap_or_else(|_| value.clone())),
         None => {
             // check that it's not negative
-            let negative = value.call_method1(intern!(py, "__lt__"), (0,))?.is_true()?;
+            let negative = value.call_method1(intern2!(py, "__lt__"), (0,))?.is_true()?;
             if negative {
                 Err(PyValueError::new_err(
                     "Negative indices cannot be used to exclude items on unsized iterables",
                 ))
             } else {
-                Ok(value)
+                Ok(value.clone())
             }
         }
     }
 }
 
-fn map_negative_indices(include_or_exclude: &PyAny, len: Option<usize>) -> PyResult<&PyAny> {
+fn map_negative_indices<'py>(include_or_exclude: &Py2<'py, PyAny>, len: Option<usize>) -> PyResult<Py2<'py, PyAny>> {
     let py = include_or_exclude.py();
     if let Ok(exclude_dict) = include_or_exclude.downcast::<PyDict>() {
-        let out = PyDict::new(py);
+        let out = PyDict::new2(py);
         for (k, v) in exclude_dict {
-            out.set_item(map_negative_index(k, len)?, v)?;
+            out.set_item(map_negative_index(&k, len)?, v)?;
         }
-        Ok(out)
+        Ok(out.into_any())
     } else if let Ok(exclude_set) = include_or_exclude.downcast::<PySet>() {
         let mut values = Vec::with_capacity(exclude_set.len());
         for v in exclude_set {
-            values.push(map_negative_index(v, len)?);
+            values.push(map_negative_index(&v, len)?);
         }
-        Ok(PySet::new(py, values)?)
+        Ok(PySet::new2(py, &values)?.into_any())
     } else {
         // return as is and deal with the error later
-        Ok(include_or_exclude)
+        Ok(include_or_exclude.clone())
     }
 }
 
+type NextFilters<'py> = Option<(Option<Py2<'py, PyAny>>, Option<Py2<'py, PyAny>>)>;
+
 impl SchemaFilter<usize> {
-    pub fn from_schema(schema: &PyDict) -> PyResult<Self> {
+    pub fn from_schema(schema: &Py2<'_, PyDict>) -> PyResult<Self> {
         let py = schema.py();
-        match schema.get_as::<&PyDict>(intern!(py, "serialization"))? {
+        match schema.get_as::<&PyDict>(intern2!(py, "serialization"))? {
             Some(ser) => {
-                let include = Self::build_set_ints(ser.get_item(intern!(py, "include"))?)?;
-                let exclude = Self::build_set_ints(ser.get_item(intern!(py, "exclude"))?)?;
+                let include = Self::build_set_ints(ser.get_item(intern2!(py, "include"))?)?;
+                let exclude = Self::build_set_ints(ser.get_item(intern2!(py, "exclude"))?)?;
                 Ok(Self { include, exclude })
             }
             None => Ok(SchemaFilter::default()),
@@ -91,30 +93,30 @@ impl SchemaFilter<usize> {
     pub fn index_filter<'py>(
         &self,
         index: usize,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
+        include: Option<&Py2<'py, PyAny>>,
+        exclude: Option<&Py2<'py, PyAny>>,
         len: Option<usize>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+    ) -> PyResult<NextFilters<'py>> {
         let include = include.map(|v| map_negative_indices(v, len)).transpose()?;
         let exclude = exclude.map(|v| map_negative_indices(v, len)).transpose()?;
-        self.filter(index, index, include, exclude)
+        self.filter(index, index, include.as_ref(), exclude.as_ref())
     }
 }
 
 impl SchemaFilter<isize> {
-    pub fn from_set_hash(include: Option<&PyAny>, exclude: Option<&PyAny>) -> PyResult<Self> {
+    pub fn from_set_hash(include: Option<&Py2<'_, PyAny>>, exclude: Option<&Py2<'_, PyAny>>) -> PyResult<Self> {
         let include = Self::build_set_hashes(include)?;
         let exclude = Self::build_set_hashes(exclude)?;
         Ok(Self { include, exclude })
     }
 
-    fn build_set_hashes(v: Option<&PyAny>) -> PyResult<Option<AHashSet<isize>>> {
+    fn build_set_hashes(v: Option<&Py2<'_, PyAny>>) -> PyResult<Option<AHashSet<isize>>> {
         match v {
             Some(value) => {
                 if value.is_none() {
                     Ok(None)
                 } else {
-                    let py_set: &PySet = value.downcast()?;
+                    let py_set = value.downcast::<PySet>()?;
                     let mut set: AHashSet<isize> = AHashSet::with_capacity(py_set.len());
 
                     for item in py_set {
@@ -129,10 +131,10 @@ impl SchemaFilter<isize> {
 
     pub fn key_filter<'py>(
         &self,
-        key: &PyAny,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        key: &Py2<'_, PyAny>,
+        include: Option<&Py2<'py, PyAny>>,
+        exclude: Option<&Py2<'py, PyAny>>,
+    ) -> PyResult<NextFilters<'py>> {
         let hash = key.hash()?;
         self.filter(key, hash, include, exclude)
     }
@@ -151,17 +153,17 @@ trait FilterLogic<T: Eq + Copy> {
         &self,
         py_key: impl ToPyObject + Copy,
         int_key: T,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
-        let mut next_exclude: Option<&PyAny> = None;
+        include: Option<&Py2<'py, PyAny>>,
+        exclude: Option<&Py2<'py, PyAny>>,
+    ) -> PyResult<NextFilters<'py>> {
+        let mut next_exclude = None;
         if let Some(exclude) = exclude {
             if exclude.is_none() {
                 // Do nothing; place this check at the top for performance in the common case
             } else if let Ok(exclude_dict) = exclude.downcast::<PyDict>() {
                 let op_exc_value = merge_all_value(exclude_dict, py_key)?;
                 if let Some(exc_value) = op_exc_value {
-                    if is_ellipsis_like(exc_value) {
+                    if is_ellipsis_like(&exc_value) {
                         // if the index is in exclude, and the exclude value is `None`, we want to omit this index/item
                         return Ok(None);
                     }
@@ -170,7 +172,7 @@ trait FilterLogic<T: Eq + Copy> {
                     next_exclude = Some(exc_value);
                 }
             } else if let Ok(exclude_set) = exclude.downcast::<PySet>() {
-                if exclude_set.contains(py_key)? || exclude_set.contains(intern!(exclude_set.py(), "__all__"))? {
+                if exclude_set.contains(py_key)? || exclude_set.contains(intern2!(exclude_set.py(), "__all__"))? {
                     // index is in the exclude set, we return Ok(None) to omit this index
                     return Ok(None);
                 }
@@ -191,7 +193,7 @@ trait FilterLogic<T: Eq + Copy> {
 
                 if let Some(inc_value) = op_inc_value {
                     // if the index is in include, we definitely want to include this index
-                    return if is_ellipsis_like(inc_value) {
+                    return if is_ellipsis_like(&inc_value) {
                         Ok(Some((None, next_exclude)))
                     } else {
                         Ok(Some((Some(inc_value), next_exclude)))
@@ -202,7 +204,7 @@ trait FilterLogic<T: Eq + Copy> {
                     return Ok(None);
                 }
             } else if let Ok(include_set) = include.downcast::<PySet>() {
-                if include_set.contains(py_key)? || include_set.contains(intern!(include_set.py(), "__all__"))? {
+                if include_set.contains(py_key)? || include_set.contains(intern2!(include_set.py(), "__all__"))? {
                     return Ok(Some((None, next_exclude)));
                 } else if !self.explicit_include(int_key) {
                     // if the index is not in include, include exists, AND it's not in schema include,
@@ -263,10 +265,10 @@ impl AnyFilter {
 
     pub fn key_filter<'py>(
         &self,
-        key: &PyAny,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+        key: &Py2<'_, PyAny>,
+        include: Option<&Py2<'py, PyAny>>,
+        exclude: Option<&Py2<'py, PyAny>>,
+    ) -> PyResult<NextFilters<'py>> {
         // just use 0 for the int_key, it's always ignored in the implementation here
         self.filter(key, 0, include, exclude)
     }
@@ -274,25 +276,25 @@ impl AnyFilter {
     pub fn index_filter<'py>(
         &self,
         index: usize,
-        include: Option<&'py PyAny>,
-        exclude: Option<&'py PyAny>,
+        include: Option<&Py2<'py, PyAny>>,
+        exclude: Option<&Py2<'py, PyAny>>,
         len: Option<usize>,
-    ) -> PyResult<Option<(Option<&'py PyAny>, Option<&'py PyAny>)>> {
+    ) -> PyResult<NextFilters<'py>> {
         let include = include.map(|v| map_negative_indices(v, len)).transpose()?;
         let exclude = exclude.map(|v| map_negative_indices(v, len)).transpose()?;
-        self.filter(index, index, include, exclude)
+        self.filter(index, index, include.as_ref(), exclude.as_ref())
     }
 }
 
 /// if a `__contains__` method exists, call it with the key and `__all__`, and return the result
 /// if it doesn't exist, or calling it fails (e.g. it's not a function), return `None`
-fn check_contains(obj: &PyAny, py_key: impl ToPyObject + Copy) -> PyResult<Option<bool>> {
+fn check_contains(obj: &Py2<'_, PyAny>, py_key: impl ToPyObject + Copy) -> PyResult<Option<bool>> {
     let py = obj.py();
-    match obj.getattr(intern!(py, "__contains__")) {
+    match obj.getattr(intern2!(py, "__contains__")) {
         Ok(contains_method) => {
             if let Ok(result) = contains_method.call1((py_key.to_object(py),)) {
                 Ok(Some(
-                    result.is_true()? || contains_method.call1((intern!(py, "__all__"),))?.is_true()?,
+                    result.is_true()? || contains_method.call1((intern2!(py, "__all__"),))?.is_true()?,
                 ))
             } else {
                 Ok(None)
@@ -316,7 +318,7 @@ where
 }
 
 /// detect both ellipsis and `True` to be compatible with pydantic V1
-fn is_ellipsis_like(v: &PyAny) -> bool {
+fn is_ellipsis_like(v: &Py2<'_, PyAny>) -> bool {
     v.is_instance_of::<PyEllipsis>()
         || match v.downcast::<PyBool>() {
             Ok(b) => b.is_true(),
@@ -325,32 +327,32 @@ fn is_ellipsis_like(v: &PyAny) -> bool {
 }
 
 /// lookup the dict, for the key and "__all__" key, and merge them following the same rules as pydantic V1
-fn merge_all_value(dict: &PyDict, py_key: impl ToPyObject + Copy) -> PyResult<Option<&PyAny>> {
+fn merge_all_value<'py>(dict: &Py2<'py, PyDict>, py_key: impl ToPyObject + Copy) -> PyResult<Option<Py2<'py, PyAny>>> {
     let op_item_value = dict.get_item(py_key)?;
-    let op_all_value = dict.get_item(intern!(dict.py(), "__all__"))?;
+    let op_all_value = dict.get_item(intern2!(dict.py(), "__all__"))?;
 
     match (op_item_value, op_all_value) {
         (Some(item_value), Some(all_value)) => {
-            if is_ellipsis_like(item_value) || is_ellipsis_like(all_value) {
-                Ok(op_item_value)
+            if is_ellipsis_like(&item_value) || is_ellipsis_like(&all_value) {
+                Ok(Some(item_value))
             } else {
-                let item_dict = as_dict(item_value)?;
-                let item_dict_merged = merge_dicts(item_dict, all_value)?;
-                Ok(Some(item_dict_merged))
+                let item_dict = as_dict(&item_value)?;
+                let item_dict_merged = merge_dicts(&item_dict, &all_value)?;
+                Ok(Some(item_dict_merged.into_any()))
             }
         }
-        (Some(_), None) => Ok(op_item_value),
-        (None, Some(_)) => Ok(op_all_value),
+        (op_item_value @ Some(_), None) => Ok(op_item_value),
+        (None, op_all_value @ Some(_)) => Ok(op_all_value),
         (None, None) => Ok(None),
     }
 }
 
-fn as_dict(value: &PyAny) -> PyResult<&PyDict> {
+fn as_dict<'py>(value: &Py2<'py, PyAny>) -> PyResult<Py2<'py, PyDict>> {
     if let Ok(dict) = value.downcast::<PyDict>() {
         dict.copy()
     } else if let Ok(set) = value.downcast::<PySet>() {
         let py = value.py();
-        let dict = PyDict::new(py);
+        let dict = PyDict::new2(py);
         for item in set {
             dict.set_item(item, py.Ellipsis())?;
         }
@@ -362,18 +364,18 @@ fn as_dict(value: &PyAny) -> PyResult<&PyDict> {
     }
 }
 
-fn merge_dicts<'py>(item_dict: &'py PyDict, all_value: &'py PyAny) -> PyResult<&'py PyDict> {
+fn merge_dicts<'py>(item_dict: &Py2<'py, PyDict>, all_value: &Py2<'py, PyAny>) -> PyResult<Py2<'py, PyDict>> {
     let item_dict = item_dict.copy()?;
     if let Ok(all_dict) = all_value.downcast::<PyDict>() {
         for (all_key, all_value) in all_dict {
-            if let Some(item_value) = item_dict.get_item(all_key)? {
-                if is_ellipsis_like(item_value) {
+            if let Some(item_value) = item_dict.get_item(&all_key)? {
+                if is_ellipsis_like(&item_value) {
                     continue;
                 }
-                let item_value_dict = as_dict(item_value)?;
+                let item_value_dict = as_dict(&item_value)?;
                 // if the all value is an ellipsis, we don't overwrite the item value
-                if !is_ellipsis_like(all_value) {
-                    item_dict.set_item(all_key, merge_dicts(item_value_dict, all_value)?)?;
+                if !is_ellipsis_like(&all_value) {
+                    item_dict.set_item(all_key, merge_dicts(&item_value_dict, &all_value)?)?;
                 }
             } else {
                 item_dict.set_item(all_key, all_value)?;
@@ -381,7 +383,7 @@ fn merge_dicts<'py>(item_dict: &'py PyDict, all_value: &'py PyAny) -> PyResult<&
         }
     } else if let Ok(set) = all_value.downcast::<PySet>() {
         for item in set {
-            if !item_dict.contains(item)? {
+            if !item_dict.contains(&item)? {
                 item_dict.set_item(item, set.py().Ellipsis())?;
             }
         }

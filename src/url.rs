@@ -8,7 +8,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyType};
-use pyo3::{intern, prelude::*};
+use pyo3::{intern2, prelude::*};
 use url::Url;
 
 use crate::tools::SchemaDict;
@@ -34,15 +34,15 @@ impl PyUrl {
 }
 
 fn build_schema_validator(py: Python, schema_type: &str) -> SchemaValidator {
-    let schema: &PyDict = PyDict::new(py);
+    let schema = PyDict::new2(py);
     schema.set_item("type", schema_type).unwrap();
-    SchemaValidator::py_new(py, schema, None).unwrap()
+    SchemaValidator::py_new(py, &schema, None).unwrap()
 }
 
 #[pymethods]
 impl PyUrl {
     #[new]
-    pub fn py_new(py: Python, url: &PyAny) -> PyResult<Self> {
+    pub fn py_new(py: Python, url: &Py2<'_, PyAny>) -> PyResult<Self> {
         let schema_obj = SCHEMA_DEFINITION_URL
             .get_or_init(py, || build_schema_validator(py, "url"))
             .validate_python(py, url, None, None, None, None)?;
@@ -218,7 +218,7 @@ static SCHEMA_DEFINITION_MULTI_HOST_URL: GILOnceCell<SchemaValidator> = GILOnceC
 #[pymethods]
 impl PyMultiHostUrl {
     #[new]
-    pub fn py_new(py: Python, url: &PyAny) -> PyResult<Self> {
+    pub fn py_new(py: Python, url: &Py2<'_, PyAny>) -> PyResult<Self> {
         let schema_obj = SCHEMA_DEFINITION_MULTI_HOST_URL
             .get_or_init(py, || build_schema_validator(py, "multi-host-url"))
             .validate_python(py, url, None, None, None, None)?;
@@ -230,7 +230,7 @@ impl PyMultiHostUrl {
         self.ref_url.scheme()
     }
 
-    pub fn hosts<'py>(&self, py: Python<'py>) -> PyResult<Vec<&'py PyDict>> {
+    pub fn hosts<'py>(&self, py: Python<'py>) -> PyResult<Vec<Py2<'py, PyDict>>> {
         if let Some(extra_urls) = &self.extra_urls {
             let mut hosts = Vec::with_capacity(extra_urls.len() + 1);
             for url in extra_urls {
@@ -434,14 +434,14 @@ impl UrlHostParts {
 }
 
 impl FromPyObject<'_> for UrlHostParts {
-    fn extract(ob: &'_ PyAny) -> PyResult<Self> {
+    fn extract(ob: &Py2<'_, PyAny>) -> PyResult<Self> {
         let py = ob.py();
         let dict = ob.downcast::<PyDict>()?;
         Ok(UrlHostParts {
-            username: dict.get_as(intern!(py, "username"))?,
-            password: dict.get_as(intern!(py, "password"))?,
-            host: dict.get_as(intern!(py, "host"))?,
-            port: dict.get_as(intern!(py, "port"))?,
+            username: dict.get_as(intern2!(py, "username"))?,
+            password: dict.get_as(intern2!(py, "password"))?,
+            host: dict.get_as(intern2!(py, "host"))?,
+            port: dict.get_as(intern2!(py, "port"))?,
         })
     }
 }
@@ -464,8 +464,8 @@ impl fmt::Display for UrlHostParts {
     }
 }
 
-fn host_to_dict<'a>(py: Python<'a>, lib_url: &Url) -> PyResult<&'a PyDict> {
-    let dict = PyDict::new(py);
+fn host_to_dict<'a>(py: Python<'a>, lib_url: &Url) -> PyResult<Py2<'a, PyDict>> {
+    let dict = PyDict::new2(py);
     dict.set_item(
         "username",
         match lib_url.username() {

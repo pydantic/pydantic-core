@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFrozenSet, PyList, PySet};
 
@@ -27,13 +27,13 @@ macro_rules! build_serializer {
             const EXPECTED_TYPE: &'static str = $expected_type;
 
             fn build(
-                schema: &PyDict,
-                config: Option<&PyDict>,
+                schema: &Py2<'_, PyDict>,
+                config: Option<&Py2<'_, PyDict>>,
                 definitions: &mut DefinitionsBuilder<CombinedSerializer>,
             ) -> PyResult<CombinedSerializer> {
                 let py = schema.py();
-                let item_serializer = match schema.get_as::<&PyDict>(intern!(py, "items_schema"))? {
-                    Some(items_schema) => CombinedSerializer::build(items_schema, config, definitions)?,
+                let item_serializer = match schema.get_as(intern2!(py, "items_schema"))? {
+                    Some(items_schema) => CombinedSerializer::build(&items_schema, config, definitions)?,
                     None => AnySerializer::build(schema, config, definitions)?,
                 };
                 let name = format!("{}[{}]", Self::EXPECTED_TYPE, item_serializer.get_name());
@@ -50,9 +50,9 @@ macro_rules! build_serializer {
         impl TypeSerializer for $struct_name {
             fn to_python(
                 &self,
-                value: &PyAny,
-                include: Option<&PyAny>,
-                exclude: Option<&PyAny>,
+                value: &Py2<'_, PyAny>,
+                include: Option<&Py2<'_, PyAny>>,
+                exclude: Option<&Py2<'_, PyAny>>,
                 extra: &Extra,
             ) -> PyResult<PyObject> {
                 let py = value.py();
@@ -62,10 +62,10 @@ macro_rules! build_serializer {
 
                         let mut items = Vec::with_capacity(py_set.len());
                         for element in py_set.iter() {
-                            items.push(item_serializer.to_python(element, include, exclude, extra)?);
+                            items.push(item_serializer.to_python(&element, include, exclude, extra)?);
                         }
                         match extra.mode {
-                            SerMode::Json => Ok(PyList::new(py, items).into_py(py)),
+                            SerMode::Json => Ok(PyList::new2(py, items).into_py(py)),
                             _ => Ok(<$py_type>::new(py, &items)?.into_py(py)),
                         }
                     }
@@ -76,16 +76,16 @@ macro_rules! build_serializer {
                 }
             }
 
-            fn json_key<'py>(&self, key: &'py PyAny, extra: &Extra) -> PyResult<Cow<'py, str>> {
+            fn json_key<'py>(&self, key: &Py2<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
                 self._invalid_as_json_key(key, extra, Self::EXPECTED_TYPE)
             }
 
             fn serde_serialize<S: serde::ser::Serializer>(
                 &self,
-                value: &PyAny,
+                value: &Py2<'_, PyAny>,
                 serializer: S,
-                include: Option<&PyAny>,
-                exclude: Option<&PyAny>,
+                include: Option<&Py2<'_, PyAny>>,
+                exclude: Option<&Py2<'_, PyAny>>,
                 extra: &Extra,
             ) -> Result<S::Ok, S::Error> {
                 match value.downcast::<$py_type>() {
@@ -95,7 +95,7 @@ macro_rules! build_serializer {
 
                         for value in py_set.iter() {
                             let item_serialize =
-                                PydanticSerializer::new(value, item_serializer, include, exclude, extra);
+                                PydanticSerializer::new(&value, item_serializer, include, exclude, extra);
                             seq.serialize_element(&item_serialize)?;
                         }
                         seq.end()

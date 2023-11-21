@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -16,22 +16,22 @@ pub struct FloatBuilder;
 impl BuildValidator for FloatBuilder {
     const EXPECTED_TYPE: &'static str = "float";
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-        let use_constrained = schema.get_item(intern!(py, "multiple_of"))?.is_some()
-            || schema.get_item(intern!(py, "le"))?.is_some()
-            || schema.get_item(intern!(py, "lt"))?.is_some()
-            || schema.get_item(intern!(py, "ge"))?.is_some()
-            || schema.get_item(intern!(py, "gt"))?.is_some();
+        let use_constrained = schema.get_item(intern2!(py, "multiple_of"))?.is_some()
+            || schema.get_item(intern2!(py, "le"))?.is_some()
+            || schema.get_item(intern2!(py, "lt"))?.is_some()
+            || schema.get_item(intern2!(py, "ge"))?.is_some()
+            || schema.get_item(intern2!(py, "gt"))?.is_some();
         if use_constrained {
             ConstrainedFloatValidator::build(schema, config, definitions)
         } else {
             Ok(FloatValidator {
                 strict: is_strict(schema, config)?,
-                allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
+                allow_inf_nan: schema_or_config_same(schema, config, intern2!(py, "allow_inf_nan"))?.unwrap_or(true),
             }
             .into())
         }
@@ -48,14 +48,14 @@ impl BuildValidator for FloatValidator {
     const EXPECTED_TYPE: &'static str = "float";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         Ok(Self {
             strict: is_strict(schema, config)?,
-            allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
+            allow_inf_nan: schema_or_config_same(schema, config, intern2!(py, "allow_inf_nan"))?.unwrap_or(true),
         }
         .into())
     }
@@ -175,19 +175,19 @@ impl Validator for ConstrainedFloatValidator {
 impl BuildValidator for ConstrainedFloatValidator {
     const EXPECTED_TYPE: &'static str = "float";
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         Ok(Self {
             strict: is_strict(schema, config)?,
-            allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
-            multiple_of: schema.get_as(intern!(py, "multiple_of"))?,
-            le: schema.get_as(intern!(py, "le"))?,
-            lt: schema.get_as(intern!(py, "lt"))?,
-            ge: schema.get_as(intern!(py, "ge"))?,
-            gt: schema.get_as(intern!(py, "gt"))?,
+            allow_inf_nan: schema_or_config_same(schema, config, intern2!(py, "allow_inf_nan"))?.unwrap_or(true),
+            multiple_of: schema.get_as(intern2!(py, "multiple_of"))?,
+            le: schema.get_as(intern2!(py, "le"))?,
+            lt: schema.get_as(intern2!(py, "lt"))?,
+            ge: schema.get_as(intern2!(py, "ge"))?,
+            gt: schema.get_as(intern2!(py, "gt"))?,
         }
         .into())
     }

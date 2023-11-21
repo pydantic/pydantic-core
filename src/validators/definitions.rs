@@ -1,5 +1,6 @@
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
+use pyo3::types::PyString;
 use pyo3::types::{PyDict, PyList};
 
 use crate::definitions::DefinitionRef;
@@ -17,24 +18,24 @@ impl BuildValidator for DefinitionsValidatorBuilder {
     const EXPECTED_TYPE: &'static str = "definitions";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
-        let schema_definitions: &PyList = schema.get_as_req(intern!(py, "definitions"))?;
+        let schema_definitions: Py2<'_, PyList> = schema.get_as_req(intern2!(py, "definitions"))?;
 
         for schema_definition in schema_definitions {
             let reference = schema_definition
-                .extract::<&PyDict>()?
-                .get_as_req::<String>(intern!(py, "ref"))?;
-            let validator = build_validator(schema_definition, config, definitions)?;
+                .extract::<Py2<'_, PyDict>>()?
+                .get_as_req::<String>(intern2!(py, "ref"))?;
+            let validator = build_validator(&schema_definition, config, definitions)?;
             definitions.add_definition(reference, validator)?;
         }
 
-        let inner_schema: &PyAny = schema.get_as_req(intern!(py, "schema"))?;
-        build_validator(inner_schema, config, definitions)
+        let inner_schema = schema.get_as_req(intern2!(py, "schema"))?;
+        build_validator(&inner_schema, config, definitions)
     }
 }
 
@@ -53,13 +54,13 @@ impl BuildValidator for DefinitionRefValidator {
     const EXPECTED_TYPE: &'static str = "definition-ref";
 
     fn build(
-        schema: &PyDict,
-        _config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        _config: Option<&Py2<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        let schema_ref = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
+        let schema_ref: Py2<'_, PyString> = schema.get_as_req(intern2!(schema.py(), "schema_ref"))?;
 
-        let definition = definitions.get_definition(schema_ref);
+        let definition = definitions.get_definition(schema_ref.to_str()?);
         Ok(Self::new(definition).into())
     }
 }
@@ -95,9 +96,9 @@ impl Validator for DefinitionRefValidator {
     fn validate_assignment<'data>(
         &self,
         py: Python<'data>,
-        obj: &'data PyAny,
-        field_name: &'data str,
-        field_value: &'data PyAny,
+        obj: &Py2<'data, PyAny>,
+        field_name: &str,
+        field_value: &Py2<'data, PyAny>,
         state: &mut ValidationState,
     ) -> ValResult<PyObject> {
         let validator = self.definition.get().unwrap();

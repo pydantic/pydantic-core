@@ -16,8 +16,8 @@ impl BuildValidator for AnyValidator {
     const EXPECTED_TYPE: &'static str = "any";
 
     fn build(
-        _schema: &PyDict,
-        _config: Option<&PyDict>,
+        _schema: &Py2<'_, PyDict>,
+        _config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         Ok(Self.into())

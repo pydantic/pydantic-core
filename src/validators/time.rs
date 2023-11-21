@@ -1,6 +1,6 @@
-use pyo3::intern;
+use pyo3::intern2;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString, PyTime};
+use pyo3::types::{PyDict, PyString};
 
 use speedate::Time;
 
@@ -24,8 +24,8 @@ impl BuildValidator for TimeValidator {
     const EXPECTED_TYPE: &'static str = "time";
 
     fn build(
-        schema: &PyDict,
-        config: Option<&PyDict>,
+        schema: &Py2<'_, PyDict>,
+        config: Option<&Py2<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let s = Self {
@@ -85,8 +85,8 @@ impl Validator for TimeValidator {
     }
 }
 
-fn convert_pytime(schema: &PyDict, field: &PyString) -> PyResult<Option<Time>> {
-    match schema.get_as::<&PyTime>(field)? {
+fn convert_pytime(schema: &Py2<'_, PyDict>, field: &Py2<'_, PyString>) -> PyResult<Option<Time>> {
+    match schema.get_as(field)? {
         Some(date) => Ok(Some(EitherTime::Py(date).as_raw()?)),
         None => Ok(None),
     }
@@ -102,13 +102,13 @@ struct TimeConstraints {
 }
 
 impl TimeConstraints {
-    fn from_py(schema: &PyDict) -> PyResult<Option<Self>> {
+    fn from_py(schema: &Py2<'_, PyDict>) -> PyResult<Option<Self>> {
         let py = schema.py();
         let c = Self {
-            le: convert_pytime(schema, intern!(py, "le"))?,
-            lt: convert_pytime(schema, intern!(py, "lt"))?,
-            ge: convert_pytime(schema, intern!(py, "ge"))?,
-            gt: convert_pytime(schema, intern!(py, "gt"))?,
+            le: convert_pytime(schema, intern2!(py, "le"))?,
+            lt: convert_pytime(schema, intern2!(py, "lt"))?,
+            ge: convert_pytime(schema, intern2!(py, "ge"))?,
+            gt: convert_pytime(schema, intern2!(py, "gt"))?,
             tz: TZConstraint::from_py(schema)?,
         };
         if c.le.is_some() || c.lt.is_some() || c.ge.is_some() || c.gt.is_some() || c.tz.is_some() {
