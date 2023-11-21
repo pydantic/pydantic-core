@@ -797,6 +797,7 @@ def test_model_and_literal_union() -> None:
         }
     )
 
-    # should raise ValidationError for Literal check, not TypeError
+    # validation against Literal[True] fails bc of the unhashable dict
+    # A ValidationError is raised, not a ValueError, which allows the validation against the union to continue
     assert validator.validate_python({'a': 42})
     assert validator.validate_python(True)
