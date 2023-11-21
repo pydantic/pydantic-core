@@ -107,9 +107,9 @@ unnecessary_wraps = "allow"
 unused_self = "allow"
 used_underscore_binding = "allow"
 
-[patch.'https://github.com/davidhewitt/pyo3']
-pyo3 = { path = "../pyo3" }
-pyo3-build-config = { path = "../pyo3/pyo3-build-config" }
+# [patch.'https://github.com/davidhewitt/pyo3']
+# pyo3 = { path = "../pyo3" }
+# pyo3-build-config = { path = "../pyo3/pyo3-build-config" }
 
-[patch.'https://github.com/pydantic/jiter']
-jiter = { path = "../jiter" }
+# [patch.'https://github.com/pydantic/jiter']
+# jiter = { path = "../jiter" }
