@@ -799,5 +799,7 @@ def test_model_and_literal_union() -> None:
 
     # validation against Literal[True] fails bc of the unhashable dict
     # A ValidationError is raised, not a ValueError, which allows the validation against the union to continue
-    assert validator.validate_python({'a': 42})
-    assert validator.validate_python(True)
+    m = validator.validate_python({'a': 42})
+    assert isinstance(m, ModelA)
+    assert m.a == 42
+    assert validator.validate_python(True) is True
