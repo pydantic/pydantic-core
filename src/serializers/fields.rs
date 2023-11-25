@@ -120,22 +120,19 @@ impl GeneralFieldsSerializer {
 
     fn extract_dicts<'a>(&self, value: &'a PyAny) -> Option<(&'a PyDict, Option<&'a PyDict>)> {
         match self.mode {
-            FieldsMode::ModelExtra => {
-                if let Ok((main_dict, extra_dict)) = value.extract::<(&PyDict, &PyDict)>() {
-                    Some((main_dict, Some(extra_dict)))
-                } else {
-                    None
-                }
-            }
-            _ => {
-                if let Ok(main_dict) = value.downcast::<PyDict>() {
-                    Some((main_dict, None))
-                } else {
-                    None
-                }
-            }
+            FieldsMode::ModelExtra => value
+                .extract::<(&PyDict, &PyDict)>()
+                .ok()
+                .map(|(main_dict, extra_dict)| (main_dict, Some(extra_dict))),
+            _ => value.downcast::<PyDict>().ok().map(|main_dict| (main_dict, None)),
         }
     }
+}
+
+/// Collect all the items in a dict into a vector.
+/// This is to allow safe iteration while the dict might be modified.
+fn dict_items(dict: &PyDict) -> Vec<(&PyAny, &PyAny)> {
+    dict.iter().collect()
 }
 
 macro_rules! option_length {
@@ -179,7 +176,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         let mut used_req_fields: usize = 0;
 
         // NOTE! we maintain the order of the input dict assuming that's right
-        for (key, value) in main_dict {
+        for (key, value) in dict_items(main_dict) {
             let key_str = key_str(key)?;
             let op_field = self.fields.get(key_str);
             if extra.exclude_none && value.is_none() {
@@ -261,9 +258,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let (main_dict, extra_dict) = if let Some(main_extra_dict) = self.extract_dicts(value) {
-            main_extra_dict
-        } else {
+        let Some((main_dict, extra_dict)) = self.extract_dicts(value) else {
             extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
             return infer_serialize(value, serializer, include, exclude, extra);
         };
@@ -283,7 +278,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         // we don't both with `used_fields` here because on unions, `to_python(..., mode='json')` is used
         let mut map = serializer.serialize_map(Some(expected_len))?;
 
-        for (key, value) in main_dict {
+        for (key, value) in dict_items(main_dict) {
             if extra.exclude_none && value.is_none() {
                 continue;
             }

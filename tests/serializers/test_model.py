@@ -456,6 +456,40 @@ def test_function_plain_field_serializer_to_python():
     assert s.to_python(Model(x=1000)) == {'x': '1_000'}
 
 
+@pytest.mark.skipif(cached_property is None, reason='cached_property is not available')
+def test_field_serializer_cached_property():
+    @dataclasses.dataclass
+    class Model:
+        x: int
+
+        @cached_property
+        def x_formatted(self) -> str:
+            return f'{self.x:_}'
+
+        def ser_x(self, v: Any, _) -> str:
+            assert self.x == 1_000 == v
+            return self.x_formatted
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Model,
+            core_schema.model_fields_schema(
+                {
+                    'x': core_schema.model_field(
+                        core_schema.int_schema(
+                            serialization=core_schema.plain_serializer_function_ser_schema(
+                                Model.ser_x, is_field_serializer=True, info_arg=True
+                            )
+                        )
+                    )
+                }
+            ),
+        )
+    )
+    assert s.to_python(Model(x=1000)) == {'x': '1_000'}
+    assert s.to_json(Model(x=1000)) == b'{"x":"1_000"}'
+
+
 def test_function_wrap_field_serializer_to_python():
     @dataclasses.dataclass
     class Model:
