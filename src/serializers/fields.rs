@@ -165,9 +165,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
             model: extra.model.map_or_else(|| Some(value), Some),
             ..*extra
         };
-        let (main_dict, extra_dict) = if let Some(main_extra_dict) = self.extract_dicts(value) {
-            main_extra_dict
-        } else {
+        let Some((main_dict, extra_dict)) = self.extract_dicts(value) else {
             td_extra.warnings.on_fallback_py(self.get_name(), value, &td_extra)?;
             return infer_to_python(value, include, exclude, &td_extra);
         };
