@@ -1,7 +1,8 @@
 use std::error::Error;
 use std::fmt;
 
-use pyo3::exceptions::PyException;
+use crate::tools::py_err;
+use pyo3::exceptions::{PyException, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 use pyo3::{intern, FromPyObject, PyErrArguments};
@@ -193,5 +194,30 @@ impl ExtraBehavior {
             None => default,
         };
         Ok(res)
+    }
+}
+
+impl ToPyObject for ExtraBehavior {
+    fn to_object(&self, py: Python) -> PyObject {
+        match self {
+            ExtraBehavior::Allow => ExtraBehavior::Allow.to_object(py),
+            ExtraBehavior::Ignore => ExtraBehavior::Ignore.to_object(py),
+            ExtraBehavior::Forbid => ExtraBehavior::Forbid.to_object(py),
+        }
+    }
+}
+
+impl FromPyObject<'_> for ExtraBehavior {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        if let Ok(string) = obj.extract::<String>() {
+            Ok(match string.as_str() {
+                "allow" => ExtraBehavior::Allow,
+                "ignore" => ExtraBehavior::Ignore,
+                "forbid" => ExtraBehavior::Forbid,
+                _ => return py_err!(PyTypeError; "Invalid string for ExtraBehavior"),
+            })
+        } else {
+            py_err!(PyTypeError; "Expected string value allow, ignore or forbid, got {}", obj.get_type())
+        }
     }
 }

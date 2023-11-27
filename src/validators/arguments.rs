@@ -5,7 +5,7 @@ use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 use ahash::AHashSet;
 
 use crate::build_tools::py_schema_err;
-use crate::build_tools::schema_or_config_same;
+use crate::build_tools::{schema_or_config_same, ExtraBehavior};
 use crate::errors::{AsLocItem, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{GenericArguments, Input, ValidationMatch};
 use crate::lookup_key::LookupKey;
@@ -31,6 +31,7 @@ pub struct ArgumentsValidator {
     var_args_validator: Option<Box<CombinedValidator>>,
     var_kwargs_validator: Option<Box<CombinedValidator>>,
     loc_by_alias: bool,
+    extra: ExtraBehavior,
 }
 
 impl BuildValidator for ArgumentsValidator {
@@ -73,7 +74,7 @@ impl BuildValidator for ArgumentsValidator {
                     }
                     None => Some(LookupKey::from_string(py, &name)),
                 };
-                kwarg_key = Some(PyString::new(py, &name).into());
+                kwarg_key = Some(PyString::intern(py, &name).into());
             }
 
             let schema: &PyAny = arg.get_as_req(intern!(py, "schema"))?;
@@ -119,6 +120,9 @@ impl BuildValidator for ArgumentsValidator {
                 None => None,
             },
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
+            extra: config
+                .get_as(intern!(py, "extra_fields_behavior"))?
+                .unwrap_or(ExtraBehavior::Forbid),
         }
         .into())
     }
@@ -166,7 +170,7 @@ impl Validator for ArgumentsValidator {
         py: Python<'data>,
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<'data, PyObject> {
         let args = input.validate_args()?;
 
         let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_params_count);
@@ -307,15 +311,16 @@ impl Validator for ArgumentsValidator {
                                         Err(err) => return Err(err),
                                     },
                                     None => {
-                                        errors.push(ValLineError::new_with_loc(
-                                            ErrorTypeDefaults::UnexpectedKeywordArgument,
-                                            value,
-                                            raw_key.as_loc_item(),
-                                        ));
+                                        if let ExtraBehavior::Forbid = self.extra {
+                                            errors.push(ValLineError::new_with_loc(
+                                                ErrorTypeDefaults::UnexpectedKeywordArgument,
+                                                value,
+                                                raw_key.as_loc_item(),
+                                            ));
+                                        }
                                     }
                                 }
-                            }
-                        }
+                        }}
                     }
                 }
             }};
