@@ -214,10 +214,12 @@ impl FromPyObject<'_> for ExtraBehavior {
                 "allow" => ExtraBehavior::Allow,
                 "ignore" => ExtraBehavior::Ignore,
                 "forbid" => ExtraBehavior::Forbid,
-                _ => return py_err!(PyTypeError; "Invalid string for ExtraBehavior"),
+                _ => {
+                    return py_err!(PyTypeError; "Invalid string for ExtraBehavior. Possible values are allow, ignore and forbid")
+                }
             })
         } else {
-            py_err!(PyTypeError; "Expected string value allow, ignore or forbid, got {}", obj.get_type())
+            py_err!(PyTypeError; "Expected string value, got {}", obj.get_type())
         }
     }
 }
