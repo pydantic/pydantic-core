@@ -120,9 +120,7 @@ impl BuildValidator for ArgumentsValidator {
                 None => None,
             },
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
-            extra: config
-                .get_as(intern!(py, "extra_fields_behavior"))?
-                .unwrap_or(ExtraBehavior::Forbid),
+            extra: ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Forbid)?,
         }
         .into())
     }
