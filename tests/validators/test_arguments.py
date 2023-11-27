@@ -823,6 +823,7 @@ def validate(config=None):
 
     return decorator
 
+
 def test_function_any():
     @validate()
     def foobar(a, b, c):
@@ -914,12 +915,13 @@ def create_function(validate, config = None):
         },
         {'type': 'unexpected_keyword_argument', 'loc': ('b',), 'msg': 'Unexpected keyword argument', 'input': 2},
     ]
-    # Allowin extras using the config
+    # Allowing extras using the config
     foobar = m.create_function(validate, config={'title': 'func', 'extra_fields_behavior': 'allow'})
     assert foobar('1', '2', c=3, d=4) == (1, 2, 3)
     # Ignore works similar than allow
     foobar = m.create_function(validate, config={'title': 'func', 'extra_fields_behavior': 'ignore'})
     assert foobar('1', '2', c=3, d=4) == (1, 2, 3)
+
 
 @pytest.mark.skipif(sys.version_info < (3, 10), reason='requires python3.10 or higher')
 def test_function_positional_only_default(import_execute):

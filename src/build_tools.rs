@@ -198,11 +198,11 @@ impl ExtraBehavior {
 }
 
 impl ToPyObject for ExtraBehavior {
-    fn to_object(&self, py: Python) -> PyObject {
+    fn to_object(&self, _py: Python) -> PyObject {
         match self {
-            ExtraBehavior::Allow => ExtraBehavior::Allow.to_object(py),
-            ExtraBehavior::Ignore => ExtraBehavior::Ignore.to_object(py),
-            ExtraBehavior::Forbid => ExtraBehavior::Forbid.to_object(py),
+            ExtraBehavior::Allow => ExtraBehavior::Allow.to_object(_py),
+            ExtraBehavior::Ignore => ExtraBehavior::Ignore.to_object(_py),
+            ExtraBehavior::Forbid => ExtraBehavior::Forbid.to_object(_py),
         }
     }
 }
