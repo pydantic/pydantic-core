@@ -773,7 +773,7 @@ fn maybe_as_enum(v: &PyAny) -> Option<&PyAny> {
 }
 
 #[cfg(PyPy)]
-static DICT_KEYS_TYPE: pyo3::once_cell::GILOnceCell<Py<PyType>> = pyo3::once_cell::GILOnceCell::new();
+static DICT_KEYS_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
 
 #[cfg(PyPy)]
 fn is_dict_keys_type(v: &PyAny) -> bool {
@@ -791,7 +791,7 @@ fn is_dict_keys_type(v: &PyAny) -> bool {
 }
 
 #[cfg(PyPy)]
-static DICT_VALUES_TYPE: pyo3::once_cell::GILOnceCell<Py<PyType>> = pyo3::once_cell::GILOnceCell::new();
+static DICT_VALUES_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
 
 #[cfg(PyPy)]
 fn is_dict_values_type(v: &PyAny) -> bool {
@@ -809,7 +809,7 @@ fn is_dict_values_type(v: &PyAny) -> bool {
 }
 
 #[cfg(PyPy)]
-static DICT_ITEMS_TYPE: pyo3::once_cell::GILOnceCell<Py<PyType>> = pyo3::once_cell::GILOnceCell::new();
+static DICT_ITEMS_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
 
 #[cfg(PyPy)]
 fn is_dict_items_type(v: &PyAny) -> bool {

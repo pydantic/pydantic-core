@@ -1,5 +1,5 @@
 use pyo3::exceptions::PyTypeError;
-use pyo3::once_cell::GILOnceCell;
+use pyo3::sync::GILOnceCell;
 use std::fmt;
 
 use pyo3::prelude::*;

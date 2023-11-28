@@ -3,8 +3,8 @@ use std::fmt::Debug;
 use enum_dispatch::enum_dispatch;
 
 use pyo3::exceptions::PyTypeError;
-use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
+use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
 use pyo3::{intern, PyTraverseError, PyVisit};
 

@@ -1,5 +1,6 @@
 use ahash::AHashSet;
 use pyo3::exceptions::PyValueError;
+use pyo3::types::PyEllipsis;
 use std::hash::Hash;
 
 use pyo3::exceptions::PyTypeError;
@@ -316,7 +317,7 @@ where
 
 /// detect both ellipsis and `True` to be compatible with pydantic V1
 fn is_ellipsis_like(v: &PyAny) -> bool {
-    v.is_ellipsis()
+    v.is_instance_of::<PyEllipsis>()
         || match v.downcast::<PyBool>() {
             Ok(b) => b.is_true(),
             Err(_) => false,
