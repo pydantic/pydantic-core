@@ -2,8 +2,8 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 
 use pyo3::exceptions::PyTypeError;
-use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
+use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
