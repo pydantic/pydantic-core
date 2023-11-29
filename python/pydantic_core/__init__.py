@@ -21,6 +21,7 @@ from ._pydantic_core import (
     TzInfo,
     Url,
     ValidationError,
+    WalkCoreSchema,
     __version__,
     from_json,
     to_json,
@@ -67,6 +68,7 @@ __all__ = [
     'from_json',
     'to_jsonable_python',
     'validate_core_schema',
+    'WalkCoreSchema',
 ]
 
 

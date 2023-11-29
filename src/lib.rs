@@ -22,6 +22,7 @@ mod serializers;
 mod tools;
 mod url;
 mod validators;
+mod walk_core_schema;
 
 // required for benchmarks
 pub use self::input::TzInfo;
@@ -116,5 +117,6 @@ fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(to_jsonable_python, m)?)?;
     m.add_function(wrap_pyfunction!(list_all_errors, m)?)?;
     m.add_function(wrap_pyfunction!(validate_core_schema, m)?)?;
+    m.add_class::<walk_core_schema::WalkCoreSchema>()?;
     Ok(())
 }
