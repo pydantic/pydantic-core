@@ -176,7 +176,7 @@ checksum = "62b02a5381cc465bd3041d84623d0fa3b66738b52b8e2fc3bab8ad63ab032f4a"
 [[package]]
 name = "jiter"
 version = "0.0.5"
-source = "git+https://github.com/pydantic/jiter?branch=dh/py2#cbf76aeec4a45bd768e600f40ff632fa29f13f14"
+source = "git+https://github.com/pydantic/jiter?branch=dh/py2#454442b09c6200aefa99a4c54d984927da6ff78b"
 dependencies = [
  "ahash",
  "lexical-core",
