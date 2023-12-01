@@ -593,3 +593,83 @@ def test_filter_or() -> None:
         'float',
         'float',
     ]
+
+
+def test_edit_core_schema() -> None:
+    def replace_with_float_schema(schema: CoreSchema, call_next: Callable[[CoreSchema], CoreSchema]) -> CoreSchema:
+        return cs.float_schema()
+
+    def replace_with_float_serializer(schema: SerSchema, call_next: Callable[[SerSchema], SerSchema]) -> SerSchema:
+        return cs.simple_ser_schema('float')
+
+    walk = WalkCoreSchema(
+        visit_core_schema=WalkCoreSchemaFilterBuilder.has_type('int').build(replace_with_float_schema),
+        visit_ser_schema=WalkCoreSchemaFilterBuilder.has_type('int').build(replace_with_float_serializer),
+    )
+
+    schema = cs.chain_schema(
+        [
+            cs.bool_schema(),
+            cs.int_schema(),
+            cs.bool_schema(
+                serialization=cs.simple_ser_schema('int'),
+            ),
+            cs.int_schema(
+                serialization=cs.simple_ser_schema('int'),
+            ),
+        ]
+    )
+
+    schema = walk.walk(schema)
+
+    # insert_assert(schema)
+    assert schema == {
+        'type': 'chain',
+        'steps': [
+            {'type': 'bool'},
+            {'type': 'float'},
+            {'type': 'bool', 'serialization': {'type': 'float'}},
+            {'type': 'float'},
+        ],
+    }
+
+
+def test_skip_call_next() -> None:
+    def return_if_list(schema: CoreSchema, call_next: CoreSchemaCallNext) -> CoreSchema:
+        if schema['type'] == 'list':
+            return schema
+        if schema['type'] == 'int':
+            return cs.float_schema()
+        return call_next(schema)
+
+    walk = WalkCoreSchema(
+        visit_core_schema=(
+            WalkCoreSchemaFilterBuilder.has_type('list')
+            | WalkCoreSchemaFilterBuilder.has_type('set')
+            | WalkCoreSchemaFilterBuilder.has_type('int')
+        ).build(return_if_list),
+    )
+
+    schema = cs.chain_schema(
+        [
+            cs.list_schema(
+                cs.int_schema(),
+            ),
+            cs.set_schema(
+                cs.int_schema(),
+            ),
+            cs.float_schema(),
+        ]
+    )
+
+    schema = walk.walk(schema)
+
+    # insert_assert(schema)
+    assert schema == {
+        'type': 'chain',
+        'steps': [
+            {'type': 'list', 'items_schema': {'type': 'int'}},
+            {'type': 'set', 'items_schema': {'type': 'float'}},
+            {'type': 'float'},
+        ],
+    }
