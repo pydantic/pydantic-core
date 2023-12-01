@@ -303,17 +303,11 @@ impl WalkCoreSchema {
         let choices_key = intern!(py, "choices");
         let choices: Option<&PyDict> = invert(schema.get_item(choices_key)?.map(pyo3::PyAny::extract))?;
         if let Some(choices) = choices {
-            let new_choices = choices
-                .iter()
-                .map(|(k, v)| {
-                    let new_v = self.walk(py, v.extract()?);
-                    Ok((k, new_v?))
-                })
-                .collect::<PyResult<Vec<(&PyAny, Py<PyDict>)>>>()?;
-            schema.set_item(
-                choices_key,
-                PyDict::from_sequence(py, PyList::new(py, new_choices).into())?,
-            )?;
+            let new_choices = choices.iter().map(|(k, v)| {
+                let new_v = self.walk(py, v.extract()?);
+                Ok((k, new_v?))
+            });
+            schema.set_item(choices_key, py_dict_from_iterator(py, new_choices)?)?;
         }
         self._check_ser_schema(py, schema)
     }
@@ -367,25 +361,19 @@ impl WalkCoreSchema {
         let fields_key = intern!(py, "fields");
         let fields: Option<&PyDict> = invert(schema.get_item(fields_key)?.map(pyo3::PyAny::extract))?;
         if let Some(fields) = fields {
-            let new_fields = fields
-                .iter()
-                .map(|(k, v)| {
-                    let typed_dict_field: &PyDict = v.extract()?;
-                    let schema: &PyDict = typed_dict_field
-                        .get_item("schema")
-                        .ok()
-                        .flatten()
-                        .ok_or_else(|| PyTypeError::new_err("Missing schema in TypedDictField"))?
-                        .extract()?;
-                    let new_schema = self.walk(py, schema)?;
-                    typed_dict_field.set_item("schema", new_schema)?;
-                    Ok((k, v))
-                })
-                .collect::<PyResult<Vec<(&PyAny, &PyAny)>>>()?;
-            schema.set_item(
-                fields_key,
-                PyDict::from_sequence(py, PyList::new(py, new_fields).into())?,
-            )?;
+            let new_fields = fields.iter().map(|(k, v)| {
+                let typed_dict_field: &PyDict = v.extract()?;
+                let schema: &PyDict = typed_dict_field
+                    .get_item("schema")
+                    .ok()
+                    .flatten()
+                    .ok_or_else(|| PyTypeError::new_err("Missing schema in TypedDictField"))?
+                    .extract()?;
+                let new_schema = self.walk(py, schema)?;
+                typed_dict_field.set_item("schema", new_schema)?;
+                Ok((k, v))
+            });
+            schema.set_item(fields_key, py_dict_from_iterator(py, new_fields)?)?;
         }
         let schema = self._handle_extras_schema(py, schema)?.into_ref(py).extract()?;
         let schema = self
@@ -726,4 +714,16 @@ impl FilterCallable {
     fn call(&self, py: Python, schema: &PyDict, call_next: PyObject) -> PyResult<Py<PyDict>> {
         self.func.call1(py, (schema, call_next))?.extract(py)
     }
+}
+
+fn py_dict_from_iterator<K: ToPyObject, V: ToPyObject>(
+    py: Python,
+    iterator: impl IntoIterator<Item = PyResult<(K, V)>>,
+) -> PyResult<Py<PyDict>> {
+    let dict = PyDict::new(py);
+    for item in iterator {
+        let (k, v) = item?;
+        dict.set_item(k, v)?;
+    }
+    Ok(dict.into())
 }
