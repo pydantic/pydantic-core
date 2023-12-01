@@ -536,3 +536,58 @@ def test_filter_and() -> None:
 
     # insert_assert(handler.called)
     assert handler.called == ['function-wrap', 'float']
+
+
+def test_filter_or() -> None:
+    handler = TrackingHandler()
+
+    walk = WalkCoreSchema(
+        visit_core_schema=(
+            WalkCoreSchemaFilterBuilder.has_type('float')
+            | WalkCoreSchemaFilterBuilder.predicate(lambda s: s.get('ref') == 'int')
+        ).build(handler),
+        visit_ser_schema=(
+            WalkCoreSchemaFilterBuilder.has_type('function-wrap')
+            | WalkCoreSchemaFilterBuilder.predicate(lambda s: s.get('type', '') == 'str')
+        ).build(handler),
+    )
+
+    schema = cs.chain_schema(
+        [
+            cs.int_schema(ref='int'),
+            cs.str_schema(
+                serialization=cs.wrap_serializer_function_ser_schema(
+                    wrap_ser_func,
+                    schema=cs.int_schema(),
+                ),
+            ),
+            cs.str_schema(
+                serialization=cs.wrap_serializer_function_ser_schema(
+                    wrap_ser_func,
+                    schema=cs.str_schema(),
+                ),
+            ),
+            cs.str_schema(
+                serialization=cs.simple_ser_schema('str'),
+            ),
+            cs.bool_schema(),
+            cs.list_schema(
+                cs.float_schema(),
+            ),
+            cs.list_schema(
+                cs.float_schema(ref='float'),
+            ),
+        ]
+    )
+
+    walk.walk(schema)
+
+    # insert_assert(handler.called)
+    assert handler.called == [
+        'int',
+        'function-wrap',
+        'function-wrap',
+        'str',
+        'float',
+        'float',
+    ]
