@@ -47,6 +47,7 @@ __all__ = [
     'TzInfo',
     'validate_core_schema',
     'WalkCoreSchema',
+    'WalkCoreSchemaFilterBuilder',
 ]
 __version__: str
 build_profile: str
@@ -866,69 +867,26 @@ def validate_core_schema(schema: CoreSchema, *, strict: bool | None = None) -> C
     using pydantic-core directly.
     """
 
-_CallNext = Callable[[_T], _T]
-_CoreSchemaCallNext = _CallNext[CoreSchema]
-_CoreSchemaHandler = Callable[[CoreSchema, _CoreSchemaCallNext], CoreSchema]
-_SerSchemaCallNext = _CallNext[SerSchema]
-_SerSchemaHandler = Callable[[SerSchema, _SerSchemaCallNext], SerSchema]
+class _WalkCoreSchemaFilter(Generic[_T]):
+    pass
 
+@final
+class WalkCoreSchemaFilterBuilder(Generic[_T]):
+    def __and__(self, other: WalkCoreSchemaFilterBuilder) -> WalkCoreSchemaFilterBuilder: ...
+    def __or__(self, other: WalkCoreSchemaFilterBuilder) -> WalkCoreSchemaFilterBuilder: ...
+    @staticmethod
+    def has_ref() -> WalkCoreSchemaFilterBuilder: ...
+    @staticmethod
+    def has_type(type: str) -> WalkCoreSchemaFilterBuilder: ...
+    @staticmethod
+    def predicate(predicate: Callable[[_T], bool]) -> WalkCoreSchemaFilterBuilder: ...
+    def build(self, func: Callable[[_T, Callable[[_T], _T]], _T]) -> _WalkCoreSchemaFilter[_T]: ...
+
+@final
 class WalkCoreSchema:
     def __init__(
         self,
-        *,
-        visit_any_schema: _CoreSchemaHandler | None = ...,
-        visit_none_schema: _CoreSchemaHandler | None = ...,
-        visit_bool_schema: _CoreSchemaHandler | None = ...,
-        visit_int_schema: _CoreSchemaHandler | None = ...,
-        visit_float_schema: _CoreSchemaHandler | None = ...,
-        visit_decimal_schema: _CoreSchemaHandler | None = ...,
-        visit_string_schema: _CoreSchemaHandler | None = ...,
-        visit_bytes_schema: _CoreSchemaHandler | None = ...,
-        visit_date_schema: _CoreSchemaHandler | None = ...,
-        visit_time_schema: _CoreSchemaHandler | None = ...,
-        visit_datetime_schema: _CoreSchemaHandler | None = ...,
-        visit_timedelta_schema: _CoreSchemaHandler | None = ...,
-        visit_literal_schema: _CoreSchemaHandler | None = ...,
-        visit_is_instance_schema: _CoreSchemaHandler | None = ...,
-        visit_is_subclass_schema: _CoreSchemaHandler | None = ...,
-        visit_callable_schema: _CoreSchemaHandler | None = ...,
-        visit_list_schema: _CoreSchemaHandler | None = ...,
-        visit_tuple_positional_schema: _CoreSchemaHandler | None = ...,
-        visit_tuple_variable_schema: _CoreSchemaHandler | None = ...,
-        visit_set_schema: _CoreSchemaHandler | None = ...,
-        visit_frozenset_schema: _CoreSchemaHandler | None = ...,
-        visit_generator_schema: _CoreSchemaHandler | None = ...,
-        visit_dict_schema: _CoreSchemaHandler | None = ...,
-        visit_after_validator_function_schema: _CoreSchemaHandler | None = ...,
-        visit_before_validator_function_schema: _CoreSchemaHandler | None = ...,
-        visit_wrap_validator_function_schema: _CoreSchemaHandler | None = ...,
-        visit_plain_validator_function_schema: _CoreSchemaHandler | None = ...,
-        visit_with_default_schema: _CoreSchemaHandler | None = ...,
-        visit_nullable_schema: _CoreSchemaHandler | None = ...,
-        visit_union_schema: _CoreSchemaHandler | None = ...,
-        visit_tagged_union_schema: _CoreSchemaHandler | None = ...,
-        visit_chain_schema: _CoreSchemaHandler | None = ...,
-        visit_lax_or_strict_schema: _CoreSchemaHandler | None = ...,
-        visit_json_or_python_schema: _CoreSchemaHandler | None = ...,
-        visit_typed_dict_schema: _CoreSchemaHandler | None = ...,
-        visit_model_fields_schema: _CoreSchemaHandler | None = ...,
-        visit_model_schema: _CoreSchemaHandler | None = ...,
-        visit_dataclass_args_schema: _CoreSchemaHandler | None = ...,
-        visit_dataclass_schema: _CoreSchemaHandler | None = ...,
-        visit_arguments_schema: _CoreSchemaHandler | None = ...,
-        visit_call_schema: _CoreSchemaHandler | None = ...,
-        visit_custom_error_schema: _CoreSchemaHandler | None = ...,
-        visit_json_schema: _CoreSchemaHandler | None = ...,
-        visit_url_schema: _CoreSchemaHandler | None = ...,
-        visit_multi_host_url_schema: _CoreSchemaHandler | None = ...,
-        visit_definitions_schema: _CoreSchemaHandler | None = ...,
-        visit_definition_reference_schema: _CoreSchemaHandler | None = ...,
-        visit_uuid_schema: _CoreSchemaHandler | None = ...,
-        # ser schemas, see SerSchema in core_schema.py
-        visit_plain_function_ser_schema: _SerSchemaHandler | None = ...,
-        visit_wrap_function_ser_schema: _SerSchemaHandler | None = ...,
-        visit_format_ser_schema: _SerSchemaHandler | None = ...,
-        visit_to_string_ser_schema: _SerSchemaHandler | None = ...,
-        visit_model_ser_schema: _SerSchemaHandler | None = ...,
+        visit_core_schema: _WalkCoreSchemaFilter[CoreSchema] | None = None,
+        visit_ser_schema: _WalkCoreSchemaFilter[SerSchema] | None = None,
     ) -> None: ...
     def walk(self, schema: CoreSchema) -> CoreSchema: ...
