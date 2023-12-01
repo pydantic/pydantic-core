@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar, Union
 
 from pydantic_core import WalkCoreSchema, WalkCoreSchemaFilterBuilder
 from pydantic_core import core_schema as cs
@@ -67,7 +67,7 @@ def _no_info_wrap_val_func(x: Any, handler: cs.ValidatorFunctionWrapHandler) -> 
 no_info_wrap_val_func = NamedFunction(_no_info_wrap_val_func)
 
 
-SchemaT = TypeVar('SchemaT', bound=CoreSchema | SerSchema)
+SchemaT = TypeVar('SchemaT', bound=Union[CoreSchema, SerSchema])
 
 
 @dataclass
