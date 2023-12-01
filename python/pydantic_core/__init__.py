@@ -22,6 +22,7 @@ from ._pydantic_core import (
     Url,
     ValidationError,
     WalkCoreSchema,
+    WalkCoreSchemaFilterBuilder,
     __version__,
     from_json,
     to_json,
@@ -69,6 +70,7 @@ __all__ = [
     'to_jsonable_python',
     'validate_core_schema',
     'WalkCoreSchema',
+    'WalkCoreSchemaFilterBuilder',
 ]
 
 

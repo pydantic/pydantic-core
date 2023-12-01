@@ -1,7 +1,8 @@
 from copy import deepcopy
+from dataclasses import dataclass, field
 from typing import Any, Callable, Generic, TypeVar
 
-from pydantic_core import WalkCoreSchema
+from pydantic_core import WalkCoreSchema, WalkCoreSchemaFilterBuilder
 from pydantic_core import core_schema as cs
 from pydantic_core.core_schema import CoreSchema, SerSchema
 
@@ -43,6 +44,13 @@ def _plain_ser_func(x: Any) -> str:
 plain_ser_func = NamedFunction(_plain_ser_func)
 
 
+def _wrap_ser_func(x: Any, handler: cs.SerializerFunctionWrapHandler) -> Any:
+    return handler(x)
+
+
+wrap_ser_func = NamedFunction(_wrap_ser_func)
+
+
 def _no_info_val_func(x: Any) -> Any:
     return x
 
@@ -57,11 +65,17 @@ def _no_info_wrap_val_func(x: Any, handler: cs.ValidatorFunctionWrapHandler) -> 
 no_info_wrap_val_func = NamedFunction(_no_info_wrap_val_func)
 
 
-def test_walk_core_schema_before():
-    called: list[CoreSchema | SerSchema] = []
+SchemaT = TypeVar('SchemaT', bound=CoreSchema | SerSchema)
 
-    def cs_handler(schema: CoreSchema, call_next: CoreSchemaCallNext) -> CoreSchema:
-        called.append(deepcopy(schema))
+
+@dataclass
+class TrackingHandler:
+    called: list[str] = field(default_factory=list)
+    stack: list[str] = field(default_factory=list)
+
+    def __call__(self, schema: SchemaT, call_next: Callable[[SchemaT], SchemaT]) -> SchemaT:
+        self.stack.append(schema['type'])
+        self.called.append(' -> '.join(self.stack))
         old = deepcopy(schema)
         try:
             new = call_next(schema)
@@ -71,66 +85,19 @@ def test_walk_core_schema_before():
             print(e)
             print(schema['type'])
             raise
+        finally:
+            self.stack.pop()
 
-    def ser_handler(schema: SerSchema, call_next: SerSchemaCallNext) -> SerSchema:
-        called.append(deepcopy(schema))
-        return call_next(schema)
+
+def test_walk_core_schema_before():
+    handler = TrackingHandler()
+
+    def match_any_predicate(schema: CoreSchema | SerSchema) -> bool:
+        return True
 
     walk = WalkCoreSchema(
-        visit_any_schema=cs_handler,
-        visit_none_schema=cs_handler,
-        visit_bool_schema=cs_handler,
-        visit_int_schema=cs_handler,
-        visit_float_schema=cs_handler,
-        visit_decimal_schema=cs_handler,
-        visit_string_schema=cs_handler,
-        visit_bytes_schema=cs_handler,
-        visit_date_schema=cs_handler,
-        visit_time_schema=cs_handler,
-        visit_datetime_schema=cs_handler,
-        visit_timedelta_schema=cs_handler,
-        visit_literal_schema=cs_handler,
-        visit_is_instance_schema=cs_handler,
-        visit_is_subclass_schema=cs_handler,
-        visit_callable_schema=cs_handler,
-        visit_list_schema=cs_handler,
-        visit_tuple_positional_schema=cs_handler,
-        visit_tuple_variable_schema=cs_handler,
-        visit_set_schema=cs_handler,
-        visit_frozenset_schema=cs_handler,
-        visit_generator_schema=cs_handler,
-        visit_dict_schema=cs_handler,
-        visit_after_validator_function_schema=cs_handler,
-        visit_before_validator_function_schema=cs_handler,
-        visit_wrap_validator_function_schema=cs_handler,
-        visit_plain_validator_function_schema=cs_handler,
-        visit_with_default_schema=cs_handler,
-        visit_nullable_schema=cs_handler,
-        visit_union_schema=cs_handler,
-        visit_tagged_union_schema=cs_handler,
-        visit_chain_schema=cs_handler,
-        visit_lax_or_strict_schema=cs_handler,
-        visit_json_or_python_schema=cs_handler,
-        visit_typed_dict_schema=cs_handler,
-        visit_model_fields_schema=cs_handler,
-        visit_model_schema=cs_handler,
-        visit_dataclass_args_schema=cs_handler,
-        visit_dataclass_schema=cs_handler,
-        visit_arguments_schema=cs_handler,
-        visit_call_schema=cs_handler,
-        visit_custom_error_schema=cs_handler,
-        visit_json_schema=cs_handler,
-        visit_url_schema=cs_handler,
-        visit_multi_host_url_schema=cs_handler,
-        visit_definitions_schema=cs_handler,
-        visit_definition_reference_schema=cs_handler,
-        visit_uuid_schema=cs_handler,
-        # ser schemas, see SerSchema in core_schema.py
-        visit_plain_function_ser_schema=ser_handler,
-        visit_wrap_function_ser_schema=ser_handler,
-        visit_format_ser_schema=ser_handler,
-        visit_to_string_ser_schema=ser_handler,
-        visit_model_ser_schema=ser_handler,
+        visit_core_schema=WalkCoreSchemaFilterBuilder.predicate(match_any_predicate).build(handler),
+        visit_ser_schema=WalkCoreSchemaFilterBuilder.predicate(match_any_predicate).build(handler),
     )
 
     schema = cs.union_schema(
@@ -331,818 +298,241 @@ def test_walk_core_schema_before():
 
     walk.walk(schema)
 
-    # insert_assert(called)
-    assert called == [
-        {
-            'type': 'union',
-            'choices': [
-                {
-                    'type': 'any',
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'none',
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {'type': 'bool', 'serialization': {'type': 'bool'}},
-                {'type': 'int', 'serialization': {'type': 'int'}},
-                {'type': 'float', 'serialization': {'type': 'float'}},
-                {
-                    'type': 'decimal',
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {'type': 'str', 'serialization': {'type': 'str'}},
-                {'type': 'bytes', 'serialization': {'type': 'bytes'}},
-                {'type': 'date', 'serialization': {'type': 'date'}},
-                {
-                    'type': 'time',
-                    'microseconds_precision': 'truncate',
-                    'serialization': {'type': 'time'},
-                },
-                {
-                    'type': 'datetime',
-                    'microseconds_precision': 'truncate',
-                    'serialization': {'type': 'datetime'},
-                },
-                {
-                    'type': 'timedelta',
-                    'microseconds_precision': 'truncate',
-                    'serialization': {'type': 'timedelta'},
-                },
-                {
-                    'type': 'literal',
-                    'expected': [1, 2, 3],
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'is-instance',
-                    'cls': NamedClass,
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'is-subclass',
-                    'cls': NamedClass,
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'callable',
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'list',
-                    'items_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'tuple-positional',
-                    'items_schema': [{'type': 'int', 'serialization': {'type': 'int'}}],
-                    'extras_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'tuple-variable',
-                    'items_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'set',
-                    'items_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'frozenset',
-                    'items_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'generator',
-                    'items_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'dict',
-                    'keys_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-                    'values_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'function-after',
-                    'function': {
-                        'type': 'no-info',
-                        'function': NamedFunction(_no_info_val_func),
-                    },
-                    'schema': {'type': 'int'},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'function-before',
-                    'function': {
-                        'type': 'no-info',
-                        'function': NamedFunction(_no_info_val_func),
-                    },
-                    'schema': {'type': 'int'},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'function-wrap',
-                    'function': {
-                        'type': 'no-info',
-                        'function': NamedFunction(_no_info_wrap_val_func),
-                    },
-                    'schema': {'type': 'int'},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'function-plain',
-                    'function': {
-                        'type': 'no-info',
-                        'function': NamedFunction(_no_info_val_func),
-                    },
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'default',
-                    'schema': {'type': 'int'},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                    'default': 1,
-                },
-                {
-                    'type': 'nullable',
-                    'schema': {'type': 'int'},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'union',
-                    'choices': [{'type': 'int'}, {'type': 'str'}],
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'tagged-union',
-                    'choices': {'a': {'type': 'int'}, 'b': {'type': 'str'}},
-                    'discriminator': 'type',
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'chain',
-                    'steps': [{'type': 'int'}, {'type': 'str'}],
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'lax-or-strict',
-                    'lax_schema': {'type': 'int'},
-                    'strict_schema': {'type': 'str'},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'json-or-python',
-                    'json_schema': {'type': 'int'},
-                    'python_schema': {'type': 'str'},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'typed-dict',
-                    'fields': {'a': {'type': 'typed-dict-field', 'schema': {'type': 'int'}}},
-                    'computed_fields': [
-                        {
-                            'type': 'computed-field',
-                            'property_name': 'b',
-                            'return_schema': {'type': 'int'},
-                        }
-                    ],
-                    'extras_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'model',
-                    'cls': NamedClass,
-                    'schema': {
-                        'type': 'model-fields',
-                        'fields': {'a': {'type': 'model-field', 'schema': {'type': 'int'}}},
-                        'computed_fields': [
-                            {
-                                'type': 'computed-field',
-                                'property_name': 'b',
-                                'return_schema': {'type': 'int'},
-                            }
-                        ],
-                        'extras_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-                    },
-                },
-                {
-                    'type': 'dataclass',
-                    'cls': NamedClass,
-                    'fields': ['a'],
-                    'schema': {
-                        'type': 'dataclass-args',
-                        'dataclass_name': 'Model',
-                        'fields': [
-                            {
-                                'type': 'dataclass-field',
-                                'name': 'a',
-                                'schema': {'type': 'int'},
-                            }
-                        ],
-                        'computed_fields': [
-                            {
-                                'type': 'computed-field',
-                                'property_name': 'b',
-                                'return_schema': {'type': 'int'},
-                            }
-                        ],
-                    },
-                },
-                {
-                    'type': 'call',
-                    'arguments_schema': {
-                        'type': 'arguments',
-                        'arguments_schema': [{'name': 'x', 'schema': {'type': 'int'}}],
-                        'serialization': {
-                            'type': 'function-plain',
-                            'function': NamedFunction(_plain_ser_func),
-                        },
-                    },
-                    'function': NamedFunction(_no_info_val_func),
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'custom-error',
-                    'schema': {'type': 'int'},
-                    'custom_error_type': 'CustomError',
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'json',
-                    'schema': {'type': 'int'},
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'url',
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'multi-host-url',
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'definitions',
-                    'schema': {'type': 'int'},
-                    'definitions': [{'type': 'int', 'ref': '#/definitions/int'}],
-                },
-                {
-                    'type': 'definition-ref',
-                    'schema_ref': '#/definitions/int',
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-                {
-                    'type': 'uuid',
-                    'serialization': {
-                        'type': 'function-plain',
-                        'function': NamedFunction(_plain_ser_func),
-                    },
-                },
-            ],
-        },
-        {
-            'type': 'any',
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'none',
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {'type': 'bool', 'serialization': {'type': 'bool'}},
-        {'type': 'bool'},
-        {'type': 'int', 'serialization': {'type': 'int'}},
-        {'type': 'int'},
-        {'type': 'float', 'serialization': {'type': 'float'}},
-        {'type': 'float'},
-        {
-            'type': 'decimal',
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {'type': 'str', 'serialization': {'type': 'str'}},
-        {'type': 'str'},
-        {'type': 'bytes', 'serialization': {'type': 'bytes'}},
-        {'type': 'bytes'},
-        {'type': 'date', 'serialization': {'type': 'date'}},
-        {'type': 'date'},
-        {
-            'type': 'time',
-            'microseconds_precision': 'truncate',
-            'serialization': {'type': 'time'},
-        },
-        {'type': 'time'},
-        {
-            'type': 'datetime',
-            'microseconds_precision': 'truncate',
-            'serialization': {'type': 'datetime'},
-        },
-        {'type': 'datetime'},
-        {
-            'type': 'timedelta',
-            'microseconds_precision': 'truncate',
-            'serialization': {'type': 'timedelta'},
-        },
-        {'type': 'timedelta'},
-        {
-            'type': 'literal',
-            'expected': [1, 2, 3],
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'is-instance',
-            'cls': NamedClass,
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'is-subclass',
-            'cls': NamedClass,
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'callable',
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'list',
-            'items_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int', 'serialization': {'type': 'int'}},
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'tuple-positional',
-            'items_schema': [{'type': 'int', 'serialization': {'type': 'int'}}],
-            'extras_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int', 'serialization': {'type': 'int'}},
-        {'type': 'int'},
-        {'type': 'int', 'serialization': {'type': 'int'}},
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'tuple-variable',
-            'items_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int', 'serialization': {'type': 'int'}},
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'set',
-            'items_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int', 'serialization': {'type': 'int'}},
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'frozenset',
-            'items_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int', 'serialization': {'type': 'int'}},
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'generator',
-            'items_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int', 'serialization': {'type': 'int'}},
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'dict',
-            'keys_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-            'values_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int', 'serialization': {'type': 'int'}},
-        {'type': 'int'},
-        {'type': 'int', 'serialization': {'type': 'int'}},
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'function-after',
-            'function': {'type': 'no-info', 'function': NamedFunction(_no_info_val_func)},
-            'schema': {'type': 'int'},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'function-before',
-            'function': {'type': 'no-info', 'function': NamedFunction(_no_info_val_func)},
-            'schema': {'type': 'int'},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'function-wrap',
-            'function': {
-                'type': 'no-info',
-                'function': NamedFunction(_no_info_wrap_val_func),
-            },
-            'schema': {'type': 'int'},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'function-plain',
-            'function': {'type': 'no-info', 'function': NamedFunction(_no_info_val_func)},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'default',
-            'schema': {'type': 'int'},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-            'default': 1,
-        },
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'nullable',
-            'schema': {'type': 'int'},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'union',
-            'choices': [{'type': 'int'}, {'type': 'str'}],
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int'},
-        {'type': 'str'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'tagged-union',
-            'choices': {'a': {'type': 'int'}, 'b': {'type': 'str'}},
-            'discriminator': 'type',
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int'},
-        {'type': 'str'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'chain',
-            'steps': [{'type': 'int'}, {'type': 'str'}],
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int'},
-        {'type': 'str'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'lax-or-strict',
-            'lax_schema': {'type': 'int'},
-            'strict_schema': {'type': 'str'},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int'},
-        {'type': 'str'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'json-or-python',
-            'json_schema': {'type': 'int'},
-            'python_schema': {'type': 'str'},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int'},
-        {'type': 'str'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'typed-dict',
-            'fields': {'a': {'type': 'typed-dict-field', 'schema': {'type': 'int'}}},
-            'computed_fields': [
-                {
-                    'type': 'computed-field',
-                    'property_name': 'b',
-                    'return_schema': {'type': 'int'},
-                }
-            ],
-            'extras_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int'},
-        {'type': 'int', 'serialization': {'type': 'int'}},
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'model',
-            'cls': NamedClass,
-            'schema': {
-                'type': 'model-fields',
-                'fields': {'a': {'type': 'model-field', 'schema': {'type': 'int'}}},
-                'computed_fields': [
-                    {
-                        'type': 'computed-field',
-                        'property_name': 'b',
-                        'return_schema': {'type': 'int'},
-                    }
-                ],
-                'extras_schema': {'type': 'int', 'serialization': {'type': 'int'}},
-            },
-        },
-        {
-            'type': 'dataclass',
-            'cls': NamedClass,
-            'fields': ['a'],
-            'schema': {
-                'type': 'dataclass-args',
-                'dataclass_name': 'Model',
-                'fields': [{'type': 'dataclass-field', 'name': 'a', 'schema': {'type': 'int'}}],
-                'computed_fields': [
-                    {
-                        'type': 'computed-field',
-                        'property_name': 'b',
-                        'return_schema': {'type': 'int'},
-                    }
-                ],
-            },
-        },
-        {
-            'type': 'dataclass-args',
-            'dataclass_name': 'Model',
-            'fields': [{'type': 'dataclass-field', 'name': 'a', 'schema': {'type': 'int'}}],
-            'computed_fields': [
-                {
-                    'type': 'computed-field',
-                    'property_name': 'b',
-                    'return_schema': {'type': 'int'},
-                }
-            ],
-        },
-        {'type': 'int'},
-        {
-            'type': 'call',
-            'arguments_schema': {
-                'type': 'arguments',
-                'arguments_schema': [{'name': 'x', 'schema': {'type': 'int'}}],
-                'serialization': {
-                    'type': 'function-plain',
-                    'function': NamedFunction(_plain_ser_func),
-                },
-            },
-            'function': NamedFunction(_no_info_val_func),
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {
-            'type': 'arguments',
-            'arguments_schema': [{'name': 'x', 'schema': {'type': 'int'}}],
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'custom-error',
-            'schema': {'type': 'int'},
-            'custom_error_type': 'CustomError',
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'json',
-            'schema': {'type': 'int'},
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'int'},
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'url',
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'multi-host-url',
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'definitions',
-            'schema': {'type': 'int'},
-            'definitions': [{'type': 'int', 'ref': '#/definitions/int'}],
-        },
-        {'type': 'int', 'ref': '#/definitions/int'},
-        {'type': 'int'},
-        {
-            'type': 'definition-ref',
-            'schema_ref': '#/definitions/int',
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
-        {
-            'type': 'uuid',
-            'serialization': {
-                'type': 'function-plain',
-                'function': NamedFunction(_plain_ser_func),
-            },
-        },
-        {'type': 'function-plain', 'function': NamedFunction(_plain_ser_func)},
+    # insert_assert(handler.called)
+    assert handler.called == [
+        'union',
+        'union -> any',
+        'union -> any -> function-plain',
+        'union -> none',
+        'union -> none -> function-plain',
+        'union -> bool',
+        'union -> bool -> bool',
+        'union -> int',
+        'union -> int -> int',
+        'union -> float',
+        'union -> float -> float',
+        'union -> decimal',
+        'union -> decimal -> function-plain',
+        'union -> str',
+        'union -> str -> str',
+        'union -> bytes',
+        'union -> bytes -> bytes',
+        'union -> date',
+        'union -> date -> date',
+        'union -> time',
+        'union -> time -> time',
+        'union -> datetime',
+        'union -> datetime -> datetime',
+        'union -> timedelta',
+        'union -> timedelta -> timedelta',
+        'union -> literal',
+        'union -> literal -> function-plain',
+        'union -> is-instance',
+        'union -> is-instance -> function-plain',
+        'union -> is-subclass',
+        'union -> is-subclass -> function-plain',
+        'union -> callable',
+        'union -> callable -> function-plain',
+        'union -> list',
+        'union -> list -> int',
+        'union -> list -> int -> int',
+        'union -> list -> function-plain',
+        'union -> tuple-positional',
+        'union -> tuple-positional -> int',
+        'union -> tuple-positional -> int -> int',
+        'union -> tuple-positional -> int',
+        'union -> tuple-positional -> int -> int',
+        'union -> tuple-positional -> function-plain',
+        'union -> tuple-variable',
+        'union -> tuple-variable -> int',
+        'union -> tuple-variable -> int -> int',
+        'union -> tuple-variable -> function-plain',
+        'union -> set',
+        'union -> set -> int',
+        'union -> set -> int -> int',
+        'union -> set -> function-plain',
+        'union -> frozenset',
+        'union -> frozenset -> int',
+        'union -> frozenset -> int -> int',
+        'union -> frozenset -> function-plain',
+        'union -> generator',
+        'union -> generator -> int',
+        'union -> generator -> int -> int',
+        'union -> generator -> function-plain',
+        'union -> dict',
+        'union -> dict -> int',
+        'union -> dict -> int -> int',
+        'union -> dict -> int',
+        'union -> dict -> int -> int',
+        'union -> dict -> function-plain',
+        'union -> function-after',
+        'union -> function-after -> function-plain',
+        'union -> function-before',
+        'union -> function-before -> function-plain',
+        'union -> function-wrap',
+        'union -> function-wrap -> int',
+        'union -> function-wrap -> function-plain',
+        'union -> function-plain',
+        'union -> function-plain -> function-plain',
+        'union -> default',
+        'union -> default -> int',
+        'union -> default -> function-plain',
+        'union -> nullable',
+        'union -> nullable -> int',
+        'union -> nullable -> function-plain',
+        'union -> union',
+        'union -> union -> int',
+        'union -> union -> str',
+        'union -> union -> function-plain',
+        'union -> tagged-union',
+        'union -> tagged-union -> int',
+        'union -> tagged-union -> str',
+        'union -> tagged-union -> function-plain',
+        'union -> chain',
+        'union -> chain -> int',
+        'union -> chain -> str',
+        'union -> chain -> function-plain',
+        'union -> lax-or-strict',
+        'union -> lax-or-strict -> int',
+        'union -> lax-or-strict -> str',
+        'union -> lax-or-strict -> function-plain',
+        'union -> json-or-python',
+        'union -> json-or-python -> int',
+        'union -> json-or-python -> str',
+        'union -> json-or-python -> function-plain',
+        'union -> typed-dict',
+        'union -> typed-dict -> int',
+        'union -> typed-dict -> int',
+        'union -> typed-dict -> int -> int',
+        'union -> typed-dict -> function-plain',
+        'union -> model',
+        'union -> dataclass',
+        'union -> dataclass -> dataclass-args',
+        'union -> dataclass -> dataclass-args -> int',
+        'union -> call',
+        'union -> call -> arguments',
+        'union -> call -> arguments -> function-plain',
+        'union -> call -> function-plain',
+        'union -> custom-error',
+        'union -> custom-error -> int',
+        'union -> custom-error -> function-plain',
+        'union -> json',
+        'union -> json -> int',
+        'union -> json -> function-plain',
+        'union -> url',
+        'union -> url -> function-plain',
+        'union -> multi-host-url',
+        'union -> multi-host-url -> function-plain',
+        'union -> definitions',
+        'union -> definitions -> int',
+        'union -> definitions -> int',
+        'union -> definition-ref',
+        'union -> definition-ref -> function-plain',
+        'union -> uuid',
+        'union -> uuid -> function-plain',
     ]
+
+
+def test_filter_has_ref() -> None:
+    handler = TrackingHandler()
+
+    walk = WalkCoreSchema(
+        visit_core_schema=WalkCoreSchemaFilterBuilder.has_ref().build(handler),
+        visit_ser_schema=WalkCoreSchemaFilterBuilder.has_ref().build(handler),
+    )
+
+    schema = cs.chain_schema(
+        [
+            cs.int_schema(ref='int'),
+            cs.str_schema(
+                serialization=cs.wrap_serializer_function_ser_schema(
+                    wrap_ser_func,
+                    schema=cs.str_schema(ref='str'),
+                ),
+            ),
+            cs.list_schema(
+                cs.float_schema(ref='float'),
+            ),
+        ]
+    )
+
+    walk.walk(schema)
+
+    # insert_assert(handler.called)
+    assert handler.called == ['int', 'str', 'float']
+
+
+def test_filter_type() -> None:
+    handler = TrackingHandler()
+
+    walk = WalkCoreSchema(
+        visit_core_schema=WalkCoreSchemaFilterBuilder.has_type('float').build(handler),
+        visit_ser_schema=WalkCoreSchemaFilterBuilder.has_type('function-wrap').build(handler),
+    )
+
+    schema = cs.chain_schema(
+        [
+            cs.int_schema(),
+            cs.str_schema(
+                serialization=cs.wrap_serializer_function_ser_schema(
+                    wrap_ser_func,
+                    schema=cs.str_schema(),
+                ),
+            ),
+            cs.list_schema(
+                cs.float_schema(),
+            ),
+        ]
+    )
+
+    walk.walk(schema)
+
+    # insert_assert(handler.called)
+    assert handler.called == ['function-wrap', 'float']
+
+
+def test_filter_and() -> None:
+    handler = TrackingHandler()
+
+    walk = WalkCoreSchema(
+        visit_core_schema=(WalkCoreSchemaFilterBuilder.has_type('float') & WalkCoreSchemaFilterBuilder.has_ref()).build(
+            handler
+        ),
+        visit_ser_schema=(
+            WalkCoreSchemaFilterBuilder.has_type('function-wrap')
+            & WalkCoreSchemaFilterBuilder.predicate(lambda s: s['schema']['type'] == 'str')
+        ).build(handler),
+    )
+
+    schema = cs.chain_schema(
+        [
+            cs.int_schema(ref='int'),
+            cs.str_schema(
+                serialization=cs.wrap_serializer_function_ser_schema(
+                    wrap_ser_func,
+                    schema=cs.int_schema(),
+                ),
+            ),
+            cs.str_schema(
+                serialization=cs.wrap_serializer_function_ser_schema(
+                    wrap_ser_func,
+                    schema=cs.str_schema(),
+                ),
+            ),
+            cs.str_schema(
+                serialization=cs.plain_serializer_function_ser_schema(plain_ser_func),
+            ),
+            cs.float_schema(),
+            cs.list_schema(
+                cs.float_schema(),
+            ),
+            cs.list_schema(
+                cs.float_schema(ref='float'),
+            ),
+        ]
+    )
+
+    walk.walk(schema)
+
+    # insert_assert(handler.called)
+    assert handler.called == ['function-wrap', 'float']

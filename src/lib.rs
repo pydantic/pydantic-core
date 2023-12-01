@@ -113,5 +113,6 @@ fn _pydantic_core(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(list_all_errors, m)?)?;
     m.add_function(wrap_pyfunction!(validate_core_schema, m)?)?;
     m.add_class::<walk_core_schema::WalkCoreSchema>()?;
+    m.add_class::<walk_core_schema::WalkCoreSchemaFilterBuilder>()?;
     Ok(())
 }
