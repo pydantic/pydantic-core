@@ -150,12 +150,26 @@ def test_exclude_none():
 
 
 def test_exclude_default():
+    class TestComparison:
+        def __init__(self, val: Any):
+            self.val = val
+
+        def __eq__(self, other):
+            return self.val == other.val
+
     v = SchemaSerializer(
         core_schema.typed_dict_schema(
             {
                 'foo': core_schema.typed_dict_field(core_schema.nullable_schema(core_schema.int_schema())),
                 'bar': core_schema.typed_dict_field(
                     core_schema.with_default_schema(core_schema.bytes_schema(), default=b'[default]')
+                ),
+                'foobar': core_schema.typed_dict_field(
+                    core_schema.with_default_schema(
+                        core_schema.any_schema(),
+                        default=TestComparison(val=1),
+                        default_comparison=lambda value, default: value.val == -1 * default.val,
+                    )
                 ),
             }
         )
@@ -165,9 +179,19 @@ def test_exclude_default():
     assert v.to_python({'foo': 1, 'bar': b'[default]'}, exclude_defaults=True) == {'foo': 1}
     assert v.to_python({'foo': 1, 'bar': b'[default]'}, mode='json') == {'foo': 1, 'bar': '[default]'}
     assert v.to_python({'foo': 1, 'bar': b'[default]'}, exclude_defaults=True, mode='json') == {'foo': 1}
-
     assert v.to_json({'foo': 1, 'bar': b'[default]'}) == b'{"foo":1,"bar":"[default]"}'
     assert v.to_json({'foo': 1, 'bar': b'[default]'}, exclude_defaults=True) == b'{"foo":1}'
+    # Note that due to the custom comparison operator foobar must be excluded
+    assert v.to_python({'foo': 1, 'bar': b'x', 'foobar': TestComparison(val=-1)}, exclude_defaults=True) == {
+        'foo': 1,
+        'bar': b'x',
+    }
+    # foobar here must be included
+    assert v.to_python({'foo': 1, 'bar': b'x', 'foobar': TestComparison(val=1)}, exclude_defaults=True) == {
+        'foo': 1,
+        'bar': b'x',
+        'foobar': TestComparison(val=1),
+    }
 
 
 def test_function_plain_field_serializer_to_python():

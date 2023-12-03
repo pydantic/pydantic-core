@@ -301,6 +301,10 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
     fn get_default(&self, _py: Python) -> PyResult<Option<PyObject>> {
         Ok(None)
     }
+
+    fn compare_with_default(&self, _py: Python, _value: &PyAny) -> PyResult<bool> {
+        Ok(false)
+    }
 }
 
 pub(crate) struct PydanticSerializer<'py> {

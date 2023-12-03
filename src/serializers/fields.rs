@@ -68,12 +68,9 @@ impl SerField {
 }
 
 fn exclude_default(value: &PyAny, extra: &Extra, serializer: &CombinedSerializer) -> PyResult<bool> {
+    let py = value.py();
     if extra.exclude_defaults {
-        if let Some(default) = serializer.get_default(value.py())? {
-            if value.eq(default)? {
-                return Ok(true);
-            }
-        }
+        return serializer.compare_with_default(py, value);
     }
     Ok(false)
 }
