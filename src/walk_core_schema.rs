@@ -1,6 +1,7 @@
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
+use pyo3::types::PyTuple;
 use pyo3::types::{PyDict, PyList, PyString};
 
 #[pyclass(subclass, module = "pydantic_core._pydantic_core")]
@@ -30,7 +31,7 @@ impl WalkCoreSchema {
                         .into_py(py)
                         .getattr(py, intern!(py, "_walk_core_schema"))?
                         .clone();
-                    visit_core_schema.call(py, schema, call_next)?.extract(py)
+                    visit_core_schema.call(py, schema.copy()?, call_next)?.extract(py)
                 } else {
                     self._walk_core_schema(py, schema)
                 }
@@ -40,6 +41,9 @@ impl WalkCoreSchema {
     }
 
     fn _walk_core_schema(&self, py: Python, schema: &PyDict) -> PyResult<Py<PyDict>> {
+        // TODO: can we remove this copy by keeping track of when we hit a filter
+        // (schemas con only get modified if they hit a filter)
+        let schema = schema.copy()?;
         let schema_type: &str = schema.get_item("type")?.unwrap().extract()?;
         match schema_type {
             "any" => self._handle_any_schema(py, schema),
@@ -78,6 +82,7 @@ impl WalkCoreSchema {
             "json-or-python" => self._handle_json_or_python_schema(py, schema),
             "typed-dict" => self._handle_typed_dict_schema(py, schema),
             "model-fields" => self._handle_model_fields_schema(py, schema),
+            "model-field" => self._handle_model_field_schema(py, schema),
             "model" => self._handle_model_schema(py, schema),
             "dataclass-args" => self._handle_dataclass_args_schema(py, schema),
             "dataclass" => self._handle_dataclass_schema(py, schema),
@@ -95,6 +100,9 @@ impl WalkCoreSchema {
     }
 
     fn _walk_ser_schema(&self, py: Python, ser_schema: &PyDict) -> PyResult<Py<PyDict>> {
+        // TODO: can we remove this copy by keeping track of when we hit a filter
+        // (schemas con only get modified if they hit a filter)
+        let ser_schema = ser_schema.copy()?;
         let schema_type: &str = ser_schema.get_item("type")?.unwrap().extract()?;
         match schema_type {
             "none" | "int" | "bool" | "float" | "str" | "bytes" | "bytearray" | "list" | "tuple" | "set"
@@ -128,6 +136,9 @@ impl WalkCoreSchema {
                     let new_ser_schema = self._walk_ser_schema(py, ser_schema)?;
                     schema.set_item(serialization_key, new_ser_schema)?;
                 }
+            } else {
+                let new_ser_schema = self._walk_ser_schema(py, ser_schema)?;
+                schema.set_item(serialization_key, new_ser_schema)?;
             }
         }
         Ok(schema.into())
@@ -251,10 +262,18 @@ impl WalkCoreSchema {
     }
 
     fn _handle_after_validator_function_schema(&self, py: Python, schema: &PyDict) -> PyResult<Py<PyDict>> {
+        let schema = self
+            ._handle_inner_schema(py, schema, intern!(py, "schema"))?
+            .into_ref(py)
+            .extract()?;
         self._check_ser_schema(py, schema)
     }
 
     fn _handle_before_validator_function_schema(&self, py: Python, schema: &PyDict) -> PyResult<Py<PyDict>> {
+        let schema = self
+            ._handle_inner_schema(py, schema, intern!(py, "schema"))?
+            .into_ref(py)
+            .extract()?;
         self._check_ser_schema(py, schema)
     }
 
@@ -292,8 +311,15 @@ impl WalkCoreSchema {
         if let Some(choices) = choices {
             let new_choices = choices
                 .iter()
-                .map(|choice| self.walk(py, choice.extract()?))
-                .collect::<PyResult<Vec<Py<PyDict>>>>()?;
+                .map(|choice| match choice.extract::<(&PyDict, &PyString)>() {
+                    Ok(choice) => {
+                        let (schema, tag) = choice;
+                        let schema = self.walk(py, schema)?;
+                        Ok(PyTuple::new(py, [schema.into_py(py), tag.into_py(py)]).into())
+                    }
+                    Err(_) => Ok(self.walk(py, choice.extract()?)?.into()),
+                })
+                .collect::<PyResult<Vec<PyObject>>>()?;
             schema.set_item(choices_key, new_choices)?;
         }
         self._check_ser_schema(py, schema)
@@ -383,18 +409,23 @@ impl WalkCoreSchema {
         self._check_ser_schema(py, schema)
     }
 
+    fn _handle_model_field_schema(&self, py: Python, schema: &PyDict) -> PyResult<Py<PyDict>> {
+        let schema = self
+            ._handle_inner_schema(py, schema, intern!(py, "schema"))?
+            .into_ref(py)
+            .extract()?;
+        self._check_ser_schema(py, schema)
+    }
+
     fn _handle_model_fields_schema(&self, py: Python, schema: &PyDict) -> PyResult<Py<PyDict>> {
         let fields_key = intern!(py, "fields");
         let fields: Option<&PyDict> = invert(schema.get_item(fields_key)?.map(pyo3::PyAny::extract))?;
         if let Some(fields) = fields {
-            let new_fields = fields
-                .iter()
-                .map(|(k, v)| {
-                    let new_v = self.walk(py, v.extract()?)?;
-                    Ok((k, new_v))
-                })
-                .collect::<PyResult<Vec<(&PyAny, Py<PyDict>)>>>()?;
-            schema.set_item(fields_key, new_fields)?;
+            let new_fields = fields.iter().map(|(k, v)| {
+                let new_v = self.walk(py, v.extract()?)?;
+                Ok((k, new_v))
+            });
+            schema.set_item(fields_key, py_dict_from_iterator(py, new_fields)?)?;
         }
         let schema = self._handle_extras_schema(py, schema)?.into_ref(py).extract()?;
         let schema = self
@@ -405,18 +436,10 @@ impl WalkCoreSchema {
     }
 
     fn _handle_model_schema(&self, py: Python, schema: &PyDict) -> PyResult<Py<PyDict>> {
-        let fields_key = intern!(py, "fields");
-        let fields: Option<&PyDict> = invert(schema.get_item(fields_key)?.map(pyo3::PyAny::extract))?;
-        if let Some(fields) = fields {
-            let new_fields = fields
-                .iter()
-                .map(|(k, v)| {
-                    let new_v = self.walk(py, v.extract()?)?;
-                    Ok((k, new_v))
-                })
-                .collect::<PyResult<Vec<(&PyAny, Py<PyDict>)>>>()?;
-            schema.set_item(fields_key, new_fields)?;
-        }
+        let schema = self
+            ._handle_inner_schema(py, schema, intern!(py, "schema"))?
+            .into_ref(py)
+            .extract()?;
         self._check_ser_schema(py, schema)
     }
 
@@ -449,18 +472,21 @@ impl WalkCoreSchema {
     }
 
     fn _handle_arguments_schema(&self, py: Python, schema: &PyDict) -> PyResult<Py<PyDict>> {
-        let var_args_schema_key = intern!(py, "var_args_schema");
-        let var_kwargs_schema_key = intern!(py, "var_kwargs_schema");
-        let var_args_schema: Option<&PyDict> = invert(schema.get_item(var_args_schema_key)?.map(pyo3::PyAny::extract))?;
-        if let Some(var_args_schema) = var_args_schema {
-            let new_var_args_schema = self.walk(py, var_args_schema)?;
-            schema.set_item(var_args_schema_key, new_var_args_schema)?;
-        }
-        let var_kwargs_schema: Option<&PyDict> =
-            invert(schema.get_item(var_kwargs_schema_key)?.map(pyo3::PyAny::extract))?;
-        if let Some(var_kwargs_schema) = var_kwargs_schema {
-            let new_var_kwargs_schema = self.walk(py, var_kwargs_schema)?;
-            schema.set_item(var_kwargs_schema_key, new_var_kwargs_schema)?;
+        let arguments_schema_key = intern!(py, "arguments_schema");
+        let arguments_schema: Option<&PyList> =
+            invert(schema.get_item(arguments_schema_key)?.map(pyo3::PyAny::extract))?;
+        if let Some(arguments_schema) = arguments_schema {
+            for argument_parameter in arguments_schema {
+                let argument_parameter: &PyDict = argument_parameter.extract()?;
+                let argument_schema: &PyDict = argument_parameter
+                    .get_item("schema")
+                    .ok()
+                    .flatten()
+                    .ok_or_else(|| PyTypeError::new_err("Missing schema in ArgumentParameter"))?
+                    .extract()?;
+                let new_argument_schema = self.walk(py, argument_schema)?;
+                argument_parameter.set_item("schema", new_argument_schema)?;
+            }
         }
         self._check_ser_schema(py, schema)
     }
@@ -585,11 +611,17 @@ impl WalkCoreSchema {
         let computed_fields: Option<&PyList> = invert(schema.get_item(computed_fields_key)?.map(pyo3::PyAny::extract))?;
         if let Some(computed_fields) = computed_fields {
             let schema_key = intern!(py, "schema");
+            let return_schema_key = intern!(py, "return_schema");
             let new_computed_fields = computed_fields
                 .iter()
                 .map(|computed_field| {
                     let computed_field_schema: &PyDict = computed_field.extract()?;
-                    self._handle_inner_schema(py, computed_field_schema, schema_key)
+                    let computed_field_schema = self
+                        ._handle_inner_schema(py, computed_field_schema, schema_key)?
+                        .into_ref(py);
+                    let computed_field_schema =
+                        self._handle_inner_schema(py, computed_field_schema, return_schema_key)?;
+                    Ok(computed_field_schema)
                 })
                 .collect::<PyResult<Vec<Py<PyDict>>>>()?;
             schema.set_item(computed_fields_key, new_computed_fields)?;
