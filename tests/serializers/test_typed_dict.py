@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List, Union
 
 import pytest
 from dirty_equals import IsStrictDict
@@ -151,29 +151,37 @@ def test_exclude_none():
 
 def test_exclude_default():
     class TestComparison:
-        def __init__(self, val: Any):
-            self.val = val
+        def __init__(self, array: Union[List[int], List[float]]):
+            self.array = array
 
         def __eq__(self, other):
-            return self.val == other.val
+            """Simple comparison arrays have to match also in the dtype"""
+            # Test case we just look at the first element to get the dtype of the array
+            self_is_integer = isinstance(self.array[0], int)
+            other_is_integer = isinstance(other.array[0], int)
+            return self_is_integer == other_is_integer and self.array == other.array
 
-    v = SchemaSerializer(
-        core_schema.typed_dict_schema(
-            {
-                'foo': core_schema.typed_dict_field(core_schema.nullable_schema(core_schema.int_schema())),
-                'bar': core_schema.typed_dict_field(
-                    core_schema.with_default_schema(core_schema.bytes_schema(), default=b'[default]')
-                ),
-                'foobar': core_schema.typed_dict_field(
-                    core_schema.with_default_schema(
-                        core_schema.any_schema(),
-                        default=TestComparison(val=1),
-                        default_comparison=lambda value, default: value.val == -1 * default.val,
-                    )
-                ),
-            }
-        )
+    def custom_comparison_operator(value: TestComparison, default: TestComparison):
+        """Will replace __eq__ in TestComparison omiting the dtype check"""
+        return value.array == default.array
+
+    dict_schema = core_schema.typed_dict_schema(
+        {
+            'foo': core_schema.typed_dict_field(core_schema.nullable_schema(core_schema.int_schema())),
+            'bar': core_schema.typed_dict_field(
+                core_schema.with_default_schema(core_schema.bytes_schema(), default=b'[default]')
+            ),
+            'foobar': core_schema.typed_dict_field(
+                core_schema.with_default_schema(
+                    core_schema.any_schema(),
+                    default=TestComparison(array=[1, 2, 3]),
+                    default_comparison=custom_comparison_operator,
+                )
+            ),
+        }
     )
+
+    v = SchemaSerializer(dict_schema)
     assert v.to_python({'foo': 1, 'bar': b'x'}) == {'foo': 1, 'bar': b'x'}
     assert v.to_python({'foo': 1, 'bar': b'[default]'}) == {'foo': 1, 'bar': b'[default]'}
     assert v.to_python({'foo': 1, 'bar': b'[default]'}, exclude_defaults=True) == {'foo': 1}
@@ -181,16 +189,23 @@ def test_exclude_default():
     assert v.to_python({'foo': 1, 'bar': b'[default]'}, exclude_defaults=True, mode='json') == {'foo': 1}
     assert v.to_json({'foo': 1, 'bar': b'[default]'}) == b'{"foo":1,"bar":"[default]"}'
     assert v.to_json({'foo': 1, 'bar': b'[default]'}, exclude_defaults=True) == b'{"foo":1}'
-    # Note that due to the custom comparison operator foobar must be excluded
-    assert v.to_python({'foo': 1, 'bar': b'x', 'foobar': TestComparison(val=-1)}, exclude_defaults=True) == {
+    # Note that due to the custom comparison operator foobar must be excluded because this operator doesn't pay attention on the dtype
+    assert v.to_python(
+        {'foo': 1, 'bar': b'x', 'foobar': TestComparison(array=[1.0, 2.0, 3.0])}, exclude_defaults=True
+    ) == {
         'foo': 1,
         'bar': b'x',
     }
-    # foobar here must be included
-    assert v.to_python({'foo': 1, 'bar': b'x', 'foobar': TestComparison(val=1)}, exclude_defaults=True) == {
+    # Now removing custom comparison operator foobar must be included due that TestComparison.__eq__ checks the array dtype
+    # So TestComparison(array=[1.0, 2.0, 3.0]) is not equal to the default TestComparison(array=[1, 2, 3])
+    del dict_schema['fields']['foobar']['schema']['default_comparison']
+    v = SchemaSerializer(dict_schema)
+    assert v.to_python(
+        {'foo': 1, 'bar': b'x', 'foobar': TestComparison(array=[1.0, 2.0, 3.0])}, exclude_defaults=True
+    ) == {
         'foo': 1,
         'bar': b'x',
-        'foobar': TestComparison(val=1),
+        'foobar': TestComparison(array=[1.0, 2.0, 3.0]),
     }
 
 
