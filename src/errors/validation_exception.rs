@@ -85,7 +85,7 @@ impl ValidationError {
     }
 
     pub fn display(&self, py: Python, prefix_override: Option<&'static str>, hide_input: bool) -> String {
-        let url_prefix = get_url_prefix(py, include_url_env(py));
+        let url_prefix = get_url_prefix(py, include_url_env());
         let line_errors = pretty_py_line_errors(py, self.input_type, self.line_errors.iter(), url_prefix, hide_input);
         if let Some(prefix) = prefix_override {
             format!("{prefix}\n{line_errors}")
@@ -191,17 +191,11 @@ impl ValidationError {
     }
 }
 
-static URL_ENV_VAR: GILOnceCell<bool> = GILOnceCell::new();
-
-fn _get_include_url_env() -> bool {
+fn include_url_env() -> bool {
     match std::env::var("PYDANTIC_ERRORS_OMIT_URL") {
         Ok(val) => val.is_empty(),
         Err(_) => true,
     }
-}
-
-fn include_url_env(py: Python) -> bool {
-    *URL_ENV_VAR.get_or_init(py, _get_include_url_env)
 }
 
 static URL_PREFIX: GILOnceCell<String> = GILOnceCell::new();
