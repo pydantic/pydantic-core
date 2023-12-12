@@ -347,7 +347,7 @@ impl ValidationError {
         let callable = slf.getattr("from_exception_data")?;
         let borrow = slf.try_borrow()?;
         let args = (
-            borrow.title.as_ref(slf.py()),
+            borrow.title.as_ref(py),
             borrow.errors(py, include_url_env(py), true, true)?,
             borrow.input_type.into_py(py),
             borrow.hide_input,
