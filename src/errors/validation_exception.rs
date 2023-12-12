@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::{Display, Write};
 use std::str::from_utf8;
@@ -5,8 +6,8 @@ use std::str::from_utf8;
 use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::ffi;
 use pyo3::intern;
-use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
+use pyo3::sync::{GILOnceCell, GILProtected};
 use pyo3::types::{PyDict, PyList, PyString};
 use serde::ser::{Error, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
@@ -85,7 +86,7 @@ impl ValidationError {
     }
 
     pub fn display(&self, py: Python, prefix_override: Option<&'static str>, hide_input: bool) -> String {
-        let url_prefix = get_url_prefix(py, include_url_env(py));
+        let url_prefix = get_url_prefix(py, include_url(py));
         let line_errors = pretty_py_line_errors(py, self.input_type, self.line_errors.iter(), url_prefix, hide_input);
         if let Some(prefix) = prefix_override {
             format!("{prefix}\n{line_errors}")
@@ -191,17 +192,24 @@ impl ValidationError {
     }
 }
 
-static URL_ENV_VAR: GILOnceCell<bool> = GILOnceCell::new();
+static INCLUDE_URL_FLAG: GILProtected<RefCell<Option<bool>>> = GILProtected::new(RefCell::new(None));
 
-fn _get_include_url_env() -> bool {
-    match std::env::var("PYDANTIC_ERRORS_OMIT_URL") {
+fn include_url(py: Python) -> bool {
+    if let Some(flag) = *INCLUDE_URL_FLAG.get(py).borrow() {
+        return flag;
+    }
+    // If uninitialized, initialize from environment variable.
+    let flag = match std::env::var("PYDANTIC_ERRORS_OMIT_URL") {
         Ok(val) => val.is_empty(),
         Err(_) => true,
-    }
+    };
+    INCLUDE_URL_FLAG.get(py).borrow_mut().replace(flag);
+    flag
 }
 
-fn include_url_env(py: Python) -> bool {
-    *URL_ENV_VAR.get_or_init(py, _get_include_url_env)
+#[pyfunction]
+pub fn set_errors_include_url(py: Python, flag: bool) {
+    INCLUDE_URL_FLAG.get(py).borrow_mut().replace(flag);
 }
 
 static URL_PREFIX: GILOnceCell<String> = GILOnceCell::new();

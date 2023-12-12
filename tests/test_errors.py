@@ -16,6 +16,7 @@ from pydantic_core import (
     SchemaValidator,
     ValidationError,
     core_schema,
+    set_errors_include_url,
 )
 from pydantic_core._pydantic_core import list_all_errors
 
@@ -1074,3 +1075,14 @@ def test_hide_input_in_json() -> None:
 
     for error in exc_info.value.errors(include_input=False):
         assert 'input' not in error
+
+
+def test_hide_url_in_repr() -> None:
+    s = SchemaValidator({'type': 'int'})
+    with pytest.raises(ValidationError) as exc_info:
+        s.validate_python('definitely not an int')
+
+    set_errors_include_url(False)
+    assert 'https' not in repr(exc_info.value)
+    set_errors_include_url(True)
+    assert 'https' in repr(exc_info.value)

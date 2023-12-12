@@ -23,6 +23,7 @@ from ._pydantic_core import (
     ValidationError,
     __version__,
     from_json,
+    set_errors_include_url,
     to_json,
     to_jsonable_python,
     validate_core_schema,
@@ -65,6 +66,7 @@ __all__ = [
     'TzInfo',
     'to_json',
     'from_json',
+    'set_errors_include_url',
     'to_jsonable_python',
     'validate_core_schema',
 ]

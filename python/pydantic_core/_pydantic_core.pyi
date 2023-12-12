@@ -44,6 +44,7 @@ __all__ = [
     'from_json',
     'to_jsonable_python',
     'list_all_errors',
+    'set_errors_include_url',
     'TzInfo',
     'validate_core_schema',
 ]
@@ -848,6 +849,16 @@ def list_all_errors() -> list[ErrorTypeInfo]:
 
     Returns:
         A list of `ErrorTypeInfo` typed dicts.
+    """
+
+def set_errors_include_url(flag: bool) -> None:
+    """
+    Set whether `repr`s of errors should include URLs to documentation on the error.
+
+    Defaults to `true` unless the `PYDANTIC_ERRORS_OMIT_URL` is set.
+
+    Args:
+        flag: Whether to include URLs in error `repr`s.
     """
 @final
 class TzInfo(datetime.tzinfo):
