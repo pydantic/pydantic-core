@@ -1,4 +1,5 @@
 import enum
+import pickle
 import re
 import sys
 from decimal import Decimal
@@ -1074,3 +1075,11 @@ def test_hide_input_in_json() -> None:
 
     for error in exc_info.value.errors(include_input=False):
         assert 'input' not in error
+
+
+def test_validation_error_pickle() -> None:
+    s = SchemaValidator({'type': 'int'})
+    with pytest.raises(ValidationError) as exc_info:
+        s.validate_python('definitely not an int')
+
+    pickle.loads(pickle.dumps(exc_info.value))
