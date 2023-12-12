@@ -1078,7 +1078,8 @@ def test_hide_input_in_json() -> None:
 
 
 @pytest.mark.skipif(
-    sys.version_info < (3, 9) and sys.implementation == 'pypy', reason='PyPy before 3.9 cannot pickle this correctly'
+    sys.version_info < (3, 9) and sys.implementation.name == 'pypy',
+    reason='PyPy before 3.9 cannot pickle this correctly',
 )
 def test_validation_error_pickle() -> None:
     s = SchemaValidator({'type': 'int'})
