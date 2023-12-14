@@ -126,3 +126,29 @@ def test_any_bytes_base64():
     assert s.to_json(b'foobar') == b'"Zm9vYmFy"'
     assert s.to_json({b'foobar': 123}) == b'{"Zm9vYmFy":123}'
     assert s.to_python({b'foobar': 123}, mode='json') == {'Zm9vYmFy': 123}
+
+
+class BasicModel:
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
+def test_bytes_mode_set_via_model_config_not_serializer_config():
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            BasicModel,
+            core_schema.model_fields_schema(
+                {
+                    'foo': core_schema.model_field(core_schema.bytes_schema()),
+                }
+            ),
+            config=core_schema.CoreConfig(ser_json_bytes='base64'),
+        )
+    )
+
+    bm = BasicModel(foo=b'foobar')
+    assert s.to_python(bm) == {'foo': b'foobar'}
+
+    assert s.to_json(bm) == b'{"foo":"Zm9vYmFy"}'
+    assert s.to_python(bm, mode='json') == {'foo': 'Zm9vYmFy'}
