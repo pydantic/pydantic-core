@@ -4,7 +4,7 @@ from enum import Enum
 
 import pytest
 
-from pydantic_core import PydanticSerializationError, SchemaSerializer, core_schema
+from pydantic_core import PydanticSerializationError, SchemaSerializer, core_schema, to_json
 
 
 def test_bytes():
@@ -152,3 +152,9 @@ def test_bytes_mode_set_via_model_config_not_serializer_config():
 
     assert s.to_json(bm) == b'{"foo":"Zm9vYmFy"}'
     assert s.to_python(bm, mode='json') == {'foo': 'Zm9vYmFy'}
+
+    # assert doesn't override serializer config
+    BasicModel.__pydantic_serializer__ = s
+    assert to_json(bm, bytes_mode='utf8') == b'{"foo":"Zm9vYmFy"}'
+
+    assert to_json({'foo': b'some bytes'}, bytes_mode='base64') == b'{"foo":"c29tZSBieXRlcw=="}'

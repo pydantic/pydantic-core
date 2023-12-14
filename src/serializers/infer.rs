@@ -117,6 +117,7 @@ pub(crate) fn infer_to_python_known(
         serializer.serializer.to_python(value, include, exclude, &extra)
     };
 
+    // TODO: add support for inf_nan_mode
     let value = match extra.mode {
         SerMode::Json => match ob_type {
             // `bool` and `None` can't be subclasses, `ObType::Int`, `ObType::Float`, `ObType::Str` refer to exact types

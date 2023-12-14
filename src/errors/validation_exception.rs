@@ -303,7 +303,7 @@ impl ValidationError {
         include_context: bool,
         include_input: bool,
     ) -> PyResult<&'py PyString> {
-        let state = SerializationState::new("iso8601", "utf8")?;
+        let state = SerializationState::new("iso8601", "utf8", "null")?;
         let extra = state.extra(py, &SerMode::Json, true, false, false, true, None);
         let serializer = ValidationErrorSerializer {
             py,

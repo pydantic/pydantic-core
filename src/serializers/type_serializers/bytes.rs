@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 
 use crate::definitions::DefinitionsBuilder;
-use crate::serializers::config::BytesMode;
+use crate::serializers::config::{BytesMode, FromConfig};
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerMode,
