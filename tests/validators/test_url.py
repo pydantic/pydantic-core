@@ -1299,3 +1299,11 @@ def test_url_build() -> None:
     )
     assert url == Url('postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test')
     assert str(url) == 'postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test'
+
+def test_url_concatenate() -> None:
+    url = Url('http://example.com')
+    concatenated_url = url + 'foo/'
+    assert concatenated_url == 'http://example.com/foo/'
+
+    reverse_concatenated_url = '123/' + url
+    assert reverse_concatenated_url == '123/http://example.com/'
