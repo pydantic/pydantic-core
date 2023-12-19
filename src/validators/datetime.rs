@@ -13,6 +13,7 @@ use crate::input::{EitherDateTime, Input};
 
 use crate::tools::SchemaDict;
 
+use super::Exactness;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug, Clone)]
@@ -68,7 +69,10 @@ impl Validator for DateTimeValidator {
         let datetime = match input.validate_datetime(strict, self.microseconds_precision) {
             Ok(val_match) => val_match.unpack(state),
             // if the error was a parsing error, in lax mode we allow dates and add the time 00:00:00
-            Err(line_errors @ ValError::LineErrors(..)) if !strict => datetime_from_date(input)?.ok_or(line_errors)?,
+            Err(line_errors @ ValError::LineErrors(..)) if !strict => {
+                state.floor_exactness(Exactness::Lax);
+                datetime_from_date(input)?.ok_or(line_errors)?
+            }
             Err(otherwise) => return Err(otherwise),
         };
         if let Some(constraints) = &self.constraints {
