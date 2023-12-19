@@ -155,6 +155,18 @@ impl PyUrl {
         (self.__str__(),)
     }
 
+    fn __add__(&self, other: &str) -> String {
+        let mut url_string = self.lib_url.to_string();
+        url_string.push_str(other);
+        url_string
+    }
+
+    fn __radd__(&self, other: &str) -> String {
+        let mut url_string = other.to_string();
+        url_string.push_str(self.lib_url.as_str());
+        url_string
+    }
+
     #[classmethod]
     #[pyo3(signature=(*, scheme, host, username=None, password=None, port=None, path=None, query=None, fragment=None))]
     #[allow(clippy::too_many_arguments)]
