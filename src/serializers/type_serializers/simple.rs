@@ -5,11 +5,12 @@ use std::borrow::Cow;
 
 use serde::Serialize;
 
+use crate::PydanticSerializationUnexpectedValue;
 use crate::{definitions::DefinitionsBuilder, input::Int};
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, IsType, ObType,
-    SerMode, TypeSerializer,
+    SerCheck, SerMode, TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
@@ -114,12 +115,15 @@ macro_rules! build_simple_serializer {
                 let py = value.py();
                 match extra.ob_type_lookup.is_type(value, $ob_type) {
                     IsType::Exact => Ok(value.into_py(py)),
-                    IsType::Subclass => match extra.mode {
-                        SerMode::Json => {
-                            let rust_value = value.extract::<$rust_type>()?;
-                            Ok(rust_value.to_object(py))
-                        }
-                        _ => infer_to_python(value, include, exclude, extra),
+                    IsType::Subclass => match extra.check {
+                        SerCheck::Strict => Err(PydanticSerializationUnexpectedValue::new_err(None)),
+                        SerCheck::Lax | SerCheck::None => match extra.mode {
+                            SerMode::Json => {
+                                let rust_value = value.extract::<$rust_type>()?;
+                                Ok(rust_value.to_object(py))
+                            }
+                            _ => infer_to_python(value, include, exclude, extra),
+                        },
                     },
                     IsType::False => {
                         extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
