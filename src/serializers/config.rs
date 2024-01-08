@@ -18,7 +18,6 @@ use super::errors::py_err_se_err;
 pub(crate) struct SerializationConfig {
     pub timedelta_mode: TimedeltaMode,
     pub bytes_mode: BytesMode,
-    #[allow(dead_code)]
     pub inf_nan_mode: InfNanMode,
 }
 
