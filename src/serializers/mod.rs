@@ -213,7 +213,7 @@ impl SchemaSerializer {
 #[pyfunction]
 #[pyo3(signature = (value, *, indent = None, include = None, exclude = None, by_alias = true,
     exclude_none = false, round_trip = false, timedelta_mode = "iso8601", bytes_mode = "utf8",
-    inf_nan_mode = "null", serialize_unknown = false, fallback = None))]
+    inf_nan_mode = "constants", serialize_unknown = false, fallback = None))]
 pub fn to_json(
     py: Python,
     value: &PyAny,
@@ -249,7 +249,7 @@ pub fn to_json(
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
 #[pyo3(signature = (value, *, include = None, exclude = None, by_alias = true, exclude_none = false, round_trip = false,
-    timedelta_mode = "iso8601", bytes_mode = "utf8", inf_nan_mode = "null", serialize_unknown = false, fallback = None))]
+    timedelta_mode = "iso8601", bytes_mode = "utf8", inf_nan_mode = "constants", serialize_unknown = false, fallback = None))]
 pub fn to_jsonable_python(
     py: Python,
     value: &PyAny,
