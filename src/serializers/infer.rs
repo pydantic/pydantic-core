@@ -128,9 +128,8 @@ pub(crate) fn infer_to_python_known(
                 let v = value.extract::<f64>()?;
                 if (v.is_nan() || v.is_infinite()) && extra.config.inf_nan_mode == InfNanMode::Null {
                     return Ok(py.None());
-                } else {
-                    v.into_py(py)
                 }
+                v.into_py(py)
             }
             ObType::Decimal => value.to_string().into_py(py),
             ObType::StrSubclass => value.extract::<&str>()?.into_py(py),
