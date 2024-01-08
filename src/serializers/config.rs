@@ -15,6 +15,7 @@ use crate::tools::SchemaDict;
 use super::errors::py_err_se_err;
 
 #[derive(Debug, Clone)]
+#[allow(clippy::redundant_field_names)]
 pub(crate) struct SerializationConfig {
     pub timedelta_mode: TimedeltaMode,
     pub bytes_mode: BytesMode,
