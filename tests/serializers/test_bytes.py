@@ -149,12 +149,14 @@ def test_bytes_mode_set_via_model_config_not_serializer_config():
 
     bm = BasicModel(foo=b'foobar')
     assert s.to_python(bm) == {'foo': b'foobar'}
-
     assert s.to_json(bm) == b'{"foo":"Zm9vYmFy"}'
     assert s.to_python(bm, mode='json') == {'foo': 'Zm9vYmFy'}
 
     # assert doesn't override serializer config
+    # in V3, we can change the serialization settings provided to to_json to override model config settings,
+    # but that'd be a breaking change
     BasicModel.__pydantic_serializer__ = s
     assert to_json(bm, bytes_mode='utf8') == b'{"foo":"Zm9vYmFy"}'
 
     assert to_json({'foo': b'some bytes'}, bytes_mode='base64') == b'{"foo":"c29tZSBieXRlcw=="}'
+    assert to_json({'bar': bm}, bytes_mode='base64') == b'{"bar":{"foo":"Zm9vYmFy"}}'
