@@ -355,7 +355,7 @@ def to_json(
     round_trip: bool = False,
     timedelta_mode: Literal['iso8601', 'float'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64'] = 'utf8',
-    inf_nan_mode: Literal['null', 'constants'] = 'null',
+    inf_nan_mode: Literal['null', 'constants'] = 'constants',
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
 ) -> bytes:
