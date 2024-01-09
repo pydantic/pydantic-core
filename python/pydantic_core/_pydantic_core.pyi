@@ -355,6 +355,7 @@ def to_json(
     round_trip: bool = False,
     timedelta_mode: Literal['iso8601', 'float'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64'] = 'utf8',
+    inf_nan_mode: Literal['null', 'constants'] = 'constants',
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
 ) -> bytes:
@@ -373,6 +374,7 @@ def to_json(
         round_trip: Whether to enable serialization and validation round-trip support.
         timedelta_mode: How to serialize `timedelta` objects, either `'iso8601'` or `'float'`.
         bytes_mode: How to serialize `bytes` objects, either `'utf8'` or `'base64'`.
+        inf_nan_mode: How to serialize `Infinity`, `-Infinity` and `NaN` values, either `'null'` or `'constants'`.
         serialize_unknown: Attempt to serialize unknown types, `str(value)` will be used, if that fails
             `"<Unserializable {value_type} object>"` will be used.
         fallback: A function to call when an unknown value is encountered,
@@ -414,6 +416,7 @@ def to_jsonable_python(
     round_trip: bool = False,
     timedelta_mode: Literal['iso8601', 'float'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64'] = 'utf8',
+    inf_nan_mode: Literal['null', 'constants'] = 'constants',
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
 ) -> Any:
@@ -432,6 +435,7 @@ def to_jsonable_python(
         round_trip: Whether to enable serialization and validation round-trip support.
         timedelta_mode: How to serialize `timedelta` objects, either `'iso8601'` or `'float'`.
         bytes_mode: How to serialize `bytes` objects, either `'utf8'` or `'base64'`.
+        inf_nan_mode: How to serialize `Infinity`, `-Infinity` and `NaN` values, either `'null'` or `'constants'`.
         serialize_unknown: Attempt to serialize unknown types, `str(value)` will be used, if that fails
             `"<Unserializable {value_type} object>"` will be used.
         fallback: A function to call when an unknown value is encountered,
@@ -785,6 +789,18 @@ class ValidationError(ValueError):
 
         Returns:
             a JSON string.
+        """
+
+    def __repr__(self) -> str:
+        """
+        A string representation of the validation error.
+
+        Whether or not documentation URLs are included in the repr is controlled by the
+        environment variable `PYDANTIC_ERRORS_INCLUDE_URL` being set to `1` or
+        `true`; by default, URLs are shown.
+
+        Due to implementation details, this environment variable can only be set once,
+        before the first validation error is created.
         """
 
 @final

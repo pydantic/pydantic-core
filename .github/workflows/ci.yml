@@ -33,7 +33,7 @@ jobs:
       - run: rustup component add llvm-tools-preview
 
       - name: set up python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -65,14 +65,11 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - '3.7'
           - '3.8'
           - '3.9'
           - '3.10'
           - '3.11'
           - '3.12'
-          - 'pypy3.7'
-          - 'pypy3.8'
           - 'pypy3.9'
           - 'pypy3.10'
 
@@ -90,7 +87,7 @@ jobs:
           key: test-v3
 
       - name: set up python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -127,7 +124,7 @@ jobs:
           key: ${{ matrix.os }}-v1
 
       - name: set up python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -158,7 +155,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: set up python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -191,7 +188,7 @@ jobs:
           path: pydantic-core
 
       - name: set up python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -233,7 +230,7 @@ jobs:
       - name: cache rust
         uses: Swatinem/rust-cache@v2
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -279,7 +276,7 @@ jobs:
       - name: cache rust
         uses: Swatinem/rust-cache@v2
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -294,7 +291,7 @@ jobs:
 
       - name: set up python
         id: setup-python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -332,7 +329,7 @@ jobs:
          ls -lh dist/
          ls -l dist/
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: wasm_wheels
           path: dist
@@ -359,7 +356,7 @@ jobs:
           command: sdist
           args: --out dist
           rust-toolchain: stable
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: pypi_files
           path: dist
@@ -385,19 +382,19 @@ jobs:
           - os: linux
             manylinux: auto
             target: armv7
-            interpreter: 3.7 3.8 3.9 3.10 3.11 3.12
+            interpreter: 3.8 3.9 3.10 3.11 3.12
           - os: linux
             manylinux: auto
             target: ppc64le
-            interpreter: 3.7 3.8 3.9 3.10 3.11 3.12
+            interpreter: 3.8 3.9 3.10 3.11 3.12
           - os: linux
             manylinux: auto
             target: s390x
-            interpreter: 3.7 3.8 3.9 3.10 3.11 3.12
+            interpreter: 3.8 3.9 3.10 3.11 3.12
           - os: linux
             manylinux: auto
             target: x86_64
-            interpreter: pypy3.7 pypy3.8 pypy3.9 pypy3.10
+            interpreter: pypy3.9 pypy3.10
 
           # musllinux
           - os: linux
@@ -414,7 +411,7 @@ jobs:
             target: x86_64
           - os: macos
             target: aarch64
-            interpreter: 3.7 3.8 3.9 pypy3.8 pypy3.9 pypy3.10
+            interpreter: 3.8 3.9 pypy3.9 pypy3.10
 
           # windows;
           # x86_64 pypy builds are not PGO optimized
@@ -422,11 +419,11 @@ jobs:
           # aarch64 only 3.11 and up, also not PGO optimized
           - os: windows
             target: x86_64
-            interpreter: pypy3.8 pypy3.9 pypy3.10
+            interpreter: pypy3.9 pypy3.10
           - os: windows
             target: i686
             python-architecture: x86
-            interpreter: 3.7 3.8 3.9 3.10 3.11 3.12
+            interpreter: 3.8 3.9 3.10 3.11 3.12
           - os: windows
             target: aarch64
             interpreter: 3.11 3.12
@@ -436,7 +433,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: set up python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           architecture: ${{ matrix.python-architecture || 'x64' }}
@@ -451,7 +448,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux == 'manylinux' && 'auto' || matrix.manylinux }}
-          args: --release --out dist --interpreter ${{ matrix.interpreter || '3.7 3.8 3.9 3.10 3.11 3.12 pypy3.7 pypy3.8 pypy3.9 pypy3.10' }}
+          args: --release --out dist --interpreter ${{ matrix.interpreter || '3.8 3.9 3.10 3.11 3.12 pypy3.9 pypy3.10' }}
           rust-toolchain: stable
           docker-options: -e CI
 
@@ -459,7 +456,7 @@ jobs:
 
       - run: twine check --strict dist/*
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: pypi_files
           path: dist
@@ -472,7 +469,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [linux, windows, macos]
-        interpreter: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
+        interpreter: ['3.8', '3.9', '3.10', '3.11', '3.12']
         include:
           # standard runners with override for macos arm
           - os: linux
@@ -485,8 +482,6 @@ jobs:
         exclude:
           # macos arm only supported from 3.10 and up
           - os: macos
-            interpreter: '3.7'
-          - os: macos
             interpreter: '3.8'
           - os: macos
             interpreter: '3.9'
@@ -496,7 +491,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: set up python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.interpreter }}
 
@@ -556,7 +551,7 @@ jobs:
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: pypi_files_pgo
           path: dist
@@ -569,7 +564,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: pypi_files
           path: dist
@@ -581,7 +576,7 @@ jobs:
          echo "`ls dist | wc -l` files"
 
       - name: get PGO dist artifacts (comes after "get dist artifacts" to so these files override the non-PGO builds)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: pypi_files_pgo
           path: dist
@@ -621,13 +616,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: pypi_files
           path: dist
 
       - name: get PGO dist artifacts (comes after "get dist artifacts" to so these files override the non-PGO builds)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: pypi_files_pgo
           path: dist
@@ -674,18 +669,18 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: set up python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: pypi_files
           path: dist
 
       - name: get PGO dist artifacts (comes after "get dist artifacts" to so these files override the non-PGO builds)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: pypi_files_pgo
           path: dist
@@ -704,7 +699,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: set up python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -714,13 +709,13 @@ jobs:
         run: python .github/check_version.py
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: pypi_files
           path: dist
 
       - name: get PGO dist artifacts (comes after "get dist artifacts" to so these files override the non-PGO builds)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: pypi_files_pgo
           path: dist
@@ -734,7 +729,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.pypi_token }}
 
       - name: get wasm dist artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: wasm_wheels
           path: wasm
