@@ -86,7 +86,7 @@ impl TypeSerializer for NoneSerializer {
 }
 
 macro_rules! build_simple_serializer {
-    ($struct_name:ident, $expected_type:literal, $rust_type:ty, $ob_type:expr, $key_method:ident) => {
+    ($struct_name:ident, $expected_type:literal, $rust_type:ty, $ob_type:expr, $key_method:ident, $subtypes_allowed:expr) => {
         #[derive(Debug, Clone)]
         pub struct $struct_name;
 
@@ -164,6 +164,10 @@ macro_rules! build_simple_serializer {
             fn get_name(&self) -> &str {
                 Self::EXPECTED_TYPE
             }
+
+            fn retry_with_lax_check(&self) -> bool {
+                $subtypes_allowed
+            }
         }
     };
 }
@@ -172,7 +176,7 @@ pub(crate) fn to_str_json_key(key: &PyAny) -> PyResult<Cow<str>> {
     Ok(key.str()?.to_string_lossy())
 }
 
-build_simple_serializer!(IntSerializer, "int", Int, ObType::Int, to_str_json_key);
+build_simple_serializer!(IntSerializer, "int", Int, ObType::Int, to_str_json_key, true);
 
 pub(crate) fn bool_json_key(key: &PyAny) -> PyResult<Cow<str>> {
     let v = if key.is_true().unwrap_or(false) {
@@ -183,4 +187,4 @@ pub(crate) fn bool_json_key(key: &PyAny) -> PyResult<Cow<str>> {
     Ok(Cow::Borrowed(v))
 }
 
-build_simple_serializer!(BoolSerializer, "bool", bool, ObType::Bool, bool_json_key);
+build_simple_serializer!(BoolSerializer, "bool", bool, ObType::Bool, bool_json_key, false);

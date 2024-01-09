@@ -517,7 +517,11 @@ def test_union_serializes_list_of_model_subclass_from_definition() -> None:
 EXAMPLE_UUID = uuid.uuid4()
 
 
-@pytest.mark.parametrize('order', ['direct', 'inverse'])
+class IntSubclass(int):
+    pass
+
+
+@pytest.mark.parametrize('reverse', [False, True])
 @pytest.mark.parametrize(
     'core_schema_left,core_schema_right,input_value,expected_value',
     [
@@ -525,6 +529,7 @@ EXAMPLE_UUID = uuid.uuid4()
         (core_schema.int_schema(), core_schema.bool_schema(), 1, 1),
         (core_schema.str_schema(), core_schema.int_schema(), 1, 1),
         (core_schema.str_schema(), core_schema.int_schema(), '1', '1'),
+        (core_schema.int_schema(), core_schema.bool_schema(), IntSubclass(1), 1),
         (
             core_schema.decimal_schema(),
             core_schema.int_schema(),
@@ -537,6 +542,18 @@ EXAMPLE_UUID = uuid.uuid4()
             core_schema.float_schema(),
             Decimal('1.'),
             Decimal('1.'),
+        ),
+        (
+            core_schema.decimal_schema(),
+            core_schema.str_schema(),
+            Decimal('_1'),
+            Decimal('_1'),
+        ),
+        (
+            core_schema.decimal_schema(),
+            core_schema.str_schema(),
+            '_1',
+            '_1',
         ),
         (
             core_schema.uuid_schema(),
@@ -553,17 +570,17 @@ EXAMPLE_UUID = uuid.uuid4()
     ],
 )
 def test_union_serializer_picks_exact_type_over_subclass(
-    core_schema_left, core_schema_right, input_value, expected_value, order
+    core_schema_left, core_schema_right, input_value, expected_value, reverse
 ):
     s = SchemaSerializer(
         core_schema.union_schema(
-            [core_schema_left, core_schema_right] if order == 'direct' else [core_schema_right, core_schema_left]
+            [core_schema_right, core_schema_left] if reverse else [core_schema_left, core_schema_right]
         )
     )
     assert s.to_python(input_value) == expected_value
 
 
-@pytest.mark.parametrize('order', ['direct', 'inverse'])
+@pytest.mark.parametrize('reverse', [False, True])
 @pytest.mark.parametrize(
     'core_schema_left,core_schema_right,input_value,expected_value',
     [
@@ -571,6 +588,7 @@ def test_union_serializer_picks_exact_type_over_subclass(
         (core_schema.int_schema(), core_schema.bool_schema(), 1, 1),
         (core_schema.str_schema(), core_schema.int_schema(), 1, 1),
         (core_schema.str_schema(), core_schema.int_schema(), '1', '1'),
+        (core_schema.int_schema(), core_schema.bool_schema(), IntSubclass(1), 1),
         (
             core_schema.decimal_schema(),
             core_schema.int_schema(),
@@ -584,14 +602,26 @@ def test_union_serializer_picks_exact_type_over_subclass(
             Decimal('1.'),
             '1',
         ),
+        (
+            core_schema.decimal_schema(),
+            core_schema.str_schema(),
+            Decimal('_1'),
+            '1',
+        ),
+        (
+            core_schema.decimal_schema(),
+            core_schema.str_schema(),
+            '_1',
+            '_1',
+        ),
     ],
 )
 def test_union_serializer_picks_exact_type_over_subclass_json(
-    core_schema_left, core_schema_right, input_value, expected_value, order
+    core_schema_left, core_schema_right, input_value, expected_value, reverse
 ):
     s = SchemaSerializer(
         core_schema.union_schema(
-            [core_schema_left, core_schema_right] if order == 'direct' else [core_schema_right, core_schema_left]
+            [core_schema_right, core_schema_left] if reverse else [core_schema_left, core_schema_right]
         )
     )
     assert s.to_python(input_value, mode='json') == expected_value
