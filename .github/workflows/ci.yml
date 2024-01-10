@@ -607,7 +607,7 @@ jobs:
       - name: get dist artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: pypi_files_*
+          pattern: pypi_files_linux_*
           merge-multiple: true
           path: dist
 
