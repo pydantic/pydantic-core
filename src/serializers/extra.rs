@@ -345,24 +345,24 @@ pub struct SerRecursionGuard {
 }
 
 impl SerRecursionGuard {
-    pub fn add(&self, value: &PyAny, def_ref_id: usize) -> PyResult<usize> {
-        // https://doc.rust-lang.org/std/collections/struct.HashSet.html#method.insert
-        // "If the set did not have this value present, `true` is returned."
+    pub fn add(&self, value: &PyAny, def_ref_id: usize) -> PyResult<(usize, usize)> {
         let id = value.as_ptr() as usize;
         let mut guard = self.guard.borrow_mut();
 
-        if guard.contains_or_insert(id, def_ref_id) {
-            Err(PyValueError::new_err("Circular reference detected (id repeated)"))
-        } else if guard.incr_depth() {
-            Err(PyValueError::new_err("Circular reference detected (depth exceeded)"))
+        if let Some(insert_index) = guard.contains_or_insert(id, def_ref_id) {
+            if guard.incr_depth() {
+                Err(PyValueError::new_err("Circular reference detected (depth exceeded)"))
+            } else {
+                Ok((id, insert_index))
+            }
         } else {
-            Ok(id)
+            Err(PyValueError::new_err("Circular reference detected (id repeated)"))
         }
     }
 
-    pub fn pop(&self, id: usize, def_ref_id: usize) {
+    pub fn pop(&self, id: usize, def_ref_id: usize, insert_index: usize) {
         let mut guard = self.guard.borrow_mut();
         guard.decr_depth();
-        guard.remove(id, def_ref_id);
+        guard.remove(id, def_ref_id, insert_index);
     }
 }
