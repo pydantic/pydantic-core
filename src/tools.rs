@@ -101,7 +101,7 @@ pub fn safe_repr(v: &PyAny) -> Cow<str> {
 
 /// Extract an i64 from a python object more quickly, see
 /// https://github.com/PyO3/pyo3/pull/3742#discussion_r1451763928
-#[cfg(not(any(target_pointer_width = "32", target_os = "windows")))]
+#[cfg(not(any(target_pointer_width = "32", windows, PyPy)))]
 pub fn extract_i64(obj: &PyAny) -> Option<i64> {
     let val = unsafe { ffi::PyLong_AsLong(obj.as_ptr()) };
     if val == -1 && PyErr::occurred(obj.py()) {
@@ -112,7 +112,7 @@ pub fn extract_i64(obj: &PyAny) -> Option<i64> {
     }
 }
 
-#[cfg(any(target_pointer_width = "32", target_os = "windows"))]
+#[cfg(any(target_pointer_width = "32", windows, PyPy))]
 pub fn extract_i64(v: &PyAny) -> Option<i64> {
     if v.is_instance_of::<pyo3::types::PyInt>() {
         v.extract().ok()
