@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::ffi::c_long;
 
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
@@ -103,7 +102,7 @@ pub fn safe_repr(v: &PyAny) -> Cow<str> {
 /// Extract an i64 from a python object more quickly, see
 /// https://github.com/PyO3/pyo3/pull/3742#discussion_r1451763928
 pub fn extract_i64(obj: &PyAny) -> Option<i64> {
-    let val: c_long = unsafe { ffi::PyLong_AsLong(obj.as_ptr()) };
+    let val = unsafe { ffi::PyLong_AsLong(obj.as_ptr()) };
     if val == -1 && PyErr::occurred(obj.py()) {
         _take_err(obj.py());
         None

@@ -866,9 +866,6 @@ impl<'a> EitherInt<'a> {
         if let Some(int_64) = extract_i64(py_any) {
             Ok(Self::I64(int_64))
         } else {
-            // In theory we could copy a lot of code from pyo3, and make big_int extraction
-            // faster by skipping the downcast and PyNumber_Index calls, but it would add A LOT
-            // of complexity
             let big_int: BigInt = py_any.extract()?;
             Ok(Self::BigInt(big_int))
         }
