@@ -1,9 +1,10 @@
 use std::borrow::Cow;
+use std::ffi::c_long;
 
-use pyo3::exceptions::{PyKeyError, PyTypeError};
+use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyInt, PyString};
-use pyo3::{intern, FromPyObject, PyTypeInfo};
+use pyo3::types::{PyDict, PyString};
+use pyo3::{ffi, intern, FromPyObject};
 
 pub trait SchemaDict<'py> {
     fn get_as<T>(&'py self, key: &PyString) -> PyResult<Option<T>>
@@ -99,10 +100,27 @@ pub fn safe_repr(v: &PyAny) -> Cow<str> {
     }
 }
 
-pub fn extract_i64(v: &PyAny) -> PyResult<i64> {
-    if PyInt::is_type_of(v) {
-        v.extract()
+/// Extract an i64 from a python object more quickly, see
+/// https://github.com/PyO3/pyo3/pull/3742#discussion_r1451763928
+pub fn extract_i64(obj: &PyAny) -> Option<i64> {
+    let val: c_long = unsafe { ffi::PyLong_AsLong(obj.as_ptr()) };
+    if val == -1 && PyErr::occurred(obj.py()) {
+        _take_err(obj.py());
+        None
     } else {
-        py_err!(PyTypeError; "expected int, got {}", safe_repr(v))
+        Some(val)
     }
+}
+
+#[cfg(not(Py_3_12))]
+fn _take_err(_: Python) {
+    let mut ptype: *mut ffi::PyObject = std::ptr::null_mut();
+    let mut pvalue: *mut ffi::PyObject = std::ptr::null_mut();
+    let mut ptraceback: *mut ffi::PyObject = std::ptr::null_mut();
+    unsafe { ffi::PyErr_Fetch(&mut ptype, &mut pvalue, &mut ptraceback) };
+}
+
+#[cfg(Py_3_12)]
+fn _take_err(_: Python) {
+    unsafe { ffi::PyErr_GetRaisedException() }
 }

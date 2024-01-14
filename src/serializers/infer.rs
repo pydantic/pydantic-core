@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::str::FromStr;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
@@ -124,7 +123,10 @@ pub(crate) fn infer_to_python_known(
             // `bool` and `None` can't be subclasses, `ObType::Int`, `ObType::Float`, `ObType::Str` refer to exact types
             ObType::None | ObType::Bool | ObType::Int | ObType::Str => value.into_py(py),
             // have to do this to make sure subclasses of for example str are upcast to `str`
-            ObType::IntSubclass => extract_i64(value)?.into_py(py),
+            ObType::IntSubclass => match extract_i64(value) {
+                Some(v) => v.into_py(py),
+                None => return py_err!(PyTypeError; "expected int, got {}", safe_repr(value)),
+            },
             ObType::Float | ObType::FloatSubclass => {
                 let v = value.extract::<f64>()?;
                 if (v.is_nan() || v.is_infinite()) && extra.config.inf_nan_mode == InfNanMode::Null {
@@ -422,11 +424,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
 
     let ser_result = match ob_type {
         ObType::None => serializer.serialize_none(),
-        ObType::Int => {
-            let n = serde_json::Number::from_str(&value.to_string()).map_err(S::Error::custom)?;
-            n.serialize(serializer)
-        }
-        ObType::IntSubclass => serialize!(Int),
+        ObType::Int | ObType::IntSubclass => serialize!(Int),
         ObType::Bool => serialize!(bool),
         ObType::Float | ObType::FloatSubclass => serialize!(f64),
         ObType::Decimal => value.to_string().serialize(serializer),

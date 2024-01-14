@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::ffi::c_long;
 use std::ops::Rem;
 use std::slice::Iter as SliceIter;
 use std::str::FromStr;
@@ -24,7 +23,7 @@ use pyo3::PyTypeInfo;
 use serde::{ser::Error, Serialize, Serializer};
 
 use crate::errors::{py_err_string, ErrorType, ErrorTypeDefaults, InputValue, ValError, ValLineError, ValResult};
-use crate::tools::py_err;
+use crate::tools::{extract_i64, py_err};
 use crate::validators::{CombinedValidator, Exactness, ValidationState, Validator};
 
 use super::input_string::StringMapping;
@@ -1042,29 +1041,4 @@ impl ToPyObject for Int {
             Self::Big(big_i) => big_i.to_object(py),
         }
     }
-}
-
-/// Extract an i64 from a python object more quickly, see
-/// https://github.com/PyO3/pyo3/pull/3742#discussion_r1451763928
-fn extract_i64(obj: &PyAny) -> Option<i64> {
-    let val: c_long = unsafe { ffi::PyLong_AsLong(obj.as_ptr()) };
-    if val == -1 && PyErr::occurred(obj.py()) {
-        _take_err(obj.py());
-        None
-    } else {
-        Some(val)
-    }
-}
-
-#[cfg(not(Py_3_12))]
-fn _take_err(_: Python) {
-    let mut ptype: *mut ffi::PyObject = std::ptr::null_mut();
-    let mut pvalue: *mut ffi::PyObject = std::ptr::null_mut();
-    let mut ptraceback: *mut ffi::PyObject = std::ptr::null_mut();
-    unsafe { ffi::PyErr_Fetch(&mut ptype, &mut pvalue, &mut ptraceback) };
-}
-
-#[cfg(Py_3_12)]
-fn _take_err(_: Python) {
-    unsafe { ffi::PyErr_GetRaisedException() }
 }
