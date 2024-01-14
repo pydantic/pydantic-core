@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::ffi::c_longlong;
 use std::ops::Rem;
 use std::slice::Iter as SliceIter;
 use std::str::FromStr;
@@ -1019,9 +1020,25 @@ impl<'a> Rem for &'a Int {
     }
 }
 
+/// Extract an i64 from a python object, note that contrary to what
+/// https://docs.python.org/3/c-api/long.html#c.PyLong_AsLongLong suggests, we are not calling
+/// `__index__()` (`ffi::PyNumber_Index`) first, as it seems to make no difference
+fn extract_i64(obj: &PyAny) -> Option<i64> {
+    let val: c_longlong = unsafe { ffi::PyLong_AsLongLong(obj.as_ptr()) };
+    if unsafe { ffi::PyErr_Occurred() }.is_null() {
+        Some(val)
+    } else {
+        let mut ptype: *mut ffi::PyObject = std::ptr::null_mut();
+        let mut pvalue: *mut ffi::PyObject = std::ptr::null_mut();
+        let mut ptraceback: *mut ffi::PyObject = std::ptr::null_mut();
+        unsafe { ffi::PyErr_Fetch(&mut ptype, &mut pvalue, &mut ptraceback) };
+        None
+    }
+}
+
 impl<'a> FromPyObject<'a> for Int {
     fn extract(obj: &'a PyAny) -> PyResult<Self> {
-        if let Ok(i) = obj.extract::<i64>() {
+        if let Some(i) = extract_i64(obj) {
             Ok(Int::I64(i))
         } else if let Ok(b) = obj.extract::<BigInt>() {
             Ok(Int::Big(b))
