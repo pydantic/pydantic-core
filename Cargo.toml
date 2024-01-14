@@ -56,8 +56,8 @@ extension-module = ["pyo3/extension-module"]
 [profile.release]
 lto = "fat"
 codegen-units = 1
-#strip = true
-debug = true
+strip = true
+#debug = true
 
 [profile.bench]
 debug = true

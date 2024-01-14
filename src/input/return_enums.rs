@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::ffi::c_longlong;
+use std::ffi::c_long;
 use std::ops::Rem;
 use std::slice::Iter as SliceIter;
 use std::str::FromStr;
@@ -864,9 +864,12 @@ pub enum EitherInt<'a> {
 impl<'a> EitherInt<'a> {
     pub fn upcast(py_any: &'a PyAny) -> ValResult<Self> {
         // Safety: we know that py_any is a python int
-        if let Ok(int_64) = py_any.extract::<i64>() {
+        if let Some(int_64) = extract_i64(py_any) {
             Ok(Self::I64(int_64))
         } else {
+            // In theory we could copy a lot of code from pyo3, and make big_int extraction
+            // faster by skipping the downcast and PyNumber_Index calls, but it would add A LOT
+            // of complexity
             let big_int: BigInt = py_any.extract()?;
             Ok(Self::BigInt(big_int))
         }
@@ -1020,22 +1023,6 @@ impl<'a> Rem for &'a Int {
     }
 }
 
-/// Extract an i64 from a python object, note that contrary to what
-/// https://docs.python.org/3/c-api/long.html#c.PyLong_AsLongLong suggests, we are not calling
-/// `__index__()` (`ffi::PyNumber_Index`) first, as it seems to make no difference
-fn extract_i64(obj: &PyAny) -> Option<i64> {
-    let val: c_longlong = unsafe { ffi::PyLong_AsLongLong(obj.as_ptr()) };
-    if unsafe { ffi::PyErr_Occurred() }.is_null() {
-        Some(val)
-    } else {
-        let mut ptype: *mut ffi::PyObject = std::ptr::null_mut();
-        let mut pvalue: *mut ffi::PyObject = std::ptr::null_mut();
-        let mut ptraceback: *mut ffi::PyObject = std::ptr::null_mut();
-        unsafe { ffi::PyErr_Fetch(&mut ptype, &mut pvalue, &mut ptraceback) };
-        None
-    }
-}
-
 impl<'a> FromPyObject<'a> for Int {
     fn extract(obj: &'a PyAny) -> PyResult<Self> {
         if let Some(i) = extract_i64(obj) {
@@ -1055,4 +1042,29 @@ impl ToPyObject for Int {
             Self::Big(big_i) => big_i.to_object(py),
         }
     }
+}
+
+/// Extract an i64 from a python object more quickly, see
+/// https://github.com/PyO3/pyo3/pull/3742#discussion_r1451763928
+fn extract_i64(obj: &PyAny) -> Option<i64> {
+    let val: c_long = unsafe { ffi::PyLong_AsLong(obj.as_ptr()) };
+    if val == -1 && PyErr::occurred(obj.py()) {
+        _take_err(obj.py());
+        None
+    } else {
+        Some(val)
+    }
+}
+
+#[cfg(not(Py_3_12))]
+fn _take_err(_: Python) {
+    let mut ptype: *mut ffi::PyObject = std::ptr::null_mut();
+    let mut pvalue: *mut ffi::PyObject = std::ptr::null_mut();
+    let mut ptraceback: *mut ffi::PyObject = std::ptr::null_mut();
+    unsafe { ffi::PyErr_Fetch(&mut ptype, &mut pvalue, &mut ptraceback) };
+}
+
+#[cfg(Py_3_12)]
+fn _take_err(_: Python) {
+    unsafe { ffi::PyErr_GetRaisedException() }
 }

@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::str::FromStr;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
@@ -421,7 +422,11 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
 
     let ser_result = match ob_type {
         ObType::None => serializer.serialize_none(),
-        ObType::Int | ObType::IntSubclass => serialize!(Int),
+        ObType::Int => {
+            let n = serde_json::Number::from_str(&value.to_string()).map_err(S::Error::custom)?;
+            n.serialize(serializer)
+        }
+        ObType::IntSubclass => serialize!(Int),
         ObType::Bool => serialize!(bool),
         ObType::Float | ObType::FloatSubclass => serialize!(f64),
         ObType::Decimal => value.to_string().serialize(serializer),
