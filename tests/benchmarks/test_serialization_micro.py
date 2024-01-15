@@ -449,3 +449,9 @@ def test_dataclass_serialization_json(benchmark):
     dc = Foo(a='hello', b=b'more', c=123, d=1.23)
     assert s.to_python(dc) == {'a': 'hello', 'b': b'more', 'c': 123, 'd': 1.23}
     benchmark(s.to_json, dc)
+
+
+@pytest.mark.benchmark(group='dataclass-ser')
+def test_dataclass_to_json(benchmark):
+    dc = Foo(a='hello', b=b'more', c=123, d=1.23)
+    benchmark(to_json, dc)
