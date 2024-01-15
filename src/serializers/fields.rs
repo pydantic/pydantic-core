@@ -4,7 +4,6 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
 use ahash::AHashMap;
-use pyo3::types::iter::PyDictIterator;
 use serde::ser::SerializeMap;
 
 use crate::serializers::extra::SerCheck;
@@ -16,7 +15,7 @@ use super::extra::Extra;
 use super::filter::SchemaFilter;
 use super::infer::{infer_json_key, infer_serialize, infer_to_python, SerializeInfer};
 use super::shared::PydanticSerializer;
-use super::shared::{CombinedSerializer, TypeSerializer};
+use super::shared::{CombinedSerializer, DictResultIterator, TypeSerializer};
 
 /// representation of a field for serialization
 #[derive(Debug, Clone)]
@@ -150,7 +149,7 @@ impl GeneralFieldsSerializer {
     pub fn main_to_python<'py>(
         &self,
         py: Python<'py>,
-        main_iter: impl Iterator<Item = PyResult<(&'py PyString, &'py PyAny)>>,
+        main_iter: impl Iterator<Item = PyResult<(&'py PyAny, &'py PyAny)>>,
         include: Option<&'py PyAny>,
         exclude: Option<&'py PyAny>,
         extra: Extra,
@@ -161,7 +160,7 @@ impl GeneralFieldsSerializer {
         // NOTE! we maintain the order of the input dict assuming that's right
         for result in main_iter {
             let (key, value) = result?;
-            let key_str = key.to_str()?;
+            let key_str = key_str(key)?;
             let op_field = self.fields.get(key_str);
             if extra.exclude_none && value.is_none() {
                 if let Some(field) = op_field {
@@ -214,7 +213,7 @@ impl GeneralFieldsSerializer {
 
     pub fn main_serde_serialize<'py, S: serde::ser::Serializer>(
         &self,
-        main_iter: impl Iterator<Item = PyResult<(&'py PyString, &'py PyAny)>>,
+        main_iter: impl Iterator<Item = PyResult<(&'py PyAny, &'py PyAny)>>,
         expected_len: usize,
         serializer: S,
         include: Option<&'py PyAny>,
@@ -408,29 +407,4 @@ impl TypeSerializer for GeneralFieldsSerializer {
 
 fn key_str(key: &PyAny) -> PyResult<&str> {
     key.downcast::<PyString>()?.to_str()
-}
-
-pub struct DictResultIterator<'py> {
-    dict_iter: PyDictIterator<'py>,
-}
-
-impl<'py> DictResultIterator<'py> {
-    pub fn new(dict: &'py PyDict) -> Self {
-        Self { dict_iter: dict.iter() }
-    }
-}
-
-impl<'py> Iterator for DictResultIterator<'py> {
-    type Item = PyResult<(&'py PyString, &'py PyAny)>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some((key, value)) = self.dict_iter.next() {
-            match key.downcast::<PyString>() {
-                Ok(key_str) => Some(Ok((key_str, value))),
-                Err(e) => Some(Err(e.into())),
-            }
-        } else {
-            None
-        }
-    }
 }

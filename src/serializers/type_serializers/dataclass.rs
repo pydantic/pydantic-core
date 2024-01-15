@@ -228,7 +228,7 @@ impl<'a, 'py> DataclassResultIterator<'a, 'py> {
 }
 
 impl<'a, 'py> Iterator for DataclassResultIterator<'a, 'py> {
-    type Item = PyResult<(&'py PyString, &'py PyAny)>;
+    type Item = PyResult<(&'py PyAny, &'py PyAny)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(field) = self.fields.get(self.index) {
