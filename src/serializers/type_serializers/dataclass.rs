@@ -4,6 +4,7 @@ use pyo3::types::{PyDict, PyList, PyString, PyType};
 use std::borrow::Cow;
 
 use ahash::AHashMap;
+use serde::ser::SerializeMap;
 
 use crate::build_tools::{py_schema_error_type, ExtraBehavior};
 use crate::definitions::DefinitionsBuilder;
@@ -131,16 +132,30 @@ impl TypeSerializer for DataclassSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let extra = Extra {
+        let dc_extra = Extra {
             model: Some(value),
             ..*extra
         };
-        if self.allow_value(value, &extra)? {
-            let inner_value = self.get_inner_value(value)?;
-            self.serializer.to_python(inner_value, include, exclude, &extra)
+        if self.allow_value(value, extra)? {
+            let py = value.py();
+            if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
+                let output_dict = fields_serializer.main_to_python(
+                    py,
+                    DataclassResultIterator::new(&self.fields, value),
+                    include,
+                    exclude,
+                    dc_extra,
+                )?;
+
+                fields_serializer.add_computed_fields_python(Some(value), output_dict, include, exclude, extra)?;
+                Ok(output_dict.into_py(py))
+            } else {
+                let inner_value = self.get_inner_value(value)?;
+                self.serializer.to_python(inner_value, include, exclude, &dc_extra)
+            }
         } else {
-            extra.warnings.on_fallback_py(self.get_name(), value, &extra)?;
-            infer_to_python(value, include, exclude, &extra)
+            extra.warnings.on_fallback_py(self.get_name(), value, &dc_extra)?;
+            infer_to_python(value, include, exclude, &dc_extra)
         }
     }
 
@@ -161,17 +176,29 @@ impl TypeSerializer for DataclassSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let extra = Extra {
-            model: Some(value),
-            ..*extra
-        };
-        if self.allow_value(value, &extra).map_err(py_err_se_err)? {
-            let inner_value = self.get_inner_value(value).map_err(py_err_se_err)?;
-            self.serializer
-                .serde_serialize(inner_value, serializer, include, exclude, &extra)
+        let model = Some(value);
+        let dc_extra = Extra { model, ..*extra };
+        if self.allow_value(value, extra).map_err(py_err_se_err)? {
+            if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
+                let expected_len = self.fields.len() + fields_serializer.computed_field_count();
+                let mut map = fields_serializer.main_serde_serialize(
+                    DataclassResultIterator::new(&self.fields, value),
+                    expected_len,
+                    serializer,
+                    include,
+                    exclude,
+                    dc_extra,
+                )?;
+                fields_serializer.add_computed_fields_json::<S>(model, &mut map, include, exclude, extra)?;
+                map.end()
+            } else {
+                let inner_value = self.get_inner_value(value).map_err(py_err_se_err)?;
+                self.serializer
+                    .serde_serialize(inner_value, serializer, include, exclude, extra)
+            }
         } else {
-            extra.warnings.on_fallback_ser::<S>(self.get_name(), value, &extra)?;
-            infer_serialize(value, serializer, include, exclude, &extra)
+            extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
+            infer_serialize(value, serializer, include, exclude, extra)
         }
     }
 
@@ -181,5 +208,39 @@ impl TypeSerializer for DataclassSerializer {
 
     fn retry_with_lax_check(&self) -> bool {
         true
+    }
+}
+
+pub struct DataclassResultIterator<'a, 'py> {
+    index: usize,
+    fields: &'a [Py<PyString>],
+    dataclass: &'py PyAny,
+}
+
+impl<'a, 'py> DataclassResultIterator<'a, 'py> {
+    pub fn new(fields: &'a [Py<PyString>], dataclass: &'py PyAny) -> Self {
+        Self {
+            index: 0,
+            fields,
+            dataclass,
+        }
+    }
+}
+
+impl<'a, 'py> Iterator for DataclassResultIterator<'a, 'py> {
+    type Item = PyResult<(&'py PyString, &'py PyAny)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(field) = self.fields.get(self.index) {
+            self.index += 1;
+            let py = self.dataclass.py();
+            let field_ref = field.clone_ref(py).into_ref(py);
+            match self.dataclass.getattr(field_ref) {
+                Ok(value) => Some(Ok((field_ref, value))),
+                Err(e) => Some(Err(e)),
+            }
+        } else {
+            None
+        }
     }
 }
