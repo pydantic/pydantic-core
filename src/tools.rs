@@ -105,7 +105,7 @@ pub fn safe_repr(v: &PyAny) -> Cow<str> {
 pub fn extract_i64(obj: &PyAny) -> Option<i64> {
     let val = unsafe { ffi::PyLong_AsLong(obj.as_ptr()) };
     if val == -1 && PyErr::occurred(obj.py()) {
-        _take_err(obj.py());
+        unsafe { ffi::PyErr_Clear() };
         None
     } else {
         Some(val)
@@ -118,20 +118,5 @@ pub fn extract_i64(v: &PyAny) -> Option<i64> {
         v.extract().ok()
     } else {
         None
-    }
-}
-
-#[cfg(not(Py_3_12))]
-fn _take_err(_: Python) {
-    let mut ptype: *mut ffi::PyObject = std::ptr::null_mut();
-    let mut pvalue: *mut ffi::PyObject = std::ptr::null_mut();
-    let mut ptraceback: *mut ffi::PyObject = std::ptr::null_mut();
-    unsafe { ffi::PyErr_Fetch(&mut ptype, &mut pvalue, &mut ptraceback) };
-}
-
-#[cfg(Py_3_12)]
-fn _take_err(_: Python) {
-    unsafe {
-        ffi::PyErr_GetRaisedException();
     }
 }
