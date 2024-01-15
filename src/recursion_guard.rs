@@ -1,5 +1,5 @@
 use ahash::AHashSet;
-use std::hash::Hash;
+use std::mem::MaybeUninit;
 
 type RecursionKey = (
     // Identifier for the input object, e.g. the id() of a Python dict
@@ -14,7 +14,7 @@ type RecursionKey = (
 /// It's used in `validators/definition` to detect when a reference is reused within itself.
 #[derive(Debug, Clone, Default)]
 pub struct RecursionGuard {
-    ids: SmallContainer<RecursionKey>,
+    ids: RecursionStack,
     // depth could be a hashmap {validator_id => depth} but for simplicity and performance it's easier to just
     // use one number for all validators
     depth: u8,
@@ -33,10 +33,10 @@ pub const RECURSION_GUARD_LIMIT: u8 = if cfg!(any(target_family = "wasm", all(wi
 
 impl RecursionGuard {
     // insert a new value
-    // * return `None` if the array/set already had it in it
-    // * return `Some(index)` if the array didn't have it in it and it was inserted
-    pub fn contains_or_insert(&mut self, obj_id: usize, node_id: usize) -> Option<usize> {
-        self.ids.contains_or_insert((obj_id, node_id))
+    // * return `false` if the stack already had it in it
+    // * return `true` if the stack didn't have it in it and it was inserted
+    pub fn insert(&mut self, obj_id: usize, node_id: usize) -> bool {
+        self.ids.insert((obj_id, node_id))
     }
 
     // see #143 this is used as a backup in case the identity check recursion guard fails
@@ -68,8 +68,8 @@ impl RecursionGuard {
         self.depth = self.depth.saturating_sub(1);
     }
 
-    pub fn remove(&mut self, obj_id: usize, node_id: usize, index: usize) {
-        self.ids.remove(&(obj_id, node_id), index);
+    pub fn remove(&mut self, obj_id: usize, node_id: usize) {
+        self.ids.remove(&(obj_id, node_id));
     }
 }
 
@@ -77,66 +77,83 @@ impl RecursionGuard {
 const ARRAY_SIZE: usize = 16;
 
 #[derive(Debug, Clone)]
-enum SmallContainer<T> {
-    Array([Option<T>; ARRAY_SIZE]),
-    Set(AHashSet<T>),
+enum RecursionStack {
+    Array {
+        data: [MaybeUninit<RecursionKey>; ARRAY_SIZE],
+        len: usize,
+    },
+    Set(AHashSet<RecursionKey>),
 }
 
-impl<T: Copy> Default for SmallContainer<T> {
+impl Default for RecursionStack {
     fn default() -> Self {
-        Self::Array([None; ARRAY_SIZE])
+        Self::Array {
+            data: std::array::from_fn(|_| MaybeUninit::uninit()),
+            len: 0,
+        }
     }
 }
 
-impl<T: Eq + Hash + Clone> SmallContainer<T> {
+impl RecursionStack {
     // insert a new value
-    // * return `None` if the array/set already had it in it
-    // * return `Some(index)` if the array didn't have it in it and it was inserted
-    pub fn contains_or_insert(&mut self, v: T) -> Option<usize> {
+    // * return `false` if the stack already had it in it
+    // * return `true` if the stack didn't have it in it and it was inserted
+    pub fn insert(&mut self, v: RecursionKey) -> bool {
         match self {
-            Self::Array(array) => {
-                for (index, op_value) in array.iter_mut().enumerate() {
-                    if let Some(existing) = op_value {
-                        if existing == &v {
-                            return None;
+            Self::Array { data, len } => {
+                if *len < ARRAY_SIZE {
+                    for value in data.iter().take(*len) {
+                        // Safety: reading values within bounds
+                        if unsafe { value.assume_init() } == v {
+                            return false;
                         }
-                    } else {
-                        *op_value = Some(v);
-                        return Some(index);
                     }
-                }
 
-                // No array slots exist; convert to set
-                let mut set: AHashSet<T> = AHashSet::with_capacity(ARRAY_SIZE + 1);
-                for existing in array.iter_mut() {
-                    set.insert(existing.take().unwrap());
+                    data[*len].write(v);
+                    *len += 1;
+                    true
+                } else {
+                    let mut set = AHashSet::with_capacity(ARRAY_SIZE + 1);
+                    for existing in data.iter() {
+                        // Safety: the array is fully initialized
+                        set.insert(unsafe { existing.assume_init() });
+                    }
+                    let inserted = set.insert(v);
+                    *self = Self::Set(set);
+                    inserted
                 }
-                set.insert(v);
-                *self = Self::Set(set);
-                // id doesn't matter here as we'll be removing from a set
-                Some(0)
             }
             // https://doc.rust-lang.org/std/collections/struct.HashSet.html#method.insert
             // "If the set did not have this value present, `true` is returned."
-            Self::Set(set) => {
-                if set.insert(v) {
-                    // again id doesn't matter here as we'll be removing from a set
-                    Some(0)
-                } else {
-                    None
-                }
-            }
+            Self::Set(set) => set.insert(v),
         }
     }
 
-    pub fn remove(&mut self, v: &T, index: usize) {
+    pub fn remove(&mut self, v: &RecursionKey) {
         match self {
-            Self::Array(array) => {
-                debug_assert!(array[index].as_ref() == Some(v), "remove did not match insert");
-                array[index] = None;
+            Self::Array { data, len } => {
+                *len = len.checked_sub(1).expect("remove from empty recursion guard");
+                // Safety: this is reading what was the back of the initialized array
+                let removed = unsafe { data.get_unchecked_mut(*len) };
+                assert!(unsafe { removed.assume_init_ref() } == v, "remove did not match insert");
+                // this should compile away to a noop
+                unsafe { std::ptr::drop_in_place(removed.as_mut_ptr()) }
             }
             Self::Set(set) => {
                 set.remove(v);
+            }
+        }
+    }
+}
+
+impl Drop for RecursionStack {
+    fn drop(&mut self) {
+        // This should compile away to a noop as Recursion>Key doesn't implement Drop, but it seemed
+        // desirable to leave this in for safety in case that should change in the future
+        if let Self::Array { data, len } = self {
+            for value in data.iter_mut().take(*len) {
+                // Safety: reading values within bounds
+                unsafe { std::ptr::drop_in_place(value.as_mut_ptr()) };
             }
         }
     }

@@ -345,24 +345,24 @@ pub struct SerRecursionGuard {
 }
 
 impl SerRecursionGuard {
-    pub fn add(&self, value: &PyAny, def_ref_id: usize) -> PyResult<(usize, usize)> {
+    pub fn add(&self, value: &PyAny, def_ref_id: usize) -> PyResult<usize> {
         let id = value.as_ptr() as usize;
         let mut guard = self.guard.borrow_mut();
 
-        if let Some(insert_index) = guard.contains_or_insert(id, def_ref_id) {
+        if guard.insert(id, def_ref_id) {
             if guard.incr_depth() {
                 Err(PyValueError::new_err("Circular reference detected (depth exceeded)"))
             } else {
-                Ok((id, insert_index))
+                Ok(id)
             }
         } else {
             Err(PyValueError::new_err("Circular reference detected (id repeated)"))
         }
     }
 
-    pub fn pop(&self, id: usize, def_ref_id: usize, insert_index: usize) {
+    pub fn pop(&self, id: usize, def_ref_id: usize) {
         let mut guard = self.guard.borrow_mut();
         guard.decr_depth();
-        guard.remove(id, def_ref_id, insert_index);
+        guard.remove(id, def_ref_id);
     }
 }
