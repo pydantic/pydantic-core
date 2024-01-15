@@ -95,29 +95,26 @@ impl<T: Eq + Hash + Clone> SmallContainer<T> {
     pub fn contains_or_insert(&mut self, v: T) -> Option<usize> {
         match self {
             Self::Array(array) => {
-                let mut first_slot: Option<usize> = None;
-                for (index, op_value) in array.iter().enumerate() {
+                for (index, op_value) in array.iter_mut().enumerate() {
                     if let Some(existing) = op_value {
                         if existing == &v {
                             return None;
                         }
                     } else {
-                        first_slot = first_slot.or(Some(index));
+                        *op_value = Some(v);
+                        return Some(index);
                     }
                 }
-                if let Some(index) = first_slot {
-                    array[index] = Some(v);
-                    first_slot
-                } else {
-                    let mut set: AHashSet<T> = AHashSet::with_capacity(ARRAY_SIZE + 1);
-                    for existing in array.iter_mut() {
-                        set.insert(existing.take().unwrap());
-                    }
-                    set.insert(v);
-                    *self = Self::Set(set);
-                    // id doesn't matter here as we'll be removing from a set
-                    Some(0)
+
+                // No array slots exist; convert to set
+                let mut set: AHashSet<T> = AHashSet::with_capacity(ARRAY_SIZE + 1);
+                for existing in array.iter_mut() {
+                    set.insert(existing.take().unwrap());
                 }
+                set.insert(v);
+                *self = Self::Set(set);
+                // id doesn't matter here as we'll be removing from a set
+                Some(0)
             }
             // https://doc.rust-lang.org/std/collections/struct.HashSet.html#method.insert
             // "If the set did not have this value present, `true` is returned."
@@ -135,6 +132,7 @@ impl<T: Eq + Hash + Clone> SmallContainer<T> {
     pub fn remove(&mut self, v: &T, index: usize) {
         match self {
             Self::Array(array) => {
+                debug_assert!(array[index].as_ref() == Some(v), "remove did not match insert");
                 array[index] = None;
             }
             Self::Set(set) => {
