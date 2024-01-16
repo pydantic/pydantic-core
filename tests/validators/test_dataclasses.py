@@ -1592,3 +1592,64 @@ def test_leak_dataclass(validator):
     gc.collect()
 
     assert ref() is None
+
+
+@pytest.mark.parametrize(
+    'input_value,extra_behavior,expected',
+    [
+        ({'a': 'hello', 'b': 'bye'}, 'ignore', {'a': 'hello', 'b': 'HELLO'}),
+        ({'a': 'hello'}, 'ignore', {'a': 'hello', 'b': 'HELLO'}),
+        ({'a': 'hello', 'b': 'bye'}, 'allow', {'a': 'hello', 'b': 'HELLO'}),
+        ({'a': 'hello'}, 'allow', {'a': 'hello', 'b': 'HELLO'}),
+        (
+            {'a': 'hello', 'b': 'bye'},
+            'forbid',
+            Err(
+                'Unexpected keyword argument',
+                errors=[
+                    {
+                        'type': 'unexpected_keyword_argument',
+                        'loc': ('b',),
+                        'msg': 'Unexpected keyword argument',
+                        'input': 'bye',
+                    }
+                ],
+            ),
+        ),
+        ({'a': 'hello'}, 'forbid', {'a': 'hello', 'b': 'HELLO'}),
+    ],
+)
+def test_dataclass_args_init(input_value, extra_behavior, expected):
+    @dataclasses.dataclass
+    class Foo:
+        a: str
+        b: str
+
+        def __post_init__(self):
+            self.b = self.a.upper()
+
+    schema = core_schema.dataclass_schema(
+        Foo,
+        core_schema.dataclass_args_schema(
+            'Foo',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+                core_schema.dataclass_field(name='b', schema=core_schema.str_schema(), init=False),
+            ],
+            extra_behavior=extra_behavior,
+        ),
+        ['a', 'b'],
+        post_init=True,
+    )
+
+    v = SchemaValidator(schema)
+
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_python(input_value)
+
+        # debug(exc_info.value.errors(include_url=False))
+        if expected.errors is not None:
+            assert exc_info.value.errors(include_url=False) == expected.errors
+    else:
+        assert dataclasses.asdict(v.validate_python(input_value)) == expected
