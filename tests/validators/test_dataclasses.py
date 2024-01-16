@@ -1597,7 +1597,6 @@ def test_leak_dataclass(validator):
 init_test_cases = [
     ({'a': 'hello', 'b': 'bye'}, 'ignore', {'a': 'hello', 'b': 'HELLO'}),
     ({'a': 'hello'}, 'ignore', {'a': 'hello', 'b': 'HELLO'}),
-    ({'a': 'hello', 'b': 'bye'}, 'allow', {'a': 'hello', 'b': 'HELLO'}),
     ({'a': 'hello'}, 'allow', {'a': 'hello', 'b': 'HELLO'}),
     (
         {'a': 'hello', 'b': 'bye'},
@@ -1620,7 +1619,10 @@ init_test_cases = [
 
 @pytest.mark.parametrize(
     'input_value,extra_behavior,expected',
-    init_test_cases,
+    [
+        *init_test_cases,
+        ({'a': 'hello', 'b': 'bye'}, 'allow', {'a': 'hello', 'b': 'HELLO'}),
+    ],
 )
 def test_dataclass_args_init(input_value, extra_behavior, expected):
     @dataclasses.dataclass
@@ -1659,7 +1661,11 @@ def test_dataclass_args_init(input_value, extra_behavior, expected):
 
 @pytest.mark.parametrize(
     'input_value,extra_behavior,expected',
-    init_test_cases,
+    [
+        *init_test_cases,
+        # special case - allow override of default, even when init=False, if extra='allow'
+        ({'a': 'hello', 'b': 'bye'}, 'allow', {'a': 'hello', 'b': 'bye'}),
+    ],
 )
 def test_dataclass_args_init_with_default(input_value, extra_behavior, expected):
     @dataclasses.dataclass
@@ -1675,7 +1681,7 @@ def test_dataclass_args_init_with_default(input_value, extra_behavior, expected)
                 core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_default_schema(core_schema.str_schema(), default='HELLO'),
+                    schema=core_schema.with_default_schema(schema=core_schema.str_schema(), default='HELLO'),
                     init=False,
                 ),
             ],
