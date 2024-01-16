@@ -82,10 +82,28 @@ def test_decimal(py_and_json: PyAndJson, input_value, expected):
         (Decimal(42), Decimal(42)),
         (Decimal('42.0'), Decimal('42.0')),
         (Decimal('42.5'), Decimal('42.5')),
-        (42.0, Err('Input should be an instance of Decimal [type=is_instance_of, input_value=42.0, input_type=float]')),
-        ('42', Err("Input should be an instance of Decimal [type=is_instance_of, input_value='42', input_type=str]")),
-        (42, Err('Input should be an instance of Decimal [type=is_instance_of, input_value=42, input_type=int]')),
-        (True, Err('Input should be an instance of Decimal [type=is_instance_of, input_value=True, input_type=bool]')),
+        (
+            42.0,
+            Err(
+                'Input should be an instance of decimal.Decimal [type=is_instance_of, input_value=42.0, input_type=float]'
+            ),
+        ),
+        (
+            '42',
+            Err(
+                "Input should be an instance of decimal.Decimal [type=is_instance_of, input_value='42', input_type=str]"
+            ),
+        ),
+        (
+            42,
+            Err('Input should be an instance of decimal.Decimal [type=is_instance_of, input_value=42, input_type=int]'),
+        ),
+        (
+            True,
+            Err(
+                'Input should be an instance of decimal.Decimal [type=is_instance_of, input_value=True, input_type=bool]'
+            ),
+        ),
     ],
     ids=repr,
 )
@@ -215,9 +233,9 @@ def test_union_decimal_py():
         {
             'type': 'is_instance_of',
             'loc': ('decimal',),
-            'msg': 'Input should be an instance of Decimal',
+            'msg': 'Input should be an instance of decimal.Decimal',
             'input': '5',
-            'ctx': {'class': 'Decimal'},
+            'ctx': {'class': 'decimal.Decimal'},
         },
         {
             'type': 'multiple_of',
@@ -292,7 +310,7 @@ def test_decimal_key(py_and_json: PyAndJson):
     assert v.validate_test({'1': 1, '2': 2}) == {Decimal('1'): 1, Decimal('2'): 2}
     assert v.validate_test({'1.5': 1, '2.4': 2}) == {Decimal('1.5'): 1, Decimal('2.4'): 2}
     if v.validator_type == 'python':
-        with pytest.raises(ValidationError, match='Input should be an instance of Decimal'):
+        with pytest.raises(ValidationError, match='Input should be an instance of decimal.Decimal'):
             v.validate_test({'1.5': 1, '2.5': 2}, strict=True)
     else:
         assert v.validate_test({'1.5': 1, '2.4': 2}, strict=True) == {Decimal('1.5'): 1, Decimal('2.4'): 2}
@@ -358,7 +376,9 @@ def test_non_finite_json_values(py_and_json: PyAndJson, input_value, allow_inf_n
         (
             Decimal('nan'),
             False,
-            Err("Input should be a finite number [type=finite_number, input_value=Decimal('NaN'), input_type=Decimal]"),
+            Err(
+                "Input should be a finite number [type=finite_number, input_value=Decimal('NaN'), input_type=decimal.Decimal]"
+            ),
         ),
     ],
 )
@@ -379,21 +399,21 @@ def test_non_finite_decimal_values(strict, input_value, allow_inf_nan, expected)
             Decimal('+inf'),
             False,
             Err(
-                "Input should be a finite number [type=finite_number, input_value=Decimal('Infinity'), input_type=Decimal]"
+                "Input should be a finite number [type=finite_number, input_value=Decimal('Infinity'), input_type=decimal.Decimal]"
             ),
         ),
         (
             Decimal('-inf'),
             True,
             Err(
-                "Input should be greater than 0 [type=greater_than, input_value=Decimal('-Infinity'), input_type=Decimal]"
+                "Input should be greater than 0 [type=greater_than, input_value=Decimal('-Infinity'), input_type=decimal.Decimal]"
             ),
         ),
         (
             Decimal('-inf'),
             False,
             Err(
-                "Input should be a finite number [type=finite_number, input_value=Decimal('-Infinity'), input_type=Decimal]"
+                "Input should be a finite number [type=finite_number, input_value=Decimal('-Infinity'), input_type=decimal.Decimal]"
             ),
         ),
     ],

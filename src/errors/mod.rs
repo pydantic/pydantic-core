@@ -14,7 +14,7 @@ pub use self::value_exception::{PydanticCustomError, PydanticKnownError, Pydanti
 
 pub fn py_err_string(py: Python, err: PyErr) -> String {
     let value = err.value(py);
-    match value.get_type().name() {
+    match value.get_type().qualname() {
         Ok(type_name) => match value.str() {
             Ok(py_str) => {
                 let str_cow = py_str.to_string_lossy();
