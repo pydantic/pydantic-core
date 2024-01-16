@@ -197,6 +197,7 @@ impl Validator for DataclassArgsValidator {
                                     }
                                     Err(err) => return Err(err),
                                 };
+                                continue;
                             };
 
                             let mut pos_value = None;

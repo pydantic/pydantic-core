@@ -1594,30 +1594,33 @@ def test_leak_dataclass(validator):
     assert ref() is None
 
 
+init_test_cases = [
+    ({'a': 'hello', 'b': 'bye'}, 'ignore', {'a': 'hello', 'b': 'HELLO'}),
+    ({'a': 'hello'}, 'ignore', {'a': 'hello', 'b': 'HELLO'}),
+    ({'a': 'hello', 'b': 'bye'}, 'allow', {'a': 'hello', 'b': 'HELLO'}),
+    ({'a': 'hello'}, 'allow', {'a': 'hello', 'b': 'HELLO'}),
+    (
+        {'a': 'hello', 'b': 'bye'},
+        'forbid',
+        Err(
+            'Unexpected keyword argument',
+            errors=[
+                {
+                    'type': 'unexpected_keyword_argument',
+                    'loc': ('b',),
+                    'msg': 'Unexpected keyword argument',
+                    'input': 'bye',
+                }
+            ],
+        ),
+    ),
+    ({'a': 'hello'}, 'forbid', {'a': 'hello', 'b': 'HELLO'}),
+]
+
+
 @pytest.mark.parametrize(
     'input_value,extra_behavior,expected',
-    [
-        ({'a': 'hello', 'b': 'bye'}, 'ignore', {'a': 'hello', 'b': 'HELLO'}),
-        ({'a': 'hello'}, 'ignore', {'a': 'hello', 'b': 'HELLO'}),
-        ({'a': 'hello', 'b': 'bye'}, 'allow', {'a': 'hello', 'b': 'HELLO'}),
-        ({'a': 'hello'}, 'allow', {'a': 'hello', 'b': 'HELLO'}),
-        (
-            {'a': 'hello', 'b': 'bye'},
-            'forbid',
-            Err(
-                'Unexpected keyword argument',
-                errors=[
-                    {
-                        'type': 'unexpected_keyword_argument',
-                        'loc': ('b',),
-                        'msg': 'Unexpected keyword argument',
-                        'input': 'bye',
-                    }
-                ],
-            ),
-        ),
-        ({'a': 'hello'}, 'forbid', {'a': 'hello', 'b': 'HELLO'}),
-    ],
+    init_test_cases,
 )
 def test_dataclass_args_init(input_value, extra_behavior, expected):
     @dataclasses.dataclass
@@ -1648,7 +1651,45 @@ def test_dataclass_args_init(input_value, extra_behavior, expected):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_python(input_value)
 
-        # debug(exc_info.value.errors(include_url=False))
+        if expected.errors is not None:
+            assert exc_info.value.errors(include_url=False) == expected.errors
+    else:
+        assert dataclasses.asdict(v.validate_python(input_value)) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,extra_behavior,expected',
+    init_test_cases,
+)
+def test_dataclass_args_init_with_default(input_value, extra_behavior, expected):
+    @dataclasses.dataclass
+    class Foo:
+        a: str
+        b: str
+
+    schema = core_schema.dataclass_schema(
+        Foo,
+        core_schema.dataclass_args_schema(
+            'Foo',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema()),
+                core_schema.dataclass_field(
+                    name='b',
+                    schema=core_schema.with_default_schema(core_schema.str_schema(), default='HELLO'),
+                    init=False,
+                ),
+            ],
+            extra_behavior=extra_behavior,
+        ),
+        ['a', 'b'],
+    )
+
+    v = SchemaValidator(schema)
+
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
+            v.validate_python(input_value)
+
         if expected.errors is not None:
             assert exc_info.value.errors(include_url=False) == expected.errors
     else:
