@@ -4,7 +4,6 @@ use std::fmt::Debug;
 use pyo3::exceptions::PyTypeError;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
-use pyo3::types::iter::PyDictIterator;
 use pyo3::types::{PyDict, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
@@ -365,75 +364,25 @@ pub(crate) fn to_json_bytes(
     Ok(bytes)
 }
 
-pub(super) struct DictIterator<'py> {
-    dict_iter: PyDictIterator<'py>,
-}
-
-impl<'py> DictIterator<'py> {
-    pub fn new(dict: &'py PyDict) -> Self {
-        Self { dict_iter: dict.iter() }
-    }
-}
-
-impl<'py> Iterator for DictIterator<'py> {
-    type Item = PyResult<(&'py PyAny, &'py PyAny)>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.dict_iter.next().map(Ok)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.dict_iter.size_hint()
-    }
-}
-
-pub(super) struct AnyDataclassIterator<'py> {
+pub(super) fn any_dataclass_iter<'py>(
     dataclass: &'py PyAny,
-    fields_iter: PyDictIterator<'py>,
-    field_type_marker: &'py PyAny,
-}
+) -> PyResult<(impl Iterator<Item = PyResult<(&'py PyAny, &'py PyAny)>> + 'py, &PyDict)> {
+    let py = dataclass.py();
+    let fields: &PyDict = dataclass.getattr(intern!(py, "__dataclass_fields__"))?.downcast()?;
+    let field_type_marker = get_field_marker(py)?;
 
-impl<'py> AnyDataclassIterator<'py> {
-    pub fn new(dc: &'py PyAny) -> PyResult<Self> {
-        let py = dc.py();
-        let fields: &PyDict = dc.getattr(intern!(py, "__dataclass_fields__"))?.downcast()?;
-        Ok(Self {
-            dataclass: dc,
-            fields_iter: fields.iter(),
-            field_type_marker: get_field_marker(py)?,
-        })
-    }
-
-    fn _next(&mut self) -> PyResult<Option<(&'py PyAny, &'py PyAny)>> {
-        if let Some((field_name, field)) = self.fields_iter.next() {
-            let field_type = field.getattr(intern!(self.dataclass.py(), "_field_type"))?;
-            if field_type.is(self.field_type_marker) {
-                let field_name: &PyString = field_name.downcast()?;
-                let value = self.dataclass.getattr(field_name)?;
-                Ok(Some((field_name, value)))
-            } else {
-                self._next()
-            }
+    let next = move |(field_name, field): (&'py PyAny, &'py PyAny)| -> PyResult<Option<(&'py PyAny, &'py PyAny)>> {
+        let field_type = field.getattr(intern!(py, "_field_type"))?;
+        if field_type.is(field_type_marker) {
+            let field_name: &PyString = field_name.downcast()?;
+            let value = dataclass.getattr(field_name)?;
+            Ok(Some((field_name, value)))
         } else {
             Ok(None)
         }
-    }
-}
+    };
 
-impl<'py> Iterator for AnyDataclassIterator<'py> {
-    type Item = PyResult<(&'py PyAny, &'py PyAny)>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self._next() {
-            Ok(Some(v)) => Some(Ok(v)),
-            Ok(None) => None,
-            Err(e) => Some(Err(e)),
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, None)
-    }
+    Ok((fields.iter().filter_map(move |field| next(field).transpose()), fields))
 }
 
 static DC_FIELD_MARKER: GILOnceCell<PyObject> = GILOnceCell::new();

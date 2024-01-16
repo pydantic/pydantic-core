@@ -15,7 +15,7 @@ use super::extra::Extra;
 use super::filter::SchemaFilter;
 use super::infer::{infer_json_key, infer_serialize, infer_to_python, SerializeInfer};
 use super::shared::PydanticSerializer;
-use super::shared::{CombinedSerializer, DictIterator, TypeSerializer};
+use super::shared::{CombinedSerializer, TypeSerializer};
 
 /// representation of a field for serialization
 #[derive(Debug, Clone)]
@@ -321,7 +321,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
             return infer_to_python(value, include, exclude, &td_extra);
         };
 
-        let output_dict = self.main_to_python(py, DictIterator::new(main_dict), include, exclude, td_extra)?;
+        let output_dict = self.main_to_python(py, main_dict.iter().map(Ok), include, exclude, td_extra)?;
 
         // this is used to include `__pydantic_extra__` in serialization on models
         if let Some(extra_dict) = extra_dict {
@@ -373,7 +373,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         // NOTE! As above, we maintain the order of the input dict assuming that's right
         // we don't both with `used_fields` here because on unions, `to_python(..., mode='json')` is used
         let mut map = self.main_serde_serialize(
-            DictIterator::new(main_dict),
+            main_dict.iter().map(Ok),
             expected_len,
             serializer,
             include,
