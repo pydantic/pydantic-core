@@ -365,17 +365,17 @@ pub(crate) fn to_json_bytes(
     Ok(bytes)
 }
 
-pub(super) struct DictResultIterator<'py> {
+pub(super) struct DictIterator<'py> {
     dict_iter: PyDictIterator<'py>,
 }
 
-impl<'py> DictResultIterator<'py> {
+impl<'py> DictIterator<'py> {
     pub fn new(dict: &'py PyDict) -> Self {
         Self { dict_iter: dict.iter() }
     }
 }
 
-impl<'py> Iterator for DictResultIterator<'py> {
+impl<'py> Iterator for DictIterator<'py> {
     type Item = PyResult<(&'py PyAny, &'py PyAny)>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -387,13 +387,13 @@ impl<'py> Iterator for DictResultIterator<'py> {
     }
 }
 
-pub(super) struct DataclassSerializer<'py> {
+pub(super) struct AnyDataclassIterator<'py> {
     dataclass: &'py PyAny,
     fields_iter: PyDictIterator<'py>,
     field_type_marker: &'py PyAny,
 }
 
-impl<'py> DataclassSerializer<'py> {
+impl<'py> AnyDataclassIterator<'py> {
     pub fn new(dc: &'py PyAny) -> PyResult<Self> {
         let py = dc.py();
         let fields: &PyDict = dc.getattr(intern!(py, "__dataclass_fields__"))?.downcast()?;
@@ -420,7 +420,7 @@ impl<'py> DataclassSerializer<'py> {
     }
 }
 
-impl<'py> Iterator for DataclassSerializer<'py> {
+impl<'py> Iterator for AnyDataclassIterator<'py> {
     type Item = PyResult<(&'py PyAny, &'py PyAny)>;
 
     fn next(&mut self) -> Option<Self::Item> {

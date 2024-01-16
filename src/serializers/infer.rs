@@ -19,7 +19,7 @@ use super::errors::{py_err_se_err, PydanticSerializationError};
 use super::extra::{Extra, SerMode};
 use super::filter::{AnyFilter, SchemaFilter};
 use super::ob_type::ObType;
-use super::shared::{DataclassSerializer, DictResultIterator, PydanticSerializer, TypeSerializer};
+use super::shared::{AnyDataclassIterator, DictIterator, PydanticSerializer, TypeSerializer};
 use super::SchemaSerializer;
 
 pub(crate) fn infer_to_python(
@@ -150,13 +150,9 @@ pub(crate) fn infer_to_python_known(
                 let elements = serialize_seq!(PyFrozenSet);
                 PyList::new(py, elements).into_py(py)
             }
-            ObType::Dict => serialize_pairs_python_mode_json(
-                py,
-                DictResultIterator::new(value.downcast()?),
-                include,
-                exclude,
-                extra,
-            )?,
+            ObType::Dict => {
+                serialize_pairs_python_mode_json(py, DictIterator::new(value.downcast()?), include, exclude, extra)?
+            }
             ObType::Datetime => {
                 let py_dt: &PyDateTime = value.downcast()?;
                 let iso_dt = super::type_serializers::datetime_etc::datetime_to_string(py_dt)?;
@@ -194,7 +190,7 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::PydanticSerializable => serialize_with_serializer()?,
             ObType::Dataclass => {
-                serialize_pairs_python_mode_json(py, DataclassSerializer::new(value)?, include, exclude, extra)?
+                serialize_pairs_python_mode_json(py, AnyDataclassIterator::new(value)?, include, exclude, extra)?
             }
             ObType::Enum => {
                 let v = value.getattr(intern!(py, "value"))?;
@@ -245,11 +241,11 @@ pub(crate) fn infer_to_python_known(
                 let elements = serialize_seq!(PyFrozenSet);
                 PyFrozenSet::new(py, &elements)?.into_py(py)
             }
-            ObType::Dict => {
-                serialize_pairs_python(py, DictResultIterator::new(value.downcast()?), include, exclude, extra)?
-            }
+            ObType::Dict => serialize_pairs_python(py, DictIterator::new(value.downcast()?), include, exclude, extra)?,
             ObType::PydanticSerializable => serialize_with_serializer()?,
-            ObType::Dataclass => serialize_pairs_python(py, DataclassSerializer::new(value)?, include, exclude, extra)?,
+            ObType::Dataclass => {
+                serialize_pairs_python(py, AnyDataclassIterator::new(value)?, include, exclude, extra)?
+            }
             ObType::Generator => {
                 let iter = super::type_serializers::generator::SerializationIterator::new(
                     value.downcast()?,
@@ -408,7 +404,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         }
         ObType::Dict => {
             let dict = value.downcast::<PyDict>().map_err(py_err_se_err)?;
-            serialize_pairs_json(DictResultIterator::new(dict), serializer, include, exclude, extra)
+            serialize_pairs_json(DictIterator::new(dict), serializer, include, exclude, extra)
         }
         ObType::List => serialize_seq_filter!(PyList),
         ObType::Tuple => serialize_seq_filter!(PyTuple),
@@ -468,7 +464,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             pydantic_serializer.serialize(serializer)
         }
         ObType::Dataclass => serialize_pairs_json(
-            DataclassSerializer::new(value).map_err(py_err_se_err)?,
+            AnyDataclassIterator::new(value).map_err(py_err_se_err)?,
             serializer,
             include,
             exclude,

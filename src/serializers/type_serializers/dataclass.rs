@@ -141,7 +141,7 @@ impl TypeSerializer for DataclassSerializer {
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
                 let output_dict = fields_serializer.main_to_python(
                     py,
-                    DataclassResultIterator::new(&self.fields, value),
+                    KnownDataclassIterator::new(&self.fields, value),
                     include,
                     exclude,
                     dc_extra,
@@ -182,7 +182,7 @@ impl TypeSerializer for DataclassSerializer {
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
                 let expected_len = self.fields.len() + fields_serializer.computed_field_count();
                 let mut map = fields_serializer.main_serde_serialize(
-                    DataclassResultIterator::new(&self.fields, value),
+                    KnownDataclassIterator::new(&self.fields, value),
                     expected_len,
                     serializer,
                     include,
@@ -211,13 +211,13 @@ impl TypeSerializer for DataclassSerializer {
     }
 }
 
-pub struct DataclassResultIterator<'a, 'py> {
+pub struct KnownDataclassIterator<'a, 'py> {
     index: usize,
     fields: &'a [Py<PyString>],
     dataclass: &'py PyAny,
 }
 
-impl<'a, 'py> DataclassResultIterator<'a, 'py> {
+impl<'a, 'py> KnownDataclassIterator<'a, 'py> {
     pub fn new(fields: &'a [Py<PyString>], dataclass: &'py PyAny) -> Self {
         Self {
             index: 0,
@@ -227,7 +227,7 @@ impl<'a, 'py> DataclassResultIterator<'a, 'py> {
     }
 }
 
-impl<'a, 'py> Iterator for DataclassResultIterator<'a, 'py> {
+impl<'a, 'py> Iterator for KnownDataclassIterator<'a, 'py> {
     type Item = PyResult<(&'py PyAny, &'py PyAny)>;
 
     fn next(&mut self) -> Option<Self::Item> {
