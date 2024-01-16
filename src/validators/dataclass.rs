@@ -185,7 +185,17 @@ impl Validator for DataclassArgsValidator {
                                         set_item!(field, value);
                                     },
                                     Ok(None) => continue,
-                                    Err(_) => continue
+                                    Err(ValError::Omit) => continue,
+                                    Err(ValError::LineErrors(line_errors)) => {
+                                        for err in line_errors {
+                                            // Note: this will always use the field name even if there is an alias
+                                            // However, we don't mind so much because this error can only happen if the
+                                            // default value fails validation, which is arguably a developer error.
+                                            // We could try to "fix" this in the future if desired.
+                                            errors.push(err);
+                                        }
+                                    }
+                                    Err(err) => return Err(err),
                                 };
                             };
 
