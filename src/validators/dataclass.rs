@@ -178,7 +178,16 @@ impl Validator for DataclassArgsValidator {
                     ($args:ident, $get_method:ident, $get_macro:ident, $slice_macro:ident) => {{
                         // go through fields getting the value from args or kwargs and validating it
                         for (index, field) in self.fields.iter().enumerate() {
-                            if (!field.init) { continue };
+                            if (!field.init) {
+                                match field.validator.default_value(py, Some(field.name.as_str()), state) {
+                                    Ok(Some(value)) => {
+                                        // Default value exists, and passed validation if required
+                                        set_item!(field, value);
+                                    },
+                                    Ok(None) => continue,
+                                    Err(_) => continue
+                                };
+                            };
 
                             let mut pos_value = None;
                             if let Some(args) = $args.args {
