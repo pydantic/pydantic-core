@@ -184,8 +184,7 @@ impl Validator for DataclassArgsValidator {
                                         // Default value exists, and passed validation if required
                                         set_item!(field, value);
                                     },
-                                    Ok(None) => continue,
-                                    Err(ValError::Omit) => continue,
+                                    Ok(None) | Err(ValError::Omit) => continue,
                                     // Note: this will always use the field name even if there is an alias
                                     // However, we don't mind so much because this error can only happen if the
                                     // default value fails validation, which is arguably a developer error.
