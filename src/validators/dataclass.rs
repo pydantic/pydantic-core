@@ -186,15 +186,11 @@ impl Validator for DataclassArgsValidator {
                                     },
                                     Ok(None) => continue,
                                     Err(ValError::Omit) => continue,
-                                    Err(ValError::LineErrors(line_errors)) => {
-                                        for err in line_errors {
-                                            // Note: this will always use the field name even if there is an alias
-                                            // However, we don't mind so much because this error can only happen if the
-                                            // default value fails validation, which is arguably a developer error.
-                                            // We could try to "fix" this in the future if desired.
-                                            errors.push(err);
-                                        }
-                                    }
+                                    // Note: this will always use the field name even if there is an alias
+                                    // However, we don't mind so much because this error can only happen if the
+                                    // default value fails validation, which is arguably a developer error.
+                                    // We could try to "fix" this in the future if desired.
+                                    Err(ValError::LineErrors(line_errors)) => errors.extend(line_errors),
                                     Err(err) => return Err(err),
                                 };
                                 continue;
