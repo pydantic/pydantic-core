@@ -370,7 +370,7 @@ impl LookupPath {
             }
             line_error
         } else {
-            line_error.with_outer_location(field_name.to_string())
+            line_error.with_outer_location(field_name)
         }
     }
 

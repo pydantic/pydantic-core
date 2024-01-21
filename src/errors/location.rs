@@ -1,6 +1,5 @@
 use pyo3::exceptions::PyTypeError;
 use pyo3::once_cell::GILOnceCell;
-use std::borrow::Cow;
 use std::fmt;
 
 use pyo3::prelude::*;
@@ -43,18 +42,12 @@ impl From<String> for LocItem {
 
 impl From<&String> for LocItem {
     fn from(s: &String) -> Self {
-        Self::S(s.to_string())
+        s.to_string().into()
     }
 }
 
 impl From<&str> for LocItem {
     fn from(s: &str) -> Self {
-        Self::S(s.to_string())
-    }
-}
-
-impl From<Cow<'_, str>> for LocItem {
-    fn from(s: Cow<'_, str>) -> Self {
         Self::S(s.to_string())
     }
 }

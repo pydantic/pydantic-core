@@ -103,6 +103,7 @@ impl From<&PyAny> for LocItem {
         }
     }
 }
+
 impl From<PyAny> for LocItem {
     fn from(py_any: PyAny) -> Self {
         (&py_any).into()
