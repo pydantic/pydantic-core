@@ -44,6 +44,7 @@ num-bigint = "0.4.4"
 python3-dll-a = "0.2.7"
 uuid = "1.6.1"
 jiter = {version = "0.0.6", features = ["python"]}
+#jiter = {path = "../jiter", features = ["python"]}
 
 [lib]
 name = "_pydantic_core"
