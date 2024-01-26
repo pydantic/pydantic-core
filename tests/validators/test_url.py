@@ -10,9 +10,8 @@ from pydantic_core import MultiHostUrl, SchemaError, SchemaValidator, Url, Valid
 from ..conftest import Err, PyAndJson
 
 
-def test_url_ok(py_and_json: PyAndJson):
-    v = py_and_json(core_schema.url_schema())
-    url = v.validate_test('https://example.com/foo/bar?baz=qux#quux')
+def assert_example_url(url: Url):
+    # example URL in question 'https://example.com/foo/bar?baz=qux#quux'
 
     assert isinstance(url, Url)
     assert str(url) == 'https://example.com/foo/bar?baz=qux#quux'
@@ -28,25 +27,53 @@ def test_url_ok(py_and_json: PyAndJson):
     assert url.username is None
     assert url.password is None
     assert url.port == 443
+
+
+def test_url_ok(py_and_json: PyAndJson):
+    v = py_and_json(core_schema.url_schema())
+    url = v.validate_test('https://example.com/foo/bar?baz=qux#quux')
+
+    assert_example_url(url)
 
 
 def test_url_from_constructor_ok():
     url = Url('https://example.com/foo/bar?baz=qux#quux')
 
-    assert isinstance(url, Url)
-    assert str(url) == 'https://example.com/foo/bar?baz=qux#quux'
-    assert repr(url) == "Url('https://example.com/foo/bar?baz=qux#quux')"
-    assert url.unicode_string() == 'https://example.com/foo/bar?baz=qux#quux'
-    assert url.scheme == 'https'
-    assert url.host == 'example.com'
-    assert url.unicode_host() == 'example.com'
-    assert url.path == '/foo/bar'
-    assert url.query == 'baz=qux'
-    assert url.query_params() == [('baz', 'qux')]
-    assert url.fragment == 'quux'
-    assert url.username is None
-    assert url.password is None
-    assert url.port == 443
+    assert_example_url(url)
+
+
+def test_url_from_build_ok():
+    # 1) no host trailing slash/no path leading slash in the input
+    url = Url.build(scheme='https', host='example.com', path='foo/bar', query='baz=qux', fragment='quux')
+    assert_example_url(url)
+
+    # 2) no host trailing slash/with path leading slash in the input
+    url = Url.build(scheme='https', host='example.com', path='/foo/bar', query='baz=qux', fragment='quux')
+    assert_example_url(url)
+
+    # 3) with host trailing slash/no path leading slash in the input
+    url = Url.build(scheme='https', host='example.com/', path='foo/bar', query='baz=qux', fragment='quux')
+    assert_example_url(url)
+
+    # 4) with host trailing slash/with path leading slash in the input
+    url = Url.build(scheme='https', host='example.com/', path='/foo/bar', query='baz=qux', fragment='quux')
+    assert_example_url(url)
+
+    # 5) query no leading question mark
+    url = Url.build(scheme='https', host='example.com', path='foo/bar', query='baz=qux', fragment='quux')
+    assert_example_url(url)
+
+    # 6) query with leading question mark
+    url = Url.build(scheme='https', host='example.com', path='foo/bar', query='?baz=qux', fragment='quux')
+    assert_example_url(url)
+
+    # 7) fragment no leading hash
+    url = Url.build(scheme='https', host='example.com', path='foo/bar', query='baz=qux', fragment='quux')
+    assert_example_url(url)
+
+    # 8) fragment with leading hash
+    url = Url.build(scheme='https', host='example.com', path='foo/bar', query='baz=qux', fragment='#quux')
+    assert_example_url(url)
 
 
 @pytest.fixture(scope='module', name='url_validator')

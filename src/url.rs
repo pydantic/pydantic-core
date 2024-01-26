@@ -177,15 +177,25 @@ impl PyUrl {
         };
         let mut url = format!("{scheme}://{url_host}");
         if let Some(path) = path {
-            url.push('/');
-            url.push_str(path);
+            if !url.ends_with('/') {
+                url.push('/');
+            }
+            if path.starts_with('/') {
+                url.push_str(path.trim_start_matches('/'));
+            } else {
+                url.push_str(path);
+            }
         }
         if let Some(query) = query {
-            url.push('?');
+            if !query.starts_with('?') {
+                url.push('?');
+            }
             url.push_str(query);
         }
         if let Some(fragment) = fragment {
-            url.push('#');
+            if !fragment.starts_with('#') {
+                url.push('#');
+            }
             url.push_str(fragment);
         }
         cls.call1((url,))
@@ -405,15 +415,25 @@ impl PyMultiHostUrl {
             };
 
         if let Some(path) = path {
-            url.push('/');
-            url.push_str(path);
+            if !url.ends_with('/') {
+                url.push('/');
+            }
+            if path.starts_with('/') {
+                url.push_str(path.trim_start_matches('/'));
+            } else {
+                url.push_str(path);
+            }
         }
         if let Some(query) = query {
-            url.push('?');
+            if !query.starts_with('?') {
+                url.push('?');
+            }
             url.push_str(query);
         }
         if let Some(fragment) = fragment {
-            url.push('#');
+            if !fragment.starts_with('#') {
+                url.push('#');
+            }
             url.push_str(fragment);
         }
         cls.call1((url,))
