@@ -1259,6 +1259,20 @@ def test_multi_url_build() -> None:
     assert url == MultiHostUrl('postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test')
     assert str(url) == 'postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test'
 
+    # assert that `build` builds correctly with leading slash in path, leading question mark in query and leading hash in fragment
+    url = MultiHostUrl.build(
+        scheme='postgresql',
+        username='testuser',
+        password='testpassword',
+        host='127.0.0.1',
+        port=5432,
+        path='/database',
+        query='?sslmode=require',
+        fragment='#test',
+    )
+    assert url == MultiHostUrl('postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test')
+    assert str(url) == 'postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test'
+
 
 @pytest.mark.parametrize('field', ['host', 'password', 'username', 'port'])
 def test_multi_url_build_hosts_set_with_single_value(field) -> None:
