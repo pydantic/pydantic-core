@@ -2,7 +2,7 @@ use std::fmt::Write;
 use std::str::FromStr;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyString, PyTuple};
+use pyo3::types::{PyDict, PyList, PySet, PyString, PyTuple};
 use pyo3::{intern, PyTraverseError, PyVisit};
 use smallvec::SmallVec;
 
@@ -112,7 +112,7 @@ impl UnionValidator {
         let mut errors = MaybeErrors::new(self.custom_error.as_ref());
 
         let mut success = None;
-
+        let mut old_output: Vec<&PyAny> = Vec::new();
         for (choice, label) in &self.choices {
             let state = &mut state.rebind_extra(|extra| {
                 if strict {
@@ -120,7 +120,50 @@ impl UnionValidator {
                 }
             });
             state.exactness = Some(Exactness::Exact);
-            let result = choice.validate(py, input, state);
+
+            let result;
+            // For generator, sequence must be saved between validations.
+            // Otherwise the generator will be exhausted after the first validation.
+            let mut output: Vec<&PyAny> = Vec::new();
+            let input_obj = input.to_object(py);
+            let input_ref = input_obj.as_ref(py);
+
+            // Filter out iterator types as generator doesn't have PyTypeInfo implementation
+            if input_ref.is_instance_of::<PyList>()
+                || input_ref.is_instance_of::<PyTuple>()
+                || input_ref.is_instance_of::<PySet>()
+            {
+                result = choice.validate(py, input, state);
+            } else {
+                match input.lax_list() {
+                    Ok(res) => {
+                        let seq = res.as_sequence_iterator(py)?;
+                        for res in seq {
+                            match res {
+                                Ok(val) => {
+                                    output.push(val);
+                                    // Save values from a generator.
+                                    if output.len() > old_output.len() {
+                                        old_output = output.clone();
+                                    }
+                                }
+                                Err(err) => {
+                                    return Err(ValError::from(err));
+                                }
+                            }
+                        }
+
+                        let result_vec = old_output.clone().into_py(py);
+                        let result_ref = result_vec.as_ref(py);
+                        result = choice.validate(py, result_ref, state);
+                    }
+                    _ => {
+                        // Fall-back to the default value if there is no sequence in the input.
+                        result = choice.validate(py, input, state);
+                    }
+                };
+            }
+
             match result {
                 Ok(new_success) => match state.exactness {
                     // exact match, return

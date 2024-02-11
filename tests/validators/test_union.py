@@ -803,3 +803,23 @@ def test_model_and_literal_union() -> None:
     assert isinstance(m, ModelA)
     assert m.a == 42
     assert validator.validate_python(True) is True
+
+
+def test_model_and_generator_union() -> None:
+    # see https://github.com/pydantic/pydantic/issues/8699
+
+    def gen():
+        for val in range(3):
+            yield val
+
+    validator = SchemaValidator(
+        {
+            'type': 'union',
+            'choices': [
+                {'type': 'list', 'items_schema': {'type': 'str'}},
+                {'type': 'list', 'items_schema': {'type': 'int'}},
+            ],
+        }
+    )
+
+    assert validator.validate_python(gen()) == [0, 1, 2]
