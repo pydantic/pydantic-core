@@ -132,6 +132,7 @@ impl UnionValidator {
             if input_ref.is_instance_of::<PyList>()
                 || input_ref.is_instance_of::<PyTuple>()
                 || input_ref.is_instance_of::<PySet>()
+                || input_ref.is_exact_instance_of::<PyDict>()
             {
                 result = choice.validate(py, input, state);
             } else {
