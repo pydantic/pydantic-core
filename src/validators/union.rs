@@ -125,6 +125,7 @@ impl UnionValidator {
 
         let mut gen_values: Vec<&PyAny> = Vec::new();
         let is_gen = input_ref.get_type().is(generator_object.as_ref(py));
+        // Save generator values in vector, as they will be lost on another union choice check.
         if is_gen {
             let values = input.lax_list()?;
             let seq = values.as_sequence_iterator(py)?;
