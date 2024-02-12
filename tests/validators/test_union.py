@@ -804,6 +804,7 @@ def test_model_and_literal_union() -> None:
     assert m.a == 42
     assert validator.validate_python(True) is True
 
+
 def test_model_and_generator_union() -> None:
     # see https://github.com/pydantic/pydantic/issues/8699
 
