@@ -150,10 +150,12 @@ impl UnionValidator {
 
             state.exactness = Some(Exactness::Exact);
 
-            let saved_ref = gen_values.clone().into_py(py);
-            let saved_input = saved_ref.as_ref(py);
             let result = match is_gen {
-                true => choice.validate(py, saved_input, state),
+                true => {
+                    let saved_ref = gen_values.clone().into_py(py);
+                    let saved_input = saved_ref.as_ref(py);
+                    choice.validate(py, saved_input, state)
+                }
                 false => choice.validate(py, input, state),
             };
             match result {
