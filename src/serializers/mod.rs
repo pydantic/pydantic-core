@@ -22,7 +22,7 @@ mod extra;
 mod fields;
 mod filter;
 mod infer;
-mod ob_type;
+pub mod ob_type;
 pub mod ser;
 mod shared;
 mod type_serializers;

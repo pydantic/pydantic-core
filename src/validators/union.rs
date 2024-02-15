@@ -19,6 +19,7 @@ use super::literal::LiteralLookup;
 use super::{
     build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, ValidationState, Validator,
 };
+use crate::serializers::ob_type::{IsType, ObType, ObTypeLookup};
 
 #[derive(Debug)]
 enum UnionMode {
@@ -115,32 +116,16 @@ impl UnionValidator {
 
         let input_obj = input.to_object(py);
         let input_ref = input_obj.as_ref(py);
-
-        let generator_object = py
-            .import("types")
-            .unwrap()
-            .getattr("GeneratorType")
-            .unwrap()
-            .to_object(py);
+        let lookup = ObTypeLookup::cached(py);
 
         let mut gen_values: Vec<&PyAny> = Vec::new();
-        let is_gen = input_ref.get_type().is(generator_object.as_ref(py));
+        let is_gen = lookup.is_type(input_ref, ObType::Generator);
+
         // Save generator values in vector, as they will be lost on another union choice check.
-        if is_gen {
+        if matches!(is_gen, IsType::Exact) {
             let values = input.lax_list()?;
-            let seq = values.as_sequence_iterator(py)?;
-            // Save values from a generator.
-            for res in seq {
-                match res {
-                    Ok(val) => {
-                        gen_values.push(val);
-                    }
-                    Err(err) => {
-                        return Err(ValError::from(err));
-                    }
-                }
-            }
-        };
+            gen_values = values.as_sequence_iterator(py)?.filter_map(Result::ok).collect();
+        }
 
         for (choice, label) in &self.choices {
             let state = &mut state.rebind_extra(|extra| {
@@ -152,12 +137,12 @@ impl UnionValidator {
             state.exactness = Some(Exactness::Exact);
 
             let result = match is_gen {
-                true => {
+                IsType::Exact => {
                     let saved_ref = gen_values.clone().into_py(py);
                     let saved_input = saved_ref.as_ref(py);
                     choice.validate(py, saved_input, state)
                 }
-                false => choice.validate(py, input, state),
+                IsType::False | IsType::Subclass => choice.validate(py, input, state),
             };
             match result {
                 Ok(new_success) => match state.exactness {
