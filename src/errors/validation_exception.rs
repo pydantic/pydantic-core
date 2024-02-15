@@ -17,7 +17,7 @@ use crate::build_tools::py_schema_error_type;
 use crate::errors::LocItem;
 use crate::get_pydantic_version;
 use crate::input::InputType;
-use crate::serializers::{SerMode, SerializationState};
+use crate::serializers::{DuckTypedSerMode, Extra, SerMode, SerializationState};
 use crate::tools::{safe_repr, SchemaDict};
 
 use super::line_error::ValLineError;
@@ -320,7 +320,16 @@ impl ValidationError {
         include_input: bool,
     ) -> PyResult<&'py PyString> {
         let state = SerializationState::new("iso8601", "utf8", "constants")?;
-        let extra = state.extra(py, &SerMode::Json, true, false, false, true, None);
+        let extra = state.extra(
+            py,
+            &SerMode::Json,
+            true,
+            false,
+            false,
+            true,
+            None,
+            DuckTypedSerMode::SchemaBased,
+        );
         let serializer = ValidationErrorSerializer {
             py,
             line_errors: &self.line_errors,
@@ -601,7 +610,7 @@ struct ValidationErrorSerializer<'py> {
     url_prefix: Option<&'py str>,
     include_context: bool,
     include_input: bool,
-    extra: &'py crate::serializers::Extra<'py>,
+    extra: &'py Extra<'py>,
     input_type: &'py InputType,
 }
 
@@ -633,7 +642,7 @@ struct PyLineErrorSerializer<'py> {
     url_prefix: Option<&'py str>,
     include_context: bool,
     include_input: bool,
-    extra: &'py crate::serializers::Extra<'py>,
+    extra: &'py Extra<'py>,
     input_type: &'py InputType,
 }
 

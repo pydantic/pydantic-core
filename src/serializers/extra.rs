@@ -23,6 +23,37 @@ pub(crate) struct SerializationState {
     config: SerializationConfig,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum DuckTypedSerMode {
+    // Don't check the type of the value, use the type of the schema
+    SchemaBased,
+    // Check the type of the value, use the type of the value
+    NeedsInference,
+    // We already checked the type of the value
+    // we don't want to infer again, but if we recurse down
+    // we do want to flip this back to NeedsInference for the
+    // fields / keys / items of any inner serializers
+    Inferred,
+}
+
+impl DuckTypedSerMode {
+    pub fn from_bool(serialize_as_any: bool) -> Self {
+        if serialize_as_any {
+            DuckTypedSerMode::NeedsInference
+        } else {
+            DuckTypedSerMode::SchemaBased
+        }
+    }
+
+    pub fn to_bool(self) -> bool {
+        match self {
+            DuckTypedSerMode::SchemaBased => false,
+            DuckTypedSerMode::NeedsInference => true,
+            DuckTypedSerMode::Inferred => true,
+        }
+    }
+}
+
 impl SerializationState {
     pub fn new(timedelta_mode: &str, bytes_mode: &str, inf_nan_mode: &str) -> PyResult<Self> {
         let warnings = CollectWarnings::new(false);
@@ -45,6 +76,7 @@ impl SerializationState {
         round_trip: bool,
         serialize_unknown: bool,
         fallback: Option<&'py PyAny>,
+        duck_typed_ser_mode: DuckTypedSerMode,
     ) -> Extra<'py> {
         Extra::new(
             py,
@@ -59,6 +91,7 @@ impl SerializationState {
             &self.rec_guard,
             serialize_unknown,
             fallback,
+            duck_typed_ser_mode,
         )
     }
 
@@ -90,6 +123,7 @@ pub(crate) struct Extra<'a> {
     pub field_name: Option<&'a str>,
     pub serialize_unknown: bool,
     pub fallback: Option<&'a PyAny>,
+    pub duck_typed_ser_mode: DuckTypedSerMode,
 }
 
 impl<'a> Extra<'a> {
@@ -107,6 +141,7 @@ impl<'a> Extra<'a> {
         rec_guard: &'a SerRecursionState,
         serialize_unknown: bool,
         fallback: Option<&'a PyAny>,
+        duck_typed_ser_mode: DuckTypedSerMode,
     ) -> Self {
         Self {
             mode,
@@ -124,6 +159,7 @@ impl<'a> Extra<'a> {
             field_name: None,
             serialize_unknown,
             fallback,
+            duck_typed_ser_mode,
         }
     }
 
@@ -182,6 +218,7 @@ pub(crate) struct ExtraOwned {
     field_name: Option<String>,
     serialize_unknown: bool,
     fallback: Option<PyObject>,
+    duck_typed_ser_mode: DuckTypedSerMode,
 }
 
 impl ExtraOwned {
@@ -201,6 +238,7 @@ impl ExtraOwned {
             field_name: extra.field_name.map(ToString::to_string),
             serialize_unknown: extra.serialize_unknown,
             fallback: extra.fallback.map(Into::into),
+            duck_typed_ser_mode: extra.duck_typed_ser_mode,
         }
     }
 
@@ -221,6 +259,7 @@ impl ExtraOwned {
             field_name: self.field_name.as_deref(),
             serialize_unknown: self.serialize_unknown,
             fallback: self.fallback.as_ref().map(|m| m.as_ref(py)),
+            duck_typed_ser_mode: self.duck_typed_ser_mode,
         }
     }
 }

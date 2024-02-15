@@ -500,6 +500,8 @@ struct SerializationInfo {
     #[pyo3(get)]
     round_trip: bool,
     field_name: Option<String>,
+    #[pyo3(get)]
+    serialize_as_any: bool,
 }
 
 impl SerializationInfo {
@@ -522,6 +524,7 @@ impl SerializationInfo {
                     exclude_none: extra.exclude_none,
                     round_trip: extra.round_trip,
                     field_name: Some(field_name.to_string()),
+                    serialize_as_any: extra.duck_typed_ser_mode.to_bool(),
                 }),
                 _ => Err(PyRuntimeError::new_err(
                     "Model field context expected for field serialization info but no model field was found",
@@ -538,6 +541,7 @@ impl SerializationInfo {
                 exclude_none: extra.exclude_none,
                 round_trip: extra.round_trip,
                 field_name: None,
+                serialize_as_any: extra.duck_typed_ser_mode.to_bool(),
             })
         }
     }

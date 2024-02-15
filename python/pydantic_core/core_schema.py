@@ -75,6 +75,7 @@ class CoreConfig(TypedDict, total=False):
             Requires exceptiongroup backport pre Python 3.11.
         coerce_numbers_to_str: Whether to enable coercion of any `Number` type to `str` (not applicable in `strict` mode).
         regex_engine: The regex engine to use for regex pattern validation. Default is 'rust-regex'. See `StringSchema`.
+        serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
     """
 
     title: str
@@ -110,6 +111,7 @@ class CoreConfig(TypedDict, total=False):
     validation_error_cause: bool  # default: False
     coerce_numbers_to_str: bool  # default: False
     regex_engine: Literal['rust-regex', 'python-re']  # default: 'rust-regex'
+    serialize_as_any: bool  # default: False
 
 
 IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
@@ -146,6 +148,10 @@ class SerializationInfo(Protocol):
 
     @property
     def round_trip(self) -> bool:
+        ...
+
+    @property
+    def serialize_as_any(self) -> bool:
         ...
 
     def mode_is_json(self) -> bool:

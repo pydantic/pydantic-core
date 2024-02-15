@@ -15,6 +15,7 @@ use crate::build_tools::py_schema_err;
 use crate::build_tools::{py_schema_error_type, ExtraBehavior};
 use crate::definitions::DefinitionsBuilder;
 use crate::serializers::errors::PydanticSerializationUnexpectedValue;
+use crate::serializers::extra::DuckTypedSerMode;
 use crate::tools::SchemaDict;
 
 const ROOT_FIELD: &str = "root";
@@ -161,10 +162,23 @@ impl TypeSerializer for ModelSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let mut extra = Extra {
-            model: Some(value),
-            field_name: None,
-            ..*extra
+        let mut extra = match extra.duck_typed_ser_mode {
+            DuckTypedSerMode::Inferred => Extra {
+                model: Some(value),
+                field_name: None,
+                duck_typed_ser_mode: DuckTypedSerMode::NeedsInference,
+                ..*extra
+            },
+            DuckTypedSerMode::NeedsInference => {
+                let extra = Extra {
+                    model: Some(value),
+                    field_name: None,
+                    duck_typed_ser_mode: DuckTypedSerMode::Inferred,
+                    ..*extra
+                };
+                return infer_to_python(value, include, exclude, &extra);
+            }
+            DuckTypedSerMode::SchemaBased => extra.clone(),
         };
         if self.root_model {
             extra.field_name = Some(ROOT_FIELD);
@@ -203,10 +217,23 @@ impl TypeSerializer for ModelSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let mut extra = Extra {
-            model: Some(value),
-            field_name: None,
-            ..*extra
+        let mut extra = match extra.duck_typed_ser_mode {
+            DuckTypedSerMode::Inferred => Extra {
+                model: Some(value),
+                field_name: None,
+                duck_typed_ser_mode: DuckTypedSerMode::NeedsInference,
+                ..*extra
+            },
+            DuckTypedSerMode::NeedsInference => {
+                let extra = Extra {
+                    model: Some(value),
+                    field_name: None,
+                    duck_typed_ser_mode: DuckTypedSerMode::Inferred,
+                    ..*extra
+                };
+                return infer_serialize(value, serializer, include, exclude, &extra);
+            }
+            DuckTypedSerMode::SchemaBased => extra.clone(),
         };
         if self.root_model {
             extra.field_name = Some(ROOT_FIELD);
