@@ -10,6 +10,7 @@ use strum::Display;
 use strum_macros::EnumString;
 
 use crate::url::{PyMultiHostUrl, PyUrl};
+
 #[derive(Debug, Clone)]
 pub struct ObTypeLookup {
     // valid JSON types
