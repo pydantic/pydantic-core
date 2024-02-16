@@ -217,7 +217,8 @@ impl TypeSerializer for ModelSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let mut extra = match extra.duck_typed_ser_mode {
+        let duck_typed_ser_mode = extra.config.duck_typed_ser_mode.unwrap_or(&extra.duck_typed_ser_mode);
+        let mut extra = match duck_typed_ser_mode {
             DuckTypedSerMode::Inferred => Extra {
                 model: Some(value),
                 field_name: None,

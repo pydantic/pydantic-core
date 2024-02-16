@@ -573,12 +573,13 @@ impl SerializationInfo {
         d.set_item("exclude_defaults", self.exclude_defaults)?;
         d.set_item("exclude_none", self.exclude_none)?;
         d.set_item("round_trip", self.round_trip)?;
+        d.set_item("serialize_as_any", self.serialize_as_any)?;
         Ok(d)
     }
 
     fn __repr__(&self, py: Python) -> PyResult<String> {
         Ok(format!(
-            "SerializationInfo(include={}, exclude={}, mode='{}', by_alias={}, exclude_unset={}, exclude_defaults={}, exclude_none={}, round_trip={})",
+            "SerializationInfo(include={}, exclude={}, mode='{}', by_alias={}, exclude_unset={}, exclude_defaults={}, exclude_none={}, round_trip={}, serialize_as_any={})",
             match self.include {
                 Some(ref include) => include.as_ref(py).repr()?.to_str()?,
                 None => "None",
@@ -593,6 +594,7 @@ impl SerializationInfo {
             py_bool(self.exclude_defaults),
             py_bool(self.exclude_none),
             py_bool(self.round_trip),
+            py_bool(self.serialize_as_any),
         ))
     }
 
