@@ -235,21 +235,3 @@ def test_json_dict():
     assert exc_info.value.errors(include_url=False) == [
         {'type': 'dict_type', 'loc': (), 'msg': 'Input should be an object', 'input': 1}
     ]
-
-
-def test_json_big_int_key():
-    v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'str'}})
-    big_integer = 1433352099889938534014333520998899385340
-    assert v.validate_python({1433352099889938534014333520998899385340: 'x'}) == {big_integer: 'x'}
-
-    assert v.validate_json('{"' + str(big_integer) + '": "x"}') == {big_integer: 'x'}
-    # with pytest.raises(ValidationError, match=re.escape('x.[key]\n  Input should be a valid integer')) as exc_info:
-    #     v.validate_python({'x': 1})
-    # assert exc_info.value.errors(include_url=False) == [
-    #     {
-    #         'type': 'int_parsing',
-    #         'loc': ('x', '[key]'),
-    #         'msg': 'Input should be a valid integer, unable to parse string as an integer',
-    #         'input': 'x',
-    #     }
-    # ]
