@@ -8,6 +8,7 @@ use serde::ser::SerializeMap;
 
 use crate::build_tools::{py_schema_error_type, ExtraBehavior};
 use crate::definitions::DefinitionsBuilder;
+use crate::serializers::DuckTypedSerMode;
 use crate::tools::SchemaDict;
 
 use super::{
@@ -132,9 +133,23 @@ impl TypeSerializer for DataclassSerializer {
         exclude: Option<&PyAny>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let dc_extra = Extra {
-            model: Some(value),
-            ..*extra
+        let dc_extra = match extra.duck_typed_ser_mode {
+            DuckTypedSerMode::Inferred => Extra {
+                model: Some(value),
+                field_name: None,
+                duck_typed_ser_mode: DuckTypedSerMode::NeedsInference,
+                ..*extra
+            },
+            DuckTypedSerMode::NeedsInference => {
+                let extra = Extra {
+                    model: Some(value),
+                    field_name: None,
+                    duck_typed_ser_mode: DuckTypedSerMode::Inferred,
+                    ..*extra
+                };
+                return infer_to_python(value, include, exclude, &extra);
+            }
+            DuckTypedSerMode::SchemaBased => extra.clone(),
         };
         if self.allow_value(value, extra)? {
             let py = value.py();
@@ -177,7 +192,24 @@ impl TypeSerializer for DataclassSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let model = Some(value);
-        let dc_extra = Extra { model, ..*extra };
+        let dc_extra = match extra.duck_typed_ser_mode {
+            DuckTypedSerMode::Inferred => Extra {
+                model: Some(value),
+                field_name: None,
+                duck_typed_ser_mode: DuckTypedSerMode::NeedsInference,
+                ..*extra
+            },
+            DuckTypedSerMode::NeedsInference => {
+                let extra = Extra {
+                    model: Some(value),
+                    field_name: None,
+                    duck_typed_ser_mode: DuckTypedSerMode::Inferred,
+                    ..*extra
+                };
+                return infer_serialize(value, serializer, include, exclude, &extra);
+            }
+            DuckTypedSerMode::SchemaBased => extra.clone(),
+        };
         if self.allow_value(value, extra).map_err(py_err_se_err)? {
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
                 let expected_len = self.fields.len() + fields_serializer.computed_field_count();
