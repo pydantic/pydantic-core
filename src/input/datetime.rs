@@ -563,8 +563,23 @@ impl TzInfo {
         hasher.finish()
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> bool {
-        op.matches(self.seconds.cmp(&other.seconds))
+    fn __richcmp__(&self, other: &PyAny, op: CompareOp) -> PyResult<Py<PyAny>> {
+        let py = other.py();
+        if other.is_instance_of::<PyTzInfo>() {
+            let offset_delta = other.call_method1(intern!(py, "utcoffset"), (py.None().as_ref(py),))?;
+            let offset_seconds: f64 = offset_delta.call_method0(intern!(py, "total_seconds"))?.extract()?;
+            let offset = offset_seconds.round() as i32;
+            match op {
+                CompareOp::Lt => Ok((self.seconds < offset).into_py(py)),
+                CompareOp::Le => Ok((self.seconds <= offset).into_py(py)),
+                CompareOp::Eq => Ok((self.seconds == offset).into_py(py)),
+                CompareOp::Ne => Ok((self.seconds != offset).into_py(py)),
+                CompareOp::Gt => Ok((self.seconds > offset).into_py(py)),
+                CompareOp::Ge => Ok((self.seconds >= offset).into_py(py)),
+            }
+        } else {
+            Ok(py.NotImplemented())
+        }
     }
 
     fn __deepcopy__(&self, py: Python, _memo: &PyDict) -> PyResult<Py<Self>> {
