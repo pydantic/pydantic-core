@@ -569,14 +569,7 @@ impl TzInfo {
             let offset_delta = other.call_method1(intern!(py, "utcoffset"), (py.None().as_ref(py),))?;
             let offset_seconds: f64 = offset_delta.call_method0(intern!(py, "total_seconds"))?.extract()?;
             let offset = offset_seconds.round() as i32;
-            match op {
-                CompareOp::Lt => Ok((self.seconds < offset).into_py(py)),
-                CompareOp::Le => Ok((self.seconds <= offset).into_py(py)),
-                CompareOp::Eq => Ok((self.seconds == offset).into_py(py)),
-                CompareOp::Ne => Ok((self.seconds != offset).into_py(py)),
-                CompareOp::Gt => Ok((self.seconds > offset).into_py(py)),
-                CompareOp::Ge => Ok((self.seconds >= offset).into_py(py)),
-            }
+            Ok(op.matches(self.seconds.cmp(&offset)).into_py(py))
         } else {
             Ok(py.NotImplemented())
         }
