@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -39,9 +41,22 @@ impl BuildSerializer for DefinitionsSerializerBuilder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DefinitionRefSerializer {
     definition: DefinitionRef<CombinedSerializer>,
+    retry_with_lax_check_cached: OnceLock<bool>,
+    in_recursion: AtomicBool,
+}
+
+// TODO(DH): Remove the need to clone serializers
+impl Clone for DefinitionRefSerializer {
+    fn clone(&self) -> Self {
+        Self {
+            definition: self.definition.clone(),
+            retry_with_lax_check_cached: OnceLock::new(),
+            in_recursion: AtomicBool::new(false),
+        }
+    }
 }
 
 impl BuildSerializer for DefinitionRefSerializer {
@@ -54,7 +69,12 @@ impl BuildSerializer for DefinitionRefSerializer {
     ) -> PyResult<CombinedSerializer> {
         let schema_ref = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
         let definition = definitions.get_definition(schema_ref);
-        Ok(Self { definition }.into())
+        Ok(Self {
+            definition,
+            retry_with_lax_check_cached: OnceLock::new(),
+            in_recursion: AtomicBool::new(false),
+        }
+        .into())
     }
 }
 
@@ -101,6 +121,20 @@ impl TypeSerializer for DefinitionRefSerializer {
     }
 
     fn retry_with_lax_check(&self) -> bool {
-        self.definition.read(|s| s.unwrap().retry_with_lax_check())
+        if let Some(cached) = self.retry_with_lax_check_cached.get() {
+            return *cached;
+        }
+        if self
+            .in_recursion
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return false;
+        }
+        let result = self
+            .retry_with_lax_check_cached
+            .get_or_init(|| self.definition.read(|s| s.unwrap().retry_with_lax_check()));
+        self.in_recursion.store(false, Ordering::SeqCst);
+        *result
     }
 }
