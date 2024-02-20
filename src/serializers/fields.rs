@@ -7,6 +7,7 @@ use ahash::AHashMap;
 use serde::ser::SerializeMap;
 
 use crate::serializers::extra::SerCheck;
+use crate::serializers::DuckTypedSerMode;
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::computed_fields::ComputedFields;
@@ -313,7 +314,24 @@ impl TypeSerializer for GeneralFieldsSerializer {
         // then do not touch it
         // If there is no model, we (a TypedDict) are the model
         let model = extra.model.map_or_else(|| Some(value), Some);
-        let td_extra = Extra { model, ..*extra };
+        let td_extra = match extra.duck_typed_ser_mode {
+            DuckTypedSerMode::Inferred => Extra {
+                model: Some(value),
+                field_name: None,
+                duck_typed_ser_mode: DuckTypedSerMode::NeedsInference,
+                ..*extra
+            },
+            DuckTypedSerMode::NeedsInference => {
+                let extra = Extra {
+                    model: Some(value),
+                    field_name: None,
+                    duck_typed_ser_mode: DuckTypedSerMode::Inferred,
+                    ..*extra
+                };
+                return infer_to_python(value, include, exclude, &extra);
+            }
+            DuckTypedSerMode::SchemaBased => Extra { model, ..*extra },
+        };
         let (main_dict, extra_dict) = if let Some(main_extra_dict) = self.extract_dicts(value) {
             main_extra_dict
         } else {
@@ -365,7 +383,24 @@ impl TypeSerializer for GeneralFieldsSerializer {
         // then do not touch it
         // If there is no model, we (a TypedDict) are the model
         let model = extra.model.map_or_else(|| Some(value), Some);
-        let td_extra = Extra { model, ..*extra };
+        let td_extra = match extra.duck_typed_ser_mode {
+            DuckTypedSerMode::Inferred => Extra {
+                model: Some(value),
+                field_name: None,
+                duck_typed_ser_mode: DuckTypedSerMode::NeedsInference,
+                ..*extra
+            },
+            DuckTypedSerMode::NeedsInference => {
+                let extra = Extra {
+                    model: Some(value),
+                    field_name: None,
+                    duck_typed_ser_mode: DuckTypedSerMode::Inferred,
+                    ..*extra
+                };
+                return infer_serialize(value, serializer, include, exclude, &extra);
+            }
+            DuckTypedSerMode::SchemaBased => Extra { model, ..*extra },
+        };
         let expected_len = match self.mode {
             FieldsMode::TypedDictAllow => main_dict.len() + self.computed_field_count(),
             _ => self.fields.len() + option_length!(extra_dict) + self.computed_field_count(),
