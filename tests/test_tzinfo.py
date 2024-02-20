@@ -175,7 +175,8 @@ class TestTzInfo(unittest.TestCase):
         self.assertTrue(self.EST == estdatetime.tzinfo)
         self.assertTrue(tz > estdatetime.tzinfo)
         if sys.version_info >= (3, 9) and sys.platform == 'linux':
-            self.assertFalse(tz == ZoneInfo('Europe/London'))
+            with self.assertRaises(TypeError):
+                tz > ZoneInfo('Europe/London')
 
     def test_copy(self):
         for tz in self.ACDT, self.EST:
