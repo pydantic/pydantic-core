@@ -4,6 +4,8 @@ import pickle
 import unittest
 from datetime import datetime, timedelta, timezone, tzinfo
 
+from zoneinfo import ZoneInfo
+
 from pydantic_core import SchemaValidator, TzInfo, core_schema
 
 
@@ -170,6 +172,7 @@ class TestTzInfo(unittest.TestCase):
         estdatetime = self.DT.replace(tzinfo=timezone(-timedelta(hours=5)))
         self.assertTrue(self.EST == estdatetime.tzinfo)
         self.assertTrue(tz > estdatetime.tzinfo)
+        self.assertFalse(tz == ZoneInfo('Europe/London'))
 
     def test_copy(self):
         for tz in self.ACDT, self.EST:

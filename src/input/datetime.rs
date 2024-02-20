@@ -566,7 +566,10 @@ impl TzInfo {
     fn __richcmp__(&self, other: &PyAny, op: CompareOp) -> PyResult<Py<PyAny>> {
         let py = other.py();
         if other.is_instance_of::<PyTzInfo>() {
-            let offset_delta = other.call_method1(intern!(py, "utcoffset"), (py.None().as_ref(py),))?;
+            let offset_delta = other.call_method1(intern!(py, "utcoffset"), (py.None(),))?;
+            if offset_delta.is_none() {
+                return Ok(py.NotImplemented());
+            }
             let offset_seconds: f64 = offset_delta.call_method0(intern!(py, "total_seconds"))?.extract()?;
             let offset = offset_seconds.round() as i32;
             Ok(op.matches(self.seconds.cmp(&offset)).into_py(py))
