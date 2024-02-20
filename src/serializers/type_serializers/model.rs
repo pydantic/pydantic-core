@@ -178,7 +178,11 @@ impl TypeSerializer for ModelSerializer {
                 };
                 return infer_to_python(value, include, exclude, &extra);
             }
-            DuckTypedSerMode::SchemaBased => extra.clone(),
+            DuckTypedSerMode::SchemaBased => Extra {
+                model: Some(value),
+                field_name: None,
+                ..*extra
+            },
         };
         if self.root_model {
             extra.field_name = Some(ROOT_FIELD);
@@ -233,7 +237,11 @@ impl TypeSerializer for ModelSerializer {
                 };
                 return infer_serialize(value, serializer, include, exclude, &extra);
             }
-            DuckTypedSerMode::SchemaBased => extra.clone(),
+            DuckTypedSerMode::SchemaBased => Extra {
+                model: Some(value),
+                field_name: None,
+                ..*extra
+            },
         };
         if self.root_model {
             extra.field_name = Some(ROOT_FIELD);

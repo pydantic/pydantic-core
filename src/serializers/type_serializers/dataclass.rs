@@ -149,7 +149,10 @@ impl TypeSerializer for DataclassSerializer {
                 };
                 return infer_to_python(value, include, exclude, &extra);
             }
-            DuckTypedSerMode::SchemaBased => extra.clone(),
+            DuckTypedSerMode::SchemaBased => Extra {
+                model: Some(value),
+                ..*extra
+            },
         };
         if self.allow_value(value, extra)? {
             let py = value.py();
@@ -208,7 +211,10 @@ impl TypeSerializer for DataclassSerializer {
                 };
                 return infer_serialize(value, serializer, include, exclude, &extra);
             }
-            DuckTypedSerMode::SchemaBased => extra.clone(),
+            DuckTypedSerMode::SchemaBased => Extra {
+                model: Some(value),
+                ..*extra
+            },
         };
         if self.allow_value(value, extra).map_err(py_err_se_err)? {
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
