@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone, tzinfo
 
 from pydantic_core import SchemaValidator, TzInfo, core_schema
 
-if sys.version_info > (3, 8):
+if sys.version_info >= (3, 9):
     from zoneinfo import ZoneInfo
 
 
@@ -174,7 +174,7 @@ class TestTzInfo(unittest.TestCase):
         estdatetime = self.DT.replace(tzinfo=timezone(-timedelta(hours=5)))
         self.assertTrue(self.EST == estdatetime.tzinfo)
         self.assertTrue(tz > estdatetime.tzinfo)
-        if sys.version_info > (3, 8) and sys.platform == 'linux':
+        if sys.version_info >= (3, 9) and sys.platform == 'linux':
             self.assertFalse(tz == ZoneInfo('Europe/London'))
 
     def test_copy(self):
