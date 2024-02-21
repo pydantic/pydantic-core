@@ -17,7 +17,7 @@ use crate::build_tools::py_schema_error_type;
 use crate::errors::LocItem;
 use crate::get_pydantic_version;
 use crate::input::InputType;
-use crate::serializers::{DuckTypedSerMode, Extra, SerMode, SerializationState};
+use crate::serializers::{DuckTypingSerMode, Extra, SerMode, SerializationState};
 use crate::tools::{safe_repr, SchemaDict};
 
 use super::line_error::ValLineError;
@@ -328,7 +328,7 @@ impl ValidationError {
             false,
             true,
             None,
-            DuckTypedSerMode::SchemaBased,
+            DuckTypingSerMode::SchemaBased,
         );
         let serializer = ValidationErrorSerializer {
             py,

@@ -11,7 +11,7 @@ use crate::py_gc::PyGcTraverse;
 use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
 use extra::{CollectWarnings, SerRecursionState};
-pub(crate) use extra::{DuckTypedSerMode, Extra, SerMode, SerializationState};
+pub(crate) use extra::{DuckTypingSerMode, Extra, SerMode, SerializationState};
 pub use shared::CombinedSerializer;
 use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
 
@@ -55,7 +55,7 @@ impl SchemaSerializer {
         rec_guard: &'a SerRecursionState,
         serialize_unknown: bool,
         fallback: Option<&'a PyAny>,
-        serialize_as_any: DuckTypedSerMode,
+        duck_typing_ser_mode: DuckTypingSerMode,
     ) -> Extra<'b> {
         Extra::new(
             py,
@@ -70,7 +70,7 @@ impl SchemaSerializer {
             rec_guard,
             serialize_unknown,
             fallback,
-            serialize_as_any,
+            duck_typing_ser_mode,
         )
     }
 }
@@ -117,7 +117,7 @@ impl SchemaSerializer {
         let mode: SerMode = mode.into();
         let warnings = CollectWarnings::new(warnings);
         let rec_guard = SerRecursionState::default();
-        let duck_typed_ser_mode = DuckTypedSerMode::from_bool(serialize_as_any);
+        let duck_typing_ser_mode = DuckTypingSerMode::from_bool(serialize_as_any);
         let extra = self.build_extra(
             py,
             &mode,
@@ -130,7 +130,7 @@ impl SchemaSerializer {
             &rec_guard,
             false,
             fallback,
-            duck_typed_ser_mode,
+            duck_typing_ser_mode,
         );
         let v = self.serializer.to_python(value, include, exclude, &extra)?;
         warnings.final_check(py)?;
@@ -159,7 +159,7 @@ impl SchemaSerializer {
     ) -> PyResult<PyObject> {
         let warnings = CollectWarnings::new(warnings);
         let rec_guard = SerRecursionState::default();
-        let duck_typed_ser_mode = DuckTypedSerMode::from_bool(serialize_as_any);
+        let duck_typing_ser_mode = DuckTypingSerMode::from_bool(serialize_as_any);
         let extra = self.build_extra(
             py,
             &SerMode::Json,
@@ -172,7 +172,7 @@ impl SchemaSerializer {
             &rec_guard,
             false,
             fallback,
-            duck_typed_ser_mode,
+            duck_typing_ser_mode,
         );
         let bytes = to_json_bytes(
             value,
@@ -239,7 +239,7 @@ pub fn to_json(
     serialize_as_any: bool,
 ) -> PyResult<PyObject> {
     let state = SerializationState::new(timedelta_mode, bytes_mode, inf_nan_mode)?;
-    let duck_typed_ser_mode = DuckTypedSerMode::from_bool(serialize_as_any);
+    let duck_typing_ser_mode = DuckTypingSerMode::from_bool(serialize_as_any);
     let extra = state.extra(
         py,
         &SerMode::Json,
@@ -248,7 +248,7 @@ pub fn to_json(
         round_trip,
         serialize_unknown,
         fallback,
-        duck_typed_ser_mode,
+        duck_typing_ser_mode,
     );
     let serializer = type_serializers::any::AnySerializer.into();
     let bytes = to_json_bytes(value, &serializer, include, exclude, &extra, indent, 1024)?;
@@ -278,7 +278,7 @@ pub fn to_jsonable_python(
     serialize_as_any: bool,
 ) -> PyResult<PyObject> {
     let state = SerializationState::new(timedelta_mode, bytes_mode, inf_nan_mode)?;
-    let duck_typed_ser_mode = DuckTypedSerMode::from_bool(serialize_as_any);
+    let duck_typing_ser_mode = DuckTypingSerMode::from_bool(serialize_as_any);
     let extra = state.extra(
         py,
         &SerMode::Json,
@@ -287,7 +287,7 @@ pub fn to_jsonable_python(
         round_trip,
         serialize_unknown,
         fallback,
-        duck_typed_ser_mode,
+        duck_typing_ser_mode,
     );
     let v = infer::infer_to_python(value, include, exclude, &extra)?;
     state.final_check(py)?;

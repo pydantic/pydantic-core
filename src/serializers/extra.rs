@@ -23,8 +23,8 @@ pub(crate) struct SerializationState {
     config: SerializationConfig,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum DuckTypedSerMode {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DuckTypingSerMode {
     // Don't check the type of the value, use the type of the schema
     SchemaBased,
     // Check the type of the value, use the type of the value
@@ -36,20 +36,28 @@ pub enum DuckTypedSerMode {
     Inferred,
 }
 
-impl DuckTypedSerMode {
+impl DuckTypingSerMode {
     pub fn from_bool(serialize_as_any: bool) -> Self {
         if serialize_as_any {
-            DuckTypedSerMode::NeedsInference
+            DuckTypingSerMode::NeedsInference
         } else {
-            DuckTypedSerMode::SchemaBased
+            DuckTypingSerMode::SchemaBased
         }
     }
 
     pub fn to_bool(self) -> bool {
         match self {
-            DuckTypedSerMode::SchemaBased => false,
-            DuckTypedSerMode::NeedsInference => true,
-            DuckTypedSerMode::Inferred => true,
+            DuckTypingSerMode::SchemaBased => false,
+            DuckTypingSerMode::NeedsInference => true,
+            DuckTypingSerMode::Inferred => true,
+        }
+    }
+
+    pub fn next_mode(self) -> Self {
+        match self {
+            DuckTypingSerMode::SchemaBased => DuckTypingSerMode::SchemaBased,
+            DuckTypingSerMode::NeedsInference => DuckTypingSerMode::Inferred,
+            DuckTypingSerMode::Inferred => DuckTypingSerMode::NeedsInference,
         }
     }
 }
@@ -76,7 +84,7 @@ impl SerializationState {
         round_trip: bool,
         serialize_unknown: bool,
         fallback: Option<&'py PyAny>,
-        duck_typed_ser_mode: DuckTypedSerMode,
+        duck_typing_ser_mode: DuckTypingSerMode,
     ) -> Extra<'py> {
         Extra::new(
             py,
@@ -91,7 +99,7 @@ impl SerializationState {
             &self.rec_guard,
             serialize_unknown,
             fallback,
-            duck_typed_ser_mode,
+            duck_typing_ser_mode,
         )
     }
 
@@ -123,7 +131,7 @@ pub(crate) struct Extra<'a> {
     pub field_name: Option<&'a str>,
     pub serialize_unknown: bool,
     pub fallback: Option<&'a PyAny>,
-    pub duck_typed_ser_mode: DuckTypedSerMode,
+    pub duck_typing_ser_mode: DuckTypingSerMode,
 }
 
 impl<'a> Extra<'a> {
@@ -141,7 +149,7 @@ impl<'a> Extra<'a> {
         rec_guard: &'a SerRecursionState,
         serialize_unknown: bool,
         fallback: Option<&'a PyAny>,
-        duck_typed_ser_mode: DuckTypedSerMode,
+        duck_typing_ser_mode: DuckTypingSerMode,
     ) -> Self {
         Self {
             mode,
@@ -159,7 +167,7 @@ impl<'a> Extra<'a> {
             field_name: None,
             serialize_unknown,
             fallback,
-            duck_typed_ser_mode,
+            duck_typing_ser_mode,
         }
     }
 
@@ -218,7 +226,7 @@ pub(crate) struct ExtraOwned {
     field_name: Option<String>,
     serialize_unknown: bool,
     fallback: Option<PyObject>,
-    duck_typed_ser_mode: DuckTypedSerMode,
+    duck_typing_ser_mode: DuckTypingSerMode,
 }
 
 impl ExtraOwned {
@@ -238,7 +246,7 @@ impl ExtraOwned {
             field_name: extra.field_name.map(ToString::to_string),
             serialize_unknown: extra.serialize_unknown,
             fallback: extra.fallback.map(Into::into),
-            duck_typed_ser_mode: extra.duck_typed_ser_mode,
+            duck_typing_ser_mode: extra.duck_typing_ser_mode,
         }
     }
 
@@ -259,7 +267,7 @@ impl ExtraOwned {
             field_name: self.field_name.as_deref(),
             serialize_unknown: self.serialize_unknown,
             fallback: self.fallback.as_ref().map(|m| m.as_ref(py)),
-            duck_typed_ser_mode: self.duck_typed_ser_mode,
+            duck_typing_ser_mode: self.duck_typing_ser_mode,
         }
     }
 }
