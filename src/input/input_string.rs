@@ -1,3 +1,4 @@
+use num_bigint::BigInt;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
@@ -112,9 +113,15 @@ impl<'a> Input<'a> for StringMapping<'a> {
 
     fn validate_int(&'a self, _strict: bool) -> ValResult<ValidationMatch<EitherInt<'a>>> {
         match self {
-            Self::String(s) => match py_string_str(s)?.parse() {
-                Ok(i) => Ok(ValidationMatch::strict(EitherInt::I64(i))),
-                Err(_) => Err(ValError::new(ErrorTypeDefaults::IntParsing, self)),
+            Self::String(s) => {
+                let str_val = py_string_str(s)?;
+                if let Ok(i) = str_val.parse::<i64>() {
+                    Ok(ValidationMatch::strict(EitherInt::I64(i)))
+                } else if let Ok(b) = str_val.parse::<BigInt>() {
+                    Ok(ValidationMatch::exact(EitherInt::BigInt(b.clone())))
+                } else {
+                    Err(ValError::new(ErrorTypeDefaults::IntParsing, self))
+                }
             },
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::IntType, self)),
         }
