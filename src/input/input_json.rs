@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use jiter::{JsonArray, JsonValue};
-use num_bigint::BigInt;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 use speedate::MicrosecondsPrecisionOverflowBehavior;
@@ -371,13 +370,7 @@ impl<'a> Input<'a> for String {
     }
 
     fn validate_int(&'a self, _strict: bool) -> ValResult<ValidationMatch<EitherInt<'a>>> {
-        if let Ok(i) = self.parse::<i64>() {
-            Ok(ValidationMatch::strict(EitherInt::I64(i)))
-        } else if let Ok(b) = self.parse::<BigInt>() {
-            Ok(ValidationMatch::exact(EitherInt::BigInt(b.clone())))
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::IntParsing, self))
-        }
+        str_as_int(self, self).map(ValidationMatch::lax)
     }
 
     fn validate_float(&'a self, _strict: bool) -> ValResult<ValidationMatch<EitherFloat<'a>>> {

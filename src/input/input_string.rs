@@ -1,4 +1,3 @@
-use num_bigint::BigInt;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
@@ -12,7 +11,7 @@ use crate::validators::decimal::create_decimal;
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, EitherDate, EitherDateTime, EitherTime,
 };
-use super::shared::{str_as_bool, str_as_float};
+use super::shared::{str_as_bool, str_as_float, str_as_int};
 use super::{
     BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments, GenericIterable,
     GenericIterator, GenericMapping, Input, ValidationMatch,
@@ -113,16 +112,7 @@ impl<'a> Input<'a> for StringMapping<'a> {
 
     fn validate_int(&'a self, _strict: bool) -> ValResult<ValidationMatch<EitherInt<'a>>> {
         match self {
-            Self::String(s) => {
-                let str_val = py_string_str(s)?;
-                if let Ok(i) = str_val.parse::<i64>() {
-                    Ok(ValidationMatch::strict(EitherInt::I64(i)))
-                } else if let Ok(b) = str_val.parse::<BigInt>() {
-                    Ok(ValidationMatch::exact(EitherInt::BigInt(b.clone())))
-                } else {
-                    Err(ValError::new(ErrorTypeDefaults::IntParsing, self))
-                }
-            },
+            Self::String(s) => str_as_int(self, py_string_str(s)?).map(ValidationMatch::strict),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::IntType, self)),
         }
     }
