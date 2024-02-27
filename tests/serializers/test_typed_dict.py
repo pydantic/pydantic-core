@@ -1,11 +1,11 @@
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pytest
 from dirty_equals import IsStrictDict
 from typing_extensions import TypedDict
 
-from pydantic_core import SchemaSerializer, core_schema
+from pydantic_core import PydanticSerializationError, SchemaSerializer, core_schema
 
 
 @pytest.mark.parametrize('extra_behavior_kw', [{}, {'extra_behavior': 'ignore'}, {'extra_behavior': None}])
@@ -333,3 +333,109 @@ def test_extra_custom_serializer():
     m = {'extra': 'extra'}
 
     assert s.to_python(m) == {'extra': 'extra bam!'}
+
+
+def test_computed_fields_with_plain_serializer_function():
+    def ser_x(v: dict):
+        two = v['0'] + v['1'] + 1
+        return two
+
+    schema = core_schema.typed_dict_schema(
+        {
+            '0': core_schema.typed_dict_field(core_schema.int_schema()),
+            '1': core_schema.typed_dict_field(core_schema.int_schema()),
+        },
+        computed_fields=[
+            core_schema.computed_field(
+                '2', core_schema.int_schema(serialization=core_schema.plain_serializer_function_ser_schema(ser_x))
+            )
+        ],
+    )
+    s = SchemaSerializer(schema)
+    value = {'0': 0, '1': 1}
+    assert s.to_python(value) == {'0': 0, '1': 1, '2': 2}
+    assert s.to_json(value) == b'{"0":0,"1":1,"2":2}'
+
+    def ser_foo(_v: dict):
+        return 'bar'
+
+    schema = core_schema.typed_dict_schema(
+        {},
+        computed_fields=[
+            core_schema.computed_field(
+                'foo', core_schema.str_schema(serialization=core_schema.plain_serializer_function_ser_schema(ser_foo))
+            )
+        ],
+    )
+    s = SchemaSerializer(schema)
+    assert s.to_python({}) == {'foo': 'bar'}
+    assert s.to_json({}) == b'{"foo":"bar"}'
+
+
+def test_computed_fields_with_warpped_serializer_function():
+    def ser_to_upper(string_arr: List[str]) -> List[str]:
+        return [s.upper() for s in string_arr]
+
+    def ser_columns(v: dict, serializer: core_schema.SerializerFunctionWrapHandler, _) -> str:
+        column_keys = serializer([key for key in v.keys()])
+        return column_keys
+
+    schema = core_schema.typed_dict_schema(
+        {
+            'one': core_schema.typed_dict_field(core_schema.int_schema()),
+            'two': core_schema.typed_dict_field(core_schema.int_schema()),
+            'three': core_schema.typed_dict_field(core_schema.int_schema()),
+        },
+        computed_fields=[
+            core_schema.computed_field(
+                'columns',
+                core_schema.int_schema(
+                    serialization=core_schema.wrap_serializer_function_ser_schema(
+                        ser_columns,
+                        info_arg=True,
+                        schema=core_schema.list_schema(
+                            serialization=core_schema.plain_serializer_function_ser_schema(ser_to_upper)
+                        ),
+                    )
+                ),
+            )
+        ],
+    )
+    s = SchemaSerializer(schema)
+    value = {'one': 1, 'two': 2, 'three': 3}
+    assert s.to_python(value) == {'one': 1, 'two': 2, 'three': 3, 'columns': ['ONE', 'TWO', 'THREE']}
+    assert s.to_json(value) == b'{"one":1,"two":2,"three":3,"columns":["ONE","TWO","THREE"]}'
+
+
+def test_computed_fields_with_typed_dict_model():
+    class Model(TypedDict):
+        x: int
+
+    def ser_y(v: Any) -> str:
+        return f'{v["x"]}.00'
+
+    s = SchemaSerializer(
+        core_schema.typed_dict_schema(
+            {'x': core_schema.typed_dict_field(core_schema.int_schema())},
+            computed_fields=[
+                core_schema.computed_field(
+                    'y', core_schema.str_schema(serialization=core_schema.plain_serializer_function_ser_schema(ser_y))
+                )
+            ],
+        )
+    )
+    assert s.to_python(Model(x=1000)) == {'x': 1000, 'y': '1000.00'}
+
+
+def test_computed_fields_without_ser_function():
+    class Model(TypedDict):
+        x: int
+
+    s = SchemaSerializer(
+        core_schema.typed_dict_schema(
+            {'x': core_schema.typed_dict_field(core_schema.int_schema())},
+            computed_fields=[core_schema.computed_field('y', core_schema.str_schema())],
+        )
+    )
+    with pytest.raises(PydanticSerializationError, match="^No serialization function found for 'y'$"):
+        s.to_python(Model(x=1000))

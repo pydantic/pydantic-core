@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyAttributeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
@@ -12,6 +13,8 @@ use crate::serializers::shared::{BuildSerializer, CombinedSerializer, PydanticSe
 use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
+use super::errors::PydanticSerializationError;
+use super::ob_type::{ObType, ObTypeLookup};
 use super::Extra;
 
 #[derive(Debug, Clone)]
@@ -52,9 +55,10 @@ impl ComputedFields {
             // Do not serialize computed fields
             return Ok(());
         }
-        for computed_fields in &self.0 {
-            computed_fields.to_python(model, output_dict, filter, include, exclude, extra)?;
+        for computed_field in &self.0 {
+            computed_field.to_python(model, output_dict, filter, include, exclude, extra)?;
         }
+
         Ok(())
     }
 
@@ -106,6 +110,7 @@ struct ComputedField {
     serializer: CombinedSerializer,
     alias: String,
     alias_py: Py<PyString>,
+    has_ser_func: bool,
 }
 
 impl ComputedField {
@@ -127,6 +132,7 @@ impl ComputedField {
             serializer,
             alias: alias_py.extract()?,
             alias_py: alias_py.into_py(py),
+            has_ser_func: has_ser_function(return_schema),
         })
     }
 
@@ -143,8 +149,7 @@ impl ComputedField {
         let property_name_py = self.property_name_py.as_ref(py);
 
         if let Some((next_include, next_exclude)) = filter.key_filter(property_name_py, include, exclude)? {
-            let next_value = model.getattr(property_name_py)?;
-
+            let next_value = get_next_value(self, model, extra.ob_type_lookup)?;
             let value = self
                 .serializer
                 .to_python(next_value, next_include, next_exclude, extra)?;
@@ -181,9 +186,8 @@ impl_py_gc_traverse!(ComputedFieldSerializer<'_> { computed_field });
 
 impl<'py> Serialize for ComputedFieldSerializer<'py> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let py = self.model.py();
-        let property_name_py = self.computed_field.property_name_py.as_ref(py);
-        let next_value = self.model.getattr(property_name_py).map_err(py_err_se_err)?;
+        let next_value =
+            get_next_value(self.computed_field, self.model, self.extra.ob_type_lookup).map_err(py_err_se_err)?;
         let s = PydanticSerializer::new(
             next_value,
             &self.computed_field.serializer,
@@ -193,4 +197,61 @@ impl<'py> Serialize for ComputedFieldSerializer<'py> {
         );
         s.serialize(serializer)
     }
+}
+
+fn has_ser_function(schema: &PyDict) -> bool {
+    let py = schema.py();
+    let ser_schema = schema
+        .get_as::<&PyDict>(intern!(py, "serialization"))
+        .unwrap_or_default();
+    ser_schema.is_some_and(|s| s.contains(intern!(py, "function")).unwrap_or_default())
+}
+
+fn get_next_value<'a>(
+    field: &'a ComputedField,
+    input_value: &'a PyAny,
+    ob_type_lookup: &'a ObTypeLookup,
+) -> PyResult<&'a PyAny> {
+    let py = input_value.py();
+    // Backwards compatiability.
+    let mut legacy_attr_error: Option<PyErr> = None;
+    let legacy_result = match ob_type_lookup.get_type(input_value) {
+        ObType::Dataclass | ObType::PydanticSerializable => {
+            match input_value.getattr(field.property_name_py.as_ref(py)) {
+                Ok(attr) => Ok(Some(attr)),
+                Err(err) => {
+                    if err.get_type(py).is_subclass_of::<PyAttributeError>()? {
+                        legacy_attr_error = Some(err);
+                        Ok(None)
+                    } else {
+                        Err(err)
+                    }
+                }
+            }
+        }
+        _ => Ok(None),
+    };
+    match legacy_result {
+        Ok(opt) => {
+            if let Some(legacy_next_value) = opt {
+                return Ok(legacy_next_value);
+            }
+        }
+        Err(err) => return Err(err),
+    };
+
+    // Default behavior: If custom serialization function provided, compute value based on input.
+    if field.has_ser_func {
+        return Ok(input_value);
+    }
+    // Fallback behavior: Check if computed field is a property of input object
+    // (i.e. in some cases input_value can be ObType::Unknown)
+    if let Ok(next_value_from_input) = input_value.getattr(field.property_name_py.as_ref(py)) {
+        return Ok(next_value_from_input);
+    }
+
+    Err(legacy_attr_error.unwrap_or(PydanticSerializationError::new_err(format!(
+        "No serialization function found for '{}'",
+        field.property_name
+    ))))
 }
