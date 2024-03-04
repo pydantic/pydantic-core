@@ -488,6 +488,8 @@ struct SerializationInfo {
     include: Option<PyObject>,
     #[pyo3(get)]
     exclude: Option<PyObject>,
+    #[pyo3(get)]
+    context: Option<PyObject>,
     _mode: SerMode,
     #[pyo3(get)]
     by_alias: bool,
@@ -515,6 +517,7 @@ impl SerializationInfo {
                 Some(field_name) => Ok(Self {
                     include: include.map(|i| i.into_py(py)),
                     exclude: exclude.map(|e| e.into_py(py)),
+                    context: extra.context.map(Into::into),
                     _mode: extra.mode.clone(),
                     by_alias: extra.by_alias,
                     exclude_unset: extra.exclude_unset,
@@ -531,6 +534,7 @@ impl SerializationInfo {
             Ok(Self {
                 include: include.map(|i| i.into_py(py)),
                 exclude: exclude.map(|e| e.into_py(py)),
+                context: extra.context.map(Into::into),
                 _mode: extra.mode.clone(),
                 by_alias: extra.by_alias,
                 exclude_unset: extra.exclude_unset,
@@ -563,6 +567,9 @@ impl SerializationInfo {
         if let Some(ref exclude) = self.exclude {
             d.set_item("exclude", exclude)?;
         }
+        if let Some(ref context) = self.context {
+            d.set_item("context", context)?;
+        }
         d.set_item("mode", self.mode(py))?;
         d.set_item("by_alias", self.by_alias)?;
         d.set_item("exclude_unset", self.exclude_unset)?;
@@ -574,13 +581,17 @@ impl SerializationInfo {
 
     fn __repr__(&self, py: Python) -> PyResult<String> {
         Ok(format!(
-            "SerializationInfo(include={}, exclude={}, mode='{}', by_alias={}, exclude_unset={}, exclude_defaults={}, exclude_none={}, round_trip={})",
+            "SerializationInfo(include={}, exclude={}, context={}, mode='{}', by_alias={}, exclude_unset={}, exclude_defaults={}, exclude_none={}, round_trip={})",
             match self.include {
                 Some(ref include) => include.as_ref(py).repr()?.to_str()?,
                 None => "None",
             },
             match self.exclude {
                 Some(ref exclude) => exclude.as_ref(py).repr()?.to_str()?,
+                None => "None",
+            },
+            match self.context {
+                Some(ref context) => context.as_ref(py).repr()?.to_str()?,
                 None => "None",
             },
             self._mode,
