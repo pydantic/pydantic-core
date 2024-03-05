@@ -1,9 +1,11 @@
 use std::borrow::Cow;
 
 use pyo3::exceptions::{PyAttributeError, PyRecursionError, PyRuntimeError};
+use pyo3::gc::PyVisit;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use pyo3::PyTraverseError;
 
 use pyo3::types::PyString;
 
@@ -440,6 +442,33 @@ impl SerializationCallable {
             exclude: exclude.map(|v| v.into_py(py)),
         }
     }
+
+    fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
+        if let Some(include) = &self.include {
+            visit.call(include)?;
+        }
+        if let Some(exclude) = &self.exclude {
+            visit.call(exclude)?;
+        }
+        if let Some(model) = &self.extra_owned.model {
+            visit.call(model)?;
+        }
+        if let Some(fallback) = &self.extra_owned.fallback {
+            visit.call(fallback)?;
+        }
+        if let Some(context) = &self.extra_owned.context {
+            visit.call(context)?;
+        }
+        Ok(())
+    }
+
+    fn __clear__(&mut self) {
+        self.include = None;
+        self.exclude = None;
+        self.extra_owned.model = None;
+        self.extra_owned.fallback = None;
+        self.extra_owned.context = None;
+    }
 }
 
 #[pymethods]
@@ -544,6 +573,25 @@ impl SerializationInfo {
                 field_name: None,
             })
         }
+    }
+
+    fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
+        if let Some(include) = &self.include {
+            visit.call(include)?;
+        }
+        if let Some(exclude) = &self.exclude {
+            visit.call(exclude)?;
+        }
+        if let Some(context) = &self.context {
+            visit.call(context)?;
+        }
+        Ok(())
+    }
+
+    fn __clear__(&mut self) {
+        self.include = None;
+        self.exclude = None;
+        self.context = None;
     }
 }
 

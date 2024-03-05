@@ -183,11 +183,11 @@ pub(crate) struct ExtraOwned {
     config: SerializationConfig,
     rec_guard: SerRecursionState,
     check: SerCheck,
-    model: Option<PyObject>,
+    pub model: Option<PyObject>,
     field_name: Option<String>,
     serialize_unknown: bool,
-    fallback: Option<PyObject>,
-    context: Option<PyObject>,
+    pub fallback: Option<PyObject>,
+    pub context: Option<PyObject>,
 }
 
 impl ExtraOwned {
