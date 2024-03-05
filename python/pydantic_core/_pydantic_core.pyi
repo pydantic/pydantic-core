@@ -1,21 +1,10 @@
-from __future__ import annotations
-
 import datetime
-import sys
-from typing import Any, Callable, Generic, Optional, Type, TypeVar
+from typing import Any, Callable, Generic, TypeVar, Literal, final
 
 from pydantic_core import ErrorDetails, ErrorTypeInfo, InitErrorDetails, MultiHostHost
 from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
 
-if sys.version_info < (3, 8):
-    from typing_extensions import final
-else:
-    from typing import final
-
-if sys.version_info < (3, 11):
-    from typing_extensions import Literal, LiteralString, Self, TypeAlias
-else:
-    from typing import Literal, LiteralString, Self, TypeAlias
+from typing_extensions import LiteralString, Self, TypeAlias
 
 from _typeshed import SupportsAllComparisons
 
@@ -73,7 +62,7 @@ class Some(Generic[_T]):
         Returns the value wrapped by `Some`.
         """
     @classmethod
-    def __class_getitem__(cls, item: Any, /) -> Type[Self]: ...
+    def __class_getitem__(cls, item: Any, /) -> type[Self]: ...
 
 @final
 class SchemaValidator:
@@ -101,7 +90,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
         self_instance: Any | None = None,
     ) -> Any:
         """
@@ -131,7 +120,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
         self_instance: Any | None = None,
     ) -> bool:
         """
@@ -148,7 +137,7 @@ class SchemaValidator:
         input: str | bytes | bytearray,
         *,
         strict: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
         self_instance: Any | None = None,
     ) -> Any:
         """
@@ -176,7 +165,7 @@ class SchemaValidator:
             The validated Python object.
         """
     def validate_strings(
-        self, input: _StringInput, *, strict: bool | None = None, context: 'dict[str, Any] | None' = None
+        self, input: _StringInput, *, strict: bool | None = None, context: dict[str, Any] | None = None
     ) -> Any:
         """
         Validate a string against the schema and return the validated Python object.
@@ -206,7 +195,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
     ) -> dict[str, Any] | tuple[dict[str, Any], dict[str, Any] | None, set[str]]:
         """
         Validate an assignment to a field on a model.
@@ -557,13 +546,13 @@ class Url(SupportsAllComparisons):
         cls,
         *,
         scheme: str,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
+        username: str | None = None,
+        password: str | None = None,
         host: str,
-        port: Optional[int] = None,
-        path: Optional[str] = None,
-        query: Optional[str] = None,
-        fragment: Optional[str] = None,
+        port: int | None = None,
+        path: str | None = None,
+        query: str | None = None,
+        fragment: str | None = None,
     ) -> Self:
         """
         Build a new `Url` instance from its component parts.
@@ -671,14 +660,14 @@ class MultiHostUrl(SupportsAllComparisons):
         cls,
         *,
         scheme: str,
-        hosts: Optional[list[MultiHostHost]] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        path: Optional[str] = None,
-        query: Optional[str] = None,
-        fragment: Optional[str] = None,
+        hosts: list[MultiHostHost] | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        host: str | None = None,
+        port: int | None = None,
+        path: str | None = None,
+        query: str | None = None,
+        fragment: str | None = None,
     ) -> Self:
         """
         Build a new `MultiHostUrl` instance from its component parts.
@@ -871,7 +860,7 @@ class TzInfo(datetime.tzinfo):
     def utcoffset(self, _dt: datetime.datetime | None) -> datetime.timedelta: ...
     def dst(self, _dt: datetime.datetime | None) -> datetime.timedelta: ...
     def fromutc(self, dt: datetime.datetime) -> datetime.datetime: ...
-    def __deepcopy__(self, _memo: dict[Any, Any]) -> 'TzInfo': ...
+    def __deepcopy__(self, _memo: dict[Any, Any]) -> TzInfo: ...
 
 def validate_core_schema(schema: CoreSchema, *, strict: bool | None = None) -> CoreSchema:
     """Validate a CoreSchema
