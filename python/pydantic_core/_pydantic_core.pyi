@@ -101,7 +101,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
         self_instance: Any | None = None,
     ) -> Any:
         """
@@ -131,7 +131,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
         self_instance: Any | None = None,
     ) -> bool:
         """
@@ -148,7 +148,7 @@ class SchemaValidator:
         input: str | bytes | bytearray,
         *,
         strict: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
         self_instance: Any | None = None,
     ) -> Any:
         """
@@ -176,7 +176,7 @@ class SchemaValidator:
             The validated Python object.
         """
     def validate_strings(
-        self, input: _StringInput, *, strict: bool | None = None, context: 'dict[str, Any] | None' = None
+        self, input: _StringInput, *, strict: bool | None = None, context: dict[str, Any] | None = None
     ) -> Any:
         """
         Validate a string against the schema and return the validated Python object.
@@ -206,7 +206,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
     ) -> dict[str, Any] | tuple[dict[str, Any], dict[str, Any] | None, set[str]]:
         """
         Validate an assignment to a field on a model.
@@ -278,7 +278,7 @@ class SchemaSerializer:
         round_trip: bool = False,
         warnings: bool = True,
         fallback: Callable[[Any], Any] | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
     ) -> Any:
         """
         Serialize/marshal a Python object to a Python object including transforming and filtering data.
@@ -321,7 +321,7 @@ class SchemaSerializer:
         round_trip: bool = False,
         warnings: bool = True,
         fallback: Callable[[Any], Any] | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
     ) -> bytes:
         """
         Serialize a Python object to JSON including transforming and filtering data.
@@ -364,7 +364,7 @@ def to_json(
     inf_nan_mode: Literal['null', 'constants'] = 'constants',
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
-    context: 'dict[str, Any] | None' = None,
+    context: dict[str, Any] | None = None,
 ) -> bytes:
     """
     Serialize a Python object to JSON including transforming and filtering data.
@@ -428,7 +428,7 @@ def to_jsonable_python(
     inf_nan_mode: Literal['null', 'constants'] = 'constants',
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
-    context: 'dict[str, Any] | None' = None,
+    context: dict[str, Any] | None = None,
 ) -> Any:
     """
     Serialize/marshal a Python object to a JSON-serializable Python object including transforming and filtering data.
