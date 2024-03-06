@@ -444,7 +444,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         }
         ObType::Url => {
             let py_url: PyUrl = value.extract().map_err(py_err_se_err)?;
-            serializer.serialize_str(py_url.__str__())
+            serializer.serialize_str(py_url.__str__().as_str())
         }
         ObType::MultiHostUrl => {
             let py_url: PyMultiHostUrl = value.extract().map_err(py_err_se_err)?;

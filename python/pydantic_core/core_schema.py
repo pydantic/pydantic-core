@@ -3454,6 +3454,7 @@ class UrlSchema(TypedDict, total=False):
     default_host: str
     default_port: int
     default_path: str
+    omit_trailing_slash: bool  # default False
     strict: bool
     ref: str
     metadata: Any
@@ -3468,6 +3469,7 @@ def url_schema(
     default_host: str | None = None,
     default_port: int | None = None,
     default_path: str | None = None,
+    omit_trailing_slash: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -3492,6 +3494,7 @@ def url_schema(
         default_host: The default host to use if the URL does not have a host
         default_port: The default port to use if the URL does not have a port
         default_path: The default path to use if the URL does not have a path
+        omit_trailing_slash: Whether to omit trailing slash (only if path == "/")
         strict: Whether to use strict URL parsing
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -3506,6 +3509,7 @@ def url_schema(
         default_port=default_port,
         default_path=default_path,
         strict=strict,
+        omit_trailing_slash=omit_trailing_slash,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
@@ -3520,6 +3524,7 @@ class MultiHostUrlSchema(TypedDict, total=False):
     default_host: str
     default_port: int
     default_path: str
+    omit_trailing_slash: bool
     strict: bool
     ref: str
     metadata: Any
@@ -3534,6 +3539,7 @@ def multi_host_url_schema(
     default_host: str | None = None,
     default_port: int | None = None,
     default_path: str | None = None,
+    omit_trailing_slash: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -3558,6 +3564,7 @@ def multi_host_url_schema(
         default_host: The default host to use if the URL does not have a host
         default_port: The default port to use if the URL does not have a port
         default_path: The default path to use if the URL does not have a path
+        omit_trailing_slash: Whether to omit trailing slash (only if path == "/")
         strict: Whether to use strict URL parsing
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -3571,6 +3578,7 @@ def multi_host_url_schema(
         default_host=default_host,
         default_port=default_port,
         default_path=default_path,
+        omit_trailing_slash=omit_trailing_slash,
         strict=strict,
         ref=ref,
         metadata=metadata,

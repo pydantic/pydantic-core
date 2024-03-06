@@ -454,12 +454,13 @@ class Url(SupportsAllComparisons):
     by Mozilla.
     """
 
-    def __new__(cls, url: str) -> Self:
+    def __new__(cls, url: str, omit_trailing_slash: bool = False) -> Self:
         """
         Create a new `Url` instance.
 
         Args:
             url: String representation of a URL.
+            omit_trailing_slash: Whether to omit trailing slash (only if path == "/")
 
         Returns:
             A new `Url` instance.
@@ -590,12 +591,13 @@ class MultiHostUrl(SupportsAllComparisons):
     by Mozilla.
     """
 
-    def __new__(cls, url: str) -> Self:
+    def __new__(cls, url: str, omit_trailing_slash: bool = False) -> Self:
         """
         Create a new `MultiHostUrl` instance.
 
         Args:
             url: String representation of a URL.
+            omit_trailing_slash: Whether to omit trailing slash (only if path == "/")
 
         Returns:
             A new `MultiHostUrl` instance.
