@@ -242,7 +242,7 @@ impl SerializationIterator {
     }
 
     fn __repr__(&self, py: Python) -> PyResult<String> {
-        let iterator = self.iterator.as_ref(py);
+        let iterator = self.iterator.bind(py);
         Ok(format!(
             "SerializationIterator(index={}, iterator={})",
             self.index,

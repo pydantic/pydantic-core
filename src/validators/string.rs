@@ -239,7 +239,7 @@ impl Pattern {
                 RegexEngine::RustRegex(Regex::new(&pattern).map_err(|e| py_schema_error_type!("{}", e))?)
             }
             RegexEngine::PYTHON_RE => {
-                let re_compile = py.import(intern!(py, "re"))?.getattr(intern!(py, "compile"))?;
+                let re_compile = py.import_bound(intern!(py, "re"))?.getattr(intern!(py, "compile"))?;
                 RegexEngine::PythonRe(re_compile.call1((&pattern,))?.into())
             }
             _ => return Err(py_schema_error_type!("Invalid regex engine: {}", engine)),

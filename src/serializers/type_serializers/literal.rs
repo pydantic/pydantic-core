@@ -95,7 +95,7 @@ impl LiteralSerializer {
             }
 
             if let Some(ref expected_py) = self.expected_py {
-                if expected_py.as_ref(value.py()).contains(value)? {
+                if expected_py.bind(value.py()).contains(value)? {
                     return Ok(OutputValue::Ok);
                 }
             }

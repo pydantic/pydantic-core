@@ -76,7 +76,7 @@ impl BuildSerializer for FormatSerializer {
         } else {
             Ok(Self {
                 format_func: py
-                    .import(intern!(py, "builtins"))?
+                    .import_bound(intern!(py, "builtins"))?
                     .getattr(intern!(py, "format"))?
                     .into_py(py),
                 formatting_string: PyString::new_bound(py, formatting_string).into(),
@@ -91,7 +91,7 @@ impl FormatSerializer {
     fn call(&self, value: &Bound<'_, PyAny>) -> Result<PyObject, String> {
         let py = value.py();
         self.format_func
-            .call1(py, (value, self.formatting_string.as_ref(py)))
+            .call1(py, (value, &self.formatting_string))
             .map_err(|e| {
                 format!(
                     "Error calling `format(value, {})`: {}",

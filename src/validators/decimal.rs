@@ -19,7 +19,7 @@ static DECIMAL_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 pub fn get_decimal_type(py: Python) -> &Bound<'_, PyType> {
     DECIMAL_TYPE
         .get_or_init(py, || {
-            py.import("decimal")
+            py.import_bound("decimal")
                 .and_then(|decimal_module| decimal_module.getattr("Decimal"))
                 .unwrap()
                 .extract::<&PyType>()
@@ -183,20 +183,17 @@ impl Validator for DecimalValidator {
 
         if let Some(multiple_of) = &self.multiple_of {
             // fraction = (decimal / multiple_of) % 1
-            let fraction: &PyAny = unsafe {
-                let division = PyObject::from_owned_ptr_or_err(
-                    py,
-                    pyo3::ffi::PyNumber_TrueDivide(decimal.as_ptr(), multiple_of.as_ptr()),
-                )?;
+            let fraction = unsafe {
+                let division = decimal.div(multiple_of)?;
                 let one = 1.to_object(py);
-                py.from_owned_ptr_or_err(pyo3::ffi::PyNumber_Remainder(division.as_ptr(), one.as_ptr()))?
+                Bound::from_owned_ptr_or_err(py, pyo3::ffi::PyNumber_Remainder(division.as_ptr(), one.as_ptr()))?
             };
             let zero = 0.to_object(py);
             if !fraction.eq(&zero)? {
                 return Err(ValError::new(
                     ErrorType::MultipleOf {
                         multiple_of: multiple_of.to_string().into(),
-                        context: Some([("multiple_of", multiple_of)].into_py_dict(py).into()),
+                        context: Some([("multiple_of", multiple_of)].into_py_dict_bound(py).into()),
                     },
                     input,
                 ));
@@ -219,7 +216,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::LessThanEqual {
                         le: Number::String(le.to_string()),
-                        context: Some([("le", le)].into_py_dict(py).into()),
+                        context: Some([("le", le)].into_py_dict_bound(py).into()),
                     },
                     input,
                 ));
@@ -230,7 +227,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::LessThan {
                         lt: Number::String(lt.to_string()),
-                        context: Some([("lt", lt)].into_py_dict(py).into()),
+                        context: Some([("lt", lt)].into_py_dict_bound(py).into()),
                     },
                     input,
                 ));
@@ -241,7 +238,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::GreaterThanEqual {
                         ge: Number::String(ge.to_string()),
-                        context: Some([("ge", ge)].into_py_dict(py).into()),
+                        context: Some([("ge", ge)].into_py_dict_bound(py).into()),
                     },
                     input,
                 ));
@@ -252,7 +249,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::GreaterThan {
                         gt: Number::String(gt.to_string()),
-                        context: Some([("gt", gt)].into_py_dict(py).into()),
+                        context: Some([("gt", gt)].into_py_dict_bound(py).into()),
                     },
                     input,
                 ));
@@ -285,7 +282,7 @@ fn handle_decimal_new_error(input: InputValue, error: PyErr, decimal_exception: 
     let py = decimal_exception.py();
     if error.matches(py, decimal_exception) {
         ValError::new_custom_input(ErrorTypeDefaults::DecimalParsing, input)
-    } else if error.matches(py, PyTypeError::type_object(py)) {
+    } else if error.matches(py, PyTypeError::type_object_bound(py)) {
         ValError::new_custom_input(ErrorTypeDefaults::DecimalType, input)
     } else {
         ValError::InternalErr(error)

@@ -68,8 +68,8 @@ impl Validator for IsInstanceValidator {
             )));
         }
 
-        let ob = input.to_object(py);
-        match ob.as_ref(py).is_instance(self.class.as_ref(py))? {
+        let ob: Py<PyAny> = input.to_object(py);
+        match ob.bind(py).is_instance(self.class.bind(py))? {
             true => Ok(ob),
             false => Err(ValError::new(
                 ErrorType::IsInstanceOf {

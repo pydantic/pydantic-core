@@ -18,7 +18,7 @@ use crate::PydanticUndefinedType;
 static COPY_DEEPCOPY: GILOnceCell<PyObject> = GILOnceCell::new();
 
 fn get_deepcopy(py: Python) -> PyResult<PyObject> {
-    Ok(py.import("copy")?.getattr("deepcopy")?.into_py(py))
+    Ok(py.import_bound("copy")?.getattr("deepcopy")?.into_py(py))
 }
 
 #[derive(Debug, Clone)]
@@ -111,7 +111,7 @@ impl BuildValidator for WithDefaultValidator {
         let validator = Box::new(build_validator(&sub_schema, config, definitions)?);
 
         let copy_default = if let DefaultType::Default(default_obj) = &default {
-            default_obj.as_ref(py).hash().is_err()
+            default_obj.bind(py).hash().is_err()
         } else {
             false
         };

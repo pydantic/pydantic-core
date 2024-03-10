@@ -358,8 +358,8 @@ impl CollectWarnings {
             match *self.warnings.borrow() {
                 Some(ref warnings) => {
                     let message = format!("Pydantic serializer warnings:\n  {}", warnings.join("\n  "));
-                    let user_warning_type = py.import("builtins")?.getattr("UserWarning")?;
-                    PyErr::warn(py, user_warning_type, &message, 0)
+                    let user_warning_type = py.import_bound("builtins")?.getattr("UserWarning")?;
+                    PyErr::warn_bound(py, &user_warning_type, &message, 0)
                 }
                 _ => Ok(()),
             }

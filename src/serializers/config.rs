@@ -190,8 +190,8 @@ impl BytesMode {
 }
 
 pub fn utf8_py_error(py: Python, err: Utf8Error, data: &[u8]) -> PyErr {
-    match pyo3::exceptions::PyUnicodeDecodeError::new_utf8(py, data, err) {
-        Ok(decode_err) => PyErr::from_value(decode_err),
+    match pyo3::exceptions::PyUnicodeDecodeError::new_utf8_bound(py, data, err) {
+        Ok(decode_err) => PyErr::from_value_bound(decode_err.into_any()),
         Err(err) => err,
     }
 }

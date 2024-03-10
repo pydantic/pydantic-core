@@ -15,9 +15,9 @@ pub struct ArgsKwargs {
 
 impl ArgsKwargs {
     fn eq(&self, py: Python, other: &Self) -> PyResult<bool> {
-        if self.args.as_ref(py).eq(other.args.as_ref(py))? {
+        if self.args.bind(py).eq(other.args.bind(py))? {
             match (&self.kwargs, &other.kwargs) {
-                (Some(d1), Some(d2)) => d1.as_ref(py).eq(d2.as_ref(py)),
+                (Some(d1), Some(d2)) => d1.bind(py).eq(d2.bind(py)),
                 (None, None) => Ok(true),
                 _ => Ok(false),
             }
@@ -50,7 +50,7 @@ impl ArgsKwargs {
                 Ok(b) => (!b).into_py(py),
                 Err(e) => e.into_py(py),
             },
-            _ => py.NotImplemented().into(),
+            _ => py.NotImplemented(),
         }
     }
 

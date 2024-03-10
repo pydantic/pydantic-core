@@ -76,7 +76,7 @@ impl PySome {
 #[pymethods]
 impl PySome {
     pub fn __repr__(&self, py: Python) -> PyResult<String> {
-        Ok(format!("Some({})", self.value.as_ref(py).repr()?,))
+        Ok(format!("Some({})", self.value.bind(py).repr()?,))
     }
 
     #[new]
@@ -86,8 +86,8 @@ impl PySome {
 
     #[classmethod]
     #[pyo3(signature = (_item, /))]
-    pub fn __class_getitem__(cls: &PyType, _item: &PyAny) -> Py<PyType> {
-        cls.into_py(cls.py())
+    pub fn __class_getitem__(cls: Py<PyType>, _item: &Bound<'_, PyAny>) -> Py<PyType> {
+        cls
     }
 
     #[classattr]
@@ -145,7 +145,7 @@ impl SchemaValidator {
         })
     }
 
-    pub fn __reduce__(slf: &PyCell<Self>) -> PyResult<(PyObject, (PyObject, PyObject))> {
+    pub fn __reduce__(slf: &Bound<Self>) -> PyResult<(PyObject, (PyObject, PyObject))> {
         // Enables support for `pickle` serialization.
         let py = slf.py();
         let cls = slf.get_type().into();
@@ -398,7 +398,7 @@ impl<'py> SelfValidator<'py> {
     fn build(py: Python) -> PyResult<SchemaValidator> {
         let code = include_str!("../self_schema.py");
         let locals = PyDict::new_bound(py);
-        py.run(code, None, Some(locals.as_gil_ref()))?;
+        py.run_bound(code, None, Some(&locals))?;
         let self_schema = locals.get_as_req(intern!(py, "self_schema"))?;
 
         let mut definitions_builder = DefinitionsBuilder::new();
@@ -411,7 +411,7 @@ impl<'py> SelfValidator<'py> {
         Ok(SchemaValidator {
             validator,
             definitions,
-            py_schema: py.None().into(),
+            py_schema: py.None(),
             py_config: None,
             title: "Self Schema".into_py(py),
             hide_input_in_errors: false,

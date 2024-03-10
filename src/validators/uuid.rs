@@ -219,7 +219,7 @@ impl UuidValidator {
         let dc = create_class(py_type)?;
         let int = uuid.as_u128();
         let safe = py
-            .import(intern!(py, "uuid"))?
+            .import_bound(intern!(py, "uuid"))?
             .getattr(intern!(py, "SafeUUID"))?
             .get_item("safe")?;
         force_setattr(py, &dc, intern!(py, UUID_INT), int)?;

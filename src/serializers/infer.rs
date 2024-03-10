@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyByteArray, PyBytes, PyDict, PyFrozenSet, PyIterator, PyList, PySet, PyString, PyTuple};
 
 use serde::ser::{Error, Serialize, SerializeMap, SerializeSeq, Serializer};
@@ -510,18 +511,18 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             seq.end()
         }
         ObType::Path => {
-            let s = value
+            let s: PyBackedStr = value
                 .str()
                 .and_then(|value_str| value_str.extract())
                 .map_err(py_err_se_err)?;
-            serializer.serialize_str(s)
+            serializer.serialize_str(&s)
         }
         ObType::Pattern => {
-            let s = value
+            let s: PyBackedStr = value
                 .getattr(intern!(value.py(), "pattern"))
                 .and_then(|pattern| pattern.str()?.extract())
                 .map_err(py_err_se_err)?;
-            serializer.serialize_str(s)
+            serializer.serialize_str(&s)
         }
         ObType::Unknown => {
             if let Some(fallback) = extra.fallback {
@@ -678,7 +679,7 @@ fn serialize_pairs_python<'py>(
     extra: &Extra,
     key_transform: impl Fn(Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>,
 ) -> PyResult<PyObject> {
-    let new_dict = PyDict::new(py);
+    let new_dict = PyDict::new_bound(py);
     let filter = AnyFilter::new();
 
     for result in pairs_iter {

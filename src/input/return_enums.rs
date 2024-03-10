@@ -14,7 +14,7 @@ use pyo3::types::{
     PyByteArray, PyBytes, PyDict, PyFloat, PyFrozenSet, PyIterator, PyList, PyMapping, PySequence, PySet, PyString,
     PyTuple,
 };
-use pyo3::{ffi, intern, PyNativeType};
+use pyo3::{ffi, intern};
 
 #[cfg(not(PyPy))]
 use pyo3::types::PyFunction;
@@ -213,7 +213,7 @@ pub trait BuildSet {
     fn build_len(&self) -> usize;
 }
 
-impl BuildSet for &PySet {
+impl BuildSet for Bound<'_, PySet> {
     fn build_add(&self, item: PyObject) -> PyResult<()> {
         self.add(item)
     }
@@ -223,7 +223,7 @@ impl BuildSet for &PySet {
     }
 }
 
-impl BuildSet for &PyFrozenSet {
+impl BuildSet for Bound<'_, PyFrozenSet> {
     fn build_add(&self, item: PyObject) -> PyResult<()> {
         py_error_on_minusone(self.py(), unsafe {
             // Safety: self.as_ptr() the _only_ pointer to the `frozenset`, and it's allowed
@@ -240,7 +240,7 @@ impl BuildSet for &PyFrozenSet {
 #[allow(clippy::too_many_arguments)]
 fn validate_iter_to_set<'a, 's>(
     py: Python<'a>,
-    set: impl BuildSet,
+    set: &impl BuildSet,
     iter: impl Iterator<Item = PyResult<impl BorrowInput>>,
     input: &'a (impl Input<'a> + 'a),
     field_type: &'static str,
@@ -363,7 +363,7 @@ impl<'a> GenericIterable<'a> {
     pub fn validate_to_set<'s>(
         &'s self,
         py: Python<'a>,
-        set: impl BuildSet,
+        set: &impl BuildSet,
         input: &'a impl Input<'a>,
         max_length: Option<usize>,
         field_type: &'static str,

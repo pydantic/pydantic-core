@@ -239,7 +239,7 @@ impl ModelValidator {
                 PySet::new_bound(py, [&String::from(ROOT_FIELD)])?
             };
             force_setattr(py, self_instance, intern!(py, DUNDER_FIELDS_SET_KEY), fields_set)?;
-            force_setattr(py, self_instance, intern!(py, ROOT_FIELD), output.as_ref(py))?;
+            force_setattr(py, self_instance, intern!(py, ROOT_FIELD), &output)?;
         } else {
             let (model_dict, model_extra, fields_set) = output.extract(py)?;
             set_model_attrs(self_instance, &model_dict, &model_extra, &fields_set)?;

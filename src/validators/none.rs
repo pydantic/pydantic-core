@@ -31,7 +31,7 @@ impl Validator for NoneValidator {
         _state: &mut ValidationState,
     ) -> ValResult<PyObject> {
         match input.is_none() {
-            true => Ok(py.None().into()),
+            true => Ok(py.None()),
             false => Err(ValError::new(ErrorTypeDefaults::NoneRequired, input)),
         }
     }

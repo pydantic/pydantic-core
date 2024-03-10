@@ -371,7 +371,7 @@ impl Validator for ModelFieldsValidator {
         let data_dict = dict.copy()?;
         if let Err(err) = data_dict.del_item(field_name) {
             // KeyError is fine here as the field might not be in the dict
-            if !err.get_type(py).is(PyType::new::<PyKeyError>(py)) {
+            if !err.get_type_bound(py).is(&PyType::new_bound::<PyKeyError>(py)) {
                 return Err(err.into());
             }
         }
@@ -432,7 +432,7 @@ impl Validator for ModelFieldsValidator {
                 new_data.update(non_extra_data.as_mapping())?;
                 new_extra.to_object(py)
             }
-            _ => py.None().into(),
+            _ => py.None(),
         };
 
         let fields_set = PySet::new_bound(py, &[field_name.to_string()])?;

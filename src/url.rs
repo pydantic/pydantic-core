@@ -158,8 +158,8 @@ impl PyUrl {
     #[classmethod]
     #[pyo3(signature=(*, scheme, host, username=None, password=None, port=None, path=None, query=None, fragment=None))]
     #[allow(clippy::too_many_arguments)]
-    pub fn build<'a>(
-        cls: &'a PyType,
+    pub fn build<'py>(
+        cls: &Bound<'py, PyType>,
         scheme: &str,
         host: &str,
         username: Option<&str>,
@@ -168,7 +168,7 @@ impl PyUrl {
         path: Option<&str>,
         query: Option<&str>,
         fragment: Option<&str>,
-    ) -> PyResult<&'a PyAny> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         let url_host = UrlHostParts {
             username: username.map(Into::into),
             password: password.map(Into::into),
@@ -358,8 +358,8 @@ impl PyMultiHostUrl {
     #[classmethod]
     #[pyo3(signature=(*, scheme, hosts=None, path=None, query=None, fragment=None, host=None, username=None, password=None, port=None))]
     #[allow(clippy::too_many_arguments)]
-    pub fn build<'a>(
-        cls: &'a PyType,
+    pub fn build<'py>(
+        cls: &Bound<'py, PyType>,
         scheme: &str,
         hosts: Option<Vec<UrlHostParts>>,
         path: Option<&str>,
@@ -370,7 +370,7 @@ impl PyMultiHostUrl {
         username: Option<&str>,
         password: Option<&str>,
         port: Option<u16>,
-    ) -> PyResult<&'a PyAny> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         let mut url =
             if hosts.is_some() && (host.is_some() || username.is_some() || password.is_some() || port.is_some()) {
                 return Err(PyValueError::new_err(
@@ -469,7 +469,7 @@ fn host_to_dict<'a>(py: Python<'a>, lib_url: &Url) -> PyResult<Bound<'a, PyDict>
     dict.set_item(
         "username",
         match lib_url.username() {
-            "" => py.None().into(),
+            "" => py.None(),
             user => user.to_object(py),
         },
     )?;

@@ -184,7 +184,7 @@ impl_py_gc_traverse!(ComputedFieldSerializer<'_> { computed_field });
 impl<'py> Serialize for ComputedFieldSerializer<'py> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let py = self.model.py();
-        let property_name_py = self.computed_field.property_name_py.as_ref(py);
+        let property_name_py = self.computed_field.property_name_py.bind(py);
         let next_value = self.model.getattr(property_name_py).map_err(py_err_se_err)?;
         let s = PydanticSerializer::new(
             &next_value,

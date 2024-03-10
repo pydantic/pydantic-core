@@ -163,7 +163,7 @@ impl Validator for DataclassArgsValidator {
             |state| {
                 macro_rules! set_item {
                     ($field:ident, $value:expr) => {{
-                        let py_name = $field.py_name.as_ref(py);
+                        let py_name = $field.py_name.bind(py);
                         if $field.init_only {
                             if let Some(ref mut init_only_args) = init_only_args {
                                 init_only_args.push($value);
@@ -398,7 +398,7 @@ impl Validator for DataclassArgsValidator {
             // which doesn't make much sense in this context but we need to put something there
             // so that function validators that sit between DataclassValidator and DataclassArgsValidator
             // always get called the same shape of data.
-            Ok(PyTuple::new_bound(py, vec![dict.to_object(py), py.None().into()]).into_py(py))
+            Ok(PyTuple::new_bound(py, vec![dict.to_object(py), py.None()]).into_py(py))
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
@@ -413,7 +413,7 @@ impl Validator for DataclassArgsValidator {
             let data_dict = dict.copy()?;
             if let Err(err) = data_dict.del_item(field_name) {
                 // KeyError is fine here as the field might not be in the dict
-                if !err.get_type(py).is(PyType::new::<PyKeyError>(py)) {
+                if !err.get_type_bound(py).is(&PyType::new_bound::<PyKeyError>(py)) {
                     return Err(err.into());
                 }
             }
@@ -655,7 +655,7 @@ impl DataclassValidator {
         }
 
         if let Some(ref post_init) = self.post_init {
-            let post_init = post_init.as_ref(py);
+            let post_init = post_init.bind(py);
             let r = if PyAnyMethods::is_none(&post_init_kwargs) {
                 dc.call_method0(post_init)
             } else {

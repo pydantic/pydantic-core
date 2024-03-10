@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use pyo3::intern;
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyDict, PyList};
 
 use crate::definitions::DefinitionsBuilder;
@@ -70,8 +71,8 @@ impl BuildSerializer for DefinitionRefSerializer {
         _config: Option<&Bound<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        let schema_ref = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
-        let definition = definitions.get_definition(schema_ref);
+        let schema_ref: PyBackedStr = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
+        let definition = definitions.get_definition(&schema_ref);
         Ok(Self {
             definition,
             retry_with_lax_check: RecursionSafeCache::new(),

@@ -71,8 +71,8 @@ impl Validator for SetValidator {
             _ => Exactness::Lax,
         };
         state.floor_exactness(exactness);
-        let set = PySet::empty(py)?;
-        collection.validate_to_set(py, set, input, self.max_length, "Set", &self.item_validator, state)?;
+        let set = PySet::empty_bound(py)?;
+        collection.validate_to_set(py, &set, input, self.max_length, "Set", &self.item_validator, state)?;
         min_length_check!(input, "Set", self.min_length, set);
         Ok(set.into_py(py))
     }

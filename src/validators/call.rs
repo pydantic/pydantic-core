@@ -55,7 +55,7 @@ impl BuildValidator for CallValidator {
                 }
             }
         };
-        let function_name = function_name.as_ref(py);
+        let function_name = function_name.bind(py);
         let name = format!("{}[{function_name}]", Self::EXPECTED_TYPE);
 
         Ok(Self {

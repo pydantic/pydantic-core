@@ -670,13 +670,13 @@ impl ErrorType {
             Self::ValueError { error, .. } => {
                 let error = &error
                     .as_ref()
-                    .map_or(Cow::Borrowed("None"), |v| Cow::Owned(v.as_ref(py).to_string()));
+                    .map_or(Cow::Borrowed("None"), |v| Cow::Owned(v.bind(py).to_string()));
                 render!(tmpl, error)
             }
             Self::AssertionError { error, .. } => {
                 let error = &error
                     .as_ref()
-                    .map_or(Cow::Borrowed("None"), |v| Cow::Owned(v.as_ref(py).to_string()));
+                    .map_or(Cow::Borrowed("None"), |v| Cow::Owned(v.bind(py).to_string()));
                 render!(tmpl, error)
             }
             Self::CustomError {

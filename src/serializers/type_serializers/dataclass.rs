@@ -115,7 +115,7 @@ impl DataclassSerializer {
         let dict = PyDict::new_bound(py);
 
         for field_name in &self.fields {
-            let field_name = field_name.as_ref(py);
+            let field_name = field_name.bind(py);
             dict.set_item(field_name, value.getattr(field_name)?)?;
         }
         Ok(dict)

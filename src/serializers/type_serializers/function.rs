@@ -181,7 +181,7 @@ impl FunctionPlainSerializer {
 }
 
 fn on_error(py: Python, err: PyErr, function_name: &str, extra: &Extra) -> PyResult<()> {
-    let exception = err.value(py);
+    let exception = err.value_bound(py);
     if let Ok(ser_err) = exception.extract::<PydanticSerializationUnexpectedValue>() {
         if extra.check.enabled() {
             Err(err)
@@ -641,16 +641,16 @@ impl SerializationInfo {
         Ok(format!(
             "SerializationInfo(include={}, exclude={}, context={}, mode='{}', by_alias={}, exclude_unset={}, exclude_defaults={}, exclude_none={}, round_trip={})",
             match self.include {
-                Some(ref include) => include.as_ref(py).repr()?.to_str()?,
-                None => "None",
+                Some(ref include) => include.bind(py).repr()?.to_str()?.to_owned(),
+                None => "None".to_owned(),
             },
             match self.exclude {
-                Some(ref exclude) => exclude.as_ref(py).repr()?.to_str()?,
-                None => "None",
+                Some(ref exclude) => exclude.bind(py).repr()?.to_str()?.to_owned(),
+                None => "None".to_owned(),
             },
             match self.context {
-                Some(ref context) => context.as_ref(py).repr()?.to_str()?,
-                None => "None",
+                Some(ref context) => context.bind(py).repr()?.to_str()?.to_owned(),
+                None => "None".to_owned(),
             },
             self._mode,
             py_bool(self.by_alias),

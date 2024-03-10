@@ -73,7 +73,7 @@ impl ValidationError {
                                 return cause_problem;
                             }
                         }
-                        PyErr::from_value(err.as_ref(py))
+                        PyErr::from_value_bound(err.into_bound(py).into_any())
                     }
                     Err(err) => err,
                 }
@@ -202,9 +202,9 @@ fn include_url_env(py: Python) -> bool {
         match std::env::var_os("PYDANTIC_ERRORS_OMIT_URL") {
             Some(val) => {
                 // We don't care whether warning succeeded or not, hence the assignment
-                let _ = PyErr::warn(
+                let _ = PyErr::warn_bound(
                     py,
-                    py.get_type::<pyo3::exceptions::PyDeprecationWarning>(),
+                    &py.get_type_bound::<pyo3::exceptions::PyDeprecationWarning>(),
                     "PYDANTIC_ERRORS_OMIT_URL is deprecated, use PYDANTIC_ERRORS_INCLUDE_URL instead",
                     1,
                 );
@@ -297,12 +297,12 @@ impl ValidationError {
             // away safely.
             self.line_errors.iter().map(|e| -> PyObject {
                 if iteration_error.is_some() {
-                    return py.None().into();
+                    return py.None();
                 }
                 e.as_dict(py, url_prefix, include_context, self.input_type, include_input)
                     .unwrap_or_else(|err| {
                         iteration_error = Some(err);
-                        py.None().into()
+                        py.None()
                     })
             }),
         );
@@ -361,12 +361,12 @@ impl ValidationError {
         self.__repr__(py)
     }
 
-    fn __reduce__(slf: &PyCell<Self>) -> PyResult<(&PyAny, PyObject)> {
+    fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<(Bound<'py, PyAny>, PyObject)> {
         let py = slf.py();
         let callable = slf.getattr("from_exception_data")?;
         let borrow = slf.try_borrow()?;
         let args = (
-            borrow.title.as_ref(py),
+            borrow.title.bind(py),
             borrow.errors(py, include_url_env(py), true, true)?,
             borrow.input_type.into_py(py),
             borrow.hide_input,
@@ -492,7 +492,7 @@ impl TryFrom<&Bound<'_, PyAny>> for PyLineError {
 
         let input_value = match dict.get_item("input")? {
             Some(i) => i.into_py(py),
-            None => py.None().into(),
+            None => py.None(),
         };
 
         Ok(Self {

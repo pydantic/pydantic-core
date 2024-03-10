@@ -189,7 +189,7 @@ impl SchemaSerializer {
         Ok(py_bytes.into())
     }
 
-    pub fn __reduce__(slf: &PyCell<Self>) -> PyResult<(PyObject, (PyObject, PyObject))> {
+    pub fn __reduce__(slf: &Bound<Self>) -> PyResult<(PyObject, (PyObject, PyObject))> {
         // Enables support for `pickle` serialization.
         let py = slf.py();
         let cls = slf.get_type().into();

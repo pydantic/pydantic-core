@@ -249,7 +249,7 @@ pub struct NowConstraint {
 static TIME_LOCALTIME: GILOnceCell<PyObject> = GILOnceCell::new();
 
 fn get_localtime(py: Python) -> PyResult<PyObject> {
-    Ok(py.import("time")?.getattr("localtime")?.into_py(py))
+    Ok(py.import_bound("time")?.getattr("localtime")?.into_py(py))
 }
 
 impl NowConstraint {
@@ -261,11 +261,7 @@ impl NowConstraint {
             Ok(utc_offset)
         } else {
             let localtime = TIME_LOCALTIME.get_or_init(py, || get_localtime(py).unwrap());
-            localtime
-                .as_ref(py)
-                .call0()?
-                .getattr(intern!(py, "tm_gmtoff"))?
-                .extract()
+            localtime.bind(py).call0()?.getattr(intern!(py, "tm_gmtoff"))?.extract()
         }
     }
 
