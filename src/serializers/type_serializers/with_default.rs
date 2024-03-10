@@ -13,6 +13,7 @@ use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 #[derive(Debug, Clone)]
 pub struct WithDefaultSerializer {
     default: DefaultType,
+    default_comparison: Option<PyObject>,
     serializer: Box<CombinedSerializer>,
 }
 
@@ -26,11 +27,16 @@ impl BuildSerializer for WithDefaultSerializer {
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let default = DefaultType::new(schema)?;
-
+        let default_comparison = schema.get_as(intern!(py, "default_comparison"))?;
         let sub_schema: &PyDict = schema.get_as_req(intern!(py, "schema"))?;
         let serializer = Box::new(CombinedSerializer::build(sub_schema, config, definitions)?);
 
-        Ok(Self { default, serializer }.into())
+        Ok(Self {
+            default,
+            default_comparison,
+            serializer,
+        }
+        .into())
     }
 }
 
@@ -73,5 +79,17 @@ impl TypeSerializer for WithDefaultSerializer {
 
     fn get_default(&self, py: Python) -> PyResult<Option<PyObject>> {
         self.default.default_value(py)
+    }
+
+    fn compare_with_default(&self, py: Python, value: &PyAny) -> PyResult<bool> {
+        if let Some(default) = self.get_default(py)? {
+            if let Some(default_comparison) = &self.default_comparison {
+                return default_comparison.call(py, (value, default), None)?.extract::<bool>(py);
+            } else if value.eq(default)? {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
     }
 }
