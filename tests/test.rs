@@ -189,6 +189,7 @@ dump_json_input_2 = {'a': 'something'}
                     false,
                     false,
                     None,
+                    false,
                     None,
                 )
                 .unwrap();
@@ -211,11 +212,12 @@ dump_json_input_2 = {'a': 'something'}
                     false,
                     false,
                     None,
+                    false,
                     None,
                 )
                 .unwrap();
             let serialization_result: &PyAny = binding.extract(py).unwrap();
-            let repr = format!("{}", serialization_result.repr().unwrap());
+            let repr: String = format!("{}", serialization_result.repr().unwrap());
             assert_eq!(repr, "b'{\"a\":\"something\"}'");
         });
     }
