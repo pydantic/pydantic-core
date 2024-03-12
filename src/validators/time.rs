@@ -85,7 +85,7 @@ impl Validator for TimeValidator {
     }
 }
 
-fn convert_pytime(schema: &PyDict, field: &PyString) -> PyResult<Option<Time>> {
+fn convert_pytime(schema: &PyDict, field: &Bound<'_, PyString>) -> PyResult<Option<Time>> {
     match schema.get_as::<&PyTime>(field)? {
         Some(date) => Ok(Some(EitherTime::Py(date).as_raw()?)),
         None => Ok(None),

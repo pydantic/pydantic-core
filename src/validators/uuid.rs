@@ -113,7 +113,7 @@ impl Validator for UuidValidator {
         } else if state.strict_or(self.strict) && state.extra().input_type == InputType::Python {
             Err(ValError::new(
                 ErrorType::IsInstanceOf {
-                    class: class.name().unwrap_or("UUID").to_string(),
+                    class: class.qualname().unwrap_or_else(|_| "UUID".to_owned()),
                     context: None,
                 },
                 input,

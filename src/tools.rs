@@ -6,17 +6,17 @@ use pyo3::types::{PyDict, PyString};
 use pyo3::{ffi, intern, FromPyObject};
 
 pub trait SchemaDict<'py> {
-    fn get_as<T>(&'py self, key: &PyString) -> PyResult<Option<T>>
+    fn get_as<T>(&'py self, key: &Bound<PyString>) -> PyResult<Option<T>>
     where
         T: FromPyObject<'py>;
 
-    fn get_as_req<T>(&'py self, key: &PyString) -> PyResult<T>
+    fn get_as_req<T>(&'py self, key: &Bound<PyString>) -> PyResult<T>
     where
         T: FromPyObject<'py>;
 }
 
 impl<'py> SchemaDict<'py> for PyDict {
-    fn get_as<T>(&'py self, key: &PyString) -> PyResult<Option<T>>
+    fn get_as<T>(&'py self, key: &Bound<PyString>) -> PyResult<Option<T>>
     where
         T: FromPyObject<'py>,
     {
@@ -26,7 +26,7 @@ impl<'py> SchemaDict<'py> for PyDict {
         }
     }
 
-    fn get_as_req<T>(&'py self, key: &PyString) -> PyResult<T>
+    fn get_as_req<T>(&'py self, key: &Bound<PyString>) -> PyResult<T>
     where
         T: FromPyObject<'py>,
     {
@@ -38,7 +38,7 @@ impl<'py> SchemaDict<'py> for PyDict {
 }
 
 impl<'py> SchemaDict<'py> for Option<&PyDict> {
-    fn get_as<T>(&'py self, key: &PyString) -> PyResult<Option<T>>
+    fn get_as<T>(&'py self, key: &Bound<PyString>) -> PyResult<Option<T>>
     where
         T: FromPyObject<'py>,
     {
@@ -49,7 +49,7 @@ impl<'py> SchemaDict<'py> for Option<&PyDict> {
     }
 
     #[cfg_attr(has_coverage_attribute, coverage(off))]
-    fn get_as_req<T>(&'py self, key: &PyString) -> PyResult<T>
+    fn get_as_req<T>(&'py self, key: &Bound<PyString>) -> PyResult<T>
     where
         T: FromPyObject<'py>,
     {
@@ -92,7 +92,7 @@ pub fn function_name(f: &PyAny) -> PyResult<String> {
 pub fn safe_repr(v: &PyAny) -> Cow<str> {
     if let Ok(s) = v.repr() {
         s.to_string_lossy()
-    } else if let Ok(name) = v.get_type().name() {
+    } else if let Ok(name) = v.get_type().qualname() {
         format!("<unprintable {name} object>").into()
     } else {
         "<unprintable object>".into()

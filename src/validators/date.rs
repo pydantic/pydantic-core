@@ -175,7 +175,7 @@ impl DateConstraints {
     }
 }
 
-fn convert_pydate(schema: &PyDict, field: &PyString) -> PyResult<Option<Date>> {
+fn convert_pydate(schema: &PyDict, field: &Bound<'_, PyString>) -> PyResult<Option<Date>> {
     match schema.get_as::<&PyDate>(field)? {
         Some(date) => Ok(Some(EitherDate::Py(date).as_raw()?)),
         None => Ok(None),

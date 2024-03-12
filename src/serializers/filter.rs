@@ -23,7 +23,7 @@ fn map_negative_index(value: &PyAny, len: Option<usize>) -> PyResult<&PyAny> {
             .map_or_else(|_| value, |v| v)),
         None => {
             // check that it's not negative
-            let negative = value.call_method1(intern!(py, "__lt__"), (0,))?.is_true()?;
+            let negative = value.call_method1(intern!(py, "__lt__"), (0,))?.is_truthy()?;
             if negative {
                 Err(PyValueError::new_err(
                     "Negative indices cannot be used to exclude items on unsized iterables",
@@ -291,7 +291,7 @@ fn check_contains(obj: &PyAny, py_key: impl ToPyObject + Copy) -> PyResult<Optio
         Ok(contains_method) => {
             if let Ok(result) = contains_method.call1((py_key.to_object(py),)) {
                 Ok(Some(
-                    result.is_true()? || contains_method.call1((intern!(py, "__all__"),))?.is_true()?,
+                    result.is_truthy()? || contains_method.call1((intern!(py, "__all__"),))?.is_truthy()?,
                 ))
             } else {
                 Ok(None)
@@ -316,7 +316,7 @@ where
 
 /// detect both ellipsis and `True` to be compatible with pydantic V1
 fn is_ellipsis_like(v: &PyAny) -> bool {
-    v.is_ellipsis()
+    v.is(&v.py().Ellipsis())
         || match v.downcast::<PyBool>() {
             Ok(b) => b.is_true(),
             Err(_) => false,

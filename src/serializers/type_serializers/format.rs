@@ -95,9 +95,9 @@ impl FormatSerializer {
                 format!(
                     "Error calling `format(value, {})`: {}",
                     self.formatting_string
-                        .as_ref(py)
+                        .bind(py)
                         .repr()
-                        .unwrap_or_else(|_| intern!(py, "???")),
+                        .unwrap_or_else(|_| intern!(py, "???").clone()),
                     e
                 )
             })

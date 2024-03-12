@@ -28,7 +28,7 @@ impl BuildValidator for IsSubclassValidator {
 
         let class_repr = match schema.get_as(intern!(py, "cls_repr"))? {
             Some(s) => s,
-            None => class.name()?.to_string(),
+            None => class.qualname()?.to_string(),
         };
         let name = format!("{}[{class_repr}]", Self::EXPECTED_TYPE);
         Ok(Self {

@@ -1,6 +1,6 @@
 use pyo3::intern;
-use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
+use pyo3::sync::GILOnceCell;
 use pyo3::types::PyDict;
 use pyo3::PyTraverseError;
 use pyo3::PyVisit;

@@ -333,7 +333,10 @@ impl CollectWarnings {
 
     fn fallback_warning(&self, field_type: &str, value: &PyAny) {
         if self.active {
-            let type_name = value.get_type().name().unwrap_or("<unknown python object>");
+            let type_name = value
+                .get_type()
+                .qualname()
+                .unwrap_or_else(|_| "<unknown python object>".to_owned());
             self.add_warning(format!(
                 "Expected `{field_type}` but got `{type_name}` - serialized value may not be as expected"
             ));

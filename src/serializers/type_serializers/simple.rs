@@ -179,7 +179,7 @@ pub(crate) fn to_str_json_key(key: &PyAny) -> PyResult<Cow<str>> {
 build_simple_serializer!(IntSerializer, "int", Int, ObType::Int, to_str_json_key, true);
 
 pub(crate) fn bool_json_key(key: &PyAny) -> PyResult<Cow<str>> {
-    let v = if key.is_true().unwrap_or(false) {
+    let v = if key.is_truthy().unwrap_or(false) {
         "true"
     } else {
         "false"

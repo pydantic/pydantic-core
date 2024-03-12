@@ -548,7 +548,7 @@ fn unknown_type_error(value: &PyAny) -> PyErr {
 fn serialize_unknown(value: &PyAny) -> Cow<str> {
     if let Ok(s) = value.str() {
         s.to_string_lossy()
-    } else if let Ok(name) = value.get_type().name() {
+    } else if let Ok(name) = value.get_type().qualname() {
         format!("<Unserializable {name} object>").into()
     } else {
         "<Unserializable object>".into()

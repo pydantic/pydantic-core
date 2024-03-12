@@ -22,9 +22,9 @@ pub enum InputType {
 impl IntoPy<PyObject> for InputType {
     fn into_py(self, py: Python<'_>) -> PyObject {
         match self {
-            Self::Json => intern!(py, "json").into(),
-            Self::Python => intern!(py, "python").into(),
-            Self::String => intern!(py, "string").into(),
+            Self::Json => intern!(py, "json").into_py(py),
+            Self::Python => intern!(py, "python").into_py(py),
+            Self::String => intern!(py, "string").into_py(py),
         }
     }
 }

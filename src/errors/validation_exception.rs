@@ -5,8 +5,8 @@ use std::str::from_utf8;
 use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::ffi;
 use pyo3::intern;
-use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
+use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyList, PyString};
 use serde::ser::{Error, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
@@ -559,7 +559,7 @@ impl PyLineError {
             let input_str = safe_repr(input_value);
             truncate_input_value!(output, &input_str);
 
-            if let Ok(type_) = input_value.get_type().name() {
+            if let Ok(type_) = input_value.get_type().qualname() {
                 write!(output, ", input_type={type_}")?;
             }
         }

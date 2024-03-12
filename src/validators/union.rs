@@ -404,7 +404,7 @@ impl Validator for TaggedUnionValidator {
                         // errors when getting attributes which should be "raised"
                         match lookup_key.$get_method($( $dict ),+)? {
                             Some((_, value)) => {
-                                Ok(value.to_object(py).into_ref(py))
+                                Ok(value.to_object(py))
                             }
                             None => Err(self.tag_not_found(input)),
                         }
@@ -419,18 +419,18 @@ impl Validator for TaggedUnionValidator {
                     GenericMapping::PyGetAttr(obj, kwargs) => find_validator!(py_get_attr, obj, kwargs),
                     GenericMapping::JsonObject(mapping) => find_validator!(json_get, mapping),
                 }?;
-                self.find_call_validator(py, tag, input, state)
+                self.find_call_validator(py, tag.bind(py), input, state)
             }
             Discriminator::Function(ref func) => {
-                let tag = func.call1(py, (input.to_object(py),))?;
-                if tag.is_none(py) {
+                let tag = func.bind(py).call1((input.to_object(py),))?;
+                if tag.is_none() {
                     Err(self.tag_not_found(input))
                 } else {
-                    self.find_call_validator(py, tag.into_ref(py), input, state)
+                    self.find_call_validator(py, &tag, input, state)
                 }
             }
             Discriminator::SelfSchema => {
-                self.find_call_validator(py, self.self_schema_tag(py, input)?.as_ref(), input, state)
+                self.find_call_validator(py, self.self_schema_tag(py, input)?.as_any(), input, state)
             }
         }
     }
@@ -445,7 +445,7 @@ impl TaggedUnionValidator {
         &'s self,
         py: Python<'data>,
         input: &'data impl Input<'data>,
-    ) -> ValResult<&'data PyString> {
+    ) -> ValResult<Bound<'data, PyString>> {
         let dict = input.strict_dict()?;
         let either_tag = match dict {
             GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "type"))? {
@@ -467,23 +467,23 @@ impl TaggedUnionValidator {
             };
             let mode = mode.ok_or_else(|| self.tag_not_found(input))?;
             match mode.as_cow()?.as_ref() {
-                "plain" => Ok(intern!(py, "function-plain")),
-                "wrap" => Ok(intern!(py, "function-wrap")),
-                _ => Ok(intern!(py, "function")),
+                "plain" => Ok(intern!(py, "function-plain").clone()),
+                "wrap" => Ok(intern!(py, "function-wrap").clone()),
+                _ => Ok(intern!(py, "function").clone()),
             }
         } else {
-            Ok(PyString::new(py, tag))
+            Ok(PyString::new_bound(py, tag))
         }
     }
 
     fn find_call_validator<'s, 'data>(
         &'s self,
         py: Python<'data>,
-        tag: &'data PyAny,
+        tag: &Bound<'data, PyAny>,
         input: &'data impl Input<'data>,
         state: &mut ValidationState,
     ) -> ValResult<PyObject> {
-        if let Ok(Some((tag, validator))) = self.lookup.validate(py, tag) {
+        if let Ok(Some((tag, validator))) = self.lookup.validate(py, tag.clone().into_gil_ref()) {
             return match validator.validate(py, input, state) {
                 Ok(res) => Ok(res),
                 Err(err) => Err(err.with_outer_location(tag)),

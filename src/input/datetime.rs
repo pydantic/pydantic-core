@@ -114,7 +114,7 @@ impl<'a> TryFrom<&'a PyAny> for EitherTimedelta<'a> {
     type Error = PyErr;
 
     fn try_from(value: &'a PyAny) -> PyResult<Self> {
-        if let Ok(dt) = <PyDelta as PyTryFrom>::try_from_exact(value) {
+        if let Ok(dt) = value.downcast_exact::<PyDelta>() {
             Ok(EitherTimedelta::PyExact(dt))
         } else {
             let dt = value.downcast::<PyDelta>()?;

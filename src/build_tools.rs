@@ -14,8 +14,8 @@ use crate::ValidationError;
 pub fn schema_or_config<'py, T>(
     schema: &'py PyDict,
     config: Option<&'py PyDict>,
-    schema_key: &PyString,
-    config_key: &PyString,
+    schema_key: &Bound<'py, PyString>,
+    config_key: &Bound<'py, PyString>,
 ) -> PyResult<Option<T>>
 where
     T: FromPyObject<'py>,
@@ -32,7 +32,7 @@ where
 pub fn schema_or_config_same<'py, T>(
     schema: &'py PyDict,
     config: Option<&'py PyDict>,
-    key: &PyString,
+    key: &Bound<'py, PyString>,
 ) -> PyResult<Option<T>>
 where
     T: FromPyObject<'py>,

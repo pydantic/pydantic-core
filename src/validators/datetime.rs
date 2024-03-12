@@ -1,6 +1,6 @@
 use pyo3::intern;
-use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
+use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDateTime, PyDict, PyString};
 use speedate::{DateTime, Time};
 use std::cmp::Ordering;
@@ -209,7 +209,7 @@ impl DateTimeConstraints {
     }
 }
 
-fn py_datetime_as_datetime(schema: &PyDict, field: &PyString) -> PyResult<Option<DateTime>> {
+fn py_datetime_as_datetime(schema: &PyDict, field: &Bound<'_, PyString>) -> PyResult<Option<DateTime>> {
     match schema.get_as::<&PyDateTime>(field)? {
         Some(dt) => Ok(Some(EitherDateTime::Py(dt).as_raw()?)),
         None => Ok(None),

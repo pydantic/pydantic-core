@@ -340,7 +340,7 @@ impl<'a> Input<'a> for PyAny {
     }
 
     fn exact_str(&'a self) -> ValResult<EitherString<'a>> {
-        if let Ok(py_str) = <PyString as PyTryFrom>::try_from_exact(self) {
+        if let Ok(py_str) = self.downcast_exact() {
             Ok(EitherString::Py(py_str))
         } else {
             Err(ValError::new(ErrorTypeDefaults::IntType, self))
@@ -389,7 +389,7 @@ impl<'a> Input<'a> for PyAny {
 
         Err(ValError::new(
             ErrorType::IsInstanceOf {
-                class: decimal_type.name().unwrap_or("Decimal").to_string(),
+                class: decimal_type.qualname().unwrap_or_else(|_| "Decimal".to_owned()),
                 context: None,
             },
             self,
@@ -773,7 +773,7 @@ fn maybe_as_enum(v: &PyAny) -> Option<&PyAny> {
 }
 
 #[cfg(PyPy)]
-static DICT_KEYS_TYPE: pyo3::once_cell::GILOnceCell<Py<PyType>> = pyo3::once_cell::GILOnceCell::new();
+static DICT_KEYS_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
 
 #[cfg(PyPy)]
 fn is_dict_keys_type(v: &PyAny) -> bool {
@@ -791,7 +791,7 @@ fn is_dict_keys_type(v: &PyAny) -> bool {
 }
 
 #[cfg(PyPy)]
-static DICT_VALUES_TYPE: pyo3::once_cell::GILOnceCell<Py<PyType>> = pyo3::once_cell::GILOnceCell::new();
+static DICT_VALUES_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
 
 #[cfg(PyPy)]
 fn is_dict_values_type(v: &PyAny) -> bool {
@@ -809,7 +809,7 @@ fn is_dict_values_type(v: &PyAny) -> bool {
 }
 
 #[cfg(PyPy)]
-static DICT_ITEMS_TYPE: pyo3::once_cell::GILOnceCell<Py<PyType>> = pyo3::once_cell::GILOnceCell::new();
+static DICT_ITEMS_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
 
 #[cfg(PyPy)]
 fn is_dict_items_type(v: &PyAny) -> bool {

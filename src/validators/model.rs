@@ -95,8 +95,7 @@ impl BuildValidator for ModelValidator {
             custom_init: schema.get_as(intern!(py, "custom_init"))?.unwrap_or(false),
             root_model: schema.get_as(intern!(py, "root_model"))?.unwrap_or(false),
             undefined: PydanticUndefinedType::new(py).to_object(py),
-            // Get the class's `__name__`, not using `class.name()` since it uses `__qualname__`
-            // which is not what we want here
+            // Get the class's `__name__`, not using `class.qualname()`
             name: class.getattr(intern!(py, "__name__"))?.extract()?,
         }
         .into())
