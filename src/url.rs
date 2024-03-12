@@ -15,17 +15,22 @@ use crate::tools::SchemaDict;
 use crate::SchemaValidator;
 
 static SCHEMA_DEFINITION_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+static SCHEMA_DEFINITION_OMIT_SLASH_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
 
 #[pyclass(name = "Url", module = "pydantic_core._pydantic_core", subclass)]
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PyUrl {
     lib_url: Url,
+    omit_trailing_slash: bool,
 }
 
 impl PyUrl {
-    pub fn new(lib_url: Url) -> Self {
-        Self { lib_url }
+    pub fn new(lib_url: Url, omit_trailing_slash: Option<bool>) -> Self {
+        Self {
+            lib_url,
+            omit_trailing_slash: omit_trailing_slash.unwrap_or(false),
+        }
     }
 
     pub fn into_url(self) -> Url {
@@ -33,18 +38,26 @@ impl PyUrl {
     }
 }
 
-fn build_schema_validator(py: Python, schema_type: &str) -> SchemaValidator {
+fn build_schema_validator(py: Python, schema_type: &str, omit_trailing_slash: bool) -> SchemaValidator {
     let schema: &PyDict = PyDict::new(py);
     schema.set_item("type", schema_type).unwrap();
+    // TODO: it seems wrong, do it?
+    schema.set_item("omit_trailing_slash", omit_trailing_slash).unwrap();
     SchemaValidator::py_new(py, schema, None).unwrap()
 }
 
 #[pymethods]
 impl PyUrl {
     #[new]
-    pub fn py_new(py: Python, url: &PyAny) -> PyResult<Self> {
-        let schema_obj = SCHEMA_DEFINITION_URL
-            .get_or_init(py, || build_schema_validator(py, "url"))
+    pub fn py_new(py: Python, url: &PyAny, omit_trailing_slash: Option<bool>) -> PyResult<Self> {
+        let omit = omit_trailing_slash.unwrap_or(false);
+        let schema = if omit {
+            &SCHEMA_DEFINITION_OMIT_SLASH_URL
+        } else {
+            &SCHEMA_DEFINITION_URL
+        };
+        let schema_obj = schema
+            .get_or_init(py, || build_schema_validator(py, "url", omit))
             .validate_python(py, url, None, None, None, None)?;
         schema_obj.extract(py)
     }
@@ -89,6 +102,7 @@ impl PyUrl {
     pub fn path(&self) -> Option<&str> {
         match self.lib_url.path() {
             "" => None,
+            path if self.omit_trailing_slash && path == "/" => None,
             path => Some(path),
         }
     }
@@ -114,15 +128,21 @@ impl PyUrl {
 
     // string representation of the URL, with punycode decoded when appropriate
     pub fn unicode_string(&self) -> String {
-        unicode_url(&self.lib_url)
+        unicode_url(&self.lib_url, self.omit_trailing_slash)
     }
 
-    pub fn __str__(&self) -> &str {
-        self.lib_url.as_str()
+    pub fn __str__(&self) -> String {
+        if self.omit_trailing_slash && self.lib_url.path() == "/" {
+            let start = before_path_length(&self.lib_url);
+            let mut s = self.lib_url.to_string();
+            s.replace_range(start..=start, "");
+            return s;
+        }
+        self.lib_url.to_string()
     }
 
     pub fn __repr__(&self) -> String {
-        format!("Url('{}')", self.lib_url)
+        format!("Url('{}')", self.__str__())
     }
 
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyResult<bool> {
@@ -151,12 +171,12 @@ impl PyUrl {
         self.clone().into_py(py)
     }
 
-    fn __getnewargs__(&self) -> (&str,) {
+    fn __getnewargs__(&self) -> (String,) {
         (self.__str__(),)
     }
 
     #[classmethod]
-    #[pyo3(signature=(*, scheme, host, username=None, password=None, port=None, path=None, query=None, fragment=None))]
+    #[pyo3(signature = (*, scheme, host, username = None, password = None, port = None, path = None, query = None, fragment = None))]
     #[allow(clippy::too_many_arguments)]
     pub fn build<'a>(
         cls: &'a PyType,
@@ -198,13 +218,15 @@ impl PyUrl {
 pub struct PyMultiHostUrl {
     ref_url: PyUrl,
     extra_urls: Option<Vec<Url>>,
+    omit_trailing_slash: bool,
 }
 
 impl PyMultiHostUrl {
-    pub fn new(ref_url: Url, extra_urls: Option<Vec<Url>>) -> Self {
+    pub fn new(ref_url: Url, extra_urls: Option<Vec<Url>>, omit_trailing_slash: Option<bool>) -> Self {
         Self {
-            ref_url: PyUrl::new(ref_url),
+            ref_url: PyUrl::new(ref_url, omit_trailing_slash),
             extra_urls,
+            omit_trailing_slash: omit_trailing_slash.unwrap_or(false),
         }
     }
 
@@ -214,13 +236,20 @@ impl PyMultiHostUrl {
 }
 
 static SCHEMA_DEFINITION_MULTI_HOST_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+static SCHEMA_DEFINITION_MULTI_HOST_OMIT_SLASH_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
 
 #[pymethods]
 impl PyMultiHostUrl {
     #[new]
-    pub fn py_new(py: Python, url: &PyAny) -> PyResult<Self> {
-        let schema_obj = SCHEMA_DEFINITION_MULTI_HOST_URL
-            .get_or_init(py, || build_schema_validator(py, "multi-host-url"))
+    pub fn py_new(py: Python, url: &PyAny, omit_trailing_slash: Option<bool>) -> PyResult<Self> {
+        let omit = omit_trailing_slash.unwrap_or(false);
+        let schema = if omit {
+            &SCHEMA_DEFINITION_MULTI_HOST_OMIT_SLASH_URL
+        } else {
+            &SCHEMA_DEFINITION_MULTI_HOST_URL
+        };
+        let schema_obj = schema
+            .get_or_init(py, || build_schema_validator(py, "multi-host-url", omit))
             .validate_python(py, url, None, None, None, None)?;
         schema_obj.extract(py)
     }
@@ -281,8 +310,9 @@ impl PyMultiHostUrl {
             let hosts = extra_urls
                 .iter()
                 .map(|url| {
-                    let str = unicode_url(url);
-                    str[host_offset..str.len() - sub].to_string()
+                    let str = unicode_url(url, self.omit_trailing_slash);
+                    let _sub = if self.omit_trailing_slash { 0 } else { sub };
+                    str[host_offset..str.len() - _sub].to_string()
                 })
                 .collect::<Vec<String>>()
                 .join(",");
@@ -298,7 +328,7 @@ impl PyMultiHostUrl {
             let schema = self.ref_url.lib_url.scheme();
             let host_offset = schema.len() + 3;
 
-            let mut full_url = self.ref_url.lib_url.to_string();
+            let mut full_url = self.ref_url.__str__();
             full_url.insert(host_offset, ',');
 
             // special urls will have had a trailing slash added, non-special urls will not
@@ -356,7 +386,7 @@ impl PyMultiHostUrl {
     }
 
     #[classmethod]
-    #[pyo3(signature=(*, scheme, hosts=None, path=None, query=None, fragment=None, host=None, username=None, password=None, port=None))]
+    #[pyo3(signature = (*, scheme, hosts = None, path = None, query = None, fragment = None, host = None, username = None, password = None, port = None))]
     #[allow(clippy::too_many_arguments)]
     pub fn build<'a>(
         cls: &'a PyType,
@@ -480,19 +510,34 @@ fn host_to_dict<'a>(py: Python<'a>, lib_url: &Url) -> PyResult<&'a PyDict> {
     Ok(dict)
 }
 
-fn unicode_url(lib_url: &Url) -> String {
+fn unicode_url(lib_url: &Url, omit_trailing_slash: bool) -> String {
     let mut s = lib_url.to_string();
 
     match lib_url.host() {
         Some(url::Host::Domain(domain)) if is_punnycode_domain(lib_url, domain) => {
             if let Some(decoded) = decode_punycode(domain) {
                 // replace the range containing the punycode domain with the decoded domain
-                let start = lib_url.scheme().len() + 3;
+                let before_path = before_path_length(lib_url);
+                let start = before_path
+                    - domain.len()
+                    - match lib_url.port() {
+                        Some(port) => 1 + port.to_string().len(),
+                        None => 0,
+                    };
+                if omit_trailing_slash && lib_url.path() == "/" {
+                    s.replace_range(before_path..=before_path, "");
+                }
                 s.replace_range(start..start + domain.len(), &decoded);
             }
             s
         }
-        _ => s,
+        _ => {
+            if omit_trailing_slash && lib_url.path() == "/" {
+                let before_path = before_path_length(lib_url);
+                s.replace_range(before_path..=before_path, "");
+            }
+            s
+        }
     }
 }
 
@@ -519,4 +564,22 @@ fn is_punnycode_domain(lib_url: &Url, domain: &str) -> bool {
 // based on https://github.com/servo/rust-url/blob/1c1e406874b3d2aa6f36c5d2f3a5c2ea74af9efb/url/src/parser.rs#L161-L167
 pub fn schema_is_special(schema: &str) -> bool {
     matches!(schema, "http" | "https" | "ws" | "wss" | "ftp" | "file")
+}
+
+fn before_path_length(url: &Url) -> usize {
+    let length = url.scheme().len()
+        + 3  // :// part
+        + match url.username() {
+            "" => 0,
+            // for colon (:) and at (@) signs we're adding +2
+            username => 2 + username.len() + url.password().unwrap_or("").len(),
+        }
+        + url.host_str().unwrap().len()
+        + match url.port() {
+        // for colon (:) +1
+        Some(port) => 1 + port.to_string().len(),
+        None => 0,
+    };
+
+    length
 }

@@ -30,6 +30,7 @@ pub struct UrlValidator {
     default_host: Option<String>,
     default_port: Option<u16>,
     default_path: Option<String>,
+    omit_trailing_slash: bool,
     name: String,
 }
 
@@ -50,6 +51,9 @@ impl BuildValidator for UrlValidator {
             default_host: schema.get_as(intern!(schema.py(), "default_host"))?,
             default_port: schema.get_as(intern!(schema.py(), "default_port"))?,
             default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
+            omit_trailing_slash: schema
+                .get_as(intern!(schema.py(), "omit_trailing_slash"))?
+                .unwrap_or(false),
             allowed_schemes,
             name,
         }
@@ -91,7 +95,7 @@ impl Validator for UrlValidator {
             Ok(()) => {
                 // Lax rather than strict to preserve V2.4 semantic that str wins over url in union
                 state.floor_exactness(Exactness::Lax);
-                Ok(PyUrl::new(lib_url).into_py(py))
+                Ok(PyUrl::new(lib_url, Some(self.omit_trailing_slash)).into_py(py))
             }
             Err(error_type) => Err(ValError::new(error_type, input)),
         }
@@ -158,6 +162,7 @@ pub struct MultiHostUrlValidator {
     default_host: Option<String>,
     default_port: Option<u16>,
     default_path: Option<String>,
+    omit_trailing_slash: bool,
     name: String,
 }
 
@@ -185,6 +190,9 @@ impl BuildValidator for MultiHostUrlValidator {
             default_host,
             default_port: schema.get_as(intern!(schema.py(), "default_port"))?,
             default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
+            omit_trailing_slash: schema
+                .get_as(intern!(schema.py(), "omit_trailing_slash"))?
+                .unwrap_or(false),
             name,
         }
         .into())
@@ -245,7 +253,7 @@ impl MultiHostUrlValidator {
 
                 self.check_length(input, || url_str.len())?;
 
-                parse_multihost_url(url_str, input, strict)
+                parse_multihost_url(url_str, input, strict, Some(self.omit_trailing_slash))
             }
             Err(_) => {
                 // we don't need to worry about whether the url was parsed in strict mode before,
@@ -256,7 +264,7 @@ impl MultiHostUrlValidator {
                 } else if let Some(py_url) = input.input_as_url() {
                     let lib_url = py_url.into_url();
                     self.check_length(input, || lib_url.as_str().len())?;
-                    Ok(PyMultiHostUrl::new(lib_url, None))
+                    Ok(PyMultiHostUrl::new(lib_url, None, Some(self.omit_trailing_slash)))
                 } else {
                     Err(ValError::new(ErrorTypeDefaults::UrlType, input))
                 }
@@ -287,6 +295,7 @@ fn parse_multihost_url<'url, 'input>(
     url_str: &'url str,
     input: &'input impl Input<'input>,
     strict: bool,
+    omit_trailing_slash: Option<bool>,
 ) -> ValResult<PyMultiHostUrl> {
     macro_rules! parsing_err {
         ($parse_error:expr) => {
@@ -380,7 +389,7 @@ fn parse_multihost_url<'url, 'input>(
 
     if hosts.is_empty() {
         // if there's no one host (e.g. no `,`), we allow it to be empty to allow for default hosts
-        Ok(PyMultiHostUrl::new(ref_url, None))
+        Ok(PyMultiHostUrl::new(ref_url, None, omit_trailing_slash))
     } else {
         // with more than one host, none of them can be empty
         if !ref_url.has_host() {
@@ -398,7 +407,7 @@ fn parse_multihost_url<'url, 'input>(
             return parsing_err!(ParseError::EmptyHost);
         }
 
-        Ok(PyMultiHostUrl::new(ref_url, Some(extra_urls)))
+        Ok(PyMultiHostUrl::new(ref_url, Some(extra_urls), omit_trailing_slash))
     }
 }
 
