@@ -222,6 +222,9 @@ def test_dataclass():
         v.validate_python({'a': 'hello', 'b': True}, strict=True)
         v.validate_python({'a': 'hello', 'b': True}, strict=True, mode='python')
 
+    with pytest.raises(ValueError, match="parameter 'mode' can only be 'python' or 'json' but was 'yaml'"):
+        v.validate_python({'a': 'hello', 'b': True}, mode='yaml')
+
     # insert_assert(exc_info.value.errors(include_url=False))
     assert exc_info.value.errors(include_url=False) == [
         {

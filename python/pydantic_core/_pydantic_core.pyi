@@ -100,7 +100,7 @@ class SchemaValidator:
         input: Any,
         *,
         strict: bool | None = None,
-        mode: Literal['python', 'json'] = 'json'
+        mode: Literal['python', 'json'] = 'python',
         from_attributes: bool | None = None,
         context: dict[str, Any] | None = None,
         self_instance: Any | None = None,

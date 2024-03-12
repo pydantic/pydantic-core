@@ -170,7 +170,7 @@ impl SchemaValidator {
             "json" => InputType::Json,
             _ => {
                 return Err(PyValueError::new_err(format!(
-                    "parameter 'mode' can only be 'python' or 'json' but was {mode}",
+                    "parameter 'mode' can only be 'python' or 'json' but was '{mode}'",
                 )))
             }
         };
