@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
 
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
@@ -153,26 +153,30 @@ impl SchemaValidator {
         Ok((cls, init_args))
     }
 
-    #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (input, *, strict=None, mode="python", from_attributes=None, context=None, self_instance=None))]
     pub fn validate_python(
         &self,
         py: Python,
         input: &Bound<'_, PyAny>,
         strict: Option<bool>,
+        mode: &str,
         from_attributes: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyObject> {
-        self._validate(
-            py,
-            input,
-            InputType::Python,
-            strict,
-            from_attributes,
-            context,
-            self_instance,
-        )
-        .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
+        let input_type = match mode {
+            "python" => InputType::Python,
+            "json" => InputType::Json,
+            _ => {
+                return Err(PyValueError::new_err(format!(
+                    "parameter 'mode' can only be 'python' or 'json' but was {mode}",
+                )))
+            }
+        };
+
+        self._validate(py, input, input_type, strict, from_attributes, context, self_instance)
+            .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
     }
 
     #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]

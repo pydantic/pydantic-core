@@ -100,6 +100,7 @@ class SchemaValidator:
         input: Any,
         *,
         strict: bool | None = None,
+        mode: Literal['python', 'json'] = 'json'
         from_attributes: bool | None = None,
         context: dict[str, Any] | None = None,
         self_instance: Any | None = None,
@@ -111,6 +112,11 @@ class SchemaValidator:
             input: The Python object to validate.
             strict: Whether to validate the object in strict mode.
                 If `None`, the value of [`CoreConfig.strict`][pydantic_core.core_schema.CoreConfig] is used.
+            mode: Specifies the validation mode. Defaults to `'python'`.
+                Under `'json'`, certain coercions are permitted (e.g. `dict` to `dataclass`),
+                even when `strict` is enabled. This can be useful if `input` is is an
+                object that has already undergone parsing (JSON, YAML, etc.), but requires
+                the same validation rules that `validate_json` would apply.
             from_attributes: Whether to validate objects as inputs to models by extracting attributes.
                 If `None`, the value of [`CoreConfig.from_attributes`][pydantic_core.core_schema.CoreConfig] is used.
             context: The context to use for validation, this is passed to functional validators as
