@@ -216,8 +216,11 @@ def test_dataclass():
 
     assert dataclasses.asdict(v.validate_python(FooDataclass(a='hello', b=True))) == {'a': 'hello', 'b': True}
 
+    foo = v.validate_python({'a': 'hello', 'b': True}, strict=True, mode='json')
+
     with pytest.raises(ValidationError, match='Input should be an instance of FooDataclass') as exc_info:
         v.validate_python({'a': 'hello', 'b': True}, strict=True)
+        v.validate_python({'a': 'hello', 'b': True}, strict=True, mode='python')
 
     # insert_assert(exc_info.value.errors(include_url=False))
     assert exc_info.value.errors(include_url=False) == [
