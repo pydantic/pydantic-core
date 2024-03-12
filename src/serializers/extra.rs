@@ -85,6 +85,7 @@ impl SerializationState {
         serialize_unknown: bool,
         fallback: Option<&'py PyAny>,
         duck_typing_ser_mode: DuckTypingSerMode,
+        context: Option<&'py PyAny>,
     ) -> Extra<'py> {
         Extra::new(
             py,
@@ -100,6 +101,7 @@ impl SerializationState {
             serialize_unknown,
             fallback,
             duck_typing_ser_mode,
+            context,
         )
     }
 
@@ -132,6 +134,7 @@ pub(crate) struct Extra<'a> {
     pub serialize_unknown: bool,
     pub fallback: Option<&'a PyAny>,
     pub duck_typing_ser_mode: DuckTypingSerMode,
+    pub context: Option<&'a PyAny>,
 }
 
 impl<'a> Extra<'a> {
@@ -150,6 +153,7 @@ impl<'a> Extra<'a> {
         serialize_unknown: bool,
         fallback: Option<&'a PyAny>,
         duck_typing_ser_mode: DuckTypingSerMode,
+        context: Option<&'a PyAny>,
     ) -> Self {
         Self {
             mode,
@@ -168,6 +172,7 @@ impl<'a> Extra<'a> {
             serialize_unknown,
             fallback,
             duck_typing_ser_mode,
+            context,
         }
     }
 
@@ -222,11 +227,12 @@ pub(crate) struct ExtraOwned {
     config: SerializationConfig,
     rec_guard: SerRecursionState,
     check: SerCheck,
-    model: Option<PyObject>,
+    pub model: Option<PyObject>,
     field_name: Option<String>,
     serialize_unknown: bool,
     fallback: Option<PyObject>,
     duck_typing_ser_mode: DuckTypingSerMode,
+    pub context: Option<PyObject>,
 }
 
 impl ExtraOwned {
@@ -247,6 +253,7 @@ impl ExtraOwned {
             serialize_unknown: extra.serialize_unknown,
             fallback: extra.fallback.map(Into::into),
             duck_typing_ser_mode: extra.duck_typing_ser_mode,
+            context: extra.context.map(Into::into),
         }
     }
 
@@ -268,6 +275,7 @@ impl ExtraOwned {
             serialize_unknown: self.serialize_unknown,
             fallback: self.fallback.as_ref().map(|m| m.as_ref(py)),
             duck_typing_ser_mode: self.duck_typing_ser_mode,
+            context: self.context.as_ref().map(|m| m.as_ref(py)),
         }
     }
 }

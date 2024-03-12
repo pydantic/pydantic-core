@@ -21,6 +21,7 @@ i64_max = 9_223_372_036_854_775_807
         (0, 0),
         ('0', 0),
         (1, 1),
+        ('  1  ', 1),
         (42, 42),
         ('42', 42),
         (42.0, 42),
@@ -503,3 +504,11 @@ def test_allow_inf_nan_false_json() -> None:
         v.validate_json('Infinity')
     with pytest.raises(ValidationError, match=r'Input should be a finite number \[type=finite_number'):
         v.validate_json('-Infinity')
+
+
+def test_json_big_int_key():
+    v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'str'}})
+    big_integer = 1433352099889938534014333520998899385340
+    assert v.validate_python({big_integer: 'x'}) == {big_integer: 'x'}
+    assert v.validate_json('{"' + str(big_integer) + '": "x"}') == {big_integer: 'x'}
+    assert v.validate_strings({str(big_integer): 'x'}) == {big_integer: 'x'}

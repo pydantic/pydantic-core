@@ -73,7 +73,7 @@ class Some(Generic[_T]):
         Returns the value wrapped by `Some`.
         """
     @classmethod
-    def __class_getitem__(cls, __item: Any) -> Type[Self]: ...
+    def __class_getitem__(cls, item: Any, /) -> Type[Self]: ...
 
 @final
 class SchemaValidator:
@@ -101,7 +101,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
         self_instance: Any | None = None,
     ) -> Any:
         """
@@ -131,7 +131,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
         self_instance: Any | None = None,
     ) -> bool:
         """
@@ -148,7 +148,7 @@ class SchemaValidator:
         input: str | bytes | bytearray,
         *,
         strict: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
         self_instance: Any | None = None,
     ) -> Any:
         """
@@ -176,7 +176,7 @@ class SchemaValidator:
             The validated Python object.
         """
     def validate_strings(
-        self, input: _StringInput, *, strict: bool | None = None, context: 'dict[str, Any] | None' = None
+        self, input: _StringInput, *, strict: bool | None = None, context: dict[str, Any] | None = None
     ) -> Any:
         """
         Validate a string against the schema and return the validated Python object.
@@ -206,7 +206,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: 'dict[str, Any] | None' = None,
+        context: dict[str, Any] | None = None,
     ) -> dict[str, Any] | tuple[dict[str, Any], dict[str, Any] | None, set[str]]:
         """
         Validate an assignment to a field on a model.
@@ -279,6 +279,7 @@ class SchemaSerializer:
         warnings: bool = True,
         fallback: Callable[[Any], Any] | None = None,
         serialize_as_any: bool = False,
+        context: dict[str, Any] | None = None,
     ) -> Any:
         """
         Serialize/marshal a Python object to a Python object including transforming and filtering data.
@@ -299,6 +300,8 @@ class SchemaSerializer:
             fallback: A function to call when an unknown value is encountered,
                 if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
             serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
+            context: The context to use for serialization, this is passed to functional serializers as
+                [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
 
         Raises:
             PydanticSerializationError: If serialization fails and no `fallback` function is provided.
@@ -321,6 +324,7 @@ class SchemaSerializer:
         warnings: bool = True,
         fallback: Callable[[Any], Any] | None = None,
         serialize_as_any: bool = False,
+        context: dict[str, Any] | None = None,
     ) -> bytes:
         """
         Serialize a Python object to JSON including transforming and filtering data.
@@ -340,6 +344,8 @@ class SchemaSerializer:
             fallback: A function to call when an unknown value is encountered,
                 if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
             serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
+            context: The context to use for serialization, this is passed to functional serializers as
+                [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
 
         Raises:
             PydanticSerializationError: If serialization fails and no `fallback` function is provided.
@@ -363,6 +369,7 @@ def to_json(
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
     serialize_as_any: bool = False,
+    context: dict[str, Any] | None = None,
 ) -> bytes:
     """
     Serialize a Python object to JSON including transforming and filtering data.
@@ -385,6 +392,8 @@ def to_json(
         fallback: A function to call when an unknown value is encountered,
             if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
         serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
+        context: The context to use for serialization, this is passed to functional serializers as
+            [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
 
     Raises:
         PydanticSerializationError: If serialization fails and no `fallback` function is provided.
@@ -426,6 +435,7 @@ def to_jsonable_python(
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
     serialize_as_any: bool = False,
+    context: dict[str, Any] | None = None,
 ) -> Any:
     """
     Serialize/marshal a Python object to a JSON-serializable Python object including transforming and filtering data.
@@ -448,6 +458,8 @@ def to_jsonable_python(
         fallback: A function to call when an unknown value is encountered,
             if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
         serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
+        context: The context to use for serialization, this is passed to functional serializers as
+            [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
 
     Raises:
         PydanticSerializationError: If serialization fails and no `fallback` function is provided.

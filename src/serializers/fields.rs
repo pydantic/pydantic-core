@@ -5,6 +5,7 @@ use pyo3::types::{PyDict, PyString};
 
 use ahash::AHashMap;
 use serde::ser::SerializeMap;
+use smallvec::SmallVec;
 
 use crate::serializers::extra::SerCheck;
 use crate::serializers::DuckTypingSerMode;
@@ -147,7 +148,7 @@ impl GeneralFieldsSerializer {
         }
     }
 
-    pub fn main_to_python<'py>(
+    pub(crate) fn main_to_python<'py>(
         &self,
         py: Python<'py>,
         main_iter: impl Iterator<Item = PyResult<(&'py PyAny, &'py PyAny)>>,
@@ -212,7 +213,7 @@ impl GeneralFieldsSerializer {
         }
     }
 
-    pub fn main_serde_serialize<'py, S: serde::ser::Serializer>(
+    pub(crate) fn main_serde_serialize<'py, S: serde::ser::Serializer>(
         &self,
         main_iter: impl Iterator<Item = PyResult<(&'py PyAny, &'py PyAny)>>,
         expected_len: usize,
@@ -258,7 +259,7 @@ impl GeneralFieldsSerializer {
         Ok(map)
     }
 
-    pub fn add_computed_fields_python(
+    pub(crate) fn add_computed_fields_python(
         &self,
         model: Option<&PyAny>,
         output_dict: &PyDict,
@@ -275,7 +276,7 @@ impl GeneralFieldsSerializer {
         Ok(())
     }
 
-    pub fn add_computed_fields_json<S: serde::ser::Serializer>(
+    pub(crate) fn add_computed_fields_json<S: serde::ser::Serializer>(
         &self,
         model: Option<&PyAny>,
         map: &mut S::SerializeMap,
@@ -291,7 +292,7 @@ impl GeneralFieldsSerializer {
         Ok(())
     }
 
-    pub fn computed_field_count(&self) -> usize {
+    pub(crate) fn computed_field_count(&self) -> usize {
         option_length!(self.computed_fields)
     }
 }
@@ -336,13 +337,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
             return infer_to_python(value, include, exclude, extra);
         };
 
-        let output_dict = self.main_to_python(
-            py,
-            main_dict.iter().map(Ok),
-            include,
-            exclude,
-            Extra { model, ..*extra },
-        )?;
+        let output_dict = self.main_to_python(py, dict_items(main_dict), include, exclude, Extra { model, ..*extra })?;
 
         // this is used to include `__pydantic_extra__` in serialization on models
         if let Some(extra_dict) = extra_dict {
@@ -408,7 +403,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         // NOTE! As above, we maintain the order of the input dict assuming that's right
         // we don't both with `used_fields` here because on unions, `to_python(..., mode='json')` is used
         let mut map = self.main_serde_serialize(
-            main_dict.iter().map(Ok),
+            dict_items(main_dict),
             expected_len,
             serializer,
             include,
@@ -442,4 +437,11 @@ impl TypeSerializer for GeneralFieldsSerializer {
 
 fn key_str(key: &PyAny) -> PyResult<&str> {
     key.downcast::<PyString>()?.to_str()
+}
+
+fn dict_items(main_dict: &PyDict) -> impl Iterator<Item = PyResult<(&PyAny, &PyAny)>> {
+    // Collect items before iterating to prevent panic on dict mutation.
+    // Use a SmallVec to avoid heap allocation for models with a reasonable number of fields.
+    let main_items: SmallVec<[_; 16]> = main_dict.iter().collect();
+    main_items.into_iter().map(Ok)
 }

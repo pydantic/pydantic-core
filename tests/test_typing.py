@@ -19,20 +19,16 @@ class Foo:
     bar: str
 
 
-def foo(bar: str) -> None:
-    ...
+def foo(bar: str) -> None: ...
 
 
-def validator_deprecated(value: Any, info: core_schema.FieldValidationInfo) -> None:
-    ...
+def validator_deprecated(value: Any, info: core_schema.FieldValidationInfo) -> None: ...
 
 
-def validator(value: Any, info: core_schema.ValidationInfo) -> None:
-    ...
+def validator(value: Any, info: core_schema.ValidationInfo) -> None: ...
 
 
-def wrap_validator(value: Any, call_next: Callable[[Any], Any], info: core_schema.ValidationInfo) -> None:
-    ...
+def wrap_validator(value: Any, call_next: Callable[[Any], Any], info: core_schema.ValidationInfo) -> None: ...
 
 
 def test_schema_typing() -> None:
@@ -225,8 +221,8 @@ def test_type_error():
 
 
 def test_ser_function_plain():
-    def f(__input: Any, __info: core_schema.SerializationInfo) -> str:
-        return str(__info)
+    def f(input: Any, info: core_schema.SerializationInfo, /) -> str:
+        return str(info)
 
     s = SchemaSerializer(
         core_schema.any_schema(
@@ -236,16 +232,16 @@ def test_ser_function_plain():
         )
     )
     assert s.to_python(123) == (
-        "SerializationInfo(include=None, exclude=None, mode='python', by_alias=True, exclude_unset=False, "
+        "SerializationInfo(include=None, exclude=None, context=None, mode='python', by_alias=True, exclude_unset=False, "
         'exclude_defaults=False, exclude_none=False, round_trip=False, serialize_as_any=False)'
     )
 
 
 def test_ser_function_wrap():
     def f(
-        __input: Any, __serialize: core_schema.SerializerFunctionWrapHandler, __info: core_schema.SerializationInfo
+        input: Any, serialize: core_schema.SerializerFunctionWrapHandler, info: core_schema.SerializationInfo, /
     ) -> str:
-        return f'{__serialize} {__info}'
+        return f'{serialize} {info}'
 
     s = SchemaSerializer(
         core_schema.any_schema(
@@ -257,7 +253,7 @@ def test_ser_function_wrap():
     # insert_assert(s.to_python(123, mode='json'))
     assert s.to_python(123, mode='json') == (
         'SerializationCallable(serializer=str) '
-        "SerializationInfo(include=None, exclude=None, mode='json', by_alias=True, exclude_unset=False, "
+        "SerializationInfo(include=None, exclude=None, context=None, mode='json', by_alias=True, exclude_unset=False, "
         'exclude_defaults=False, exclude_none=False, round_trip=False, serialize_as_any=False)'
     )
 
