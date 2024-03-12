@@ -137,6 +137,7 @@ def test_function_args():
         'exclude_defaults': False,
         'exclude_none': False,
         'round_trip': False,
+        'serialize_as_any': False,
     }
 
 

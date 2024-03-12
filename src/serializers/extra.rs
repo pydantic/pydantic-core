@@ -230,7 +230,7 @@ pub(crate) struct ExtraOwned {
     pub model: Option<PyObject>,
     field_name: Option<String>,
     serialize_unknown: bool,
-    fallback: Option<PyObject>,
+    pub fallback: Option<PyObject>,
     duck_typing_ser_mode: DuckTypingSerMode,
     pub context: Option<PyObject>,
 }
