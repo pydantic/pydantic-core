@@ -352,7 +352,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         };
 
         let output_dict =
-            self.main_to_python(py, dict_items(main_dict), include, exclude, Extra { model, ..*extra })?;
+            self.main_to_python(py, dict_items(&main_dict), include, exclude, Extra { model, ..*extra })?;
 
         // this is used to include `__pydantic_extra__` in serialization on models
         if let Some(extra_dict) = extra_dict {

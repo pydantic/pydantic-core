@@ -154,7 +154,7 @@ impl TypeSerializer for DataclassSerializer {
                     dc_extra,
                 )?;
 
-                fields_serializer.add_computed_fields_python(model, output_dict, include, exclude, extra)?;
+                fields_serializer.add_computed_fields_python(model, &output_dict, include, exclude, extra)?;
                 Ok(output_dict.into_py(py))
             } else {
                 let inner_value = self.get_inner_value(value)?;
@@ -209,7 +209,7 @@ impl TypeSerializer for DataclassSerializer {
             } else {
                 let inner_value = self.get_inner_value(value).map_err(py_err_se_err)?;
                 self.serializer
-                    .serde_serialize(inner_value, serializer, include, exclude, &dc_extra)
+                    .serde_serialize(&inner_value, serializer, include, exclude, &dc_extra)
             }
         } else {
             extra.warnings.on_fallback_ser::<S>(self.get_name(), value, &dc_extra)?;

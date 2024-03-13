@@ -54,9 +54,9 @@ impl SchemaSerializer {
         round_trip: bool,
         rec_guard: &'a SerRecursionState,
         serialize_unknown: bool,
-        fallback: Option<&'a PyAny>,
+        fallback: Option<&'a Bound<'a, PyAny>>,
         duck_typing_ser_mode: DuckTypingSerMode,
-        context: Option<&'a PyAny>,
+        context: Option<&'a Bound<'a, PyAny>>,
     ) -> Extra<'b> {
         Extra::new(
             py,
@@ -113,9 +113,9 @@ impl SchemaSerializer {
         exclude_none: bool,
         round_trip: bool,
         warnings: bool,
-        fallback: Option<&PyAny>,
+        fallback: Option<&Bound<'_, PyAny>>,
         serialize_as_any: bool,
-        context: Option<&PyAny>,
+        context: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyObject> {
         let mode: SerMode = mode.into();
         let warnings = CollectWarnings::new(warnings);
@@ -158,9 +158,9 @@ impl SchemaSerializer {
         exclude_none: bool,
         round_trip: bool,
         warnings: bool,
-        fallback: Option<&PyAny>,
+        fallback: Option<&Bound<'_, PyAny>>,
         serialize_as_any: bool,
-        context: Option<&PyAny>,
+        context: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyObject> {
         let warnings = CollectWarnings::new(warnings);
         let rec_guard = SerRecursionState::default();
@@ -242,10 +242,8 @@ pub fn to_json(
     bytes_mode: &str,
     inf_nan_mode: &str,
     serialize_unknown: bool,
-    fallback: Option<&PyAny>,
-    serialize_as_any: bool,
-    context: Option<&PyAny>,
     fallback: Option<&Bound<'_, PyAny>>,
+    serialize_as_any: bool,
     context: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyObject> {
     let state = SerializationState::new(timedelta_mode, bytes_mode, inf_nan_mode)?;
@@ -285,9 +283,9 @@ pub fn to_jsonable_python(
     bytes_mode: &str,
     inf_nan_mode: &str,
     serialize_unknown: bool,
-    fallback: Option<&PyAny>,
+    fallback: Option<&Bound<'_, PyAny>>,
     serialize_as_any: bool,
-    context: Option<&PyAny>,
+    context: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyObject> {
     let state = SerializationState::new(timedelta_mode, bytes_mode, inf_nan_mode)?;
     let duck_typing_ser_mode = DuckTypingSerMode::from_bool(serialize_as_any);

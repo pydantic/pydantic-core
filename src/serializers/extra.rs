@@ -83,9 +83,9 @@ impl SerializationState {
         exclude_none: bool,
         round_trip: bool,
         serialize_unknown: bool,
-        fallback: Option<&'py PyAny>,
+        fallback: Option<&'py Bound<'_, PyAny>>,
         duck_typing_ser_mode: DuckTypingSerMode,
-        context: Option<&'py PyAny>,
+        context: Option<&'py Bound<'_, PyAny>>,
     ) -> Extra<'py> {
         Extra::new(
             py,
@@ -132,9 +132,9 @@ pub(crate) struct Extra<'a> {
     pub model: Option<&'a Bound<'a, PyAny>>,
     pub field_name: Option<&'a str>,
     pub serialize_unknown: bool,
-    pub fallback: Option<&'a PyAny>,
+    pub fallback: Option<&'a Bound<'a, PyAny>>,
     pub duck_typing_ser_mode: DuckTypingSerMode,
-    pub context: Option<&'a PyAny>,
+    pub context: Option<&'a Bound<'a, PyAny>>,
 }
 
 impl<'a> Extra<'a> {
@@ -151,9 +151,9 @@ impl<'a> Extra<'a> {
         config: &'a SerializationConfig,
         rec_guard: &'a SerRecursionState,
         serialize_unknown: bool,
-        fallback: Option<&'a PyAny>,
+        fallback: Option<&'a Bound<'a, PyAny>>,
         duck_typing_ser_mode: DuckTypingSerMode,
-        context: Option<&'a PyAny>,
+        context: Option<&'a Bound<'a, PyAny>>,
     ) -> Self {
         Self {
             mode,
@@ -251,9 +251,9 @@ impl ExtraOwned {
             model: extra.model.map(|model| model.clone().into()),
             field_name: extra.field_name.map(ToString::to_string),
             serialize_unknown: extra.serialize_unknown,
-            fallback: extra.fallback.map(Into::into),
+            fallback: extra.fallback.map(|model| model.clone().into()),
             duck_typing_ser_mode: extra.duck_typing_ser_mode,
-            context: extra.context.map(Into::into),
+            context: extra.context.map(|model| model.clone().into()),
         }
     }
 
@@ -273,9 +273,9 @@ impl ExtraOwned {
             model: self.model.as_ref().map(|m| m.bind(py)),
             field_name: self.field_name.as_deref(),
             serialize_unknown: self.serialize_unknown,
-            fallback: self.fallback.as_ref().map(|m| m.as_ref(py)),
+            fallback: self.fallback.as_ref().map(|m| m.bind(py)),
             duck_typing_ser_mode: self.duck_typing_ser_mode,
-            context: self.context.as_ref().map(|m| m.as_ref(py)),
+            context: self.context.as_ref().map(|m| m.bind(py)),
         }
     }
 }

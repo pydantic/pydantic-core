@@ -190,10 +190,10 @@ impl TypeSerializer for ModelSerializer {
                     original_err
                 }
             })?;
-            self.serializer.to_python(root, include, exclude, &root_extra)
+            self.serializer.to_python(&root, include, exclude, &root_extra)
         } else if self.allow_value(value, &model_extra)? {
             let inner_value = self.get_inner_value(value, &model_extra)?;
-            self.serializer.to_python(inner_value, include, exclude, &model_extra)
+            self.serializer.to_python(&inner_value, include, exclude, &model_extra)
         } else {
             extra.warnings.on_fallback_py(self.get_name(), value, &model_extra)?;
             infer_to_python(value, include, exclude, &model_extra)
@@ -237,11 +237,11 @@ impl TypeSerializer for ModelSerializer {
             let py = value.py();
             let root = value.getattr(intern!(py, ROOT_FIELD)).map_err(py_err_se_err)?;
             self.serializer
-                .serde_serialize(root, serializer, include, exclude, &root_extra)
+                .serde_serialize(&root, serializer, include, exclude, &root_extra)
         } else if self.allow_value(value, &model_extra).map_err(py_err_se_err)? {
             let inner_value = self.get_inner_value(value, &model_extra).map_err(py_err_se_err)?;
             self.serializer
-                .serde_serialize(inner_value, serializer, include, exclude, &model_extra)
+                .serde_serialize(&inner_value, serializer, include, exclude, &model_extra)
         } else {
             extra
                 .warnings
