@@ -1,12 +1,11 @@
 import datetime
-from typing import Any, Callable, Generic, TypeVar, Literal, final
+from typing import Any, Callable, Generic, Literal, TypeVar, final
+
+from _typeshed import SupportsAllComparisons
+from typing_extensions import LiteralString, Self, TypeAlias
 
 from pydantic_core import ErrorDetails, ErrorTypeInfo, InitErrorDetails, MultiHostHost
 from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
-
-from typing_extensions import LiteralString, Self, TypeAlias
-
-from _typeshed import SupportsAllComparisons
 
 __all__ = [
     '__version__',
