@@ -163,7 +163,6 @@ impl ComputedField {
         }
         Ok(())
     }
-
 }
 
 pub(crate) struct ComputedFieldSerializer<'py> {
