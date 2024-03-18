@@ -308,13 +308,6 @@ impl<'py> Input<'py> for JsonValue {
     }
 }
 
-impl BorrowInput<'_> for &'_ JsonValue {
-    type Input = JsonValue;
-    fn borrow_input(&self) -> &Self::Input {
-        self
-    }
-}
-
 /// Required for JSON Object keys so the string can behave like an Input
 impl<'py> Input<'py> for String {
     fn as_error_value(&self) -> InputValue {
@@ -436,13 +429,6 @@ impl<'py> Input<'py> for String {
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
     ) -> ValResult<ValidationMatch<EitherTimedelta>> {
         bytes_as_timedelta(self, self.as_bytes(), microseconds_overflow_behavior).map(ValidationMatch::lax)
-    }
-}
-
-impl BorrowInput<'_> for &'_ String {
-    type Input = String;
-    fn borrow_input(&self) -> &Self::Input {
-        self
     }
 }
 

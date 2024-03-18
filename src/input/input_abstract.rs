@@ -231,3 +231,10 @@ pub trait BorrowInput<'py> {
     type Input: Input<'py>;
     fn borrow_input(&self) -> &Self::Input;
 }
+
+impl<'py, T: Input<'py>> BorrowInput<'py> for &'_ T {
+    type Input = T;
+    fn borrow_input(&self) -> &Self::Input {
+        self
+    }
+}
