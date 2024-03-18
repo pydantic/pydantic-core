@@ -28,7 +28,7 @@ impl CustomError {
             Some(error_type) => error_type,
             None => return Ok(None),
         };
-        let context: Option<&PyDict> = schema.get_as(intern!(py, "custom_error_context"))?;
+        let context: Option<Bound<'_, PyDict>> = schema.get_as(intern!(py, "custom_error_context"))?;
 
         if ErrorType::valid_type(py, &error_type) {
             if schema.contains(intern!(py, "custom_error_message"))? {
@@ -41,7 +41,6 @@ impl CustomError {
             }
         } else {
             let error = PydanticCustomError::py_new(
-                py,
                 error_type,
                 schema.get_as_req::<String>(intern!(py, "custom_error_message"))?,
                 context,
@@ -89,10 +88,10 @@ impl BuildValidator for CustomErrorValidator {
 impl_py_gc_traverse!(CustomErrorValidator { validator });
 
 impl Validator for CustomErrorValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
+        py: Python<'py>,
+        input: &impl Input<'py>,
         state: &mut ValidationState,
     ) -> ValResult<PyObject> {
         self.validator
