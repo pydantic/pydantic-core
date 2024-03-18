@@ -23,6 +23,12 @@ impl<'a, T: BorrowInput<'a>> ToErrorValue for T {
     }
 }
 
+impl ToErrorValue for &'_ dyn ToErrorValue {
+    fn to_error_value(&self) -> InputValue {
+        (**self).to_error_value()
+    }
+}
+
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub enum ValError {
     LineErrors(Vec<ValLineError>),
