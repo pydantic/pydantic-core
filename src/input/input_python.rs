@@ -3,6 +3,8 @@ use std::str::from_utf8;
 
 use pyo3::intern;
 use pyo3::prelude::*;
+#[cfg(not(PyPy))]
+use pyo3::types::PyFunction;
 use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDict, PyFloat, PyFrozenSet, PyInt, PyIterator, PyList,
     PyMapping, PySequence, PySet, PyString, PyTime, PyTuple, PyType,
@@ -12,6 +14,7 @@ use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 
+use crate::errors::py_err_string;
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::tools::{extract_i64, safe_repr};
 use crate::validators::decimal::{create_decimal, get_decimal_type};
@@ -29,11 +32,13 @@ use super::shared::{
     decimal_as_int, float_as_int, get_enum_meta_object, int_as_bool, str_as_bool, str_as_float, str_as_int,
 };
 use super::Arguments;
+use super::ConsumeIterator;
 use super::KeywordArgs;
 use super::PositionalArgs;
+use super::ValidatedDict;
 use super::{
     py_string_str, BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericIterable,
-    GenericIterator, GenericMapping, Input,
+    GenericIterator, Input,
 };
 
 #[cfg(not(PyPy))]
@@ -419,40 +424,46 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         }
     }
 
-    fn strict_dict<'a>(&'a self) -> ValResult<GenericMapping<'a, 'py>> {
+    type Dict<'a> = GenericPyMapping<'a, 'py> where Self: 'a;
+
+    fn strict_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
         if let Ok(dict) = self.downcast::<PyDict>() {
-            Ok(dict.into())
+            Ok(GenericPyMapping::Dict(dict))
         } else {
             Err(ValError::new(ErrorTypeDefaults::DictType, self))
         }
     }
 
-    fn lax_dict<'a>(&'a self) -> ValResult<GenericMapping<'a, 'py>> {
+    fn lax_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
         if let Ok(dict) = self.downcast::<PyDict>() {
-            Ok(dict.into())
+            Ok(GenericPyMapping::Dict(dict))
         } else if let Ok(mapping) = self.downcast::<PyMapping>() {
-            Ok(mapping.into())
+            Ok(GenericPyMapping::Mapping(mapping))
         } else {
             Err(ValError::new(ErrorTypeDefaults::DictType, self))
         }
     }
 
-    fn validate_model_fields<'a>(&'a self, strict: bool, from_attributes: bool) -> ValResult<GenericMapping<'a, 'py>> {
+    fn validate_model_fields<'a>(
+        &'a self,
+        strict: bool,
+        from_attributes: bool,
+    ) -> ValResult<GenericPyMapping<'a, 'py>> {
         if from_attributes {
             // if from_attributes, first try a dict, then mapping then from_attributes
             if let Ok(dict) = self.downcast::<PyDict>() {
-                return Ok(dict.into());
+                return Ok(GenericPyMapping::Dict(dict));
             } else if !strict {
                 if let Ok(mapping) = self.downcast::<PyMapping>() {
-                    return Ok(mapping.into());
+                    return Ok(GenericPyMapping::Mapping(mapping));
                 }
             }
 
             if from_attributes_applicable(self) {
-                Ok(GenericMapping::PyGetAttr(self.to_owned(), None))
+                Ok(GenericPyMapping::GetAttr(self.to_owned(), None))
             } else if let Ok((obj, kwargs)) = self.extract() {
                 if from_attributes_applicable(&obj) {
-                    Ok(GenericMapping::PyGetAttr(obj, Some(kwargs)))
+                    Ok(GenericPyMapping::GetAttr(obj, Some(kwargs)))
                 } else {
                     Err(ValError::new(ErrorTypeDefaults::ModelAttributesType, self))
                 }
@@ -909,4 +920,127 @@ impl<'py> KeywordArgs<'py> for PyKwargs<'py> {
     fn iter(&self) -> impl Iterator<Item = ValResult<(Self::Key<'_>, Self::Item<'_>)>> {
         self.0.iter().map(Ok)
     }
+}
+
+#[cfg_attr(debug_assertions, derive(Debug))]
+pub enum GenericPyMapping<'a, 'py> {
+    Dict(&'a Bound<'py, PyDict>),
+    Mapping(&'a Bound<'py, PyMapping>),
+    GetAttr(Bound<'py, PyAny>, Option<Bound<'py, PyDict>>),
+}
+
+impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
+    type Key<'a> = Bound<'py, PyAny>
+    where
+        Self: 'a;
+
+    type Item<'a> = Bound<'py, PyAny>
+    where
+        Self: 'a;
+
+    fn get_item<'k>(
+        &self,
+        key: &'k crate::lookup_key::LookupKey,
+    ) -> ValResult<Option<(&'k crate::lookup_key::LookupPath, Self::Item<'_>)>> {
+        match self {
+            Self::Dict(dict) => key.py_get_dict_item(dict),
+            Self::Mapping(mapping) => key.py_get_mapping_item(mapping),
+            Self::GetAttr(obj, dict) => key.py_get_attr(obj, dict.as_ref()),
+        }
+    }
+
+    fn as_py_dict(&self) -> Option<&Bound<'py, PyDict>> {
+        match self {
+            Self::Dict(dict) => Some(dict),
+            _ => None,
+        }
+    }
+
+    fn iterate<'a, R>(
+        &'a self,
+        consumer: impl ConsumeIterator<ValResult<(Self::Key<'a>, Self::Item<'a>)>, Output = R>,
+    ) -> ValResult<R> {
+        match self {
+            Self::Dict(dict) => Ok(consumer.consume_iterator(dict.iter().map(Ok))),
+            Self::Mapping(mapping) => Ok(consumer.consume_iterator(iterate_mapping_items(mapping)?)),
+            Self::GetAttr(obj, _) => Ok(consumer.consume_iterator(iterate_attributes(obj))),
+        }
+    }
+}
+
+fn iterate_mapping_items<'a, 'py>(
+    mapping: &'a Bound<'py, PyMapping>,
+) -> ValResult<impl Iterator<Item = ValResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> + 'a> {
+    let py = mapping.py();
+    let input = mapping.as_any();
+    let iterator = mapping
+        .items()
+        .map_err(|e| mapping_err(e, py, input))?
+        .iter()
+        .map_err(|e| mapping_err(e, py, input))?
+        .map(move |item| match item {
+            Ok(item) => item.extract().map_err(|_| {
+                ValError::new(
+                    ErrorType::MappingType {
+                        error: MAPPING_TUPLE_ERROR.into(),
+                        context: None,
+                    },
+                    input,
+                )
+            }),
+            Err(e) => Err(mapping_err(e, py, input)),
+        });
+    Ok(iterator)
+}
+
+fn mapping_err<'py>(err: PyErr, py: Python<'py>, input: &'py (impl Input<'py> + ?Sized)) -> ValError {
+    ValError::new(
+        ErrorType::MappingType {
+            error: py_err_string(py, err).into(),
+            context: None,
+        },
+        input,
+    )
+}
+
+const MAPPING_TUPLE_ERROR: &str = "Mapping items must be tuples of (key, value) pairs";
+
+fn iterate_attributes<'a, 'py>(
+    object: &'a Bound<'py, PyAny>,
+) -> impl Iterator<Item = ValResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> + 'a {
+    let mut attributes_iterator = object.dir().into_iter();
+
+    std::iter::from_fn(move || {
+        // loop until we find an attribute who's name does not start with underscore,
+        // or we get to the end of the list of attributes
+        let name = attributes_iterator.next()?;
+        // from benchmarks this is 14x faster than using the python `startswith` method
+        let name_cow = match name.downcast::<PyString>() {
+            Ok(name) => name.to_string_lossy(),
+            Err(e) => return Some(Err(e.into())),
+        };
+        if !name_cow.as_ref().starts_with('_') {
+            // getattr is most likely to fail due to an exception in a @property, skip
+            if let Ok(attr) = object.getattr(name_cow.as_ref()) {
+                // we don't want bound methods to be included, is there a better way to check?
+                // ref https://stackoverflow.com/a/18955425/949890
+                let is_bound = matches!(attr.hasattr(intern!(attr.py(), "__self__")), Ok(true));
+                // the PyFunction::is_type_of(attr) catches `staticmethod`, but also any other function,
+                // I think that's better than including static methods in the yielded attributes,
+                // if someone really wants fields, they can use an explicit field, or a function to modify input
+                #[cfg(not(PyPy))]
+                if !is_bound && !attr.is_instance_of::<PyFunction>() {
+                    return Some(Ok((name, attr)));
+                }
+                // MASSIVE HACK! PyFunction doesn't exist for PyPy,
+                // is_instance_of::<PyFunction> crashes with a null pointer, hence this hack, see
+                // https://github.com/pydantic/pydantic-core/pull/161#discussion_r917257635
+                #[cfg(PyPy)]
+                if !is_bound && attr.get_type().to_string() != "<class 'function'>" {
+                    return Some(Ok((name, attr)));
+                }
+            }
+        }
+        None
+    })
 }
