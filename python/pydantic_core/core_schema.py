@@ -1200,7 +1200,7 @@ def enum_schema(
 
     schema = core_schema.enum_schema(cls=Color, members=list(Color.__members__.values()))
     v = SchemaValidator(schema)
-    assert v.validate_python(2) == Color.GREEN
+    assert v.validate_python(2) is Color.GREEN
     ```
 
     Args:

@@ -1386,3 +1386,33 @@ class TestBenchmarkDecimal:
     @pytest.mark.benchmark(group='decimal from str')
     def test_decimal_from_string_limit(self, benchmark):
         benchmark(decimal.Decimal, '123.456789')
+
+
+class Foo(int, Enum):
+    a = 1
+    b = 2
+    c = 3
+
+
+@pytest.mark.benchmark(group='enum')
+def test_enum_python(benchmark):
+    def to_enum(input_value: Any, /) -> Enum:
+        try:
+            return Foo(input_value)
+        except ValueError:
+            raise PydanticCustomError('enum', 'Input should be {expected}', {'expected': '1, 2 or 3'})
+
+    v = SchemaValidator(core_schema.no_info_after_validator_function(to_enum, core_schema.int_schema()))
+
+    assert v.validate_python(1) is Foo.a
+
+    benchmark(v.validate_python, 1)
+
+
+@pytest.mark.benchmark(group='enum')
+def test_enum_core(benchmark):
+    v = SchemaValidator(core_schema.enum_schema(Foo, list(Foo.__members__.values()), sub_type='int'))
+
+    assert v.validate_python(1) is Foo.a
+
+    benchmark(v.validate_python, 1)
