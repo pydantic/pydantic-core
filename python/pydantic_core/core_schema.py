@@ -117,43 +117,55 @@ IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
 
 class SerializationInfo(Protocol):
     @property
-    def include(self) -> IncExCall: ...
+    def include(self) -> IncExCall:
+        ...
 
     @property
-    def exclude(self) -> IncExCall: ...
+    def exclude(self) -> IncExCall:
+        ...
 
     @property
     def context(self) -> Any | None:
         """Current serialization context."""
 
     @property
-    def mode(self) -> str: ...
+    def mode(self) -> str:
+        ...
 
     @property
-    def by_alias(self) -> bool: ...
+    def by_alias(self) -> bool:
+        ...
 
     @property
-    def exclude_unset(self) -> bool: ...
+    def exclude_unset(self) -> bool:
+        ...
 
     @property
-    def exclude_defaults(self) -> bool: ...
+    def exclude_defaults(self) -> bool:
+        ...
 
     @property
-    def exclude_none(self) -> bool: ...
+    def exclude_none(self) -> bool:
+        ...
 
     @property
-    def round_trip(self) -> bool: ...
+    def round_trip(self) -> bool:
+        ...
 
-    def mode_is_json(self) -> bool: ...
+    def mode_is_json(self) -> bool:
+        ...
 
-    def __str__(self) -> str: ...
+    def __str__(self) -> str:
+        ...
 
-    def __repr__(self) -> str: ...
+    def __repr__(self) -> str:
+        ...
 
 
 class FieldSerializationInfo(SerializationInfo, Protocol):
     @property
-    def field_name(self) -> str: ...
+    def field_name(self) -> str:
+        ...
 
 
 class ValidationInfo(Protocol):
@@ -297,7 +309,8 @@ def plain_serializer_function_ser_schema(
 
 
 class SerializerFunctionWrapHandler(Protocol):  # pragma: no cover
-    def __call__(self, input_value: Any, index_key: int | str | None = None, /) -> Any: ...
+    def __call__(self, input_value: Any, index_key: int | str | None = None, /) -> Any:
+        ...
 
 
 # (input_value: Any, serializer: SerializerFunctionWrapHandler, /) -> Any
@@ -1163,6 +1176,65 @@ def literal_schema(
         serialization: Custom serialization schema
     """
     return _dict_not_none(type='literal', expected=expected, ref=ref, metadata=metadata, serialization=serialization)
+
+
+class EnumSchema(TypedDict, total=False):
+    type: Required[Literal['enum']]
+    cls: Required[Any]
+    members: Required[List[Any]]
+    sub_type: Literal['str', 'int']
+    missing: Callable[[Any], Any]
+    ref: str
+    metadata: Any
+    serialization: SerSchema
+
+
+def enum_schema(
+    cls: Any,
+    members: list[Any],
+    *,
+    sub_type: Literal['str', 'int'] | None = None,
+    missing: Callable[[Any], Any] | None = None,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
+) -> EnumSchema:
+    """
+    Returns a schema that matches an enum value, e.g.:
+
+    ```py
+    from enum import Enum
+    from pydantic_core import SchemaValidator, core_schema
+
+    class Color(Enum):
+        RED = 1
+        GREEN = 2
+        BLUE = 3
+
+    schema = core_schema.enum_schema(cls=Color, members=list(Color.__members__.values()))
+    v = SchemaValidator(schema)
+    assert v.validate_python(2) == Color.GREEN
+    ```
+
+    Args:
+        cls: The enum class
+        members: The members of the enum, generally `list(MyEnum.__members__.values())`
+        sub_type: The type of the enum, either 'str' or 'int' or None for plain enums
+        missing: A function to use when the value is not found in the enum, from `_missing_`
+        ref: optional unique identifier of the schema, used to reference the schema in other places
+        metadata: Any other information you want to include with the schema, not used by pydantic-core
+        serialization: Custom serialization schema
+    """
+    return _dict_not_none(
+        type='enum',
+        cls=cls,
+        members=members,
+        sub_type=sub_type,
+        missing=missing,
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
+    )
 
 
 # must match input/parse_json.rs::JsonType::try_from

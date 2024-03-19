@@ -2,10 +2,11 @@
 // which can be an int, a string, bytes or an Enum value (including `class Foo(str, Enum)` type enums)
 use core::fmt::Debug;
 
-use ahash::AHashMap;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use pyo3::{intern, PyTraverseError, PyVisit};
+
+use ahash::AHashMap;
 
 use crate::build_tools::{py_schema_err, py_schema_error_type};
 use crate::errors::{ErrorType, ValError, ValResult};
@@ -15,7 +16,7 @@ use crate::tools::SchemaDict;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct BoolLiteral {
     pub true_id: Option<usize>,
     pub false_id: Option<usize>,
@@ -39,10 +40,7 @@ impl<T: Debug> LiteralLookup<T> {
     pub fn new<'py>(py: Python<'py>, expected: impl Iterator<Item = (Bound<'py, PyAny>, T)>) -> PyResult<Self> {
         let mut expected_int = AHashMap::new();
         let mut expected_str: AHashMap<String, usize> = AHashMap::new();
-        let mut expected_bool = BoolLiteral {
-            true_id: None,
-            false_id: None,
-        };
+        let mut expected_bool = BoolLiteral::default();
         let expected_py = PyDict::new_bound(py);
         let mut values = Vec::new();
         for (k, v) in expected {
@@ -144,6 +142,36 @@ impl<T: Debug> LiteralLookup<T> {
                 return Ok(Some((input, &self.values[id])));
             }
         };
+        Ok(None)
+    }
+
+    /// Used by enums
+    pub fn validate_int_lax<'a, 'py, I: Input<'py> + ?Sized>(
+        &self,
+        py: Python<'py>,
+        input: &'a I,
+    ) -> ValResult<Option<&T>> {
+        if let Some(expected_ints) = &self.expected_int {
+            if let Ok(either_int) = input.validate_int(false) {
+                let int = either_int.into_inner().into_i64(py)?;
+                if let Some(id) = expected_ints.get(&int) {
+                    return Ok(Some(&self.values[*id]));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Used by enums
+    pub fn validate_str_lax<'a, 'py, I: Input<'py> + ?Sized>(&self, input: &'a I) -> ValResult<Option<&T>> {
+        if let Some(expected_strings) = &self.expected_str {
+            if let Ok(either_str) = input.validate_str(false, false) {
+                let s = either_str.into_inner();
+                if let Some(id) = expected_strings.get(s.as_cow()?.as_ref()) {
+                    return Ok(Some(&self.values[*id]));
+                }
+            }
+        }
         Ok(None)
     }
 }
