@@ -1169,7 +1169,7 @@ class EnumSchema(TypedDict, total=False):
     type: Required[Literal['enum']]
     cls: Required[Any]
     members: Required[List[Any]]
-    sub_type: Literal['str', 'int']
+    sub_type: Literal['str', 'int', 'float']
     missing: Callable[[Any], Any]
     ref: str
     metadata: Any
@@ -1180,7 +1180,7 @@ def enum_schema(
     cls: Any,
     members: list[Any],
     *,
-    sub_type: Literal['str', 'int'] | None = None,
+    sub_type: Literal['str', 'int', 'float'] | None = None,
     missing: Callable[[Any], Any] | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1198,7 +1198,7 @@ def enum_schema(
         GREEN = 2
         BLUE = 3
 
-    schema = core_schema.enum_schema(cls=Color, members=list(Color.__members__.values()))
+    schema = core_schema.enum_schema(Color, list(Color.__members__.values()))
     v = SchemaValidator(schema)
     assert v.validate_python(2) is Color.GREEN
     ```
@@ -3729,6 +3729,7 @@ if not MYPY:
         DatetimeSchema,
         TimedeltaSchema,
         LiteralSchema,
+        EnumSchema,
         IsInstanceSchema,
         IsSubclassSchema,
         CallableSchema,
@@ -3783,6 +3784,7 @@ CoreSchemaType = Literal[
     'datetime',
     'timedelta',
     'literal',
+    'enum',
     'is-instance',
     'is-subclass',
     'callable',

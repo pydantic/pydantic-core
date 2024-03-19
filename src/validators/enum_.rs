@@ -63,6 +63,10 @@ impl BuildValidator for BuildEnumValidator {
                 gv,
                 name: format!("str-enum[{class_repr}]"),
             })),
+            Some("float") => Ok(CombinedValidator::FloatEnum(FloatEnumValidator {
+                gv,
+                name: format!("float-enum[{class_repr}]"),
+            })),
             Some(_) => py_schema_err!("`sub_type` must be one of: 'int', 'str' or None"),
             None => Ok(CombinedValidator::PlainEnum(PlainEnumValidator {
                 gv,
@@ -205,6 +209,31 @@ impl Validator for StrEnumValidator {
     ) -> ValResult<PyObject> {
         self.gv.validate(py, input, state.strict_or(false), |input| {
             Ok(self.gv.lookup.validate_str_lax(input)?.map(Clone::clone))
+        })
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FloatEnumValidator {
+    gv: GeneralEnumValidator,
+    name: String,
+}
+
+impl_py_gc_traverse!(FloatEnumValidator { gv });
+
+impl Validator for FloatEnumValidator {
+    fn validate<'py>(
+        &self,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
+    ) -> ValResult<PyObject> {
+        self.gv.validate(py, input, state.strict_or(false), |input| {
+            Ok(self.gv.lookup.validate_float_lax(py, input)?.map(Clone::clone))
         })
     }
 

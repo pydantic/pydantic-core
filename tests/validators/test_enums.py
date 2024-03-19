@@ -14,8 +14,8 @@ def test_plain_enum():
     v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
 
     # debug(v)
-    assert v.validate_python(1) is MyEnum.a
     assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python(1) is MyEnum.a
 
     assert v.validate_json('1') is MyEnum.a
 
@@ -43,11 +43,13 @@ def test_int_enum():
     v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), sub_type='int'))
 
     # debug(v)
-    assert v.validate_python(1) is MyEnum.a
     assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python(1) is MyEnum.a
+    assert v.validate_python(1.0) is MyEnum.a
     assert v.validate_python('1') is MyEnum.a
 
     assert v.validate_json('1') is MyEnum.a
+    assert v.validate_json('"1"') is MyEnum.a
 
     with pytest.raises(ValidationError, match=r'Input should be 1 or 2 \[type=enum, input_value=3, input_type=int\]'):
         v.validate_python(3)
@@ -89,3 +91,34 @@ def test_str_enum():
     )
     with pytest.raises(ValidationError, match=re.escape(e)):
         v.validate_python('x', strict=True)
+
+
+def test_float_enum():
+    class MyEnum(float, Enum):
+        a = 1.5
+        b = 2.5
+        c = 3.0
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), sub_type='float'))
+
+    # debug(v)
+    assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python(1.5) is MyEnum.a
+    assert v.validate_python('1.5') is MyEnum.a
+    assert v.validate_python(3) is MyEnum.c
+
+    assert v.validate_json('1.5') is MyEnum.a
+    # assert v.validate_json('"1.5"') is MyEnum.a
+
+    e = r'Input should be 1.5, 2.5 or 3.0 \[type=enum, input_value=4.0, input_type=float\]'
+    with pytest.raises(ValidationError, match=e):
+        v.validate_python(4.0)
+
+    assert v.validate_python(MyEnum.a, strict=True) is MyEnum.a
+
+    e = (
+        'Input should be an instance of test_float_enum.<locals>.MyEnum '
+        '[type=is_instance_of, input_value=1.5, input_type=float]'
+    )
+    with pytest.raises(ValidationError, match=re.escape(e)):
+        v.validate_python(1.5, strict=True)

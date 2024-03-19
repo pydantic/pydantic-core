@@ -662,6 +662,7 @@ pub enum CombinedValidator {
     // enums
     IntEnum(enum_::IntEnumValidator),
     StrEnum(enum_::StrEnumValidator),
+    FloatEnum(enum_::FloatEnumValidator),
     PlainEnum(enum_::PlainEnumValidator),
     // any
     Any(any::AnyValidator),

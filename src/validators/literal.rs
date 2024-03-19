@@ -38,9 +38,9 @@ pub struct LiteralLookup<T: Debug> {
 
 impl<T: Debug> LiteralLookup<T> {
     pub fn new<'py>(py: Python<'py>, expected: impl Iterator<Item = (Bound<'py, PyAny>, T)>) -> PyResult<Self> {
+        let mut expected_bool = BoolLiteral::default();
         let mut expected_int = AHashMap::new();
         let mut expected_str: AHashMap<String, usize> = AHashMap::new();
-        let mut expected_bool = BoolLiteral::default();
         let expected_py = PyDict::new_bound(py);
         let mut values = Vec::new();
         for (k, v) in expected {
@@ -145,7 +145,7 @@ impl<T: Debug> LiteralLookup<T> {
         Ok(None)
     }
 
-    /// Used by enums
+    /// Used by int enums
     pub fn validate_int_lax<'a, 'py, I: Input<'py> + ?Sized>(
         &self,
         py: Python<'py>,
@@ -162,13 +162,32 @@ impl<T: Debug> LiteralLookup<T> {
         Ok(None)
     }
 
-    /// Used by enums
+    /// Used by str enums
     pub fn validate_str_lax<'a, 'py, I: Input<'py> + ?Sized>(&self, input: &'a I) -> ValResult<Option<&T>> {
         if let Some(expected_strings) = &self.expected_str {
             if let Ok(either_str) = input.validate_str(false, false) {
                 let s = either_str.into_inner();
                 if let Some(id) = expected_strings.get(s.as_cow()?.as_ref()) {
                     return Ok(Some(&self.values[*id]));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Used by float enums
+    pub fn validate_float_lax<'a, 'py, I: Input<'py> + ?Sized>(
+        &self,
+        py: Python<'py>,
+        input: &'a I,
+    ) -> ValResult<Option<&T>> {
+        if let Some(expected_py) = &self.expected_py {
+            if let Ok(either_float) = input.validate_float(false) {
+                let f = either_float.into_inner().as_f64();
+                let py_float = f.to_object(py);
+                if let Ok(Some(v)) = expected_py.bind(py).get_item(py_float.bind(py)) {
+                    let id: usize = v.extract().unwrap();
+                    return Ok(Some(&self.values[id]));
                 }
             }
         }
