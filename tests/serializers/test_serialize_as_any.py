@@ -116,3 +116,53 @@ def test_serialize_as_any_with_typeddict() -> None:
         'x': 1,
         'y': 'hopefully not a secret',
     }
+
+
+def test_serialize_as_any_with_unrelated_models() -> None:
+    class Parent:
+        x: int
+
+    class Other:
+        y: str
+
+    Parent.__pydantic_core_schema__ = core_schema.model_schema(
+        Parent,
+        core_schema.model_fields_schema(
+            {
+                'x': core_schema.model_field(core_schema.int_schema()),
+            }
+        ),
+    )
+    Parent.__pydantic_validator__ = SchemaValidator(Parent.__pydantic_core_schema__)
+    Parent.__pydantic_serializer__ = SchemaSerializer(Parent.__pydantic_core_schema__)
+
+    Other.__pydantic_core_schema__ = core_schema.model_schema(
+        Other,
+        core_schema.model_fields_schema(
+            {
+                'y': core_schema.model_field(core_schema.str_schema()),
+            }
+        ),
+        extra_behavior='allow',
+    )
+    Other.__pydantic_validator__ = SchemaValidator(Other.__pydantic_core_schema__)
+    Other.__pydantic_serializer__ = SchemaSerializer(Other.__pydantic_core_schema__)
+
+    other = Other.__pydantic_validator__.validate_python({'x': 1, 'y': 'hopefully not a secret'})
+    assert Parent.__pydantic_serializer__.to_python(other, serialize_as_any=False) == {}
+    # note, without extra='allow', the 'x' field would not be included
+    assert Parent.__pydantic_serializer__.to_python(other, serialize_as_any=True) == {
+        'x': 1,
+        'y': 'hopefully not a secret',
+    }
+    """
+    Odd, we're actually getting the same issue with extra / result coupling that I reported yesterday, needs to be
+    fixed before we merge.
+
+    Traceback (most recent call last):
+    File "<string>", line 1, in <module>
+    UserWarning: Pydantic serializer warnings:
+    Expected `general-fields` but got `tuple` - serialized value may not be as expected
+
+    ({'y': 'hopefully not a secret', '__pydantic_extra__': None, '__pydantic_private__': None, '__pydantic_fields_set__': {'y'}}, None)
+    """
