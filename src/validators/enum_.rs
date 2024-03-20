@@ -48,7 +48,7 @@ impl BuildValidator for BuildEnumValidator {
         let gv = GeneralEnumValidator {
             class: class.clone().into(),
             lookup: LiteralLookup::new(py, expected.into_iter())?,
-            missing_func: schema.get_as(intern!(py, "missing_func"))?,
+            missing: schema.get_as(intern!(py, "missing"))?,
             expected_repr: expected_repr_name(repr_args, "").0,
             class_repr: class_repr.clone(),
         };
@@ -80,16 +80,12 @@ impl BuildValidator for BuildEnumValidator {
 struct GeneralEnumValidator {
     class: Py<PyType>,
     lookup: LiteralLookup<PyObject>,
-    missing_func: Option<PyObject>,
+    missing: Option<PyObject>,
     expected_repr: String,
     class_repr: String,
 }
 
-impl_py_gc_traverse!(GeneralEnumValidator {
-    class,
-    lookup,
-    missing_func
-});
+impl_py_gc_traverse!(GeneralEnumValidator { class, lookup, missing });
 
 impl GeneralEnumValidator {
     /// Try to match the behavior of https://github.com/python/cpython/blob/v3.12.2/Lib/enum.py#L1116
@@ -103,42 +99,40 @@ impl GeneralEnumValidator {
         // exact type check as per
         let class = self.class.bind(py);
         if input.input_is_exact_instance(class) {
-            Ok(input.to_object(py))
+            return Ok(input.to_object(py));
         } else if strict {
             // TODO what about instances of subclasses?
-            Err(ValError::new(
+            return Err(ValError::new(
                 ErrorType::IsInstanceOf {
                     class: self.class_repr.clone(),
                     context: None,
                 },
                 input,
-            ))
+            ));
         } else if let Some(v) = validate_value(input)? {
-            Ok(v)
-        } else if let Some(ref missing_func) = self.missing_func {
-            let missing_func = missing_func.bind(py);
-            let enum_value = missing_func.call1((input.to_object(py),))?;
+            return Ok(v);
+        } else if let Some(ref missing) = self.missing {
+            let enum_value = missing.bind(py).call1((input.to_object(py),))?;
             // check enum_value is an instance of the class like
             // https://github.com/python/cpython/blob/v3.12.2/Lib/enum.py#L1148
             if enum_value.is_instance(class)? {
-                Ok(enum_value.into())
-            } else {
+                return Ok(enum_value.into());
+            } else if !enum_value.is(&py.None()) {
                 let type_error = PyTypeError::new_err(format!(
                     "error in {}._missing_: returned {} instead of None or a valid member",
                     class.name().unwrap_or_else(|_| "<Unknown>".into()),
                     safe_repr(&enum_value)
                 ));
-                Err(type_error.into())
+                return Err(type_error.into());
             }
-        } else {
-            Err(ValError::new(
-                ErrorType::Enum {
-                    expected: self.expected_repr.clone(),
-                    context: None,
-                },
-                input,
-            ))
         }
+        Err(ValError::new(
+            ErrorType::Enum {
+                expected: self.expected_repr.clone(),
+                context: None,
+            },
+            input,
+        ))
     }
 }
 

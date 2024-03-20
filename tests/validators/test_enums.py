@@ -122,3 +122,71 @@ def test_float_enum():
     )
     with pytest.raises(ValidationError, match=re.escape(e)):
         v.validate_python(1.5, strict=True)
+
+
+def test_enum_missing():
+    class MyEnum(Enum):
+        a = 1
+        b = 2
+
+        @classmethod
+        def _missing_(cls, v):
+            return cls.b
+
+    assert MyEnum(1) is MyEnum.a
+    assert MyEnum(2) is MyEnum.b
+    assert MyEnum(3) is MyEnum.b
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), missing=MyEnum._missing_))
+
+    # debug(v)
+    assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python(1) is MyEnum.a
+    assert v.validate_python(2) is MyEnum.b
+    assert v.validate_python(3) is MyEnum.b
+
+    assert v.validate_json('1') is MyEnum.a
+    assert v.validate_json('3') is MyEnum.b
+
+
+def test_enum_missing_none():
+    class MyEnum(Enum):
+        a = 1
+        b = 2
+
+        @classmethod
+        def _missing_(cls, v):
+            return None
+
+    assert MyEnum(1) is MyEnum.a
+    assert MyEnum(2) is MyEnum.b
+    with pytest.raises(ValueError, match='3 is not a valid'):
+        MyEnum(3)
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), missing=MyEnum._missing_))
+
+    # debug(v)
+    assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python(1) is MyEnum.a
+    with pytest.raises(ValidationError, match=r'Input should be 1 or 2 \[type=enum, input_value=3, input_type=int\]'):
+        v.validate_python(3)
+
+    assert v.validate_json('1') is MyEnum.a
+    with pytest.raises(ValidationError, match=r'Input should be 1 or 2 \[type=enum, input_value=3, input_type=int\]'):
+        v.validate_json('3')
+
+
+def test_enum_missing_wrong():
+    class MyEnum(Enum):
+        a = 1
+        b = 2
+
+        @classmethod
+        def _missing_(cls, v):
+            return 'foobar'
+
+    assert MyEnum(1) is MyEnum.a
+    assert MyEnum(2) is MyEnum.b
+    e = "error in MyEnum._missing_: returned 'foobar' instead of None or a valid member"
+    with pytest.raises(TypeError, match=e):
+        MyEnum(3)
