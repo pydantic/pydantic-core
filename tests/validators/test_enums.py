@@ -4,7 +4,7 @@ from enum import Enum
 
 import pytest
 
-from pydantic_core import SchemaValidator, ValidationError, core_schema
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
 
 
 def test_plain_enum():
@@ -259,3 +259,11 @@ def test_plain_enum_lists():
     assert v.validate_python(MyEnum.a) is MyEnum.a
     assert v.validate_python([1]) is MyEnum.a
     assert v.validate_python([2]) is MyEnum.b
+
+
+def test_plain_enum_empty():
+    class MyEnum(Enum):
+        pass
+
+    with pytest.raises(SchemaError, match='`members` should have length > 0'):
+        SchemaValidator(core_schema.enum_schema(MyEnum, []))
