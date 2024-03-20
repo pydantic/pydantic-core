@@ -115,6 +115,9 @@ impl TypeSerializer for EnumSerializer {
     }
 
     fn retry_with_lax_check(&self) -> bool {
-        todo!()
+        match self.serializer {
+            Some(ref s) => s.retry_with_lax_check(),
+            None => false,
+        }
     }
 }
