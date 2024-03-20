@@ -12,10 +12,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 #[cfg(not(PyPy))]
 use pyo3::types::PyFunction;
-use pyo3::types::{
-    PyByteArray, PyBytes, PyDict, PyFloat, PyFrozenSet, PyIterator, PyList, PyMapping, PySequence, PySet, PyString,
-    PyTuple,
-};
+use pyo3::types::{PyBytes, PyFloat, PyFrozenSet, PyIterator, PyMapping, PySet, PyString};
 
 use serde::{ser::Error, Serialize, Serializer};
 
@@ -25,7 +22,7 @@ use crate::errors::{
 use crate::tools::{extract_i64, py_err};
 use crate::validators::{CombinedValidator, Exactness, ValidationState, Validator};
 
-use super::{py_error_on_minusone, BorrowInput, ConsumeIterator, Input, ValidatedList, ValidatedSet, ValidatedTuple};
+use super::{py_error_on_minusone, BorrowInput, Input};
 
 pub struct ValidationMatch<T>(T, Exactness);
 
@@ -58,29 +55,6 @@ impl<T> ValidationMatch<T> {
     pub fn into_inner(self) -> T {
         self.0
     }
-}
-
-/// Container for all the collections (sized iterable containers) types, which
-/// can mostly be converted to each other in lax mode.
-/// This mostly matches python's definition of `Collection`.
-#[cfg_attr(debug_assertions, derive(Debug))]
-pub enum GenericIterable<'a, 'py> {
-    List(&'a Bound<'py, PyList>),
-    Tuple(&'a Bound<'py, PyTuple>),
-    Set(&'a Bound<'py, PySet>),
-    FrozenSet(&'a Bound<'py, PyFrozenSet>),
-    Dict(&'a Bound<'py, PyDict>),
-    // Treat dict values / keys / items as generic iterators
-    // since PyPy doesn't export the concrete types
-    DictKeys(Bound<'py, PyIterator>),
-    DictValues(Bound<'py, PyIterator>),
-    DictItems(Bound<'py, PyIterator>),
-    Mapping(&'a Bound<'py, PyMapping>),
-    PyString(&'a Bound<'py, PyString>),
-    Bytes(&'a Bound<'py, PyBytes>),
-    PyByteArray(&'a Bound<'py, PyByteArray>),
-    Sequence(&'a Bound<'py, PySequence>),
-    Iterator(Bound<'py, PyIterator>),
 }
 
 pub struct MaxLengthCheck<'a, INPUT: ?Sized> {
@@ -267,84 +241,6 @@ pub(crate) fn no_validator_iter_to_vec<'py>(
             Ok(v.borrow_input().to_object(py))
         })
         .collect()
-}
-
-impl<'py> GenericIterable<'_, 'py> {
-    pub fn generic_len(&self) -> Option<usize> {
-        match &self {
-            GenericIterable::List(iter) => Some(iter.len()),
-            GenericIterable::Tuple(iter) => Some(iter.len()),
-            GenericIterable::Set(iter) => Some(iter.len()),
-            GenericIterable::FrozenSet(iter) => Some(iter.len()),
-            GenericIterable::Dict(iter) => Some(iter.len()),
-            GenericIterable::DictKeys(iter) => iter.len().ok(),
-            GenericIterable::DictValues(iter) => iter.len().ok(),
-            GenericIterable::DictItems(iter) => iter.len().ok(),
-            GenericIterable::Mapping(iter) => iter.len().ok(),
-            GenericIterable::PyString(iter) => iter.len().ok(),
-            GenericIterable::Bytes(iter) => iter.len().ok(),
-            GenericIterable::PyByteArray(iter) => Some(iter.len()),
-            GenericIterable::Sequence(iter) => iter.len().ok(),
-            GenericIterable::Iterator(iter) => iter.len().ok(),
-        }
-    }
-
-    fn generic_iterate<R>(
-        self,
-        consumer: impl ConsumeIterator<PyResult<Bound<'py, PyAny>>, Output = R>,
-    ) -> ValResult<R> {
-        match self {
-            GenericIterable::List(iter) => Ok(consumer.consume_iterator(iter.iter().map(Ok))),
-            GenericIterable::Tuple(iter) => Ok(consumer.consume_iterator(iter.iter().map(Ok))),
-            GenericIterable::Set(iter) => Ok(consumer.consume_iterator(iter.iter().map(Ok))),
-            GenericIterable::FrozenSet(iter) => Ok(consumer.consume_iterator(iter.iter().map(Ok))),
-            // Note that this iterates over only the keys, just like doing iter({}) in Python
-            GenericIterable::Dict(iter) => Ok(consumer.consume_iterator(iter.iter().map(|(k, _)| Ok(k)))),
-            GenericIterable::DictKeys(iter) => Ok(consumer.consume_iterator(iter.iter()?)),
-            GenericIterable::DictValues(iter) => Ok(consumer.consume_iterator(iter.iter()?)),
-            GenericIterable::DictItems(iter) => Ok(consumer.consume_iterator(iter.iter()?)),
-            // Note that this iterates over only the keys, just like doing iter({}) in Python
-            GenericIterable::Mapping(iter) => Ok(consumer.consume_iterator(iter.keys()?.iter()?)),
-            GenericIterable::PyString(iter) => Ok(consumer.consume_iterator(iter.iter()?)),
-            GenericIterable::Bytes(iter) => Ok(consumer.consume_iterator(iter.iter()?)),
-            GenericIterable::PyByteArray(iter) => Ok(consumer.consume_iterator(iter.iter()?)),
-            GenericIterable::Sequence(iter) => Ok(consumer.consume_iterator(iter.iter()?)),
-            GenericIterable::Iterator(iter) => Ok(consumer.consume_iterator(iter.iter()?)),
-        }
-    }
-}
-
-impl<'py> ValidatedList<'py> for GenericIterable<'_, 'py> {
-    type Item = Bound<'py, PyAny>;
-    fn len(&self) -> Option<usize> {
-        self.generic_len()
-    }
-    fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
-        self.generic_iterate(consumer)
-    }
-    fn as_py_list(&self) -> Option<&Bound<'py, PyList>> {
-        match self {
-            GenericIterable::List(iter) => Some(iter),
-            _ => None,
-        }
-    }
-}
-
-impl<'py> ValidatedTuple<'py> for GenericIterable<'_, 'py> {
-    type Item = Bound<'py, PyAny>;
-    fn len(&self) -> Option<usize> {
-        self.generic_len()
-    }
-    fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
-        self.generic_iterate(consumer)
-    }
-}
-
-impl<'py> ValidatedSet<'py> for GenericIterable<'_, 'py> {
-    type Item = Bound<'py, PyAny>;
-    fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
-        self.generic_iterate(consumer)
-    }
 }
 
 pub(crate) fn iterate_mapping_items<'a, 'py>(
