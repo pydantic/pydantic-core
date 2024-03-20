@@ -75,14 +75,15 @@ impl TypeSerializer for EnumSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         let py = key.py();
         if key.is_exact_instance(self.class.bind(py)) {
             let dot_value = key.getattr(intern!(py, "value"))?;
-            match self.serializer {
+            let k = match self.serializer {
                 Some(ref s) => s.json_key(&dot_value, extra),
                 None => infer_json_key(&dot_value, extra),
-            }
+            }?;
+            Ok(Cow::Owned(k.into_owned()))
         } else {
             extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
             infer_json_key(key, extra)

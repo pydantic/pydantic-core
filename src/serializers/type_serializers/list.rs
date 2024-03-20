@@ -81,7 +81,7 @@ impl TypeSerializer for ListSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         self._invalid_as_json_key(key, extra, Self::EXPECTED_TYPE)
     }
 

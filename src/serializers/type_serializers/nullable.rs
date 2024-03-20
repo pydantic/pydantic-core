@@ -48,7 +48,7 @@ impl TypeSerializer for NullableSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         match extra.ob_type_lookup.is_type(key, ObType::None) {
             IsType::Exact => infer_json_key_known(ObType::None, key, extra),
             _ => self.serializer.json_key(key, extra),

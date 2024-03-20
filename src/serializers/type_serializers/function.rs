@@ -224,7 +224,7 @@ macro_rules! function_type_serializer {
                 }
             }
 
-            fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+            fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
                 let py = key.py();
                 match self.call(key, None, None, extra) {
                     Ok((true, v)) => self

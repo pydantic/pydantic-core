@@ -69,7 +69,7 @@ impl TypeSerializer for FloatSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         match extra.ob_type_lookup.is_type(key, ObType::Float) {
             IsType::Exact | IsType::Subclass => to_str_json_key(key),
             IsType::False => {

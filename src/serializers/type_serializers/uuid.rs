@@ -52,7 +52,7 @@ impl TypeSerializer for UuidSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         match extra.ob_type_lookup.is_type(key, ObType::Uuid) {
             IsType::Exact | IsType::Subclass => {
                 let str = uuid_to_string(key)?;

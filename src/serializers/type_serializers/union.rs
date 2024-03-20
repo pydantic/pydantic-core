@@ -105,7 +105,7 @@ impl TypeSerializer for UnionSerializer {
         infer_to_python(value, include, exclude, extra)
     }
 
-    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
         for comb_serializer in &self.choices {

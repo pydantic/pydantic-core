@@ -47,7 +47,7 @@ impl TypeSerializer for WithDefaultSerializer {
         self.serializer.to_python(value, include, exclude, extra)
     }
 
-    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         self.serializer.json_key(key, extra)
     }
 

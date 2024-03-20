@@ -561,16 +561,16 @@ fn serialize_unknown<'py>(value: &Bound<'py, PyAny>) -> Cow<'py, str> {
     }
 }
 
-pub(crate) fn infer_json_key<'py>(key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+pub(crate) fn infer_json_key<'a>(key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
     let ob_type = extra.ob_type_lookup.get_type(key);
     infer_json_key_known(ob_type, key, extra)
 }
 
-pub(crate) fn infer_json_key_known<'py>(
+pub(crate) fn infer_json_key_known<'a>(
     ob_type: ObType,
-    key: &Bound<'py, PyAny>,
+    key: &'a Bound<'_, PyAny>,
     extra: &Extra,
-) -> PyResult<Cow<'py, str>> {
+) -> PyResult<Cow<'a, str>> {
     match ob_type {
         ObType::None => super::type_serializers::simple::none_json_key(),
         ObType::Int | ObType::IntSubclass | ObType::Float | ObType::FloatSubclass => {

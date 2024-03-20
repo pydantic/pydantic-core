@@ -134,7 +134,7 @@ impl TypeSerializer for LiteralSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         match self.check(key, extra)? {
             OutputValue::OkInt(int) => Ok(Cow::Owned(int.to_string())),
             OutputValue::OkStr(s) => Ok(Cow::Owned(s.to_string_lossy().into_owned())),

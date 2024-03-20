@@ -52,7 +52,7 @@ macro_rules! build_serializer {
                 }
             }
 
-            fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+            fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
                 match key.extract::<$extract>() {
                     Ok(py_url) => Ok(Cow::Owned(py_url.__str__().to_string())),
                     Err(_) => {

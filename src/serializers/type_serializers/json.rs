@@ -62,7 +62,7 @@ impl TypeSerializer for JsonSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         if extra.round_trip {
             let bytes = to_json_bytes(key, &self.serializer, None, None, extra, None, 0)?;
             let py = key.py();

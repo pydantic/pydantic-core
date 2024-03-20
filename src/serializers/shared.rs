@@ -265,14 +265,14 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
         extra: &Extra,
     ) -> PyResult<PyObject>;
 
-    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>>;
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>>;
 
-    fn _invalid_as_json_key<'py>(
+    fn _invalid_as_json_key<'a>(
         &self,
-        key: &Bound<'py, PyAny>,
+        key: &'a Bound<'_, PyAny>,
         extra: &Extra,
         expected_type: &'static str,
-    ) -> PyResult<Cow<'py, str>> {
+    ) -> PyResult<Cow<'a, str>> {
         match extra.ob_type_lookup.is_type(key, ObType::None) {
             IsType::Exact | IsType::Subclass => py_err!(PyTypeError; "`{}` not valid as object key", expected_type),
             IsType::False => {

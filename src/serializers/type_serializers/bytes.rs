@@ -55,14 +55,9 @@ impl TypeSerializer for BytesSerializer {
         }
     }
 
-    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         match key.downcast::<PyBytes>() {
-            Ok(py_bytes) => {
-                // TODO(Samuel) the lifetime is now wrong here, would imagine `py_bytes.as_bytes()` should have
-                // lifetime 'py, but pyo3 is saying it has lifetime of the `key` reference
-                let s = self.bytes_mode.bytes_to_string(key.py(), py_bytes.as_bytes())?;
-                return Ok(Cow::Owned(s.to_string()));
-            }
+            Ok(py_bytes) => self.bytes_mode.bytes_to_string(key.py(), py_bytes.as_bytes()),
             Err(_) => {
                 extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
                 infer_json_key(key, extra)
