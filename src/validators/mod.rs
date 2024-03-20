@@ -660,10 +660,10 @@ pub enum CombinedValidator {
     // literals
     Literal(literal::LiteralValidator),
     // enums
-    IntEnum(enum_::IntEnumValidator),
-    StrEnum(enum_::StrEnumValidator),
-    FloatEnum(enum_::FloatEnumValidator),
-    PlainEnum(enum_::PlainEnumValidator),
+    IntEnum(enum_::EnumValidator<enum_::IntEnumValidator>),
+    StrEnum(enum_::EnumValidator<enum_::StrEnumValidator>),
+    FloatEnum(enum_::EnumValidator<enum_::FloatEnumValidator>),
+    PlainEnum(enum_::EnumValidator<enum_::PlainEnumValidator>),
     // any
     Any(any::AnyValidator),
     // bytes

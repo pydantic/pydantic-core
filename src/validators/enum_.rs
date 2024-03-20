@@ -1,5 +1,5 @@
 // Validator for Enums, so named because "enum" is a reserved keyword in Rust.
-use core::fmt::Debug;
+use std::marker::PhantomData;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
@@ -45,62 +45,64 @@ impl BuildValidator for BuildEnumValidator {
 
         let class: Bound<PyType> = schema.get_as_req(intern!(py, "cls"))?;
         let class_repr = class_repr(schema, &class)?;
-        let gv = GeneralEnumValidator {
-            class: class.clone().into(),
-            lookup: LiteralLookup::new(py, expected.into_iter())?,
-            missing: schema.get_as(intern!(py, "missing"))?,
-            expected_repr: expected_repr_name(repr_args, "").0,
-            class_repr: class_repr.clone(),
-        };
-        let sub_type: Option<String> = schema.get_as(intern!(py, "sub_type"))?;
 
+        let lookup = LiteralLookup::new(py, expected.into_iter())?;
+
+        macro_rules! build {
+            ($vv:ty, $name_prefix:literal) => {
+                EnumValidator {
+                    phantom: PhantomData::<$vv>,
+                    class: class.clone().into(),
+                    lookup,
+                    missing: schema.get_as(intern!(py, "missing"))?,
+                    expected_repr: expected_repr_name(repr_args, "").0,
+                    class_repr: class_repr.clone(),
+                    name: format!("{}[{class_repr}]", $name_prefix),
+                }
+            };
+        }
+
+        let sub_type: Option<String> = schema.get_as(intern!(py, "sub_type"))?;
         match sub_type.as_deref() {
-            Some("int") => Ok(CombinedValidator::IntEnum(IntEnumValidator {
-                gv,
-                name: format!("int-enum[{class_repr}]"),
-            })),
-            Some("str") => Ok(CombinedValidator::StrEnum(StrEnumValidator {
-                gv,
-                name: format!("str-enum[{class_repr}]"),
-            })),
-            Some("float") => Ok(CombinedValidator::FloatEnum(FloatEnumValidator {
-                gv,
-                name: format!("float-enum[{class_repr}]"),
-            })),
+            Some("int") => Ok(CombinedValidator::IntEnum(build!(IntEnumValidator, "int-enum"))),
+            Some("str") => Ok(CombinedValidator::StrEnum(build!(StrEnumValidator, "str-enum"))),
+            Some("float") => Ok(CombinedValidator::FloatEnum(build!(FloatEnumValidator, "float-enum"))),
             Some(_) => py_schema_err!("`sub_type` must be one of: 'int', 'str', 'float' or None"),
-            None => Ok(CombinedValidator::PlainEnum(PlainEnumValidator {
-                gv,
-                name: format!("{}[{class_repr}]", Self::EXPECTED_TYPE),
-            })),
+            None => Ok(CombinedValidator::PlainEnum(build!(PlainEnumValidator, "enum"))),
         }
     }
 }
 
+pub trait EnumValidateValue: std::fmt::Debug + Clone + Send + Sync {
+    fn validate_value<'py, I: Input<'py> + ?Sized>(
+        py: Python<'py>,
+        input: &I,
+        lookup: &LiteralLookup<PyObject>,
+    ) -> ValResult<Option<PyObject>>;
+}
+
 #[derive(Debug, Clone)]
-struct GeneralEnumValidator {
+pub struct EnumValidator<T: EnumValidateValue> {
+    phantom: PhantomData<T>,
     class: Py<PyType>,
     lookup: LiteralLookup<PyObject>,
     missing: Option<PyObject>,
     expected_repr: String,
     class_repr: String,
+    name: String,
 }
 
-impl_py_gc_traverse!(GeneralEnumValidator { class, lookup, missing });
-
-impl GeneralEnumValidator {
-    /// Try to match the behavior of https://github.com/python/cpython/blob/v3.12.2/Lib/enum.py#L1116
-    fn validate<'py, I: Input<'py> + ?Sized>(
+impl<T: EnumValidateValue> Validator for EnumValidator<T> {
+    fn validate<'py>(
         &self,
         py: Python<'py>,
-        input: &I,
-        strict: bool,
-        validate_value: impl FnOnce(&I) -> ValResult<Option<PyObject>>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        // exact type check as per
         let class = self.class.bind(py);
         if input.input_is_exact_instance(class) {
             return Ok(input.to_object(py));
-        } else if strict {
+        } else if state.strict_or(false) {
             // TODO what about instances of subclasses?
             return Err(ValError::new(
                 ErrorType::IsInstanceOf {
@@ -109,7 +111,7 @@ impl GeneralEnumValidator {
                 },
                 input,
             ));
-        } else if let Some(v) = validate_value(input)? {
+        } else if let Some(v) = T::validate_value(py, input, &self.lookup)? {
             return Ok(v);
         } else if let Some(ref missing) = self.missing {
             let enum_value = missing.bind(py).call1((input.to_object(py),))?;
@@ -134,27 +136,6 @@ impl GeneralEnumValidator {
             input,
         ))
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct PlainEnumValidator {
-    gv: GeneralEnumValidator,
-    name: String,
-}
-
-impl_py_gc_traverse!(PlainEnumValidator { gv });
-
-impl Validator for PlainEnumValidator {
-    fn validate<'py>(
-        &self,
-        py: Python<'py>,
-        input: &(impl Input<'py> + ?Sized),
-        state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
-        self.gv.validate(py, input, state.strict_or(false), |input| {
-            Ok(self.gv.lookup.validate(py, input)?.map(|(_, v)| v.clone()))
-        })
-    }
 
     fn get_name(&self) -> &str {
         &self.name
@@ -162,76 +143,61 @@ impl Validator for PlainEnumValidator {
 }
 
 #[derive(Debug, Clone)]
-pub struct IntEnumValidator {
-    gv: GeneralEnumValidator,
-    name: String,
-}
+pub struct PlainEnumValidator;
 
-impl_py_gc_traverse!(IntEnumValidator { gv });
+impl_py_gc_traverse!(EnumValidator<PlainEnumValidator> { class, missing });
 
-impl Validator for IntEnumValidator {
-    fn validate<'py>(
-        &self,
+impl EnumValidateValue for PlainEnumValidator {
+    fn validate_value<'py, I: Input<'py> + ?Sized>(
         py: Python<'py>,
-        input: &(impl Input<'py> + ?Sized),
-        state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
-        self.gv.validate(py, input, state.strict_or(false), |input| {
-            Ok(self.gv.lookup.validate_int_lax(py, input)?.map(Clone::clone))
-        })
-    }
-
-    fn get_name(&self) -> &str {
-        &self.name
+        input: &I,
+        lookup: &LiteralLookup<PyObject>,
+    ) -> ValResult<Option<PyObject>> {
+        Ok(lookup.validate(py, input)?.map(|(_, v)| v.clone()))
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct StrEnumValidator {
-    gv: GeneralEnumValidator,
-    name: String,
-}
+pub struct IntEnumValidator;
 
-impl_py_gc_traverse!(StrEnumValidator { gv });
+impl_py_gc_traverse!(EnumValidator<IntEnumValidator> { class, missing });
 
-impl Validator for StrEnumValidator {
-    fn validate<'py>(
-        &self,
+impl EnumValidateValue for IntEnumValidator {
+    fn validate_value<'py, I: Input<'py> + ?Sized>(
         py: Python<'py>,
-        input: &(impl Input<'py> + ?Sized),
-        state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
-        self.gv.validate(py, input, state.strict_or(false), |input| {
-            Ok(self.gv.lookup.validate_str_lax(input)?.map(Clone::clone))
-        })
-    }
-
-    fn get_name(&self) -> &str {
-        &self.name
+        input: &I,
+        lookup: &LiteralLookup<PyObject>,
+    ) -> ValResult<Option<PyObject>> {
+        Ok(lookup.validate_int_lax(py, input)?.map(Clone::clone))
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct FloatEnumValidator {
-    gv: GeneralEnumValidator,
-    name: String,
+pub struct StrEnumValidator;
+
+impl_py_gc_traverse!(EnumValidator<StrEnumValidator> { class, missing });
+
+impl EnumValidateValue for StrEnumValidator {
+    fn validate_value<'py, I: Input<'py> + ?Sized>(
+        _py: Python,
+        input: &I,
+        lookup: &LiteralLookup<PyObject>,
+    ) -> ValResult<Option<PyObject>> {
+        Ok(lookup.validate_str_lax(input)?.map(Clone::clone))
+    }
 }
 
-impl_py_gc_traverse!(FloatEnumValidator { gv });
+#[derive(Debug, Clone)]
+pub struct FloatEnumValidator;
 
-impl Validator for FloatEnumValidator {
-    fn validate<'py>(
-        &self,
+impl_py_gc_traverse!(EnumValidator<FloatEnumValidator> { class, missing });
+
+impl EnumValidateValue for FloatEnumValidator {
+    fn validate_value<'py, I: Input<'py> + ?Sized>(
         py: Python<'py>,
-        input: &(impl Input<'py> + ?Sized),
-        state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
-        self.gv.validate(py, input, state.strict_or(false), |input| {
-            Ok(self.gv.lookup.validate_float_lax(py, input)?.map(Clone::clone))
-        })
-    }
-
-    fn get_name(&self) -> &str {
-        &self.name
+        input: &I,
+        lookup: &LiteralLookup<PyObject>,
+    ) -> ValResult<Option<PyObject>> {
+        Ok(lookup.validate_float_lax(py, input)?.map(Clone::clone))
     }
 }
