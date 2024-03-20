@@ -15,9 +15,12 @@ def test_plain_enum():
 
     # debug(v)
     assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python(MyEnum.b) is MyEnum.b
     assert v.validate_python(1) is MyEnum.a
+    assert v.validate_python(2) is MyEnum.b
 
     assert v.validate_json('1') is MyEnum.a
+    # assert v.validate_json('"1"') is MyEnum.a
 
     with pytest.raises(ValidationError, match=r'Input should be 1 or 2 \[type=enum, input_value=3, input_type=int\]'):
         v.validate_python(3)
@@ -33,6 +36,10 @@ def test_plain_enum():
     )
     with pytest.raises(ValidationError, match=re.escape(e)):
         v.validate_python(1, strict=True)
+
+    assert v.validate_json('1', strict=True) is MyEnum.a
+    with pytest.raises(ValidationError, match='type=enum'):
+        v.validate_json('"1"', strict=True)
 
 
 def test_int_enum():
@@ -63,6 +70,11 @@ def test_int_enum():
     with pytest.raises(ValidationError, match=re.escape(e)):
         v.validate_python(1, strict=True)
 
+    assert v.validate_json('1', strict=True) is MyEnum.a
+
+    with pytest.raises(ValidationError, match=r"Input should be 1 or 2 \[type=enum, input_value='1', input_type=str\]"):
+        v.validate_json('"1"', strict=True)
+
 
 def test_str_enum():
     class MyEnum(str, Enum):
@@ -91,6 +103,7 @@ def test_str_enum():
     )
     with pytest.raises(ValidationError, match=re.escape(e)):
         v.validate_python('x', strict=True)
+    assert v.validate_json('"x"', strict=True) is MyEnum.a
 
 
 def test_float_enum():
@@ -108,7 +121,7 @@ def test_float_enum():
     assert v.validate_python(3) is MyEnum.c
 
     assert v.validate_json('1.5') is MyEnum.a
-    # assert v.validate_json('"1.5"') is MyEnum.a
+    assert v.validate_json('"1.5"') is MyEnum.a
 
     e = r'Input should be 1.5, 2.5 or 3.0 \[type=enum, input_value=4.0, input_type=float\]'
     with pytest.raises(ValidationError, match=e):
@@ -122,6 +135,11 @@ def test_float_enum():
     )
     with pytest.raises(ValidationError, match=re.escape(e)):
         v.validate_python(1.5, strict=True)
+
+    assert v.validate_json('1.5', strict=True) is MyEnum.a
+
+    with pytest.raises(ValidationError, match='type=enum'):
+        v.validate_json('"3.0"', strict=True)
 
 
 def test_enum_missing():
@@ -190,3 +208,25 @@ def test_enum_missing_wrong():
     e = "error in MyEnum._missing_: returned 'foobar' instead of None or a valid member"
     with pytest.raises(TypeError, match=e):
         MyEnum(3)
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), missing=MyEnum._missing_))
+    with pytest.raises(TypeError, match=e):
+        v.validate_python(3)
+
+
+def test_enum_exactness():
+    class MyEnum(int, Enum):
+        a = 1
+        b = 2
+
+    v = SchemaValidator(
+        core_schema.union_schema(
+            [
+                core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), missing=MyEnum._missing_),
+                core_schema.int_schema(),
+            ],
+        )
+    )
+    assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python(1) == 1
+    assert v.validate_python(1) is not MyEnum.a

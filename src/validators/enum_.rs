@@ -13,7 +13,7 @@ use crate::tools::{safe_repr, SchemaDict};
 
 use super::is_instance::class_repr;
 use super::literal::{expected_repr_name, LiteralLookup};
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, ValidationState, Validator};
 
 #[derive(Debug, Clone)]
 pub struct BuildEnumValidator;
@@ -78,6 +78,7 @@ pub trait EnumValidateValue: std::fmt::Debug + Clone + Send + Sync {
         py: Python<'py>,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
+        strict: bool,
     ) -> ValResult<Option<PyObject>>;
 }
 
@@ -102,7 +103,9 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
         let class = self.class.bind(py);
         if input.input_is_exact_instance(class) {
             return Ok(input.to_object(py));
-        } else if state.strict_or(false) {
+        }
+        let strict = state.strict_or(false);
+        if strict && input.is_python() {
             // TODO what about instances of subclasses?
             return Err(ValError::new(
                 ErrorType::IsInstanceOf {
@@ -111,9 +114,11 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
                 },
                 input,
             ));
-        } else if let Some(v) = T::validate_value(py, input, &self.lookup)? {
+        } else if let Some(v) = T::validate_value(py, input, &self.lookup, strict)? {
+            state.floor_exactness(Exactness::Lax);
             return Ok(v);
         } else if let Some(ref missing) = self.missing {
+            state.floor_exactness(Exactness::Lax);
             let enum_value = missing.bind(py).call1((input.to_object(py),))?;
             // check enum_value is an instance of the class like
             // https://github.com/python/cpython/blob/v3.12.2/Lib/enum.py#L1148
@@ -152,6 +157,7 @@ impl EnumValidateValue for PlainEnumValidator {
         py: Python<'py>,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
+        _strict: bool,
     ) -> ValResult<Option<PyObject>> {
         Ok(lookup.validate(py, input)?.map(|(_, v)| v.clone()))
     }
@@ -167,8 +173,9 @@ impl EnumValidateValue for IntEnumValidator {
         py: Python<'py>,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
+        strict: bool,
     ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate_int_lax(py, input)?.map(Clone::clone))
+        Ok(lookup.validate_int(py, input, strict)?.map(Clone::clone))
     }
 }
 
@@ -182,8 +189,9 @@ impl EnumValidateValue for StrEnumValidator {
         _py: Python,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
+        strict: bool,
     ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate_str_lax(input)?.map(Clone::clone))
+        Ok(lookup.validate_str(input, strict)?.map(Clone::clone))
     }
 }
 
@@ -197,7 +205,8 @@ impl EnumValidateValue for FloatEnumValidator {
         py: Python<'py>,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
+        strict: bool,
     ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate_float_lax(py, input)?.map(Clone::clone))
+        Ok(lookup.validate_float(py, input, strict)?.map(Clone::clone))
     }
 }

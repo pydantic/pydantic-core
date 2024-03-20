@@ -146,13 +146,14 @@ impl<T: Debug> LiteralLookup<T> {
     }
 
     /// Used by int enums
-    pub fn validate_int_lax<'a, 'py, I: Input<'py> + ?Sized>(
+    pub fn validate_int<'a, 'py, I: Input<'py> + ?Sized>(
         &self,
         py: Python<'py>,
         input: &'a I,
+        strict: bool,
     ) -> ValResult<Option<&T>> {
         if let Some(expected_ints) = &self.expected_int {
-            if let Ok(either_int) = input.validate_int(false) {
+            if let Ok(either_int) = input.validate_int(strict) {
                 let int = either_int.into_inner().into_i64(py)?;
                 if let Some(id) = expected_ints.get(&int) {
                     return Ok(Some(&self.values[*id]));
@@ -163,9 +164,9 @@ impl<T: Debug> LiteralLookup<T> {
     }
 
     /// Used by str enums
-    pub fn validate_str_lax<'a, 'py, I: Input<'py> + ?Sized>(&self, input: &'a I) -> ValResult<Option<&T>> {
+    pub fn validate_str<'a, 'py, I: Input<'py> + ?Sized>(&self, input: &'a I, strict: bool) -> ValResult<Option<&T>> {
         if let Some(expected_strings) = &self.expected_str {
-            if let Ok(either_str) = input.validate_str(false, false) {
+            if let Ok(either_str) = input.validate_str(strict, false) {
                 let s = either_str.into_inner();
                 if let Some(id) = expected_strings.get(s.as_cow()?.as_ref()) {
                     return Ok(Some(&self.values[*id]));
@@ -176,13 +177,14 @@ impl<T: Debug> LiteralLookup<T> {
     }
 
     /// Used by float enums
-    pub fn validate_float_lax<'a, 'py, I: Input<'py> + ?Sized>(
+    pub fn validate_float<'a, 'py, I: Input<'py> + ?Sized>(
         &self,
         py: Python<'py>,
         input: &'a I,
+        strict: bool,
     ) -> ValResult<Option<&T>> {
         if let Some(expected_py) = &self.expected_py {
-            if let Ok(either_float) = input.validate_float(false) {
+            if let Ok(either_float) = input.validate_float(strict) {
                 let f = either_float.into_inner().as_f64();
                 let py_float = f.to_object(py);
                 if let Ok(Some(v)) = expected_py.bind(py).get_item(py_float.bind(py)) {
