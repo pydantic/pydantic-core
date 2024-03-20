@@ -6,7 +6,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
 
-use crate::build_tools::py_schema_err;
+use crate::build_tools::{is_strict, py_schema_err};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::tools::{safe_repr, SchemaDict};
@@ -23,7 +23,7 @@ impl BuildValidator for BuildEnumValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        _config: Option<&Bound<'_, PyDict>>,
+        config: Option<&Bound<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let members: Bound<PyList> = schema.get_as_req(intern!(schema.py(), "members"))?;
@@ -56,6 +56,7 @@ impl BuildValidator for BuildEnumValidator {
                     lookup,
                     missing: schema.get_as(intern!(py, "missing"))?,
                     expected_repr: expected_repr_name(repr_args, "").0,
+                    strict: is_strict(schema, config)?,
                     class_repr: class_repr.clone(),
                     name: format!("{}[{class_repr}]", $name_prefix),
                 }
@@ -89,6 +90,7 @@ pub struct EnumValidator<T: EnumValidateValue> {
     lookup: LiteralLookup<PyObject>,
     missing: Option<PyObject>,
     expected_repr: String,
+    strict: bool,
     class_repr: String,
     name: String,
 }
@@ -104,7 +106,7 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
         if input.input_is_exact_instance(class) {
             return Ok(input.to_object(py));
         }
-        let strict = state.strict_or(false);
+        let strict = state.strict_or(self.strict);
         if strict && input.is_python() {
             // TODO what about instances of subclasses?
             return Err(ValError::new(
@@ -159,7 +161,7 @@ impl EnumValidateValue for PlainEnumValidator {
         lookup: &LiteralLookup<PyObject>,
         _strict: bool,
     ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate(py, input)?.map(|(_, v)| v.clone()))
+        Ok(lookup.validate(py, input)?.map(|(_, v)| v.clone_ref(py)))
     }
 }
 
@@ -175,7 +177,7 @@ impl EnumValidateValue for IntEnumValidator {
         lookup: &LiteralLookup<PyObject>,
         strict: bool,
     ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate_int(py, input, strict)?.map(Clone::clone))
+        Ok(lookup.validate_int(py, input, strict)?.map(|v| v.clone_ref(py)))
     }
 }
 
@@ -186,12 +188,12 @@ impl_py_gc_traverse!(EnumValidator<StrEnumValidator> { class, missing });
 
 impl EnumValidateValue for StrEnumValidator {
     fn validate_value<'py, I: Input<'py> + ?Sized>(
-        _py: Python,
+        py: Python,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
         strict: bool,
     ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate_str(input, strict)?.map(Clone::clone))
+        Ok(lookup.validate_str(input, strict)?.map(|v| v.clone_ref(py)))
     }
 }
 
@@ -207,6 +209,6 @@ impl EnumValidateValue for FloatEnumValidator {
         lookup: &LiteralLookup<PyObject>,
         strict: bool,
     ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate_float(py, input, strict)?.map(Clone::clone))
+        Ok(lookup.validate_float(py, input, strict)?.map(|v| v.clone_ref(py)))
     }
 }

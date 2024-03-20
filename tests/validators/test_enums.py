@@ -1,4 +1,5 @@
 import re
+import sys
 from enum import Enum
 
 import pytest
@@ -40,6 +41,18 @@ def test_plain_enum():
     assert v.validate_json('1', strict=True) is MyEnum.a
     with pytest.raises(ValidationError, match='type=enum'):
         v.validate_json('"1"', strict=True)
+
+    v_strict = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), strict=True))
+    assert v_strict.validate_python(MyEnum.a) is MyEnum.a
+
+    with pytest.raises(ValidationError, match=re.escape(e)):
+        v_strict.validate_python(1, strict=True)
+
+    v_strict_f = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), strict=True))
+    assert v_strict_f.validate_python(MyEnum.a) is MyEnum.a
+
+    with pytest.raises(ValidationError, match=re.escape(e)):
+        v_strict_f.validate_python(1, strict=True)
 
 
 def test_int_enum():
@@ -205,7 +218,11 @@ def test_enum_missing_wrong():
 
     assert MyEnum(1) is MyEnum.a
     assert MyEnum(2) is MyEnum.b
-    e = "error in MyEnum._missing_: returned 'foobar' instead of None or a valid member"
+    # different error from pypy
+    if sys.implementation.name == 'pypy':
+        e = "returned 'foobar' instead of None or a valid member"
+    else:
+        e = "error in MyEnum._missing_: returned 'foobar' instead of None or a valid member"
     with pytest.raises(TypeError, match=e):
         MyEnum(3)
 
