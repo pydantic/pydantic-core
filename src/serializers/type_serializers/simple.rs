@@ -178,13 +178,13 @@ macro_rules! build_simple_serializer {
     };
 }
 
-pub(crate) fn to_str_json_key<'py>(key: &Bound<'py, PyAny>) -> PyResult<Cow<'py, str>> {
+pub(crate) fn to_str_json_key<'a>(key: &'a Bound<'_, PyAny>) -> PyResult<Cow<'a, str>> {
     Ok(Cow::Owned(key.str()?.to_string_lossy().into_owned()))
 }
 
 build_simple_serializer!(IntSerializer, "int", Int, ObType::Int, to_str_json_key, true);
 
-pub(crate) fn bool_json_key<'py>(key: &Bound<'py, PyAny>) -> PyResult<Cow<'py, str>> {
+pub(crate) fn bool_json_key<'a>(key: &'a Bound<'_, PyAny>) -> PyResult<Cow<'a, str>> {
     let v = if key.is_truthy().unwrap_or(false) {
         "true"
     } else {
