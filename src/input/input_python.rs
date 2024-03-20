@@ -482,7 +482,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         if let Ok(list) = self.downcast::<PyList>() {
             return Ok(ValidationMatch::exact(GenericIterable::List(list)));
         } else if !strict {
-            match self.extract_generic_iterable() {
+            match extract_generic_iterable(self) {
                 Ok(
                     GenericIterable::PyString(_)
                     | GenericIterable::Bytes(_)
@@ -497,99 +497,65 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::ListType, self))
     }
 
-    fn strict_tuple<'a>(&'a self) -> ValResult<GenericIterable<'a, 'py>> {
-        match self.lax_tuple()? {
-            GenericIterable::Tuple(iter) => Ok(GenericIterable::Tuple(iter)),
-            _ => Err(ValError::new(ErrorTypeDefaults::TupleType, self)),
+    type Tuple<'a> = GenericIterable<'a, 'py> where Self: 'a;
+
+    fn validate_tuple<'a>(&'a self, strict: bool) -> ValMatch<GenericIterable<'a, 'py>> {
+        if let Ok(tup) = self.downcast::<PyTuple>() {
+            return Ok(ValidationMatch::exact(GenericIterable::Tuple(tup)));
+        } else if !strict {
+            match extract_generic_iterable(self) {
+                Ok(
+                    GenericIterable::PyString(_)
+                    | GenericIterable::Bytes(_)
+                    | GenericIterable::Dict(_)
+                    | GenericIterable::Mapping(_),
+                )
+                | Err(_) => {}
+                Ok(other) => return Ok(ValidationMatch::lax(other)),
+            }
         }
+
+        Err(ValError::new(ErrorTypeDefaults::TupleType, self))
     }
 
-    fn lax_tuple<'a>(&'a self) -> ValResult<GenericIterable<'a, 'py>> {
-        match self
-            .extract_generic_iterable()
-            .map_err(|_| ValError::new(ErrorTypeDefaults::TupleType, self))?
-        {
-            GenericIterable::PyString(_)
-            | GenericIterable::Bytes(_)
-            | GenericIterable::Dict(_)
-            | GenericIterable::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::TupleType, self)),
-            other => Ok(other),
+    type Set<'a> = GenericIterable<'a, 'py> where Self: 'a;
+
+    fn validate_set<'a>(&'a self, strict: bool) -> ValMatch<GenericIterable<'a, 'py>> {
+        if let Ok(set) = self.downcast::<PySet>() {
+            return Ok(ValidationMatch::exact(GenericIterable::Set(set)));
+        } else if !strict {
+            match extract_generic_iterable(self) {
+                Ok(
+                    GenericIterable::PyString(_)
+                    | GenericIterable::Bytes(_)
+                    | GenericIterable::Dict(_)
+                    | GenericIterable::Mapping(_),
+                )
+                | Err(_) => {}
+                Ok(other) => return Ok(ValidationMatch::lax(other)),
+            }
         }
+
+        Err(ValError::new(ErrorTypeDefaults::SetType, self))
     }
 
-    fn strict_set<'a>(&'a self) -> ValResult<GenericIterable<'a, 'py>> {
-        match self.lax_set()? {
-            GenericIterable::Set(iter) => Ok(GenericIterable::Set(iter)),
-            _ => Err(ValError::new(ErrorTypeDefaults::SetType, self)),
+    fn validate_frozenset<'a>(&'a self, strict: bool) -> ValMatch<GenericIterable<'a, 'py>> {
+        if let Ok(frozenset) = self.downcast::<PyFrozenSet>() {
+            return Ok(ValidationMatch::exact(GenericIterable::FrozenSet(frozenset)));
+        } else if !strict {
+            match extract_generic_iterable(self) {
+                Ok(
+                    GenericIterable::PyString(_)
+                    | GenericIterable::Bytes(_)
+                    | GenericIterable::Dict(_)
+                    | GenericIterable::Mapping(_),
+                )
+                | Err(_) => {}
+                Ok(other) => return Ok(ValidationMatch::lax(other)),
+            }
         }
-    }
 
-    fn lax_set<'a>(&'a self) -> ValResult<GenericIterable<'a, 'py>> {
-        match self
-            .extract_generic_iterable()
-            .map_err(|_| ValError::new(ErrorTypeDefaults::SetType, self))?
-        {
-            GenericIterable::PyString(_)
-            | GenericIterable::Bytes(_)
-            | GenericIterable::Dict(_)
-            | GenericIterable::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::SetType, self)),
-            other => Ok(other),
-        }
-    }
-
-    fn strict_frozenset<'a>(&'a self) -> ValResult<GenericIterable<'a, 'py>> {
-        match self.lax_frozenset()? {
-            GenericIterable::FrozenSet(iter) => Ok(GenericIterable::FrozenSet(iter)),
-            _ => Err(ValError::new(ErrorTypeDefaults::FrozenSetType, self)),
-        }
-    }
-
-    fn lax_frozenset<'a>(&'a self) -> ValResult<GenericIterable<'a, 'py>> {
-        match self
-            .extract_generic_iterable()
-            .map_err(|_| ValError::new(ErrorTypeDefaults::FrozenSetType, self))?
-        {
-            GenericIterable::PyString(_)
-            | GenericIterable::Bytes(_)
-            | GenericIterable::Dict(_)
-            | GenericIterable::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::FrozenSetType, self)),
-            other => Ok(other),
-        }
-    }
-
-    fn extract_generic_iterable<'a>(&'a self) -> ValResult<GenericIterable<'a, 'py>> {
-        // Handle concrete non-overlapping types first, then abstract types
-        if let Ok(iterable) = self.downcast::<PyList>() {
-            Ok(GenericIterable::List(iterable))
-        } else if let Ok(iterable) = self.downcast::<PyTuple>() {
-            Ok(GenericIterable::Tuple(iterable))
-        } else if let Ok(iterable) = self.downcast::<PySet>() {
-            Ok(GenericIterable::Set(iterable))
-        } else if let Ok(iterable) = self.downcast::<PyFrozenSet>() {
-            Ok(GenericIterable::FrozenSet(iterable))
-        } else if let Ok(iterable) = self.downcast::<PyDict>() {
-            Ok(GenericIterable::Dict(iterable))
-        } else if let Some(iterable) = extract_dict_keys!(self.py(), self) {
-            Ok(GenericIterable::DictKeys(iterable))
-        } else if let Some(iterable) = extract_dict_values!(self.py(), self) {
-            Ok(GenericIterable::DictValues(iterable))
-        } else if let Some(iterable) = extract_dict_items!(self.py(), self) {
-            Ok(GenericIterable::DictItems(iterable))
-        } else if let Ok(iterable) = self.downcast::<PyMapping>() {
-            Ok(GenericIterable::Mapping(iterable))
-        } else if let Ok(iterable) = self.downcast::<PyString>() {
-            Ok(GenericIterable::PyString(iterable))
-        } else if let Ok(iterable) = self.downcast::<PyBytes>() {
-            Ok(GenericIterable::Bytes(iterable))
-        } else if let Ok(iterable) = self.downcast::<PyByteArray>() {
-            Ok(GenericIterable::PyByteArray(iterable))
-        } else if let Ok(iterable) = self.downcast::<PySequence>() {
-            Ok(GenericIterable::Sequence(iterable))
-        } else if let Ok(iterable) = self.iter() {
-            Ok(GenericIterable::Iterator(iterable))
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::IterableType, self))
-        }
+        Err(ValError::new(ErrorTypeDefaults::FrozenSetType, self))
     }
 
     fn validate_iter(&self) -> ValResult<GenericIterator> {
@@ -963,5 +929,40 @@ impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
             Self::Mapping(mapping) => Ok(consumer.consume_iterator(iterate_mapping_items(mapping)?)),
             Self::GetAttr(obj, _) => Ok(consumer.consume_iterator(iterate_attributes(obj))),
         }
+    }
+}
+
+fn extract_generic_iterable<'a, 'py>(obj: &'a Bound<'py, PyAny>) -> ValResult<GenericIterable<'a, 'py>> {
+    // Handle concrete non-overlapping types first, then abstract types
+    if let Ok(iterable) = obj.downcast::<PyList>() {
+        Ok(GenericIterable::List(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PyTuple>() {
+        Ok(GenericIterable::Tuple(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PySet>() {
+        Ok(GenericIterable::Set(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PyFrozenSet>() {
+        Ok(GenericIterable::FrozenSet(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PyDict>() {
+        Ok(GenericIterable::Dict(iterable))
+    } else if let Some(iterable) = extract_dict_keys!(obj.py(), obj) {
+        Ok(GenericIterable::DictKeys(iterable))
+    } else if let Some(iterable) = extract_dict_values!(obj.py(), obj) {
+        Ok(GenericIterable::DictValues(iterable))
+    } else if let Some(iterable) = extract_dict_items!(obj.py(), obj) {
+        Ok(GenericIterable::DictItems(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PyMapping>() {
+        Ok(GenericIterable::Mapping(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PyString>() {
+        Ok(GenericIterable::PyString(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PyBytes>() {
+        Ok(GenericIterable::Bytes(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PyByteArray>() {
+        Ok(GenericIterable::PyByteArray(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PySequence>() {
+        Ok(GenericIterable::Sequence(iterable))
+    } else if let Ok(iterable) = obj.iter() {
+        Ok(GenericIterable::Iterator(iterable))
+    } else {
+        Err(ValError::new(ErrorTypeDefaults::IterableType, obj))
     }
 }
