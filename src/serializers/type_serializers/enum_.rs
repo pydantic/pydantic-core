@@ -66,7 +66,7 @@ impl TypeSerializer for EnumSerializer {
                     None => infer_to_python(&dot_value, include, exclude, extra),
                 }
             } else {
-                // if we're not in JSON mode, we assume the value is safe to redirect directly
+                // if we're not in JSON mode, we assume the value is safe to return directly
                 Ok(value.into_py(py))
             }
         } else {
@@ -83,6 +83,8 @@ impl TypeSerializer for EnumSerializer {
                 Some(ref s) => s.json_key(&dot_value, extra),
                 None => infer_json_key(&dot_value, extra),
             }?;
+            // since dot_value is a local reference, we need to allocate it and returned an
+            // owned variant of cow.
             Ok(Cow::Owned(k.into_owned()))
         } else {
             extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
