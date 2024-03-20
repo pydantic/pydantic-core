@@ -93,7 +93,7 @@ impl TypeSerializer for TupleSerializer {
         }
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
         match key.downcast::<PyTuple>() {
             Ok(py_tuple) => {
                 let mut key_builder = KeyBuilder::new();

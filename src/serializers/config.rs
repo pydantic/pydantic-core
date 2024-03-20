@@ -163,7 +163,7 @@ impl TimedeltaMode {
 }
 
 impl BytesMode {
-    pub fn bytes_to_string<'a>(&self, py: Python, bytes: &'a [u8]) -> PyResult<Cow<'a, str>> {
+    pub fn bytes_to_string<'py>(&self, py: Python<'py>, bytes: &'py [u8]) -> PyResult<Cow<'py, str>> {
         match self {
             Self::Utf8 => from_utf8(bytes)
                 .map_err(|err| utf8_py_error(py, err, bytes))

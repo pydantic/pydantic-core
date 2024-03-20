@@ -67,7 +67,7 @@ impl BuildValidator for BuildEnumValidator {
                 gv,
                 name: format!("float-enum[{class_repr}]"),
             })),
-            Some(_) => py_schema_err!("`sub_type` must be one of: 'int', 'str' or None"),
+            Some(_) => py_schema_err!("`sub_type` must be one of: 'int', 'str', 'float' or None"),
             None => Ok(CombinedValidator::PlainEnum(PlainEnumValidator {
                 gv,
                 name: format!("{}[{class_repr}]", Self::EXPECTED_TYPE),

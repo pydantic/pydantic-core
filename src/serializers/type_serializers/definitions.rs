@@ -98,7 +98,7 @@ impl TypeSerializer for DefinitionRefSerializer {
         })
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
         self.definition.read(|s| s.unwrap().json_key(key, extra))
     }
 

@@ -13,6 +13,12 @@ use super::{
 #[derive(Debug, Clone)]
 pub struct StrSerializer;
 
+impl StrSerializer {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 impl BuildSerializer for StrSerializer {
     const EXPECTED_TYPE: &'static str = "str";
 
@@ -21,7 +27,7 @@ impl BuildSerializer for StrSerializer {
         _config: Option<&Bound<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        Ok(Self {}.into())
+        Ok(Self::new().into())
     }
 }
 
@@ -49,7 +55,7 @@ impl TypeSerializer for StrSerializer {
         }
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
         if let Ok(py_str) = key.downcast::<PyString>() {
             // FIXME py cow to avoid the copy
             Ok(Cow::Owned(py_str.to_string_lossy().into_owned()))

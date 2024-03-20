@@ -359,7 +359,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         Ok(output_dict.into_py(py))
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
         self._invalid_as_json_key(key, extra, "fields")
     }
 

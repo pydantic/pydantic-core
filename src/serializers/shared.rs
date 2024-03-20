@@ -139,6 +139,7 @@ combined_serializer! {
         JsonOrPython: super::type_serializers::json_or_python::JsonOrPythonSerializer;
         Union: super::type_serializers::union::UnionSerializer;
         Literal: super::type_serializers::literal::LiteralSerializer;
+        Enum: super::type_serializers::enum_::EnumSerializer;
         Recursive: super::type_serializers::definitions::DefinitionRefSerializer;
         Tuple: super::type_serializers::tuple::TupleSerializer;
     }
@@ -246,6 +247,7 @@ impl PyGcTraverse for CombinedSerializer {
             CombinedSerializer::JsonOrPython(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Union(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Literal(inner) => inner.py_gc_traverse(visit),
+            CombinedSerializer::Enum(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Recursive(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Tuple(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Uuid(inner) => inner.py_gc_traverse(visit),
@@ -263,14 +265,14 @@ pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
         extra: &Extra,
     ) -> PyResult<PyObject>;
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>>;
+    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>>;
 
-    fn _invalid_as_json_key<'a>(
+    fn _invalid_as_json_key<'py>(
         &self,
-        key: &'a Bound<'_, PyAny>,
+        key: &Bound<'py, PyAny>,
         extra: &Extra,
         expected_type: &'static str,
-    ) -> PyResult<Cow<'a, str>> {
+    ) -> PyResult<Cow<'py, str>> {
         match extra.ob_type_lookup.is_type(key, ObType::None) {
             IsType::Exact | IsType::Subclass => py_err!(PyTypeError; "`{}` not valid as object key", expected_type),
             IsType::False => {

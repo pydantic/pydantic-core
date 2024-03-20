@@ -52,7 +52,7 @@ impl TypeSerializer for TimeDeltaSerializer {
         }
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
         match EitherTimedelta::try_from(key) {
             Ok(either_timedelta) => self.timedelta_mode.json_key(key.py(), &either_timedelta),
             Err(_) => {

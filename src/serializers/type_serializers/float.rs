@@ -20,6 +20,16 @@ pub struct FloatSerializer {
     inf_nan_mode: InfNanMode,
 }
 
+impl FloatSerializer {
+    pub fn new(py: Python, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        let inf_nan_mode = config
+            .and_then(|c| c.get_as(intern!(py, "ser_json_inf_nan")).transpose())
+            .transpose()?
+            .unwrap_or_default();
+        Ok(Self { inf_nan_mode })
+    }
+}
+
 impl BuildSerializer for FloatSerializer {
     const EXPECTED_TYPE: &'static str = "float";
 
@@ -28,11 +38,7 @@ impl BuildSerializer for FloatSerializer {
         config: Option<&Bound<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        let inf_nan_mode = config
-            .and_then(|c| c.get_as(intern!(schema.py(), "ser_json_inf_nan")).transpose())
-            .transpose()?
-            .unwrap_or_default();
-        Ok(Self { inf_nan_mode }.into())
+        Self::new(schema.py(), config).map(Into::into)
     }
 }
 
@@ -63,7 +69,7 @@ impl TypeSerializer for FloatSerializer {
         }
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
         match extra.ob_type_lookup.is_type(key, ObType::Float) {
             IsType::Exact | IsType::Subclass => to_str_json_key(key),
             IsType::False => {

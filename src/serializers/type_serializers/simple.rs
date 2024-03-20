@@ -53,7 +53,7 @@ impl TypeSerializer for NoneSerializer {
         }
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+    fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
         match extra.ob_type_lookup.is_type(key, ObType::None) {
             IsType::Exact => none_json_key(),
             _ => {
@@ -90,6 +90,12 @@ macro_rules! build_simple_serializer {
         #[derive(Debug, Clone)]
         pub struct $struct_name;
 
+        impl $struct_name {
+            pub fn new() -> Self {
+                Self {}
+            }
+        }
+
         impl BuildSerializer for $struct_name {
             const EXPECTED_TYPE: &'static str = $expected_type;
 
@@ -98,7 +104,7 @@ macro_rules! build_simple_serializer {
                 _config: Option<&Bound<'_, PyDict>>,
                 _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
             ) -> PyResult<CombinedSerializer> {
-                Ok(Self {}.into())
+                Ok(Self::new().into())
             }
         }
 
@@ -132,7 +138,7 @@ macro_rules! build_simple_serializer {
                 }
             }
 
-            fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+            fn json_key<'py>(&self, key: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Cow<'py, str>> {
                 match extra.ob_type_lookup.is_type(key, $ob_type) {
                     IsType::Exact | IsType::Subclass => $key_method(key),
                     IsType::False => {
