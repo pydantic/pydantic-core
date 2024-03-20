@@ -247,3 +247,15 @@ def test_enum_exactness():
     assert v.validate_python(MyEnum.a) is MyEnum.a
     assert v.validate_python(1) == 1
     assert v.validate_python(1) is not MyEnum.a
+
+
+def test_plain_enum_lists():
+    class MyEnum(Enum):
+        a = [1]
+        b = [2]
+
+    assert MyEnum([1]) is MyEnum.a
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+    assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python([1]) is MyEnum.a
+    assert v.validate_python([2]) is MyEnum.b

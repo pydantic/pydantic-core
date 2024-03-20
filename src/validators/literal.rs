@@ -1,6 +1,7 @@
 // Validator for things inside of a typing.Literal[]
 // which can be an int, a string, bytes or an Enum value (including `class Foo(str, Enum)` type enums)
 use core::fmt::Debug;
+use std::cmp::Ordering;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -31,8 +32,11 @@ pub struct LiteralLookup<T: Debug> {
     expected_bool: Option<BoolLiteral>,
     expected_int: Option<AHashMap<i64, usize>>,
     expected_str: Option<AHashMap<String, usize>>,
-    // Catch all for Enum and bytes (the latter only because it is seldom used)
-    expected_py: Option<Py<PyDict>>,
+    // Catch all for hashable types like Enum and bytes (the latter only because it is seldom used)
+    expected_py_dict: Option<Py<PyDict>>,
+    // Catch all for unhashable types like list
+    expected_py_list: Option<Py<PyList>>,
+
     pub values: Vec<T>,
 }
 
@@ -41,7 +45,8 @@ impl<T: Debug> LiteralLookup<T> {
         let mut expected_bool = BoolLiteral::default();
         let mut expected_int = AHashMap::new();
         let mut expected_str: AHashMap<String, usize> = AHashMap::new();
-        let expected_py = PyDict::new_bound(py);
+        let expected_py_dict = PyDict::new_bound(py);
+        let expected_py_list = PyList::empty_bound(py);
         let mut values = Vec::new();
         for (k, v) in expected {
             let id = values.len();
@@ -63,8 +68,8 @@ impl<T: Debug> LiteralLookup<T> {
                     .as_cow()
                     .map_err(|_| py_schema_error_type!("error extracting str {:?}", k))?;
                 expected_str.insert(str.to_string(), id);
-            } else {
-                expected_py.set_item(&k, id)?;
+            } else if expected_py_dict.set_item(&k, id).is_err() {
+                expected_py_list.append((&k, id))?;
             }
         }
 
@@ -81,9 +86,13 @@ impl<T: Debug> LiteralLookup<T> {
                 true => None,
                 false => Some(expected_str),
             },
-            expected_py: match expected_py.is_empty() {
+            expected_py_dict: match expected_py_dict.is_empty() {
                 true => None,
-                false => Some(expected_py.into()),
+                false => Some(expected_py_dict.into()),
+            },
+            expected_py_list: match expected_py_list.is_empty() {
+                true => None,
+                false => Some(expected_py_list.into()),
             },
             values,
         })
@@ -132,14 +141,24 @@ impl<T: Debug> LiteralLookup<T> {
                 }
             }
         }
-        // must be an enum or bytes
-        if let Some(expected_py) = &self.expected_py {
+        if let Some(expected_py_dict) = &self.expected_py_dict {
             // We don't use ? to unpack the result of `get_item` in the next line because unhashable
             // inputs will produce a TypeError, which in this case we just want to treat equivalently
             // to a failed lookup
-            if let Ok(Some(v)) = expected_py.bind(py).get_item(input) {
+            if let Ok(Some(v)) = expected_py_dict.bind(py).get_item(input) {
                 let id: usize = v.extract().unwrap();
                 return Ok(Some((input, &self.values[id])));
+            }
+        };
+        if let Some(expected_py_list) = &self.expected_py_list {
+            for item in expected_py_list.bind(py) {
+                let (k, id): (Bound<PyAny>, usize) = item.extract()?;
+                if k.compare(input.to_object(py).bind(py))
+                    .unwrap_or(Ordering::Less)
+                    .is_eq()
+                {
+                    return Ok(Some((input, &self.values[id])));
+                }
             }
         };
         Ok(None)
@@ -183,7 +202,7 @@ impl<T: Debug> LiteralLookup<T> {
         input: &'a I,
         strict: bool,
     ) -> ValResult<Option<&T>> {
-        if let Some(expected_py) = &self.expected_py {
+        if let Some(expected_py) = &self.expected_py_dict {
             if let Ok(either_float) = input.validate_float(strict) {
                 let f = either_float.into_inner().as_f64();
                 let py_float = f.to_object(py);
@@ -199,7 +218,7 @@ impl<T: Debug> LiteralLookup<T> {
 
 impl<T: PyGcTraverse + Debug> PyGcTraverse for LiteralLookup<T> {
     fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
-        self.expected_py.py_gc_traverse(visit)?;
+        self.expected_py_dict.py_gc_traverse(visit)?;
         self.values.py_gc_traverse(visit)?;
         Ok(())
     }
