@@ -48,5 +48,5 @@ def test_pandas():
     v = SchemaSerializer(core_schema.timedelta_schema())
     d = pandas.Timestamp('2023-01-01T02:00:00Z') - pandas.Timestamp('2023-01-01T00:00:00Z')
     assert v.to_python(d) == d
-    assert v.to_python(d, mode='json') == 'PT7200S'
-    assert v.to_json(d) == b'"PT7200S"'
+    assert v.to_python(d, mode='json') == 'PT2H'
+    assert v.to_json(d) == b'"PT2H"'
