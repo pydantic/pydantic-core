@@ -303,7 +303,7 @@ impl Validator for DataclassArgsValidator {
                                             match validator.validate(py, value.borrow_input(), state) {
                                                 Ok(value) => {
                                                     output_dict.set_item(
-                                                        either_str.as_py_string(py, state.cache_strings()),
+                                                        either_str.as_py_string(py, state.cache_str()),
                                                         value,
                                                     )?;
                                                 }
@@ -316,7 +316,7 @@ impl Validator for DataclassArgsValidator {
                                             }
                                         } else {
                                             output_dict
-                                                .set_item(either_str.as_py_string(py, state.cache_strings()), value)?;
+                                                .set_item(either_str.as_py_string(py, state.cache_str()), value)?;
                                         }
                                     }
                                 }

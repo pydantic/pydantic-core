@@ -219,7 +219,7 @@ pub struct InternalValidator {
     validation_mode: InputType,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
-    cache_strings: bool,
+    cache_str: bool,
 }
 
 impl fmt::Debug for InternalValidator {
@@ -251,7 +251,7 @@ impl InternalValidator {
             validation_mode: extra.input_type,
             hide_input_in_errors,
             validation_error_cause,
-            cache_strings: extra.cache_strings,
+            cache_str: extra.cache_str,
         }
     }
 
@@ -270,7 +270,7 @@ impl InternalValidator {
             from_attributes: self.from_attributes,
             context: self.context.as_ref().map(|data| data.bind(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.bind(py)),
-            cache_strings: self.cache_strings,
+            cache_str: self.cache_str,
         };
         let mut state = ValidationState::new(extra, &mut self.recursion_guard);
         state.exactness = self.exactness;
@@ -305,7 +305,7 @@ impl InternalValidator {
             from_attributes: self.from_attributes,
             context: self.context.as_ref().map(|data| data.bind(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.bind(py)),
-            cache_strings: self.cache_strings,
+            cache_str: self.cache_str,
         };
         let mut state = ValidationState::new(extra, &mut self.recursion_guard);
         state.exactness = self.exactness;

@@ -276,8 +276,7 @@ impl Validator for ArgumentsValidator {
                         match self.var_kwargs_validator {
                             Some(ref validator) => match validator.validate(py, value.borrow_input(), state) {
                                 Ok(value) => {
-                                    output_kwargs
-                                        .set_item(either_str.as_py_string(py, state.cache_strings()), value)?;
+                                    output_kwargs.set_item(either_str.as_py_string(py, state.cache_str()), value)?;
                                 }
                                 Err(ValError::LineErrors(line_errors)) => {
                                     for err in line_errors {
