@@ -132,9 +132,7 @@ impl GeneralFieldsSerializer {
 
     fn extract_dicts<'a>(&self, value: &Bound<'a, PyAny>) -> Option<(Bound<'a, PyDict>, Option<Bound<'a, PyDict>>)> {
         match self.mode {
-            FieldsMode::ModelExtra => {
-                value.extract().ok()
-            }
+            FieldsMode::ModelExtra => value.extract().ok(),
             _ => {
                 if let Ok(main_dict) = value.downcast::<PyDict>() {
                     Some((main_dict.clone(), None))
