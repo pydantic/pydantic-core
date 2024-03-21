@@ -50,7 +50,8 @@ pub fn from_json<'py>(
         .map_err(|_| PyTypeError::new_err("Expected bytes, bytearray or str"))?;
     let json_either_bytes = v_match.into_inner();
     let json_bytes = json_either_bytes.as_slice();
-    jiter::python_parse(py, json_bytes, allow_inf_nan, cache_strings).map_err(|e| jiter::map_json_error(json_bytes, &e))
+    jiter::python_parse(py, json_bytes, allow_inf_nan, cache_strings.into())
+        .map_err(|e| jiter::map_json_error(json_bytes, &e))
 }
 
 pub fn get_pydantic_core_version() -> &'static str {

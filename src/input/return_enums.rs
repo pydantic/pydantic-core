@@ -437,7 +437,7 @@ impl<'a> EitherString<'a> {
 
     pub fn as_py_string(&'a self, py: Python<'a>) -> Bound<'a, PyString> {
         match self {
-            Self::Cow(cow) => PyString::new_bound(py, cow),
+            Self::Cow(cow) => jiter::cached_py_string(py, cow.as_ref()),
             Self::Py(py_string) => py_string.clone(),
         }
     }
