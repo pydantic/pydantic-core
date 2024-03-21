@@ -110,6 +110,7 @@ pub struct SchemaValidator {
     title: PyObject,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
+    cache_strings: bool,
 }
 
 #[pymethods]
@@ -135,6 +136,7 @@ impl SchemaValidator {
         };
         let hide_input_in_errors: bool = config.get_as(intern!(py, "hide_input_in_errors"))?.unwrap_or(false);
         let validation_error_cause: bool = config.get_as(intern!(py, "validation_error_cause"))?.unwrap_or(false);
+        let cache_strings: bool = config.get_as(intern!(py, "cache_strings"))?.unwrap_or(true);
         Ok(Self {
             validator,
             definitions,
@@ -143,6 +145,7 @@ impl SchemaValidator {
             title,
             hide_input_in_errors,
             validation_error_cause,
+            cache_strings,
         })
     }
 
@@ -262,6 +265,7 @@ impl SchemaValidator {
             from_attributes,
             context,
             self_instance: None,
+            cache_strings: self.cache_strings,
         };
 
         let guard = &mut RecursionState::default();
@@ -285,6 +289,7 @@ impl SchemaValidator {
             from_attributes: None,
             context,
             self_instance: None,
+            cache_strings: self.cache_strings,
         };
         let recursion_guard = &mut RecursionState::default();
         let mut state = ValidationState::new(extra, recursion_guard);
@@ -331,7 +336,14 @@ impl SchemaValidator {
     ) -> ValResult<PyObject> {
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
-            Extra::new(strict, from_attributes, context, self_instance, input_type),
+            Extra::new(
+                strict,
+                from_attributes,
+                context,
+                self_instance,
+                input_type,
+                self.cache_strings,
+            ),
             &mut recursion_guard,
         );
         self.validator.validate(py, input, &mut state)
@@ -384,7 +396,7 @@ impl<'py> SelfValidator<'py> {
         let py = schema.py();
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
-            Extra::new(strict, None, None, None, InputType::Python),
+            Extra::new(strict, None, None, None, InputType::Python, true),
             &mut recursion_guard,
         );
         match self.validator.validator.validate(py, schema, &mut state) {
@@ -414,6 +426,7 @@ impl<'py> SelfValidator<'py> {
             title: "Self Schema".into_py(py),
             hide_input_in_errors: false,
             validation_error_cause: false,
+            cache_strings: true,
         })
     }
 }
@@ -577,6 +590,8 @@ pub struct Extra<'a, 'py> {
     pub context: Option<&'a Bound<'py, PyAny>>,
     /// This is an instance of the model or dataclass being validated, when validation is performed from `__init__`
     self_instance: Option<&'a Bound<'py, PyAny>>,
+    /// Whether to use a cache of short strings to accelerate python string construction
+    cache_strings: bool,
 }
 
 impl<'a, 'py> Extra<'a, 'py> {
@@ -586,6 +601,7 @@ impl<'a, 'py> Extra<'a, 'py> {
         context: Option<&'a Bound<'py, PyAny>>,
         self_instance: Option<&'a Bound<'py, PyAny>>,
         input_type: InputType,
+        cache_strings: bool,
     ) -> Self {
         Extra {
             input_type,
@@ -594,6 +610,7 @@ impl<'a, 'py> Extra<'a, 'py> {
             from_attributes,
             context,
             self_instance,
+            cache_strings,
         }
     }
 }
@@ -607,6 +624,7 @@ impl Extra<'_, '_> {
             from_attributes: self.from_attributes,
             context: self.context,
             self_instance: self.self_instance,
+            cache_strings: self.cache_strings,
         }
     }
 }

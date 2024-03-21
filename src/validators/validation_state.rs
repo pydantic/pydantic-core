@@ -1,3 +1,6 @@
+use pyo3::prelude::*;
+use pyo3::types::PyString;
+
 use crate::recursion_guard::{ContainsRecursionState, RecursionState};
 
 use super::Extra;
@@ -59,6 +62,18 @@ impl<'a, 'py> ValidationState<'a, 'py> {
                 }
             }
             Some(Exactness::Exact) => self.exactness = Some(exactness),
+        }
+    }
+
+    pub fn cache_strings(&self) -> bool {
+        self.extra.cache_strings
+    }
+
+    pub fn maybe_cached_str(&self, py: Python<'py>, s: &str) -> Bound<'py, PyString> {
+        if self.cache_strings() {
+            jiter::cached_py_string(py, s)
+        } else {
+            PyString::new_bound(py, s)
         }
     }
 }

@@ -435,9 +435,10 @@ impl<'a> EitherString<'a> {
         }
     }
 
-    pub fn as_py_string(&'a self, py: Python<'a>) -> Bound<'a, PyString> {
+    pub fn as_py_string(&'a self, py: Python<'a>, cache_strings: bool) -> Bound<'a, PyString> {
         match self {
-            Self::Cow(cow) => jiter::cached_py_string(py, cow.as_ref()),
+            Self::Cow(cow) if cache_strings => jiter::cached_py_string(py, cow.as_ref()),
+            Self::Cow(cow) => PyString::new_bound(py, cow.as_ref()),
             Self::Py(py_string) => py_string.clone(),
         }
     }
@@ -458,12 +459,6 @@ impl<'a> From<String> for EitherString<'a> {
 impl<'a> From<Bound<'a, PyString>> for EitherString<'a> {
     fn from(date: Bound<'a, PyString>) -> Self {
         Self::Py(date)
-    }
-}
-
-impl<'a> IntoPy<PyObject> for EitherString<'a> {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        self.as_py_string(py).into_py(py)
     }
 }
 
