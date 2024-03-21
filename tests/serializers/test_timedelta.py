@@ -14,8 +14,8 @@ def test_timedelta():
     v = SchemaSerializer(core_schema.timedelta_schema())
     assert v.to_python(timedelta(days=2, hours=3, minutes=4)) == timedelta(days=2, hours=3, minutes=4)
 
-    assert v.to_python(timedelta(days=2, hours=3, minutes=4), mode='json') == 'P2DT11040S'
-    assert v.to_json(timedelta(days=2, hours=3, minutes=4)) == b'"P2DT11040S"'
+    assert v.to_python(timedelta(days=2, hours=3, minutes=4), mode='json') == 'P2DT3H4M'
+    assert v.to_json(timedelta(days=2, hours=3, minutes=4)) == b'"P2DT3H4M"'
 
     with pytest.warns(
         UserWarning, match='Expected `timedelta` but got `int` - serialized value may not be as expected'
@@ -39,8 +39,8 @@ def test_timedelta_float():
 def test_timedelta_key():
     v = SchemaSerializer(core_schema.dict_schema(core_schema.timedelta_schema(), core_schema.int_schema()))
     assert v.to_python({timedelta(days=2, hours=3, minutes=4): 1}) == {timedelta(days=2, hours=3, minutes=4): 1}
-    assert v.to_python({timedelta(days=2, hours=3, minutes=4): 1}, mode='json') == {'P2DT11040S': 1}
-    assert v.to_json({timedelta(days=2, hours=3, minutes=4): 1}) == b'{"P2DT11040S":1}'
+    assert v.to_python({timedelta(days=2, hours=3, minutes=4): 1}, mode='json') == {'P2DT3H4M': 1}
+    assert v.to_json({timedelta(days=2, hours=3, minutes=4): 1}) == b'{"P2DT3H4M":1}'
 
 
 @pytest.mark.skipif(not pandas, reason='pandas not installed')
