@@ -25,14 +25,14 @@ impl BuildValidator for CallableValidator {
 impl_py_gc_traverse!(CallableValidator {});
 
 impl Validator for CallableValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         state.floor_exactness(Exactness::Lax);
-        match input.callable() {
+        match input.as_python().is_some_and(PyAnyMethods::is_callable) {
             true => Ok(input.to_object(py)),
             false => Err(ValError::new(ErrorTypeDefaults::CallableType, input)),
         }

@@ -1,5 +1,3 @@
-use std::ops::ControlFlow;
-
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
@@ -8,17 +6,16 @@ use ahash::AHashSet;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config, schema_or_config_same, ExtraBehavior};
+use crate::errors::LocItem;
 use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
-use crate::input::{
-    AttributesGenericIterator, BorrowInput, DictGenericIterator, GenericMapping, Input, JsonObjectGenericIterator,
-    MappingGenericIterator, StringMappingGenericIterator, ValidationMatch,
-};
+use crate::input::BorrowInput;
+use crate::input::ConsumeIterator;
+use crate::input::ValidationMatch;
+use crate::input::{Input, ValidatedDict};
 use crate::lookup_key::LookupKey;
 use crate::tools::SchemaDict;
 
-use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, ValidationState, Validator,
-};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug)]
 struct TypedDictField {
@@ -145,11 +142,11 @@ impl_py_gc_traverse!(TypedDictValidator {
 });
 
 impl Validator for TypedDictValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let strict = state.strict_or(self.strict);
         let dict = input.validate_dict(strict)?;
@@ -159,116 +156,116 @@ impl Validator for TypedDictValidator {
 
         // we only care about which keys have been used if we're iterating over the object for extra after
         // the first pass
-        let mut used_keys: Option<AHashSet<&str>> = match (&self.extra_behavior, &dict) {
-            (_, GenericMapping::PyGetAttr(_, _)) => None,
-            (ExtraBehavior::Allow | ExtraBehavior::Forbid, _) => Some(AHashSet::with_capacity(self.fields.len())),
-            _ => None,
+        let mut used_keys: Option<AHashSet<&str>> = match self.extra_behavior {
+            ExtraBehavior::Allow | ExtraBehavior::Forbid => Some(AHashSet::with_capacity(self.fields.len())),
+            ExtraBehavior::Ignore => None,
         };
 
-        macro_rules! control_flow {
-            ($e: expr) => {
-                match $e {
-                    Ok(v) => ControlFlow::Continue(v),
-                    Err(err) => ControlFlow::Break(ValError::from(err)),
-                }
-            };
-        }
+        {
+            let state = &mut state.rebind_extra(|extra| extra.data = Some(output_dict.clone()));
 
-        macro_rules! process {
-            ($dict:expr, $get_method:ident, $iter:ty $(,$kwargs:expr)?) => {{
-                match state.with_new_extra(Extra {
-                    data: Some(output_dict.clone()),
-                    ..*state.extra()
-                }, |state| {
-                    for field in &self.fields {
-                        let op_key_value = match field.lookup_key.$get_method($dict $(, $kwargs )? ) {
-                            Ok(v) => v,
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    errors.push(err.with_outer_location(&field.name));
-                                }
-                                continue;
-                            }
-                            Err(err) => return ControlFlow::Break(err),
-                        };
-                        if let Some((lookup_path, value)) = op_key_value {
-                            if let Some(ref mut used_keys) = used_keys {
-                                // key is "used" whether or not validation passes, since we want to skip this key in
-                                // extra logic either way
-                                used_keys.insert(lookup_path.first_key());
-                            }
-                            match field.validator.validate(py, value.borrow_input(), state) {
-                                Ok(value) => {
-                                    control_flow!(output_dict.set_item(&field.name_py, value))?;
-                                }
-                                Err(ValError::Omit) => continue,
-                                Err(ValError::LineErrors(line_errors)) => {
-                                    for err in line_errors {
-                                        errors.push(
-                                            lookup_path
-                                            .apply_error_loc(err, self.loc_by_alias, &field.name)
-                                        );
-                                    }
-                                }
-                                Err(err) => return ControlFlow::Break(err),
-                            }
-                            continue;
+            for field in &self.fields {
+                let op_key_value = match dict.get_item(&field.lookup_key) {
+                    Ok(v) => v,
+                    Err(ValError::LineErrors(line_errors)) => {
+                        for err in line_errors {
+                            errors.push(err.with_outer_location(&field.name));
                         }
-
-                        match field.validator.default_value(py, Some(field.name.as_str()), state) {
-                            Ok(Some(value)) => {
-                                // Default value exists, and passed validation if required
-                                control_flow!(output_dict.set_item(&field.name_py, value))?;
-                            },
-                            Ok(None) => {
-                                // This means there was no default value
-                                if (field.required) {
-                                    errors.push(field.lookup_key.error(
-                                        ErrorTypeDefaults::Missing,
-                                        input,
-                                        self.loc_by_alias,
-                                        &field.name
-                                    ));
-                                }
-                            },
-                            Err(ValError::Omit) => continue,
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    // Note: this will always use the field name even if there is an alias
-                                    // However, we don't mind so much because this error can only happen if the
-                                    // default value fails validation, which is arguably a developer error.
-                                    // We could try to "fix" this in the future if desired.
-                                    errors.push(err);
-                                }
+                        continue;
+                    }
+                    Err(err) => return Err(err),
+                };
+                if let Some((lookup_path, value)) = op_key_value {
+                    if let Some(ref mut used_keys) = used_keys {
+                        // key is "used" whether or not validation passes, since we want to skip this key in
+                        // extra logic either way
+                        used_keys.insert(lookup_path.first_key());
+                    }
+                    match field.validator.validate(py, value.borrow_input(), state) {
+                        Ok(value) => {
+                            output_dict.set_item(&field.name_py, value)?;
+                        }
+                        Err(ValError::Omit) => continue,
+                        Err(ValError::LineErrors(line_errors)) => {
+                            for err in line_errors {
+                                errors.push(lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name));
                             }
-                            Err(err) => return ControlFlow::Break(err),
+                        }
+                        Err(err) => return Err(err),
+                    }
+                    continue;
+                }
+
+                match field.validator.default_value(py, Some(field.name.as_str()), state) {
+                    Ok(Some(value)) => {
+                        // Default value exists, and passed validation if required
+                        output_dict.set_item(&field.name_py, value)?;
+                    }
+                    Ok(None) => {
+                        // This means there was no default value
+                        if field.required {
+                            errors.push(field.lookup_key.error(
+                                ErrorTypeDefaults::Missing,
+                                input,
+                                self.loc_by_alias,
+                                &field.name,
+                            ));
                         }
                     }
-                    ControlFlow::Continue(())
-                }) {
-                    ControlFlow::Continue(()) => {}
-                    ControlFlow::Break(err) => return Err(err),
+                    Err(ValError::Omit) => continue,
+                    Err(ValError::LineErrors(line_errors)) => {
+                        for err in line_errors {
+                            // Note: this will always use the field name even if there is an alias
+                            // However, we don't mind so much because this error can only happen if the
+                            // default value fails validation, which is arguably a developer error.
+                            // We could try to "fix" this in the future if desired.
+                            errors.push(err);
+                        }
+                    }
+                    Err(err) => return Err(err),
                 }
+            }
+        }
 
-                if let Some(ref mut used_keys) = used_keys {
-                    for item_result in <$iter>::new($dict)? {
+        if let Some(used_keys) = used_keys {
+            struct ValidateExtras<'a, 's, 'py> {
+                py: Python<'py>,
+                used_keys: AHashSet<&'a str>,
+                errors: &'a mut Vec<ValLineError>,
+                extras_validator: Option<&'a CombinedValidator>,
+                output_dict: &'a Bound<'py, PyDict>,
+                state: &'a mut ValidationState<'s, 'py>,
+                extra_behavior: ExtraBehavior,
+            }
+
+            impl<'py, Key, Value> ConsumeIterator<ValResult<(Key, Value)>> for ValidateExtras<'_, '_, 'py>
+            where
+                Key: BorrowInput<'py> + Clone + Into<LocItem>,
+                Value: BorrowInput<'py>,
+            {
+                type Output = ValResult<()>;
+                fn consume_iterator(self, iterator: impl Iterator<Item = ValResult<(Key, Value)>>) -> ValResult<()> {
+                    for item_result in iterator {
                         let (raw_key, value) = item_result?;
-                        let either_str = match raw_key.validate_str(true, false).map(ValidationMatch::into_inner) {
+                        let either_str = match raw_key
+                            .borrow_input()
+                            .validate_str(true, false)
+                            .map(ValidationMatch::into_inner)
+                        {
                             Ok(k) => k,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
-                                    errors.push(
+                                    self.errors.push(
                                         err.with_outer_location(raw_key.clone())
-                                            .with_type(ErrorTypeDefaults::InvalidKey)
-
+                                            .with_type(ErrorTypeDefaults::InvalidKey),
                                     );
                                 }
                                 continue;
                             }
                             Err(err) => return Err(err),
                         };
-                        let cow = either_str.as_cow().map_err(|err| err)?;
-                        if used_keys.contains(cow.as_ref()) {
+                        let cow = either_str.as_cow()?;
+                        if self.used_keys.contains(cow.as_ref()) {
                             continue;
                         }
 
@@ -276,51 +273,47 @@ impl Validator for TypedDictValidator {
                         // Unknown / extra field
                         match self.extra_behavior {
                             ExtraBehavior::Forbid => {
-                                errors.push(
-                                    ValLineError::new_with_loc(
-                                        ErrorTypeDefaults::ExtraForbidden,
-                                        value,
-                                        raw_key.clone(),
-                                    )
-
-                                );
+                                self.errors.push(ValLineError::new_with_loc(
+                                    ErrorTypeDefaults::ExtraForbidden,
+                                    value,
+                                    raw_key.clone(),
+                                ));
                             }
                             ExtraBehavior::Ignore => {}
                             ExtraBehavior::Allow => {
-                            let py_key = either_str.as_py_string(py);
-                                if let Some(ref validator) = self.extras_validator {
-                                    match validator.validate(py, value, state) {
+                                let py_key = either_str.as_py_string(self.py);
+                                if let Some(validator) = self.extras_validator {
+                                    match validator.validate(self.py, value, self.state) {
                                         Ok(value) => {
-                                            output_dict.set_item(py_key, value)?;
+                                            self.output_dict.set_item(py_key, value)?;
                                         }
                                         Err(ValError::LineErrors(line_errors)) => {
                                             for err in line_errors {
-                                                errors.push(
-                                                    err.with_outer_location(raw_key.clone())
-                                                );
+                                                self.errors.push(err.with_outer_location(raw_key.clone()));
                                             }
                                         }
                                         Err(err) => return Err(err),
                                     }
                                 } else {
-                                    output_dict.set_item(py_key, value.to_object(py))?;
+                                    self.output_dict.set_item(py_key, value.to_object(self.py))?;
                                 };
                             }
                         }
                     }
+
+                    Ok(())
                 }
-            }};
-        }
-        match dict {
-            GenericMapping::PyDict(d) => {
-                process!(&d, py_get_dict_item, DictGenericIterator);
             }
-            GenericMapping::PyMapping(d) => process!(&d, py_get_mapping_item, MappingGenericIterator),
-            GenericMapping::StringMapping(d) => process!(&d, py_get_string_mapping_item, StringMappingGenericIterator),
-            GenericMapping::PyGetAttr(d, kwargs) => {
-                process!(&d, py_get_attr, AttributesGenericIterator, kwargs.as_ref());
-            }
-            GenericMapping::JsonObject(d) => process!(d, json_get, JsonObjectGenericIterator),
+
+            dict.iterate(ValidateExtras {
+                used_keys,
+                py,
+                errors: &mut errors,
+                extras_validator: self.extras_validator.as_deref(),
+                output_dict: &output_dict,
+                state,
+                extra_behavior: self.extra_behavior,
+            })??;
         }
 
         if !errors.is_empty() {

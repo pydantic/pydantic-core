@@ -1,23 +1,11 @@
-from __future__ import annotations
-
 import datetime
-import sys
-from typing import Any, Callable, Generic, Optional, Type, TypeVar
+from typing import Any, Callable, Generic, Literal, TypeVar, final
+
+from _typeshed import SupportsAllComparisons
+from typing_extensions import LiteralString, Self, TypeAlias
 
 from pydantic_core import ErrorDetails, ErrorTypeInfo, InitErrorDetails, MultiHostHost
 from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
-
-if sys.version_info < (3, 8):
-    from typing_extensions import final
-else:
-    from typing import final
-
-if sys.version_info < (3, 11):
-    from typing_extensions import Literal, LiteralString, Self, TypeAlias
-else:
-    from typing import Literal, LiteralString, Self, TypeAlias
-
-from _typeshed import SupportsAllComparisons
 
 __all__ = [
     '__version__',
@@ -73,7 +61,7 @@ class Some(Generic[_T]):
         Returns the value wrapped by `Some`.
         """
     @classmethod
-    def __class_getitem__(cls, item: Any, /) -> Type[Self]: ...
+    def __class_getitem__(cls, item: Any, /) -> type[Self]: ...
 
 @final
 class SchemaValidator:
@@ -278,6 +266,7 @@ class SchemaSerializer:
         round_trip: bool = False,
         warnings: bool = True,
         fallback: Callable[[Any], Any] | None = None,
+        serialize_as_any: bool = False,
         context: dict[str, Any] | None = None,
     ) -> Any:
         """
@@ -298,6 +287,7 @@ class SchemaSerializer:
             warnings: Whether to log warnings when invalid fields are encountered.
             fallback: A function to call when an unknown value is encountered,
                 if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
+            serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
             context: The context to use for serialization, this is passed to functional serializers as
                 [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
 
@@ -321,6 +311,7 @@ class SchemaSerializer:
         round_trip: bool = False,
         warnings: bool = True,
         fallback: Callable[[Any], Any] | None = None,
+        serialize_as_any: bool = False,
         context: dict[str, Any] | None = None,
     ) -> bytes:
         """
@@ -340,6 +331,7 @@ class SchemaSerializer:
             warnings: Whether to log warnings when invalid fields are encountered.
             fallback: A function to call when an unknown value is encountered,
                 if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
+            serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
             context: The context to use for serialization, this is passed to functional serializers as
                 [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
 
@@ -364,6 +356,7 @@ def to_json(
     inf_nan_mode: Literal['null', 'constants'] = 'constants',
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
+    serialize_as_any: bool = False,
     context: dict[str, Any] | None = None,
 ) -> bytes:
     """
@@ -386,6 +379,7 @@ def to_json(
             `"<Unserializable {value_type} object>"` will be used.
         fallback: A function to call when an unknown value is encountered,
             if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
+        serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
         context: The context to use for serialization, this is passed to functional serializers as
             [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
 
@@ -428,6 +422,7 @@ def to_jsonable_python(
     inf_nan_mode: Literal['null', 'constants'] = 'constants',
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
+    serialize_as_any: bool = False,
     context: dict[str, Any] | None = None,
 ) -> Any:
     """
@@ -450,6 +445,7 @@ def to_jsonable_python(
             `"<Unserializable {value_type} object>"` will be used.
         fallback: A function to call when an unknown value is encountered,
             if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
+        serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
         context: The context to use for serialization, this is passed to functional serializers as
             [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
 
@@ -569,13 +565,13 @@ class Url(SupportsAllComparisons):
         cls,
         *,
         scheme: str,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
+        username: str | None = None,
+        password: str | None = None,
         host: str,
-        port: Optional[int] = None,
-        path: Optional[str] = None,
-        query: Optional[str] = None,
-        fragment: Optional[str] = None,
+        port: int | None = None,
+        path: str | None = None,
+        query: str | None = None,
+        fragment: str | None = None,
     ) -> Self:
         """
         Build a new `Url` instance from its component parts.
@@ -683,14 +679,14 @@ class MultiHostUrl(SupportsAllComparisons):
         cls,
         *,
         scheme: str,
-        hosts: Optional[list[MultiHostHost]] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        path: Optional[str] = None,
-        query: Optional[str] = None,
-        fragment: Optional[str] = None,
+        hosts: list[MultiHostHost] | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        host: str | None = None,
+        port: int | None = None,
+        path: str | None = None,
+        query: str | None = None,
+        fragment: str | None = None,
     ) -> Self:
         """
         Build a new `MultiHostUrl` instance from its component parts.
@@ -883,7 +879,7 @@ class TzInfo(datetime.tzinfo):
     def utcoffset(self, _dt: datetime.datetime | None) -> datetime.timedelta: ...
     def dst(self, _dt: datetime.datetime | None) -> datetime.timedelta: ...
     def fromutc(self, dt: datetime.datetime) -> datetime.datetime: ...
-    def __deepcopy__(self, _memo: dict[Any, Any]) -> 'TzInfo': ...
+    def __deepcopy__(self, _memo: dict[Any, Any]) -> TzInfo: ...
 
 def validate_core_schema(schema: CoreSchema, *, strict: bool | None = None) -> CoreSchema:
     """Validate a CoreSchema

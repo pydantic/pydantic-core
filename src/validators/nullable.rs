@@ -33,11 +33,11 @@ impl BuildValidator for NullableValidator {
 impl_py_gc_traverse!(NullableValidator { validator });
 
 impl Validator for NullableValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         match input.is_none() {
             true => Ok(py.None()),

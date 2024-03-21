@@ -35,13 +35,7 @@ impl BuildValidator for IsInstanceValidator {
             return py_schema_err!("'cls' must be valid as the first argument to 'isinstance'");
         }
 
-        let class_repr = match schema.get_as(intern!(py, "cls_repr"))? {
-            Some(s) => s,
-            None => match class.extract::<&PyType>() {
-                Ok(t) => t.qualname()?.to_string(),
-                Err(_) => class.repr()?.extract()?,
-            },
-        };
+        let class_repr = class_repr(schema, &class)?;
         let name = format!("{}[{class_repr}]", Self::EXPECTED_TYPE);
         Ok(Self {
             class: class.into(),
@@ -55,22 +49,20 @@ impl BuildValidator for IsInstanceValidator {
 impl_py_gc_traverse!(IsInstanceValidator { class });
 
 impl Validator for IsInstanceValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        _state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        _state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        if !input.is_python() {
+        let Some(obj) = input.as_python() else {
             return Err(ValError::InternalErr(PyNotImplementedError::new_err(
                 "Cannot check isinstance when validating from json, \
                             use a JsonOrPython validator instead.",
             )));
-        }
-
-        let ob: Py<PyAny> = input.to_object(py);
-        match ob.bind(py).is_instance(self.class.bind(py))? {
-            true => Ok(ob),
+        };
+        match obj.is_instance(self.class.bind(py))? {
+            true => Ok(obj.clone().unbind()),
             false => Err(ValError::new(
                 ErrorType::IsInstanceOf {
                     class: self.class_repr.clone(),
@@ -83,5 +75,15 @@ impl Validator for IsInstanceValidator {
 
     fn get_name(&self) -> &str {
         &self.name
+    }
+}
+
+pub fn class_repr(schema: &Bound<'_, PyDict>, class: &Bound<'_, PyAny>) -> PyResult<String> {
+    match schema.get_as(intern!(schema.py(), "cls_repr"))? {
+        Some(s) => Ok(s),
+        None => match class.extract::<&PyType>() {
+            Ok(t) => Ok(t.qualname()?.to_string()),
+            Err(_) => Ok(class.repr()?.extract()?),
+        },
     }
 }

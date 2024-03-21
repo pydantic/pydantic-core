@@ -46,11 +46,11 @@ impl BuildValidator for JsonValidator {
 impl_py_gc_traverse!(JsonValidator { validator });
 
 impl Validator for JsonValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let v_match = validate_json_bytes(input)?;
         let json_either_bytes = v_match.unpack(state);
@@ -76,7 +76,9 @@ impl Validator for JsonValidator {
     }
 }
 
-pub fn validate_json_bytes<'data>(input: &'data impl Input<'data>) -> ValResult<ValidationMatch<EitherBytes<'data>>> {
+pub fn validate_json_bytes<'a, 'py>(
+    input: &'a (impl Input<'py> + ?Sized),
+) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
     match input.validate_bytes(false) {
         Ok(v_match) => Ok(v_match),
         Err(ValError::LineErrors(e)) => Err(ValError::LineErrors(
@@ -95,7 +97,7 @@ fn map_bytes_error(line_error: ValLineError) -> ValLineError {
     }
 }
 
-pub fn map_json_err<'a>(input: &'a impl Input<'a>, error: jiter::JsonError, json_bytes: &[u8]) -> ValError {
+pub fn map_json_err<'py>(input: &(impl Input<'py> + ?Sized), error: jiter::JsonError, json_bytes: &[u8]) -> ValError {
     ValError::new(
         ErrorType::JsonInvalid {
             error: error.description(json_bytes),

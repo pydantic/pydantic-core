@@ -3,93 +3,54 @@ use std::str::from_utf8;
 
 use pyo3::intern;
 use pyo3::prelude::*;
+
+use pyo3::types::PyType;
 use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDict, PyFloat, PyFrozenSet, PyInt, PyIterator, PyList,
-    PyMapping, PySequence, PySet, PyString, PyTime, PyTuple, PyType,
+    PyMapping, PySet, PyString, PyTime, PyTuple,
 };
-#[cfg(not(PyPy))]
-use pyo3::types::{PyDictItems, PyDictKeys, PyDictValues};
 
+use pyo3::PyTypeCheck;
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::tools::{extract_i64, safe_repr};
 use crate::validators::decimal::{create_decimal, get_decimal_type};
 use crate::validators::Exactness;
-use crate::{ArgsKwargs, PyMultiHostUrl, PyUrl};
+use crate::ArgsKwargs;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, date_as_datetime, float_as_datetime,
     float_as_duration, float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime,
     EitherTime,
 };
-use super::return_enums::ValidationMatch;
+use super::input_abstract::ValMatch;
+use super::return_enums::{iterate_attributes, iterate_mapping_items, ValidationMatch};
 use super::shared::{
     decimal_as_int, float_as_int, get_enum_meta_object, int_as_bool, str_as_bool, str_as_float, str_as_int,
 };
+use super::Arguments;
+use super::ConsumeIterator;
+use super::KeywordArgs;
+use super::PositionalArgs;
+use super::ValidatedDict;
+use super::ValidatedList;
+use super::ValidatedSet;
+use super::ValidatedTuple;
 use super::{
-    py_string_str, BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericArguments,
-    GenericIterable, GenericIterator, GenericMapping, Input, PyArgs,
+    py_string_str, BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericIterator,
+    Input,
 };
 
-#[cfg(not(PyPy))]
-macro_rules! extract_dict_keys {
-    ($py:expr, $obj:expr) => {
-        $obj.downcast::<PyDictKeys>()
-            .ok()
-            .map(|v| PyIterator::from_bound_object(v).unwrap())
-    };
+pub(crate) fn downcast_python_input<'py, T: PyTypeCheck>(input: &(impl Input<'py> + ?Sized)) -> Option<&Bound<'py, T>> {
+    input.as_python().and_then(|any| any.downcast::<T>().ok())
 }
 
-#[cfg(PyPy)]
-macro_rules! extract_dict_keys {
-    ($py:expr, $obj:expr) => {
-        if is_dict_keys_type($obj) {
-            Some(PyIterator::from_bound_object($obj).unwrap())
-        } else {
-            None
-        }
-    };
-}
-
-#[cfg(not(PyPy))]
-macro_rules! extract_dict_values {
-    ($py:expr, $obj:expr) => {
-        $obj.downcast::<PyDictValues>()
-            .ok()
-            .map(|v| PyIterator::from_bound_object(v).unwrap())
-    };
-}
-
-#[cfg(PyPy)]
-macro_rules! extract_dict_values {
-    ($py:expr, $obj:expr) => {
-        if is_dict_values_type($obj) {
-            Some(PyIterator::from_bound_object($obj).unwrap())
-        } else {
-            None
-        }
-    };
-}
-
-#[cfg(not(PyPy))]
-macro_rules! extract_dict_items {
-    ($py:expr, $obj:expr) => {
-        $obj.downcast::<PyDictItems>()
-            .ok()
-            .map(|v| PyIterator::from_bound_object(v).unwrap())
-    };
-}
-
-#[cfg(PyPy)]
-macro_rules! extract_dict_items {
-    ($py:expr, $obj:expr) => {
-        if is_dict_items_type($obj) {
-            Some(PyIterator::from_bound_object($obj).unwrap())
-        } else {
-            None
-        }
-    };
+pub(crate) fn input_as_python_instance<'a, 'py>(
+    input: &'a (impl Input<'py> + ?Sized),
+    class: &Bound<'py, PyType>,
+) -> Option<&'a Bound<'py, PyAny>> {
+    input.as_python().filter(|any| any.is_instance(class).unwrap_or(false))
 }
 
 impl From<&Bound<'_, PyAny>> for LocItem {
@@ -110,77 +71,50 @@ impl From<Bound<'_, PyAny>> for LocItem {
     }
 }
 
-impl<'a> Input<'a> for Bound<'a, PyAny> {
+impl<'py> Input<'py> for Bound<'py, PyAny> {
     fn as_error_value(&self) -> InputValue {
         InputValue::Python(self.clone().into())
-    }
-
-    fn identity(&self) -> Option<usize> {
-        Some(self.as_ptr() as usize)
     }
 
     fn is_none(&self) -> bool {
         PyAnyMethods::is_none(self)
     }
 
-    fn input_is_instance(&self, class: &Bound<'_, PyType>) -> Option<&Bound<'a, PyAny>> {
-        if self.is_instance(class).unwrap_or(false) {
-            Some(self)
-        } else {
-            None
-        }
+    fn as_python(&self) -> Option<&Bound<'py, PyAny>> {
+        Some(self)
     }
 
-    fn is_python(&self) -> bool {
-        true
+    fn as_kwargs(&self, py: Python<'py>) -> Option<Bound<'py, PyDict>> {
+        self.downcast::<PyDict>()
+            .ok()
+            .map(|dict| dict.to_owned().unbind().into_bound(py))
     }
 
-    fn as_kwargs(&self, _py: Python<'a>) -> Option<Bound<'a, PyDict>> {
-        self.downcast::<PyDict>().ok().map(Clone::clone)
-    }
+    type Arguments<'a> = PyArgs<'py> where Self: 'a;
 
-    fn input_is_subclass(&self, class: &Bound<'_, PyType>) -> PyResult<bool> {
-        match self.downcast::<PyType>() {
-            Ok(py_type) => py_type.is_subclass(class),
-            Err(_) => Ok(false),
-        }
-    }
-
-    fn input_as_url(&self) -> Option<PyUrl> {
-        self.extract::<PyUrl>().ok()
-    }
-
-    fn input_as_multi_host_url(&self) -> Option<PyMultiHostUrl> {
-        self.extract::<PyMultiHostUrl>().ok()
-    }
-
-    fn callable(&self) -> bool {
-        self.is_callable()
-    }
-
-    fn validate_args(&'a self) -> ValResult<GenericArguments<'a>> {
+    fn validate_args(&self) -> ValResult<PyArgs<'py>> {
         if let Ok(dict) = self.downcast::<PyDict>() {
-            Ok(PyArgs::new(None, Some(dict.clone())).into())
+            Ok(PyArgs::new(None, Some(dict.clone())))
         } else if let Ok(args_kwargs) = self.extract::<ArgsKwargs>() {
             let args = args_kwargs.args.into_bound(self.py());
             let kwargs = args_kwargs.kwargs.map(|d| d.into_bound(self.py()));
-            Ok(PyArgs::new(Some(args), kwargs).into())
+            Ok(PyArgs::new(Some(args), kwargs))
         } else if let Ok(tuple) = self.downcast::<PyTuple>() {
-            Ok(PyArgs::new(Some(tuple.clone()), None).into())
+            Ok(PyArgs::new(Some(tuple.clone()), None))
         } else if let Ok(list) = self.downcast::<PyList>() {
-            Ok(PyArgs::new(Some(list.to_tuple()), None).into())
+            Ok(PyArgs::new(Some(list.to_tuple()), None))
         } else {
             Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self))
         }
     }
 
-    fn validate_dataclass_args(&'a self, class_name: &str) -> ValResult<GenericArguments<'a>> {
+    fn validate_dataclass_args<'a>(&'a self, class_name: &str) -> ValResult<PyArgs<'py>> {
         if let Ok(dict) = self.downcast::<PyDict>() {
-            Ok(PyArgs::new(None, Some(dict.clone())).into())
+            Ok(PyArgs::new(None, Some(dict.clone())))
         } else if let Ok(args_kwargs) = self.extract::<ArgsKwargs>() {
             let args = args_kwargs.args.into_bound(self.py());
             let kwargs = args_kwargs.kwargs.map(|d| d.into_bound(self.py()));
-            Ok(PyArgs::new(Some(args), kwargs).into())
+            Ok(PyArgs::new(Some(args), kwargs))
         } else {
             let class_name = class_name.to_string();
             Err(ValError::new(
@@ -193,11 +127,7 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         }
     }
 
-    fn validate_str(
-        &'a self,
-        strict: bool,
-        coerce_numbers_to_str: bool,
-    ) -> ValResult<ValidationMatch<EitherString<'a>>> {
+    fn validate_str(&self, strict: bool, coerce_numbers_to_str: bool) -> ValResult<ValidationMatch<EitherString<'_>>> {
         if let Ok(py_str) = self.downcast_exact::<PyString>() {
             return Ok(ValidationMatch::exact(py_str.clone().into()));
         } else if let Ok(py_str) = self.downcast::<PyString>() {
@@ -244,7 +174,7 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::StringType, self))
     }
 
-    fn validate_bytes(&'a self, strict: bool) -> ValResult<ValidationMatch<EitherBytes<'a>>> {
+    fn validate_bytes<'a>(&'a self, strict: bool) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
         if let Ok(py_bytes) = self.downcast_exact::<PyBytes>() {
             return Ok(ValidationMatch::exact(py_bytes.into()));
         } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
@@ -291,7 +221,7 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::BoolType, self))
     }
 
-    fn validate_int(&'a self, strict: bool) -> ValResult<ValidationMatch<EitherInt<'a>>> {
+    fn validate_int(&self, strict: bool) -> ValResult<ValidationMatch<EitherInt<'_>>> {
         if self.is_exact_instance_of::<PyInt>() {
             return Ok(ValidationMatch::exact(EitherInt::Py(self.clone())));
         } else if self.is_instance_of::<PyInt>() {
@@ -331,7 +261,7 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::IntType, self))
     }
 
-    fn exact_int(&'a self) -> ValResult<EitherInt<'a>> {
+    fn exact_int(&self) -> ValResult<EitherInt<'_>> {
         if self.is_exact_instance_of::<PyInt>() {
             Ok(EitherInt::Py(self.clone()))
         } else {
@@ -339,7 +269,7 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         }
     }
 
-    fn exact_str(&'a self) -> ValResult<EitherString<'a>> {
+    fn exact_str(&self) -> ValResult<EitherString<'_>> {
         if let Ok(py_str) = self.downcast_exact() {
             Ok(EitherString::Py(py_str.clone()))
         } else {
@@ -347,7 +277,7 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         }
     }
 
-    fn validate_float(&'a self, strict: bool) -> ValResult<ValidationMatch<EitherFloat<'a>>> {
+    fn validate_float(&self, strict: bool) -> ValResult<ValidationMatch<EitherFloat<'_>>> {
         if let Ok(float) = self.downcast_exact::<PyFloat>() {
             return Ok(ValidationMatch::exact(EitherFloat::Py(float.clone())));
         }
@@ -374,11 +304,11 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::FloatType, self))
     }
 
-    fn strict_decimal(&'a self, py: Python<'a>) -> ValResult<Bound<'a, PyAny>> {
+    fn strict_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
         let decimal_type = get_decimal_type(py);
         // Fast path for existing decimal objects
         if self.is_exact_instance(decimal_type) {
-            return Ok(self.clone());
+            return Ok(self.to_owned());
         }
 
         // Try subclasses of decimals, they will be upcast to Decimal
@@ -395,11 +325,11 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         ))
     }
 
-    fn lax_decimal(&'a self, py: Python<'a>) -> ValResult<Bound<'a, PyAny>> {
+    fn lax_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
         let decimal_type = get_decimal_type(py);
         // Fast path for existing decimal objects
         if self.is_exact_instance(decimal_type) {
-            return Ok(self.clone());
+            return Ok(self.to_owned().clone());
         }
 
         if self.is_instance_of::<PyString>() || (self.is_instance_of::<PyInt>() && !self.is_instance_of::<PyBool>()) {
@@ -415,40 +345,46 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         }
     }
 
-    fn strict_dict(&'a self) -> ValResult<GenericMapping<'a>> {
+    type Dict<'a> = GenericPyMapping<'a, 'py> where Self: 'a;
+
+    fn strict_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
         if let Ok(dict) = self.downcast::<PyDict>() {
-            Ok(dict.clone().into())
+            Ok(GenericPyMapping::Dict(dict))
         } else {
             Err(ValError::new(ErrorTypeDefaults::DictType, self))
         }
     }
 
-    fn lax_dict(&'a self) -> ValResult<GenericMapping<'a>> {
+    fn lax_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
         if let Ok(dict) = self.downcast::<PyDict>() {
-            Ok(dict.clone().into())
+            Ok(GenericPyMapping::Dict(dict))
         } else if let Ok(mapping) = self.downcast::<PyMapping>() {
-            Ok(mapping.clone().into())
+            Ok(GenericPyMapping::Mapping(mapping))
         } else {
             Err(ValError::new(ErrorTypeDefaults::DictType, self))
         }
     }
 
-    fn validate_model_fields(&'a self, strict: bool, from_attributes: bool) -> ValResult<GenericMapping<'a>> {
+    fn validate_model_fields<'a>(
+        &'a self,
+        strict: bool,
+        from_attributes: bool,
+    ) -> ValResult<GenericPyMapping<'a, 'py>> {
         if from_attributes {
             // if from_attributes, first try a dict, then mapping then from_attributes
             if let Ok(dict) = self.downcast::<PyDict>() {
-                return Ok(dict.clone().into());
+                return Ok(GenericPyMapping::Dict(dict));
             } else if !strict {
                 if let Ok(mapping) = self.downcast::<PyMapping>() {
-                    return Ok(mapping.clone().into());
+                    return Ok(GenericPyMapping::Mapping(mapping));
                 }
             }
 
             if from_attributes_applicable(self) {
-                Ok(self.clone().into())
+                Ok(GenericPyMapping::GetAttr(self.to_owned(), None))
             } else if let Ok((obj, kwargs)) = self.extract() {
                 if from_attributes_applicable(&obj) {
-                    Ok(GenericMapping::PyGetAttr(obj, Some(kwargs)))
+                    Ok(GenericPyMapping::GetAttr(obj, Some(kwargs)))
                 } else {
                     Err(ValError::new(ErrorTypeDefaults::ModelAttributesType, self))
                 }
@@ -463,122 +399,61 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         }
     }
 
-    fn strict_list(&'a self) -> ValResult<GenericIterable<'a>> {
-        match self.lax_list()? {
-            GenericIterable::List(iter) => Ok(GenericIterable::List(iter)),
-            _ => Err(ValError::new(ErrorTypeDefaults::ListType, self)),
+    type List<'a> = PySequenceIterable<'a, 'py> where Self: 'a;
+
+    fn validate_list<'a>(&'a self, strict: bool) -> ValMatch<PySequenceIterable<'a, 'py>> {
+        if let Ok(list) = self.downcast::<PyList>() {
+            return Ok(ValidationMatch::exact(PySequenceIterable::List(list)));
+        } else if !strict {
+            if let Ok(other) = extract_sequence_iterable(self) {
+                return Ok(ValidationMatch::lax(other));
+            }
         }
+
+        Err(ValError::new(ErrorTypeDefaults::ListType, self))
     }
 
-    fn lax_list(&'a self) -> ValResult<GenericIterable<'a>> {
-        match self
-            .extract_generic_iterable()
-            .map_err(|_| ValError::new(ErrorTypeDefaults::ListType, self))?
-        {
-            GenericIterable::PyString(_)
-            | GenericIterable::Bytes(_)
-            | GenericIterable::Dict(_)
-            | GenericIterable::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::ListType, self)),
-            other => Ok(other),
+    type Tuple<'a> = PySequenceIterable<'a, 'py> where Self: 'a;
+
+    fn validate_tuple<'a>(&'a self, strict: bool) -> ValMatch<PySequenceIterable<'a, 'py>> {
+        if let Ok(tup) = self.downcast::<PyTuple>() {
+            return Ok(ValidationMatch::exact(PySequenceIterable::Tuple(tup)));
+        } else if !strict {
+            if let Ok(other) = extract_sequence_iterable(self) {
+                return Ok(ValidationMatch::lax(other));
+            }
         }
+
+        Err(ValError::new(ErrorTypeDefaults::TupleType, self))
     }
 
-    fn strict_tuple(&'a self) -> ValResult<GenericIterable<'a>> {
-        match self.lax_tuple()? {
-            GenericIterable::Tuple(iter) => Ok(GenericIterable::Tuple(iter)),
-            _ => Err(ValError::new(ErrorTypeDefaults::TupleType, self)),
+    type Set<'a> = PySequenceIterable<'a, 'py> where Self: 'a;
+
+    fn validate_set<'a>(&'a self, strict: bool) -> ValMatch<PySequenceIterable<'a, 'py>> {
+        if let Ok(set) = self.downcast::<PySet>() {
+            return Ok(ValidationMatch::exact(PySequenceIterable::Set(set)));
+        } else if !strict {
+            if let Ok(other) = extract_sequence_iterable(self) {
+                return Ok(ValidationMatch::lax(other));
+            }
         }
+
+        Err(ValError::new(ErrorTypeDefaults::SetType, self))
     }
 
-    fn lax_tuple(&'a self) -> ValResult<GenericIterable<'a>> {
-        match self
-            .extract_generic_iterable()
-            .map_err(|_| ValError::new(ErrorTypeDefaults::TupleType, self))?
-        {
-            GenericIterable::PyString(_)
-            | GenericIterable::Bytes(_)
-            | GenericIterable::Dict(_)
-            | GenericIterable::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::TupleType, self)),
-            other => Ok(other),
+    fn validate_frozenset<'a>(&'a self, strict: bool) -> ValMatch<PySequenceIterable<'a, 'py>> {
+        if let Ok(frozenset) = self.downcast::<PyFrozenSet>() {
+            return Ok(ValidationMatch::exact(PySequenceIterable::FrozenSet(frozenset)));
+        } else if !strict {
+            if let Ok(other) = extract_sequence_iterable(self) {
+                return Ok(ValidationMatch::lax(other));
+            }
         }
+
+        Err(ValError::new(ErrorTypeDefaults::FrozenSetType, self))
     }
 
-    fn strict_set(&'a self) -> ValResult<GenericIterable<'a>> {
-        match self.lax_set()? {
-            GenericIterable::Set(iter) => Ok(GenericIterable::Set(iter)),
-            _ => Err(ValError::new(ErrorTypeDefaults::SetType, self)),
-        }
-    }
-
-    fn lax_set(&'a self) -> ValResult<GenericIterable<'a>> {
-        match self
-            .extract_generic_iterable()
-            .map_err(|_| ValError::new(ErrorTypeDefaults::SetType, self))?
-        {
-            GenericIterable::PyString(_)
-            | GenericIterable::Bytes(_)
-            | GenericIterable::Dict(_)
-            | GenericIterable::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::SetType, self)),
-            other => Ok(other),
-        }
-    }
-
-    fn strict_frozenset(&'a self) -> ValResult<GenericIterable<'a>> {
-        match self.lax_frozenset()? {
-            GenericIterable::FrozenSet(iter) => Ok(GenericIterable::FrozenSet(iter)),
-            _ => Err(ValError::new(ErrorTypeDefaults::FrozenSetType, self)),
-        }
-    }
-
-    fn lax_frozenset(&'a self) -> ValResult<GenericIterable<'a>> {
-        match self
-            .extract_generic_iterable()
-            .map_err(|_| ValError::new(ErrorTypeDefaults::FrozenSetType, self))?
-        {
-            GenericIterable::PyString(_)
-            | GenericIterable::Bytes(_)
-            | GenericIterable::Dict(_)
-            | GenericIterable::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::FrozenSetType, self)),
-            other => Ok(other),
-        }
-    }
-
-    fn extract_generic_iterable(&'a self) -> ValResult<GenericIterable<'a>> {
-        // Handle concrete non-overlapping types first, then abstract types
-        if let Ok(iterable) = self.downcast::<PyList>() {
-            Ok(GenericIterable::List(iterable.clone()))
-        } else if let Ok(iterable) = self.downcast::<PyTuple>() {
-            Ok(GenericIterable::Tuple(iterable.clone()))
-        } else if let Ok(iterable) = self.downcast::<PySet>() {
-            Ok(GenericIterable::Set(iterable.clone()))
-        } else if let Ok(iterable) = self.downcast::<PyFrozenSet>() {
-            Ok(GenericIterable::FrozenSet(iterable.clone()))
-        } else if let Ok(iterable) = self.downcast::<PyDict>() {
-            Ok(GenericIterable::Dict(iterable.clone()))
-        } else if let Some(iterable) = extract_dict_keys!(self.py(), self) {
-            Ok(GenericIterable::DictKeys(iterable))
-        } else if let Some(iterable) = extract_dict_values!(self.py(), self) {
-            Ok(GenericIterable::DictValues(iterable))
-        } else if let Some(iterable) = extract_dict_items!(self.py(), self) {
-            Ok(GenericIterable::DictItems(iterable))
-        } else if let Ok(iterable) = self.downcast::<PyMapping>() {
-            Ok(GenericIterable::Mapping(iterable.clone()))
-        } else if let Ok(iterable) = self.downcast::<PyString>() {
-            Ok(GenericIterable::PyString(iterable.clone()))
-        } else if let Ok(iterable) = self.downcast::<PyBytes>() {
-            Ok(GenericIterable::Bytes(iterable.clone()))
-        } else if let Ok(iterable) = self.downcast::<PyByteArray>() {
-            Ok(GenericIterable::PyByteArray(iterable.clone()))
-        } else if let Ok(iterable) = self.downcast::<PySequence>() {
-            Ok(GenericIterable::Sequence(iterable.clone()))
-        } else if let Ok(iterable) = self.iter() {
-            Ok(GenericIterable::Iterator(iterable))
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::IterableType, self))
-        }
-    }
-
-    fn validate_iter(&self) -> ValResult<GenericIterator> {
+    fn validate_iter(&self) -> ValResult<GenericIterator<'static>> {
         if self.iter().is_ok() {
             Ok(self.into())
         } else {
@@ -586,7 +461,7 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         }
     }
 
-    fn validate_date(&self, strict: bool) -> ValResult<ValidationMatch<EitherDate>> {
+    fn validate_date(&self, strict: bool) -> ValResult<ValidationMatch<EitherDate<'py>>> {
         if let Ok(date) = self.downcast_exact::<PyDate>() {
             Ok(ValidationMatch::exact(date.clone().into()))
         } else if self.is_instance_of::<PyDateTime>() {
@@ -617,7 +492,7 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         &self,
         strict: bool,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<ValidationMatch<EitherTime>> {
+    ) -> ValResult<ValidationMatch<EitherTime<'py>>> {
         if let Ok(time) = self.downcast_exact::<PyTime>() {
             return Ok(ValidationMatch::exact(time.clone().into()));
         } else if let Ok(time) = self.downcast::<PyTime>() {
@@ -651,7 +526,7 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         &self,
         strict: bool,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<ValidationMatch<EitherDateTime>> {
+    ) -> ValResult<ValidationMatch<EitherDateTime<'py>>> {
         if let Ok(dt) = self.downcast_exact::<PyDateTime>() {
             return Ok(ValidationMatch::exact(dt.clone().into()));
         } else if let Ok(dt) = self.downcast::<PyDateTime>() {
@@ -687,7 +562,7 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
         &self,
         strict: bool,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
-    ) -> ValResult<ValidationMatch<EitherTimedelta>> {
+    ) -> ValResult<ValidationMatch<EitherTimedelta<'py>>> {
         if let Ok(either_dt) = EitherTimedelta::try_from(self) {
             let exactness = if matches!(either_dt, EitherTimedelta::PyExact(_)) {
                 Exactness::Exact
@@ -719,16 +594,16 @@ impl<'a> Input<'a> for Bound<'a, PyAny> {
     }
 }
 
-impl BorrowInput for Bound<'_, PyAny> {
-    type Input<'a> = Bound<'a, PyAny> where Self: 'a;
-    fn borrow_input(&self) -> &Self::Input<'_> {
+impl<'py> BorrowInput<'py> for Bound<'py, PyAny> {
+    type Input = Bound<'py, PyAny>;
+    fn borrow_input(&self) -> &Self::Input {
         self
     }
 }
 
-impl BorrowInput for Borrowed<'_, '_, PyAny> {
-    type Input<'a> = Bound<'a, PyAny> where Self: 'a;
-    fn borrow_input(&self) -> &Self::Input<'_> {
+impl<'py> BorrowInput<'py> for Borrowed<'_, 'py, PyAny> {
+    type Input = Bound<'py, PyAny>;
+    fn borrow_input(&self) -> &Self::Input {
         self
     }
 }
@@ -830,4 +705,222 @@ fn is_dict_items_type(v: &Bound<'_, PyAny>) -> bool {
         })
         .bind(py);
     v.is_instance(items_type).unwrap_or(false)
+}
+
+#[cfg_attr(debug_assertions, derive(Debug))]
+pub struct PyArgs<'py> {
+    pub args: Option<PyPosArgs<'py>>,
+    pub kwargs: Option<PyKwargs<'py>>,
+}
+
+#[cfg_attr(debug_assertions, derive(Debug))]
+pub struct PyPosArgs<'py>(Bound<'py, PyTuple>);
+#[cfg_attr(debug_assertions, derive(Debug))]
+pub struct PyKwargs<'py>(Bound<'py, PyDict>);
+
+impl<'py> PyArgs<'py> {
+    pub fn new(args: Option<Bound<'py, PyTuple>>, kwargs: Option<Bound<'py, PyDict>>) -> Self {
+        Self {
+            args: args.map(PyPosArgs),
+            kwargs: kwargs.map(PyKwargs),
+        }
+    }
+}
+
+impl<'py> Arguments<'py> for PyArgs<'py> {
+    type Args = PyPosArgs<'py>;
+    type Kwargs = PyKwargs<'py>;
+
+    fn args(&self) -> Option<&PyPosArgs<'py>> {
+        self.args.as_ref()
+    }
+
+    fn kwargs(&self) -> Option<&PyKwargs<'py>> {
+        self.kwargs.as_ref()
+    }
+}
+
+impl<'py> PositionalArgs<'py> for PyPosArgs<'py> {
+    type Item<'a> = Borrowed<'a, 'py, PyAny> where Self: 'a;
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn get_item(&self, index: usize) -> Option<Self::Item<'_>> {
+        self.0.get_borrowed_item(index).ok()
+    }
+
+    fn iter(&self) -> impl Iterator<Item = Self::Item<'_>> {
+        self.0.iter_borrowed()
+    }
+}
+
+impl<'py> KeywordArgs<'py> for PyKwargs<'py> {
+    type Key<'a> = Bound<'py, PyAny>
+    where
+        Self: 'a;
+
+    type Item<'a> = Bound<'py, PyAny>
+    where
+        Self: 'a;
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn get_item<'k>(
+        &self,
+        key: &'k crate::lookup_key::LookupKey,
+    ) -> ValResult<Option<(&'k crate::lookup_key::LookupPath, Self::Item<'_>)>> {
+        key.py_get_dict_item(&self.0)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = ValResult<(Self::Key<'_>, Self::Item<'_>)>> {
+        self.0.iter().map(Ok)
+    }
+}
+
+#[cfg_attr(debug_assertions, derive(Debug))]
+pub enum GenericPyMapping<'a, 'py> {
+    Dict(&'a Bound<'py, PyDict>),
+    Mapping(&'a Bound<'py, PyMapping>),
+    GetAttr(Bound<'py, PyAny>, Option<Bound<'py, PyDict>>),
+}
+
+impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
+    type Key<'a> = Bound<'py, PyAny>
+    where
+        Self: 'a;
+
+    type Item<'a> = Bound<'py, PyAny>
+    where
+        Self: 'a;
+
+    fn get_item<'k>(
+        &self,
+        key: &'k crate::lookup_key::LookupKey,
+    ) -> ValResult<Option<(&'k crate::lookup_key::LookupPath, Self::Item<'_>)>> {
+        match self {
+            Self::Dict(dict) => key.py_get_dict_item(dict),
+            Self::Mapping(mapping) => key.py_get_mapping_item(mapping),
+            Self::GetAttr(obj, dict) => key.py_get_attr(obj, dict.as_ref()),
+        }
+    }
+
+    fn as_py_dict(&self) -> Option<&Bound<'py, PyDict>> {
+        match self {
+            Self::Dict(dict) => Some(dict),
+            _ => None,
+        }
+    }
+
+    fn iterate<'a, R>(
+        &'a self,
+        consumer: impl ConsumeIterator<ValResult<(Self::Key<'a>, Self::Item<'a>)>, Output = R>,
+    ) -> ValResult<R> {
+        match self {
+            Self::Dict(dict) => Ok(consumer.consume_iterator(dict.iter().map(Ok))),
+            Self::Mapping(mapping) => Ok(consumer.consume_iterator(iterate_mapping_items(mapping)?)),
+            Self::GetAttr(obj, _) => Ok(consumer.consume_iterator(iterate_attributes(obj))),
+        }
+    }
+}
+
+/// Container for all the collections (sized iterable containers) types, which
+/// can mostly be converted to each other in lax mode.
+/// This mostly matches python's definition of `Collection`.
+pub enum PySequenceIterable<'a, 'py> {
+    List(&'a Bound<'py, PyList>),
+    Tuple(&'a Bound<'py, PyTuple>),
+    Set(&'a Bound<'py, PySet>),
+    FrozenSet(&'a Bound<'py, PyFrozenSet>),
+    Iterator(Bound<'py, PyIterator>),
+}
+
+/// Extract types which can be iterated to produce a sequence-like container like a list, tuple, set
+/// or frozenset
+fn extract_sequence_iterable<'a, 'py>(obj: &'a Bound<'py, PyAny>) -> ValResult<PySequenceIterable<'a, 'py>> {
+    // Handle concrete non-overlapping types first, then abstract types
+    if let Ok(iterable) = obj.downcast::<PyList>() {
+        Ok(PySequenceIterable::List(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PyTuple>() {
+        Ok(PySequenceIterable::Tuple(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PySet>() {
+        Ok(PySequenceIterable::Set(iterable))
+    } else if let Ok(iterable) = obj.downcast::<PyFrozenSet>() {
+        Ok(PySequenceIterable::FrozenSet(iterable))
+    } else {
+        // Try to get this as a generable iterable thing, but exclude string and mapping types
+        if !(obj.is_instance_of::<PyString>()
+            || obj.is_instance_of::<PyBytes>()
+            || obj.is_instance_of::<PyByteArray>()
+            || obj.is_instance_of::<PyDict>()
+            || obj.downcast::<PyMapping>().is_ok())
+        {
+            if let Ok(iter) = obj.iter() {
+                return Ok(PySequenceIterable::Iterator(iter));
+            }
+        }
+
+        Err(ValError::new(ErrorTypeDefaults::IterableType, obj))
+    }
+}
+
+impl<'py> PySequenceIterable<'_, 'py> {
+    pub fn generic_len(&self) -> Option<usize> {
+        match &self {
+            PySequenceIterable::List(iter) => Some(iter.len()),
+            PySequenceIterable::Tuple(iter) => Some(iter.len()),
+            PySequenceIterable::Set(iter) => Some(iter.len()),
+            PySequenceIterable::FrozenSet(iter) => Some(iter.len()),
+            PySequenceIterable::Iterator(iter) => iter.len().ok(),
+        }
+    }
+
+    fn generic_iterate<R>(
+        self,
+        consumer: impl ConsumeIterator<PyResult<Bound<'py, PyAny>>, Output = R>,
+    ) -> ValResult<R> {
+        match self {
+            PySequenceIterable::List(iter) => Ok(consumer.consume_iterator(iter.iter().map(Ok))),
+            PySequenceIterable::Tuple(iter) => Ok(consumer.consume_iterator(iter.iter().map(Ok))),
+            PySequenceIterable::Set(iter) => Ok(consumer.consume_iterator(iter.iter().map(Ok))),
+            PySequenceIterable::FrozenSet(iter) => Ok(consumer.consume_iterator(iter.iter().map(Ok))),
+            PySequenceIterable::Iterator(iter) => Ok(consumer.consume_iterator(iter.iter()?)),
+        }
+    }
+}
+
+impl<'py> ValidatedList<'py> for PySequenceIterable<'_, 'py> {
+    type Item = Bound<'py, PyAny>;
+    fn len(&self) -> Option<usize> {
+        self.generic_len()
+    }
+    fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
+        self.generic_iterate(consumer)
+    }
+    fn as_py_list(&self) -> Option<&Bound<'py, PyList>> {
+        match self {
+            PySequenceIterable::List(iter) => Some(iter),
+            _ => None,
+        }
+    }
+}
+
+impl<'py> ValidatedTuple<'py> for PySequenceIterable<'_, 'py> {
+    type Item = Bound<'py, PyAny>;
+    fn len(&self) -> Option<usize> {
+        self.generic_len()
+    }
+    fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
+        self.generic_iterate(consumer)
+    }
+}
+
+impl<'py> ValidatedSet<'py> for PySequenceIterable<'_, 'py> {
+    type Item = Bound<'py, PyAny>;
+    fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
+        self.generic_iterate(consumer)
+    }
 }

@@ -30,11 +30,11 @@ impl BuildValidator for BoolValidator {
 impl_py_gc_traverse!(BoolValidator {});
 
 impl Validator for BoolValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool
         // and back again, might be worth profiling?

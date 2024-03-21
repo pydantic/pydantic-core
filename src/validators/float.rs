@@ -64,11 +64,11 @@ impl BuildValidator for FloatValidator {
 impl_py_gc_traverse!(FloatValidator {});
 
 impl Validator for FloatValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let either_float = input.validate_float(state.strict_or(self.strict))?.unpack(state);
         if !self.allow_inf_nan && !either_float.as_f64().is_finite() {
@@ -96,11 +96,11 @@ pub struct ConstrainedFloatValidator {
 impl_py_gc_traverse!(ConstrainedFloatValidator {});
 
 impl Validator for ConstrainedFloatValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let either_float = input.validate_float(state.strict_or(self.strict))?.unpack(state);
         let float: f64 = either_float.as_f64();

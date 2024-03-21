@@ -8,8 +8,8 @@ use smallvec::SmallVec;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config};
-use crate::errors::{ErrorType, ValError, ValLineError, ValResult};
-use crate::input::{GenericMapping, Input};
+use crate::errors::{ErrorType, ToErrorValue, ValError, ValLineError, ValResult};
+use crate::input::{BorrowInput, Input, ValidatedDict};
 use crate::lookup_key::LookupKey;
 use crate::py_gc::PyGcTraverse;
 use crate::tools::SchemaDict;
@@ -101,11 +101,11 @@ impl BuildValidator for UnionValidator {
 }
 
 impl UnionValidator {
-    fn validate_smart<'data>(
+    fn validate_smart<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let old_exactness = state.exactness;
         let strict = state.strict_or(self.strict);
@@ -167,11 +167,11 @@ impl UnionValidator {
         Err(errors.into_val_error(input))
     }
 
-    fn validate_left_to_right<'data>(
+    fn validate_left_to_right<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let mut errors = MaybeErrors::new(self.custom_error.as_ref());
 
@@ -202,11 +202,11 @@ impl PyGcTraverse for UnionValidator {
 }
 
 impl Validator for UnionValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         match self.mode {
             UnionMode::Smart => self.validate_smart(py, input, state),
@@ -249,7 +249,7 @@ impl<'a> MaybeErrors<'a> {
         }
     }
 
-    fn into_val_error<'i>(self, input: &impl Input<'i>) -> ValError {
+    fn into_val_error(self, input: impl ToErrorValue) -> ValError {
         match self {
             Self::Custom(custom_error) => custom_error.as_val_error(input),
             Self::Errors(errors) => ValError::LineErrors(
@@ -390,44 +390,25 @@ impl BuildValidator for TaggedUnionValidator {
 impl_py_gc_traverse!(TaggedUnionValidator { discriminator, lookup });
 
 impl Validator for TaggedUnionValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        match self.discriminator {
-            Discriminator::LookupKey(ref lookup_key) => {
-                macro_rules! find_validator {
-                    ($get_method:ident, $($dict:expr),+) => {{
-                        // note all these methods return PyResult<Option<(data, data)>>, the outer Err is just for
-                        // errors when getting attributes which should be "raised"
-                        match lookup_key.$get_method($( $dict ),+)? {
-                            Some((_, value)) => Ok(value.to_object(py)),
-                            None => Err(self.tag_not_found(input)),
-                        }
-                    }};
-                }
+        match &self.discriminator {
+            Discriminator::LookupKey(lookup_key) => {
                 let from_attributes = state.extra().from_attributes.unwrap_or(self.from_attributes);
                 let dict = input.validate_model_fields(self.strict, from_attributes)?;
-                let tag = match dict {
-                    GenericMapping::PyDict(dict) => {
-                        find_validator!(py_get_dict_item, &dict)
-                    }
-                    GenericMapping::PyMapping(mapping) => {
-                        find_validator!(py_get_mapping_item, &mapping)
-                    }
-                    GenericMapping::StringMapping(d) => {
-                        find_validator!(py_get_dict_item, &d)
-                    }
-                    GenericMapping::PyGetAttr(obj, kwargs) => {
-                        find_validator!(py_get_attr, &obj, kwargs.as_ref())
-                    }
-                    GenericMapping::JsonObject(mapping) => find_validator!(json_get, mapping),
-                }?;
-                self.find_call_validator(py, tag.bind(py), input, state)
+                // note this methods returns PyResult<Option<(data, data)>>, the outer Err is just for
+                // errors when getting attributes which should be "raised"
+                let tag = match dict.get_item(lookup_key)? {
+                    Some((_, value)) => value,
+                    None => return Err(self.tag_not_found(input)),
+                };
+                self.find_call_validator(py, tag.borrow_input().to_object(py).bind(py), input, state)
             }
-            Discriminator::Function(ref func) => {
+            Discriminator::Function(func) => {
                 let tag: Py<PyAny> = func.call1(py, (input.to_object(py),))?;
                 if tag.is_none(py) {
                     Err(self.tag_not_found(input))
@@ -447,25 +428,20 @@ impl Validator for TaggedUnionValidator {
 }
 
 impl TaggedUnionValidator {
-    fn self_schema_tag<'data>(
+    fn self_schema_tag<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-    ) -> ValResult<Bound<'data, PyString>> {
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+    ) -> ValResult<Bound<'py, PyString>> {
         let dict = input.strict_dict()?;
-        let tag = match &dict {
-            GenericMapping::PyDict(dict) => match dict.get_item(intern!(py, "type"))? {
-                Some(t) => t.downcast_into::<PyString>()?,
-                None => return Err(self.tag_not_found(input)),
-            },
-            _ => unreachable!(),
+        let dict = dict.as_py_dict().expect("self schema is always a Python dictionary");
+        let tag = match dict.get_item(intern!(py, "type"))? {
+            Some(t) => t.downcast_into::<PyString>()?,
+            None => return Err(self.tag_not_found(input)),
         };
         let tag = tag.to_str()?;
         // custom logic to distinguish between different function and tuple schemas
         if tag == "function" {
-            let GenericMapping::PyDict(dict) = dict else {
-                unreachable!()
-            };
             let Some(mode) = dict.get_item(intern!(py, "mode"))? else {
                 return Err(self.tag_not_found(input));
             };
@@ -480,12 +456,12 @@ impl TaggedUnionValidator {
         }
     }
 
-    fn find_call_validator<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        tag: &Bound<'data, PyAny>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+    fn find_call_validator<'py>(
+        &self,
+        py: Python<'py>,
+        tag: &Bound<'py, PyAny>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         if let Ok(Some((tag, validator))) = self.lookup.validate(py, tag) {
             return match validator.validate(py, input, state) {
@@ -507,7 +483,7 @@ impl TaggedUnionValidator {
         }
     }
 
-    fn tag_not_found<'s, 'data>(&'s self, input: &'data impl Input<'data>) -> ValError {
+    fn tag_not_found<'py>(&self, input: &(impl Input<'py> + ?Sized)) -> ValError {
         match self.custom_error {
             Some(ref custom_error) => custom_error.as_val_error(input),
             None => ValError::new(

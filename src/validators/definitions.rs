@@ -69,15 +69,16 @@ impl BuildValidator for DefinitionRefValidator {
 impl_py_gc_traverse!(DefinitionRefValidator {});
 
 impl Validator for DefinitionRefValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         self.definition.read(|validator| {
             let validator = validator.unwrap();
-            if let Some(id) = input.identity() {
+            if let Some(id) = input.as_python().map(py_identity) {
+                // Python objects can be cyclic, so need recursion guard
                 let Ok(mut guard) = RecursionGuard::new(state, id, self.definition.id()) else {
                     return Err(ValError::new(ErrorTypeDefaults::RecursionLoop, input));
                 };
@@ -88,28 +89,28 @@ impl Validator for DefinitionRefValidator {
         })
     }
 
-    fn validate_assignment<'data>(
+    fn validate_assignment<'py>(
         &self,
-        py: Python<'data>,
-        obj: &Bound<'data, PyAny>,
+        py: Python<'py>,
+        obj: &Bound<'py, PyAny>,
         field_name: &str,
-        field_value: &Bound<'data, PyAny>,
-        state: &mut ValidationState,
+        field_value: &Bound<'py, PyAny>,
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         self.definition.read(|validator| {
             let validator = validator.unwrap();
-            if let Some(id) = obj.identity() {
-                let Ok(mut guard) = RecursionGuard::new(state, id, self.definition.id()) else {
-                    return Err(ValError::new(ErrorTypeDefaults::RecursionLoop, obj));
-                };
-                validator.validate_assignment(py, obj, field_name, field_value, guard.state())
-            } else {
-                validator.validate_assignment(py, obj, field_name, field_value, state)
-            }
+            let Ok(mut guard) = RecursionGuard::new(state, py_identity(obj), self.definition.id()) else {
+                return Err(ValError::new(ErrorTypeDefaults::RecursionLoop, obj));
+            };
+            validator.validate_assignment(py, obj, field_name, field_value, guard.state())
         })
     }
 
     fn get_name(&self) -> &str {
         self.definition.get_or_init_name(|v| v.get_name().into())
     }
+}
+
+fn py_identity(obj: &Bound<'_, PyAny>) -> usize {
+    obj.as_ptr() as usize
 }

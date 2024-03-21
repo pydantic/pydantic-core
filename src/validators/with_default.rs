@@ -134,11 +134,11 @@ impl BuildValidator for WithDefaultValidator {
 impl_py_gc_traverse!(WithDefaultValidator { default, validator });
 
 impl Validator for WithDefaultValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         if input.to_object(py).is(&self.undefined) {
             Ok(self.default_value(py, None::<usize>, state)?.unwrap())
@@ -157,11 +157,11 @@ impl Validator for WithDefaultValidator {
         }
     }
 
-    fn default_value(
+    fn default_value<'py>(
         &self,
-        py: Python<'_>,
+        py: Python<'py>,
         outer_loc: Option<impl Into<LocItem>>,
-        state: &mut ValidationState,
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<Option<PyObject>> {
         match self.default.default_value(py)? {
             Some(stored_dft) => {

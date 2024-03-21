@@ -41,11 +41,11 @@ impl BuildValidator for StrValidator {
 impl_py_gc_traverse!(StrValidator {});
 
 impl Validator for StrValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         input
             .validate_str(state.strict_or(self.strict), self.coerce_numbers_to_str)
@@ -73,11 +73,11 @@ pub struct StrConstrainedValidator {
 impl_py_gc_traverse!(StrConstrainedValidator {});
 
 impl Validator for StrConstrainedValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let either_str = input
             .validate_str(state.strict_or(self.strict), self.coerce_numbers_to_str)?

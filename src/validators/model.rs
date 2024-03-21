@@ -13,7 +13,7 @@ use super::{
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
-use crate::input::{py_error_on_minusone, Input};
+use crate::input::{input_as_python_instance, py_error_on_minusone, Input};
 use crate::tools::{py_err, SchemaDict};
 use crate::PydanticUndefinedType;
 
@@ -108,11 +108,11 @@ impl BuildValidator for ModelValidator {
 impl_py_gc_traverse!(ModelValidator { class, validator });
 
 impl Validator for ModelValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         if let Some(self_instance) = state.extra().self_instance {
             // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
@@ -124,7 +124,7 @@ impl Validator for ModelValidator {
         // if the input is an instance of the class, we "revalidate" it - e.g. we extract and reuse `__pydantic_fields_set__`
         // but use from attributes to create a new instance of the model field type
         let class = self.class.bind(py);
-        if let Some(py_input) = input.input_is_instance(class) {
+        if let Some(py_input) = input_as_python_instance(input, class) {
             if self.revalidate.should_revalidate(py_input, class) {
                 let fields_set = py_input.getattr(intern!(py, DUNDER_FIELDS_SET_KEY))?;
                 if self.root_model {
@@ -154,13 +154,13 @@ impl Validator for ModelValidator {
         }
     }
 
-    fn validate_assignment<'data>(
+    fn validate_assignment<'py>(
         &self,
-        py: Python<'data>,
-        model: &Bound<'data, PyAny>,
+        py: Python<'py>,
+        model: &Bound<'py, PyAny>,
         field_name: &str,
-        field_value: &Bound<'data, PyAny>,
-        state: &mut ValidationState,
+        field_value: &Bound<'py, PyAny>,
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         if self.frozen {
             return Err(ValError::new(ErrorTypeDefaults::FrozenInstance, field_value));
@@ -223,12 +223,12 @@ impl Validator for ModelValidator {
 
 impl ModelValidator {
     /// here we just call the inner validator, then set attributes on `self_instance`
-    fn validate_init<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        self_instance: &Bound<'s, PyAny>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+    fn validate_init<'py>(
+        &self,
+        py: Python<'py>,
+        self_instance: &Bound<'py, PyAny>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         // we need to set `self_instance` to None for nested validators as we don't want to operate on self_instance
         // anymore
@@ -250,12 +250,12 @@ impl ModelValidator {
         self.call_post_init(py, self_instance.clone(), input, state.extra())
     }
 
-    fn validate_construct<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
+    fn validate_construct<'py>(
+        &self,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
         existing_fields_set: Option<&Bound<'_, PyAny>>,
-        state: &mut ValidationState,
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         if self.custom_init {
             // If we wanted, we could introspect the __init__ signature, and store the
@@ -291,11 +291,11 @@ impl ModelValidator {
         self.call_post_init(py, instance, input, state.extra())
     }
 
-    fn call_post_init<'s, 'data>(
-        &'s self,
-        py: Python<'data>,
+    fn call_post_init<'py>(
+        &self,
+        py: Python<'py>,
         instance: Bound<'_, PyAny>,
-        input: &'data impl Input<'data>,
+        input: &(impl Input<'py> + ?Sized),
         extra: &Extra,
     ) -> ValResult<PyObject> {
         if let Some(ref post_init) = self.post_init {

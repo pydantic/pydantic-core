@@ -59,13 +59,13 @@ impl BuildValidator for GeneratorValidator {
 impl_py_gc_traverse!(GeneratorValidator { item_validator });
 
 impl Validator for GeneratorValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let iterator = input.validate_iter()?;
+        let iterator = input.validate_iter()?.into_static();
         let validator = self.item_validator.as_ref().map(|v| {
             InternalValidator::new(
                 py,
@@ -96,7 +96,7 @@ impl Validator for GeneratorValidator {
 #[pyclass(module = "pydantic_core._pydantic_core")]
 #[derive(Debug)]
 struct ValidatorIterator {
-    iterator: GenericIterator,
+    iterator: GenericIterator<'static>,
     validator: Option<InternalValidator>,
     min_length: Option<usize>,
     max_length: Option<usize>,
@@ -253,12 +253,12 @@ impl InternalValidator {
         }
     }
 
-    pub fn validate_assignment<'data>(
+    pub fn validate_assignment<'py>(
         &mut self,
-        py: Python<'data>,
-        model: &Bound<'data, PyAny>,
+        py: Python<'py>,
+        model: &Bound<'py, PyAny>,
         field_name: &str,
-        field_value: &Bound<'data, PyAny>,
+        field_value: &Bound<'py, PyAny>,
         outer_location: Option<LocItem>,
     ) -> PyResult<PyObject> {
         let extra = Extra {
@@ -289,10 +289,10 @@ impl InternalValidator {
         result
     }
 
-    pub fn validate<'data>(
+    pub fn validate<'py>(
         &mut self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
         outer_location: Option<LocItem>,
     ) -> PyResult<PyObject> {
         let extra = Extra {

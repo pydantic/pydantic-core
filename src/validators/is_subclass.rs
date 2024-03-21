@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyNotImplementedError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
@@ -43,15 +44,21 @@ impl BuildValidator for IsSubclassValidator {
 impl_py_gc_traverse!(IsSubclassValidator { class });
 
 impl Validator for IsSubclassValidator {
-    fn validate<'data>(
+    fn validate<'py>(
         &self,
-        py: Python<'data>,
-        input: &'data impl Input<'data>,
-        _state: &mut ValidationState,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        _state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        match input.input_is_subclass(self.class.bind(py))? {
-            true => Ok(input.to_object(py)),
-            false => Err(ValError::new(
+        let Some(obj) = input.as_python() else {
+            return Err(ValError::InternalErr(PyNotImplementedError::new_err(
+                "Cannot check issubclass when validating from json, \
+                            use a JsonOrPython validator instead.",
+            )));
+        };
+        match obj.downcast::<PyType>() {
+            Ok(py_type) if py_type.is_subclass(self.class.bind(py))? => Ok(obj.clone().unbind()),
+            _ => Err(ValError::new(
                 ErrorType::IsSubclassOf {
                     class: self.class_repr.clone(),
                     context: None,

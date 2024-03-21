@@ -148,9 +148,9 @@ checksum = "62b02a5381cc465bd3041d84623d0fa3b66738b52b8e2fc3bab8ad63ab032f4a"
 
 [[package]]
 name = "jiter"
-version = "0.0.7"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2a1b6e316923afd3087ec73829f646a67c18f3a5bd61624247b05e652e4a99d"
+checksum = "a9cbc4bba9fee7e90f7ab23d53caa097007c6b870b2ca0a33334e774eb34c1ff"
 dependencies = [
  "ahash",
  "hashbrown",
@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "pydantic-core"
-version = "2.16.2"
+version = "2.17.0"
 dependencies = [
  "ahash",
  "base64",
@@ -506,9 +506,9 @@ checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
 
 [[package]]
 name = "speedate"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "242f76c50fd18cbf098607090ade73a08d39cfd84ea835f3796a2c855223b19b"
+checksum = "c323c4e6fece5a5a1a2a7f726d243144cce9fbcfe3ce4d9f3c6ede726a2bc780"
 dependencies = [
  "strum",
  "strum_macros 0.25.3",
