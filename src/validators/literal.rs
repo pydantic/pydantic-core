@@ -266,9 +266,9 @@ impl Validator for LiteralValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         _state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         match self.lookup.validate(py, input)? {
-            Some((_, v)) => Ok(v.clone()),
+            Some((_, v)) => Ok(v.bind(py).clone()),
             None => Err(ValError::new(
                 ErrorType::LiteralError {
                     expected: self.expected_repr.clone(),

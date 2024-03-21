@@ -46,7 +46,7 @@ impl PyUrl {
         let schema_obj = SCHEMA_DEFINITION_URL
             .get_or_init(py, || build_schema_validator(py, "url"))
             .validate_python(py, url, None, None, None, None)?;
-        schema_obj.extract(py)
+        schema_obj.extract()
     }
 
     #[getter]
@@ -226,7 +226,7 @@ impl PyMultiHostUrl {
         let schema_obj = SCHEMA_DEFINITION_MULTI_HOST_URL
             .get_or_init(py, || build_schema_validator(py, "multi-host-url"))
             .validate_python(py, url, None, None, None, None)?;
-        schema_obj.extract(py)
+        schema_obj.extract()
     }
 
     #[getter]

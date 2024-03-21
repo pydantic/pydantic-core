@@ -80,7 +80,7 @@ pub trait EnumValidateValue: std::fmt::Debug + Clone + Send + Sync {
         input: &I,
         lookup: &LiteralLookup<PyObject>,
         strict: bool,
-    ) -> ValResult<Option<PyObject>>;
+    ) -> ValResult<Option<Bound<'py, PyAny>>>;
 }
 
 #[derive(Debug, Clone)]
@@ -101,10 +101,10 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let class = self.class.bind(py);
         if input.as_python().is_some_and(|any| any.is_exact_instance(class)) {
-            return Ok(input.to_object(py));
+            return Ok(input.to_object(py).into_bound(py));
         }
         let strict = state.strict_or(self.strict);
         if strict && input.as_python().is_some() {
@@ -125,7 +125,7 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
             // check enum_value is an instance of the class like
             // https://github.com/python/cpython/blob/v3.12.2/Lib/enum.py#L1148
             if enum_value.is_instance(class)? {
-                return Ok(enum_value.into());
+                return Ok(enum_value);
             } else if !enum_value.is(&py.None()) {
                 let type_error = PyTypeError::new_err(format!(
                     "error in {}._missing_: returned {} instead of None or a valid member",
@@ -160,8 +160,8 @@ impl EnumValidateValue for PlainEnumValidator {
         input: &I,
         lookup: &LiteralLookup<PyObject>,
         _strict: bool,
-    ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate(py, input)?.map(|(_, v)| v.clone_ref(py)))
+    ) -> ValResult<Option<Bound<'py, PyAny>>> {
+        Ok(lookup.validate(py, input)?.map(|(_, v)| v.bind(py).clone()))
     }
 }
 
@@ -176,8 +176,8 @@ impl EnumValidateValue for IntEnumValidator {
         input: &I,
         lookup: &LiteralLookup<PyObject>,
         strict: bool,
-    ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate_int(py, input, strict)?.map(|v| v.clone_ref(py)))
+    ) -> ValResult<Option<Bound<'py, PyAny>>> {
+        Ok(lookup.validate_int(py, input, strict)?.map(|v| v.bind(py).clone()))
     }
 }
 
@@ -188,12 +188,12 @@ impl_py_gc_traverse!(EnumValidator<StrEnumValidator> { class, missing });
 
 impl EnumValidateValue for StrEnumValidator {
     fn validate_value<'py, I: Input<'py> + ?Sized>(
-        py: Python,
+        py: Python<'py>,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
         strict: bool,
-    ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate_str(input, strict)?.map(|v| v.clone_ref(py)))
+    ) -> ValResult<Option<Bound<'py, PyAny>>> {
+        Ok(lookup.validate_str(input, strict)?.map(|v| v.bind(py).clone()))
     }
 }
 
@@ -208,7 +208,7 @@ impl EnumValidateValue for FloatEnumValidator {
         input: &I,
         lookup: &LiteralLookup<PyObject>,
         strict: bool,
-    ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate_float(py, input, strict)?.map(|v| v.clone_ref(py)))
+    ) -> ValResult<Option<Bound<'py, PyAny>>> {
+        Ok(lookup.validate_float(py, input, strict)?.map(|v| v.bind(py).clone()))
     }
 }

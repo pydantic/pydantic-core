@@ -65,7 +65,7 @@ impl Validator for DateTimeValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let strict = state.strict_or(self.strict);
         let datetime = match input.validate_datetime(strict, self.microseconds_precision) {
             Ok(val_match) => val_match.unpack(state),

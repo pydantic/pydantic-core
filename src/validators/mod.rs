@@ -115,7 +115,7 @@ pub struct SchemaValidator {
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    pub fn py_new(py: Python, schema: &Bound<'_, PyAny>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+    pub fn py_new(py: Python<'_>, schema: &Bound<'_, PyAny>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
         let mut definitions_builder = DefinitionsBuilder::new();
 
         let validator = build_validator(schema, config, &mut definitions_builder)?;
@@ -155,15 +155,15 @@ impl SchemaValidator {
     }
 
     #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]
-    pub fn validate_python(
+    pub fn validate_python<'py>(
         &self,
-        py: Python,
-        input: &Bound<'_, PyAny>,
+        py: Python<'py>,
+        input: &Bound<'py, PyAny>,
         strict: Option<bool>,
         from_attributes: Option<bool>,
-        context: Option<&Bound<'_, PyAny>>,
-        self_instance: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+        context: Option<&Bound<'py, PyAny>>,
+        self_instance: Option<&Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         self._validate(
             py,
             input,
@@ -177,14 +177,14 @@ impl SchemaValidator {
     }
 
     #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]
-    pub fn isinstance_python(
+    pub fn isinstance_python<'py>(
         &self,
-        py: Python,
-        input: &Bound<'_, PyAny>,
+        py: Python<'py>,
+        input: &Bound<'py, PyAny>,
         strict: Option<bool>,
         from_attributes: Option<bool>,
-        context: Option<&Bound<'_, PyAny>>,
-        self_instance: Option<&Bound<'_, PyAny>>,
+        context: Option<&Bound<'py, PyAny>>,
+        self_instance: Option<&Bound<'py, PyAny>>,
     ) -> PyResult<bool> {
         match self._validate(
             py,
@@ -204,14 +204,14 @@ impl SchemaValidator {
     }
 
     #[pyo3(signature = (input, *, strict=None, context=None, self_instance=None))]
-    pub fn validate_json(
+    pub fn validate_json<'py>(
         &self,
-        py: Python,
-        input: &Bound<'_, PyAny>,
+        py: Python<'py>,
+        input: &Bound<'py, PyAny>,
         strict: Option<bool>,
-        context: Option<&Bound<'_, PyAny>>,
-        self_instance: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+        context: Option<&Bound<'py, PyAny>>,
+        self_instance: Option<&Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let r = match json::validate_json_bytes(input) {
             Ok(v_match) => self._validate_json(
                 py,
@@ -227,13 +227,13 @@ impl SchemaValidator {
     }
 
     #[pyo3(signature = (input, *, strict=None, context=None))]
-    pub fn validate_strings(
+    pub fn validate_strings<'py>(
         &self,
-        py: Python,
-        input: Bound<'_, PyAny>,
+        py: Python<'py>,
+        input: Bound<'py, PyAny>,
         strict: Option<bool>,
-        context: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+        context: Option<&Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let t = InputType::String;
         let string_mapping = StringMapping::new_value(input).map_err(|e| self.prepare_validation_err(py, e, t))?;
 
@@ -245,16 +245,16 @@ impl SchemaValidator {
 
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (obj, field_name, field_value, *, strict=None, from_attributes=None, context=None))]
-    pub fn validate_assignment(
+    pub fn validate_assignment<'py>(
         &self,
-        py: Python,
-        obj: Bound<'_, PyAny>,
+        py: Python<'py>,
+        obj: Bound<'py, PyAny>,
         field_name: &str,
-        field_value: Bound<'_, PyAny>,
+        field_value: Bound<'py, PyAny>,
         strict: Option<bool>,
         from_attributes: Option<bool>,
-        context: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+        context: Option<&Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let extra = Extra {
             input_type: InputType::Python,
             data: None,
@@ -272,12 +272,12 @@ impl SchemaValidator {
     }
 
     #[pyo3(signature = (*, strict=None, context=None))]
-    pub fn get_default_value(
+    pub fn get_default_value<'py>(
         &self,
-        py: Python,
+        py: Python<'py>,
         strict: Option<bool>,
-        context: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+        context: Option<&Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let extra = Extra {
             input_type: InputType::Python,
             data: None,
@@ -291,8 +291,8 @@ impl SchemaValidator {
         let r = self.validator.default_value(py, None::<i64>, &mut state);
         match r {
             Ok(maybe_default) => match maybe_default {
-                Some(v) => Ok(PySome::new(v).into_py(py)),
-                None => Ok(py.None().into_py(py)),
+                Some(v) => Ok(PySome::new(v.unbind()).into_py(py).into_bound(py)),
+                None => Ok(py.None().into_py(py).into_bound(py)),
             },
             Err(e) => Err(self.prepare_validation_err(py, e, InputType::Python)),
         }
@@ -328,7 +328,7 @@ impl SchemaValidator {
         from_attributes: Option<bool>,
         context: Option<&Bound<'py, PyAny>>,
         self_instance: Option<&Bound<'py, PyAny>>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
             Extra::new(strict, from_attributes, context, self_instance, input_type),
@@ -337,21 +337,21 @@ impl SchemaValidator {
         self.validator.validate(py, input, &mut state)
     }
 
-    fn _validate_json(
+    fn _validate_json<'py>(
         &self,
-        py: Python,
-        input: &Bound<'_, PyAny>,
+        py: Python<'py>,
+        input: &Bound<'py, PyAny>,
         json_data: &[u8],
         strict: Option<bool>,
-        context: Option<&Bound<'_, PyAny>>,
-        self_instance: Option<&Bound<'_, PyAny>>,
-    ) -> ValResult<PyObject> {
+        context: Option<&Bound<'py, PyAny>>,
+        self_instance: Option<&Bound<'py, PyAny>>,
+    ) -> ValResult<Bound<'py, PyAny>> {
         let json_value =
             jiter::JsonValue::parse(json_data, true).map_err(|e| json::map_json_err(input, e, json_data))?;
         self._validate(py, &json_value, InputType::Json, strict, None, context, self_instance)
     }
 
-    fn prepare_validation_err(&self, py: Python, error: ValError, input_type: InputType) -> PyErr {
+    fn prepare_validation_err(&self, py: Python<'_>, error: ValError, input_type: InputType) -> PyErr {
         ValidationError::from_val_error(
             py,
             self.title.clone_ref(py),
@@ -388,7 +388,7 @@ impl<'py> SelfValidator<'py> {
             &mut recursion_guard,
         );
         match self.validator.validator.validate(py, schema, &mut state) {
-            Ok(schema_obj) => Ok(schema_obj.into_bound(py)),
+            Ok(schema_obj) => Ok(schema_obj),
             Err(e) => Err(SchemaError::from_val_error(py, e)),
         }
     }
@@ -718,7 +718,7 @@ pub trait Validator: Send + Sync + Debug {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject>;
+    ) -> ValResult<Bound<'py, PyAny>>;
 
     /// Get a default value, currently only used by `WithDefaultValidator`
     fn default_value<'py>(
@@ -726,7 +726,7 @@ pub trait Validator: Send + Sync + Debug {
         _py: Python<'py>,
         _outer_loc: Option<impl Into<LocItem>>,
         _state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<Option<PyObject>> {
+    ) -> ValResult<Option<Bound<'py, PyAny>>> {
         Ok(None)
     }
 
@@ -739,7 +739,7 @@ pub trait Validator: Send + Sync + Debug {
         _field_name: &str,
         _field_value: &Bound<'py, PyAny>,
         _state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let py_err = PyTypeError::new_err(format!("validate_assignment is not supported for {}", self.get_name()));
         Err(py_err.into())
     }

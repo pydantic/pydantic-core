@@ -10,7 +10,7 @@ use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{Arguments, BorrowInput, Input, KeywordArgs, PositionalArgs, ValidationMatch};
 use crate::lookup_key::LookupKey;
 
-use crate::tools::SchemaDict;
+use crate::tools::{new_bound_tuple, SchemaDict};
 
 use super::validation_state::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
@@ -143,10 +143,10 @@ impl Validator for ArgumentsValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let args = input.validate_args()?;
 
-        let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_params_count);
+        let mut output_args = Vec::with_capacity(self.positional_params_count);
         let output_kwargs = PyDict::new_bound(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let mut used_kwargs: AHashSet<&str> = AHashSet::with_capacity(self.parameters.len());
@@ -300,7 +300,7 @@ impl Validator for ArgumentsValidator {
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
         } else {
-            Ok((PyTuple::new_bound(py, output_args), output_kwargs).to_object(py))
+            Ok(new_bound_tuple(py, (PyTuple::new_bound(py, output_args), output_kwargs)).into_any())
         }
     }
 

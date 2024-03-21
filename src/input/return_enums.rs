@@ -123,8 +123,8 @@ pub(crate) fn validate_iter_to_vec<'py>(
     mut max_length_check: MaxLengthCheck<'_, impl Input<'py> + ?Sized>,
     validator: &CombinedValidator,
     state: &mut ValidationState<'_, 'py>,
-) -> ValResult<Vec<PyObject>> {
-    let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
+) -> ValResult<Vec<Bound<'py, PyAny>>> {
+    let mut output: Vec<Bound<'py, PyAny>> = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
     for (index, item_result) in iter.enumerate() {
         let item = item_result.map_err(|e| any_next_error!(py, e, max_length_check.input, index))?;
@@ -150,13 +150,13 @@ pub(crate) fn validate_iter_to_vec<'py>(
 }
 
 pub trait BuildSet {
-    fn build_add(&self, item: PyObject) -> PyResult<()>;
+    fn build_add(&self, item: &Bound<'_, PyAny>) -> PyResult<()>;
 
     fn build_len(&self) -> usize;
 }
 
 impl BuildSet for Bound<'_, PySet> {
-    fn build_add(&self, item: PyObject) -> PyResult<()> {
+    fn build_add(&self, item: &Bound<'_, PyAny>) -> PyResult<()> {
         self.add(item)
     }
 
@@ -166,7 +166,7 @@ impl BuildSet for Bound<'_, PySet> {
 }
 
 impl BuildSet for Bound<'_, PyFrozenSet> {
-    fn build_add(&self, item: PyObject) -> PyResult<()> {
+    fn build_add(&self, item: &Bound<'_, PyAny>) -> PyResult<()> {
         py_error_on_minusone(self.py(), unsafe {
             // Safety: self.as_ptr() the _only_ pointer to the `frozenset`, and it's allowed
             // to mutate this via the C API when nothing else can refer to it.
@@ -195,7 +195,7 @@ pub(crate) fn validate_iter_to_set<'py>(
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
         match validator.validate(py, item.borrow_input(), state) {
             Ok(item) => {
-                set.build_add(item)?;
+                set.build_add(&item)?;
                 if let Some(max_length) = max_length {
                     if set.build_len() > max_length {
                         return Err(ValError::new(
@@ -233,12 +233,12 @@ pub(crate) fn no_validator_iter_to_vec<'py>(
     input: &(impl Input<'py> + ?Sized),
     iter: impl Iterator<Item = PyResult<impl BorrowInput<'py>>>,
     mut max_length_check: MaxLengthCheck<'_, impl Input<'py> + ?Sized>,
-) -> ValResult<Vec<PyObject>> {
+) -> ValResult<Vec<Bound<'py, PyAny>>> {
     iter.enumerate()
         .map(|(index, result)| {
             let v = result.map_err(|e| any_next_error!(py, e, input, index))?;
             max_length_check.incr()?;
-            Ok(v.borrow_input().to_object(py))
+            Ok(v.borrow_input().to_object(py).into_bound(py))
         })
         .collect()
 }
@@ -435,10 +435,11 @@ impl<'a> EitherString<'a> {
         }
     }
 
-    pub fn as_py_string(&'a self, py: Python<'a>) -> Bound<'a, PyString> {
+    pub fn as_py_string<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         match self {
             Self::Cow(cow) => PyString::new_bound(py, cow),
-            Self::Py(py_string) => py_string.clone(),
+            // TODO lifetimes could be separated here
+            Self::Py(py_string) => py_string.clone().unbind().into_bound(py),
         }
     }
 }

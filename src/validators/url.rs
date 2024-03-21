@@ -67,7 +67,7 @@ impl Validator for UrlValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let mut either_url = self.get_url(input, state.strict_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
@@ -93,7 +93,7 @@ impl Validator for UrlValidator {
             Ok(()) => {
                 // Lax rather than strict to preserve V2.4 semantic that str wins over url in union
                 state.floor_exactness(Exactness::Lax);
-                Ok(either_url.into_py(py))
+                Ok(either_url.into_py(py).into_bound(py))
             }
             Err(error_type) => Err(ValError::new(error_type, input)),
         }
@@ -233,7 +233,7 @@ impl Validator for MultiHostUrlValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let mut multi_url = self.get_url(input, state.strict_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
@@ -258,7 +258,7 @@ impl Validator for MultiHostUrlValidator {
             Ok(()) => {
                 // Lax rather than strict to preserve V2.4 semantic that str wins over url in union
                 state.floor_exactness(Exactness::Lax);
-                Ok(multi_url.into_py(py))
+                Ok(multi_url.into_py(py).into_bound(py))
             }
             Err(error_type) => Err(ValError::new(error_type, input)),
         }

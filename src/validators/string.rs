@@ -46,10 +46,10 @@ impl Validator for StrValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         input
             .validate_str(state.strict_or(self.strict), self.coerce_numbers_to_str)
-            .map(|val_match| val_match.unpack(state).into_py(py))
+            .map(|val_match| val_match.unpack(state).into_py(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {
@@ -78,7 +78,7 @@ impl Validator for StrConstrainedValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let either_str = input
             .validate_str(state.strict_or(self.strict), self.coerce_numbers_to_str)?
             .unpack(state);
@@ -138,7 +138,7 @@ impl Validator for StrConstrainedValidator {
             // we haven't modified the string, return the original as it might be a PyString
             either_str.as_py_string(py)
         };
-        Ok(py_string.into_py(py))
+        Ok(py_string.into_any())
     }
 
     fn get_name(&self) -> &str {

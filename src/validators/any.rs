@@ -32,10 +32,10 @@ impl Validator for AnyValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         // in a union, Any should be preferred to doing lax coercions
         state.floor_exactness(Exactness::Strict);
-        Ok(input.to_object(py))
+        Ok(input.to_object(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {

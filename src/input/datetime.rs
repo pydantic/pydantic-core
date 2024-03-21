@@ -53,12 +53,12 @@ impl<'a> EitherDate<'a> {
         }
     }
 
-    pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
+    pub fn try_into_py(self, py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
         let date = match self {
             Self::Py(date) => Ok(date),
             Self::Raw(date) => PyDate::new_bound(py, date.year.into(), date.month, date.day),
         }?;
-        Ok(date.into_py(py))
+        Ok(date.unbind().into_bound(py).into_any())
     }
 }
 
@@ -208,7 +208,7 @@ impl<'a> EitherTime<'a> {
         }
     }
 
-    pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
+    pub fn try_into_py(self, py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
         let time = match self {
             Self::Py(time) => Ok(time),
             Self::Raw(time) => PyTime::new_bound(
@@ -220,7 +220,7 @@ impl<'a> EitherTime<'a> {
                 time_as_tzinfo(py, &time)?.as_ref(),
             ),
         }?;
-        Ok(time.into_py(py))
+        Ok(time.unbind().into_bound(py).into_any())
     }
 }
 
@@ -267,7 +267,7 @@ impl<'a> EitherDateTime<'a> {
         }
     }
 
-    pub fn try_into_py(self, py: Python<'a>) -> PyResult<PyObject> {
+    pub fn try_into_py(self, py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
         let dt = match self {
             Self::Raw(datetime) => PyDateTime::new_bound(
                 py,
@@ -280,9 +280,9 @@ impl<'a> EitherDateTime<'a> {
                 datetime.time.microsecond,
                 time_as_tzinfo(py, &datetime.time)?.as_ref(),
             )?,
-            Self::Py(dt) => dt.clone(),
+            Self::Py(dt) => dt,
         };
-        Ok(dt.into_py(py))
+        Ok(dt.unbind().into_bound(py).into_any())
     }
 }
 

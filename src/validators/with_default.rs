@@ -42,10 +42,10 @@ impl DefaultType {
         }
     }
 
-    pub fn default_value(&self, py: Python) -> PyResult<Option<PyObject>> {
+    pub fn default_value<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         match self {
-            Self::Default(ref default) => Ok(Some(default.clone_ref(py))),
-            Self::DefaultFactory(ref default_factory) => Ok(Some(default_factory.call0(py)?)),
+            Self::Default(ref default) => Ok(Some(default.bind(py).clone())),
+            Self::DefaultFactory(ref default_factory) => Ok(Some(default_factory.bind(py).call0()?)),
             Self::None => Ok(None),
         }
     }
@@ -139,7 +139,7 @@ impl Validator for WithDefaultValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         if input.to_object(py).is(&self.undefined) {
             Ok(self.default_value(py, None::<usize>, state)?.unwrap())
         } else {
@@ -162,17 +162,17 @@ impl Validator for WithDefaultValidator {
         py: Python<'py>,
         outer_loc: Option<impl Into<LocItem>>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<Option<PyObject>> {
+    ) -> ValResult<Option<Bound<'py, PyAny>>> {
         match self.default.default_value(py)? {
             Some(stored_dft) => {
-                let dft: Py<PyAny> = if self.copy_default {
-                    let deepcopy_func = COPY_DEEPCOPY.get_or_init(py, || get_deepcopy(py).unwrap());
-                    deepcopy_func.call1(py, (&stored_dft,))?.into_py(py)
+                let dft = if self.copy_default {
+                    let deepcopy_func = COPY_DEEPCOPY.get_or_init(py, || get_deepcopy(py).unwrap()).bind(py);
+                    deepcopy_func.call1((&stored_dft,))?
                 } else {
                     stored_dft
                 };
                 if self.validate_default {
-                    match self.validate(py, dft.bind(py), state) {
+                    match self.validate(py, &dft, state) {
                         Ok(v) => Ok(Some(v)),
                         Err(e) => {
                             if let Some(outer_loc) = outer_loc {

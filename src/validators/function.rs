@@ -96,11 +96,11 @@ impl_build!(FunctionBeforeValidator, "function-before");
 impl FunctionBeforeValidator {
     fn _validate<'s, 'py>(
         &'s self,
-        call: impl FnOnce(Bound<'py, PyAny>, &mut ValidationState<'_, 'py>) -> ValResult<PyObject>,
+        call: impl FnOnce(Bound<'py, PyAny>, &mut ValidationState<'_, 'py>) -> ValResult<Bound<'py, PyAny>>,
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &'s mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
             self.func.call1(py, (input.to_object(py), info))
@@ -124,7 +124,7 @@ impl Validator for FunctionBeforeValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let validate = |v, s: &mut ValidationState<'_, 'py>| self.validator.validate(py, &v, s);
         self._validate(validate, py, input, state)
     }
@@ -135,7 +135,7 @@ impl Validator for FunctionBeforeValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let validate = move |v, s: &mut ValidationState<'_, 'py>| {
             self.validator.validate_assignment(py, &v, field_name, field_value, s)
         };
@@ -162,17 +162,17 @@ impl_build!(FunctionAfterValidator, "function-after");
 impl FunctionAfterValidator {
     fn _validate<'py, I: Input<'py> + ?Sized>(
         &self,
-        call: impl FnOnce(&I, &mut ValidationState<'_, 'py>) -> ValResult<PyObject>,
+        call: impl FnOnce(&I, &mut ValidationState<'_, 'py>) -> ValResult<Bound<'py, PyAny>>,
         py: Python<'py>,
         input: &I,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let v = call(input, state)?;
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (v.to_object(py), info))
+            self.func.bind(py).call1((v.to_object(py), info))
         } else {
-            self.func.call1(py, (v.to_object(py),))
+            self.func.bind(py).call1((v.to_object(py),))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -190,7 +190,7 @@ impl Validator for FunctionAfterValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let validate = |v: &_, s: &mut ValidationState<'_, 'py>| self.validator.validate(py, v, s);
         self._validate(validate, py, input, state)
     }
@@ -201,7 +201,7 @@ impl Validator for FunctionAfterValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let validate = move |v: &Bound<'py, PyAny>, s: &mut ValidationState<'_, 'py>| {
             self.validator.validate_assignment(py, v, field_name, field_value, s)
         };
@@ -254,12 +254,12 @@ impl Validator for FunctionPlainValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), info))
+            self.func.bind(py).call1((input.to_object(py), info))
         } else {
-            self.func.call1(py, (input.to_object(py),))
+            self.func.bind(py).call1((input.to_object(py),))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -318,12 +318,12 @@ impl FunctionWrapValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), handler, info))
+            self.func.bind(py).call1((input.to_object(py), handler, info))
         } else {
-            self.func.call1(py, (input.to_object(py), handler))
+            self.func.bind(py).call1((input.to_object(py), handler))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -341,7 +341,7 @@ impl Validator for FunctionWrapValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let handler = ValidatorCallable {
             validator: InternalValidator::new(
                 py,
@@ -365,7 +365,7 @@ impl Validator for FunctionWrapValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let handler = AssignmentValidatorCallable {
             validator: InternalValidator::new(
                 py,
@@ -394,12 +394,12 @@ struct ValidatorCallable {
 
 #[pymethods]
 impl ValidatorCallable {
-    fn __call__(
+    fn __call__<'py>(
         &mut self,
-        py: Python,
-        input_value: &Bound<'_, PyAny>,
-        outer_location: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+        py: Python<'py>,
+        input_value: &Bound<'py, PyAny>,
+        outer_location: Option<&Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let outer_location = outer_location.map(Into::into);
         self.validator.validate(py, input_value, outer_location)
     }
@@ -427,12 +427,12 @@ struct AssignmentValidatorCallable {
 
 #[pymethods]
 impl AssignmentValidatorCallable {
-    fn __call__(
+    fn __call__<'py>(
         &mut self,
-        py: Python,
-        input_value: &Bound<'_, PyAny>,
-        outer_location: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+        py: Python<'py>,
+        input_value: &Bound<'py, PyAny>,
+        outer_location: Option<&Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let outer_location = outer_location.map(Into::into);
         self.validator.validate_assignment(
             py,

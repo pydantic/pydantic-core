@@ -51,7 +51,7 @@ impl Validator for JsonValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let v_match = validate_json_bytes(input)?;
         let json_either_bytes = v_match.unpack(state);
         let json_bytes = json_either_bytes.as_slice();
@@ -66,7 +66,7 @@ impl Validator for JsonValidator {
             None => {
                 let obj =
                     jiter::python_parse(py, json_bytes, true, true).map_err(|e| map_json_err(input, e, json_bytes))?;
-                Ok(obj.unbind())
+                Ok(obj)
             }
         }
     }

@@ -35,12 +35,12 @@ impl Validator for BoolValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         // TODO in theory this could be quicker if we used PyBool rather than going to a bool
         // and back again, might be worth profiling?
         input
             .validate_bool(state.strict_or(self.strict))
-            .map(|val_match| val_match.unpack(state).into_py(py))
+            .map(|val_match| val_match.unpack(state).into_py(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {

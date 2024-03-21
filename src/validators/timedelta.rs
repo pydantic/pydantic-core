@@ -70,7 +70,7 @@ impl Validator for TimeDeltaValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let timedelta = input
             .validate_timedelta(state.strict_or(self.strict), self.microseconds_precision)?
             .unpack(state);
@@ -100,7 +100,7 @@ impl Validator for TimeDeltaValidator {
             check_constraint!(ge, GreaterThanEqual);
             check_constraint!(gt, GreaterThan);
         }
-        Ok(py_timedelta.into())
+        Ok(py_timedelta.into_any())
     }
 
     fn get_name(&self) -> &str {

@@ -49,7 +49,7 @@ impl Validator for IsSubclassValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         _state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let Some(obj) = input.as_python() else {
             return Err(ValError::InternalErr(PyNotImplementedError::new_err(
                 "Cannot check issubclass when validating from json, \
@@ -57,7 +57,7 @@ impl Validator for IsSubclassValidator {
             )));
         };
         match obj.downcast::<PyType>() {
-            Ok(py_type) if py_type.is_subclass(self.class.bind(py))? => Ok(obj.clone().unbind()),
+            Ok(py_type) if py_type.is_subclass(self.class.bind(py))? => Ok(obj.clone()),
             _ => Err(ValError::new(
                 ErrorType::IsSubclassOf {
                     class: self.class_repr.clone(),

@@ -44,7 +44,7 @@ impl Validator for DateValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let strict = state.strict_or(self.strict);
         let date = match input.validate_date(strict) {
             Ok(val_match) => val_match.unpack(state),

@@ -69,12 +69,12 @@ impl Validator for FloatValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let either_float = input.validate_float(state.strict_or(self.strict))?.unpack(state);
         if !self.allow_inf_nan && !either_float.as_f64().is_finite() {
             return Err(ValError::new(ErrorTypeDefaults::FiniteNumber, input));
         }
-        Ok(either_float.into_py(py))
+        Ok(either_float.into_py(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {
@@ -101,7 +101,7 @@ impl Validator for ConstrainedFloatValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let either_float = input.validate_float(state.strict_or(self.strict))?.unpack(state);
         let float: f64 = either_float.as_f64();
         if !self.allow_inf_nan && !float.is_finite() {
@@ -164,7 +164,7 @@ impl Validator for ConstrainedFloatValidator {
                 ));
             }
         }
-        Ok(either_float.into_py(py))
+        Ok(either_float.into_py(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {

@@ -74,7 +74,7 @@ impl Validator for DefinitionRefValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         self.definition.read(|validator| {
             let validator = validator.unwrap();
             if let Some(id) = input.as_python().map(py_identity) {
@@ -96,7 +96,7 @@ impl Validator for DefinitionRefValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         self.definition.read(|validator| {
             let validator = validator.unwrap();
             let Ok(mut guard) = RecursionGuard::new(state, py_identity(obj), self.definition.id()) else {

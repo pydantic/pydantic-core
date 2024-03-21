@@ -64,7 +64,7 @@ impl TupleValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-        output: &mut Vec<PyObject>,
+        output: &mut Vec<Bound<'py, PyAny>>,
         errors: &mut Vec<ValLineError>,
         item_validators: &[CombinedValidator],
         collection_iter: &mut NextCountingIterator<impl Iterator<Item = I>>,
@@ -104,7 +104,7 @@ impl TupleValidator {
         errors: &mut Vec<ValLineError>,
         collection_iter: &mut NextCountingIterator<impl Iterator<Item = I>>,
         actual_length: Option<usize>,
-    ) -> ValResult<Vec<PyObject>> {
+    ) -> ValResult<Vec<Bound<'py, PyAny>>> {
         let expected_length = if self.variadic_item_index.is_some() {
             actual_length.unwrap_or(self.validators.len())
         } else {
@@ -218,8 +218,8 @@ impl TupleValidator {
     fn push_output_item<'py>(
         &self,
         input: &(impl Input<'py> + ?Sized),
-        output: &mut Vec<PyObject>,
-        item: PyObject,
+        output: &mut Vec<Bound<'py, PyAny>>,
+        item: Bound<'py, PyAny>,
         actual_length: Option<usize>,
     ) -> ValResult<()> {
         output.push(item);
@@ -246,7 +246,7 @@ impl Validator for TupleValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let collection = input.validate_tuple(state.strict_or(self.strict))?.unpack(state);
         let actual_length = collection.len();
 
@@ -277,7 +277,7 @@ impl Validator for TupleValidator {
         }
 
         if errors.is_empty() {
-            Ok(PyTuple::new_bound(py, output).into_py(py))
+            Ok(PyTuple::new_bound(py, output).into_any())
         } else {
             Err(ValError::LineErrors(errors))
         }
@@ -302,8 +302,8 @@ where
     T: BorrowInput<'py>,
     I: Input<'py> + ?Sized,
 {
-    type Output = ValResult<Vec<PyObject>>;
-    fn consume_iterator(self, mut iterator: impl Iterator<Item = PyResult<T>>) -> ValResult<Vec<PyObject>> {
+    type Output = ValResult<Vec<Bound<'py, PyAny>>>;
+    fn consume_iterator(self, mut iterator: impl Iterator<Item = PyResult<T>>) -> ValResult<Vec<Bound<'py, PyAny>>> {
         let mut iteration_error = None;
 
         let output = self.validator.validate_tuple_variable(

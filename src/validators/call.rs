@@ -80,13 +80,13 @@ impl Validator for CallValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
-        let args = self.arguments_validator.validate(py, input, state)?.into_bound(py);
+    ) -> ValResult<Bound<'py, PyAny>> {
+        let args = self.arguments_validator.validate(py, input, state)?;
 
         let return_value = if let Ok((args, kwargs)) = args.extract::<(Bound<PyTuple>, Bound<PyDict>)>() {
-            self.function.call_bound(py, args, Some(&kwargs))?
+            self.function.bind(py).call(args, Some(&kwargs))?
         } else if let Ok(kwargs) = args.downcast::<PyDict>() {
-            self.function.call_bound(py, (), Some(kwargs))?
+            self.function.bind(py).call((), Some(kwargs))?
         } else {
             let msg = "Arguments validator should return a tuple of (args, kwargs) or a dict of kwargs";
             return Err(PyTypeError::new_err(msg).into());
@@ -94,10 +94,10 @@ impl Validator for CallValidator {
 
         if let Some(return_validator) = &self.return_validator {
             return_validator
-                .validate(py, return_value.bind(py), state)
+                .validate(py, &return_value, state)
                 .map_err(|e| e.with_outer_location("return"))
         } else {
-            Ok(return_value.to_object(py))
+            Ok(return_value)
         }
     }
 

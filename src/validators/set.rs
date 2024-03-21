@@ -62,7 +62,7 @@ impl Validator for SetValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let collection = input.validate_set(state.strict_or(self.strict))?.unpack(state);
         let set = PySet::empty_bound(py)?;
         collection.iterate(ValidateToSet {
@@ -74,7 +74,7 @@ impl Validator for SetValidator {
             state,
         })??;
         min_length_check!(input, "Set", self.min_length, set);
-        Ok(set.into_py(py))
+        Ok(set.into_any())
     }
 
     fn get_name(&self) -> &str {

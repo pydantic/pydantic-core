@@ -64,7 +64,7 @@ impl Validator for GeneratorValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let iterator = input.validate_iter()?.into_static();
         let validator = self.item_validator.as_ref().map(|v| {
             InternalValidator::new(
@@ -85,7 +85,7 @@ impl Validator for GeneratorValidator {
             hide_input_in_errors: self.hide_input_in_errors,
             validation_error_cause: self.validation_error_cause,
         };
-        Ok(v_iterator.into_py(py))
+        Ok(v_iterator.into_py(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {
@@ -110,7 +110,7 @@ impl ValidatorIterator {
         slf
     }
 
-    fn __next__(mut slf: PyRefMut<'_, Self>, py: Python) -> PyResult<Option<PyObject>> {
+    fn __next__<'py>(mut slf: PyRefMut<'_, Self>, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         let min_length = slf.min_length;
         let max_length = slf.max_length;
         let hide_input_in_errors = slf.hide_input_in_errors;
@@ -149,7 +149,7 @@ impl ValidatorIterator {
                                 .validate(py, next.borrow_input(), Some(index.into()))
                                 .map(Some)
                         }
-                        None => Ok(Some(next.to_object(py))),
+                        None => Ok(Some(next.to_object(py).into_bound(py))),
                     },
                     None => {
                         if let Some(min_length) = min_length {
@@ -260,7 +260,7 @@ impl InternalValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         outer_location: Option<LocItem>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         let extra = Extra {
             input_type: self.validation_mode,
             data: self.data.as_ref().map(|data| data.bind(py).clone()),
@@ -294,7 +294,7 @@ impl InternalValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         outer_location: Option<LocItem>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         let extra = Extra {
             input_type: self.validation_mode,
             data: self.data.as_ref().map(|data| data.bind(py).clone()),

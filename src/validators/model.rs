@@ -113,7 +113,7 @@ impl Validator for ModelValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         if let Some(self_instance) = state.extra().self_instance {
             // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
             return self.validate_init(py, self_instance, input, state);
@@ -145,7 +145,7 @@ impl Validator for ModelValidator {
                     self.validate_construct(py, &inner_input, Some(&fields_set), state)
                 }
             } else {
-                Ok(input.to_object(py))
+                Ok(py_input.clone())
             }
         } else {
             // Having to construct a new model is not an exact match
@@ -161,7 +161,7 @@ impl Validator for ModelValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         if self.frozen {
             return Err(ValError::new(ErrorTypeDefaults::FrozenInstance, field_value));
         } else if self.root_model {
@@ -178,7 +178,7 @@ impl Validator for ModelValidator {
                 let output = self.validator.validate(py, field_value, state)?;
 
                 force_setattr(py, model, intern!(py, ROOT_FIELD), output)?;
-                Ok(model.into_py(py))
+                Ok(model.clone())
             };
         }
         let old_dict = model.getattr(intern!(py, DUNDER_DICT))?.downcast_into::<PyDict>()?;
@@ -197,7 +197,7 @@ impl Validator for ModelValidator {
             Bound<'_, PyDict>,
             Bound<'_, PyAny>,
             Bound<'_, PySet>,
-        ) = output.extract(py)?;
+        ) = output.extract()?;
 
         if let Ok(fields_set) = model.getattr(intern!(py, DUNDER_FIELDS_SET_KEY)) {
             let fields_set = fields_set.downcast::<PySet>()?;
@@ -213,7 +213,7 @@ impl Validator for ModelValidator {
             intern!(py, DUNDER_MODEL_EXTRA_KEY),
             validated_extra.to_object(py),
         )?;
-        Ok(model.into_py(py))
+        Ok(model.clone())
     }
 
     fn get_name(&self) -> &str {
@@ -229,7 +229,7 @@ impl ModelValidator {
         self_instance: &Bound<'py, PyAny>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         // we need to set `self_instance` to None for nested validators as we don't want to operate on self_instance
         // anymore
         let state = &mut state.rebind_extra(|extra| extra.self_instance = None);
@@ -244,7 +244,7 @@ impl ModelValidator {
             force_setattr(py, self_instance, intern!(py, DUNDER_FIELDS_SET_KEY), fields_set)?;
             force_setattr(py, self_instance, intern!(py, ROOT_FIELD), &output)?;
         } else {
-            let (model_dict, model_extra, fields_set) = output.extract(py)?;
+            let (model_dict, model_extra, fields_set) = output.extract()?;
             set_model_attrs(self_instance, &model_dict, &model_extra, &fields_set)?;
         }
         self.call_post_init(py, self_instance.clone(), input, state.extra())
@@ -256,7 +256,7 @@ impl ModelValidator {
         input: &(impl Input<'py> + ?Sized),
         existing_fields_set: Option<&Bound<'_, PyAny>>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         if self.custom_init {
             // If we wanted, we could introspect the __init__ signature, and store the
             // keyword arguments and types, and create a validator for them.
@@ -266,7 +266,8 @@ impl ModelValidator {
             if let Some(kwargs) = input.as_kwargs(py) {
                 return self
                     .class
-                    .call_bound(py, (), Some(&kwargs))
+                    .bind(py)
+                    .call((), Some(&kwargs))
                     .map_err(|e| convert_err(py, e, input));
             }
         }
@@ -284,7 +285,7 @@ impl ModelValidator {
             force_setattr(py, &instance, intern!(py, DUNDER_FIELDS_SET_KEY), fields_set)?;
             force_setattr(py, &instance, intern!(py, ROOT_FIELD), output)?;
         } else {
-            let (model_dict, model_extra, val_fields_set) = output.extract(py)?;
+            let (model_dict, model_extra, val_fields_set) = output.extract()?;
             let fields_set = existing_fields_set.unwrap_or(&val_fields_set);
             set_model_attrs(&instance, &model_dict, &model_extra, fields_set)?;
         }
@@ -294,16 +295,16 @@ impl ModelValidator {
     fn call_post_init<'py>(
         &self,
         py: Python<'py>,
-        instance: Bound<'_, PyAny>,
+        instance: Bound<'py, PyAny>,
         input: &(impl Input<'py> + ?Sized),
         extra: &Extra,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         if let Some(ref post_init) = self.post_init {
             instance
                 .call_method1(post_init.bind(py), (extra.context,))
                 .map_err(|e| convert_err(py, e, input))?;
         }
-        Ok(instance.into())
+        Ok(instance)
     }
 }
 

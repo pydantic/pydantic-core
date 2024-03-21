@@ -32,7 +32,7 @@ impl Validator for FrozenSetValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let collection = input.validate_frozenset(state.strict_or(self.strict))?.unpack(state);
         let f_set = PyFrozenSet::empty_bound(py)?;
         collection.iterate(ValidateToFrozenSet {
@@ -44,7 +44,7 @@ impl Validator for FrozenSetValidator {
             state,
         })??;
         min_length_check!(input, "Frozenset", self.min_length, f_set);
-        Ok(f_set.into_py(py))
+        Ok(f_set.into_py(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {

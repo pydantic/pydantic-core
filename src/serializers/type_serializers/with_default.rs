@@ -72,6 +72,6 @@ impl TypeSerializer for WithDefaultSerializer {
     }
 
     fn get_default(&self, py: Python) -> PyResult<Option<PyObject>> {
-        self.default.default_value(py)
+        self.default.default_value(py).map(|v| v.map(Bound::unbind))
     }
 }

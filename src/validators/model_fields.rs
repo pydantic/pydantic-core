@@ -12,6 +12,7 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValRes
 use crate::input::ConsumeIterator;
 use crate::input::{BorrowInput, Input, ValidatedDict, ValidationMatch};
 use crate::lookup_key::LookupKey;
+use crate::tools::new_bound_tuple;
 use crate::tools::SchemaDict;
 
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
@@ -119,7 +120,7 @@ impl Validator for ModelFieldsValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let strict = state.strict_or(self.strict);
         let from_attributes = state.extra().from_attributes.unwrap_or(self.from_attributes);
 
@@ -334,7 +335,7 @@ impl Validator for ModelFieldsValidator {
                 model_extra_dict_op = Some(PyDict::new_bound(py));
             };
 
-            Ok((model_dict, model_extra_dict_op, fields_set).to_object(py))
+            Ok(new_bound_tuple(py, (model_dict, model_extra_dict_op, fields_set)).into_any())
         }
     }
 
@@ -345,16 +346,16 @@ impl Validator for ModelFieldsValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let dict = obj.downcast::<PyDict>()?;
 
-        let get_updated_dict = |output: PyObject| {
+        let get_updated_dict = |output: &Bound<'py, PyAny>| {
             dict.set_item(field_name, output)?;
             Ok(dict)
         };
 
-        let prepare_result = |result: ValResult<PyObject>| match result {
-            Ok(output) => get_updated_dict(output),
+        let prepare_result = |result: ValResult<Bound<'py, PyAny>>| match result {
+            Ok(output) => get_updated_dict(&output),
             Err(ValError::LineErrors(line_errors)) => {
                 let errors = line_errors
                     .into_iter()
@@ -396,7 +397,7 @@ impl Validator for ModelFieldsValidator {
                 match self.extra_behavior {
                     ExtraBehavior::Allow => match self.extras_validator {
                         Some(ref validator) => prepare_result(validator.validate(py, field_value, state))?,
-                        None => get_updated_dict(field_value.to_object(py))?,
+                        None => get_updated_dict(field_value)?,
                     },
                     ExtraBehavior::Forbid | ExtraBehavior::Ignore => {
                         return Err(ValError::new_with_loc(
@@ -429,7 +430,7 @@ impl Validator for ModelFieldsValidator {
         };
 
         let fields_set = PySet::new_bound(py, &[field_name.to_string()])?;
-        Ok((new_data.to_object(py), new_extra, fields_set.to_object(py)).to_object(py))
+        Ok(new_bound_tuple(py, (new_data, new_extra, fields_set)).into_any())
     }
 
     fn get_name(&self) -> &str {

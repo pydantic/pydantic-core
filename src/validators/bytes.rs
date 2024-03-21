@@ -45,10 +45,10 @@ impl Validator for BytesValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         input
             .validate_bytes(state.strict_or(self.strict))
-            .map(|m| m.unpack(state).into_py(py))
+            .map(|m| m.unpack(state).into_py(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {
@@ -71,7 +71,7 @@ impl Validator for BytesConstrainedValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let either_bytes = input.validate_bytes(state.strict_or(self.strict))?.unpack(state);
         let len = either_bytes.len()?;
 
@@ -97,7 +97,7 @@ impl Validator for BytesConstrainedValidator {
                 ));
             }
         }
-        Ok(either_bytes.into_py(py))
+        Ok(either_bytes.into_py(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {

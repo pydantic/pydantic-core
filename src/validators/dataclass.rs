@@ -12,6 +12,7 @@ use crate::input::{
     input_as_python_instance, Arguments, BorrowInput, Input, InputType, KeywordArgs, PositionalArgs, ValidationMatch,
 };
 use crate::lookup_key::LookupKey;
+use crate::tools::new_bound_tuple;
 use crate::tools::SchemaDict;
 use crate::validators::function::convert_err;
 
@@ -144,7 +145,7 @@ impl Validator for DataclassArgsValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let args = input.validate_dataclass_args(&self.dataclass_name)?;
 
         let output_dict = PyDict::new_bound(py);
@@ -333,11 +334,11 @@ impl Validator for DataclassArgsValidator {
         }
 
         if errors.is_empty() {
-            if let Some(init_only_args) = init_only_args {
-                Ok((output_dict, PyTuple::new_bound(py, init_only_args)).to_object(py))
-            } else {
-                Ok((output_dict, py.None()).to_object(py))
-            }
+            Ok(new_bound_tuple(
+                py,
+                (output_dict, init_only_args.map(|args| PyTuple::new_bound(py, args))),
+            )
+            .into_any())
         } else {
             Err(ValError::LineErrors(errors))
         }
@@ -350,16 +351,16 @@ impl Validator for DataclassArgsValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let dict = obj.downcast::<PyDict>()?;
 
-        let ok = |output: PyObject| {
+        let ok = |output: Bound<'_, PyAny>| {
             dict.set_item(field_name, output)?;
             // The second return value represents `init_only_args`
             // which doesn't make much sense in this context but we need to put something there
             // so that function validators that sit between DataclassValidator and DataclassArgsValidator
             // always get called the same shape of data.
-            Ok(PyTuple::new_bound(py, vec![dict.to_object(py), py.None()]).into_py(py))
+            Ok(PyTuple::new_bound(py, vec![dict.to_object(py), py.None()]).into_any())
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
@@ -401,7 +402,7 @@ impl Validator for DataclassArgsValidator {
             match self.extra_behavior {
                 // For dataclasses we allow assigning unknown fields
                 // to match stdlib dataclass behavior
-                ExtraBehavior::Allow => ok(field_value.to_object(py)),
+                ExtraBehavior::Allow => ok(field_value.to_object(py).into_bound(py)),
                 _ => Err(ValError::new_with_loc(
                     ErrorType::NoSuchAttribute {
                         attribute: field_name.to_string(),
@@ -494,7 +495,7 @@ impl Validator for DataclassValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         if let Some(self_instance) = state.extra().self_instance {
             // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
             return self.validate_init(py, self_instance, input, state);
@@ -508,9 +509,9 @@ impl Validator for DataclassValidator {
                 let val_output = self.validator.validate(py, input_dict.as_any(), state)?;
                 let dc = create_class(self.class.bind(py))?;
                 self.set_dict_call(py, &dc, val_output, input)?;
-                Ok(dc.into())
+                Ok(dc)
             } else {
-                Ok(input.to_object(py))
+                Ok(py_input.clone())
             }
         } else if state.strict_or(self.strict) && state.extra().input_type == InputType::Python {
             Err(ValError::new(
@@ -525,7 +526,7 @@ impl Validator for DataclassValidator {
             state.floor_exactness(Exactness::Strict);
             let dc = create_class(self.class.bind(py))?;
             self.set_dict_call(py, &dc, val_output, input)?;
-            Ok(dc.into())
+            Ok(dc)
         }
     }
 
@@ -536,7 +537,7 @@ impl Validator for DataclassValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         if self.frozen {
             return Err(ValError::new(ErrorTypeDefaults::FrozenInstance, field_value));
         }
@@ -549,7 +550,7 @@ impl Validator for DataclassValidator {
             self.validator
                 .validate_assignment(py, new_dict.as_any(), field_name, field_value, state)?;
 
-        let (dc_dict, _): (Bound<'_, PyDict>, Bound<'_, PyAny>) = val_assignment_result.extract(py)?;
+        let (dc_dict, _): (Bound<'_, PyDict>, Bound<'_, PyAny>) = val_assignment_result.extract()?;
 
         if self.slots {
             let value = dc_dict
@@ -560,7 +561,7 @@ impl Validator for DataclassValidator {
             force_setattr(py, obj, intern!(py, "__dict__"), dc_dict)?;
         }
 
-        Ok(obj.to_object(py))
+        Ok(obj.to_object(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {
@@ -573,10 +574,10 @@ impl DataclassValidator {
     fn validate_init<'py>(
         &self,
         py: Python<'py>,
-        self_instance: &Bound<'_, PyAny>,
+        self_instance: &Bound<'py, PyAny>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         // we need to set `self_instance` to None for nested validators as we don't want to operate on the self_instance
         // instance anymore
         let state = &mut state.rebind_extra(|extra| extra.self_instance = None);
@@ -584,7 +585,7 @@ impl DataclassValidator {
 
         self.set_dict_call(py, self_instance, val_output, input)?;
 
-        Ok(self_instance.into_py(py))
+        Ok(self_instance.clone())
     }
 
     fn dataclass_to_dict<'py>(&self, dc: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
@@ -601,10 +602,10 @@ impl DataclassValidator {
         &self,
         py: Python<'py>,
         dc: &Bound<'_, PyAny>,
-        val_output: PyObject,
+        val_output: Bound<'py, PyAny>,
         input: &(impl Input<'py> + ?Sized),
     ) -> ValResult<()> {
-        let (dc_dict, post_init_kwargs): (Bound<'_, PyAny>, Bound<'_, PyAny>) = val_output.extract(py)?;
+        let (dc_dict, post_init_kwargs): (Bound<'_, PyAny>, Bound<'_, PyAny>) = val_output.extract()?;
         if self.slots {
             let dc_dict = dc_dict.downcast::<PyDict>()?;
             for (key, value) in dc_dict.iter() {

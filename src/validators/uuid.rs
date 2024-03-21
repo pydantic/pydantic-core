@@ -92,7 +92,7 @@ impl Validator for UuidValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let class = get_uuid_type(py)?;
         if let Some(py_input) = input_as_python_instance(input, class) {
             if let Some(expected_version) = self.version {
@@ -110,7 +110,7 @@ impl Validator for UuidValidator {
                     ));
                 }
             }
-            Ok(py_input.to_object(py))
+            Ok(py_input.clone())
         } else if state.strict_or(self.strict) && state.extra().input_type == InputType::Python {
             Err(ValError::new(
                 ErrorType::IsInstanceOf {
@@ -214,7 +214,7 @@ impl UuidValidator {
     ///
     /// This implementation does not use the Python `__init__` function to speed up the process,
     /// as the `__init__` function in the Python `uuid` module performs extensive checks.
-    fn create_py_uuid(&self, py_type: &Bound<'_, PyType>, uuid: &Uuid) -> ValResult<PyObject> {
+    fn create_py_uuid<'py>(&self, py_type: &Bound<'py, PyType>, uuid: &Uuid) -> ValResult<Bound<'py, PyAny>> {
         let py = py_type.py();
         let dc = create_class(py_type)?;
         let int = uuid.as_u128();
@@ -224,6 +224,6 @@ impl UuidValidator {
             .get_item("safe")?;
         force_setattr(py, &dc, intern!(py, UUID_INT), int)?;
         force_setattr(py, &dc, intern!(py, UUID_IS_SAFE), safe)?;
-        Ok(dc.into())
+        Ok(dc)
     }
 }

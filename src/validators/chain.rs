@@ -75,12 +75,12 @@ impl Validator for ChainValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let mut steps_iter = self.steps.iter();
         let first_step = steps_iter.next().unwrap();
         let value = first_step.validate(py, input, state)?;
 
-        steps_iter.try_fold(value, |v, step| step.validate(py, v.bind(py), state))
+        steps_iter.try_fold(value, |v, step| step.validate(py, &v, state))
     }
 
     fn get_name(&self) -> &str {

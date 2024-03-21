@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::{PyDict, PyString, PyTuple};
 use pyo3::{ffi, intern, FromPyObject};
 
 pub trait SchemaDict<'py> {
@@ -142,4 +142,8 @@ pub fn extract_i64(v: &Bound<'_, PyAny>) -> Option<i64> {
     } else {
         None
     }
+}
+
+pub(crate) fn new_bound_tuple(py: Python<'_>, items: impl IntoPy<Py<PyTuple>>) -> Bound<'_, PyTuple> {
+    items.into_py(py).into_bound(py)
 }

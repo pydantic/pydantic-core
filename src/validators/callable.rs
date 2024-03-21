@@ -30,10 +30,10 @@ impl Validator for CallableValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         state.floor_exactness(Exactness::Lax);
         match input.as_python().is_some_and(PyAnyMethods::is_callable) {
-            true => Ok(input.to_object(py)),
+            true => Ok(input.to_object(py).into_bound(py)),
             false => Err(ValError::new(ErrorTypeDefaults::CallableType, input)),
         }
     }

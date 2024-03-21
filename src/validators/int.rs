@@ -48,10 +48,10 @@ impl Validator for IntValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         input
             .validate_int(state.strict_or(self.strict))
-            .map(|val_match| val_match.unpack(state).into_py(py))
+            .map(|val_match| val_match.unpack(state).into_py(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {
@@ -77,7 +77,7 @@ impl Validator for ConstrainedIntValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let either_int = input.validate_int(state.strict_or(self.strict))?.unpack(state);
         let int_value = either_int.as_int()?;
 
@@ -136,7 +136,7 @@ impl Validator for ConstrainedIntValidator {
                 ));
             }
         }
-        Ok(either_int.into_py(py))
+        Ok(either_int.into_py(py).into_bound(py))
     }
 
     fn get_name(&self) -> &str {

@@ -106,7 +106,7 @@ impl UnionValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let old_exactness = state.exactness;
         let strict = state.strict_or(self.strict);
         let mut errors = MaybeErrors::new(self.custom_error.as_ref());
@@ -172,7 +172,7 @@ impl UnionValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         let mut errors = MaybeErrors::new(self.custom_error.as_ref());
 
         let mut rebound_state;
@@ -207,7 +207,7 @@ impl Validator for UnionValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         match self.mode {
             UnionMode::Smart => self.validate_smart(py, input, state),
             UnionMode::LeftToRight => self.validate_left_to_right(py, input, state),
@@ -395,7 +395,7 @@ impl Validator for TaggedUnionValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         match &self.discriminator {
             Discriminator::LookupKey(lookup_key) => {
                 let from_attributes = state.extra().from_attributes.unwrap_or(self.from_attributes);
@@ -462,7 +462,7 @@ impl TaggedUnionValidator {
         tag: &Bound<'py, PyAny>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Bound<'py, PyAny>> {
         if let Ok(Some((tag, validator))) = self.lookup.validate(py, tag) {
             return match validator.validate(py, input, state) {
                 Ok(res) => Ok(res),
