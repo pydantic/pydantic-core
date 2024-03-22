@@ -5,7 +5,7 @@ from _typeshed import SupportsAllComparisons
 from typing_extensions import LiteralString, Self, TypeAlias
 
 from pydantic_core import ErrorDetails, ErrorTypeInfo, InitErrorDetails, MultiHostHost
-from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
+from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType, SerSchema
 
 __all__ = [
     '__version__',
@@ -34,6 +34,8 @@ __all__ = [
     'list_all_errors',
     'TzInfo',
     'validate_core_schema',
+    'WalkCoreSchema',
+    'WalkCoreSchemaFilterBuilder',
 ]
 __version__: str
 build_profile: str
@@ -888,3 +890,27 @@ def validate_core_schema(schema: CoreSchema, *, strict: bool | None = None) -> C
     We may also remove this function altogether, do not rely on it being present if you are
     using pydantic-core directly.
     """
+
+class _WalkCoreSchemaFilter(Generic[_T]):
+    pass
+
+@final
+class WalkCoreSchemaFilterBuilder(Generic[_T]):
+    def __and__(self, other: WalkCoreSchemaFilterBuilder) -> WalkCoreSchemaFilterBuilder: ...
+    def __or__(self, other: WalkCoreSchemaFilterBuilder) -> WalkCoreSchemaFilterBuilder: ...
+    @staticmethod
+    def has_ref() -> WalkCoreSchemaFilterBuilder: ...
+    @staticmethod
+    def has_type(type: str) -> WalkCoreSchemaFilterBuilder: ...
+    @staticmethod
+    def predicate(predicate: Callable[[_T], bool]) -> WalkCoreSchemaFilterBuilder: ...
+    def build(self, func: Callable[[_T, Callable[[_T], _T]], _T]) -> _WalkCoreSchemaFilter[_T]: ...
+
+@final
+class WalkCoreSchema:
+    def __init__(
+        self,
+        visit_core_schema: _WalkCoreSchemaFilter[CoreSchema] | None = None,
+        visit_ser_schema: _WalkCoreSchemaFilter[SerSchema] | None = None,
+    ) -> None: ...
+    def walk(self, schema: CoreSchema) -> CoreSchema: ...
