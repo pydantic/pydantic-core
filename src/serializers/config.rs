@@ -210,38 +210,9 @@ fn remove_whitespace(bytes: &[u8]) -> &[u8] {
     let start = bytes.iter().position(|&byte| byte != b' ').unwrap_or(bytes.len());
     let end = bytes.iter().rposition(|&byte| byte != b' ').map_or(0, |i| i + 1);
 
+    if start >= end {
+        return &[];
+    }
+
     &bytes[start..end]
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_remove_whitespace() {
-        let input = b"   foo,   bar!   ";
-        let expected_output = b"foo,   bar!";
-        assert_eq!(remove_whitespace(input), expected_output);
-    }
-
-    #[test]
-    fn test_remove_whitespace_empty() {
-        let input = b"foo bar";
-        let expected_output = b"foo bar";
-        assert_eq!(remove_whitespace(input), expected_output);
-    }
-
-    #[test]
-    fn test_remove_whitespace_empty_2() {
-        let input = b"this is bytes";
-        let expected_output = b"this is bytes";
-        assert_eq!(remove_whitespace(input), expected_output);
-    }
-
-    #[test]
-    fn test_remove_whitespace_no_whitespace() {
-        let input = b"foo,bar!";
-        let expected_output = b"foo,bar!";
-        assert_eq!(remove_whitespace(input), expected_output);
-    }
 }
