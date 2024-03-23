@@ -168,7 +168,9 @@ impl BytesMode {
             Self::Utf8 => from_utf8(bytes)
                 .map_err(|err| utf8_py_error(py, err, bytes))
                 .map(Cow::Borrowed),
-            Self::Base64 => Ok(Cow::Owned(base64::engine::general_purpose::URL_SAFE.encode(bytes))),
+            Self::Base64 => Ok(Cow::Owned(
+                base64::engine::general_purpose::URL_SAFE.encode(remove_whitespace(bytes)),
+            )),
             Self::Hex => Ok(Cow::Owned(
                 bytes.iter().fold(String::new(), |acc, b| acc + &format!("{b:02x}")),
             )),
@@ -181,7 +183,9 @@ impl BytesMode {
                 Ok(s) => serializer.serialize_str(s),
                 Err(e) => Err(Error::custom(e.to_string())),
             },
-            Self::Base64 => serializer.serialize_str(&base64::engine::general_purpose::URL_SAFE.encode(bytes)),
+            Self::Base64 => {
+                serializer.serialize_str(&base64::engine::general_purpose::URL_SAFE.encode(remove_whitespace(bytes)))
+            }
             Self::Hex => {
                 serializer.serialize_str(&bytes.iter().fold(String::new(), |acc, b| acc + &format!("{b:02x}")))
             }
@@ -199,5 +203,45 @@ pub fn utf8_py_error(py: Python, err: Utf8Error, data: &[u8]) -> PyErr {
 impl FromPyObject<'_> for InfNanMode {
     fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
         Self::from_str(ob.downcast::<PyString>()?.to_str()?)
+    }
+}
+
+fn remove_whitespace(bytes: &[u8]) -> &[u8] {
+    let start = bytes.iter().position(|&byte| byte != b' ').unwrap_or(bytes.len());
+    let end = bytes.iter().rposition(|&byte| byte != b' ').map_or(0, |i| i + 1);
+
+    &bytes[start..end]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_remove_whitespace() {
+        let input = b"   foo,   bar!   ";
+        let expected_output = b"foo,   bar!";
+        assert_eq!(remove_whitespace(input), expected_output);
+    }
+
+    #[test]
+    fn test_remove_whitespace_empty() {
+        let input = b"foo bar";
+        let expected_output = b"foo bar";
+        assert_eq!(remove_whitespace(input), expected_output);
+    }
+
+    #[test]
+    fn test_remove_whitespace_empty_2() {
+        let input = b"this is bytes";
+        let expected_output = b"this is bytes";
+        assert_eq!(remove_whitespace(input), expected_output);
+    }
+
+    #[test]
+    fn test_remove_whitespace_no_whitespace() {
+        let input = b"foo,bar!";
+        let expected_output = b"foo,bar!";
+        assert_eq!(remove_whitespace(input), expected_output);
     }
 }
