@@ -112,7 +112,7 @@ class CoreConfig(TypedDict, total=False):
     validation_error_cause: bool  # default: False
     coerce_numbers_to_str: bool  # default: False
     regex_engine: Literal['rust-regex', 'python-re']  # default: 'rust-regex'
-    cache_strings: bool | Literal['all', 'keys', 'none']  # default: 'True'
+    cache_strings: Union[bool, Literal['all', 'keys', 'none']]  # default: 'True'
 
 
 IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
