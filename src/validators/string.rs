@@ -3,8 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 use regex::Regex;
 
-use crate::build_tools::schema_or_config_same;
-use crate::build_tools::{is_strict, py_schema_error_type, schema_or_config};
+use crate::build_tools::{is_strict, py_schema_error_type, schema_or_config, schema_or_config_same};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::tools::SchemaDict;
