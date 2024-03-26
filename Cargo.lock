@@ -138,8 +138,9 @@ checksum = "62b02a5381cc465bd3041d84623d0fa3b66738b52b8e2fc3bab8ad63ab032f4a"
 
 [[package]]
 name = "jiter"
-version = "0.1.0"
-source = "git+https://github.com/pydantic/jiter.git?branch=fixed-size-cache#a5ae93a08498d40abcd3c1cdae1b76e914def9af"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c0b7c896d2b1da897be13affb0bbf7bff95437e9c50823ede962addadae58d8"
 dependencies = [
  "ahash",
  "lexical-parse-float",

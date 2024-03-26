@@ -61,7 +61,8 @@ pub fn from_json<'py>(
         CacheStringsArg::Bool(b) => b.into(),
         CacheStringsArg::Literal(mode) => mode,
     };
-    jiter::python_parse(py, json_bytes, allow_inf_nan, cache_mode).map_err(|e| jiter::map_json_error(json_bytes, &e))
+    jiter::python_parse(py, json_bytes, allow_inf_nan, cache_mode, false)
+        .map_err(|e| jiter::map_json_error(json_bytes, &e))
 }
 
 pub fn get_pydantic_core_version() -> &'static str {
