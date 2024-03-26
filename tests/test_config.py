@@ -148,3 +148,6 @@ def test_cache_strings():
 
     v = SchemaValidator({'type': 'str'}, {'cache_strings': False})
     assert 'cache_strings=False' in plain_repr(v)
+
+    v = SchemaValidator({'type': 'str'}, {'cache_strings': 'keys'})
+    assert "cache_strings='keys'" in plain_repr(v)
