@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use std::ops::Rem;
 use std::str::FromStr;
 
-use jiter::{JsonArray, JsonValue};
+use jiter::{JsonArray, JsonValue, StringCacheMode};
 use num_bigint::BigInt;
 
 use pyo3::exceptions::PyTypeError;
@@ -435,10 +435,15 @@ impl<'a> EitherString<'a> {
         }
     }
 
-    pub fn as_py_string(&'a self, py: Python<'a>, cache_str: bool) -> Bound<'a, PyString> {
+    pub fn as_py_string(&'a self, py: Python<'a>, cache_str: StringCacheMode) -> Bound<'a, PyString> {
         match self {
-            Self::Cow(cow) if cache_str => jiter::cached_py_string(py, cow.as_ref()),
-            Self::Cow(cow) => PyString::new_bound(py, cow.as_ref()),
+            Self::Cow(cow) => {
+                if matches!(cache_str, StringCacheMode::All) {
+                    jiter::cached_py_string(py, cow.as_ref())
+                } else {
+                    PyString::new_bound(py, cow.as_ref())
+                }
+            }
             Self::Py(py_string) => py_string.clone(),
         }
     }

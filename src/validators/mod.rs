@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
+use jiter::StringCacheMode;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
@@ -110,7 +111,7 @@ pub struct SchemaValidator {
     title: PyObject,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
-    cache_str: bool,
+    cache_str: StringCacheMode,
 }
 
 #[pymethods]
@@ -136,7 +137,9 @@ impl SchemaValidator {
         };
         let hide_input_in_errors: bool = config.get_as(intern!(py, "hide_input_in_errors"))?.unwrap_or(false);
         let validation_error_cause: bool = config.get_as(intern!(py, "validation_error_cause"))?.unwrap_or(false);
-        let cache_str: bool = config.get_as(intern!(py, "cache_strings"))?.unwrap_or(true);
+        let cache_str: StringCacheMode = config
+            .get_as(intern!(py, "cache_strings"))?
+            .unwrap_or(StringCacheMode::All);
         Ok(Self {
             validator,
             definitions,
@@ -309,7 +312,11 @@ impl SchemaValidator {
             self.title.extract::<&str>(py).unwrap(),
             self.validator,
             self.definitions,
-            if self.cache_str { "True" } else { "False" }
+            match self.cache_str {
+                StringCacheMode::All => "True",
+                StringCacheMode::Keys => "'keys'",
+                StringCacheMode::None => "False",
+            }
         )
     }
 
@@ -397,7 +404,7 @@ impl<'py> SelfValidator<'py> {
         let py = schema.py();
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
-            Extra::new(strict, None, None, None, InputType::Python, true),
+            Extra::new(strict, None, None, None, InputType::Python, true.into()),
             &mut recursion_guard,
         );
         match self.validator.validator.validate(py, schema, &mut state) {
@@ -427,7 +434,7 @@ impl<'py> SelfValidator<'py> {
             title: "Self Schema".into_py(py),
             hide_input_in_errors: false,
             validation_error_cause: false,
-            cache_str: true,
+            cache_str: true.into(),
         })
     }
 }
@@ -592,7 +599,7 @@ pub struct Extra<'a, 'py> {
     /// This is an instance of the model or dataclass being validated, when validation is performed from `__init__`
     self_instance: Option<&'a Bound<'py, PyAny>>,
     /// Whether to use a cache of short strings to accelerate python string construction
-    cache_str: bool,
+    cache_str: StringCacheMode,
 }
 
 impl<'a, 'py> Extra<'a, 'py> {
@@ -602,7 +609,7 @@ impl<'a, 'py> Extra<'a, 'py> {
         context: Option<&'a Bound<'py, PyAny>>,
         self_instance: Option<&'a Bound<'py, PyAny>>,
         input_type: InputType,
-        cache_str: bool,
+        cache_str: StringCacheMode,
     ) -> Self {
         Extra {
             input_type,

@@ -219,7 +219,7 @@ pub struct InternalValidator {
     validation_mode: InputType,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
-    cache_str: bool,
+    cache_str: jiter::StringCacheMode,
 }
 
 impl fmt::Debug for InternalValidator {

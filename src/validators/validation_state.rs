@@ -1,6 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::types::PyString;
 
+use jiter::StringCacheMode;
+
 use crate::recursion_guard::{ContainsRecursionState, RecursionState};
 
 use super::Extra;
@@ -65,12 +67,12 @@ impl<'a, 'py> ValidationState<'a, 'py> {
         }
     }
 
-    pub fn cache_str(&self) -> bool {
+    pub fn cache_str(&self) -> StringCacheMode {
         self.extra.cache_str
     }
 
     pub fn maybe_cached_str(&self, py: Python<'py>, s: &str) -> Bound<'py, PyString> {
-        if self.cache_str() {
+        if matches!(self.extra.cache_str, StringCacheMode::All) {
             jiter::cached_py_string(py, s)
         } else {
             PyString::new_bound(py, s)
