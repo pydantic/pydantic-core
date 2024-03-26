@@ -45,12 +45,13 @@ pub enum CacheStringsArg {
     Literal(StringCacheMode),
 }
 
-#[pyfunction(signature = (data, *, allow_inf_nan=true, cache_strings=CacheStringsArg::Bool(true)))]
+#[pyfunction(signature = (data, *, allow_inf_nan=true, cache_strings=CacheStringsArg::Bool(true), allow_partial=false))]
 pub fn from_json<'py>(
     py: Python<'py>,
     data: &Bound<'_, PyAny>,
     allow_inf_nan: bool,
     cache_strings: CacheStringsArg,
+    allow_partial: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let v_match = data
         .validate_bytes(false)
@@ -61,7 +62,7 @@ pub fn from_json<'py>(
         CacheStringsArg::Bool(b) => b.into(),
         CacheStringsArg::Literal(mode) => mode,
     };
-    jiter::python_parse(py, json_bytes, allow_inf_nan, cache_mode, false)
+    jiter::python_parse(py, json_bytes, allow_inf_nan, cache_mode, allow_partial)
         .map_err(|e| jiter::map_json_error(json_bytes, &e))
 }
 
