@@ -43,6 +43,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "bytecount"
+version = "0.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1e5f035d16fc623ae5f74981db80a439803888314e3a555fd6f04acd51a3205"
+
+[[package]]
 name = "cc"
 version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -139,8 +145,7 @@ checksum = "62b02a5381cc465bd3041d84623d0fa3b66738b52b8e2fc3bab8ad63ab032f4a"
 [[package]]
 name = "jiter"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c0b7c896d2b1da897be13affb0bbf7bff95437e9c50823ede962addadae58d8"
+source = "git+https://github.com/pydantic/jiter?branch=ascii-string-creation#85c6285458c5b14fa4840fed08ee0e7a641ed80a"
 dependencies = [
  "ahash",
  "lexical-parse-float",
@@ -297,6 +302,7 @@ version = "2.17.0"
 dependencies = [
  "ahash",
  "base64",
+ "bytecount",
  "enum_dispatch",
  "idna",
  "jiter",
