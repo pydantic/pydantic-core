@@ -73,7 +73,7 @@ impl<'a, 'py> ValidationState<'a, 'py> {
 
     pub fn maybe_cached_str(&self, py: Python<'py>, s: &str) -> Bound<'py, PyString> {
         if matches!(self.extra.cache_str, StringCacheMode::All) {
-            jiter::cached_py_string(py, s)
+            jiter::cached_py_string(py, s, bytecount::num_chars(s.as_bytes()) == s.len())
         } else {
             PyString::new_bound(py, s)
         }

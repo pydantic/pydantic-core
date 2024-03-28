@@ -439,7 +439,8 @@ impl<'a> EitherString<'a> {
         match self {
             Self::Cow(cow) => {
                 if matches!(cache_str, StringCacheMode::All) {
-                    jiter::cached_py_string(py, cow.as_ref())
+                    let s = cow.as_ref();
+                    jiter::cached_py_string(py, s, bytecount::num_chars(s.as_bytes()) == s.len())
                 } else {
                     PyString::new_bound(py, cow.as_ref())
                 }

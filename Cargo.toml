@@ -44,7 +44,9 @@ base64 = "0.21.7"
 num-bigint = "0.4.4"
 python3-dll-a = "0.2.7"
 uuid = "1.7.0"
-jiter = { version = "0.1.1", features = ["python"] }
+bytecount = { version = "0.6.7", default_features = false, features = ["runtime-dispatch-simd"] }
+#jiter = { version = "0.1.1", features = ["python"] }
+jiter = { git = "https://github.com/pydantic/jiter", branch = "ascii-string-creation", features = ["python"] }
 
 [lib]
 name = "_pydantic_core"
