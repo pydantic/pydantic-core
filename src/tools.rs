@@ -5,6 +5,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 use pyo3::{ffi, intern, FromPyObject};
 
+use jiter::{cached_py_string, pystring_fast_new, StringCacheMode};
+
 pub trait SchemaDict<'py> {
     fn get_as<T>(&self, key: &Bound<'_, PyString>) -> PyResult<Option<T>>
     where
@@ -141,5 +143,14 @@ pub fn extract_i64(v: &Bound<'_, PyAny>) -> Option<i64> {
         v.extract().ok()
     } else {
         None
+    }
+}
+
+pub(crate) fn new_py_string<'py>(py: Python<'py>, s: &str, cache_str: StringCacheMode) -> Bound<'py, PyString> {
+    let ascii_only = bytecount::num_chars(s.as_bytes()) == s.len();
+    if matches!(cache_str, StringCacheMode::All) {
+        cached_py_string(py, s, ascii_only)
+    } else {
+        pystring_fast_new(py, s, ascii_only)
     }
 }
