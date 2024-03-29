@@ -7,6 +7,7 @@ from collections import namedtuple
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from enum import Enum
+from math import nan, inf, isnan, isinf
 from pathlib import Path
 from typing import ClassVar
 
@@ -603,3 +604,13 @@ def test_numpy_float(any_serializer):
         any_serializer.to_python(numpy.float16(1.0), mode='json')
     with pytest.raises(PydanticSerializationError, match=r"Unable to serialize unknown type: <class 'numpy\.float16'>"):
         any_serializer.to_json(numpy.float16(1.0))
+
+
+def test_ser_json_inf_nan_with_any():
+    s = SchemaSerializer(core_schema.any_schema(), core_schema.CoreConfig(ser_json_inf_nan='constants'))
+    assert isinf(s.to_python(inf))
+    assert s.to_python(inf, mode='json') == 'Infinity'
+    assert s.to_json(inf) == b'"Infinity"'
+    assert isnan(s.to_python(nan))
+    assert s.to_python(nan, mode='json') == 'NaN'
+    assert s.to_json(nan) == b'"NaN"'
