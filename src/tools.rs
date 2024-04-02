@@ -147,7 +147,8 @@ pub fn extract_i64(v: &Bound<'_, PyAny>) -> Option<i64> {
 }
 
 pub(crate) fn new_py_string<'py>(py: Python<'py>, s: &str, cache_str: StringCacheMode) -> Bound<'py, PyString> {
-    let ascii_only = bytecount::num_chars(s.as_bytes()) == s.len();
+    // we could use `bytecount::num_chars(s.as_bytes()) == s.len()` as orjson does, but it doesn't appear to be faster
+    let ascii_only = false;
     if matches!(cache_str, StringCacheMode::All) {
         cached_py_string(py, s, ascii_only)
     } else {
