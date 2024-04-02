@@ -582,9 +582,7 @@ pub(crate) fn infer_json_key_known<'a>(
 ) -> PyResult<Cow<'a, str>> {
     match ob_type {
         ObType::None => super::type_serializers::simple::none_json_key(),
-        ObType::Int | ObType::IntSubclass => {
-            super::type_serializers::simple::to_str_json_key(key)
-        }
+        ObType::Int | ObType::IntSubclass => super::type_serializers::simple::to_str_json_key(key),
         ObType::Float | ObType::FloatSubclass => {
             let v = key.extract::<f64>()?;
             if (v.is_nan() || v.is_infinite()) && extra.config.inf_nan_mode == InfNanMode::Null {

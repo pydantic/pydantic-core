@@ -7,7 +7,7 @@ from collections import namedtuple
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from enum import Enum
-from math import nan, inf, isnan, isinf
+from math import inf, isinf, isnan, nan
 from pathlib import Path
 from typing import ClassVar
 
@@ -606,19 +606,41 @@ def test_numpy_float(any_serializer):
         any_serializer.to_json(numpy.float16(1.0))
 
 
-def test_ser_json_inf_nan_with_any():
+def test_ser_json_inf_nan_with_any() -> None:
     s = SchemaSerializer(core_schema.any_schema(), core_schema.CoreConfig(ser_json_inf_nan='constants'))
     assert isinf(s.to_python(inf))
-    assert s.to_python(inf, mode='json') == 'Infinity'
-    assert s.to_json(inf) == b'"Infinity"'
+    assert isinf(s.to_python(inf, mode='json'))
+    assert s.to_json(inf) == b'Infinity'
     assert isnan(s.to_python(nan))
-    assert s.to_python(nan, mode='json') == 'NaN'
-    assert s.to_json(nan) == b'"NaN"'
+    assert isnan(s.to_python(nan, mode='json'))
+    assert s.to_json(nan) == b'NaN'
 
     s = SchemaSerializer(core_schema.any_schema(), core_schema.CoreConfig(ser_json_inf_nan='null'))
     assert isinf(s.to_python(inf))
-    assert s.to_python(inf, mode='json') is 'null'
+    assert s.to_python(inf, mode='json') is None
     assert s.to_json(inf) == b'null'
     assert isnan(s.to_python(nan))
-    assert s.to_python(nan, mode='json') is 'null'
+    assert s.to_python(nan, mode='json') is None
     assert s.to_json(nan) == b'null'
+
+
+def test_ser_json_inf_nan_with_list_of_any() -> None:
+    s = SchemaSerializer(
+        core_schema.list_schema(core_schema.any_schema()), core_schema.CoreConfig(ser_json_inf_nan='constants')
+    )
+    assert isinf(s.to_python([inf])[0])
+    assert isinf(s.to_python([inf], mode='json')[0])
+    assert s.to_json([inf]) == b'[Infinity]'
+    assert isnan(s.to_python([nan])[0])
+    assert isnan(s.to_python([nan], mode='json')[0])
+    assert s.to_json([nan]) == b'[NaN]'
+
+    s = SchemaSerializer(
+        core_schema.list_schema(core_schema.any_schema()), core_schema.CoreConfig(ser_json_inf_nan='null')
+    )
+    assert isinf(s.to_python([inf])[0])
+    assert s.to_python([inf], mode='json')[0] is None
+    assert s.to_json([inf]) == b'[null]'
+    assert isnan(s.to_python([nan])[0])
+    assert s.to_python([nan], mode='json')[0] is None
+    assert s.to_json([nan]) == b'[null]'
