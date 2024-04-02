@@ -139,13 +139,14 @@ checksum = "62b02a5381cc465bd3041d84623d0fa3b66738b52b8e2fc3bab8ad63ab032f4a"
 [[package]]
 name = "jiter"
 version = "0.1.1"
-source = "git+https://github.com/pydantic/jiter?branch=main#f6b698e8a8a17a8ea611591fce389eeba2338461"
+source = "git+https://github.com/pydantic/jiter?branch=main#a5f7dac3f4564f7e4f6c5c43ef0b3da0258c7f46"
 dependencies = [
  "ahash",
  "lexical-parse-float",
  "num-bigint",
  "num-traits",
  "pyo3",
+ "pyo3-build-config",
  "smallvec",
 ]
 
