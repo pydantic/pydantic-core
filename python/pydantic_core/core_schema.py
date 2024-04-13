@@ -75,6 +75,8 @@ class CoreConfig(TypedDict, total=False):
             Requires exceptiongroup backport pre Python 3.11.
         coerce_numbers_to_str: Whether to enable coercion of any `Number` type to `str` (not applicable in `strict` mode).
         regex_engine: The regex engine to use for regex pattern validation. Default is 'rust-regex'. See `StringSchema`.
+        cache_strings: Whether to cache strings. Default is `True`, `True` or `'all'` is required to cache strings
+            during general validation since validators don't know if they're in a key or a value.
     """
 
     title: str
@@ -110,6 +112,7 @@ class CoreConfig(TypedDict, total=False):
     validation_error_cause: bool  # default: False
     coerce_numbers_to_str: bool  # default: False
     regex_engine: Literal['rust-regex', 'python-re']  # default: 'rust-regex'
+    cache_strings: Union[bool, Literal['all', 'keys', 'none']]  # default: 'True'
 
 
 IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
@@ -749,6 +752,7 @@ class StringSchema(TypedDict, total=False):
     to_upper: bool
     regex_engine: Literal['rust-regex', 'python-re']  # default: 'rust-regex'
     strict: bool
+    coerce_numbers_to_str: bool
     ref: str
     metadata: Any
     serialization: SerSchema
@@ -764,6 +768,7 @@ def str_schema(
     to_upper: bool | None = None,
     regex_engine: Literal['rust-regex', 'python-re'] | None = None,
     strict: bool | None = None,
+    coerce_numbers_to_str: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
@@ -793,6 +798,7 @@ def str_schema(
             - `python-re` use the [`re`](https://docs.python.org/3/library/re.html) module,
               which supports all regex features, but may be slower.
         strict: Whether the value should be a string or a value that can be converted to a string
+        coerce_numbers_to_str: Whether to enable coercion of any `Number` type to `str` (not applicable in `strict` mode).
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
@@ -807,6 +813,7 @@ def str_schema(
         to_upper=to_upper,
         regex_engine=regex_engine,
         strict=strict,
+        coerce_numbers_to_str=coerce_numbers_to_str,
         ref=ref,
         metadata=metadata,
         serialization=serialization,

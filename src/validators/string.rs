@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 use regex::Regex;
 
-use crate::build_tools::{is_strict, py_schema_error_type, schema_or_config};
+use crate::build_tools::{is_strict, py_schema_error_type, schema_or_config, schema_or_config_same};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 use crate::tools::SchemaDict;
@@ -49,7 +49,7 @@ impl Validator for StrValidator {
     ) -> ValResult<PyObject> {
         input
             .validate_str(state.strict_or(self.strict), self.coerce_numbers_to_str)
-            .map(|val_match| val_match.unpack(state).into_py(py))
+            .map(|val_match| val_match.unpack(state).as_py_string(py, state.cache_str()).into_py(py))
     }
 
     fn get_name(&self) -> &str {
@@ -129,14 +129,14 @@ impl Validator for StrConstrainedValidator {
         }
 
         let py_string = if self.to_lower {
-            PyString::new_bound(py, &str.to_lowercase())
+            state.maybe_cached_str(py, &str.to_lowercase())
         } else if self.to_upper {
-            PyString::new_bound(py, &str.to_uppercase())
+            state.maybe_cached_str(py, &str.to_uppercase())
         } else if self.strip_whitespace {
-            PyString::new_bound(py, str)
+            state.maybe_cached_str(py, str)
         } else {
             // we haven't modified the string, return the original as it might be a PyString
-            either_str.as_py_string(py)
+            either_str.as_py_string(py, state.cache_str())
         };
         Ok(py_string.into_py(py))
     }
@@ -184,12 +184,8 @@ impl StrConstrainedValidator {
         let to_upper: bool =
             schema_or_config(schema, config, intern!(py, "to_upper"), intern!(py, "str_to_upper"))?.unwrap_or(false);
 
-        let coerce_numbers_to_str = match config {
-            Some(c) => c
-                .get_item("coerce_numbers_to_str")?
-                .map_or(Ok(false), |any| any.is_truthy())?,
-            None => false,
-        };
+        let coerce_numbers_to_str: bool =
+            schema_or_config_same(schema, config, intern!(py, "coerce_numbers_to_str"))?.unwrap_or(false);
 
         Ok(Self {
             strict: is_strict(schema, config)?,
@@ -212,6 +208,7 @@ impl StrConstrainedValidator {
             || self.strip_whitespace
             || self.to_lower
             || self.to_upper
+            || self.coerce_numbers_to_str
     }
 }
 

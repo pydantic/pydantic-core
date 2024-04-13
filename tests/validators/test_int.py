@@ -26,7 +26,18 @@ i64_max = 9_223_372_036_854_775_807
         ('42', 42),
         (42.0, 42),
         ('42.0', 42),
+        ('42.00', 42),
+        ('042', 42),
+        ('4_2', 42),
+        ('4_2.0', 42),
+        ('04_2.0', 42),
+        ('  04_2.0 ', 42),
+        # because zeros are striped before underscores this is not allowed
+        ('  0_42.0 ', Err('Input should be a valid integer, unable to parse string as an integer')),
+        ('000001', 1),
         ('123456789.0', 123_456_789),
+        ('1.', Err('Input should be a valid integer, unable to parse string as an integer')),
+        ('42.', Err('Input should be a valid integer, unable to parse string as an integer')),
         ('123456789123456.00001', Err('Input should be a valid integer, unable to parse string as an integer')),
         (int(1e10), int(1e10)),
         (i64_max, i64_max),
@@ -342,9 +353,15 @@ def test_union_int_simple(py_and_json: PyAndJson):
 
 def test_int_repr():
     v = SchemaValidator({'type': 'int'})
-    assert plain_repr(v) == 'SchemaValidator(title="int",validator=Int(IntValidator{strict:false}),definitions=[])'
+    assert (
+        plain_repr(v)
+        == 'SchemaValidator(title="int",validator=Int(IntValidator{strict:false}),definitions=[],cache_strings=True)'
+    )
     v = SchemaValidator({'type': 'int', 'strict': True})
-    assert plain_repr(v) == 'SchemaValidator(title="int",validator=Int(IntValidator{strict:true}),definitions=[])'
+    assert (
+        plain_repr(v)
+        == 'SchemaValidator(title="int",validator=Int(IntValidator{strict:true}),definitions=[],cache_strings=True)'
+    )
     v = SchemaValidator({'type': 'int', 'multiple_of': 7})
     assert plain_repr(v).startswith('SchemaValidator(title="constrained-int",validator=ConstrainedInt(')
 

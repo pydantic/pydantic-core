@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use std::ops::Rem;
 use std::str::FromStr;
 
-use jiter::{JsonArray, JsonValue};
+use jiter::{JsonArray, JsonValue, StringCacheMode};
 use num_bigint::BigInt;
 
 use pyo3::exceptions::PyTypeError;
@@ -19,7 +19,7 @@ use serde::{ser::Error, Serialize, Serializer};
 use crate::errors::{
     py_err_string, ErrorType, ErrorTypeDefaults, InputValue, ToErrorValue, ValError, ValLineError, ValResult,
 };
-use crate::tools::{extract_i64, py_err};
+use crate::tools::{extract_i64, new_py_string, py_err};
 use crate::validators::{CombinedValidator, Exactness, ValidationState, Validator};
 
 use super::{py_error_on_minusone, BorrowInput, Input};
@@ -435,9 +435,9 @@ impl<'a> EitherString<'a> {
         }
     }
 
-    pub fn as_py_string(&'a self, py: Python<'a>) -> Bound<'a, PyString> {
+    pub fn as_py_string(&'a self, py: Python<'a>, cache_str: StringCacheMode) -> Bound<'a, PyString> {
         match self {
-            Self::Cow(cow) => PyString::new_bound(py, cow),
+            Self::Cow(cow) => new_py_string(py, cow.as_ref(), cache_str),
             Self::Py(py_string) => py_string.clone(),
         }
     }
@@ -458,12 +458,6 @@ impl<'a> From<String> for EitherString<'a> {
 impl<'a> From<Bound<'a, PyString>> for EitherString<'a> {
     fn from(date: Bound<'a, PyString>) -> Self {
         Self::Py(date)
-    }
-}
-
-impl<'a> IntoPy<PyObject> for EitherString<'a> {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        self.as_py_string(py).into_py(py)
     }
 }
 

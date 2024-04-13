@@ -1,8 +1,10 @@
+use std::borrow::Cow;
+
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
 use pyo3::{intern, Py, PyAny, Python};
 
-use num_bigint::BigInt;
+use jiter::{JsonErrorType, NumberInt};
 
 use crate::errors::{ErrorTypeDefaults, ValError, ValResult};
 
@@ -61,35 +63,34 @@ fn strip_underscores(s: &str) -> Option<String> {
     // Double consecutive underscores are also not valid
     // If there are no underscores at all, no need to replace anything
     if s.starts_with('_') || s.ends_with('_') || !s.contains('_') || s.contains("__") {
-        // no underscores to strip
-        return None;
+        // no underscores to strip, or underscores in the wrong place
+        None
+    } else {
+        Some(s.replace('_', ""))
     }
-    Some(s.replace('_', ""))
 }
 
 /// parse a string as an int
-///
-/// max length of the input is 4300, see
+/// max length of the input is 4300 which is checked by jiter, see
 /// https://docs.python.org/3/whatsnew/3.11.html#other-cpython-implementation-changes and
 /// https://github.com/python/cpython/issues/95778 for more info in that length bound
 pub fn str_as_int<'py>(input: &(impl Input<'py> + ?Sized), str: &str) -> ValResult<EitherInt<'py>> {
-    let str = str.trim();
-    let len = str.len();
-    if len > 4300 {
-        Err(ValError::new(ErrorTypeDefaults::IntParsingSize, input))
-    } else if let Some(int) = _parse_str(input, str, len) {
-        Ok(int)
-    } else if let Some(str_stripped) = strip_decimal_zeros(str) {
-        if let Some(int) = _parse_str(input, str_stripped, len) {
-            Ok(int)
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::IntParsing, input))
+    // we can't move `NumberInt::try_from` into its own function we fail fast if the string is too long
+    match NumberInt::try_from(str.as_bytes()) {
+        Ok(NumberInt::Int(i)) => return Ok(EitherInt::I64(i)),
+        Ok(NumberInt::BigInt(i)) => return Ok(EitherInt::BigInt(i)),
+        Err(e) => {
+            if e.error_type == JsonErrorType::NumberOutOfRange {
+                return Err(ValError::new(ErrorTypeDefaults::IntParsingSize, input));
+            }
         }
-    } else if let Some(str_stripped) = strip_underscores(str) {
-        if let Some(int) = _parse_str(input, &str_stripped, len) {
-            Ok(int)
-        } else {
-            Err(ValError::new(ErrorTypeDefaults::IntParsing, input))
+    }
+
+    if let Some(cleaned_str) = clean_int_str(str) {
+        match NumberInt::try_from(cleaned_str.as_ref().as_bytes()) {
+            Ok(NumberInt::Int(i)) => Ok(EitherInt::I64(i)),
+            Ok(NumberInt::BigInt(i)) => Ok(EitherInt::BigInt(i)),
+            Err(_) => Err(ValError::new(ErrorTypeDefaults::IntParsing, input)),
         }
     } else {
         Err(ValError::new(ErrorTypeDefaults::IntParsing, input))
@@ -107,28 +108,33 @@ pub fn str_as_float<'py>(input: &(impl Input<'py> + ?Sized), str: &str) -> ValRe
     }
 }
 
-/// parse a string as an int, `input` is required here to get lifetimes to match up
-///
-fn _parse_str<'py>(_input: &(impl Input<'py> + ?Sized), str: &str, len: usize) -> Option<EitherInt<'py>> {
-    if len < 19 {
-        if let Ok(i) = str.parse::<i64>() {
-            return Some(EitherInt::I64(i));
-        }
-    } else if let Ok(i) = str.parse::<BigInt>() {
-        return Some(EitherInt::BigInt(i));
-    }
-    None
-}
+fn clean_int_str(mut s: &str) -> Option<Cow<str>> {
+    let len_before = s.len();
 
-/// we don't want to parse as f64 then call `float_as_int` as it can loose precision for large ints, therefore
-/// we strip `.0+` manually instead, then parse as i64
-fn strip_decimal_zeros(s: &str) -> Option<&str> {
+    // strip leading and trailing whitespace
+    s = s.trim();
+
+    // strip loading zeros
+    s = s.trim_start_matches('0');
+
+    // we don't want to parse as f64 then call `float_as_int` as it can lose precision for large ints, therefore
+    // we strip `.0+` manually instead
     if let Some(i) = s.find('.') {
-        if s[i + 1..].chars().all(|c| c == '0') {
-            return Some(&s[..i]);
+        let decimal_part = &s[i + 1..];
+        if !decimal_part.is_empty() && decimal_part.chars().all(|c| c == '0') {
+            s = &s[..i];
         }
     }
-    None
+
+    // remove underscores
+    if let Some(str_stripped) = strip_underscores(s) {
+        Some(str_stripped.into())
+    } else {
+        match len_before == s.len() {
+            true => None,
+            false => Some(s.into()),
+        }
+    }
 }
 
 pub fn float_as_int<'py>(input: &(impl Input<'py> + ?Sized), float: f64) -> ValResult<EitherInt<'py>> {

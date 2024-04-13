@@ -1,6 +1,6 @@
 [package]
 name = "pydantic-core"
-version = "2.17.0"
+version = "2.18.1"
 edition = "2021"
 license = "MIT"
 homepage = "https://github.com/pydantic/pydantic-core"
@@ -27,15 +27,15 @@ include = [
 rust-version = "1.76"
 
 [dependencies]
-pyo3 = { version = "0.21.0-beta.0", features = ["generate-import-lib", "num-bigint"] }
+pyo3 = { version = "0.21.1", features = ["generate-import-lib", "num-bigint"] }
 regex = "1.10.3"
 strum = { version = "0.25.0", features = ["derive"] }
 strum_macros = "0.26.1"
 serde_json = {version = "1.0.114", features = ["arbitrary_precision", "preserve_order"]}
-enum_dispatch = "0.3.8"
-serde = { version = "1.0.196", features = ["derive"] }
+enum_dispatch = "0.3.13"
+serde = { version = "1.0.197", features = ["derive"] }
 speedate = "0.14.0"
-smallvec = "1.13.1"
+smallvec = "1.13.2"
 ahash = "0.8.10"
 url = "2.5.0"
 # idna is already required by url, added here to be explicit
@@ -44,7 +44,7 @@ base64 = "0.21.7"
 num-bigint = "0.4.4"
 python3-dll-a = "0.2.7"
 uuid = "1.7.0"
-jiter = { version = "0.1.0", features = ["python"] }
+jiter = { version = "0.2.1", features = ["python"] }
 
 [lib]
 name = "_pydantic_core"
@@ -72,12 +72,12 @@ debug = true
 strip = false
 
 [dev-dependencies]
-pyo3 = { version = "0.21.0-beta.0", features = ["auto-initialize"] }
+pyo3 = { version = "0.21.0", features = ["auto-initialize"] }
 
 [build-dependencies]
 version_check = "0.9.4"
 # used where logic has to be version/distribution specific, e.g. pypy
-pyo3-build-config = { version = "0.21.0-beta.0" }
+pyo3-build-config = { version = "0.21.0" }
 
 [lints.clippy]
 dbg_macro = "warn"

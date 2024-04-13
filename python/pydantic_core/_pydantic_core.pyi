@@ -264,7 +264,7 @@ class SchemaSerializer:
         exclude_defaults: bool = False,
         exclude_none: bool = False,
         round_trip: bool = False,
-        warnings: bool = True,
+        warnings: bool | Literal['none', 'warn', 'error'] = True,
         fallback: Callable[[Any], Any] | None = None,
         serialize_as_any: bool = False,
         context: dict[str, Any] | None = None,
@@ -284,7 +284,8 @@ class SchemaSerializer:
             exclude_defaults: Whether to exclude fields that are equal to their default value.
             exclude_none: Whether to exclude fields that have a value of `None`.
             round_trip: Whether to enable serialization and validation round-trip support.
-            warnings: Whether to log warnings when invalid fields are encountered.
+            warnings: How to handle invalid fields. False/"none" ignores them, True/"warn" logs errors,
+                "error" raises a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError].
             fallback: A function to call when an unknown value is encountered,
                 if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
             serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
@@ -309,7 +310,7 @@ class SchemaSerializer:
         exclude_defaults: bool = False,
         exclude_none: bool = False,
         round_trip: bool = False,
-        warnings: bool = True,
+        warnings: bool | Literal['none', 'warn', 'error'] = True,
         fallback: Callable[[Any], Any] | None = None,
         serialize_as_any: bool = False,
         context: dict[str, Any] | None = None,
@@ -328,7 +329,8 @@ class SchemaSerializer:
             exclude_defaults: Whether to exclude fields that are equal to their default value.
             exclude_none: Whether to exclude fields that have a value of `None`.
             round_trip: Whether to enable serialization and validation round-trip support.
-            warnings: Whether to log warnings when invalid fields are encountered.
+            warnings: How to handle invalid fields. False/"none" ignores them, True/"warn" logs errors,
+                "error" raises a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError].
             fallback: A function to call when an unknown value is encountered,
                 if `None` a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError] error is raised.
             serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
@@ -390,17 +392,26 @@ def to_json(
        JSON bytes.
     """
 
-def from_json(data: str | bytes | bytearray, *, allow_inf_nan: bool = True, cache_strings: bool = True) -> Any:
+def from_json(
+    data: str | bytes | bytearray,
+    *,
+    allow_inf_nan: bool = True,
+    cache_strings: bool | Literal['all', 'keys', 'none'] = True,
+    allow_partial: bool = False,
+) -> Any:
     """
     Deserialize JSON data to a Python object.
 
-    This is effectively a faster version of `json.loads()`.
+    This is effectively a faster version of `json.loads()`, with some extra functionality.
 
     Arguments:
         data: The JSON data to deserialize.
         allow_inf_nan: Whether to allow `Infinity`, `-Infinity` and `NaN` values as `json.loads()` does by default.
         cache_strings: Whether to cache strings to avoid constructing new Python objects,
-            this should have a significant impact on performance while increasing memory usage slightly.
+            this should have a significant impact on performance while increasing memory usage slightly,
+            `all/True` means cache all strings, `keys` means cache only dict keys, `none/False` means no caching.
+        allow_partial: Whether to allow partial deserialization, if `True` JSON data is returned if the end of the
+            input is reached before the full object is deserialized, e.g. `["aa", "bb", "c` would return `['aa', 'bb']`.
 
     Raises:
         ValueError: If deserialization fails.
