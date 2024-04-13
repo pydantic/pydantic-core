@@ -151,22 +151,21 @@ fn strip_leading_zeros(s: &str) -> Option<&str> {
         // anything else is invalid, we return None
         _ => return None,
     };
-    loop {
-        match char_iter.next() {
-            // continue on more leading zeros
-            Some((_, '0')) => (),
-            // if we get an underscore we continue - we're "within the number"
-            Some((_, '_')) => (),
+    for (i, c) in char_iter {
+        match c {
+            // continue on more leading zeros or if we get an underscore we continue - we're "within the number"
+            '0' | '_' => (),
             // any other digit we return the rest of the string
-            Some((i, c)) if ('1'..='9').contains(&c) => return Some(&s[i..]),
+            '1'..='9' => return Some(&s[i..]),
             // if we get a dot we return the rest of the string but include the last zero
-            Some((i, '.')) => return Some(&s[(i - 1)..]),
-            // if the string is all zeros, we return a single zero
-            None => return Some("0"),
+            '.' => return Some(&s[(i - 1)..]),
             // anything else is invalid, we return None
             _ => return None,
         }
     }
+    // if the string is all zeros (or underscores), we return the last character
+    // generally this will be zero, but could be an underscore, which will fail
+    Some(&s[s.len() - 1..])
 }
 
 pub fn float_as_int<'py>(input: &(impl Input<'py> + ?Sized), float: f64) -> ValResult<EitherInt<'py>> {

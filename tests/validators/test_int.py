@@ -36,6 +36,7 @@ i64_max = 9_223_372_036_854_775_807
         ('042', 42),
         ('01', 1),
         ('09', 9),
+        ('00_', Err('Input should be a valid integer, unable to parse string as an integer')),
         # next character after 9 is not valid
         ('0:', Err('Input should be a valid integer, unable to parse string as an integer')),
         ('4_2', 42),
