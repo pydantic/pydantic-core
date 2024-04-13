@@ -115,7 +115,10 @@ fn clean_int_str(mut s: &str) -> Option<Cow<str>> {
     s = s.trim();
 
     // strip loading zeros
-    s = s.trim_start_matches('0');
+    match strip_leading_zeros(s) {
+        Some(str_stripped) => s = str_stripped,
+        None => return None,
+    }
 
     // we don't want to parse as f64 then call `float_as_int` as it can lose precision for large ints, therefore
     // we strip `.0+` manually instead
@@ -133,6 +136,38 @@ fn clean_int_str(mut s: &str) -> Option<Cow<str>> {
         match len_before == s.len() {
             true => None,
             false => Some(s.into()),
+        }
+    }
+}
+
+/// strip leading zeros from a string, we can't simple use `s.trim_start_matches('0')`, because:
+/// - we need to keep one zero if the string is only zeros e.g. `000` -> `0`
+/// - we need to keep the zero if the string is a float which is an exact int e.g. `0.0` -> `0.0`
+/// - underscores within the zeros should be ignored e.g. `0_000` -> `0`
+fn strip_leading_zeros(s: &str) -> Option<&str> {
+    let mut char_iter = s.char_indices();
+    match char_iter.next() {
+        // if we get a leading zero we continue
+        Some((_, '0')) => (),
+        // if we get another digit we return the whole string
+        Some((_, c)) if ('1'..='9').contains(&c) => return Some(s),
+        // anything else is invalid, we return None
+        _ => return None,
+    };
+    loop {
+        match char_iter.next() {
+            // continue on more leading zeros
+            Some((_, '0')) => (),
+            // if we get an underscore we continue - we're "within the number"
+            Some((_, '_')) => (),
+            // any other digit we return the rest of the string
+            Some((i, c)) if ('1'..='9').contains(&c) => return Some(&s[i..]),
+            // if we get a dot we return the rest of the string but include the last zero
+            Some((i, '.')) => return Some(&s[(i - 1)..]),
+            // if the string is all zeros, we return a single zero
+            None => return Some("0"),
+            // anything else is invalid, we return None
+            _ => return None,
         }
     }
 }
