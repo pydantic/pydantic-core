@@ -115,10 +115,7 @@ fn clean_int_str(mut s: &str) -> Option<Cow<str>> {
     s = s.trim();
 
     // strip loading zeros
-    match strip_leading_zeros(s) {
-        Some(str_stripped) => s = str_stripped,
-        None => return None,
-    }
+    s = strip_leading_zeros(s)?;
 
     // we don't want to parse as f64 then call `float_as_int` as it can lose precision for large ints, therefore
     // we strip `.0+` manually instead
@@ -142,8 +139,8 @@ fn clean_int_str(mut s: &str) -> Option<Cow<str>> {
 
 /// strip leading zeros from a string, we can't simple use `s.trim_start_matches('0')`, because:
 /// - we need to keep one zero if the string is only zeros e.g. `000` -> `0`
-/// - we need to keep the zero if the string is a float which is an exact int e.g. `0.0` -> `0.0`
-/// - underscores within the zeros should be ignored e.g. `0_000` -> `0`
+/// - we need to keep one zero if the string is a float which is an exact int e.g. `00.0` -> `0.0`
+/// - underscores within leading zeros should also be stripped e.g. `0_000` -> `0`, but not `_000`
 fn strip_leading_zeros(s: &str) -> Option<&str> {
     let mut char_iter = s.char_indices();
     match char_iter.next() {
