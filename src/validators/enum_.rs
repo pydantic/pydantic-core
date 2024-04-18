@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
+use pyo3::types::PyString;
 use pyo3::types::{PyDict, PyList, PyType};
 
 use crate::build_tools::{is_strict, py_schema_err};
@@ -159,8 +160,16 @@ impl EnumValidateValue for PlainEnumValidator {
         py: Python<'py>,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
-        _strict: bool,
+        strict: bool,
     ) -> ValResult<Option<PyObject>> {
+        // if value is a subclass of str, use validate_str approach
+        if let Some(py_input) = input.as_python() {
+            if !strict && py_input.is_instance_of::<PyString>() {
+                return Ok(lookup.validate_str(input, false)?.map(|v| v.clone_ref(py)));
+            }
+        }
+
+        // otherwise, use generic literal lookup
         Ok(lookup.validate(py, input)?.map(|(_, v)| v.clone_ref(py)))
     }
 }
