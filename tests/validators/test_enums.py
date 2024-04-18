@@ -274,7 +274,7 @@ def test_enum_with_str_subclass():
         a = 'a'
         b = 'b'
 
-    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), sub_type='str'))
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()))
 
     assert v.validate_python(MyEnum.a) is MyEnum.a
     assert v.validate_python('a') is MyEnum.a
