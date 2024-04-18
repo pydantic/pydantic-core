@@ -47,6 +47,7 @@ i64_max = 9_223_372_036_854_775_807
         ('+0_42', 42),
         ('+4_2.0', 42),
         ('+04_2.0', 42),
+        ('++4_2', Err('Input should be a valid integer, unable to parse string as an integer')),
         ('4_2', 42),
         ('0_42', 42),
         ('4_2.0', 42),
