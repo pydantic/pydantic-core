@@ -267,3 +267,21 @@ def test_plain_enum_empty():
 
     with pytest.raises(SchemaError, match='`members` should have length > 0'):
         SchemaValidator(core_schema.enum_schema(MyEnum, []))
+
+
+def test_enum_with_str_subclass():
+    class MyEnum(Enum):
+        a = 'a'
+        b = 'b'
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), sub_type='str'))
+
+    assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python('a') is MyEnum.a
+
+    class MyStr(str):
+        pass
+
+    assert v.validate_python(MyStr('a')) is MyEnum.a
+    with pytest.raises(ValidationError):
+        v.validate_python(MyStr('a'), strict=True)
