@@ -114,6 +114,9 @@ fn clean_int_str(mut s: &str) -> Option<Cow<str>> {
     // strip leading and trailing whitespace
     s = s.trim();
 
+    // strip leading unary plus
+    s = s.trim_start_matches('+');
+
     // strip loading zeros
     s = strip_leading_zeros(s)?;
 
