@@ -119,7 +119,7 @@ def test_int_py_and_json(py_and_json: PyAndJson, input_value, expected):
             Decimal('1.001'),
             Err(
                 'Input should be a valid integer, got a number with a fractional part '
-                "[type=int_from_float, input_value=Decimal('1.001'), input_type=Decimal]"
+                "[type=int_from_float, input_value=Decimal('1.001'), input_type=decimal.Decimal]"
             ),
             id='decimal-remainder',
         ),
@@ -166,7 +166,7 @@ def test_int(input_value, expected):
             Decimal('1.001'),
             Err(
                 'Input should be a valid integer, got a number with a fractional part '
-                "[type=int_from_float, input_value=Decimal('1.001'), input_type=Decimal]"
+                "[type=int_from_float, input_value=Decimal('1.001'), input_type=decimal.Decimal]"
             ),
             id='decimal-remainder',
         ),

@@ -18,7 +18,7 @@ use crate::errors::LocItem;
 use crate::get_pydantic_version;
 use crate::input::InputType;
 use crate::serializers::{DuckTypingSerMode, Extra, SerMode, SerializationState};
-use crate::tools::{safe_repr, SchemaDict};
+use crate::tools::{get_type_name, safe_repr, SchemaDict};
 
 use super::line_error::ValLineError;
 use super::location::Location;
@@ -572,7 +572,7 @@ impl PyLineError {
             let input_str = safe_repr(input_value);
             truncate_input_value!(output, &input_str.to_cow());
 
-            if let Ok(type_) = input_value.get_type().qualname() {
+            if let Ok(type_) = get_type_name(input_value.get_type()) {
                 write!(output, ", input_type={type_}")?;
             }
         }

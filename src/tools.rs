@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::{PyDict, PyString, PyType};
 use pyo3::{ffi, intern, FromPyObject};
 
 use jiter::{cached_py_string, pystring_fast_new, StringCacheMode};
@@ -112,6 +112,18 @@ impl std::fmt::Display for ReprOutput<'_> {
             ReprOutput::Fallback(s) => write!(f, "{s}"),
         }
     }
+}
+
+pub fn get_type_name(t: Bound<'_, PyType>) -> Result<String, ()> {
+    if let Ok(repr) = t.repr() {
+        let repr = repr.to_string();
+        if repr.starts_with("<class '") {
+            return Ok(repr[8..repr.len() - 2].to_owned());
+        }
+        // For example repr(typing.Literal) is 'typing.Literal'
+        return Ok(repr);
+    }
+    Err(())
 }
 
 pub fn safe_repr<'py>(v: &Bound<'py, PyAny>) -> ReprOutput<'py> {
