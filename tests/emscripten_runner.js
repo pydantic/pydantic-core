@@ -83,9 +83,9 @@ async function main() {
     const pyodide = await loadPyodide();
     const FS = pyodide.FS;
     setupStreams(FS, pyodide._module.TTY);
-    FS.mkdir('/test_dir');
-    FS.mount(FS.filesystems.NODEFS, {root: path.join(root_dir, 'tests')}, '/test_dir');
-    FS.chdir('/test_dir');
+    FS.mkdir('/tests');
+    FS.mount(FS.filesystems.NODEFS, {root: path.join(root_dir, 'tests')}, '/tests');
+    FS.chdir('/tests');
     await pyodide.loadPackage(['micropip', 'pytest', 'pytz']);
     // language=python
     errcode = await pyodide.runPythonAsync(`
