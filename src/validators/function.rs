@@ -162,7 +162,7 @@ impl_build!(FunctionAfterValidator, "function-after");
 impl FunctionAfterValidator {
     fn _validate<'py, I: Input<'py> + ?Sized>(
         &self,
-        call: impl FnOnce(&I, &mut ValidationState<'_, 'py>) -> ValResult<PyObject>,
+        call: impl FnOnce(&I, &mut ValidationState<'_, 'py>) -> ValResult<Bound<'py, PyAny>>,
         py: Python<'py>,
         input: &I,
         state: &mut ValidationState<'_, 'py>,
@@ -170,11 +170,11 @@ impl FunctionAfterValidator {
         let v = call(input, state)?;
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (v.to_object(py), info))
+            self.func.call1(py, (v.clone(), info))
         } else {
-            self.func.call1(py, (v.to_object(py),))
+            self.func.call1(py, (v.clone(),))
         };
-        r.map_err(|e| convert_err(py, e, input))
+        r.map_err(|e| convert_err(py, e, v))
     }
 }
 
@@ -191,7 +191,9 @@ impl Validator for FunctionAfterValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let validate = |v: &_, s: &mut ValidationState<'_, 'py>| self.validator.validate(py, v, s);
+        let validate = |v: &_, s: &mut ValidationState<'_, 'py>| {
+            self.validator.validate(py, v, s).map(|object| object.into_bound(py))
+        };
         self._validate(validate, py, input, state)
     }
     fn validate_assignment<'py>(
@@ -203,7 +205,9 @@ impl Validator for FunctionAfterValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let validate = move |v: &Bound<'py, PyAny>, s: &mut ValidationState<'_, 'py>| {
-            self.validator.validate_assignment(py, v, field_name, field_value, s)
+            self.validator
+                .validate_assignment(py, v, field_name, field_value, s)
+                .map(|object| object.into_bound(py))
         };
         self._validate(validate, py, obj, state)
     }
