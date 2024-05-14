@@ -64,7 +64,6 @@ impl BuildValidator for ArgumentsValidator {
                 .map(|py_str| py_str.to_str())
                 .transpose()?
                 .unwrap_or("positional_or_keyword");
-
             let positional = mode == "positional_only" || mode == "positional_or_keyword";
             if positional {
                 positional_params_count = arg_index + 1;
