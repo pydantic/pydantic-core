@@ -51,6 +51,7 @@ impl BuildValidator for ArgumentsValidator {
 
         let mut positional_params_count = 0;
         let mut had_default_arg = false;
+        let mut had_keyword_only = false;
 
         for (arg_index, arg) in arguments_schema.iter().enumerate() {
             let arg = arg.downcast::<PyDict>()?;
@@ -63,9 +64,14 @@ impl BuildValidator for ArgumentsValidator {
                 .map(|py_str| py_str.to_str())
                 .transpose()?
                 .unwrap_or("positional_or_keyword");
+
             let positional = mode == "positional_only" || mode == "positional_or_keyword";
             if positional {
                 positional_params_count = arg_index + 1;
+            }
+
+            if mode == "keyword_only" {
+                had_keyword_only = true;
             }
 
             let mut kw_lookup_key = None;
@@ -98,7 +104,7 @@ impl BuildValidator for ArgumentsValidator {
                 _ => false,
             };
 
-            if had_default_arg && !has_default {
+            if had_default_arg && !has_default && !had_keyword_only {
                 return py_schema_err!("Non-default argument '{}' follows default argument", name);
             } else if has_default {
                 had_default_arg = true;
