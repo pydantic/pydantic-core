@@ -5,7 +5,7 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
-use pyo3::types::{PyDict, PyList, PyType};
+use pyo3::types::{PyDict, PyFloat, PyInt, PyList, PyType};
 
 use crate::build_tools::{is_strict, py_schema_err};
 use crate::errors::{ErrorType, ValError, ValResult};
@@ -164,8 +164,14 @@ impl EnumValidateValue for PlainEnumValidator {
     ) -> ValResult<Option<PyObject>> {
         // if value is a subclass of str, use validate_str approach
         if let Some(py_input) = input.as_python() {
-            if !strict && py_input.is_instance_of::<PyString>() {
-                return Ok(lookup.validate_str(input, false)?.map(|v| v.clone_ref(py)));
+            if !strict {
+                if py_input.is_instance_of::<PyString>() {
+                    return Ok(lookup.validate_str(input, false)?.map(|v| v.clone_ref(py)));
+                } else if py_input.is_instance_of::<PyInt>() {
+                    return Ok(lookup.validate_int(py, input, false)?.map(|v| v.clone_ref(py)));
+                } else if py_input.is_instance_of::<PyFloat>() {
+                    return Ok(lookup.validate_int(py, input, false)?.map(|v| v.clone_ref(py)));
+                }
             }
         }
 

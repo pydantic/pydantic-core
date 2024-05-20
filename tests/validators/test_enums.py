@@ -269,7 +269,7 @@ def test_plain_enum_empty():
         SchemaValidator(core_schema.enum_schema(MyEnum, []))
 
 
-def test_enum_with_str_subclass():
+def test_enum_with_str_subclass() -> None:
     class MyEnum(Enum):
         a = 'a'
         b = 'b'
@@ -285,3 +285,31 @@ def test_enum_with_str_subclass():
     assert v.validate_python(MyStr('a')) is MyEnum.a
     with pytest.raises(ValidationError):
         v.validate_python(MyStr('a'), strict=True)
+
+
+def test_enum_with_int_subclass() -> None:
+    class MyEnum(Enum):
+        a = 1
+        b = 2
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+
+    assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python(1) is MyEnum.a
+
+    class MyInt(int):
+        pass
+
+    assert v.validate_python(MyInt(1)) is MyEnum.a
+    with pytest.raises(ValidationError):
+        v.validate_python(MyInt(1), strict=True)
+
+
+def test_validate_float_for_int_enum() -> None:
+    class MyEnum(int, Enum):
+        a = 1
+        b = 2
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+
+    assert v.validate_python(1.0) is MyEnum.a
