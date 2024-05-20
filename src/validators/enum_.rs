@@ -169,9 +169,9 @@ impl EnumValidateValue for PlainEnumValidator {
         lookup: &LiteralLookup<PyObject>,
         strict: bool,
     ) -> ValResult<Option<PyObject>> {
-        match Ok(lookup.validate(py, input)?.map(|(_, v)| v.clone_ref(py))) {
-            Ok(Some(validation_match)) => Ok(Some(validation_match)),
-            Ok(None) => {
+        match lookup.validate(py, input)? {
+            Some((_, v)) => Ok(Some(v.clone_ref(py))),
+            None => {
                 if !strict {
                     if let Some(py_input) = input.as_python() {
                         // necessary for compatibility with 2.6, where str and int subclasses are allowed
@@ -187,7 +187,6 @@ impl EnumValidateValue for PlainEnumValidator {
                 }
                 Ok(None)
             }
-            Err(val_err) => Err(val_err),
         }
     }
 }
