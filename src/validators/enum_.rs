@@ -4,8 +4,7 @@ use std::marker::PhantomData;
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::PyString;
-use pyo3::types::{PyDict, PyFloat, PyInt, PyList, PyType};
+use pyo3::types::{PyDict, PyFloat, PyInt, PyList, PyString, PyType};
 
 use crate::build_tools::{is_strict, py_schema_err};
 use crate::errors::{ErrorType, ValError, ValResult};
@@ -170,21 +169,24 @@ impl EnumValidateValue for PlainEnumValidator {
         lookup: &LiteralLookup<PyObject>,
         strict: bool,
     ) -> ValResult<Option<PyObject>> {
-        // if value is a subclass of str, use validate_str approach
-        if let Some(py_input) = input.as_python() {
-            if !strict {
-                if py_input.is_instance_of::<PyString>() {
-                    return Ok(lookup.validate_str(input, false)?.map(|v| v.clone_ref(py)));
-                } else if py_input.is_instance_of::<PyInt>() {
-                    return Ok(lookup.validate_int(py, input, false)?.map(|v| v.clone_ref(py)));
-                } else if py_input.is_instance_of::<PyFloat>() {
-                    return Ok(lookup.validate_int(py, input, false)?.map(|v| v.clone_ref(py)));
+        match Ok(lookup.validate(py, input)?.map(|(_, v)| v.clone_ref(py))) {
+            Ok(Some(validation_match)) => Ok(Some(validation_match)),
+            Ok(None) => {
+                if !strict {
+                    if let Some(py_input) = input.as_python() {
+                        if py_input.is_instance_of::<PyString>() {
+                            return Ok(lookup.validate_str(input, false)?.map(|v| v.clone_ref(py)));
+                        } else if py_input.is_instance_of::<PyInt>() {
+                            return Ok(lookup.validate_int(py, input, false)?.map(|v| v.clone_ref(py)));
+                        } else if py_input.is_instance_of::<PyFloat>() {
+                            return Ok(lookup.validate_int(py, input, false)?.map(|v| v.clone_ref(py)));
+                        }
+                    }
                 }
+                Ok(None)
             }
+            Err(val_err) => Err(val_err),
         }
-
-        // otherwise, use generic literal lookup
-        Ok(lookup.validate(py, input)?.map(|(_, v)| v.clone_ref(py)))
     }
 }
 
