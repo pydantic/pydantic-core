@@ -376,3 +376,22 @@ def test_partial_parse():
     with pytest.raises(ValueError, match='EOF while parsing a string at line 1 column 15'):
         from_json(b'["aa", "bb", "c')
     assert from_json(b'["aa", "bb", "c', allow_partial=True) == ['aa', 'bb']
+
+
+def test_json_bytes_base64_round_trip():
+    data = b'hello'
+    encoded = b'"aGVsbG8="'
+    assert to_json(data, bytes_mode='base64') == encoded
+
+    v = SchemaValidator({'type': 'bytes'}, {'ser_json_bytes': 'base64'})
+    assert v.validate_json(encoded) == data
+
+    with pytest.raises(ValueError):
+        v.validate_json('"wrong!"')
+
+    assert to_json({'key': data}, bytes_mode='base64') == b'{"key":"aGVsbG8="}'
+    v = SchemaValidator(
+        {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'bytes'}},
+        {'ser_json_bytes': 'base64'},
+    )
+    assert v.validate_json('{"key":"aGVsbG8="}') == {'key': data}

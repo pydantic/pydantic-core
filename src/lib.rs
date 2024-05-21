@@ -7,6 +7,7 @@ use std::sync::OnceLock;
 use jiter::StringCacheMode;
 use pyo3::exceptions::PyTypeError;
 use pyo3::{prelude::*, sync::GILOnceCell};
+use serializers::config::BytesMode;
 
 // parse this first to get access to the contained macro
 #[macro_use]
@@ -55,7 +56,7 @@ pub fn from_json<'py>(
     allow_partial: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let v_match = data
-        .validate_bytes(false)
+        .validate_bytes(false, BytesMode::Utf8)
         .map_err(|_| PyTypeError::new_err("Expected bytes, bytearray or str"))?;
     let json_either_bytes = v_match.into_inner();
     let json_bytes = json_either_bytes.as_slice();

@@ -13,6 +13,7 @@ use crate::input::input_as_python_instance;
 use crate::input::Input;
 use crate::input::InputType;
 use crate::input::ValidationMatch;
+use crate::serializers::config::BytesMode;
 use crate::tools::SchemaDict;
 
 use super::model::create_class;
@@ -169,7 +170,7 @@ impl UuidValidator {
             }
             None => {
                 let either_bytes = input
-                    .validate_bytes(true)
+                    .validate_bytes(true, BytesMode::Utf8)
                     .map_err(|_| ValError::new(ErrorTypeDefaults::UuidType, input))?
                     .into_inner();
                 let bytes_slice = either_bytes.as_slice();
