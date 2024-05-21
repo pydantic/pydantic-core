@@ -379,19 +379,26 @@ def test_partial_parse():
 
 
 def test_json_bytes_base64_round_trip():
-    data = b'hello'
-    encoded = b'"aGVsbG8="'
-    assert to_json(data, bytes_mode='base64') == encoded
+    data = b'TDR3\xbe\x11J\xe9\x9f\xa4&\x91\xff\xc8\xef4\xdf\xd3$\xf3^\xca\xb5\x14V \xdeDH\n\x85\x8b'
+    encoded_std = b'"VERSM74RSumfpCaR/8jvNN/TJPNeyrUUViDeREgKhYs="'
+    encoded_url = b'"VERSM74RSumfpCaR_8jvNN_TJPNeyrUUViDeREgKhYs="'
+    assert to_json(data, bytes_mode='base64') == encoded_url
 
     v = SchemaValidator({'type': 'bytes'}, {'val_json_bytes': 'base64'})
-    assert v.validate_json(encoded) == data
+    assert v.validate_json(encoded_url) == data
+    assert v.validate_json(encoded_std) == data
 
-    assert to_json({'key': data}, bytes_mode='base64') == b'{"key":"aGVsbG8="}'
+    with pytest.raises(ValidationError) as exc:
+        v.validate_json('"wrong!"')
+    [details] = exc.value.errors()
+    assert details['type'] == 'bytes_invalid_encoding'
+
+    assert to_json({'key': data}, bytes_mode='base64') == b'{"key":' + encoded_url + b'}'
     v = SchemaValidator(
         {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'bytes'}},
         {'val_json_bytes': 'base64'},
     )
-    assert v.validate_json('{"key":"aGVsbG8="}') == {'key': data}
+    assert v.validate_json(b'{"key":' + encoded_url + b'}') == {'key': data}
 
 
 def test_json_bytes_base64_invalid():

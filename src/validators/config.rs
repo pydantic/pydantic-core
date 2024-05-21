@@ -28,7 +28,7 @@ impl ValBytesMode {
     pub fn deserialize_string<'py>(self, s: &str) -> Result<EitherBytes<'_, 'py>, ErrorType> {
         match self.ser {
             BytesMode::Utf8 => Ok(EitherBytes::Cow(Cow::Borrowed(s.as_bytes()))),
-            BytesMode::Base64 => match base64::engine::general_purpose::URL_SAFE.decode(s) {
+            BytesMode::Base64 => match base64::engine::general_purpose::URL_SAFE.decode(to_base64_urlsafe(s)) {
                 Ok(bytes) => Ok(EitherBytes::from(bytes)),
                 Err(err) => Err(ErrorType::BytesInvalidEncoding {
                     encoding: "base64".to_string(),
@@ -45,5 +45,13 @@ impl ValBytesMode {
                 }),
             },
         }
+    }
+}
+
+fn to_base64_urlsafe(s: &str) -> String {
+    if s.contains('+') || s.contains('/') {
+        s.replace('+', "-").replace('/', "_")
+    } else {
+        s.to_string()
     }
 }
