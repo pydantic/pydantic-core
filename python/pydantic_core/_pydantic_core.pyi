@@ -163,9 +163,7 @@ class SchemaValidator:
         Returns:
             The validated Python object.
         """
-    def validate_strings(
-        self, input: _StringInput, *, strict: bool | None = None, context: Any | None = None
-    ) -> Any:
+    def validate_strings(self, input: _StringInput, *, strict: bool | None = None, context: Any | None = None) -> Any:
         """
         Validate a string against the schema and return the validated Python object.
 
