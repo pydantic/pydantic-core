@@ -130,13 +130,13 @@ def type_dict_schema(  # noqa: C901
             if 'CoreSchema' == fr_arg or re.search('[^a-zA-Z]CoreSchema', fr_arg):
                 if fr_arg == 'CoreSchema':
                     schema = schema_ref_validator
-                elif fr_arg == 'List[CoreSchema]':
+                elif fr_arg == 'list[CoreSchema]':
                     schema = {'type': 'list', 'items_schema': schema_ref_validator}
-                elif fr_arg == 'Dict[str, CoreSchema]':
+                elif fr_arg == 'dict[str, CoreSchema]':
                     schema = {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': schema_ref_validator}
-                elif fr_arg == 'Dict[Hashable, CoreSchema]':
+                elif fr_arg == 'dict[Hashable, CoreSchema]':
                     schema = {'type': 'dict', 'keys_schema': {'type': 'any'}, 'values_schema': schema_ref_validator}
-                elif fr_arg == 'List[Union[CoreSchema, Tuple[CoreSchema, str]]]':
+                elif fr_arg == 'list[Union[CoreSchema, tuple[CoreSchema, str]]]':
                     schema = {
                         'type': 'list',
                         'items_schema': {
