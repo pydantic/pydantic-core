@@ -2,7 +2,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use jiter::{map_json_error, JsonValue, PartialMode, PythonParse};
+use jiter::{JsonValue, PartialMode, PythonParse};
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{EitherBytes, Input, InputType, ValidationMatch};
