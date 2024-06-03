@@ -73,7 +73,7 @@ impl Validator for JsonValidator {
                 };
                 let obj = parse_builder
                     .python_parse(py, json_bytes)
-                    .map_err(|e| map_json_error(json_bytes, &e))?;
+                    .map_err(|e| map_json_err(json_bytes, &e))?;
                 Ok(obj.unbind())
             }
         }
