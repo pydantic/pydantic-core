@@ -9,7 +9,8 @@ from pydantic_core import SchemaValidator, ValidationError, core_schema
 from ..conftest import Err, PyAndJson
 
 
-class MyStr(str): ...
+class MyStr(str):
+    ...
 
 
 @pytest.mark.parametrize(

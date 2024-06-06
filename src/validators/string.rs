@@ -230,18 +230,36 @@ impl RegexEngine {
 }
 
 impl Pattern {
-    fn compile(py: Python<'_>, pattern: String, engine: &str) -> PyResult<Self> {
+    fn compile(py: Python<'_>, pattern: Bound<'_, PyAny>, engine: &str) -> PyResult<Self> {
         let engine = match engine {
             RegexEngine::RUST_REGEX => {
+                let pattern = pattern.to_string();
                 RegexEngine::RustRegex(Regex::new(&pattern).map_err(|e| py_schema_error_type!("{}", e))?)
             }
             RegexEngine::PYTHON_RE => {
-                let re_compile = py.import_bound(intern!(py, "re"))?.getattr(intern!(py, "compile"))?;
-                RegexEngine::PythonRe(re_compile.call1((&pattern,))?.into())
+                let py = pattern.py();
+                let re_module = py.import_bound(intern!(py, "re"))?;
+                let re_compile = re_module.getattr(intern!(py, "compile"))?;
+                let re_pattern = re_module.getattr(intern!(py, "Pattern"))?;
+
+                let pattern_compiled = if pattern.is_instance_of::<PyString>() {
+                    re_compile.call1((&pattern,))?.into()
+                } else if pattern.is_instance(&re_pattern)? {
+                    pattern.to_object(py)
+                } else {
+                    return Err(py_schema_error_type!(
+                        "Invalid pattern, must be str or re.Pattern: {}",
+                        pattern
+                    ));
+                };
+                RegexEngine::PythonRe(pattern_compiled)
             }
             _ => return Err(py_schema_error_type!("Invalid regex engine: {}", engine)),
         };
-        Ok(Self { pattern, engine })
+        Ok(Self {
+            pattern: pattern.to_string(),
+            engine,
+        })
     }
 
     fn is_match(&self, py: Python<'_>, target: &str) -> PyResult<bool> {
