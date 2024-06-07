@@ -1399,6 +1399,7 @@ class ListSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    fail_fast: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1410,6 +1411,7 @@ def list_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    fail_fast: bool = False,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1430,6 +1432,7 @@ def list_schema(
         items_schema: The value must be a list of items that match this schema
         min_length: The value must be a list with at least this many items
         max_length: The value must be a list with at most this many items
+        fail_fast: Stop validation on the first error
         strict: The value must be a list with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1440,6 +1443,7 @@ def list_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        fail_fast=fail_fast,
         strict=strict,
         ref=ref,
         metadata=metadata,

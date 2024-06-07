@@ -397,6 +397,23 @@ def test_max_length_fail_fast(error_in_func: bool) -> None:
     )
 
 
+def test_list_fail_fast():
+    s = core_schema.list_schema(core_schema.int_schema(), fail_fast=True)
+    v = SchemaValidator(s)
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python([1, 'not-num', 'again'])
+
+    assert exc_info.value.errors(include_url=False) == [
+        {
+            'type': 'int_parsing',
+            'loc': (1,),
+            'msg': 'Input should be a valid integer, unable to parse string as an integer',
+            'input': 'not-num',
+        }
+    ]
+
+
 class MySequence(collections.abc.Sequence):
     def __init__(self, data: List[Any]):
         self._data = data
