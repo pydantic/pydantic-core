@@ -1411,7 +1411,7 @@ def list_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
-    fail_fast: bool = False,
+    fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
