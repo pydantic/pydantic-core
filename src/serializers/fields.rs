@@ -8,6 +8,7 @@ use serde::ser::SerializeMap;
 use smallvec::SmallVec;
 
 use crate::serializers::extra::SerCheck;
+use crate::serializers::CombinedSerializer::Function;
 use crate::serializers::DuckTypingSerMode;
 use crate::PydanticSerializationUnexpectedValue;
 
@@ -176,12 +177,15 @@ impl GeneralFieldsSerializer {
                 if let Some(field) = op_field {
                     if let Some(ref serializer) = field.serializer {
                         if !exclude_default(&value, &field_extra, serializer)? {
-                            let value = serializer.to_python(
-                                &value,
-                                next_include.as_ref(),
-                                next_exclude.as_ref(),
-                                &field_extra,
-                            )?;
+                            let value = match serializer {
+                                Function(_) => serializer.to_python(&value, include, exclude, &field_extra),
+                                _ => serializer.to_python(
+                                    &value,
+                                    next_include.as_ref(),
+                                    next_exclude.as_ref(),
+                                    &field_extra,
+                                ),
+                            }?;
                             let output_key = field.get_key_py(output_dict.py(), &field_extra);
                             output_dict.set_item(output_key, value)?;
                         }

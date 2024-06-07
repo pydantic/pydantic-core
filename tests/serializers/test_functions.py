@@ -218,6 +218,37 @@ def test_function_known_type():
         assert s.to_json('abc') == b'"abc"'
 
 
+def test_function_include_and_exclude_args_str():
+    def ser_field(value, info):
+        if info.include != {'bar'}:
+            raise AssertionError('include value is not correct')
+        if info.exclude != {'foo'}:
+            raise AssertionError('exclude value is not correct')
+        return value
+
+    class MyModel:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            MyModel,
+            core_schema.model_fields_schema(
+                {
+                    'foo': core_schema.model_field(
+                        core_schema.str_schema(
+                            serialization=core_schema.plain_serializer_function_ser_schema(ser_field, info_arg=True)
+                        )
+                    ),
+                    'bar': core_schema.model_field(core_schema.str_schema()),
+                }
+            ),
+        )
+    )
+    v = s.to_python(MyModel(foo='foo_value', bar='bar_value'), include={'bar'}, exclude={'foo'})
+    assert v == {'bar': 'bar_value'}
+
+
 def test_function_args_str():
     def append_args(value, info):
         return f'{value} info={info}'
