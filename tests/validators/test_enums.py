@@ -1,5 +1,6 @@
 import re
 import sys
+from decimal import Decimal
 from enum import Enum, IntEnum, IntFlag
 
 import pytest
@@ -344,3 +345,34 @@ def test_big_int():
 
     assert v.validate_python(ColorEnum.GREEN) is ColorEnum.GREEN
     assert v.validate_python(1 << 63) is ColorEnum.GREEN
+
+
+@pytest.mark.parametrize(
+    'value',
+    [-1.0, -1, 0, 1, 1.0],
+)
+def test_enum_int_validation_should_succeed_for_decimal(value: int):
+    class MyEnum(Enum):
+        VALUE = value
+
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+    assert v.validate_python(Decimal(value)) is MyEnum.VALUE
+
+
+def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
+    class MyEnum(Enum):
+        VALUE = 1
+
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+    with pytest.raises(ValidationError):
+        v.validate_python(Decimal(2))

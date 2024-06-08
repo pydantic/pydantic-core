@@ -11,10 +11,11 @@ use ahash::AHashMap;
 
 use crate::build_tools::{py_schema_err, py_schema_error_type};
 use crate::errors::{ErrorType, ValError, ValResult};
-use crate::input::{Input, ValidationMatch};
+use crate::input::{decimal_as_int, EitherInt, Input, ValidationMatch};
 use crate::py_gc::PyGcTraverse;
 use crate::tools::SchemaDict;
 
+use super::decimal::get_decimal_type;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug, Clone, Default)]
@@ -124,6 +125,12 @@ impl<T: Debug> LiteralLookup<T> {
                 }
             }
         }
+
+        // if the input is a Decimal type, we need to check if its value is in the expected_ints
+        if let Ok(Some(v)) = self.validate_decimal(py, input) {
+            return Ok(Some(v));
+        }
+
         if let Some(expected_strings) = &self.expected_str {
             let validation_result = if input.as_python().is_some() {
                 input.exact_str()
@@ -164,6 +171,38 @@ impl<T: Debug> LiteralLookup<T> {
             }
         };
         Ok(None)
+    }
+
+    fn validate_decimal<'a, 'py, I: Input<'py> + ?Sized>(
+        &self,
+        py: Python<'py>,
+        input: &'a I,
+    ) -> ValResult<Option<(&'a I, &T)>> {
+        let Some(py_input) = input.as_python() else {
+            return Ok(None);
+        };
+
+        if py_input.is_instance(get_decimal_type(py)).is_err() {
+            return Ok(None);
+        }
+
+        let Some(expected_ints) = &self.expected_int else {
+            return Ok(None);
+        };
+
+        let Ok(EitherInt::Py(dec_value)) = decimal_as_int(input, py_input) else {
+            return Ok(None);
+        };
+
+        let Ok(either_int) = dec_value.exact_int() else {
+            return Ok(None);
+        };
+        let int = either_int.into_i64(py)?;
+
+        let Some(id) = expected_ints.get(&int) else {
+            return Ok(None);
+        };
+        Ok(Some((input, &self.values[*id])))
     }
 
     /// Used by int enums
