@@ -377,3 +377,6 @@ def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
     )
     with pytest.raises(ValidationError):
         v.validate_python(Decimal(2))
+
+    with pytest.raises(ValidationError):
+        v.validate_python((1, 2))

@@ -182,7 +182,7 @@ impl<T: Debug> LiteralLookup<T> {
             return Ok(None);
         };
 
-        if py_input.is_instance(get_decimal_type(py)).is_err() {
+        if let Ok(false) = py_input.is_instance(get_decimal_type(py)) {
             return Ok(None);
         }
 
