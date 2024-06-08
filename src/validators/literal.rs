@@ -126,11 +126,6 @@ impl<T: Debug> LiteralLookup<T> {
             }
         }
 
-        // if the input is a Decimal type, we need to check if its value is in the expected_ints
-        if let Ok(Some(v)) = self.validate_decimal(py, input) {
-            return Ok(Some(v));
-        }
-
         if let Some(expected_strings) = &self.expected_str {
             let validation_result = if input.as_python().is_some() {
                 input.exact_str()
@@ -170,6 +165,11 @@ impl<T: Debug> LiteralLookup<T> {
                 }
             }
         };
+
+        // if the input is a Decimal type, we need to check if its value is in the expected_ints
+        if let Ok(Some(v)) = self.validate_decimal(py, input) {
+            return Ok(Some(v));
+        }
         Ok(None)
     }
 
