@@ -349,7 +349,7 @@ def test_big_int():
 
 @pytest.mark.parametrize(
     'value',
-    [-1.0, -1, 0, 1, 1.0],
+    [-1, 0, 1],
 )
 def test_enum_int_validation_should_succeed_for_decimal(value: int):
     class MyEnum(Enum):
@@ -362,6 +362,7 @@ def test_enum_int_validation_should_succeed_for_decimal(value: int):
         )
     )
     assert v.validate_python(Decimal(value)) is MyEnum.VALUE
+    assert v.validate_python(Decimal(float(value))) is MyEnum.VALUE
 
 
 def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
