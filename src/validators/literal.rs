@@ -126,7 +126,7 @@ impl<T: Debug> LiteralLookup<T> {
                 }
             }
             // if the input is a Decimal type, we need to check if its value is in the expected_ints
-            if let Ok(Some(value)) = try_from_decimal_to_int(py, input) {
+            if let Ok(value) = try_from_decimal_to_int(py, input) {
                 let Some(id) = expected_ints.get(&value) else {
                     return Ok(None);
                 };
@@ -154,7 +154,7 @@ impl<T: Debug> LiteralLookup<T> {
             }
             if !strict {
                 // if the input is a Decimal type, we need to check if its value is in the expected_ints
-                if let Ok(Some(value)) = try_from_decimal_to_int(py, input) {
+                if let Ok(value) = try_from_decimal_to_int(py, input) {
                     let Some(id) = expected_strings.get(&value.to_string()) else {
                         return Ok(None);
                     };

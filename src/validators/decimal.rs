@@ -292,24 +292,23 @@ fn handle_decimal_new_error(input: impl ToErrorValue, error: PyErr, decimal_exce
 pub(crate) fn try_from_decimal_to_int<'a, 'py, I: Input<'py> + ?Sized>(
     py: Python<'py>,
     input: &'a I,
-) -> ValResult<Option<i64>> {
+) -> ValResult<i64> {
     let Some(py_input) = input.as_python() else {
-        return Ok(None);
+        return Err(ValError::new(ErrorTypeDefaults::DecimalType, input));
     };
 
     if let Ok(false) = py_input.is_instance(get_decimal_type(py)) {
-        return Ok(None);
+        return Err(ValError::new(ErrorTypeDefaults::DecimalType, input));
     }
 
-    let Ok(EitherInt::Py(dec_value)) = decimal_as_int(input, py_input) else {
-        return Ok(None);
+    let dec_value = match decimal_as_int(input, py_input)? {
+        EitherInt::Py(value) => value,
+        _ => return Err(ValError::new(ErrorType::DecimalParsing { context: None }, input)),
     };
 
-    let Ok(either_int) = dec_value.exact_int() else {
-        return Ok(None);
-    };
+    let either_int = dec_value.exact_int()?;
 
     let int = either_int.into_i64(py)?;
 
-    Ok(Some(int))
+    Ok(int)
 }
