@@ -1,7 +1,7 @@
 import re
 import sys
 from decimal import Decimal
-from enum import Enum, IntEnum, IntFlag, StrEnum
+from enum import Enum, IntEnum, IntFlag
 
 import pytest
 
@@ -384,7 +384,7 @@ def test_enum_int_validation_should_succeed_for_decimal(value: int):
 
 def test_enum_str_validation_should_succeed_for_decimal_with_strict_disabled():
     # GIVEN
-    class MyEnum(StrEnum):
+    class MyEnum(Enum):
         VALUE = '1'
 
     # WHEN
@@ -401,7 +401,7 @@ def test_enum_str_validation_should_succeed_for_decimal_with_strict_disabled():
 
 def test_enum_str_validation_should_fail_for_decimal_with_strict_enabled():
     # GIVEN
-    class MyEnum(StrEnum):
+    class MyEnum(Enum):
         VALUE = '1'
 
     # WHEN
@@ -422,7 +422,7 @@ def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
     class MyEnum(Enum):
         VALUE = 1
 
-    class MyStrEnum(StrEnum):
+    class MyStrEnum(Enum):
         VALUE = '2'
 
     # WHEN
