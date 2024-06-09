@@ -169,7 +169,7 @@ impl EnumValidateValue for PlainEnumValidator {
         lookup: &LiteralLookup<PyObject>,
         strict: bool,
     ) -> ValResult<Option<PyObject>> {
-        match lookup.validate(py, input)? {
+        match lookup.validate(py, input, strict)? {
             Some((_, v)) => Ok(Some(v.clone_ref(py))),
             None => {
                 if !strict {

@@ -105,6 +105,7 @@ impl<T: Debug> LiteralLookup<T> {
         &self,
         py: Python<'py>,
         input: &'a I,
+        strict: bool,
     ) -> ValResult<Option<(&'a I, &T)>> {
         if let Some(expected_bool) = &self.expected_bool {
             if let Ok(bool_value) = input.validate_bool(true) {
@@ -124,6 +125,10 @@ impl<T: Debug> LiteralLookup<T> {
                     return Ok(Some((input, &self.values[*id])));
                 }
             }
+            // if the input is a Decimal type, we need to check if its value is in the expected_ints
+            if let Ok(Some(v)) = self.try_from_dec_to_int(py, input, expected_ints) {
+                return Ok(Some(v));
+            }
         }
 
         if let Some(expected_strings) = &self.expected_str {
@@ -142,6 +147,12 @@ impl<T: Debug> LiteralLookup<T> {
                 let cow = either_str.as_cow()?;
                 if let Some(id) = expected_strings.get(cow.as_ref()) {
                     return Ok(Some((input, &self.values[*id])));
+                }
+            }
+            if !strict {
+                // if the input is a Decimal type, we need to check if its value is in the expected_strings
+                if let Ok(Some(v)) = self.try_from_dec_to_str(py, input, expected_strings) {
+                    return Ok(Some(v));
                 }
             }
         }
@@ -166,17 +177,14 @@ impl<T: Debug> LiteralLookup<T> {
             }
         };
 
-        // if the input is a Decimal type, we need to check if its value is in the expected_ints
-        if let Ok(Some(v)) = self.validate_decimal(py, input) {
-            return Ok(Some(v));
-        }
         Ok(None)
     }
 
-    fn validate_decimal<'a, 'py, I: Input<'py> + ?Sized>(
+    fn try_from_dec_to_int<'a, 'py, I: Input<'py> + ?Sized>(
         &self,
         py: Python<'py>,
         input: &'a I,
+        expected_ints: &AHashMap<i64, usize>,
     ) -> ValResult<Option<(&'a I, &T)>> {
         let Some(py_input) = input.as_python() else {
             return Ok(None);
@@ -185,10 +193,6 @@ impl<T: Debug> LiteralLookup<T> {
         if let Ok(false) = py_input.is_instance(get_decimal_type(py)) {
             return Ok(None);
         }
-
-        let Some(expected_ints) = &self.expected_int else {
-            return Ok(None);
-        };
 
         let Ok(EitherInt::Py(dec_value)) = decimal_as_int(input, py_input) else {
             return Ok(None);
@@ -202,7 +206,37 @@ impl<T: Debug> LiteralLookup<T> {
         let Some(id) = expected_ints.get(&int) else {
             return Ok(None);
         };
+
         Ok(Some((input, &self.values[*id])))
+    }
+
+    fn try_from_dec_to_str<'a, 'py, I: Input<'py> + ?Sized>(
+        &self,
+        py: Python<'py>,
+        input: &'a I,
+        expected_strings: &AHashMap<String, usize>,
+    ) -> ValResult<Option<(&'a I, &T)>> {
+        let Some(py_input) = input.as_python() else {
+            return Ok(None);
+        };
+
+        if let Ok(false) = py_input.is_instance(get_decimal_type(py)) {
+            return Ok(None);
+        }
+
+        let Ok(EitherInt::Py(dec_value)) = decimal_as_int(input, py_input) else {
+            return Ok(None);
+        };
+
+        let Ok(either_int) = dec_value.exact_int() else {
+            return Ok(None);
+        };
+        let int = either_int.into_i64(py)?;
+        if let Some(id) = expected_strings.get(&int.to_string()) {
+            return Ok(Some((input, &self.values[*id])));
+        }
+
+        Ok(None)
     }
 
     /// Used by int enums
@@ -308,7 +342,7 @@ impl Validator for LiteralValidator {
         input: &(impl Input<'py> + ?Sized),
         _state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        match self.lookup.validate(py, input)? {
+        match self.lookup.validate(py, input, _state.strict_or(false))? {
             Some((_, v)) => Ok(v.clone()),
             None => Err(ValError::new(
                 ErrorType::LiteralError {
