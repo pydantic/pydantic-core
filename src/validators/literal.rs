@@ -11,11 +11,11 @@ use ahash::AHashMap;
 
 use crate::build_tools::{py_schema_err, py_schema_error_type};
 use crate::errors::{ErrorType, ValError, ValResult};
-use crate::input::{decimal_as_int, EitherInt, Input, ValidationMatch};
+use crate::input::{Input, ValidationMatch};
 use crate::py_gc::PyGcTraverse;
 use crate::tools::SchemaDict;
 
-use super::decimal::get_decimal_type;
+use super::decimal::try_from_decimal_to_int;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug, Clone, Default)]
@@ -126,8 +126,11 @@ impl<T: Debug> LiteralLookup<T> {
                 }
             }
             // if the input is a Decimal type, we need to check if its value is in the expected_ints
-            if let Ok(Some(v)) = self.try_from_dec_to_int(py, input, expected_ints) {
-                return Ok(Some(v));
+            if let Ok(Some(value)) = try_from_decimal_to_int(py, input) {
+                let Some(id) = expected_ints.get(&value) else {
+                    return Ok(None);
+                };
+                return Ok(Some((input, &self.values[*id])));
             }
         }
 
@@ -150,9 +153,12 @@ impl<T: Debug> LiteralLookup<T> {
                 }
             }
             if !strict {
-                // if the input is a Decimal type, we need to check if its value is in the expected_strings
-                if let Ok(Some(v)) = self.try_from_dec_to_str(py, input, expected_strings) {
-                    return Ok(Some(v));
+                // if the input is a Decimal type, we need to check if its value is in the expected_ints
+                if let Ok(Some(value)) = try_from_decimal_to_int(py, input) {
+                    let Some(id) = expected_strings.get(&value.to_string()) else {
+                        return Ok(None);
+                    };
+                    return Ok(Some((input, &self.values[*id])));
                 }
             }
         }
@@ -176,65 +182,6 @@ impl<T: Debug> LiteralLookup<T> {
                 }
             }
         };
-
-        Ok(None)
-    }
-
-    fn try_from_dec_to_int<'a, 'py, I: Input<'py> + ?Sized>(
-        &self,
-        py: Python<'py>,
-        input: &'a I,
-        expected_ints: &AHashMap<i64, usize>,
-    ) -> ValResult<Option<(&'a I, &T)>> {
-        let Some(py_input) = input.as_python() else {
-            return Ok(None);
-        };
-
-        if let Ok(false) = py_input.is_instance(get_decimal_type(py)) {
-            return Ok(None);
-        }
-
-        let Ok(EitherInt::Py(dec_value)) = decimal_as_int(input, py_input) else {
-            return Ok(None);
-        };
-
-        let Ok(either_int) = dec_value.exact_int() else {
-            return Ok(None);
-        };
-        let int = either_int.into_i64(py)?;
-
-        let Some(id) = expected_ints.get(&int) else {
-            return Ok(None);
-        };
-
-        Ok(Some((input, &self.values[*id])))
-    }
-
-    fn try_from_dec_to_str<'a, 'py, I: Input<'py> + ?Sized>(
-        &self,
-        py: Python<'py>,
-        input: &'a I,
-        expected_strings: &AHashMap<String, usize>,
-    ) -> ValResult<Option<(&'a I, &T)>> {
-        let Some(py_input) = input.as_python() else {
-            return Ok(None);
-        };
-
-        if let Ok(false) = py_input.is_instance(get_decimal_type(py)) {
-            return Ok(None);
-        }
-
-        let Ok(EitherInt::Py(dec_value)) = decimal_as_int(input, py_input) else {
-            return Ok(None);
-        };
-
-        let Ok(either_int) = dec_value.exact_int() else {
-            return Ok(None);
-        };
-        let int = either_int.into_i64(py)?;
-        if let Some(id) = expected_strings.get(&int.to_string()) {
-            return Ok(Some((input, &self.values[*id])));
-        }
 
         Ok(None)
     }

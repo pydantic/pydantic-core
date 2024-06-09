@@ -9,7 +9,7 @@ use crate::errors::ErrorType;
 use crate::errors::ValResult;
 use crate::errors::{ErrorTypeDefaults, Number};
 use crate::errors::{ToErrorValue, ValError};
-use crate::input::Input;
+use crate::input::{decimal_as_int, EitherInt, Input};
 use crate::tools::SchemaDict;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
@@ -287,4 +287,29 @@ fn handle_decimal_new_error(input: impl ToErrorValue, error: PyErr, decimal_exce
     } else {
         ValError::InternalErr(error)
     }
+}
+
+pub(crate) fn try_from_decimal_to_int<'a, 'py, I: Input<'py> + ?Sized>(
+    py: Python<'py>,
+    input: &'a I,
+) -> ValResult<Option<i64>> {
+    let Some(py_input) = input.as_python() else {
+        return Ok(None);
+    };
+
+    if let Ok(false) = py_input.is_instance(get_decimal_type(py)) {
+        return Ok(None);
+    }
+
+    let Ok(EitherInt::Py(dec_value)) = decimal_as_int(input, py_input) else {
+        return Ok(None);
+    };
+
+    let Ok(either_int) = dec_value.exact_int() else {
+        return Ok(None);
+    };
+
+    let int = either_int.into_i64(py)?;
+
+    Ok(Some(int))
 }
