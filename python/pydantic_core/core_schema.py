@@ -744,7 +744,7 @@ def decimal_schema(
 
 class StringSchema(TypedDict, total=False):
     type: Required[Literal['str']]
-    pattern: Any  # str | Pattern[str], but typing.Pattern[str] isn't recognized
+    pattern: str | Pattern[str]
     max_length: int
     min_length: int
     strip_whitespace: bool

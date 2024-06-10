@@ -13,7 +13,7 @@ import re
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, ForwardRef, List, Set, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, ForwardRef, List, Pattern, Set, Type, Union
 
 from typing_extensions import TypedDict, get_args, get_origin, is_typeddict
 
@@ -46,7 +46,7 @@ else:
 schema_ref_validator = {'type': 'definition-ref', 'schema_ref': 'root-schema'}
 
 
-def get_schema(obj: Any, definitions: dict[str, core_schema.CoreSchema]) -> core_schema.CoreSchema:
+def get_schema(obj: Any, definitions: dict[str, core_schema.CoreSchema]) -> core_schema.CoreSchema:  # noqa: C901
     if isinstance(obj, str):
         return {'type': obj}
     elif obj in (datetime, timedelta, date, time, bool, int, float, str, decimal.Decimal):
@@ -81,6 +81,8 @@ def get_schema(obj: Any, definitions: dict[str, core_schema.CoreSchema]) -> core
     elif issubclass(origin, Type):
         # can't really use 'is-instance' since this is used for the class_ parameter of 'is-instance' validators
         return {'type': 'any'}
+    elif origin in (Pattern, re.Pattern):
+        return {'type': 'string', 'format': 'regex'}
     else:
         # debug(obj)
         raise TypeError(f'Unknown type: {obj!r}')
