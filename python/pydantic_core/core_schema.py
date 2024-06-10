@@ -744,7 +744,7 @@ def decimal_schema(
 
 class StringSchema(TypedDict, total=False):
     type: Required[Literal['str']]
-    pattern: str | Pattern[str]
+    pattern: Union[str, Pattern[str]]
     max_length: int
     min_length: int
     strip_whitespace: bool
