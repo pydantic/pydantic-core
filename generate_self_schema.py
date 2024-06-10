@@ -82,7 +82,7 @@ def get_schema(obj: Any, definitions: dict[str, core_schema.CoreSchema]) -> core
         # can't really use 'is-instance' since this is used for the class_ parameter of 'is-instance' validators
         return {'type': 'any'}
     elif origin in (Pattern, re.Pattern):
-        # can't really use isinstance easily with Pattern, so we use `any` as a placeholder for now
+        # can't really use 'is-instance' easily with Pattern, so we use `any` as a placeholder for now
         return {'type': 'any'}
     else:
         # debug(obj)
