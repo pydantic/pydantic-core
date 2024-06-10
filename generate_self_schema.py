@@ -10,6 +10,7 @@ from __future__ import annotations as _annotations
 import decimal
 import importlib.util
 import re
+import sys
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
@@ -192,16 +193,12 @@ def all_literal_values(type_: type[core_schema.Literal]) -> list[any]:
 
 
 def eval_forward_ref(type_: Any) -> Any:
-    try:
-        try:
-            # Python 3.12+
-            return type_._evaluate(core_schema.__dict__, None, type_params=set(), recursive_guard=set())
-        except TypeError:
-            # Python 3.9+
-            return type_._evaluate(core_schema.__dict__, None, set())
-    except TypeError:
-        # for Python 3.8
+    if sys.version_info < (3, 9):
         return type_._evaluate(core_schema.__dict__, None)
+    elif sys.version_info < (3, 12):
+        return type_._evaluate(core_schema.__dict__, None, recursive_guard=set())
+    else:
+        return type_._evaluate(core_schema.__dict__, None, type_params=set(), recursive_guard=set())
 
 
 def main() -> None:
