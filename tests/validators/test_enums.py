@@ -448,4 +448,10 @@ def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
         v.validate_python((1, 2))
 
     with pytest.raises(ValidationError):
+        v.validate_python(Decimal(1.1))
+
+    with pytest.raises(ValidationError):
         v_str.validate_python(Decimal(1))
+
+    with pytest.raises(ValidationError):
+        v_str.validate_python(Decimal(2.1))
