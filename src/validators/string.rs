@@ -230,21 +230,20 @@ impl RegexEngine {
 }
 
 impl Pattern {
-    fn extract_pattern_str(pattern: Bound<'_, PyAny>) -> PyResult<String> {
+    fn extract_pattern_str(pattern: &Bound<'_, PyAny>) -> PyResult<String> {
         if pattern.is_instance_of::<PyString>() {
             Ok(pattern.to_string())
         } else {
-            match pattern.getattr("pattern") {
-                Ok(attr) => attr.extract::<String>(),
-                Err(_) => Err(py_schema_error_type!(
-                    "Invalid pattern, must be str or re.Pattern: {}",
-                    pattern
-                )),
-            }
+            pattern
+                .getattr("pattern")
+                .and_then(|attr| attr.extract::<String>())
+                .map_err(|_| py_schema_error_type!("Invalid pattern, must be str or re.Pattern: {}", pattern))
         }
     }
 
-    fn compile_pattern(pattern: Bound<'_, PyAny>) -> PyResult<PyObject> {
+    fn compile(pattern: Bound<'_, PyAny>, engine: &str) -> PyResult<Self> {
+        let pattern_str = Self::extract_pattern_str(&pattern)?;
+
         let py = pattern.py();
 
         let re_module = py.import_bound(intern!(py, "re"))?;
@@ -252,26 +251,26 @@ impl Pattern {
         let re_pattern = re_module.getattr(intern!(py, "Pattern"))?;
 
         if pattern.is_instance(&re_pattern)? {
-            Ok(pattern.to_object(py))
+            // if the pattern is already a compiled regex object, we default to using the python re engine
+            // so that any flags, etc. are preserved
+            Ok(Self {
+                pattern: pattern_str,
+                engine: RegexEngine::PythonRe(pattern.to_object(py)),
+            })
         } else {
-            Ok(re_compile.call1((pattern,))?.into())
+            let engine = match engine {
+                RegexEngine::RUST_REGEX => {
+                    RegexEngine::RustRegex(Regex::new(&pattern_str).map_err(|e| py_schema_error_type!("{}", e))?)
+                }
+                RegexEngine::PYTHON_RE => RegexEngine::PythonRe(re_compile.call1((pattern,))?.into()),
+                _ => return Err(py_schema_error_type!("Invalid regex engine: {}", engine)),
+            };
+
+            Ok(Self {
+                pattern: pattern_str,
+                engine,
+            })
         }
-    }
-
-    fn compile(pattern: Bound<'_, PyAny>, engine: &str) -> PyResult<Self> {
-        let pattern_str = Self::extract_pattern_str(pattern.clone())?;
-
-        let engine = match engine {
-            RegexEngine::RUST_REGEX => {
-                RegexEngine::RustRegex(Regex::new(&pattern_str).map_err(|e| py_schema_error_type!("{}", e))?)
-            }
-            RegexEngine::PYTHON_RE => RegexEngine::PythonRe(Self::compile_pattern(pattern)?),
-            _ => return Err(py_schema_error_type!("Invalid regex engine: {}", engine)),
-        };
-        Ok(Self {
-            pattern: pattern_str,
-            engine,
-        })
     }
 
     fn is_match(&self, py: Python<'_>, target: &str) -> PyResult<bool> {
