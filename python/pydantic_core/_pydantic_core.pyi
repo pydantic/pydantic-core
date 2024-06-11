@@ -89,7 +89,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: dict[str, Any] | None = None,
+        context: Any | None = None,
         self_instance: Any | None = None,
     ) -> Any:
         """
@@ -119,7 +119,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: dict[str, Any] | None = None,
+        context: Any | None = None,
         self_instance: Any | None = None,
     ) -> bool:
         """
@@ -136,7 +136,7 @@ class SchemaValidator:
         input: str | bytes | bytearray,
         *,
         strict: bool | None = None,
-        context: dict[str, Any] | None = None,
+        context: Any | None = None,
         self_instance: Any | None = None,
     ) -> Any:
         """
@@ -163,9 +163,7 @@ class SchemaValidator:
         Returns:
             The validated Python object.
         """
-    def validate_strings(
-        self, input: _StringInput, *, strict: bool | None = None, context: dict[str, Any] | None = None
-    ) -> Any:
+    def validate_strings(self, input: _StringInput, *, strict: bool | None = None, context: Any | None = None) -> Any:
         """
         Validate a string against the schema and return the validated Python object.
 
@@ -194,7 +192,7 @@ class SchemaValidator:
         *,
         strict: bool | None = None,
         from_attributes: bool | None = None,
-        context: dict[str, Any] | None = None,
+        context: Any | None = None,
     ) -> dict[str, Any] | tuple[dict[str, Any], dict[str, Any] | None, set[str]]:
         """
         Validate an assignment to a field on a model.
@@ -267,7 +265,7 @@ class SchemaSerializer:
         warnings: bool | Literal['none', 'warn', 'error'] = True,
         fallback: Callable[[Any], Any] | None = None,
         serialize_as_any: bool = False,
-        context: dict[str, Any] | None = None,
+        context: Any | None = None,
     ) -> Any:
         """
         Serialize/marshal a Python object to a Python object including transforming and filtering data.
@@ -313,7 +311,7 @@ class SchemaSerializer:
         warnings: bool | Literal['none', 'warn', 'error'] = True,
         fallback: Callable[[Any], Any] | None = None,
         serialize_as_any: bool = False,
-        context: dict[str, Any] | None = None,
+        context: Any | None = None,
     ) -> bytes:
         """
         Serialize a Python object to JSON including transforming and filtering data.
@@ -355,11 +353,11 @@ def to_json(
     round_trip: bool = False,
     timedelta_mode: Literal['iso8601', 'float'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64'] = 'utf8',
-    inf_nan_mode: Literal['null', 'constants'] = 'constants',
+    inf_nan_mode: Literal['null', 'constants', 'strings'] = 'constants',
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
     serialize_as_any: bool = False,
-    context: dict[str, Any] | None = None,
+    context: Any | None = None,
 ) -> bytes:
     """
     Serialize a Python object to JSON including transforming and filtering data.
@@ -376,7 +374,7 @@ def to_json(
         round_trip: Whether to enable serialization and validation round-trip support.
         timedelta_mode: How to serialize `timedelta` objects, either `'iso8601'` or `'float'`.
         bytes_mode: How to serialize `bytes` objects, either `'utf8'` or `'base64'`.
-        inf_nan_mode: How to serialize `Infinity`, `-Infinity` and `NaN` values, either `'null'` or `'constants'`.
+        inf_nan_mode: How to serialize `Infinity`, `-Infinity` and `NaN` values, either `'null'`, `'constants'`, or `'strings'`.
         serialize_unknown: Attempt to serialize unknown types, `str(value)` will be used, if that fails
             `"<Unserializable {value_type} object>"` will be used.
         fallback: A function to call when an unknown value is encountered,
@@ -430,11 +428,11 @@ def to_jsonable_python(
     round_trip: bool = False,
     timedelta_mode: Literal['iso8601', 'float'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64'] = 'utf8',
-    inf_nan_mode: Literal['null', 'constants'] = 'constants',
+    inf_nan_mode: Literal['null', 'constants', 'strings'] = 'constants',
     serialize_unknown: bool = False,
     fallback: Callable[[Any], Any] | None = None,
     serialize_as_any: bool = False,
-    context: dict[str, Any] | None = None,
+    context: Any | None = None,
 ) -> Any:
     """
     Serialize/marshal a Python object to a JSON-serializable Python object including transforming and filtering data.
@@ -451,7 +449,7 @@ def to_jsonable_python(
         round_trip: Whether to enable serialization and validation round-trip support.
         timedelta_mode: How to serialize `timedelta` objects, either `'iso8601'` or `'float'`.
         bytes_mode: How to serialize `bytes` objects, either `'utf8'` or `'base64'`.
-        inf_nan_mode: How to serialize `Infinity`, `-Infinity` and `NaN` values, either `'null'` or `'constants'`.
+        inf_nan_mode: How to serialize `Infinity`, `-Infinity` and `NaN` values, either `'null'`, `'constants'`, or `'strings'`.
         serialize_unknown: Attempt to serialize unknown types, `str(value)` will be used, if that fails
             `"<Unserializable {value_type} object>"` will be used.
         fallback: A function to call when an unknown value is encountered,

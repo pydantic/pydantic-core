@@ -50,7 +50,7 @@ impl Validator for BytesValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         input
-            .validate_bytes(state.strict_or(self.strict), self.bytes_mode.clone())
+            .validate_bytes(state.strict_or(self.strict), self.bytes_mode)
             .map(|m| m.unpack(state).into_py(py))
     }
 
@@ -77,7 +77,7 @@ impl Validator for BytesConstrainedValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let either_bytes = input
-            .validate_bytes(state.strict_or(self.strict), self.bytes_mode.clone())?
+            .validate_bytes(state.strict_or(self.strict), self.bytes_mode)?
             .unpack(state);
         let len = either_bytes.len()?;
 

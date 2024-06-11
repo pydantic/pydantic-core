@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Callable, Dict, Hashable, List, Set, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Hashable, List, Pattern, Set, Tuple, Type, Union
 
 from typing_extensions import deprecated
 
@@ -106,7 +106,7 @@ class CoreConfig(TypedDict, total=False):
     # the config options are used to customise serialization to JSON
     ser_json_timedelta: Literal['iso8601', 'float']  # default: 'iso8601'
     ser_json_bytes: Literal['utf8', 'base64', 'hex']  # default: 'utf8'
-    ser_json_inf_nan: Literal['null', 'constants']  # default: 'null'
+    ser_json_inf_nan: Literal['null', 'constants', 'strings']  # default: 'null'
     # used to hide input data from ValidationError repr
     hide_input_in_errors: bool
     validation_error_cause: bool  # default: False
@@ -744,7 +744,7 @@ def decimal_schema(
 
 class StringSchema(TypedDict, total=False):
     type: Required[Literal['str']]
-    pattern: str
+    pattern: Union[str, Pattern[str]]
     max_length: int
     min_length: int
     strip_whitespace: bool
@@ -760,7 +760,7 @@ class StringSchema(TypedDict, total=False):
 
 def str_schema(
     *,
-    pattern: str | None = None,
+    pattern: str | Pattern[str] | None = None,
     max_length: int | None = None,
     min_length: int | None = None,
     strip_whitespace: bool | None = None,
@@ -2062,7 +2062,7 @@ def with_info_after_validator_function(
 
 
 class ValidatorFunctionWrapHandler(Protocol):
-    def __call__(self, input_value: Any, outer_location: str | int | None = None) -> Any:  # pragma: no cover
+    def __call__(self, input_value: Any, outer_location: str | int | None = None, /) -> Any:  # pragma: no cover
         ...
 
 
