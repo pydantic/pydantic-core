@@ -14,8 +14,8 @@ use pyo3::PyTypeCheck;
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
-use crate::serializers::config::BytesMode;
 use crate::tools::{extract_i64, safe_repr};
+use crate::validators::config::ValBytesMode;
 use crate::validators::decimal::{create_decimal, get_decimal_type};
 use crate::validators::Exactness;
 use crate::ArgsKwargs;
@@ -175,7 +175,11 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::StringType, self))
     }
 
-    fn validate_bytes<'a>(&'a self, strict: bool, mode: BytesMode) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
+    fn validate_bytes<'a>(
+        &'a self,
+        strict: bool,
+        mode: ValBytesMode,
+    ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
         if let Ok(py_bytes) = self.downcast_exact::<PyBytes>() {
             return Ok(ValidationMatch::exact(py_bytes.into()));
         } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {

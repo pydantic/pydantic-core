@@ -6,8 +6,8 @@ use speedate::MicrosecondsPrecisionOverflowBehavior;
 use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::input::py_string_str;
 use crate::lookup_key::{LookupKey, LookupPath};
-use crate::serializers::config::BytesMode;
 use crate::tools::safe_repr;
+use crate::validators::config::ValBytesMode;
 use crate::validators::decimal::create_decimal;
 
 use super::datetime::{
@@ -109,7 +109,7 @@ impl<'py> Input<'py> for StringMapping<'py> {
     fn validate_bytes<'a>(
         &'a self,
         _strict: bool,
-        mode: BytesMode,
+        mode: ValBytesMode,
     ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
         match self {
             Self::String(s) => py_string_str(s).and_then(|b| match mode.deserialize_string(b) {

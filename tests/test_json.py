@@ -383,7 +383,7 @@ def test_json_bytes_base64_round_trip():
     encoded = b'"aGVsbG8="'
     assert to_json(data, bytes_mode='base64') == encoded
 
-    v = SchemaValidator({'type': 'bytes'}, {'ser_json_bytes': 'base64'})
+    v = SchemaValidator({'type': 'bytes'}, {'val_json_bytes': 'base64'})
     assert v.validate_json(encoded) == data
 
     with pytest.raises(ValueError):
@@ -392,6 +392,6 @@ def test_json_bytes_base64_round_trip():
     assert to_json({'key': data}, bytes_mode='base64') == b'{"key":"aGVsbG8="}'
     v = SchemaValidator(
         {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'bytes'}},
-        {'ser_json_bytes': 'base64'},
+        {'val_json_bytes': 'base64'},
     )
     assert v.validate_json('{"key":"aGVsbG8="}') == {'key': data}

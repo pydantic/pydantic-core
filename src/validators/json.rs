@@ -9,6 +9,7 @@ use crate::input::{EitherBytes, Input, InputType, ValidationMatch};
 use crate::serializers::config::BytesMode;
 use crate::tools::SchemaDict;
 
+use super::config::ValBytesMode;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug)]
@@ -88,7 +89,7 @@ impl Validator for JsonValidator {
 pub fn validate_json_bytes<'a, 'py>(
     input: &'a (impl Input<'py> + ?Sized),
 ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
-    match input.validate_bytes(false, BytesMode::Utf8) {
+    match input.validate_bytes(false, ValBytesMode { ser: BytesMode::Utf8 }) {
         Ok(v_match) => Ok(v_match),
         Err(ValError::LineErrors(e)) => Err(ValError::LineErrors(
             e.into_iter().map(map_bytes_error).collect::<Vec<_>>(),

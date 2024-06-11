@@ -24,6 +24,7 @@ mod bytes;
 mod call;
 mod callable;
 mod chain;
+pub(crate) mod config;
 mod custom_error;
 mod dataclass;
 mod date;

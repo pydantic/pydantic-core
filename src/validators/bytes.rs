@@ -6,15 +6,15 @@ use crate::build_tools::is_strict;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 
-use crate::serializers::config::{BytesMode, FromConfig};
 use crate::tools::SchemaDict;
 
+use super::config::ValBytesMode;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug, Clone)]
 pub struct BytesValidator {
     strict: bool,
-    bytes_mode: BytesMode,
+    bytes_mode: ValBytesMode,
 }
 
 impl BuildValidator for BytesValidator {
@@ -33,7 +33,7 @@ impl BuildValidator for BytesValidator {
         } else {
             Ok(Self {
                 strict: is_strict(schema, config)?,
-                bytes_mode: BytesMode::from_config(config)?,
+                bytes_mode: ValBytesMode::from_config(config)?,
             }
             .into())
         }
@@ -62,7 +62,7 @@ impl Validator for BytesValidator {
 #[derive(Debug, Clone)]
 pub struct BytesConstrainedValidator {
     strict: bool,
-    bytes_mode: BytesMode,
+    bytes_mode: ValBytesMode,
     max_length: Option<usize>,
     min_length: Option<usize>,
 }
@@ -116,7 +116,7 @@ impl BytesConstrainedValidator {
         let py = schema.py();
         Ok(Self {
             strict: is_strict(schema, config)?,
-            bytes_mode: BytesMode::from_config(config)?,
+            bytes_mode: ValBytesMode::from_config(config)?,
             min_length: schema.get_as(intern!(py, "min_length"))?,
             max_length: schema.get_as(intern!(py, "max_length"))?,
         }

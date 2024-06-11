@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::str::{from_utf8, FromStr, Utf8Error};
 
 use base64::Engine;
-use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDelta, PyDict, PyString};
@@ -10,7 +9,7 @@ use pyo3::types::{PyDelta, PyDict, PyString};
 use serde::ser::Error;
 
 use crate::build_tools::py_schema_err;
-use crate::input::{EitherBytes, EitherTimedelta};
+use crate::input::EitherTimedelta;
 use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
@@ -187,17 +186,6 @@ impl BytesMode {
             Self::Hex => {
                 serializer.serialize_str(&bytes.iter().fold(String::new(), |acc, b| acc + &format!("{b:02x}")))
             }
-        }
-    }
-
-    pub fn deserialize_string<'a, 'py>(&self, s: &'a str) -> PyResult<EitherBytes<'a, 'py>> {
-        match self {
-            Self::Utf8 => Ok(EitherBytes::Cow(Cow::Borrowed(s.as_bytes()))),
-            Self::Base64 => match base64::engine::general_purpose::URL_SAFE.decode(s) {
-                Ok(bytes) => Ok(EitherBytes::from(bytes)),
-                Err(err) => Err(PyValueError::new_err(format!("Base64 decode error: {err}"))),
-            },
-            Self::Hex => Err(PyValueError::new_err("Hex deserialization is not supported")),
         }
     }
 }

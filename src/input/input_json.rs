@@ -9,7 +9,7 @@ use strum::EnumMessage;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::lookup_key::{LookupKey, LookupPath};
-use crate::serializers::config::BytesMode;
+use crate::validators::config::ValBytesMode;
 use crate::validators::decimal::create_decimal;
 
 use super::datetime::{
@@ -110,7 +110,7 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
     fn validate_bytes<'a>(
         &'a self,
         _strict: bool,
-        mode: BytesMode,
+        mode: ValBytesMode,
     ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
         match self {
             JsonValue::Str(s) => match mode.deserialize_string(s) {
@@ -353,7 +353,7 @@ impl<'py> Input<'py> for str {
     fn validate_bytes<'a>(
         &'a self,
         _strict: bool,
-        mode: BytesMode,
+        mode: ValBytesMode,
     ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
         match mode.deserialize_string(self) {
             Ok(b) => Ok(ValidationMatch::strict(b)),
