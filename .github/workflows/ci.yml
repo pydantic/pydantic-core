@@ -453,9 +453,15 @@ jobs:
             target: i686
             python-architecture: x86
             interpreter: 3.8 3.9 3.10 3.11 3.12
+          # FIXME aarch64 builds broken, see https://github.com/PyO3/maturin/issues/2110
+          # - os: windows
+          #   target: aarch64
+          #   interpreter: 3.11 3.12
+
+        exclude:
+          # See above; disabled for now.
           - os: windows
             target: aarch64
-            interpreter: 3.11 3.12
 
     runs-on: ${{ (matrix.os == 'linux' && 'ubuntu') || matrix.os }}-latest
     steps:
@@ -659,10 +665,8 @@ jobs:
             fi
           run: |
             set -x
-            # typing-extensions isn't automatically installed because of `--no-index --no-deps`
             python3 -m venv venv
             source venv/bin/activate
-            python3 -m pip install -U pip typing-extensions
             python3 -m pip install -r tests/requirements.txt
             python3 -m pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
             python3 -m pytest --ignore=tests/test_docstrings.py
@@ -693,7 +697,6 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - run: pip install typing-extensions
       - run: pip install -r tests/requirements.txt
       - run: pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
       - run: pytest --ignore=tests/test_docstrings.py
