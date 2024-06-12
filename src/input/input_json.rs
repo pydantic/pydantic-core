@@ -311,13 +311,15 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
                 }
                 let real = object.get("real").unwrap_or(&default).validate_float(true);
                 let imag = object.get("imag").unwrap_or(&default).validate_float(true);
-                if real.is_err() || imag.is_err() {
-                    return Err(ValError::new(ErrorTypeDefaults::ComplexType, self));
+                if let Ok(re) = real {
+                    if let Ok(im) = imag {
+                        return Ok(ValidationMatch::strict(EitherComplex::Complex([
+                            re.into_inner().as_f64(),
+                            im.into_inner().as_f64(),
+                        ])));
+                    }
                 }
-                Ok(ValidationMatch::strict(EitherComplex::Complex([
-                    real.unwrap().into_inner().as_f64(),
-                    imag.unwrap().into_inner().as_f64(),
-                ])))
+                Err(ValError::new(ErrorTypeDefaults::ComplexType, self))
             }
             _ => Err(ValError::new(ErrorTypeDefaults::ComplexType, self)),
         }

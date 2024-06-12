@@ -385,6 +385,11 @@ all_errors = [
         'Decimal input should have no more than 1 digit before the decimal point',
         {'whole_digits': 1},
     ),
+    (
+        'complex_type',
+        "Input should be a valid dictionary with exactly two keys, 'real' and 'imag', with float values",
+        None,
+    ),
 ]
 
 
