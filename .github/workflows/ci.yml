@@ -482,6 +482,8 @@ jobs:
           args: --release --out dist --interpreter ${{ matrix.interpreter || '3.8 3.9 3.10 3.11 3.12 pypy3.9 pypy3.10' }}
           rust-toolchain: stable
           docker-options: -e CI
+        env:
+          RUST_LOG: debug
 
       - run: ${{ (matrix.os == 'windows' && 'dir') || 'ls -lh' }} dist/
 
