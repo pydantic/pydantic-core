@@ -9,7 +9,7 @@ use crate::lookup_key::{LookupKey, LookupPath};
 use crate::tools::py_err;
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
-use super::return_enums::{EitherBytes, EitherInt, EitherString};
+use super::return_enums::{EitherBytes, EitherComplex, EitherInt, EitherString};
 use super::{EitherFloat, GenericIterator, ValidationMatch};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -172,6 +172,8 @@ pub trait Input<'py>: fmt::Debug + ToPyObject {
         strict: bool,
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
     ) -> ValMatch<EitherTimedelta<'py>>;
+
+    fn validate_complex(&self) -> ValMatch<EitherComplex<'py>>;
 }
 
 /// The problem to solve here is that iterating collections often returns owned

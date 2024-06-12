@@ -742,6 +742,43 @@ def decimal_schema(
     )
 
 
+class ComplexSchema(TypedDict, total=False):
+    type: Required[Literal['complex']]
+    ref: str
+    metadata: Any
+    serialization: SerSchema
+
+
+def complex_schema(
+    *,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
+) -> ComplexSchema:
+    """
+    Returns a schema that matches a complex value, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    schema = core_schema.complex_schema()
+    v = SchemaValidator(schema)
+    assert v.validate_python({'real': 1, 'imag': 2}) == complex(1, 2)
+    ```
+
+    Args:
+        ref: optional unique identifier of the schema, used to reference the schema in other places
+        metadata: Any other information you want to include with the schema, not used by pydantic-core
+        serialization: Custom serialization schema
+    """
+    return _dict_not_none(
+        type='complex',
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
+    )
+
+
 class StringSchema(TypedDict, total=False):
     type: Required[Literal['str']]
     pattern: str
@@ -3777,6 +3814,7 @@ if not MYPY:
         DefinitionsSchema,
         DefinitionReferenceSchema,
         UuidSchema,
+        ComplexSchema,
     ]
 elif False:
     CoreSchema: TypeAlias = Mapping[str, Any]
@@ -3832,6 +3870,7 @@ CoreSchemaType = Literal[
     'definitions',
     'definition-ref',
     'uuid',
+    'complex',
 ]
 
 CoreSchemaFieldType = Literal['model-field', 'dataclass-field', 'typed-dict-field', 'computed-field']

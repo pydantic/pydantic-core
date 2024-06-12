@@ -13,7 +13,8 @@ use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, EitherDate, EitherDateTime, EitherTime,
 };
 use super::input_abstract::{Never, ValMatch};
-use super::shared::{str_as_bool, str_as_float, str_as_int};
+use super::return_enums::EitherComplex;
+use super::shared::{str_as_bool, str_as_complex, str_as_float, str_as_int};
 use super::{
     Arguments, BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericIterator, Input,
     KeywordArgs, ValidatedDict, ValidationMatch,
@@ -215,6 +216,13 @@ impl<'py> Input<'py> for StringMapping<'py> {
             Self::String(s) => bytes_as_timedelta(self, py_string_str(s)?.as_bytes(), microseconds_overflow_behavior)
                 .map(ValidationMatch::strict),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self)),
+        }
+    }
+
+    fn validate_complex(&self) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+        match self {
+            Self::String(s) => str_as_complex(self, py_string_str(s)?).map(ValidationMatch::strict),
+            Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::FloatType, self)),
         }
     }
 }

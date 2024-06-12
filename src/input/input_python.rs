@@ -6,8 +6,8 @@ use pyo3::prelude::*;
 
 use pyo3::types::PyType;
 use pyo3::types::{
-    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDict, PyFloat, PyFrozenSet, PyInt, PyIterator, PyList,
-    PyMapping, PySet, PyString, PyTime, PyTuple,
+    PyBool, PyByteArray, PyBytes, PyComplex, PyDate, PyDateTime, PyDict, PyFloat, PyFrozenSet, PyInt, PyIterator,
+    PyList, PyMapping, PySet, PyString, PyTime, PyTuple,
 };
 
 use pyo3::PyTypeCheck;
@@ -25,6 +25,7 @@ use super::datetime::{
     EitherTime,
 };
 use super::input_abstract::ValMatch;
+use super::return_enums::EitherComplex;
 use super::return_enums::{iterate_attributes, iterate_mapping_items, ValidationMatch};
 use super::shared::{
     decimal_as_int, float_as_int, get_enum_meta_object, int_as_bool, str_as_bool, str_as_float, str_as_int,
@@ -591,6 +592,37 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         }
 
         Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self))
+    }
+
+    fn validate_complex<'a>(&'a self) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+        if let Ok(complex) = self.downcast::<PyComplex>() {
+            return Ok(ValidationMatch::exact(EitherComplex::Py(complex.to_owned())));
+        } else if let Ok(complex) = self.downcast::<PyDict>() {
+            let re = complex.get_item("real");
+            let im = complex.get_item("imag");
+            if complex.len() > 2 || re.is_err() && im.is_err() {
+                return Err(ValError::new(ErrorTypeDefaults::ComplexType, self));
+            }
+            let mut res = [0.0, 0.0];
+            if let Some(v) = re.unwrap_or(None) {
+                if v.is_instance_of::<PyFloat>() || v.is_instance_of::<PyInt>() {
+                    let u = v.extract::<f64>();
+                    res[0] = u.unwrap_or(0.0);
+                } else {
+                    return Err(ValError::new(ErrorTypeDefaults::ComplexType, self));
+                }
+            }
+            if let Some(v) = im.unwrap_or(None) {
+                if v.is_instance_of::<PyFloat>() || v.is_instance_of::<PyInt>() {
+                    let u = v.extract::<f64>();
+                    res[1] = u.unwrap_or(0.0);
+                } else {
+                    return Err(ValError::new(ErrorTypeDefaults::ComplexType, self));
+                }
+            }
+            return Ok(ValidationMatch::exact(EitherComplex::Complex(res)));
+        }
+        Err(ValError::new(ErrorTypeDefaults::ComplexType, self))
     }
 }
 
