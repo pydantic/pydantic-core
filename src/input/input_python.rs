@@ -605,22 +605,32 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
             }
             let mut res = [0.0, 0.0];
             if let Some(v) = re.unwrap_or(None) {
-                if v.is_instance_of::<PyFloat>() || v.is_instance_of::<PyInt>() {
+                if v.is_exact_instance_of::<PyFloat>() || v.is_exact_instance_of::<PyInt>() {
                     let u = v.extract::<f64>();
-                    res[0] = u.unwrap_or(0.0);
+                    res[0] = u.unwrap();
                 } else {
                     return Err(ValError::new(ErrorTypeDefaults::ComplexType, self));
                 }
             }
             if let Some(v) = im.unwrap_or(None) {
-                if v.is_instance_of::<PyFloat>() || v.is_instance_of::<PyInt>() {
+                if v.is_exact_instance_of::<PyFloat>() || v.is_exact_instance_of::<PyInt>() {
                     let u = v.extract::<f64>();
-                    res[1] = u.unwrap_or(0.0);
+                    res[1] = u.unwrap();
                 } else {
                     return Err(ValError::new(ErrorTypeDefaults::ComplexType, self));
                 }
             }
             return Ok(ValidationMatch::exact(EitherComplex::Complex(res)));
+        } else if self.is_exact_instance_of::<PyFloat>() {
+            return Ok(ValidationMatch::exact(EitherComplex::Complex([
+                self.extract::<f64>().unwrap(),
+                0.0,
+            ])));
+        } else if self.is_exact_instance_of::<PyInt>() {
+            return Ok(ValidationMatch::exact(EitherComplex::Complex([
+                self.extract::<i64>().unwrap() as f64,
+                0.0,
+            ])));
         }
         Err(ValError::new(ErrorTypeDefaults::ComplexType, self))
     }

@@ -27,7 +27,10 @@ def test_dict(py_and_json: PyAndJson):
         ({'real': 2}, complex(2, 0)),
         ({'imag': 2}, complex(0, 2)),
         ({}, complex(0, 0)),
+        (3, complex(3, 0)),
+        (2.0, complex(2, 0)),
         ({'real': 'test', 'imag': 1}, Err(EXPECTED_TYPE_ERROR_MESSAGE)),
+        ({'real': True, 'imag': 1}, Err(EXPECTED_TYPE_ERROR_MESSAGE)),
         ('foobar', Err(EXPECTED_TYPE_ERROR_MESSAGE)),
         ([], Err(EXPECTED_TYPE_ERROR_MESSAGE)),
         ([('x', 'y')], Err(EXPECTED_TYPE_ERROR_MESSAGE)),
@@ -61,14 +64,16 @@ def test_nan_inf_complex():
 def test_json_complex():
     v = SchemaValidator({'type': 'complex'})
     assert v.validate_json('{"real": 2, "imag": 4}') == complex(2, 4)
+    assert v.validate_json('1') == complex(1, 0)
+    assert v.validate_json('1.0') == complex(1, 0)
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_json('1')
+        v.validate_json('"1"')
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'complex_type',
             'loc': (),
             'msg': EXPECTED_TYPE_ERROR_MESSAGE,
-            'input': 1,
+            'input': '1',
         }
     ]
 
@@ -76,4 +81,4 @@ def test_json_complex():
 def test_string_complex():
     v = SchemaValidator({'type': 'complex'})
     with pytest.raises(ValidationError, match=re.escape(EXPECTED_TYPE_ERROR_MESSAGE)):
-        v.validate_strings("{'real': float('nan'), 'imag': 0}")
+        v.validate_strings("{'real': 1, 'imag': 0}")

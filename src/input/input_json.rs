@@ -321,6 +321,8 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
                 }
                 Err(ValError::new(ErrorTypeDefaults::ComplexType, self))
             }
+            JsonValue::Float(f) => Ok(ValidationMatch::strict(EitherComplex::Complex([*f, 0.0]))),
+            JsonValue::Int(f) => Ok(ValidationMatch::strict(EitherComplex::Complex([(*f) as f64, 0.0]))),
             _ => Err(ValError::new(ErrorTypeDefaults::ComplexType, self)),
         }
     }
