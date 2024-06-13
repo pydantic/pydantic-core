@@ -194,6 +194,7 @@ pub(crate) fn validate_iter_to_set<'py>(
     max_length: Option<usize>,
     validator: &CombinedValidator,
     state: &mut ValidationState<'_, 'py>,
+    fail_fast: bool,
 ) -> ValResult<()> {
     let mut errors: Vec<ValLineError> = Vec::new();
     for (index, item_result) in iter.enumerate() {
@@ -223,6 +224,9 @@ pub(crate) fn validate_iter_to_set<'py>(
             }
             Err(ValError::Omit) => (),
             Err(err) => return Err(err),
+        }
+        if fail_fast && !errors.is_empty() {
+            break;
         }
     }
 
