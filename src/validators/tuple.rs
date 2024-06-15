@@ -220,6 +220,10 @@ impl TupleValidator {
                 self.fail_fast,
             )?;
 
+            if self.fail_fast && !errors.is_empty() {
+                return Ok(output);
+            }
+
             // Generate an error if there are any extra items:
             if collection_iter.next().is_some() {
                 return Err(ValError::new(
