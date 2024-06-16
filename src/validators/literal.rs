@@ -15,7 +15,6 @@ use crate::input::{Input, ValidationMatch};
 use crate::py_gc::PyGcTraverse;
 use crate::tools::SchemaDict;
 
-use super::decimal::try_from_decimal_to_int;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug, Clone, Default)]
@@ -105,7 +104,6 @@ impl<T: Debug> LiteralLookup<T> {
         &self,
         py: Python<'py>,
         input: &'a I,
-        strict: bool,
     ) -> ValResult<Option<(&'a I, &T)>> {
         if let Some(expected_bool) = &self.expected_bool {
             if let Ok(bool_value) = input.validate_bool(true) {
@@ -125,13 +123,6 @@ impl<T: Debug> LiteralLookup<T> {
                     return Ok(Some((input, &self.values[*id])));
                 }
             }
-            // if the input is a Decimal type, we need to check if its value is in the expected_ints
-            if let Ok(value) = try_from_decimal_to_int(py, input) {
-                let Some(id) = expected_ints.get(&value) else {
-                    return Ok(None);
-                };
-                return Ok(Some((input, &self.values[*id])));
-            }
         }
 
         if let Some(expected_strings) = &self.expected_str {
@@ -149,15 +140,6 @@ impl<T: Debug> LiteralLookup<T> {
             if let Ok(either_str) = validation_result {
                 let cow = either_str.as_cow()?;
                 if let Some(id) = expected_strings.get(cow.as_ref()) {
-                    return Ok(Some((input, &self.values[*id])));
-                }
-            }
-            if !strict {
-                // if the input is a Decimal type, we need to check if its value is in the expected_ints
-                if let Ok(value) = try_from_decimal_to_int(py, input) {
-                    let Some(id) = expected_strings.get(&value.to_string()) else {
-                        return Ok(None);
-                    };
                     return Ok(Some((input, &self.values[*id])));
                 }
             }
@@ -236,6 +218,38 @@ impl<T: Debug> LiteralLookup<T> {
         }
         Ok(None)
     }
+
+    pub fn try_validate_any<'a, 'py, I: Input<'py> + ?Sized>(&self, input: &'a I) -> ValResult<Option<&T>> {
+        let Some(py_input) = input.as_python() else {
+            return Ok(None);
+        };
+
+        if let Some(expected_ints) = &self.expected_int {
+            for (k, id) in expected_ints {
+                if let Ok(equality) = py_input.call_method1("__eq__", (*k,)) {
+                    if equality.extract::<bool>()? {
+                        return Ok(Some(&self.values[*id]));
+                    }
+                };
+            }
+        };
+
+        let Some(expected_strings) = &self.expected_str else {
+            return Ok(None);
+        };
+
+        for (k, id) in expected_strings {
+            let Ok(k_as_int) = k.parse::<i64>() else {
+                continue;
+            };
+            if let Ok(equality) = py_input.call_method1("__eq__", (k_as_int,)) {
+                if equality.extract::<bool>()? {
+                    return Ok(Some(&self.values[*id]));
+                }
+            };
+        }
+        Ok(None)
+    }
 }
 
 impl<T: PyGcTraverse + Debug> PyGcTraverse for LiteralLookup<T> {
@@ -289,7 +303,7 @@ impl Validator for LiteralValidator {
         input: &(impl Input<'py> + ?Sized),
         _state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        match self.lookup.validate(py, input, _state.strict_or(false))? {
+        match self.lookup.validate(py, input)? {
             Some((_, v)) => Ok(v.clone()),
             None => Err(ValError::new(
                 ErrorType::LiteralError {

@@ -382,6 +382,32 @@ def test_enum_int_validation_should_succeed_for_decimal(value: int):
     assert v_int.validate_python(Decimal(float(value))) is MyIntEnum.VALUE
 
 
+def test_enum_int_validation_should_succeed_for_custom_type():
+    # GIVEN
+    class IntWrapper:
+        def __init__(self, value):
+            self.value = value
+
+        def __eq__(self, other: object) -> bool:
+            return self.value == other
+
+    class MyEnum(Enum):
+        VALUE = 999
+        SECOND_VALUE = 1000000
+
+    # WHEN
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    # THEN
+    assert v.validate_python(IntWrapper(999)) is MyEnum.VALUE
+    assert v.validate_python(IntWrapper(1000000)) is MyEnum.SECOND_VALUE
+
+
 def test_enum_str_validation_should_succeed_for_decimal_with_strict_disabled():
     # GIVEN
     class MyEnum(Enum):

@@ -26,8 +26,6 @@ pub(crate) use return_enums::{
     EitherInt, EitherString, GenericIterator, Int, MaxLengthCheck, ValidationMatch,
 };
 
-pub(crate) use shared::decimal_as_int;
-
 // Defined here as it's not exported by pyo3
 pub fn py_error_on_minusone(py: Python<'_>, result: c_int) -> PyResult<()> {
     if result != -1 {
