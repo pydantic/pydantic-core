@@ -224,13 +224,16 @@ impl<T: Debug> LiteralLookup<T> {
             return Ok(None);
         };
 
+        let is_equal = |k: &i64| -> PyResult<bool> {
+            let equality = py_input.call_method1("__eq__", (*k,))?;
+            equality.extract::<bool>()
+        };
+
         if let Some(expected_ints) = &self.expected_int {
-            for (k, id) in expected_ints {
-                if let Ok(equality) = py_input.call_method1("__eq__", (*k,)) {
-                    if equality.extract::<bool>()? {
-                        return Ok(Some(&self.values[*id]));
-                    }
-                };
+            let id = expected_ints.iter().find(|(k, _)| is_equal(k).unwrap_or(false));
+
+            if let Some((_, id)) = id {
+                return Ok(Some(&self.values[*id]));
             }
         };
 
@@ -238,15 +241,13 @@ impl<T: Debug> LiteralLookup<T> {
             return Ok(None);
         };
 
-        for (k, id) in expected_strings {
-            let Ok(k_as_int) = k.parse::<i64>() else {
-                continue;
-            };
-            if let Ok(equality) = py_input.call_method1("__eq__", (k_as_int,)) {
-                if equality.extract::<bool>()? {
-                    return Ok(Some(&self.values[*id]));
-                }
-            };
+        let id = expected_strings
+            .iter()
+            .filter_map(|(k, id)| k.parse::<i64>().ok().map(|k_as_int| (k_as_int, id)))
+            .find(|(k, _)| is_equal(k).unwrap_or(false));
+
+        if let Some((_, id)) = id {
+            return Ok(Some(&self.values[*id]));
         }
         Ok(None)
     }
