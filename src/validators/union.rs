@@ -2,7 +2,7 @@ use std::fmt::Write;
 use std::str::FromStr;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyString, PyTuple};
+use pyo3::types::{PyDict, PyList, PySet, PyString, PyTuple};
 use pyo3::{intern, PyTraverseError, PyVisit};
 use smallvec::SmallVec;
 
@@ -20,6 +20,8 @@ use super::{
     build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, HasNumFields, ValidationState,
     Validator,
 };
+
+const DUNDER_FIELDS_SET_KEY: &str = "__pydantic_fields_set__";
 
 #[derive(Debug)]
 enum UnionMode {
@@ -149,6 +151,36 @@ impl UnionValidator {
                             CombinedValidator::TypedDict(z) => z.num_fields(),
                             _ => None,
                         };
+
+                        // let fields_set: Option<Py<PyAny>> = match new_success.getattr(py, DUNDER_FIELDS_SET_KEY) {
+                        //     Ok(fields_set) => fields_set.extract(py)?,
+                        //     Err(_) => None,
+                        // };
+                        // dbg!(fields_set);
+
+                        // let new_fields_set: Option<PySet> = match new_success.getattr(py, intern!(py, DUNDER_FIELDS_SET_KEY)) {
+                        //     Ok(fields_set) => match fields_set.downcast_bound::<PySet>(py) {
+                        //         Ok(fields_set) => Some(fields_set),
+                        //         Err(_) => None,
+                        //     }
+                        //     Err(_) => None,
+                        // };
+                        // dbg!(new_fields_set);
+
+                        let fields_set_length: Option<usize> = match new_success.getattr(py, intern!(py, DUNDER_FIELDS_SET_KEY)) {
+                            Ok(fields_set) => match fields_set.downcast_bound::<PySet>(py) {
+                                Ok(py_set) => Some(py_set.len()),
+                                Err(_) => None,
+                            },
+                            Err(_) => None,
+                        };
+
+                        dbg!(fields_set_length);
+
+                        dbg!(fields_set_length);
+
+                        // dbg!(new_success.getattr(py, DUNDER_FIELDS_SET_KEY)?.extract()?);
+
 
                         let new_success_is_best_match: bool =
                             success.as_ref().map_or(true, |(_, cur_exactness, cur_num_fields)| {
