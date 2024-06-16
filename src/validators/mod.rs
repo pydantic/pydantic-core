@@ -582,6 +582,10 @@ pub fn build_validator(
     )
 }
 
+pub trait HasNumFields {
+    fn num_fields(&self) -> Option<usize>;
+}
+
 /// More (mostly immutable) data to pass between validators, should probably be class `Context`,
 /// but that would confuse it with context as per pydantic/pydantic#1549
 #[derive(Debug, Clone)]

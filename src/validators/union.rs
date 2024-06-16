@@ -17,7 +17,8 @@ use crate::tools::SchemaDict;
 use super::custom_error::CustomError;
 use super::literal::LiteralLookup;
 use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, ValidationState, Validator,
+    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, HasNumFields, ValidationState,
+    Validator,
 };
 
 #[derive(Debug)]
@@ -111,7 +112,9 @@ impl UnionValidator {
         let strict = state.strict_or(self.strict);
         let mut errors = MaybeErrors::new(self.custom_error.as_ref());
 
-        let mut success = None;
+        // we use this to track the validation against the most compatible union member
+        // up to the current point
+        let mut success: Option<(Py<PyAny>, Exactness, Option<usize>)> = None;
 
         for (choice, label) in &self.choices {
             let state = &mut state.rebind_extra(|extra| {
@@ -134,16 +137,37 @@ impl UnionValidator {
                     _ => {
                         // success should always have an exactness
                         debug_assert_ne!(state.exactness, None);
+
                         let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
-                        // if the new result has higher exactness than the current success, replace it
-                        if success
-                            .as_ref()
-                            .map_or(true, |(_, current_exactness)| *current_exactness < new_exactness)
-                        {
-                            // TODO: is there a possible optimization here, where once there has
-                            // been one success, we turn on strict mode, to avoid unnecessary
-                            // coercions for further validation?
-                            success = Some((new_success, new_exactness));
+
+                        // in the case where the exactness is Strict or Lax, we also check
+                        // the number of fields in the model, and prefer the one with more fields
+                        // which is useful for choosing a more specific model in a union, like a subclass
+                        let new_num_fields: Option<usize> = match choice {
+                            CombinedValidator::Model(x) => x.num_fields(),
+                            CombinedValidator::Dataclass(y) => y.num_fields(),
+                            CombinedValidator::TypedDict(z) => z.num_fields(),
+                            _ => None,
+                        };
+
+                        let new_success_is_best_match: bool =
+                            success.as_ref().map_or(true, |(_, cur_exactness, cur_num_fields)| {
+                                match (*cur_num_fields, new_num_fields) {
+                                    // if the number of fields is greater and the exactness is more precise
+                                    // then the new union member is a better match
+                                    (Some(cur_fields), Some(new_fields)) => {
+                                        cur_fields < new_fields && *cur_exactness <= new_exactness
+                                    }
+                                    // if the number of fields isn't known, the new union
+                                    // member is only a better match if the exactness is more precise
+                                    // which ensures that we prefer left-to-right order in the union
+                                    // when exactness ties occur
+                                    _ => *cur_exactness < new_exactness,
+                                }
+                            });
+
+                        if new_success_is_best_match {
+                            success = Some((new_success, new_exactness, new_num_fields));
                         }
                     }
                 },
@@ -158,7 +182,7 @@ impl UnionValidator {
         }
         state.exactness = old_exactness;
 
-        if let Some((success, exactness)) = success {
+        if let Some((success, exactness, _fields)) = success {
             state.floor_exactness(exactness);
             return Ok(success);
         }

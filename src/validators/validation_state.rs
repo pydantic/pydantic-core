@@ -10,9 +10,9 @@ use super::Extra;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub enum Exactness {
-    Lax,
-    Strict,
-    Exact,
+    Lax = 1,
+    Strict = 2,
+    Exact = 3,
 }
 
 pub struct ValidationState<'a, 'py> {
