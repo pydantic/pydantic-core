@@ -172,6 +172,8 @@ class TestModelClassSimilar:
 
     def test_model_b_ignored(self, schema_validator: SchemaValidator):
         # first choice works, so second choice is not used
+        # TODO: I would argue that this is the wrong behavior - we should initialize
+        # a ModelB in this case.
         m = schema_validator.validate_python({'a': 1, 'b': 'hello', 'c': 2.0})
         assert isinstance(m, self.ModelA)
         assert m.a == 1

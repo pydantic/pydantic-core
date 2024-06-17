@@ -21,8 +21,6 @@ use super::{
     Validator,
 };
 
-const DUNDER_FIELDS_SET_KEY: &str = "__pydantic_fields_set__";
-
 #[derive(Debug)]
 enum UnionMode {
     Smart,
@@ -146,55 +144,35 @@ impl UnionValidator {
                         // the number of fields in the model, and prefer the one with more fields
                         // which is useful for choosing a more specific model in a union, like a subclass
                         let new_num_fields: Option<usize> = match choice {
-                            CombinedValidator::Model(x) => x.num_fields(),
+                            CombinedValidator::Model(x) => {
+                                // for models, we attempt to fetch the number of fields set, as this is a better
+                                // measure of the fit of the input data than the total number of fields on a model
+                                // but we fallback to the total number of fields
+                                let num_model_fields_set: Option<usize> =
+                                    match new_success.getattr(py, intern!(py, "__pydantic_fields_set__")) {
+                                        Ok(fields_set) => match fields_set.downcast_bound::<PySet>(py) {
+                                            Ok(py_set) => Some(py_set.len()),
+                                            Err(_) => x.num_fields(),
+                                        },
+                                        Err(_) => x.num_fields(),
+                                    };
+                                num_model_fields_set
+                            }
                             CombinedValidator::Dataclass(y) => y.num_fields(),
                             CombinedValidator::TypedDict(z) => z.num_fields(),
                             _ => None,
                         };
 
-                        // let fields_set: Option<Py<PyAny>> = match new_success.getattr(py, DUNDER_FIELDS_SET_KEY) {
-                        //     Ok(fields_set) => fields_set.extract(py)?,
-                        //     Err(_) => None,
-                        // };
-                        // dbg!(fields_set);
-
-                        // let new_fields_set: Option<PySet> = match new_success.getattr(py, intern!(py, DUNDER_FIELDS_SET_KEY)) {
-                        //     Ok(fields_set) => match fields_set.downcast_bound::<PySet>(py) {
-                        //         Ok(fields_set) => Some(fields_set),
-                        //         Err(_) => None,
-                        //     }
-                        //     Err(_) => None,
-                        // };
-                        // dbg!(new_fields_set);
-
-                        let fields_set_length: Option<usize> = match new_success.getattr(py, intern!(py, DUNDER_FIELDS_SET_KEY)) {
-                            Ok(fields_set) => match fields_set.downcast_bound::<PySet>(py) {
-                                Ok(py_set) => Some(py_set.len()),
-                                Err(_) => None,
-                            },
-                            Err(_) => None,
-                        };
-
-                        dbg!(fields_set_length);
-
-                        dbg!(fields_set_length);
-
-                        // dbg!(new_success.getattr(py, DUNDER_FIELDS_SET_KEY)?.extract()?);
-
-
                         let new_success_is_best_match: bool =
                             success.as_ref().map_or(true, |(_, cur_exactness, cur_num_fields)| {
-                                match (*cur_num_fields, new_num_fields) {
-                                    // if the number of fields is greater and the exactness is more precise
+                                if *cur_exactness < new_exactness {
+                                    true
+                                } else if let (Some(cur_fields), Some(new_fields)) = (*cur_num_fields, new_num_fields) {
+                                    // if the number of fields is greater and the exactness is the same,
                                     // then the new union member is a better match
-                                    (Some(cur_fields), Some(new_fields)) => {
-                                        cur_fields < new_fields && *cur_exactness <= new_exactness
-                                    }
-                                    // if the number of fields isn't known, the new union
-                                    // member is only a better match if the exactness is more precise
-                                    // which ensures that we prefer left-to-right order in the union
-                                    // when exactness ties occur
-                                    _ => *cur_exactness < new_exactness,
+                                    cur_fields < new_fields && *cur_exactness == new_exactness
+                                } else {
+                                    false
                                 }
                             });
 
