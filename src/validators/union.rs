@@ -155,9 +155,10 @@ impl UnionValidator {
 
                         let new_success_is_best_match: bool =
                             success.as_ref().map_or(true, |(_, cur_exactness, cur_num_fields)| {
-                                *cur_exactness < new_exactness
-                                    || (*cur_exactness == new_exactness
-                                        && cur_num_fields.unwrap_or(0) < new_num_fields.unwrap_or(0))
+                                match (*cur_num_fields, new_num_fields) {
+                                    (Some(cur), Some(new)) if cur != new => cur < new,
+                                    _ => *cur_exactness < new_exactness,
+                                }
                             });
 
                         if new_success_is_best_match {

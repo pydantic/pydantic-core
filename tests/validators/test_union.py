@@ -814,48 +814,30 @@ def test_union_with_subclass() -> None:
     class ModelB(ModelA):
         b: int
 
-    model_a_schema = {
-        'type': 'model',
-        'cls': ModelA,
-        'schema': {
-            'type': 'model-fields',
-            'fields': {
-                'a': {'type': 'model-field', 'schema': {'type': 'int'}},
-            },
-        },
-    }
-
-    model_b_schema = {
-        'type': 'model',
-        'cls': ModelB,
-        'schema': {
-            'type': 'model-fields',
-            'fields': {
-                'a': {'type': 'model-field', 'schema': {'type': 'int'}},
-                'b': {'type': 'model-field', 'schema': {'type': 'int'}},
-            },
-        },
-    }
-
-    a_b_val = SchemaValidator(
-        {
-            'type': 'union',
-            'choices': [model_a_schema, model_b_schema],
-        }
+    model_a_schema = core_schema.model_schema(
+        ModelA, core_schema.model_fields_schema(fields={'a': core_schema.model_field(core_schema.int_schema())})
+    )
+    model_b_schema = core_schema.model_schema(
+        ModelB,
+        core_schema.model_fields_schema(
+            fields={
+                'a': core_schema.model_field(core_schema.int_schema()),
+                'b': core_schema.model_field(core_schema.int_schema()),
+            }
+        ),
     )
 
-    b_a_val = SchemaValidator(
-        {
-            'type': 'union',
-            'choices': [model_b_schema, model_a_schema],
-        }
-    )
+    for choices in [[model_a_schema, model_b_schema], [model_b_schema, model_a_schema]]:
+        validator = SchemaValidator(schema=core_schema.union_schema(choices))
+        assert isinstance(validator.validate_python({'a': 1}), ModelA)
+        assert isinstance(validator.validate_python({'a': 1, 'b': 2}), ModelB)
 
-    assert isinstance(a_b_val.validate_python({'a': 1}), ModelA)
-    assert isinstance(b_a_val.validate_python({'a': 1}), ModelA)
-
-    assert isinstance(a_b_val.validate_python({'a': 1, 'b': 2}), ModelB)
-    assert isinstance(b_a_val.validate_python({'a': 1, 'b': 2}), ModelB)
+        # confirm that a model that matches in lax mode with 2 fields
+        # is preferred over a model that matches in strict mode with 1 field
+        assert isinstance(validator.validate_python({'a': '1', 'b': '2'}), ModelB)
+        assert isinstance(validator.validate_python({'a': '1', 'b': 2}), ModelB)
+        assert isinstance(validator.validate_python({'a': 1, 'b': '2'}), ModelB)
+        assert isinstance(validator.validate_python({'a': 1, 'b': 2}), ModelB)
 
 
 def test_union_with_default() -> None:
