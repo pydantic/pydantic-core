@@ -224,13 +224,10 @@ impl<T: Debug> LiteralLookup<T> {
             return Ok(None);
         };
 
-        let is_equal = |k: &i64| -> PyResult<bool> {
-            let equality = py_input.call_method1("__eq__", (*k,))?;
-            equality.extract::<bool>()
-        };
-
         if let Some(expected_ints) = &self.expected_int {
-            let id = expected_ints.iter().find(|(k, _)| is_equal(k).unwrap_or(false));
+            let id = expected_ints
+                .iter()
+                .find(|(&k, _)| is_equal_to(py_input, k).unwrap_or(false));
 
             if let Some((_, id)) = id {
                 return Ok(Some(&self.values[*id]));
@@ -241,16 +238,31 @@ impl<T: Debug> LiteralLookup<T> {
             return Ok(None);
         };
 
+        // try with raw strings
+        let id = expected_strings
+            .iter()
+            .find(|(k, _)| is_equal_to(py_input, k.as_str()).unwrap_or(false));
+
+        if let Some((_, id)) = id {
+            return Ok(Some(&self.values[*id]));
+        }
+
+        // try with converting to int
         let id = expected_strings
             .iter()
             .filter_map(|(k, id)| k.parse::<i64>().ok().map(|k_as_int| (k_as_int, id)))
-            .find(|(k, _)| is_equal(k).unwrap_or(false));
+            .find(|(k, _)| is_equal_to(py_input, *k).unwrap_or(false));
 
         if let Some((_, id)) = id {
             return Ok(Some(&self.values[*id]));
         }
         Ok(None)
     }
+}
+
+fn is_equal_to<TValue: IntoPy<Py<PyAny>>>(input: &Bound<PyAny>, value: TValue) -> PyResult<bool> {
+    let equality = input.call_method1("__eq__", (value,))?;
+    equality.extract::<bool>()
 }
 
 impl<T: PyGcTraverse + Debug> PyGcTraverse for LiteralLookup<T> {

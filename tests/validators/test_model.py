@@ -1,7 +1,7 @@
 import re
 from copy import deepcopy
 from decimal import Decimal
-from typing import Any, Callable, Dict, List, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
 
 import pytest
 from dirty_equals import HasRepr, IsInstance
@@ -1379,3 +1379,34 @@ def test_model_with_enum_int_field_validation_should_succeed_for_any_type_equali
     v.validate_assignment(m, 'enum_field_3', IntWrappable(3))
     v.validate_assignment(m, 'enum_field_4', Decimal(4))
     v.validate_assignment(m, 'enum_field_4', IntWrappable(4))
+
+
+def test_model_bug():
+    class MyModel:
+        __slots__ = (
+            '__dict__',
+            '__pydantic_fields_set__',
+            '__pydantic_extra__',
+            '__pydantic_private__',
+        )
+        x: Iterable[int]
+
+    # WHEN
+    v = SchemaValidator(
+        core_schema.model_schema(
+            MyModel,
+            core_schema.model_fields_schema(
+                {
+                    'x': core_schema.model_field(core_schema.generator_schema()),
+                },
+            ),
+        )
+    )
+    print(v)
+
+    # THEN
+    # v.validate_json('{"x": [1, 2, 3]}')
+    m = v.validate_python({'x': [1, 2, 3]})
+    print(m)
+    print(m.x)
+    print(type(m.x))

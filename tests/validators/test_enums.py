@@ -384,7 +384,7 @@ def test_enum_int_validation_should_succeed_for_decimal(value: int):
 
 def test_enum_int_validation_should_succeed_for_custom_type():
     # GIVEN
-    class IntWrapper:
+    class AnyWrapper:
         def __init__(self, value):
             self.value = value
 
@@ -394,6 +394,7 @@ def test_enum_int_validation_should_succeed_for_custom_type():
     class MyEnum(Enum):
         VALUE = 999
         SECOND_VALUE = 1000000
+        THIRD_VALUE = 'Py03'
 
     # WHEN
     v = SchemaValidator(
@@ -404,8 +405,9 @@ def test_enum_int_validation_should_succeed_for_custom_type():
     )
 
     # THEN
-    assert v.validate_python(IntWrapper(999)) is MyEnum.VALUE
-    assert v.validate_python(IntWrapper(1000000)) is MyEnum.SECOND_VALUE
+    assert v.validate_python(AnyWrapper(999)) is MyEnum.VALUE
+    assert v.validate_python(AnyWrapper(1000000)) is MyEnum.SECOND_VALUE
+    assert v.validate_python(AnyWrapper('Py03')) is MyEnum.THIRD_VALUE
 
 
 def test_enum_str_validation_should_succeed_for_decimal_with_strict_disabled():
@@ -481,3 +483,25 @@ def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
 
     with pytest.raises(ValidationError):
         v_str.validate_python(Decimal(2.1))
+
+
+def test_enum_int_validation_should_fail_for_plain_type_without_eq_checking():
+    # GIVEN
+    class MyEnum(Enum):
+        VALUE = 1
+
+    class MyClass:
+        def __init__(self, value):
+            self.value = value
+
+    # WHEN
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    # THEN
+    with pytest.raises(ValidationError):
+        v.validate_python(MyClass(1))
