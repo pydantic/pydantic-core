@@ -772,8 +772,8 @@ pub trait Validator: Send + Sync + Debug {
 
     // Used as a tie-breaking score for union validators for model like validators
     // Eventually, it'd be nice to make this a more robust metric that applies
-    // to a greater variety of validators, but we want to avoid the arbitrary metric,
-    // z-index like spiral of doom for now, see https://danielrotter.at/2020/04/08/avoid-z-index-whenever-possible.html
+    // to a greater variety of validators, but we want to avoid the arbitrary metric, z-index like spiral of doom for now.
+    // see https://danielrotter.at/2020/04/08/avoid-z-index-whenever-possible.html
     fn num_fields(&self) -> Option<usize> {
         None
     }
