@@ -218,51 +218,6 @@ impl<T: Debug> LiteralLookup<T> {
         }
         Ok(None)
     }
-
-    pub fn try_validate_any<'a, 'py, I: Input<'py> + ?Sized>(&self, input: &'a I) -> ValResult<Option<&T>> {
-        let Some(py_input) = input.as_python() else {
-            return Ok(None);
-        };
-
-        if let Some(expected_ints) = &self.expected_int {
-            let id = expected_ints
-                .iter()
-                .find(|(&k, _)| is_equal_to(py_input, k).unwrap_or(false));
-
-            if let Some((_, id)) = id {
-                return Ok(Some(&self.values[*id]));
-            }
-        };
-
-        let Some(expected_strings) = &self.expected_str else {
-            return Ok(None);
-        };
-
-        // try with raw strings
-        let id = expected_strings
-            .iter()
-            .find(|(k, _)| is_equal_to(py_input, k.as_str()).unwrap_or(false));
-
-        if let Some((_, id)) = id {
-            return Ok(Some(&self.values[*id]));
-        }
-
-        // try with converting to int
-        let id = expected_strings
-            .iter()
-            .filter_map(|(k, id)| k.parse::<i64>().ok().map(|k_as_int| (k_as_int, id)))
-            .find(|(k, _)| is_equal_to(py_input, *k).unwrap_or(false));
-
-        if let Some((_, id)) = id {
-            return Ok(Some(&self.values[*id]));
-        }
-        Ok(None)
-    }
-}
-
-fn is_equal_to<TValue: IntoPy<Py<PyAny>>>(input: &Bound<PyAny>, value: TValue) -> PyResult<bool> {
-    let equality = input.call_method1("__eq__", (value,))?;
-    equality.extract::<bool>()
 }
 
 impl<T: PyGcTraverse + Debug> PyGcTraverse for LiteralLookup<T> {

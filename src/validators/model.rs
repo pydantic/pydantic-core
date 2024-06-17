@@ -270,7 +270,6 @@ impl ModelValidator {
                     .map_err(|e| convert_err(py, e, input));
             }
         }
-
         let output = self.validator.validate(py, input, state)?;
 
         let instance = create_class(self.class.bind(py))?;

@@ -86,6 +86,7 @@ impl Validator for GeneratorValidator {
             hide_input_in_errors: self.hide_input_in_errors,
             validation_error_cause: self.validation_error_cause,
         };
+
         Ok(v_iterator.into_py(py))
     }
 

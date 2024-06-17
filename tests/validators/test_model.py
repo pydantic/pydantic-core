@@ -1323,7 +1323,6 @@ def test_model_with_enum_int_field_validation_should_succeed_for_any_type_equali
         enum_value = 1
         enum_value_2 = 2
         enum_value_3 = 3
-        enum_value_4 = '4'
 
     class IntWrappable:
         def __init__(self, value: int):
@@ -1356,26 +1355,20 @@ def test_model_with_enum_int_field_validation_should_succeed_for_any_type_equali
                     'enum_field_3': core_schema.model_field(
                         core_schema.enum_schema(EnumClass, list(EnumClass.__members__.values()))
                     ),
-                    'enum_field_4': core_schema.model_field(
-                        core_schema.enum_schema(EnumClass, list(EnumClass.__members__.values()))
-                    ),
                 }
             ),
         )
     )
 
     # THEN
-    v.validate_json('{"enum_field": 1, "enum_field_2": 2, "enum_field_3": 3, "enum_field_4": "4"}')
+    v.validate_json('{"enum_field": 1, "enum_field_2": 2, "enum_field_3": 3}')
     m = v.validate_python(
         {
             'enum_field': Decimal(1),
             'enum_field_2': Decimal(2),
             'enum_field_3': IntWrappable(3),
-            'enum_field_4': IntWrappable(4),
         }
     )
     v.validate_assignment(m, 'enum_field', Decimal(1))
     v.validate_assignment(m, 'enum_field_2', Decimal(2))
     v.validate_assignment(m, 'enum_field_3', IntWrappable(3))
-    v.validate_assignment(m, 'enum_field_4', Decimal(4))
-    v.validate_assignment(m, 'enum_field_4', IntWrappable(4))

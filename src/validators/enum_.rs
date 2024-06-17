@@ -79,6 +79,7 @@ pub trait EnumValidateValue: std::fmt::Debug + Clone + Send + Sync {
         py: Python<'py>,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
+        class: &Py<PyType>,
         strict: bool,
     ) -> ValResult<Option<PyObject>>;
 }
@@ -116,7 +117,7 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
                 },
                 input,
             ));
-        } else if let Some(v) = T::validate_value(py, input, &self.lookup, strict)? {
+        } else if let Some(v) = T::validate_value(py, input, &self.lookup, &self.class, strict)? {
             state.floor_exactness(Exactness::Lax);
             return Ok(v);
         } else if let Some(ref missing) = self.missing {
@@ -167,6 +168,7 @@ impl EnumValidateValue for PlainEnumValidator {
         py: Python<'py>,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
+        class: &Py<PyType>,
         strict: bool,
     ) -> ValResult<Option<PyObject>> {
         match lookup.validate(py, input)? {
@@ -184,8 +186,8 @@ impl EnumValidateValue for PlainEnumValidator {
                             return Ok(lookup.validate_int(py, input, false)?.map(|v| v.clone_ref(py)));
                         }
                         if py_input.is_instance_of::<PyAny>() {
-                            if let Ok(Some(res)) = lookup.try_validate_any(input) {
-                                return Ok(Some(res.clone_ref(py)));
+                            if let Ok(res) = class.call1(py, (py_input,)) {
+                                return Ok(Some(res));
                             }
                         }
                     }
@@ -207,6 +209,7 @@ impl EnumValidateValue for IntEnumValidator {
         py: Python<'py>,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
+        _class: &Py<PyType>,
         strict: bool,
     ) -> ValResult<Option<PyObject>> {
         Ok(lookup.validate_int(py, input, strict)?.map(|v| v.clone_ref(py)))
@@ -223,6 +226,7 @@ impl EnumValidateValue for StrEnumValidator {
         py: Python,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
+        _class: &Py<PyType>,
         strict: bool,
     ) -> ValResult<Option<PyObject>> {
         Ok(lookup.validate_str(input, strict)?.map(|v| v.clone_ref(py)))
@@ -239,6 +243,7 @@ impl EnumValidateValue for FloatEnumValidator {
         py: Python<'py>,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
+        _class: &Py<PyType>,
         strict: bool,
     ) -> ValResult<Option<PyObject>> {
         Ok(lookup.validate_float(py, input, strict)?.map(|v| v.clone_ref(py)))

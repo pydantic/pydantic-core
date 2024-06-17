@@ -410,7 +410,7 @@ def test_enum_int_validation_should_succeed_for_custom_type():
     assert v.validate_python(AnyWrapper('Py03')) is MyEnum.THIRD_VALUE
 
 
-def test_enum_str_validation_should_succeed_for_decimal_with_strict_disabled():
+def test_enum_str_validation_should_fail_for_decimal_when_expecting_str_value():
     # GIVEN
     class MyEnum(Enum):
         VALUE = '1'
@@ -419,23 +419,6 @@ def test_enum_str_validation_should_succeed_for_decimal_with_strict_disabled():
     v = SchemaValidator(
         core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
-            default=MyEnum.VALUE,
-        )
-    )
-
-    # THEN
-    assert v.validate_python(Decimal(1)) is MyEnum.VALUE
-
-
-def test_enum_str_validation_should_fail_for_decimal_with_strict_enabled():
-    # GIVEN
-    class MyEnum(Enum):
-        VALUE = '1'
-
-    # WHEN
-    v = SchemaValidator(
-        core_schema.with_default_schema(
-            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), strict=True),
             default=MyEnum.VALUE,
         )
     )
@@ -450,21 +433,11 @@ def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
     class MyEnum(Enum):
         VALUE = 1
 
-    class MyStrEnum(Enum):
-        VALUE = '2'
-
     # WHEN
     v = SchemaValidator(
         core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
             default=MyEnum.VALUE,
-        )
-    )
-
-    v_str = SchemaValidator(
-        core_schema.with_default_schema(
-            schema=core_schema.enum_schema(MyStrEnum, list(MyStrEnum.__members__.values())),
-            default=MyStrEnum.VALUE,
         )
     )
 
@@ -477,12 +450,6 @@ def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
 
     with pytest.raises(ValidationError):
         v.validate_python(Decimal(1.1))
-
-    with pytest.raises(ValidationError):
-        v_str.validate_python(Decimal(1))
-
-    with pytest.raises(ValidationError):
-        v_str.validate_python(Decimal(2.1))
 
 
 def test_enum_int_validation_should_fail_for_plain_type_without_eq_checking():
