@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date, time
 from enum import Enum, IntEnum
-from typing import Any
+from typing import Any, Optional
 from uuid import UUID
 
 import pytest
@@ -805,3 +805,175 @@ def test_model_and_literal_union() -> None:
     assert isinstance(m, ModelA)
     assert m.a == 42
     assert validator.validate_python(True) is True
+
+
+def test_union_with_subclass() -> None:
+    class ModelA:
+        a: int
+
+    class ModelB(ModelA):
+        b: int
+
+    model_a_schema = {
+        'type': 'model',
+        'cls': ModelA,
+        'schema': {
+            'type': 'model-fields',
+            'fields': {
+                'a': {'type': 'model-field', 'schema': {'type': 'int'}},
+            },
+        },
+    }
+
+    model_b_schema = {
+        'type': 'model',
+        'cls': ModelB,
+        'schema': {
+            'type': 'model-fields',
+            'fields': {
+                'a': {'type': 'model-field', 'schema': {'type': 'int'}},
+                'b': {'type': 'model-field', 'schema': {'type': 'int'}},
+            },
+        },
+    }
+
+    a_b_val = SchemaValidator(
+        {
+            'type': 'union',
+            'choices': [model_a_schema, model_b_schema],
+        }
+    )
+
+    b_a_val = SchemaValidator(
+        {
+            'type': 'union',
+            'choices': [model_b_schema, model_a_schema],
+        }
+    )
+
+    assert isinstance(a_b_val.validate_python({'a': 1}), ModelA)
+    assert isinstance(b_a_val.validate_python({'a': 1}), ModelA)
+
+    assert isinstance(a_b_val.validate_python({'a': 1, 'b': 2}), ModelB)
+    assert isinstance(b_a_val.validate_python({'a': 1, 'b': 2}), ModelB)
+
+
+def test_union_with_default() -> None:
+    class ModelA:
+        a: int = 0
+
+    class ModelB:
+        b: int = 0
+
+    val = SchemaValidator(
+        {
+            'type': 'union',
+            'choices': [
+                {
+                    'type': 'model',
+                    'cls': ModelA,
+                    'schema': {
+                        'type': 'model-fields',
+                        'fields': {
+                            'a': {
+                                'type': 'model-field',
+                                'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default': 0},
+                            },
+                        },
+                    },
+                },
+                {
+                    'type': 'model',
+                    'cls': ModelB,
+                    'schema': {
+                        'type': 'model-fields',
+                        'fields': {
+                            'b': {
+                                'type': 'model-field',
+                                'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default': 0},
+                            },
+                        },
+                    },
+                },
+            ],
+        }
+    )
+
+    assert isinstance(val.validate_python({'a': 1}), ModelA)
+    assert isinstance(val.validate_python({'b': 1}), ModelB)
+
+    # defaults to leftmost choice if there's a tie
+    assert isinstance(val.validate_python({}), ModelA)
+
+
+def test_optional_union_with_members_having_defaults() -> None:
+    class ModelA:
+        a: int = 0
+
+    class ModelB:
+        b: int = 0
+
+    class WrapModel:
+        val: Optional[ModelA | ModelB] = None
+
+    val = SchemaValidator(
+        {
+            'type': 'model',
+            'cls': WrapModel,
+            'schema': {
+                'type': 'model-fields',
+                'fields': {
+                    'val': {
+                        'type': 'model-field',
+                        'schema': {
+                            'type': 'default',
+                            'schema': {
+                                'type': 'union',
+                                'choices': [
+                                    {
+                                        'type': 'model',
+                                        'cls': ModelA,
+                                        'schema': {
+                                            'type': 'model-fields',
+                                            'fields': {
+                                                'a': {
+                                                    'type': 'model-field',
+                                                    'schema': {
+                                                        'type': 'default',
+                                                        'schema': {'type': 'int'},
+                                                        'default': 0,
+                                                    },
+                                                }
+                                            },
+                                        },
+                                    },
+                                    {
+                                        'type': 'model',
+                                        'cls': ModelB,
+                                        'schema': {
+                                            'type': 'model-fields',
+                                            'fields': {
+                                                'b': {
+                                                    'type': 'model-field',
+                                                    'schema': {
+                                                        'type': 'default',
+                                                        'schema': {'type': 'int'},
+                                                        'default': 0,
+                                                    },
+                                                }
+                                            },
+                                        },
+                                    },
+                                ],
+                            },
+                            'default': None,
+                        },
+                    }
+                },
+            },
+        }
+    )
+
+    assert isinstance(val.validate_python({'val': {'a': 1}}).val, ModelA)
+    assert isinstance(val.validate_python({'val': {'b': 1}}).val, ModelB)
+    assert val.validate_python({}).val is None
