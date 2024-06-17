@@ -148,15 +148,16 @@ impl UnionValidator {
                                 // for models, we attempt to fetch the number of fields set, as this is a better
                                 // measure of the fit of the input data than the total number of fields on a model
                                 // but we fallback to the total number of fields
-                                let num_model_fields_set: Option<usize> =
-                                    match new_success.getattr(py, intern!(py, "__pydantic_fields_set__")) {
-                                        Ok(fields_set) => match fields_set.downcast_bound::<PySet>(py) {
-                                            Ok(py_set) => Some(py_set.len()),
-                                            Err(_) => x.num_fields(),
-                                        },
-                                        Err(_) => x.num_fields(),
-                                    };
-                                num_model_fields_set
+                                new_success
+                                    .getattr(py, intern!(py, "__pydantic_fields_set__"))
+                                    .ok()
+                                    .and_then(|fields_set| {
+                                        fields_set
+                                            .downcast_bound::<PySet>(py)
+                                            .ok()
+                                            .map(pyo3::prelude::PySetMethods::len)
+                                    })
+                                    .or_else(|| x.num_fields())
                             }
                             CombinedValidator::Dataclass(y) => y.num_fields(),
                             CombinedValidator::TypedDict(z) => z.num_fields(),
@@ -165,15 +166,9 @@ impl UnionValidator {
 
                         let new_success_is_best_match: bool =
                             success.as_ref().map_or(true, |(_, cur_exactness, cur_num_fields)| {
-                                if *cur_exactness < new_exactness {
-                                    true
-                                } else if let (Some(cur_fields), Some(new_fields)) = (*cur_num_fields, new_num_fields) {
-                                    // if the number of fields is greater and the exactness is the same,
-                                    // then the new union member is a better match
-                                    cur_fields < new_fields && *cur_exactness == new_exactness
-                                } else {
-                                    false
-                                }
+                                *cur_exactness < new_exactness
+                                    || (*cur_exactness == new_exactness
+                                        && cur_num_fields.unwrap_or(0) < new_num_fields.unwrap_or(0))
                             });
 
                         if new_success_is_best_match {

@@ -425,12 +425,6 @@ impl Validator for DataclassArgsValidator {
     }
 }
 
-impl HasNumFields for DataclassArgsValidator {
-    fn num_fields(&self) -> Option<usize> {
-        Some(self.fields.len())
-    }
-}
-
 #[derive(Debug)]
 pub struct DataclassValidator {
     strict: bool,
