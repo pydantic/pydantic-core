@@ -582,10 +582,6 @@ pub fn build_validator(
     )
 }
 
-pub trait HasNumFields {
-    fn num_fields(&self) -> Option<usize>;
-}
-
 /// More (mostly immutable) data to pass between validators, should probably be class `Context`,
 /// but that would confuse it with context as per pydantic/pydantic#1549
 #[derive(Debug, Clone)]
@@ -772,6 +768,14 @@ pub trait Validator: Send + Sync + Debug {
     ) -> ValResult<PyObject> {
         let py_err = PyTypeError::new_err(format!("validate_assignment is not supported for {}", self.get_name()));
         Err(py_err.into())
+    }
+
+    // Used as a tie-breaking score for union validators for model like validators
+    // Eventually, it'd be nice to make this a more robust metric that applies
+    // to a greater variety of validators, but we want to avoid the arbitrary metric,
+    // z-index like spiral of doom for now, see https://danielrotter.at/2020/04/08/avoid-z-index-whenever-possible.html
+    fn num_fields(&self) -> Option<usize> {
+        None
     }
 
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator

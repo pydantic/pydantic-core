@@ -15,9 +15,7 @@ use crate::input::{Input, ValidatedDict};
 use crate::lookup_key::LookupKey;
 use crate::tools::SchemaDict;
 
-use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, HasNumFields, ValidationState, Validator,
-};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug)]
 struct TypedDictField {
@@ -327,13 +325,11 @@ impl Validator for TypedDictValidator {
         }
     }
 
-    fn get_name(&self) -> &str {
-        Self::EXPECTED_TYPE
-    }
-}
-
-impl HasNumFields for TypedDictValidator {
     fn num_fields(&self) -> Option<usize> {
         Some(self.fields.len())
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
     }
 }

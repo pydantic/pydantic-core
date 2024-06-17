@@ -8,8 +8,7 @@ use pyo3::{intern, prelude::*};
 use super::function::convert_err;
 use super::validation_state::Exactness;
 use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, HasNumFields, ValidationState,
-    Validator,
+    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, ValidationState, Validator,
 };
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
@@ -217,6 +216,10 @@ impl Validator for ModelValidator {
         Ok(model.into_py(py))
     }
 
+    fn num_fields(&self) -> Option<usize> {
+        self.validator.num_fields()
+    }
+
     fn get_name(&self) -> &str {
         &self.name
     }
@@ -305,15 +308,6 @@ impl ModelValidator {
                 .map_err(|e| convert_err(py, e, input))?;
         }
         Ok(instance.into())
-    }
-}
-
-impl HasNumFields for ModelValidator {
-    fn num_fields(&self) -> Option<usize> {
-        match &*self.validator {
-            CombinedValidator::ModelFields(model_fields_validator) => model_fields_validator.num_fields(),
-            _ => None,
-        }
     }
 }
 

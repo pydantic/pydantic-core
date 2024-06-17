@@ -14,9 +14,7 @@ use crate::input::{BorrowInput, Input, ValidatedDict, ValidationMatch};
 use crate::lookup_key::LookupKey;
 use crate::tools::SchemaDict;
 
-use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, HasNumFields, ValidationState, Validator,
-};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug)]
 struct Field {
@@ -434,13 +432,11 @@ impl Validator for ModelFieldsValidator {
         Ok((new_data.to_object(py), new_extra, fields_set.to_object(py)).to_object(py))
     }
 
-    fn get_name(&self) -> &str {
-        Self::EXPECTED_TYPE
-    }
-}
-
-impl HasNumFields for ModelFieldsValidator {
     fn num_fields(&self) -> Option<usize> {
         Some(self.fields.len())
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
     }
 }

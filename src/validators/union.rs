@@ -17,8 +17,7 @@ use crate::tools::SchemaDict;
 use super::custom_error::CustomError;
 use super::literal::LiteralLookup;
 use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, HasNumFields, ValidationState,
-    Validator,
+    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, ValidationState, Validator,
 };
 
 #[derive(Debug)]
@@ -140,29 +139,19 @@ impl UnionValidator {
 
                         let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
 
-                        // in the case where the exactness is Strict or Lax, we also check
-                        // the number of fields in the model, and prefer the one with more fields
-                        // which is useful for choosing a more specific model in a union, like a subclass
-                        let new_num_fields: Option<usize> = match choice {
-                            CombinedValidator::Model(x) => {
-                                // for models, we attempt to fetch the number of fields set, as this is a better
-                                // measure of the fit of the input data than the total number of fields on a model
-                                // but we fallback to the total number of fields
-                                new_success
-                                    .getattr(py, intern!(py, "__pydantic_fields_set__"))
+                        // in the case where the exactness is Strict or Lax, we also check the number of fields set on the result
+                        // (or number of fields on the model, as a fallback), and prefer the one with more fields which is useful
+                        // for choosing a more specific model in a union, like a subclass over a superclass
+                        let new_num_fields = new_success
+                            .getattr(py, intern!(py, "__pydantic_fields_set__"))
+                            .ok()
+                            .and_then(|fields_set| {
+                                fields_set
+                                    .downcast_bound::<PySet>(py)
                                     .ok()
-                                    .and_then(|fields_set| {
-                                        fields_set
-                                            .downcast_bound::<PySet>(py)
-                                            .ok()
-                                            .map(pyo3::prelude::PySetMethods::len)
-                                    })
-                                    .or_else(|| x.num_fields())
-                            }
-                            CombinedValidator::Dataclass(y) => y.num_fields(),
-                            CombinedValidator::TypedDict(z) => z.num_fields(),
-                            _ => None,
-                        };
+                                    .map(pyo3::prelude::PySetMethods::len)
+                            })
+                            .or_else(|| choice.num_fields());
 
                         let new_success_is_best_match: bool =
                             success.as_ref().map_or(true, |(_, cur_exactness, cur_num_fields)| {

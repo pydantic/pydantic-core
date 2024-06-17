@@ -17,9 +17,7 @@ use crate::validators::function::convert_err;
 
 use super::model::{create_class, force_setattr, Revalidate};
 use super::validation_state::Exactness;
-use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, HasNumFields, ValidationState, Validator,
-};
+use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug)]
 struct Field {
@@ -569,6 +567,10 @@ impl Validator for DataclassValidator {
         Ok(obj.to_object(py))
     }
 
+    fn num_fields(&self) -> Option<usize> {
+        Some(self.fields.len())
+    }
+
     fn get_name(&self) -> &str {
         &self.name
     }
@@ -631,11 +633,5 @@ impl DataclassValidator {
             r.map_err(|e| convert_err(py, e, input))?;
         }
         Ok(())
-    }
-}
-
-impl HasNumFields for DataclassValidator {
-    fn num_fields(&self) -> Option<usize> {
-        Some(self.fields.len())
     }
 }

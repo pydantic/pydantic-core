@@ -170,15 +170,15 @@ class TestModelClassSimilar:
         assert m.b == 'hello'
         assert not hasattr(m, 'c')
 
-    def test_model_b_ignored(self, schema_validator: SchemaValidator):
-        # first choice works, so second choice is not used
-        # TODO: I would argue that this is the wrong behavior - we should initialize
-        # a ModelB in this case.
+    def test_model_b_preferred(self, schema_validator: SchemaValidator):
+        # Note, this is a different behavior to previous smart union behavior,
+        # where the first match would be preferred. However, we believe is it better
+        # to prefer the match with the greatest number of valid fields set.
         m = schema_validator.validate_python({'a': 1, 'b': 'hello', 'c': 2.0})
-        assert isinstance(m, self.ModelA)
+        assert isinstance(m, self.ModelB)
         assert m.a == 1
         assert m.b == 'hello'
-        assert not hasattr(m, 'c')
+        assert m.c == 2.0
 
     def test_model_b_not_ignored(self, schema_validator: SchemaValidator):
         m1 = self.ModelB()
