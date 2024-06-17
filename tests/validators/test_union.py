@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date, time
 from enum import Enum, IntEnum
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from uuid import UUID
 
 import pytest
@@ -896,7 +896,7 @@ def test_optional_union_with_members_having_defaults() -> None:
         b: int = 0
 
     class WrapModel:
-        val: Optional[ModelA | ModelB] = None
+        val: Optional[Union[ModelA, ModelB]] = None
 
     val = SchemaValidator(
         {
