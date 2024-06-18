@@ -108,6 +108,8 @@ impl UnionValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let old_exactness = state.exactness;
+        let old_fields_set_count = state.fields_set_count;
+
         let strict = state.strict_or(self.strict);
         let mut errors = MaybeErrors::new(self.custom_error.as_ref());
 
@@ -131,6 +133,7 @@ impl UnionValidator {
                         return {
                             // exact match, return, restore any previous exactness
                             state.exactness = old_exactness;
+                            state.fields_set_count = old_fields_set_count;
                             Ok(new_success)
                         };
                     }
@@ -166,7 +169,7 @@ impl UnionValidator {
 
         // restore previous validation state to prepare for any future validations
         state.exactness = old_exactness;
-        state.fields_set_count = None;
+        state.fields_set_count = old_fields_set_count;
 
         if let Some((success, exactness, _fields_set)) = success {
             state.floor_exactness(exactness);
