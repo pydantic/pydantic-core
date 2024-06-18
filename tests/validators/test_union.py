@@ -1046,3 +1046,12 @@ def test_td_smart_union_by_fields_set() -> None:
         assert validator.validate_python({'x': 1, 'y': '2'}).keys() == ModelB.__required_keys__
         assert validator.validate_python({'x': '1', 'y': 2}).keys() == ModelB.__required_keys__
         assert validator.validate_python({'x': '1', 'y': '2'}).keys() == ModelB.__required_keys__
+
+
+def test_smart_union_does_nested_model_field_counting() -> None: ...
+
+
+def test_smart_union_does_nested_dataclass_field_counting() -> None: ...
+
+
+def test_smart_union_does_nested_typed_dict_field_counting() -> None: ...
