@@ -125,25 +125,35 @@ impl UnionValidator {
             state.fields_set_count = None;
             let result = choice.validate(py, input, state);
             match result {
-                Ok(new_success) => {
-                    // success should always have an exactness
-                    debug_assert_ne!(state.exactness, None);
-
-                    let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
-                    let new_fields_set = state.fields_set_count;
-
-                    let new_success_is_best_match: bool =
-                        success.as_ref().map_or(true, |(_, cur_exactness, cur_fields_set)| {
-                            match (*cur_fields_set, new_fields_set) {
-                                (Some(cur), Some(new)) if cur != new => cur < new,
-                                _ => *cur_exactness < new_exactness,
-                            }
-                        });
-
-                    if new_success_is_best_match {
-                        success = Some((new_success, new_exactness, new_fields_set));
+                Ok(new_success) => match (state.exactness, state.fields_set_count) {
+                    (Some(Exactness::Exact), None) => {
+                        // exact match with no fields set data, return immediately
+                        return {
+                            // exact match, return, restore any previous exactness
+                            state.exactness = old_exactness;
+                            Ok(new_success)
+                        };
                     }
-                }
+                    _ => {
+                        // success should always have an exactness
+                        debug_assert_ne!(state.exactness, None);
+
+                        let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
+                        let new_fields_set = state.fields_set_count;
+
+                        let new_success_is_best_match: bool =
+                            success.as_ref().map_or(true, |(_, cur_exactness, cur_fields_set)| {
+                                match (*cur_fields_set, new_fields_set) {
+                                    (Some(cur), Some(new)) if cur != new => cur < new,
+                                    _ => *cur_exactness < new_exactness,
+                                }
+                            });
+
+                        if new_success_is_best_match {
+                            success = Some((new_success, new_exactness, new_fields_set));
+                        }
+                    }
+                },
                 Err(ValError::LineErrors(lines)) => {
                     // if we don't yet know this validation will succeed, record the error
                     if success.is_none() {
