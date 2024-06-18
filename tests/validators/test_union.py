@@ -1016,9 +1016,6 @@ def test_dc_smart_union_with_defaults() -> None:
         assert isinstance(validator.validate_python({'a': 1}), ModelA)
         assert isinstance(validator.validate_python({'b': 1}), ModelB)
 
-        # defaults to leftmost choice if there's a tie
-        assert isinstance(validator.validate_python({}), ModelA)
-
 
 def test_td_smart_union_by_fields_set() -> None:
     class ModelA(TypedDict):

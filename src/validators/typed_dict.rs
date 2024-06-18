@@ -230,7 +230,7 @@ impl Validator for TypedDictValidator {
                 }
             }
 
-            state.fields_set_count = (fields_set_count != 0).then_some(fields_set_count);
+            state.fields_set_count = Some(fields_set_count);
         }
 
         if let Some(used_keys) = used_keys {
