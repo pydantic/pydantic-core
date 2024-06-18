@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 from dirty_equals import IsFloat, IsInt
+from typing_extensions import TypedDict
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema, validate_core_schema
 
@@ -848,37 +849,30 @@ def test_union_with_default() -> None:
         b: int = 0
 
     val = SchemaValidator(
-        {
-            'type': 'union',
-            'choices': [
-                {
-                    'type': 'model',
-                    'cls': ModelA,
-                    'schema': {
-                        'type': 'model-fields',
-                        'fields': {
-                            'a': {
-                                'type': 'model-field',
-                                'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default': 0},
-                            },
-                        },
-                    },
-                },
-                {
-                    'type': 'model',
-                    'cls': ModelB,
-                    'schema': {
-                        'type': 'model-fields',
-                        'fields': {
-                            'b': {
-                                'type': 'model-field',
-                                'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default': 0},
-                            },
-                        },
-                    },
-                },
-            ],
-        }
+        core_schema.union_schema(
+            [
+                core_schema.model_schema(
+                    ModelA,
+                    core_schema.model_fields_schema(
+                        fields={
+                            'a': core_schema.model_field(
+                                core_schema.with_default_schema(core_schema.int_schema(), default=0)
+                            )
+                        }
+                    ),
+                ),
+                core_schema.model_schema(
+                    ModelB,
+                    core_schema.model_fields_schema(
+                        fields={
+                            'b': core_schema.model_field(
+                                core_schema.with_default_schema(core_schema.int_schema(), default=0)
+                            )
+                        }
+                    ),
+                ),
+            ]
+        ),
     )
 
     assert isinstance(val.validate_python({'a': 1}), ModelA)
@@ -899,63 +893,159 @@ def test_optional_union_with_members_having_defaults() -> None:
         val: Optional[Union[ModelA, ModelB]] = None
 
     val = SchemaValidator(
-        {
-            'type': 'model',
-            'cls': WrapModel,
-            'schema': {
-                'type': 'model-fields',
-                'fields': {
-                    'val': {
-                        'type': 'model-field',
-                        'schema': {
-                            'type': 'default',
-                            'schema': {
-                                'type': 'union',
-                                'choices': [
-                                    {
-                                        'type': 'model',
-                                        'cls': ModelA,
-                                        'schema': {
-                                            'type': 'model-fields',
-                                            'fields': {
-                                                'a': {
-                                                    'type': 'model-field',
-                                                    'schema': {
-                                                        'type': 'default',
-                                                        'schema': {'type': 'int'},
-                                                        'default': 0,
-                                                    },
-                                                }
-                                            },
-                                        },
-                                    },
-                                    {
-                                        'type': 'model',
-                                        'cls': ModelB,
-                                        'schema': {
-                                            'type': 'model-fields',
-                                            'fields': {
-                                                'b': {
-                                                    'type': 'model-field',
-                                                    'schema': {
-                                                        'type': 'default',
-                                                        'schema': {'type': 'int'},
-                                                        'default': 0,
-                                                    },
-                                                }
-                                            },
-                                        },
-                                    },
-                                ],
-                            },
-                            'default': None,
-                        },
-                    }
-                },
-            },
-        }
+        core_schema.model_schema(
+            WrapModel,
+            core_schema.model_fields_schema(
+                fields={
+                    'val': core_schema.model_field(
+                        core_schema.with_default_schema(
+                            core_schema.union_schema(
+                                [
+                                    core_schema.model_schema(
+                                        ModelA,
+                                        core_schema.model_fields_schema(
+                                            fields={
+                                                'a': core_schema.model_field(
+                                                    core_schema.with_default_schema(core_schema.int_schema(), default=0)
+                                                )
+                                            }
+                                        ),
+                                    ),
+                                    core_schema.model_schema(
+                                        ModelB,
+                                        core_schema.model_fields_schema(
+                                            fields={
+                                                'b': core_schema.model_field(
+                                                    core_schema.with_default_schema(core_schema.int_schema(), default=0)
+                                                )
+                                            }
+                                        ),
+                                    ),
+                                ]
+                            ),
+                            default=None,
+                        )
+                    )
+                }
+            ),
+        )
     )
 
     assert isinstance(val.validate_python({'val': {'a': 1}}).val, ModelA)
     assert isinstance(val.validate_python({'val': {'b': 1}}).val, ModelB)
     assert val.validate_python({}).val is None
+
+
+def test_dc_smart_union_by_fields_set() -> None:
+    @dataclass
+    class ModelA:
+        x: int
+
+    @dataclass
+    class ModelB(ModelA):
+        y: int
+
+    dc_a_schema = core_schema.dataclass_schema(
+        ModelA,
+        core_schema.dataclass_args_schema('ModelA', [core_schema.dataclass_field('x', core_schema.int_schema())]),
+        ['x'],
+    )
+
+    dc_b_schema = core_schema.dataclass_schema(
+        ModelB,
+        core_schema.dataclass_args_schema(
+            'ModelB',
+            [
+                core_schema.dataclass_field('x', core_schema.int_schema()),
+                core_schema.dataclass_field('y', core_schema.int_schema()),
+            ],
+        ),
+        ['x', 'y'],
+    )
+
+    for choices in [[dc_a_schema, dc_b_schema], [dc_b_schema, dc_a_schema]]:
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
+
+        assert isinstance(validator.validate_python({'x': 1}), ModelA)
+        assert isinstance(validator.validate_python({'x': '1'}), ModelA)
+
+        assert isinstance(validator.validate_python({'x': 1, 'y': 2}), ModelB)
+        assert isinstance(validator.validate_python({'x': 1, 'y': '2'}), ModelB)
+        assert isinstance(validator.validate_python({'x': '1', 'y': 2}), ModelB)
+        assert isinstance(validator.validate_python({'x': '1', 'y': '2'}), ModelB)
+
+
+def test_dc_smart_union_with_defaults() -> None:
+    @dataclass
+    class ModelA:
+        a: int = 0
+
+    @dataclass
+    class ModelB:
+        b: int = 0
+
+    dc_a_schema = core_schema.dataclass_schema(
+        ModelA,
+        core_schema.dataclass_args_schema(
+            'ModelA',
+            [
+                core_schema.dataclass_field(
+                    'a', core_schema.with_default_schema(schema=core_schema.int_schema(), default=0)
+                )
+            ],
+        ),
+        ['a'],
+    )
+
+    dc_b_schema = core_schema.dataclass_schema(
+        ModelB,
+        core_schema.dataclass_args_schema(
+            'ModelB',
+            [
+                core_schema.dataclass_field(
+                    'b', core_schema.with_default_schema(schema=core_schema.int_schema(), default=0)
+                )
+            ],
+        ),
+        ['b'],
+    )
+
+    for choices in [[dc_a_schema, dc_b_schema], [dc_b_schema, dc_a_schema]]:
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
+
+        assert isinstance(validator.validate_python({'a': 1}), ModelA)
+        assert isinstance(validator.validate_python({'b': 1}), ModelB)
+
+        # defaults to leftmost choice if there's a tie
+        assert isinstance(validator.validate_python({}), ModelA)
+
+
+def test_td_smart_union_by_fields_set() -> None:
+    class ModelA(TypedDict):
+        x: int
+
+    class ModelB(TypedDict):
+        x: int
+        y: int
+
+    td_a_schema = core_schema.typed_dict_schema(
+        fields={'x': core_schema.typed_dict_field(core_schema.int_schema())},
+    )
+
+    td_b_schema = core_schema.typed_dict_schema(
+        fields={
+            'x': core_schema.typed_dict_field(core_schema.int_schema()),
+            'y': core_schema.typed_dict_field(core_schema.int_schema()),
+        },
+    )
+
+    for choices in [[td_a_schema, td_b_schema], [td_b_schema, td_a_schema]]:
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
+
+        assert validator.validate_python({'x': 1}).keys() == ModelA.__required_keys__
+        assert validator.validate_python({'x': '1'}).keys() == ModelA.__required_keys__
+
+        assert validator.validate_python({'x': 1, 'y': 2}).keys() == ModelB.__required_keys__
+        assert validator.validate_python({'x': 1, 'y': '2'}).keys() == ModelB.__required_keys__
+        assert validator.validate_python({'x': '1', 'y': 2}).keys() == ModelB.__required_keys__
+        assert validator.validate_python({'x': '1', 'y': '2'}).keys() == ModelB.__required_keys__

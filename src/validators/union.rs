@@ -122,37 +122,28 @@ impl UnionValidator {
                 }
             });
             state.exactness = Some(Exactness::Exact);
+            state.fields_set_count = None;
             let result = choice.validate(py, input, state);
             match result {
-                Ok(new_success) => match state.exactness {
-                    // exact match, return
-                    Some(Exactness::Exact) => {
-                        return {
-                            // exact match, return, restore any previous exactness
-                            state.exactness = old_exactness;
-                            Ok(new_success)
-                        };
+                Ok(new_success) => {
+                    // success should always have an exactness
+                    debug_assert_ne!(state.exactness, None);
+
+                    let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
+                    let new_fields_set = state.fields_set_count;
+
+                    let new_success_is_best_match: bool =
+                        success.as_ref().map_or(true, |(_, cur_exactness, cur_fields_set)| {
+                            match (*cur_fields_set, new_fields_set) {
+                                (Some(cur), Some(new)) if cur != new => cur < new,
+                                _ => *cur_exactness < new_exactness,
+                            }
+                        });
+
+                    if new_success_is_best_match {
+                        success = Some((new_success, new_exactness, new_fields_set));
                     }
-                    _ => {
-                        // success should always have an exactness
-                        debug_assert_ne!(state.exactness, None);
-
-                        let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
-                        let new_fields_set = state.fields_set_count;
-
-                        let new_success_is_best_match: bool =
-                            success.as_ref().map_or(true, |(_, cur_exactness, cur_fields_set)| {
-                                match (*cur_fields_set, new_fields_set) {
-                                    (Some(cur), Some(new)) if cur != new => cur < new,
-                                    _ => *cur_exactness < new_exactness,
-                                }
-                            });
-
-                        if new_success_is_best_match {
-                            success = Some((new_success, new_exactness, new_fields_set));
-                        }
-                    }
-                },
+                }
                 Err(ValError::LineErrors(lines)) => {
                     // if we don't yet know this validation will succeed, record the error
                     if success.is_none() {
@@ -162,7 +153,10 @@ impl UnionValidator {
                 otherwise => return otherwise,
             }
         }
+
+        // restore previous validation state to prepare for any future validations
         state.exactness = old_exactness;
+        state.fields_set_count = None;
 
         if let Some((success, exactness, _fields_set)) = success {
             state.floor_exactness(exactness);
