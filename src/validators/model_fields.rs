@@ -432,10 +432,6 @@ impl Validator for ModelFieldsValidator {
         Ok((new_data.to_object(py), new_extra, fields_set.to_object(py)).to_object(py))
     }
 
-    fn num_fields(&self) -> Option<usize> {
-        Some(self.fields.len())
-    }
-
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }

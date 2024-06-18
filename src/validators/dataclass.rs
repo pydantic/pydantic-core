@@ -567,10 +567,6 @@ impl Validator for DataclassValidator {
         Ok(obj.to_object(py))
     }
 
-    fn num_fields(&self) -> Option<usize> {
-        Some(self.fields.len())
-    }
-
     fn get_name(&self) -> &str {
         &self.name
     }

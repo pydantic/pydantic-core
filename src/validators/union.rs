@@ -2,7 +2,7 @@ use std::fmt::Write;
 use std::str::FromStr;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PySet, PyString, PyTuple};
+use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 use pyo3::{intern, PyTraverseError, PyVisit};
 use smallvec::SmallVec;
 
@@ -138,31 +138,18 @@ impl UnionValidator {
                         debug_assert_ne!(state.exactness, None);
 
                         let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
-
-                        // in the case where the exactness is Strict or Lax, we also check the number of fields set on the result
-                        // (or number of fields on the model, as a fallback), and prefer the one with more fields which is useful
-                        // for choosing a more specific model in a union, like a subclass over a superclass
-                        let new_num_fields = new_success
-                            .getattr(py, intern!(py, "__pydantic_fields_set__"))
-                            .ok()
-                            .and_then(|fields_set| {
-                                fields_set
-                                    .downcast_bound::<PySet>(py)
-                                    .ok()
-                                    .map(pyo3::prelude::PySetMethods::len)
-                            })
-                            .or_else(|| choice.num_fields());
+                        let new_fields_set = state.fields_set_count;
 
                         let new_success_is_best_match: bool =
-                            success.as_ref().map_or(true, |(_, cur_exactness, cur_num_fields)| {
-                                match (*cur_num_fields, new_num_fields) {
+                            success.as_ref().map_or(true, |(_, cur_exactness, cur_fields_set)| {
+                                match (*cur_fields_set, new_fields_set) {
                                     (Some(cur), Some(new)) if cur != new => cur < new,
                                     _ => *cur_exactness < new_exactness,
                                 }
                             });
 
                         if new_success_is_best_match {
-                            success = Some((new_success, new_exactness, new_num_fields));
+                            success = Some((new_success, new_exactness, new_fields_set));
                         }
                     }
                 },
@@ -177,7 +164,7 @@ impl UnionValidator {
         }
         state.exactness = old_exactness;
 
-        if let Some((success, exactness, _fields)) = success {
+        if let Some((success, exactness, _fields_set)) = success {
             state.floor_exactness(exactness);
             return Ok(success);
         }

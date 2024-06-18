@@ -204,6 +204,7 @@ impl Validator for ModelValidator {
             for field_name in validated_fields_set {
                 fields_set.add(field_name)?;
             }
+            state.fields_set_count = Some(fields_set.len());
         }
 
         force_setattr(py, model, intern!(py, DUNDER_DICT), validated_dict.to_object(py))?;
@@ -214,10 +215,6 @@ impl Validator for ModelValidator {
             validated_extra.to_object(py),
         )?;
         Ok(model.into_py(py))
-    }
-
-    fn num_fields(&self) -> Option<usize> {
-        self.validator.num_fields()
     }
 
     fn get_name(&self) -> &str {
@@ -245,10 +242,13 @@ impl ModelValidator {
             } else {
                 PySet::new_bound(py, [&String::from(ROOT_FIELD)])?
             };
-            force_setattr(py, self_instance, intern!(py, DUNDER_FIELDS_SET_KEY), fields_set)?;
+            force_setattr(py, self_instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, self_instance, intern!(py, ROOT_FIELD), &output)?;
+            state.fields_set_count = Some(fields_set.len());
         } else {
-            let (model_dict, model_extra, fields_set) = output.extract(py)?;
+            let (model_dict, model_extra, fields_set): (Bound<PyAny>, Bound<PyAny>, Bound<PyAny>) =
+                output.extract(py)?;
+            state.fields_set_count = fields_set.len().ok();
             set_model_attrs(self_instance, &model_dict, &model_extra, &fields_set)?;
         }
         self.call_post_init(py, self_instance.clone(), input, state.extra())
@@ -285,11 +285,13 @@ impl ModelValidator {
             } else {
                 PySet::new_bound(py, [&String::from(ROOT_FIELD)])?
             };
-            force_setattr(py, &instance, intern!(py, DUNDER_FIELDS_SET_KEY), fields_set)?;
+            force_setattr(py, &instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, &instance, intern!(py, ROOT_FIELD), output)?;
+            state.fields_set_count = Some(fields_set.len());
         } else {
             let (model_dict, model_extra, val_fields_set) = output.extract(py)?;
             let fields_set = existing_fields_set.unwrap_or(&val_fields_set);
+            state.fields_set_count = fields_set.len().ok();
             set_model_attrs(&instance, &model_dict, &model_extra, fields_set)?;
         }
         self.call_post_init(py, instance, input, state.extra())
