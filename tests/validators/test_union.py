@@ -808,7 +808,7 @@ def test_model_and_literal_union() -> None:
     assert validator.validate_python(True) is True
 
 
-def permute_choices(choices: List[core_schema.CoreSchema]) -> List[list[core_schema.CoreSchema]]:
+def permute_choices(choices: List[core_schema.CoreSchema]) -> List[List[core_schema.CoreSchema]]:
     return [list(p) for p in permutations(choices)]
 
 
