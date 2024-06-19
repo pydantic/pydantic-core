@@ -6,7 +6,6 @@ from uuid import UUID
 
 import pytest
 from dirty_equals import IsFloat, IsInt
-from typing_extensions import TypedDict
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema, validate_core_schema
 
@@ -1018,13 +1017,6 @@ def test_dc_smart_union_with_defaults() -> None:
 
 
 def test_td_smart_union_by_fields_set() -> None:
-    class ModelA(TypedDict):
-        x: int
-
-    class ModelB(TypedDict):
-        x: int
-        y: int
-
     td_a_schema = core_schema.typed_dict_schema(
         fields={'x': core_schema.typed_dict_field(core_schema.int_schema())},
     )
@@ -1039,19 +1031,180 @@ def test_td_smart_union_by_fields_set() -> None:
     for choices in [[td_a_schema, td_b_schema], [td_b_schema, td_a_schema]]:
         validator = SchemaValidator(core_schema.union_schema(choices=choices))
 
-        assert validator.validate_python({'x': 1}).keys() == ModelA.__required_keys__
-        assert validator.validate_python({'x': '1'}).keys() == ModelA.__required_keys__
+        assert set(validator.validate_python({'x': 1}).keys()) == {'x'}
+        assert set(validator.validate_python({'x': '1'}).keys()) == {'x'}
 
-        assert validator.validate_python({'x': 1, 'y': 2}).keys() == ModelB.__required_keys__
-        assert validator.validate_python({'x': 1, 'y': '2'}).keys() == ModelB.__required_keys__
-        assert validator.validate_python({'x': '1', 'y': 2}).keys() == ModelB.__required_keys__
-        assert validator.validate_python({'x': '1', 'y': '2'}).keys() == ModelB.__required_keys__
-
-
-def test_smart_union_does_nested_model_field_counting() -> None: ...
+        assert set(validator.validate_python({'x': 1, 'y': 2}).keys()) == {'x', 'y'}
+        assert set(validator.validate_python({'x': 1, 'y': '2'}).keys()) == {'x', 'y'}
+        assert set(validator.validate_python({'x': '1', 'y': 2}).keys()) == {'x', 'y'}
+        assert set(validator.validate_python({'x': '1', 'y': '2'}).keys()) == {'x', 'y'}
 
 
-def test_smart_union_does_nested_dataclass_field_counting() -> None: ...
+def test_smart_union_does_nested_model_field_counting() -> None:
+    class SubModelA:
+        x: int = 1
+
+    class SubModelB:
+        y: int = 2
+
+    class ModelA:
+        sub: SubModelA
+
+    class ModelB:
+        sub: SubModelB
+
+    model_a_schema = core_schema.model_schema(
+        ModelA,
+        core_schema.model_fields_schema(
+            fields={
+                'sub': core_schema.model_field(
+                    core_schema.model_schema(
+                        SubModelA,
+                        core_schema.model_fields_schema(
+                            fields={
+                                'x': core_schema.model_field(
+                                    core_schema.with_default_schema(core_schema.int_schema(), default=1)
+                                )
+                            }
+                        ),
+                    )
+                )
+            }
+        ),
+    )
+
+    model_b_schema = core_schema.model_schema(
+        ModelB,
+        core_schema.model_fields_schema(
+            fields={
+                'sub': core_schema.model_field(
+                    core_schema.model_schema(
+                        SubModelB,
+                        core_schema.model_fields_schema(
+                            fields={
+                                'y': core_schema.model_field(
+                                    core_schema.with_default_schema(core_schema.int_schema(), default=2)
+                                )
+                            }
+                        ),
+                    )
+                )
+            }
+        ),
+    )
+
+    for choices in [[model_a_schema, model_b_schema], [model_b_schema, model_a_schema]]:
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
+
+        assert isinstance(validator.validate_python({'sub': {'x': 1}}), ModelA)
+        assert isinstance(validator.validate_python({'sub': {'y': 3}}), ModelB)
+
+        # defaults to leftmost choice if there's a tie
+        assert isinstance(validator.validate_python({'sub': {}}), choices[0]['cls'])
 
 
-def test_smart_union_does_nested_typed_dict_field_counting() -> None: ...
+def test_smart_union_does_nested_dataclass_field_counting() -> None:
+    @dataclass
+    class SubModelA:
+        x: int = 1
+
+    @dataclass
+    class SubModelB:
+        y: int = 2
+
+    @dataclass
+    class ModelA:
+        sub: SubModelA
+
+    @dataclass
+    class ModelB:
+        sub: SubModelB
+
+    dc_a_schema = core_schema.dataclass_schema(
+        ModelA,
+        core_schema.dataclass_args_schema(
+            'ModelA',
+            [
+                core_schema.dataclass_field(
+                    'sub',
+                    core_schema.with_default_schema(
+                        core_schema.dataclass_schema(
+                            SubModelA,
+                            core_schema.dataclass_args_schema(
+                                'SubModelA',
+                                [
+                                    core_schema.dataclass_field(
+                                        'x', core_schema.with_default_schema(core_schema.int_schema(), default=1)
+                                    )
+                                ],
+                            ),
+                            ['x'],
+                        ),
+                        default=SubModelA(),
+                    ),
+                )
+            ],
+        ),
+        ['sub'],
+    )
+
+    dc_b_schema = core_schema.dataclass_schema(
+        ModelB,
+        core_schema.dataclass_args_schema(
+            'ModelB',
+            [
+                core_schema.dataclass_field(
+                    'sub',
+                    core_schema.with_default_schema(
+                        core_schema.dataclass_schema(
+                            SubModelB,
+                            core_schema.dataclass_args_schema(
+                                'SubModelB',
+                                [
+                                    core_schema.dataclass_field(
+                                        'y', core_schema.with_default_schema(core_schema.int_schema(), default=2)
+                                    )
+                                ],
+                            ),
+                            ['y'],
+                        ),
+                        default=SubModelB(),
+                    ),
+                )
+            ],
+        ),
+        ['sub'],
+    )
+
+    for choices in [[dc_a_schema, dc_b_schema], [dc_b_schema, dc_a_schema]]:
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
+
+        assert isinstance(validator.validate_python({'sub': {'x': 1}}), ModelA)
+        assert isinstance(validator.validate_python({'sub': {'y': 3}}), ModelB)
+
+        # defaults to leftmost choice if there's a tie
+        assert isinstance(validator.validate_python({'sub': {}}), choices[0]['cls'])
+
+
+def test_smart_union_does_nested_typed_dict_field_counting() -> None:
+    td_a_schema = core_schema.typed_dict_schema(
+        fields={
+            'sub': core_schema.typed_dict_field(
+                core_schema.typed_dict_schema(fields={'x': core_schema.typed_dict_field(core_schema.int_schema())})
+            )
+        }
+    )
+
+    td_b_schema = core_schema.typed_dict_schema(
+        fields={
+            'sub': core_schema.typed_dict_field(
+                core_schema.typed_dict_schema(fields={'y': core_schema.typed_dict_field(core_schema.int_schema())})
+            )
+        }
+    )
+
+    for choices in [[td_a_schema, td_b_schema], [td_b_schema, td_a_schema]]:
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
+
+        assert set(validator.validate_python({'sub': {'x': 1}})['sub'].keys()) == {'x'}
+        assert set(validator.validate_python({'sub': {'y': 2}})['sub'].keys()) == {'y'}
