@@ -1199,10 +1199,10 @@ def test_nested_unions_bubble_up_field_count() -> None:
         w3: int = 0
 
     class ModelA:
-        a: SubModelX | SubModelY
+        a: Union[SubModelX, SubModelY]
 
     class ModelB:
-        b: SubModelZ | SubModelW
+        b: Union[SubModelZ, SubModelW]
 
     model_x_schema = core_schema.model_schema(
         SubModelX,
