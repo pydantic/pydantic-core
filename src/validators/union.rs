@@ -144,6 +144,12 @@ impl UnionValidator {
                         let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
                         let new_fields_set = state.fields_set_count;
 
+                        // we use both the exactness and the fields_set_count to determine the best union member match
+                        // if fields_set_count is available for the current best match and the new candidate, we use this
+                        // as the primary metric. If the new fields_set_count is greater, the new candidate is better.
+                        // if the fields_set_count is the same, we use the exactness as a tie breaker to determine the best match.
+                        // if the fields_set_count is not available for either the current best match or the new candidate,
+                        // we use the exactness to determine the best match.
                         let new_success_is_best_match: bool =
                             success.as_ref().map_or(true, |(_, cur_exactness, cur_fields_set)| {
                                 match (*cur_fields_set, new_fields_set) {
@@ -176,6 +182,8 @@ impl UnionValidator {
             state.fields_set_count = match (state.fields_set_count, fields_set_count) {
                 (Some(cur), Some(new)) => Some(cur + new),
                 (None, Some(new)) => Some(new),
+                // if both are None, or if new is None, we keep state.fields_set_count = None
+                // because for some validators, fields_set_count is not relevant
                 _ => state.fields_set_count,
             };
             return Ok(success);

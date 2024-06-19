@@ -344,7 +344,7 @@ impl Validator for DataclassArgsValidator {
             }
         }
 
-        state.fields_set_count = Some(fields_set_count + state.fields_set_count.unwrap_or(0));
+        state.add_fields_set(fields_set_count);
 
         if errors.is_empty() {
             if let Some(init_only_args) = init_only_args {

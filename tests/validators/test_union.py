@@ -1208,3 +1208,6 @@ def test_smart_union_does_nested_typed_dict_field_counting() -> None:
 
         assert set(validator.validate_python({'sub': {'x': 1}})['sub'].keys()) == {'x'}
         assert set(validator.validate_python({'sub': {'y': 2}})['sub'].keys()) == {'y'}
+
+
+def test_nested_unions_bubble_up_field_count() -> None: ...

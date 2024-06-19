@@ -70,6 +70,10 @@ impl<'a, 'py> ValidationState<'a, 'py> {
         }
     }
 
+    pub fn add_fields_set(&mut self, fields_set_count: usize) {
+        *self.fields_set_count.get_or_insert(0) += fields_set_count;
+    }
+
     pub fn cache_str(&self) -> StringCacheMode {
         self.extra.cache_str
     }
