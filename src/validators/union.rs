@@ -113,9 +113,7 @@ impl UnionValidator {
         let strict = state.strict_or(self.strict);
         let mut errors = MaybeErrors::new(self.custom_error.as_ref());
 
-        // we use this to track the validation against the most compatible union member
-        // up to the current point
-        let mut success: Option<(Py<PyAny>, Exactness, Option<usize>)> = None;
+        let mut best_match: Option<(Py<PyAny>, Exactness, Option<usize>)> = None;
 
         for (choice, label) in &self.choices {
             let state = &mut state.rebind_extra(|extra| {
@@ -151,7 +149,7 @@ impl UnionValidator {
                         // if the fields_set_count is not available for either the current best match or the new candidate,
                         // we use the exactness to determine the best match.
                         let new_success_is_best_match: bool =
-                            success
+                            best_match
                                 .as_ref()
                                 .map_or(true, |(_, cur_exactness, cur_fields_set_count)| {
                                     match (*cur_fields_set_count, new_fields_set_count) {
@@ -161,13 +159,13 @@ impl UnionValidator {
                                 });
 
                         if new_success_is_best_match {
-                            success = Some((new_success, new_exactness, new_fields_set_count));
+                            best_match = Some((new_success, new_exactness, new_fields_set_count));
                         }
                     }
                 },
                 Err(ValError::LineErrors(lines)) => {
                     // if we don't yet know this validation will succeed, record the error
-                    if success.is_none() {
+                    if best_match.is_none() {
                         errors.push(choice, label.as_deref(), lines);
                     }
                 }
@@ -179,12 +177,12 @@ impl UnionValidator {
         state.exactness = old_exactness;
         state.fields_set_count = old_fields_set_count;
 
-        if let Some((success, exactness, fields_set_count)) = success {
+        if let Some((best_match, exactness, fields_set_count)) = best_match {
             state.floor_exactness(exactness);
             if let Some(count) = fields_set_count {
                 state.add_fields_set(count);
             }
-            return Ok(success);
+            return Ok(best_match);
         }
 
         // no matches, build errors
