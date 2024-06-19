@@ -171,8 +171,13 @@ impl UnionValidator {
         state.exactness = old_exactness;
         state.fields_set_count = old_fields_set_count;
 
-        if let Some((success, exactness, _fields_set)) = success {
+        if let Some((success, exactness, fields_set_count)) = success {
             state.floor_exactness(exactness);
+            state.fields_set_count = match (state.fields_set_count, fields_set_count) {
+                (Some(cur), Some(new)) => Some(cur + new),
+                (None, Some(new)) => Some(new),
+                _ => state.fields_set_count,
+            };
             return Ok(success);
         }
 
