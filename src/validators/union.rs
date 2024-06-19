@@ -142,7 +142,7 @@ impl UnionValidator {
                         debug_assert_ne!(state.exactness, None);
 
                         let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
-                        let new_fields_set = state.fields_set_count;
+                        let new_fields_set_count = state.fields_set_count;
 
                         // we use both the exactness and the fields_set_count to determine the best union member match
                         // if fields_set_count is available for the current best match and the new candidate, we use this
@@ -151,15 +151,17 @@ impl UnionValidator {
                         // if the fields_set_count is not available for either the current best match or the new candidate,
                         // we use the exactness to determine the best match.
                         let new_success_is_best_match: bool =
-                            success.as_ref().map_or(true, |(_, cur_exactness, cur_fields_set)| {
-                                match (*cur_fields_set, new_fields_set) {
-                                    (Some(cur), Some(new)) if cur != new => cur < new,
-                                    _ => *cur_exactness < new_exactness,
-                                }
-                            });
+                            success
+                                .as_ref()
+                                .map_or(true, |(_, cur_exactness, cur_fields_set_count)| {
+                                    match (*cur_fields_set_count, new_fields_set_count) {
+                                        (Some(cur), Some(new)) if cur != new => cur < new,
+                                        _ => *cur_exactness < new_exactness,
+                                    }
+                                });
 
                         if new_success_is_best_match {
-                            success = Some((new_success, new_exactness, new_fields_set));
+                            success = Some((new_success, new_exactness, new_fields_set_count));
                         }
                     }
                 },
