@@ -3977,6 +3977,7 @@ ErrorType = Literal[
     'decimal_max_places',
     'decimal_whole_digits',
     'complex_type',
+    'complex_parsing',
 ]
 
 
