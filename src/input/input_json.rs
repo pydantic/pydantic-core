@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::collections::HashSet;
 
 use jiter::{JsonArray, JsonObject, JsonValue, LazyIndexMap};
 use pyo3::prelude::*;
@@ -9,7 +8,9 @@ use speedate::MicrosecondsPrecisionOverflowBehavior;
 use strum::EnumMessage;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
+use crate::input::return_enums::EitherComplex;
 use crate::lookup_key::{LookupKey, LookupPath};
+use crate::validators::complex::string_to_complex;
 use crate::validators::decimal::create_decimal;
 
 use super::datetime::{
@@ -17,7 +18,7 @@ use super::datetime::{
     float_as_time, int_as_datetime, int_as_duration, int_as_time, EitherDate, EitherDateTime, EitherTime,
 };
 use super::input_abstract::{ConsumeIterator, Never, ValMatch};
-use super::return_enums::{EitherComplex, ValidationMatch};
+use super::return_enums::ValidationMatch;
 use super::shared::{float_as_int, int_as_bool, str_as_bool, str_as_float, str_as_int};
 use super::{
     Arguments, BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericIterator, Input,
@@ -298,32 +299,15 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         }
     }
 
-    fn validate_complex(&self) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
-        let default = JsonValue::Float(0.0);
+    fn validate_complex(&self, py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
         match self {
-            JsonValue::Object(object) => {
-                let mut allowed_keys = HashSet::from(["real".to_owned(), "imag".to_owned()]);
-                for key in object.keys() {
-                    let k = &key.to_string();
-                    if !allowed_keys.remove(k) {
-                        return Err(ValError::new(ErrorTypeDefaults::ComplexType, self));
-                    }
-                }
-                let real = object.get("real").unwrap_or(&default).validate_float(true);
-                let imag = object.get("imag").unwrap_or(&default).validate_float(true);
-                if let Ok(re) = real {
-                    if let Ok(im) = imag {
-                        return Ok(ValidationMatch::strict(EitherComplex::Complex([
-                            re.into_inner().as_f64(),
-                            im.into_inner().as_f64(),
-                        ])));
-                    }
-                }
-                Err(ValError::new(ErrorTypeDefaults::ComplexType, self))
-            }
+            JsonValue::Str(s) => Ok(ValidationMatch::strict(EitherComplex::Py(string_to_complex(
+                &PyString::new_bound(py, s),
+                self,
+            )?))),
             JsonValue::Float(f) => Ok(ValidationMatch::strict(EitherComplex::Complex([*f, 0.0]))),
             JsonValue::Int(f) => Ok(ValidationMatch::strict(EitherComplex::Complex([(*f) as f64, 0.0]))),
-            _ => Err(ValError::new(ErrorTypeDefaults::ComplexType, self)),
+            _ => Err(ValError::new(ErrorTypeDefaults::ComplexParsing, self)),
         }
     }
 }
@@ -456,7 +440,7 @@ impl<'py> Input<'py> for str {
         bytes_as_timedelta(self, self.as_bytes(), microseconds_overflow_behavior).map(ValidationMatch::lax)
     }
 
-    fn validate_complex(&self) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+    fn validate_complex(&self, _py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
         Err(ValError::new(ErrorTypeDefaults::ComplexType, self))
     }
 }

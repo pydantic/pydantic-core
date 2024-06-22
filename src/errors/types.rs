@@ -423,6 +423,7 @@ error_types! {
         whole_digits: {ctx_type: u64, ctx_fn: field_from_context},
     },
     // Complex errors
+    ComplexParsing{},
     ComplexType {},
 }
 
@@ -566,7 +567,8 @@ impl ErrorType {
             Self::DecimalMaxDigits {..} => "Decimal input should have no more than {max_digits} digit{expected_plural} in total",
             Self::DecimalMaxPlaces {..} => "Decimal input should have no more than {decimal_places} decimal place{expected_plural}",
             Self::DecimalWholeDigits {..} => "Decimal input should have no more than {whole_digits} digit{expected_plural} before the decimal point",
-            Self::ComplexType { .. } => "Input should be a valid dictionary with exactly two keys, 'real' and 'imag', with float values",
+            Self::ComplexParsing {..} => "Input should be a valid complex string following the rule at https://docs.python.org/3/library/functions.html#complex",
+            Self::ComplexType { .. } => "Input should be a valid complex number",
         }
     }
 

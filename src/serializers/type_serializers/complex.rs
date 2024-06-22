@@ -3,8 +3,6 @@ use std::borrow::Cow;
 use pyo3::prelude::*;
 use pyo3::types::{PyComplex, PyDict};
 
-use serde::ser::SerializeMap;
-
 use crate::definitions::DefinitionsBuilder;
 
 use super::{infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerMode, TypeSerializer};
@@ -37,10 +35,17 @@ impl TypeSerializer for ComplexSerializer {
         match value.downcast::<PyComplex>() {
             Ok(py_complex) => match extra.mode {
                 SerMode::Json => {
-                    let new_dict = PyDict::new_bound(py);
-                    let _ = new_dict.set_item("real", py_complex.real());
-                    let _ = new_dict.set_item("imag", py_complex.imag());
-                    Ok(new_dict.into_py(py))
+                    let re = py_complex.real();
+                    let im = py_complex.imag();
+                    let mut s = format!("{im}j");
+                    if re != 0.0 {
+                        let mut sign = "";
+                        if im >= 0.0 {
+                            sign = "+";
+                        }
+                        s = format!("{re}{sign}{s}");
+                    }
+                    Ok(s.into_py(py))
                 }
                 _ => Ok(value.into_py(py)),
             },
@@ -65,10 +70,17 @@ impl TypeSerializer for ComplexSerializer {
     ) -> Result<S::Ok, S::Error> {
         match value.downcast::<PyComplex>() {
             Ok(py_complex) => {
-                let mut map = serializer.serialize_map(Some(2))?;
-                map.serialize_entry(&"real", &py_complex.real())?;
-                map.serialize_entry(&"imag", &py_complex.imag())?;
-                map.end()
+                let re = py_complex.real();
+                let im = py_complex.imag();
+                let mut s = format!("{im}j");
+                if re != 0.0 {
+                    let mut sign = "";
+                    if im >= 0.0 {
+                        sign = "+";
+                    }
+                    s = format!("{re}{sign}{s}");
+                }
+                Ok(serializer.collect_str::<String>(&s)?)
             }
             Err(_) => {
                 extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;

@@ -15,6 +15,7 @@ use speedate::MicrosecondsPrecisionOverflowBehavior;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::tools::{extract_i64, safe_repr};
+use crate::validators::complex::string_to_complex;
 use crate::validators::decimal::{create_decimal, get_decimal_type};
 use crate::validators::Exactness;
 use crate::ArgsKwargs;
@@ -594,33 +595,11 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self))
     }
 
-    fn validate_complex<'a>(&'a self) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+    fn validate_complex<'a>(&'a self, _py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
         if let Ok(complex) = self.downcast::<PyComplex>() {
             return Ok(ValidationMatch::exact(EitherComplex::Py(complex.to_owned())));
-        } else if let Ok(complex) = self.downcast::<PyDict>() {
-            let re = complex.get_item("real");
-            let im = complex.get_item("imag");
-            if complex.len() > 2 || re.is_err() && im.is_err() {
-                return Err(ValError::new(ErrorTypeDefaults::ComplexType, self));
-            }
-            let mut res = [0.0, 0.0];
-            if let Some(v) = re.unwrap_or(None) {
-                if v.is_exact_instance_of::<PyFloat>() || v.is_exact_instance_of::<PyInt>() {
-                    let u = v.extract::<f64>();
-                    res[0] = u.unwrap();
-                } else {
-                    return Err(ValError::new(ErrorTypeDefaults::ComplexType, self));
-                }
-            }
-            if let Some(v) = im.unwrap_or(None) {
-                if v.is_exact_instance_of::<PyFloat>() || v.is_exact_instance_of::<PyInt>() {
-                    let u = v.extract::<f64>();
-                    res[1] = u.unwrap();
-                } else {
-                    return Err(ValError::new(ErrorTypeDefaults::ComplexType, self));
-                }
-            }
-            return Ok(ValidationMatch::exact(EitherComplex::Complex(res)));
+        } else if let Ok(s) = self.downcast::<PyString>() {
+            return Ok(ValidationMatch::exact(EitherComplex::Py(string_to_complex(s, self)?)));
         } else if self.is_exact_instance_of::<PyFloat>() {
             return Ok(ValidationMatch::exact(EitherComplex::Complex([
                 self.extract::<f64>().unwrap(),

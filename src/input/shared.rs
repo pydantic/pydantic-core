@@ -8,7 +8,6 @@ use jiter::{JsonErrorType, NumberInt};
 
 use crate::errors::{ErrorTypeDefaults, ValError, ValResult};
 
-use super::return_enums::EitherComplex;
 use super::{EitherFloat, EitherInt, Input};
 static ENUM_META_OBJECT: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
@@ -204,10 +203,4 @@ pub fn decimal_as_int<'py>(
         return Err(ValError::new(ErrorTypeDefaults::IntFromFloat, input));
     }
     Ok(EitherInt::Py(numerator))
-}
-
-/// parse a complex as a complex
-pub fn str_as_complex<'py>(input: &(impl Input<'py> + ?Sized), _str: &str) -> ValResult<EitherComplex<'py>> {
-    // TODO
-    Err(ValError::new(ErrorTypeDefaults::ComplexType, input))
 }

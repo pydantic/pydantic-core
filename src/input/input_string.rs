@@ -7,6 +7,7 @@ use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult}
 use crate::input::py_string_str;
 use crate::lookup_key::{LookupKey, LookupPath};
 use crate::tools::safe_repr;
+use crate::validators::complex::string_to_complex;
 use crate::validators::decimal::create_decimal;
 
 use super::datetime::{
@@ -14,7 +15,7 @@ use super::datetime::{
 };
 use super::input_abstract::{Never, ValMatch};
 use super::return_enums::EitherComplex;
-use super::shared::{str_as_bool, str_as_complex, str_as_float, str_as_int};
+use super::shared::{str_as_bool, str_as_float, str_as_int};
 use super::{
     Arguments, BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericIterator, Input,
     KeywordArgs, ValidatedDict, ValidationMatch,
@@ -219,9 +220,9 @@ impl<'py> Input<'py> for StringMapping<'py> {
         }
     }
 
-    fn validate_complex(&self) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+    fn validate_complex(&self, _py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
         match self {
-            Self::String(s) => str_as_complex(self, py_string_str(s)?).map(ValidationMatch::strict),
+            Self::String(s) => Ok(ValidationMatch::strict(EitherComplex::Py(string_to_complex(s, self)?))),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::ComplexType, self)),
         }
     }
