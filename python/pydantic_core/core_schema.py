@@ -763,7 +763,8 @@ def complex_schema(
 
     schema = core_schema.complex_schema()
     v = SchemaValidator(schema)
-    assert v.validate_python({'real': 1, 'imag': 2}) == complex(1, 2)
+    assert v.validate_python('1+2j') == complex(1, 2)
+    assert v.validate_python(complex(1, 2)) == complex(1, 2)
     ```
 
     Args:

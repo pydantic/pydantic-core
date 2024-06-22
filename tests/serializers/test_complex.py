@@ -12,7 +12,7 @@ from pydantic_core import SchemaSerializer, core_schema
         (complex(0, -1.23), '-1.23j'),
         (complex(1.5, 0), '1.5+0j'),
         (complex(1, 2), '1+2j'),
-        (complex(0, 1), 'j'),
+        (complex(0, 1), '1j'),
         (complex(0, 1e-500), '0j'),
         (complex(-float('inf'), 2), '-inf+2j'),
         (complex(float('inf'), 2), 'inf+2j'),
