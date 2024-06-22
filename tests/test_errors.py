@@ -391,7 +391,7 @@ all_errors = [
         None,
     ),
     (
-        'complex_parse',
+        'complex_parsing',
         "Input should be a valid complex string following the rule at https://docs.python.org/3/library/functions.html#complex",
         None,
     ),
