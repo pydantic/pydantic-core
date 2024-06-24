@@ -440,12 +440,12 @@ jobs:
           # arm pypy and older pythons which can't be run on the arm hardware for PGO
           #
           # FIXME https://github.com/PyO3/maturin-action/issues/275
-          # cffi prevents `maturin-action` working on Windows 3.13 for now for the optimized build
+          # cffi prevents `maturin-action` working on macOS 3.13 for now for the optimized build
           - os: macos
             target: x86_64
           - os: macos
             target: aarch64
-            interpreter: 3.8 3.9 pypy3.9 pypy3.10 3.13
+            interpreter: 3.8 3.9 pypy3.9 pypy3.10 # 3.13
 
           # windows;
           # x86_64 pypy builds are not PGO optimized
@@ -454,13 +454,15 @@ jobs:
           #
           # FIXME https://github.com/PyO3/maturin-action/issues/275
           # cffi prevents `maturin-action` working on Windows 3.13 for now for the optimized build
+          # AND FIXME https://github.com/PyO3/python3-dll-a/issues/69
+          # prevents older Python versions from building 3.13
           - os: windows
             target: x86_64
-            interpreter: pypy3.9 pypy3.10 3.13
+            interpreter: pypy3.9 pypy3.10 # 3.13
           - os: windows
             target: i686
             python-architecture: x86
-            interpreter: 3.8 3.9 3.10 3.11 3.12 3.13
+            interpreter: 3.8 3.9 3.10 3.11 3.12 # 3.13
           # FIXME aarch64 builds broken, see https://github.com/PyO3/maturin/issues/2110
           # - os: windows
           #   target: aarch64
