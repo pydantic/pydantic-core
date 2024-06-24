@@ -156,8 +156,9 @@ checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 
 [[package]]
 name = "jiter"
-version = "0.4.2"
-source = "git+https://github.com/pydantic/jiter?branch=dh/pyo3-0.22#e1b18fec7d4e0d7747f9767a50874bcbe00468e0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02e23549143ef50eddffd46ba8cd0229b0a4500aef7518cf2eb0f41c9a09d22b"
 dependencies = [
  "ahash",
  "bitvec",
@@ -303,7 +304,8 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.22.0"
-source = "git+https://github.com/pyo3/pyo3?branch=release-0.22#ec6d4f8f1b477cbd5b968189f993d38c7330761a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1962a33ed2a201c637fc14a4e0fd4e06e6edfdeee6a5fede0dab55507ad74cf7"
 dependencies = [
  "cfg-if",
  "indoc",
@@ -321,7 +323,8 @@ dependencies = [
 [[package]]
 name = "pyo3-build-config"
 version = "0.22.0"
-source = "git+https://github.com/pyo3/pyo3?branch=release-0.22#ec6d4f8f1b477cbd5b968189f993d38c7330761a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab7164b2202753bd33afc7f90a10355a719aa973d1f94502c50d06f3488bc420"
 dependencies = [
  "once_cell",
  "python3-dll-a",
@@ -331,7 +334,8 @@ dependencies = [
 [[package]]
 name = "pyo3-ffi"
 version = "0.22.0"
-source = "git+https://github.com/pyo3/pyo3?branch=release-0.22#ec6d4f8f1b477cbd5b968189f993d38c7330761a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6424906ca49013c0829c5c1ed405e20e2da2dc78b82d198564880a704e6a7b7"
 dependencies = [
  "libc",
  "pyo3-build-config",
@@ -340,7 +344,8 @@ dependencies = [
 [[package]]
 name = "pyo3-macros"
 version = "0.22.0"
-source = "git+https://github.com/pyo3/pyo3?branch=release-0.22#ec6d4f8f1b477cbd5b968189f993d38c7330761a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82b2f19e153122d64afd8ce7aaa72f06a00f52e34e1d1e74b6d71baea396460a"
 dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
@@ -351,7 +356,8 @@ dependencies = [
 [[package]]
 name = "pyo3-macros-backend"
 version = "0.22.0"
-source = "git+https://github.com/pyo3/pyo3?branch=release-0.22#ec6d4f8f1b477cbd5b968189f993d38c7330761a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd698c04cac17cf0fe63d47790ab311b8b25542f5cb976b65c374035c50f1eef"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",

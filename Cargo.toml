@@ -46,7 +46,7 @@ base64 = "0.21.7"
 num-bigint = "0.4.4"
 python3-dll-a = "0.2.7"
 uuid = "1.8.0"
-jiter = { version = "0.4.1", features = ["python"] }
+jiter = { version = "0.5", features = ["python"] }
 
 [lib]
 name = "_pydantic_core"
@@ -110,8 +110,3 @@ too_many_lines = "allow"
 unnecessary_wraps = "allow"
 unused_self = "allow"
 used_underscore_binding = "allow"
-
-[patch.crates-io]
-pyo3 = { git = "https://github.com/pyo3/pyo3", branch = "release-0.22" }
-pyo3-build-config = { git = "https://github.com/pyo3/pyo3", branch = "release-0.22" }
-jiter = { git = "https://github.com/pydantic/jiter", branch = "dh/pyo3-0.22" }
